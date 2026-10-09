@@ -11,6 +11,7 @@ import hashlib
 import json
 import re
 from collections.abc import Mapping, Sequence
+from copy import deepcopy
 
 from hashmarks.operation_contract import operation_schema
 from hashmarks.paths import normalize_relative_path
@@ -18,6 +19,9 @@ from hashmarks.paths import normalize_relative_path
 _FILE_REVISION = re.compile(r"[0-9a-f]{64}\Z")
 _MAX_MEMBERS = 32
 EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA = "hashmarks.external-diagnostic-observation.v1"
+DIAGNOSTIC_SOURCE_REVISION_EVIDENCE_SCHEMA = (
+    "hashmarks.diagnostic-source-revision-evidence.v1"
+)
 
 
 def diagnostic_identity(row: Mapping[str, object]) -> str:
@@ -33,15 +37,26 @@ def diagnostic_identity(row: Mapping[str, object]) -> str:
     return "sha256:" + hashlib.sha256(raw).hexdigest()
 
 
+def _revision_scope(scope_paths: object) -> set[str]:
+    """Resolve the explicit scope admitted for producer revision claims."""
+    if (
+        not isinstance(scope_paths, Sequence)
+        or isinstance(scope_paths, (str, bytes))
+        or any(not isinstance(path, str) for path in scope_paths)
+    ):
+        raise ValueError("scope_paths must be a sequence of strings")
+    return {normalize_relative_path(path, allow_root=False) for path in scope_paths}
+
+
 def normalize_source_revision_claims(
-    claims: Mapping[str, str] | None, scope_paths: Sequence[str]
+    claims: object, scope_paths: object
 ) -> dict[str, str] | None:
     """Validate explicit producer claims without inventing missing revisions."""
     if claims is None:
         return None
     if not isinstance(claims, Mapping) or len(claims) > _MAX_MEMBERS:
         raise ValueError("source_revisions must be a mapping of at most 32 members")
-    scope = {normalize_relative_path(path, allow_root=False) for path in scope_paths}
+    scope = _revision_scope(scope_paths)
     normalized: dict[str, str] = {}
     for raw_path, revision in claims.items():
         if not isinstance(raw_path, str):
@@ -55,6 +70,41 @@ def normalize_source_revision_claims(
             raise ValueError("source_revisions values must be 64 lowercase hex digits")
         normalized[path] = revision
     return dict(sorted(normalized.items()))
+
+
+def diagnostic_revision_delta(
+    before: Mapping[str, object], after: Mapping[str, object]
+) -> dict[str, object]:
+    """Keep producer revision changes separate from diagnostic fact identity."""
+    prior = normalize_source_revision_claims(
+        before.get("source_revisions"), before.get("scope_paths", ())
+    )
+    later = normalize_source_revision_claims(
+        after.get("source_revisions"), after.get("scope_paths", ())
+    )
+    return {
+        "before": prior,
+        "after": later,
+        "changed": prior != later,
+        "claim_authority": "producer-claimed",
+    }
+
+
+def diagnostic_revision_claim_reason(
+    diagnostic: Mapping[str, object], member: Mapping[str, object]
+) -> str | None:
+    """A producer's contradictory revision cannot support source correspondence."""
+    try:
+        claims = normalize_source_revision_claims(
+            diagnostic.get("source_revisions"), diagnostic.get("scope_paths", ())
+        )
+    except (TypeError, ValueError):
+        return "invalid-diagnostic-source-revisions"
+    path = member.get("path")
+    claimed = (claims or {}).get(path) if isinstance(path, str) else None
+    if claimed is not None and claimed != member.get("member_revision"):
+        return "diagnostic-source-revision-mismatch"
+    return None
 
 
 def _source_member_qualified(
@@ -128,7 +178,7 @@ def _member_comparison(
             state, reason = "unknown", "unsupported-source-observation-schema"
         elif not _source_member_qualified(source, member, path):
             state, reason = "unknown", "source-member-not-revision-qualified"
-        elif source.get("freshness") != "current":
+        elif source.get("freshness") not in ("current", "unknown"):
             state, reason = "unknown", "source-observation-freshness-unproven"
         elif claimed != member["member_revision"]:
             state, reason = "different", "claimed-and-observed-member-revisions-differ"
@@ -146,13 +196,29 @@ def _member_comparison(
     }
 
 
+def _revision_summary(rows: Sequence[Mapping[str, object]]) -> dict[str, object]:
+    """Account for every declared member without upgrading repository freshness."""
+    return {
+        "matching_count": sum(row["state"] == "matching" for row in rows),
+        "different_count": sum(row["state"] == "different" for row in rows),
+        "unknown_count": sum(row["state"] == "unknown" for row in rows),
+        "coverage": (
+            "unknown"
+            if not rows
+            else "complete-for-declared-members"
+            if all(row["state"] != "unknown" for row in rows)
+            else "incomplete"
+        ),
+    }
+
+
 def diagnostic_source_revision_evidence(
     diagnostic: Mapping[str, object],
     source_observations: Sequence[Mapping[str, object]],
 ) -> dict[str, object]:
     """Compare claimed source revisions with explicitly retained member evidence.
 
-    A match means only that producer-claimed revision bytes equal one fresh,
+    A match means only that producer-claimed revision bytes equal one stable,
     caller-supplied source observation. It cannot prove an LSP executed against
     those bytes, or that verification is valid for the repository as a whole.
     """
@@ -183,25 +249,110 @@ def diagnostic_source_revision_evidence(
         if not isinstance(row, Mapping) or row.get("path") not in claims_by_path
     )
     return {
-        "schema": "hashmarks.diagnostic-source-revision-evidence.v1",
+        "schema": DIAGNOSTIC_SOURCE_REVISION_EVIDENCE_SCHEMA,
         "repository_identity": diagnostic.get("repository_identity"),
         "diagnostic_generation": diagnostic.get("codemap_generation"),
         "producer": diagnostic.get("producer"),
         "collection": diagnostic.get("collection"),
         "diagnostic_outcome": diagnostic.get("outcome"),
         "rows": rows,
-        "matching_count": sum(row["state"] == "matching" for row in rows),
-        "different_count": sum(row["state"] == "different" for row in rows),
-        "unknown_count": sum(row["state"] == "unknown" for row in rows),
+        **_revision_summary(rows),
         "unclaimed_diagnostic_count": unbound,
         "ignored_source_observation_count": unused,
-        "coverage": (
-            "unknown"
-            if not claims_by_path
-            else "complete-for-declared-members"
-            if all(row["state"] != "unknown" for row in rows)
-            else "incomplete"
-        ),
         "authority": "descriptive-source-revision-correspondence-only",
         "execution_effect": "none",
     }
+
+
+def _validate_compared_revision_row(row: Mapping[str, object], generation: int) -> None:
+    observed = row.get("observed_member_revision")
+    identity = row.get("source_observation_identity")
+    source_generation = row.get("source_generation")
+    required = (
+        isinstance(observed, str) and bool(_FILE_REVISION.fullmatch(observed)),
+        isinstance(identity, str)
+        and identity.startswith("sha256:")
+        and bool(_FILE_REVISION.fullmatch(identity[7:])),
+        type(source_generation) is int and source_generation >= 0,
+        row.get("source_freshness") in ("current", "unknown"),
+        row.get("generation_relation")
+        == ("same" if source_generation == generation else "different"),
+    )
+    if not all(required):
+        raise ValueError("compared source member is not revision-qualified")
+    matching = row["producer_claimed_member_revision"] == observed
+    if row["state"] != ("matching" if matching else "different"):
+        raise ValueError("source revision comparison contradicts member revisions")
+
+
+def _validate_revision_row(row: Mapping[str, object], generation: int) -> None:
+    path = row.get("path")
+    claimed = row.get("producer_claimed_member_revision")
+    if (
+        not isinstance(path, str)
+        or normalize_relative_path(path, allow_root=False) != path
+    ):
+        raise ValueError("revision comparison paths must be canonical")
+    if not isinstance(claimed, str) or not _FILE_REVISION.fullmatch(claimed):
+        raise ValueError("invalid producer revision claim")
+    if row.get("state") not in ("matching", "different", "unknown"):
+        raise ValueError("invalid revision comparison state")
+    if (
+        row.get("claim_authority") != "producer-claimed"
+        or row.get("comparison_authority")
+        != "source-local-caller-supplied-observations"
+    ):
+        raise ValueError("invalid revision comparison authority")
+    if row["state"] != "unknown":
+        _validate_compared_revision_row(row, generation)
+
+
+def _validated_revision_rows(
+    rows: object, generation: int
+) -> Sequence[Mapping[str, object]]:
+    """Admit one bounded, unambiguous row per producer-claimed member."""
+    if not isinstance(rows, list) or len(rows) > _MAX_MEMBERS:
+        raise ValueError("revision rows must be a list of at most 32 members")
+    for row in rows:
+        if not isinstance(row, Mapping):
+            raise ValueError("revision rows must contain mappings")
+        _validate_revision_row(row, generation)
+    if len({row["path"] for row in rows}) != len(rows):
+        raise ValueError("duplicate revision comparison paths")
+    return rows
+
+
+def validated_diagnostic_source_revision_evidence(
+    payload: Mapping[str, object],
+) -> dict[str, object]:
+    """Validate the comparison's own bounded semantics, never producer execution."""
+    generation = payload.get("diagnostic_generation")
+    if type(generation) is not int or generation < 0:
+        raise ValueError("invalid diagnostic generation")
+    rows = _validated_revision_rows(payload.get("rows"), generation)
+    summary = _revision_summary(rows)
+    _validate_revision_summary(payload, summary)
+    return {
+        "source_revision_rows": deepcopy(rows),
+        "source_revision_coverage": summary["coverage"],
+    }
+
+
+def _validate_revision_summary(
+    payload: Mapping[str, object], summary: Mapping[str, object]
+) -> None:
+    """Counts preserve both compared and explicitly unclaimed evidence."""
+    for field in (
+        "matching_count",
+        "different_count",
+        "unknown_count",
+        "unclaimed_diagnostic_count",
+        "ignored_source_observation_count",
+    ):
+        count = payload.get(field)
+        if type(count) is not int or count < 0:
+            raise ValueError("revision evidence counts must be nonnegative integers")
+        if field in summary and count != summary[field]:
+            raise ValueError("revision comparison counts do not account for rows")
+    if payload.get("coverage") != summary["coverage"]:
+        raise ValueError("revision comparison coverage does not account for rows")

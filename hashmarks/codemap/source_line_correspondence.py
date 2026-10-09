@@ -13,6 +13,8 @@ from typing import cast
 
 from hashmarks.operation_contract import operation_schema
 
+from .diagnostic_source_revision import diagnostic_revision_claim_reason
+
 
 def validated_source_lines(lines: Sequence[int]) -> list[int]:
     """Fail before source reads on invalid explicit line requests."""
@@ -106,7 +108,7 @@ def _source_endpoint_reason(
     )
     if not all(required):
         return "source-observation-not-current-complete-and-bound"
-    return None
+    return diagnostic_revision_claim_reason(diagnostic, member)
 
 
 def _diagnostic_scope_reason(

@@ -16,6 +16,7 @@ from .decision_session import diagnostic_producer
 from .diagnostic_source_revision import (
     EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA,
     diagnostic_identity,
+    diagnostic_revision_delta,
     diagnostic_source_revision_evidence,
     normalize_source_revision_claims,
 )
@@ -1204,6 +1205,7 @@ class RepositoryDeltaMixin:
         return {
             "schema": DIAGNOSTIC_DELTA_SCHEMA,
             "producer": after.get("producer"),
+            "source_revisions": diagnostic_revision_delta(before, after),
             "repository": {
                 "before": before.get("repository_identity"),
                 "after": after.get("repository_identity"),

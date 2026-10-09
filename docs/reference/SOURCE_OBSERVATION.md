@@ -172,6 +172,12 @@ document-version counters, or new evidence identities. The existing diagnostic
 identity excludes this provenance so the same diagnostic fact does not appear
 added or removed merely because its revision claim changed.
 
+Diagnostic deltas preserve a separate `source_revisions` axis with normalized
+`before` and `after` claims, a `changed` flag, and
+`claim_authority="producer-claimed"`. Missing claims remain `None`; changing,
+adding, or removing a claim does not change diagnostic fact identity or imply
+that repository source bytes changed.
+
 Claims are limited to 32 normalized, explicitly scoped members; absolute or
 escaping paths, duplicate normalized aliases, wrong digest format, and claims
 outside the collection's declared path scope fail before rows are published.
@@ -195,13 +201,17 @@ producer-claimed and observed member revisions, source observation identity,
 source generation and freshness, and exact qualifications:
 
 - **matching** means a claimed revision equals a single caller-supplied,
-  current, complete, stable canonical member observation; it does **not** prove
+  complete, stable canonical member observation; it does **not** prove
   the LSP read those bytes or that repository-wide verification is current.
 - **different** means the observed member bytes differ from the claimed
   source revision; it does **not** decide whether or how to rerun verification.
 - **unknown** means absent/ambiguous source packets, unreadable/denied/oversized
   source, incomplete/truncated source evidence, unsupported source schemas, or
-  stale/unknown repository freshness. It is not a file-absence assertion.
+  stale or invalid repository freshness. It is not a file-absence assertion.
+
+A stable, revision-verified member can support exact byte comparison even when
+repository-wide freshness is `unknown`. Each row preserves that freshness as
+`source_freshness`; `matching` never upgrades it to `current`.
 
 Diagnostic collection outcomes and repository generation remain separate;
 different diagnostic/source generations are exposed without inventing
@@ -210,6 +220,14 @@ evidence**, not an independently authenticated execution trace. Its
 `complete-for-declared-members` coverage applies only to the claimed member
 set, not every source file or diagnostic path. Unclaimed diagnostic paths and
 ignored source packets are counted separately.
+
+The public `validate_repository_intelligence_evidence()` validator recognizes
+this comparison schema and checks its bounded rows, revision comparisons,
+counts, coverage, and authority labels. Its normalized projection retains
+`source_revision_rows` and `source_revision_coverage`. Diagnostic observations
+also retain normalized `source_revisions` through validation and reject malformed
+or out-of-scope claims. A revision comparison supplies no repository-wide fresh
+authority, so `require_fresh=True` rejects it even when all claimed bytes match.
 
 The producer owns acquisition timing and LSP document versions; the agent
 harness owns read/edit coordination, verification execution and decisions.
@@ -249,6 +267,11 @@ revision-verified member bytes (never `stale`), different canonical member
 revisions from distinct admitted CodeMap generations, the same admitted path, the same nonblank
 producer/repository/environment identity, eligible diagnostic
 collection states, and explicit diagnostic scopes containing the source path.
+If a producer supplies a source revision for that path, it must match the
+corresponding canonical member revision. A contradictory claim leaves the
+candidate unresolved with `diagnostic-source-revision-mismatch`; malformed
+claims are rejected. Omitted revision claims keep the existing generation-bound
+correspondence semantics and are never backfilled from a source observation.
 
 The repository-wide freshness axis remains explicit: a directly read,
 revision-verified member can support a **source-local** byte correspondence

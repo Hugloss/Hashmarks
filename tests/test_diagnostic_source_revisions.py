@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hashmarks import CodeMap
+from hashmarks import CodeMap, validate_repository_intelligence_evidence
 from hashmarks.codemap.repository_delta import (
     RepositoryDeltaMixin,
     RepositoryGenerationBinding,
@@ -111,9 +111,9 @@ def test_changed_source_revision_is_not_reported_as_current(
     assert result["rows"][0]["reason"] == "claimed-and-observed-member-revisions-differ"
 
 
-@pytest.mark.parametrize("freshness", ["stale", "unknown"])
+@pytest.mark.parametrize("freshness", ["stale", "invalid", None])
 def test_unqualified_source_freshness_never_validates_revision(
-    tmp_path: Path, freshness: str
+    tmp_path: Path, freshness: str | None
 ) -> None:
     source = _source(tmp_path)
     observation = _diagnostic(
@@ -123,6 +123,116 @@ def test_unqualified_source_freshness_never_validates_revision(
     result = _project(observation, weakened)
     assert result["unknown_count"] == 1
     assert result["rows"][0]["reason"] == "source-observation-freshness-unproven"
+
+
+def test_exact_byte_comparison_preserves_unknown_repository_freshness(
+    tmp_path: Path,
+) -> None:
+    source = {**_source(tmp_path), "freshness": "unknown"}
+    observation = _diagnostic(
+        source_revisions={"src.py": source["member"]["member_revision"]}
+    )
+
+    result = _project(observation, source)
+    assert result["rows"][0]["state"] == "matching"
+    assert result["rows"][0]["source_freshness"] == "unknown"
+    checked = validate_repository_intelligence_evidence(result)
+    assert checked["valid"] is True
+    assert checked["normalized"]["stale"] is None
+    assert (
+        checked["normalized"]["source_revision_rows"][0]["source_freshness"]
+        == "unknown"
+    )
+    required = validate_repository_intelligence_evidence(result, require_fresh=True)
+    assert required["reasons"] == ["fresh-evidence-required"]
+
+
+def test_revision_claim_only_delta_preserves_fact_identity() -> None:
+    before = _diagnostic(source_revisions={"src.py": "a" * 64})
+    after = _diagnostic(source_revisions={"src.py": "b" * 64})
+
+    delta = RepositoryDeltaMixin.diagnostic_observation_delta(before, after)
+
+    assert delta["diagnostics"]["added"] == []
+    assert delta["diagnostics"]["removed"] == []
+    assert delta["diagnostics"]["unchanged_count"] == 1
+    assert delta["source_revisions"] == {
+        "before": {"src.py": "a" * 64},
+        "after": {"src.py": "b" * 64},
+        "changed": True,
+        "claim_authority": "producer-claimed",
+    }
+    assert delta != RepositoryDeltaMixin.diagnostic_observation_delta(before, before)
+
+
+@pytest.mark.parametrize("claims", [None, {"src.py": "a" * 64}])
+def test_revision_claim_addition_and_removal_are_observation_changes(
+    claims: Mapping[str, str] | None,
+) -> None:
+    before = _diagnostic(source_revisions=claims)
+    after = _diagnostic(source_revisions={"src.py": "b" * 64})
+    forward = RepositoryDeltaMixin.diagnostic_observation_delta(before, after)
+    reverse = RepositoryDeltaMixin.diagnostic_observation_delta(after, before)
+    assert forward["source_revisions"]["changed"] is True
+    assert reverse["source_revisions"]["after"] == claims
+    assert reverse["source_revisions"]["changed"] is True
+
+
+@pytest.mark.parametrize(
+    "claims",
+    [
+        {"../../outside.py": "a" * 64},
+        {"other.py": "a" * 64},
+        {"src.py": "wrong-digest"},
+        {"src.py": "a" * 64, "./src.py": "b" * 64},
+        ["a" * 64],
+    ],
+)
+def test_public_validator_rejects_malformed_diagnostic_revision_claims(
+    claims: object,
+) -> None:
+    packet = _diagnostic()
+    packet["source_revisions"] = claims
+
+    checked = validate_repository_intelligence_evidence(packet)
+    assert checked["valid"] is False
+    assert "invalid-source-revisions" in checked["reasons"]
+
+
+def test_public_validator_preserves_diagnostic_revision_claims() -> None:
+    packet = _diagnostic(source_revisions={"src.py": "a" * 64})
+    checked = validate_repository_intelligence_evidence(packet)
+    assert checked["valid"] is True
+    assert checked["normalized"]["source_revisions"] == {"src.py": "a" * 64}
+
+
+@pytest.mark.parametrize(
+    "mutation", ["count", "state", "coverage", "freshness", "unclaimed"]
+)
+def test_public_validator_rejects_inconsistent_revision_comparison(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    source = _source(tmp_path)
+    packet = _project(
+        _diagnostic(source_revisions={"src.py": source["member"]["member_revision"]}),
+        source,
+    )
+    if mutation == "count":
+        packet["matching_count"] = 0
+    elif mutation == "state":
+        packet["rows"][0]["state"] = "different"
+        packet["matching_count"] = 0
+        packet["different_count"] = 1
+    elif mutation == "coverage":
+        packet["coverage"] = "unknown"
+    elif mutation == "freshness":
+        packet["rows"][0]["source_freshness"] = "stale"
+    else:
+        packet["unclaimed_diagnostic_count"] = -1
+    checked = validate_repository_intelligence_evidence(packet)
+    assert checked["valid"] is False
+    assert "invalid-diagnostic-source-revision-evidence" in checked["reasons"]
 
 
 def test_absent_and_duplicate_source_packets_are_not_negative_evidence(
