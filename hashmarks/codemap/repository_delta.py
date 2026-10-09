@@ -652,6 +652,27 @@ class RepositoryDeltaMixin:
             }, None
         return member, raw
 
+    def _source_evidenced_hits(
+        self,
+        hits: list[dict[str, object]],
+        *,
+        text: str,
+        literal: str,
+        context_lines: int,
+    ) -> None:
+        """Attach stable location IDs before optional display-only excerpts."""
+        for hit in hits:
+            hit["evidence_identity"] = self._evidence_identity(
+                "hashmarks.source-occurrence.v1", hit
+            )
+            if context_lines:
+                hit["context_excerpt"] = self._source_context_excerpt(
+                    text,
+                    line=cast("int", hit["line"]),
+                    column=cast("int", hit["column"]),
+                    literal_length=len(literal),
+                )
+
     def _source_observation_from_bytes(
         self, packet: dict[str, object], raw: bytes
     ) -> None:
@@ -698,20 +719,12 @@ class RepositoryDeltaMixin:
             symbols=symbols,
             token_kinds=self._python_source_token_kinds(text, str(member["path"])),
         )
-        context_lines = cast("dict[str, int]", packet["limits"]).get("context_lines", 0)
-        for hit in hits:
-            # An optional excerpt is a display projection, not part of the
-            # location's canonical evidence identity.
-            hit["evidence_identity"] = self._evidence_identity(
-                "hashmarks.source-occurrence.v1", hit
-            )
-            if context_lines:
-                hit["context_excerpt"] = self._source_context_excerpt(
-                    text,
-                    line=cast("int", hit["line"]),
-                    column=cast("int", hit["column"]),
-                    literal_length=len(literal),
-                )
+        self._source_evidenced_hits(
+            hits,
+            text=text,
+            literal=literal,
+            context_lines=cast("dict[str, int]", packet["limits"]).get("context_lines", 0),
+        )
         packet["occurrences"] = hits
         packet["observed_match_count"] = count
         packet["truncation"] = "truncated" if count > limit else "complete"
@@ -729,7 +742,7 @@ class RepositoryDeltaMixin:
         long_line_threshold: int = 2_000,
         lines: Sequence[int] = (),
         context_lines: int = 0,
-    ) -> dict[str, object]:
+    ) -> dict[str, object]:  # noqa: PLR0913 - preserve public source API compatibility
         """Describe one stable source member, with no repository-wide absence claim."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -884,7 +897,9 @@ class RepositoryDeltaMixin:
             "execution_effect": "none",
         }
         if batch.context_lines:
-            cast("dict[str, int]", result["limits"])["context_lines"] = batch.context_lines
+            cast("dict[str, int]", result["limits"])["context_lines"] = (
+                batch.context_lines
+            )
         result["observation_identity"] = self._evidence_identity(
             operation_schema("source_observation", "scope"),
             {
