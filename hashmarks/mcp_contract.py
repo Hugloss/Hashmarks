@@ -337,34 +337,105 @@ def normalize_mcp_tool_names(
     return tuple(name for name in MCP_TOOL_NAMES if name in selected)
 
 
-def mcp_projection_instructions(names: tuple[str, ...] | list[str] | None) -> str:
-    selected = normalize_mcp_tool_names(names)
-    if selected == MCP_TOOL_NAMES:
+def normalize_mcp_query_surfaces(
+    surfaces: tuple[str, ...] | list[str] | None,
+) -> tuple[str, ...]:
+    """Return canonical-order repository-intelligence query surfaces."""
+
+    from .codemap.repository_intelligence_query import QUERY_SURFACES
+
+    if surfaces is None:
+        return tuple(QUERY_SURFACES)
+    requested = tuple(str(name) for name in surfaces)
+    if not requested:
+        raise ValueError(
+            "repository_intelligence_query projection must expose at least one surface"
+        )
+    if len(set(requested)) != len(requested):
+        raise ValueError(
+            "repository_intelligence_query projection contains duplicate surfaces"
+        )
+    unknown = sorted(set(requested) - set(QUERY_SURFACES))
+    if unknown:
+        raise ValueError(
+            "unknown repository_intelligence_query projection surface(s): "
+            + ", ".join(unknown)
+        )
+    selected = set(requested)
+    return tuple(name for name in QUERY_SURFACES if name in selected)
+
+
+def _projection_selection(
+    names: tuple[str, ...] | list[str] | None,
+    query_surfaces: tuple[str, ...] | list[str] | None,
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    selected_tools = normalize_mcp_tool_names(names)
+    selected_surfaces = normalize_mcp_query_surfaces(query_surfaces)
+    if (
+        query_surfaces is not None
+        and "repository_intelligence_query" not in selected_tools
+    ):
+        raise ValueError(
+            "repository_intelligence_query surface projection requires "
+            "repository_intelligence_query to be exposed"
+        )
+    return selected_tools, selected_surfaces
+
+
+def mcp_projection_instructions(
+    names: tuple[str, ...] | list[str] | None,
+    *,
+    query_surfaces: tuple[str, ...] | list[str] | None = None,
+) -> str:
+    selected, selected_surfaces = _projection_selection(names, query_surfaces)
+    if selected == MCP_TOOL_NAMES and query_surfaces is None:
         return MCP_SERVER_INSTRUCTIONS
+    query_note = ""
+    if query_surfaces is not None:
+        query_note = (
+            " repository_intelligence_query is restricted to these query surfaces: "
+            + ", ".join(selected_surfaces)
+            + ". Other repository_intelligence_query surfaces are intentionally withheld."
+        )
     return (
         "Hashmarks read-only MCP tool projection derived from the canonical "
         "repository-intelligence contract. Available tools: "
         + ", ".join(selected)
-        + ". Use only advertised tools; unavailable Hashmarks tools are intentionally "
-        "withheld by the caller's experiment. Hashmarks remains descriptive repository "
-        "intelligence and does not replace editing, shell, tests, or git."
+        + "."
+        + query_note
+        + " Use only advertised tools and query surfaces; unavailable Hashmarks "
+        "capabilities are intentionally withheld by the caller's experiment. "
+        "Hashmarks remains descriptive repository intelligence and does not replace "
+        "editing, shell, tests, or git."
     )
 
 
 def mcp_projection_summary(
     canonical_summary: dict[str, object],
     names: tuple[str, ...] | list[str],
+    *,
+    query_surfaces: tuple[str, ...] | list[str] | None = None,
 ) -> dict[str, object]:
-    selected = normalize_mcp_tool_names(names)
+    selected, selected_surfaces = _projection_selection(names, query_surfaces)
     contract_identity = canonical_summary.get("contract_identity")
     if not isinstance(contract_identity, str):
         raise ValueError("canonical MCP contract identity is unavailable")
-    instructions = mcp_projection_instructions(selected)
+    instructions = mcp_projection_instructions(
+        selected,
+        query_surfaces=query_surfaces,
+    )
     payload = {
         "schema": MCP_PROJECTION_SCHEMA,
         "source_contract_identity": contract_identity,
         "tools": list(selected),
         "instructions": instructions,
+        **(
+            {
+                "repository_intelligence_query_surfaces": list(selected_surfaces),
+            }
+            if query_surfaces is not None
+            else {}
+        ),
     }
     encoded = json.dumps(
         payload,
