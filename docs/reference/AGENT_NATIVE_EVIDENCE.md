@@ -118,6 +118,38 @@ remains a producer claim. The complete native ownership/verification records
 remain visible in the original result. All projections preserve source
 pointers, current freshness and their producer-owned qualifications.
 
+### Qualified owner labels must match producer proof
+
+An agent-visible `qualified_owner` row is now displayed only when the
+**same native `task_evidence` packet** declares all of:
+
+- `ownership.status == "resolved"` and
+  `ownership.proof_scope_complete is True`;
+- `ownership.authority == "repository-ownership-only"` and a nonempty
+  `ownership.owner.path`;
+- `freshness.state == "current"` at the top-level canonical task endpoint.
+
+These checks do not re-resolve a repository owner, authenticate producer
+claims, or grant execution authority. They govern **presentation labels only**.
+A stale/unknown/missing freshness state, unresolved/ambiguous status, missing
+owner path, or incomplete proof can no longer appear as an unqualified
+`observed_fact` under the misleading `qualified_owner` name.
+
+When a producer packet still contains an owner/source object under those
+conditions, it remains visibly available as `unqualified_owner` and
+`unqualified_owner_source` with `assertion: producer_claim` and exact native
+`/ownership/owner` and `/ownership/source_evidence` pointers. The
+`task_ownership` source context preserves the original status, scope proof,
+authority/proof identity, owner path, freshness state, and descriptive
+`display_qualification`. Candidate and discrimination read rows always remain
+producer claims; verifier selection and plan remain separate producer claims.
+No missing proof or freshness is silently filled in by the renderer.
+
+The full native packet, `evidence_receipt`, original scope semantics, and
+uncertainty remain intact. This strengthens the **display boundary**, not
+CodeMap owner resolution or the agent's next-tool policy. Regression:
+`tests/test_task_owner_presentation_qualification.py`.
+
 For `source_observation`, the compact source group displays exact literal
 `occurrences` before `member_observations`. An explicit scope with many
 members must not displace the actual matches under the five-row display cap.
