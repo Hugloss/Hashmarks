@@ -163,9 +163,13 @@ def test_scip_observed_zero_claims_is_not_missing_provider_evidence(
         codemap.import_scip(index)
         observed = codemap.task_evidence(_TASK, token_budget=256)
 
-    # Neither the owner nor verification authority is reselected.
-    assert observed["ownership"] == missing["ownership"]
-    assert observed["verification"] == missing["verification"]
+    # SCIP import advances the repository generation, so proof identities
+    # may legitimately change; the admitted owner and verifier must not.
+    assert observed["ownership"]["status"] == missing["ownership"]["status"]
+    assert observed["ownership"]["owner"] == missing["ownership"]["owner"]
+    assert observed["ownership"]["basis"] == missing["ownership"]["basis"]
+    assert observed["verification"]["selected"] == missing["verification"]["selected"]
+    assert observed["verification"]["plan"] == missing["verification"]["plan"]
     discovery = observed["semantic_relationships"]
     assert discovery["observation_state"] == "definition-observed-no-direct-claims"
     assert discovery["observed_relationship_count"] == 0
