@@ -91,3 +91,43 @@ class TaskEvidenceScopedMethodMixin:
                     path, member, score=score, visibility=visibility
                 )
         return None
+
+    def _task_evidence_attach_scip_discovery(
+        self, packet: dict[str, object]
+    ) -> None:
+        """Expose native semantic facts only for a current, proven task owner."""
+        ownership = packet.get("ownership")
+        freshness = packet.get("freshness")
+        if not isinstance(ownership, Mapping) or not isinstance(freshness, Mapping):
+            return
+        if (
+            ownership.get("status") != "resolved"
+            or ownership.get("proof_scope_complete") is not True
+            or ownership.get("authority") != "repository-ownership-only"
+            or freshness.get("state") != "current"
+        ):
+            return
+        owner = ownership.get("owner")
+        if not isinstance(owner, Mapping):
+            return
+        path = str(owner.get("path") or "")
+        qualname = str(owner.get("qualname") or "")
+        if not path or not qualname:
+            return
+        if self._task_evidence_visibility(path) not in {
+            EvidenceVisibility.SOURCE,
+            EvidenceVisibility.OUTLINE,
+        }:
+            return
+        if (
+            self.policy.decide(path).evidence_visibility is EvidenceVisibility.DENY
+            or not self._indexed_path_current(path)
+        ):
+            return
+        current = self.store.symbol_at(path, qualname)
+        if current is None:
+            return
+        discovery = self._scip_compact_discovery(current)
+        related = packet.get("related")
+        if discovery is not None and isinstance(related, dict):
+            related["semantic_relationships"] = discovery
