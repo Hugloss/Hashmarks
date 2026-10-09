@@ -119,9 +119,7 @@ def _source_context_request(
 ) -> tuple[int, list[int], int]:
     """Validate exact line-context selection before CodeMap sync or source reads."""
     if not isinstance(context_lines, dict):
-        radius = _bounded_int(
-            context_lines, name="context_lines", minimum=0, maximum=1
-        )
+        radius = _bounded_int(context_lines, name="context_lines", minimum=0, maximum=1)
         if literal is None and radius:
             raise McpSurfaceError("context_lines requires a literal")
         return radius, [], 0
