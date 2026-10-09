@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 from pathlib import Path
 
@@ -8,6 +9,28 @@ import hashmarks.cli as cli
 import hashmarks.mcp_readiness as readiness
 from hashmarks.mcp_contract import MCP_TOOL_NAMES
 from hashmarks.mcp_readiness import MCP_READINESS_SCHEMA, mcp_readiness
+
+
+def test_native_server_advertises_restricted_query_surface(
+    tmp_path: Path,
+) -> None:
+    from hashmarks.mcp_server import build_server
+
+    server = build_server(
+        tmp_path,
+        tool_names=("repository_intelligence_query",),
+        query_surfaces=("verification-explanation",),
+    )
+    try:
+        tools = asyncio.run(server.list_tools())
+        assert [tool.name for tool in tools] == ["repository_intelligence_query"]
+        assert "verification-explanation" in str(tools[0].description)
+        assert server._hashmarks_projection_query_surfaces == (
+            "verification-explanation",
+        )
+        assert server._hashmarks_query_surface_projection_explicit is True
+    finally:
+        server._hashmarks_surface.close()
 
 
 def test_mcp_readiness_projects_contract_and_launch(
