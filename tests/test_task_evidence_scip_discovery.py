@@ -150,7 +150,6 @@ def test_scip_discovery_does_not_promote_unresolved_or_denied_owners(
         assert "semantic_relationships" not in packet
 
 
-
 def test_scip_observed_zero_claims_is_not_missing_provider_evidence(
     tmp_path: Path,
 ) -> None:
@@ -197,9 +196,10 @@ def test_scip_empty_observation_invalidated_after_source_edit(
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
         codemap.import_scip(index)
-        assert codemap.task_evidence(_TASK)["semantic_relationships"][
-            "observation_state"
-        ] == "definition-observed-no-direct-claims"
+        assert (
+            codemap.task_evidence(_TASK)["semantic_relationships"]["observation_state"]
+            == "definition-observed-no-direct-claims"
+        )
 
         (tmp_path / "src" / "engine.py").write_text(
             "def normalize_widget(value: str) -> str:\n"
