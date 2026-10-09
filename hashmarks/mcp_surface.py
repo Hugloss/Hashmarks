@@ -475,21 +475,30 @@ class HashmarksMcpSurface:
         literal: str | None = None,
         result_mode: str = operation_default_mode("source_observation"),
         limit: int = 50,
+        context_lines: int = 0,
     ) -> dict[str, object]:
         self._validate_source_request(paths, literal, result_mode)
         if literal is not None:
             literal = _bounded_text(literal, name="literal", maximum=_MAX_QUERY_CHARS)
         limit = _bounded_int(limit, name="limit", minimum=1, maximum=50)
+        context_lines = _bounded_int(
+            context_lines, name="context_lines", minimum=0, maximum=1
+        )
+        if literal is None and context_lines:
+            raise McpSurfaceError("context_lines requires a literal")
 
         def project() -> dict[str, object]:
             try:
                 self._map.sync(paths)
                 if result_mode == "member":
                     return self._map.source_observation(
-                        paths[0], literal=literal, limit=limit
+                        paths[0], literal=literal, limit=limit,
+                        context_lines=context_lines,
                     )
                 assert literal is not None
-                return self._map.scoped_source_occurrences(paths, literal, limit=limit)
+                return self._map.scoped_source_occurrences(
+                    paths, literal, limit=limit, context_lines=context_lines
+                )
             except ValueError as exc:
                 raise _surface_value_error(exc) from exc
 
