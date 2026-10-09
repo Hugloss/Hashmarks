@@ -8,7 +8,7 @@ from .codemap.change_impact import CHANGE_IMPACT_DEFAULT_REQUEST
 from .codemap.evidence_packet import TASK_EVIDENCE_DEFAULT_OPTIONS
 from .codemap.evidence_profiles import ProfileName
 from .codemap.find_engine import FIND_DEFAULT_OPTIONS
-from .codemap.repository_intelligence_query import QuerySurface
+from .codemap.repository_intelligence_query import QUERY_SURFACES, QuerySurface
 from .errors import OptionalFeatureError, UserFacingError
 from .evidence_presentation import (
     FORMATS,
@@ -24,6 +24,7 @@ from .mcp_contract import (
     MCP_TOOL_NAMES,
     McpToolContract,
     mcp_projection_instructions,
+    normalize_mcp_query_surfaces,
     normalize_mcp_tool_names,
     tool_contract,
 )
@@ -140,13 +141,23 @@ def _register_agent_evidence_tools(
     surface: HashmarksMcpSurface,
     annotations: Any,
     tool_error: type[Exception],
+    *,
+    query_surfaces: tuple[str, ...],
 ) -> None:
     """Expose existing producers while keeping MCP registration bounded."""
     intelligence_contract = tool_contract("repository_intelligence_query")
 
+    query_description = intelligence_contract.description
+    if query_surfaces != tuple(QUERY_SURFACES):
+        query_description += (
+            " This server projection permits only these surfaces: "
+            + ", ".join(query_surfaces)
+            + "."
+        )
+
     @server.tool(
         name=intelligence_contract.name,
-        description=intelligence_contract.description,
+        description=query_description,
         annotations=annotations,
     )
     def repository_intelligence_query(  # noqa: PLR0913 - explicit MCP query inputs
@@ -158,6 +169,13 @@ def _register_agent_evidence_tools(
         member_path: str | None = None,
         previous_snapshot: dict[str, Any] | None = None,
     ) -> dict[str, object]:
+        if surface_name not in query_surfaces:
+            error = McpSurfaceError(
+                "repository_intelligence_query surface is unavailable in this "
+                "server projection: "
+                + str(surface_name)
+            )
+            raise tool_error(error.transport_message())
         return _call_surface(
             intelligence_contract,
             tool_error,
@@ -309,16 +327,29 @@ def build_server(
     *,
     state_dir: str | Path | None = None,
     tool_names: tuple[str, ...] | list[str] | None = None,
+    query_surfaces: tuple[str, ...] | list[str] | None = None,
 ):
     MCPServer, ToolAnnotations, ToolError = _sdk()
     selected_tools = normalize_mcp_tool_names(tool_names)
+    selected_query_surfaces = normalize_mcp_query_surfaces(query_surfaces)
+    if (
+        query_surfaces is not None
+        and "repository_intelligence_query" not in selected_tools
+    ):
+        raise ValueError(
+            "repository_intelligence_query surface projection requires "
+            "repository_intelligence_query to be exposed"
+        )
     surface = HashmarksMcpSurface(
         str(workspace), state_dir=None if state_dir is None else str(state_dir)
     )
     server = MCPServer(
         MCP_SERVER_NAME,
         description=MCP_SERVER_DESCRIPTION,
-        instructions=mcp_projection_instructions(selected_tools),
+        instructions=mcp_projection_instructions(
+            selected_tools,
+            query_surfaces=query_surfaces,
+        ),
         version=__version__,
     )
     annotations = ToolAnnotations(
@@ -497,13 +528,21 @@ def build_server(
             presentation=presentation,
         )
 
-    _register_agent_evidence_tools(server, surface, annotations, ToolError)
+    _register_agent_evidence_tools(
+        server,
+        surface,
+        annotations,
+        ToolError,
+        query_surfaces=selected_query_surfaces,
+    )
     _register_evidence_comparison_tool(server, surface, annotations, ToolError)
 
     _apply_tool_projection(server, selected_tools)
 
     server._hashmarks_surface = surface
     server._hashmarks_projection_tools = selected_tools
+    server._hashmarks_projection_query_surfaces = selected_query_surfaces
+    server._hashmarks_query_surface_projection_explicit = query_surfaces is not None
     return server
 
 
@@ -512,11 +551,13 @@ def run_stdio(
     *,
     state_dir: str | Path | None = None,
     tool_names: tuple[str, ...] | list[str] | None = None,
+    query_surfaces: tuple[str, ...] | list[str] | None = None,
 ) -> None:
     server = build_server(
         workspace,
         state_dir=state_dir,
         tool_names=tool_names,
+        query_surfaces=query_surfaces,
     )
     try:
         server.run(transport="stdio")
@@ -540,11 +581,26 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="repeat to expose only the selected canonical MCP tools",
     )
+    parser.add_argument(
+        "--query-surface",
+        action="append",
+        choices=QUERY_SURFACES,
+        default=None,
+        help=(
+            "repeat to restrict repository_intelligence_query to selected "
+            "canonical query surfaces"
+        ),
+    )
     args = parser.parse_args(argv)
     workspace = canonical_host_path(args.workspace)
     state_dir = None if args.state_dir is None else canonical_host_path(args.state_dir)
     try:
-        run_stdio(workspace, state_dir=state_dir, tool_names=args.tool)
+        run_stdio(
+            workspace,
+            state_dir=state_dir,
+            tool_names=args.tool,
+            query_surfaces=args.query_surface,
+        )
     except (UserFacingError, McpSurfaceError) as exc:
         raise SystemExit(str(exc)) from exc
     return 0
