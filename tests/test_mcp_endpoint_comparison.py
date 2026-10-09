@@ -187,12 +187,8 @@ def test_diagnostic_comparison_transports_other_member_locality(
             scope_paths=scope,
         )
 
-    before = observation(
-        [{"tool": "pyright", "rule": "old", "path": "src/owner.py"}]
-    )
-    after = observation(
-        [{"tool": "pyright", "rule": "new", "path": "src/consumer.py"}]
-    )
+    before = observation([{"tool": "pyright", "rule": "old", "path": "src/owner.py"}])
+    after = observation([{"tool": "pyright", "rule": "new", "path": "src/consumer.py"}])
     surface = HashmarksMcpSurface(
         str(_repo(tmp_path)), state_dir=str(tmp_path / "state")
     )
