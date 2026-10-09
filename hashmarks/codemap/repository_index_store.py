@@ -347,6 +347,8 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
               line INTEGER NOT NULL,
               end_line INTEGER NOT NULL,
               producer TEXT NOT NULL,
+              relationships_json TEXT NOT NULL DEFAULT '[]',
+              relationships_truncated INTEGER NOT NULL DEFAULT 0,
               PRIMARY KEY(path,symbol,line,producer)
             );
             CREATE INDEX IF NOT EXISTS native_definition_name_idx ON native_definition(display_name);
@@ -534,6 +536,17 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         if not tables:
             return True
         if tables != self._CURRENT_TABLES:
+            return False
+        if self._column_names(self._db, "native_definition") != (
+            "path",
+            "symbol",
+            "display_name",
+            "line",
+            "end_line",
+            "producer",
+            "relationships_json",
+            "relationships_truncated",
+        ):
             return False
         if self._column_names(self._db, "edge") != (
             "path",
@@ -1011,7 +1024,7 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
             )
             self._db.execute("DELETE FROM native_edge WHERE producer=?", (producer,))
             self._db.executemany(
-                "INSERT OR REPLACE INTO native_definition(path,symbol,display_name,line,end_line,producer) VALUES (?,?,?,?,?,?)",
+                "INSERT OR REPLACE INTO native_definition(path,symbol,display_name,line,end_line,producer,relationships_json,relationships_truncated) VALUES (?,?,?,?,?,?,?,?)",
                 [
                     (
                         row["path"],
@@ -1020,6 +1033,8 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                         int(row["line"]),
                         int(row["end_line"]),
                         producer,
+                        row.get("relationships_json", "[]"),
+                        int(bool(row.get("relationships_truncated", False))),
                     )
                     for row in definitions
                 ],
@@ -1052,6 +1067,18 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
             rows = self._db.execute(
                 "SELECT * FROM native_definition WHERE lower(display_name) LIKE ? OR lower(symbol) LIKE ? ORDER BY path,line LIMIT ?",
                 (q, q, limit),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def native_definitions_for_path(
+        self, path: str, limit: int = 129
+    ) -> list[dict]:
+        """Bounded SCIP definition evidence in one admitted member."""
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT * FROM native_definition WHERE path=? "
+                "ORDER BY line,symbol,producer LIMIT ?",
+                (path, limit),
             ).fetchall()
         return [dict(row) for row in rows]
 
