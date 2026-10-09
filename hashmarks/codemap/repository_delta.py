@@ -839,9 +839,7 @@ class RepositoryDeltaMixin:
             "authority": "repository-evidence-only",
             "execution_effect": "none",
         }
-        self._record_source_context_limits(
-            packet, context_lines, anchor_context_lines
-        )
+        self._record_source_context_limits(packet, context_lines, anchor_context_lines)
         if raw is None:
             return packet
         self._source_observation_from_bytes(packet, raw)
