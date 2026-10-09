@@ -915,48 +915,81 @@ def _find(
     p.field(packet, "results", "retrieval_evidence", ref, ctx)
 
 
+def _task_owner_display_qualified(
+    ownership: Mapping[str, object],
+    owner_path: object,
+    freshness: object,
+) -> bool:
+    """Respect existing producer-owned proof/freshness, without redeciding owner."""
+    return (
+        ownership.get("status") == "resolved"
+        and ownership.get("proof_scope_complete") is True
+        and ownership.get("authority") == "repository-ownership-only"
+        and isinstance(owner_path, str)
+        and bool(owner_path)
+        and isinstance(freshness, Mapping)
+        and freshness.get("state") == "current"
+    )
+
+
 def _task_ownership(
     p: _Projection,
     packet: Mapping[str, object],
     ref: tuple[object, ...],
     ctx: Mapping[str, object],
 ) -> None:
-    """Present existing ownership facts without choosing or upgrading an owner."""
+    """Project owner claims without promoting incomplete or stale evidence."""
     ownership = packet.get("ownership")
-    if isinstance(ownership, Mapping):
-        owner = ownership.get("owner")
-        owner_path = owner.get("path") if isinstance(owner, Mapping) else None
-        ownership_context = {
-            **ctx,
-            "task_ownership": {
-                "status": ownership.get("status"),
-                "authority": ownership.get("authority"),
-                "proof_scope_complete": ownership.get("proof_scope_complete"),
-                "owner_path": owner_path,
-            },
-        }
-        for key, family, kind, assertion in (
-            ("owner", "ownership_evidence", "qualified_owner", "observed_fact"),
-            ("candidate", "ownership_evidence", "owner_candidate", "producer_claim"),
-            ("source_evidence", "source", "owner_source_evidence", "observed_fact"),
-            (
-                "next_read",
-                "ownership_evidence",
-                "discrimination_read",
-                "producer_claim",
+    if not isinstance(ownership, Mapping):
+        return
+    owner = ownership.get("owner")
+    owner_path = owner.get("path") if isinstance(owner, Mapping) else None
+    freshness = packet.get("freshness")
+    freshness_state = (
+        freshness.get("state") if isinstance(freshness, Mapping) else "unknown"
+    )
+    qualified = _task_owner_display_qualified(ownership, owner_path, freshness)
+    ownership_context = {
+        **ctx,
+        "task_ownership": {
+            "status": ownership.get("status"),
+            "authority": ownership.get("authority"),
+            "authority_proof_identity": ownership.get("authority_proof_identity"),
+            "proof_scope_complete": ownership.get("proof_scope_complete"),
+            "owner_path": owner_path,
+            "freshness_state": freshness_state,
+            "display_qualification": (
+                "producer-claimed-qualified" if qualified else "unqualified"
             ),
-        ):
-            if isinstance(ownership.get(key), Mapping):
-                p.field(
-                    ownership,
-                    key,
-                    family,
-                    (*ref, "ownership"),
-                    ownership_context,
-                    kind=kind,
-                    shape="record",
-                    assertion=assertion,
-                )
+        },
+    }
+    for key, family, kind, assertion in (
+        (
+            "owner",
+            "ownership_evidence",
+            "qualified_owner" if qualified else "unqualified_owner",
+            "observed_fact" if qualified else "producer_claim",
+        ),
+        ("candidate", "ownership_evidence", "owner_candidate", "producer_claim"),
+        (
+            "source_evidence",
+            "source",
+            "owner_source_evidence" if qualified else "unqualified_owner_source",
+            "observed_fact" if qualified else "producer_claim",
+        ),
+        ("next_read", "ownership_evidence", "discrimination_read", "producer_claim"),
+    ):
+        if isinstance(ownership.get(key), Mapping):
+            p.field(
+                ownership,
+                key,
+                family,
+                (*ref, "ownership"),
+                ownership_context,
+                kind=kind,
+                shape="record",
+                assertion=assertion,
+            )
 
 
 def _task_verification(
