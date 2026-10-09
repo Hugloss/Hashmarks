@@ -865,8 +865,13 @@ class StructuralLocalityMixin:
         # Direct SCIP facts belong to the target's exact definition. Their
         # relation flags are producer claims, not inferred repository graph
         # edges, resolved call sites, or safe-refactor recommendations.
-        native_definitions = self._fresh_native_definitions_for_path(
-            str(target_row["path"]), limit=129
+        native_definitions, native_source_truncated = (
+            self._fresh_native_definitions_for_path(
+                str(target_row["path"]),
+                name=str(target_row["name"]),
+                line=int(target_row["start_line"]),
+                limit=129,
+            )
         )
         native_rows = [
             row
@@ -899,7 +904,7 @@ class StructuralLocalityMixin:
             "authority": "scip-producer-claim-only",
             "scope": "target-definition-start-line-only",
             "producer_bindings": sorted({str(row["producer"]) for row in native_rows}),
-            "truncated": len(native_definitions) > 128
+            "truncated": native_source_truncated
             or any(bool(row["relationships_truncated"]) for row in native_rows),
             "negative_evidence_admissible": False,
             "relationships": native_relations,
