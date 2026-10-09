@@ -114,7 +114,9 @@ def _scip_document_relationships(
         for row in _scip_relation_rows(info):
             bucket.add(row)
             if len(bucket) > 65:
-                bucket.remove(max(bucket, key=lambda item: (item.kind, item.target_symbol)))
+                bucket.remove(
+                    max(bucket, key=lambda item: (item.kind, item.target_symbol))
+                )
     return {
         symbol: tuple(sorted(rows, key=lambda item: (item.kind, item.target_symbol)))
         for symbol, rows in collected.items()
@@ -161,7 +163,9 @@ def parse_scip_json(value: dict[str, Any]) -> tuple[str, tuple[ScipOccurrence, .
     tool = _field(metadata, "toolInfo", "tool_info", {})
     if not isinstance(tool, dict):
         tool = {}
-    producer = f"{str(tool.get('name') or 'scip')}:{str(tool.get('version') or 'unknown')}"
+    name = str(tool.get("name") or "scip")
+    version = str(tool.get("version") or "unknown")
+    producer = f"{name}:{version}"
     out: list[ScipOccurrence] = []
     for document in value.get("documents") or ():
         if isinstance(document, dict):
