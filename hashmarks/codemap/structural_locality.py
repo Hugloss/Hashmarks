@@ -819,35 +819,202 @@ class StructuralLocalityMixin:
                 refresh=refresh,
             )
 
-    def _scip_direct_relationships(
-        self,
-        target_row: Mapping[str, object],
-        target_node: Mapping[str, object],
-    ) -> dict[str, object]:
-        """Project exact SCIP flags as an optional response fragment."""
-        native_definitions, truncated = self._fresh_native_definitions_for_path(
-            str(target_row["path"]),
-            name=str(target_row["name"]),
-            line=int(target_row["start_line"]),
-            limit=129,
+    @staticmethod
+    def _scip_relationship_payload(
+        row: Mapping[str, object],
+    ) -> tuple[list[Mapping[str, object]], str | None]:
+        value = json.loads(str(row["relationships_json"]))
+        if isinstance(value, list):
+            # Old disposable CodeMap state has no import-time source revision.
+            return [item for item in value if isinstance(item, Mapping)], None
+        if not isinstance(value, Mapping):
+            return [], None
+        raw = value.get("relationships", [])
+        relationships = (
+            [item for item in raw if isinstance(item, Mapping)]
+            if isinstance(raw, list)
+            else []
         )
-        native_rows = native_definitions[:128]
-        if not native_rows and not truncated:
-            return {}
-        relations = sorted(
-            [
+        revision = value.get("source_revision_observation")
+        return relationships, revision if isinstance(revision, str) else None
+
+    def _scip_target_resolution(
+        self, producer: str, target_symbol: str
+    ) -> dict[str, object]:
+        fresh, _reason = self._evidence_fresh("scip", producer)
+        candidates = self.store.native_definitions_for_symbol(
+            target_symbol, producer=producer, limit=65
+        )
+        truncated = len(candidates) >= 65
+        current = candidates[:64] if fresh else []
+        projected: list[dict[str, object]] = []
+        mapped: set[str] = set()
+        for candidate in current:
+            path = str(candidate["path"])
+            symbols = [
+                row
+                for row in self._session_symbols_for_path(path)
+                if str(row["name"]) == str(candidate["display_name"])
+                and int(row["start_line"]) == int(candidate["line"])
+            ]
+            symbol_ids = sorted(_symbol_id(row) for row in symbols)
+            mapped.update(symbol_ids)
+            _relationships, revision = self._scip_relationship_payload(candidate)
+            projected.append(
                 {
-                    "producer": row["producer"],
-                    "path": row["path"],
-                    "line": row["line"],
-                    "source_symbol": row["symbol"],
-                    "kind": item["kind"],
-                    "target_symbol": item["target_symbol"],
-                    "source_identity": target_node["symbol_source_identity"],
+                    "producer": producer,
+                    "scip_symbol": target_symbol,
+                    "path": path,
+                    "line": int(candidate["line"]),
+                    "code_map_symbol_ids": symbol_ids,
+                    "source_revision_observation": revision,
                 }
-                for row in native_rows
-                for item in json.loads(str(row["relationships_json"]))
-            ],
+            )
+        if truncated:
+            state = "incomplete-candidate-search"
+        elif len(projected) == 1 and len(mapped) == 1:
+            state = "unique-candidate"
+        elif len(projected) > 1 or len(mapped) > 1:
+            state = "ambiguous-candidates"
+        else:
+            state = "unresolved"
+        return {
+            "state": state,
+            "candidates": projected,
+            "candidate_search": {
+                "scope": "retained-fresh-definitions-from-same-scip-producer",
+                "complete_within_scope": not truncated,
+                "truncated": truncated,
+                "negative_evidence_admissible": False,
+            },
+            "negative_evidence_admissible": False,
+        }
+
+    def _scip_provider_freshness(
+        self, raw_rows: Sequence[Mapping[str, object]]
+    ) -> tuple[dict[str, tuple[bool, str | None]], bool]:
+        freshness = {
+            producer: self._evidence_fresh("scip", producer)
+            for producer in {str(row["producer"]) for row in raw_rows}
+        }
+        statuses = [
+            row for row in self._native_evidence_status() if row.get("kind") == "scip"
+        ]
+        for row in statuses[:64]:
+            producer = str(row["producer"])
+            freshness.setdefault(
+                producer,
+                (
+                    bool(row["fresh"]),
+                    None if row["reason"] is None else str(row["reason"]),
+                ),
+            )
+        return freshness, len(statuses) > 64
+
+    def _scip_decoded_relationships(
+        self, rows: Sequence[Mapping[str, object]]
+    ) -> tuple[
+        dict[int, tuple[list[Mapping[str, object]], str | None]],
+        dict[str, set[str]],
+        list[str],
+        bool,
+    ]:
+        decoded = {id(row): self._scip_relationship_payload(row) for row in rows}
+        observed: dict[str, set[str]] = {}
+        revisions: set[str] = set()
+        truncated = False
+        for row in rows:
+            producer = str(row["producer"])
+            relationships, revision = decoded[id(row)]
+            observed.setdefault(producer, set()).update(
+                str(item["kind"])
+                for item in relationships
+                if isinstance(item.get("kind"), str)
+            )
+            if revision is not None:
+                revisions.add(revision)
+            truncated = truncated or bool(row["relationships_truncated"])
+        return decoded, observed, sorted(revisions), truncated
+
+    def _scip_target_resolutions(
+        self,
+        rows: Sequence[Mapping[str, object]],
+        decoded: Mapping[int, tuple[list[Mapping[str, object]], str | None]],
+    ) -> tuple[dict[tuple[str, str], dict[str, object]], bool]:
+        by_producer: dict[str, set[str]] = {}
+        for row in rows:
+            producer = str(row["producer"])
+            by_producer.setdefault(producer, set()).update(
+                str(item["target_symbol"])
+                for item in decoded[id(row)][0]
+                if isinstance(item.get("target_symbol"), str)
+            )
+        projected: dict[tuple[str, str], dict[str, object]] = {}
+        truncated = False
+        for producer, targets in by_producer.items():
+            ordered = sorted(targets)
+            for target in ordered[:128]:
+                projected[(producer, target)] = self._scip_target_resolution(
+                    producer, target
+                )
+            for target in ordered[128:]:
+                truncated = True
+                projected[(producer, target)] = {
+                    "state": "not-searched-budget",
+                    "candidates": [],
+                    "candidate_search": {
+                        "scope": "retained-fresh-definitions-from-same-scip-producer",
+                        "complete_within_scope": False,
+                        "truncated": True,
+                        "negative_evidence_admissible": False,
+                    },
+                    "negative_evidence_admissible": False,
+                }
+        return projected, truncated
+
+    @staticmethod
+    def _scip_projected_relation_rows(
+        rows: Sequence[Mapping[str, object]],
+        decoded: Mapping[int, tuple[list[Mapping[str, object]], str | None]],
+        target_node: Mapping[str, object],
+    ) -> list[dict[str, object]]:
+        relations: list[dict[str, object]] = []
+        for row in rows:
+            producer = str(row["producer"])
+            source_revision = decoded[id(row)][1]
+            for item in decoded[id(row)][0]:
+                target = item.get("target_symbol")
+                if not isinstance(target, str):
+                    continue
+                relations.append(
+                    {
+                        "producer": producer,
+                        "path": row["path"],
+                        "line": row["line"],
+                        "source_symbol": row["symbol"],
+                        "kind": item.get("kind"),
+                        "target_symbol": target,
+                        "source_identity": target_node["symbol_source_identity"],
+                        "source_revision": {
+                            "observed_at_import": source_revision,
+                            "observed_current": target_node.get("file_digest"),
+                            "same_as_current_observation": (
+                                source_revision == target_node.get("file_digest")
+                                if source_revision is not None
+                                else None
+                            ),
+                            "producer_claimed_revision": None,
+                            "producer_claim_state": "not-captured-by-scip-adapter",
+                            "binding_state": "unknown",
+                        },
+                        "target_resolution_ref": {
+                            "producer": producer,
+                            "target_symbol": target,
+                        },
+                    }
+                )
+        return sorted(
+            relations,
             key=lambda item: (
                 str(item["producer"]),
                 str(item["source_symbol"]),
@@ -855,15 +1022,109 @@ class StructuralLocalityMixin:
                 str(item["target_symbol"]),
             ),
         )
+
+    def _scip_direct_relationships(
+        self,
+        target_row: Mapping[str, object],
+        target_node: Mapping[str, object],
+    ) -> dict[str, object]:
+        """Project bounded SCIP claims with revision and coverage provenance."""
+        raw_rows = self.store.native_definitions_for_path(
+            str(target_row["path"]),
+            name=str(target_row["name"]),
+            line=int(target_row["start_line"]),
+            limit=129,
+        )
+        source_truncated = len(raw_rows) >= 129
+        freshness, provider_status_truncated = self._scip_provider_freshness(raw_rows)
+        fresh_rows = [row for row in raw_rows if freshness[str(row["producer"])][0]][
+            :128
+        ]
+        decoded, observed_kinds, revisions, relationship_truncated = (
+            self._scip_decoded_relationships(fresh_rows)
+        )
+        target_resolutions, target_resolution_truncated = self._scip_target_resolutions(
+            fresh_rows, decoded
+        )
+        truncated = source_truncated or relationship_truncated
+        relations = self._scip_projected_relation_rows(fresh_rows, decoded, target_node)
+        target_resolution_records = [
+            {
+                "producer": producer,
+                "target_symbol": target_symbol,
+                **resolution,
+            }
+            for (producer, target_symbol), resolution in sorted(
+                target_resolutions.items()
+            )
+        ]
+        providers = sorted(freshness)
         return {
             "native_semantic_relationships": {
                 "authority": "scip-producer-claim-only",
                 "scope": "target-definition-start-line-only",
                 "producer_bindings": sorted(
-                    {str(row["producer"]) for row in native_rows}
+                    {str(row["producer"]) for row in fresh_rows}
                 ),
-                "truncated": truncated
-                or any(bool(row["relationships_truncated"]) for row in native_rows),
+                "provider_capabilities": [
+                    {
+                        "producer": producer,
+                        "declared_relationship_capability": None,
+                        "declared_capability_state": "not-captured-by-scip-adapter",
+                        "adapter_recognized_relationship_kinds": [
+                            "definition",
+                            "implementation",
+                            "reference",
+                            "type_definition",
+                        ],
+                        "observed_relationship_kinds_for_scope": sorted(
+                            observed_kinds.get(producer, set())
+                        ),
+                        "unobserved_kinds_meaning": "unknown-not-unsupported",
+                        "freshness": "current" if freshness[producer][0] else "stale",
+                        "freshness_reason": freshness[producer][1],
+                    }
+                    for producer in providers
+                ],
+                "provider_status_truncated": provider_status_truncated,
+                "target_resolution_truncated": target_resolution_truncated,
+                "target_resolutions": target_resolution_records,
+                "source_revision": {
+                    "observed_at_import": revisions,
+                    "observed_current": target_node.get("file_digest"),
+                    "same_as_current_observation": (
+                        all(
+                            revision == target_node.get("file_digest")
+                            for revision in revisions
+                        )
+                        if revisions
+                        else None
+                    ),
+                    "producer_claimed_revision": None,
+                    "producer_claim_state": "not-captured-by-scip-adapter",
+                    "binding_state": "unknown",
+                },
+                "observation_coverage": {
+                    "state": "current-bounded-observation"
+                    if fresh_rows
+                    else "stale-provider-observation"
+                    if any(not value[0] for value in freshness.values())
+                    else "provider-observed-target-definition-not-found"
+                    if freshness
+                    else "no-provider-observation",
+                    "definition_scope": ("exact-admitted-path-display-name-start-line"),
+                    "definitions_observed": len(fresh_rows),
+                    "definition_limit": 128,
+                    "relationship_limit_per_definition": 64,
+                    "truncated": (
+                        truncated
+                        or target_resolution_truncated
+                        or provider_status_truncated
+                    ),
+                    "producer_response_completeness": "unknown",
+                    "negative_evidence_admissible": False,
+                },
+                "truncated": truncated,
                 "negative_evidence_admissible": False,
                 "relationships": relations,
             }
@@ -998,7 +1259,8 @@ class StructuralLocalityMixin:
                 "execution_authority": False,
             },
         }
-        # Missing native evidence is not rendered as a claimed empty observation.
+        # Preserve unavailable and stale provider coverage without making it a
+        # repository-negative relationship claim.
         semantic.update(self._scip_direct_relationships(target_row, target_node))
         return {**semantic, "evidence_identity": _identity(semantic)}
 
@@ -1134,17 +1396,22 @@ def _native_relation_evidence(
     rows = raw.get("relationships")
     if not isinstance(producers, list) or not isinstance(rows, list):
         return set(), set(), False
-    keys = {
-        (
-            str(row["producer"]),
-            str(row["source_symbol"]),
-            str(row["kind"]),
-            str(row["target_symbol"]),
-            str(row["line"]),
+    keys: set[tuple[str, str, str, str, str]] = set()
+    for row in rows:
+        if not isinstance(row, Mapping) or any(
+            not isinstance(row.get(key), (str, int)) or isinstance(row.get(key), bool)
+            for key in ("producer", "source_symbol", "kind", "target_symbol", "line")
+        ):
+            return set(), set(), False
+        keys.add(
+            (
+                str(row["producer"]),
+                str(row["source_symbol"]),
+                str(row["kind"]),
+                str(row["target_symbol"]),
+                str(row["line"]),
+            )
         )
-        for row in rows
-        if isinstance(row, Mapping)
-    }
     return {str(value) for value in producers}, keys, True
 
 
@@ -1153,6 +1420,35 @@ def _string_set(packet: Mapping[str, object], key: str) -> set[str]:
     if not isinstance(values, Sequence) or isinstance(values, (str, bytes, bytearray)):
         return set()
     return {str(value) for value in values if value}
+
+
+def _native_relationship_delta(
+    before: Mapping[str, object],
+    after: Mapping[str, object],
+    endpoint_issues: Sequence[str],
+) -> dict[str, object]:
+    before_producers, before_relations, before_valid = _native_relation_evidence(before)
+    after_producers, after_relations, after_valid = _native_relation_evidence(after)
+    reasons = []
+    if endpoint_issues:
+        reasons.append("structural-endpoints-incomparable")
+    if not before_valid:
+        reasons.append("before-relationship-observation-incomplete")
+    if not after_valid:
+        reasons.append("after-relationship-observation-incomplete")
+    if not before_producers or before_producers != after_producers:
+        reasons.append("producer-bindings-differ-or-unobserved")
+    comparable = not reasons
+    return {
+        "native_relationships_comparable": comparable,
+        "native_relationships_incomparability_reasons": sorted(set(reasons)),
+        "native_relationships_added": sorted(after_relations - before_relations)
+        if comparable
+        else [],
+        "native_relationships_removed": sorted(before_relations - after_relations)
+        if comparable
+        else [],
+    }
 
 
 @operation_response("structural_locality_delta")
@@ -1169,14 +1465,7 @@ def structural_locality_delta(
         issues.append("dimensions")
     before_verifiers = _string_set(before, "verification_paths")
     after_verifiers = _string_set(after, "verification_paths")
-    before_producers, before_relations, before_valid = _native_relation_evidence(before)
-    after_producers, after_relations, after_valid = _native_relation_evidence(after)
-    native_comparable = (
-        before_valid
-        and after_valid
-        and bool(before_producers)
-        and before_producers == after_producers
-    )
+    native_delta = _native_relationship_delta(before, after, issues)
     # No comparable producer at either endpoint means no absence claim.
     semantic = {
         "schema": STRUCTURAL_LOCALITY_DELTA_SCHEMA,
@@ -1195,13 +1484,7 @@ def structural_locality_delta(
         "dimension_delta": dimension_delta,
         "verification_paths_added": sorted(after_verifiers - before_verifiers),
         "verification_paths_removed": sorted(before_verifiers - after_verifiers),
-        "native_relationships_comparable": native_comparable,
-        "native_relationships_added": sorted(after_relations - before_relations)
-        if native_comparable
-        else [],
-        "native_relationships_removed": sorted(before_relations - after_relations)
-        if native_comparable
-        else [],
+        **native_delta,
         "claims": {
             "architectural_improvement": False,
             "refactor_recommendation": False,

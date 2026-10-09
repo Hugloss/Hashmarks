@@ -1083,6 +1083,18 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def native_definitions_for_symbol(
+        self, symbol: str, *, producer: str, limit: int = 65
+    ) -> list[dict]:
+        """Bounded exact SCIP definition candidates for one producer symbol."""
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT * FROM native_definition "
+                "WHERE symbol=? AND producer=? ORDER BY path,line LIMIT ?",
+                (symbol, producer, limit),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def native_refs(self, query: str, limit: int = 200) -> list[dict]:
         q = f"%{query.lower()}%"
         with self._lock:
