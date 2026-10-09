@@ -7,6 +7,11 @@ from collections.abc import Mapping
 from typing import Any
 
 from .codemap.decision_contract import DecisionPacketContract
+from .codemap.diagnostic_observation import (
+    validated_diagnostic_delta,
+    validated_diagnostic_endpoint,
+)
+from .codemap.diagnostic_provenance import diagnostic_member_claims
 from .codemap.diagnostic_source_revision import (
     DIAGNOSTIC_SOURCE_REVISION_EVIDENCE_SCHEMA,
     normalize_source_revision_claims,
@@ -362,9 +367,16 @@ def _diagnostic_observation(
     except (TypeError, ValueError):
         reasons.append("invalid-source-revisions")
         claims = None
+    try:
+        member_claims = diagnostic_member_claims(payload)
+        validated_diagnostic_endpoint(payload)
+    except (TypeError, ValueError):
+        reasons.append("invalid-diagnostic-member-evidence")
+        member_claims = {}
     return {
         **binding,
         **({"source_revisions": claims} if "source_revisions" in payload else {}),
+        **member_claims,
     }
 
 
@@ -392,7 +404,11 @@ def _diagnostic_delta(
     reasons: list[str],
 ) -> dict[str, object]:
     _require_authority(payload, authority="observation-only", reasons=reasons)
-    return {}
+    try:
+        return validated_diagnostic_delta(payload)
+    except (TypeError, ValueError):
+        reasons.append("invalid-diagnostic-delta-evidence")
+        return {}
 
 
 def _observation_freshness(
@@ -502,6 +518,12 @@ def validate_repository_intelligence_evidence(
                 field: projection[field]
                 for field in (
                     "source_revisions",
+                    "source_provenance",
+                    "collection_by_path",
+                    "diagnostic_path_deltas",
+                    "diagnostic_path_locality",
+                    "diagnostic_change_set",
+                    "diagnostic_scope_paths",
                     "source_revision_rows",
                     "source_revision_coverage",
                     "change_set_completeness",

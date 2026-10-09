@@ -559,25 +559,6 @@ class HashmarksMcpSurface:
 
         return self._read(project)
 
-    @staticmethod
-    def _diagnostic_endpoint(packet: dict[str, Any], *, name: str) -> None:
-        from .codemap.repository_delta import (
-            EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA,
-            RepositoryDeltaMixin,
-        )
-
-        if packet.get("schema") != EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA:
-            raise ValueError(f"{name} must be an external diagnostic observation")
-        if not isinstance(packet.get("diagnostics"), list):
-            raise ValueError(f"{name} diagnostics must be a list")
-        for row in packet["diagnostics"]:
-            if (
-                not isinstance(row, dict)
-                or not isinstance(row.get("identity"), str)
-                or row["identity"] != RepositoryDeltaMixin._diagnostic_identity(row)
-            ):
-                raise ValueError(f"{name} diagnostic identity mismatch")
-
     def _compare_native_evidence(
         self,
         before: dict[str, Any],
@@ -585,6 +566,7 @@ class HashmarksMcpSurface:
         *,
         result_mode: str,
         changed_paths: list[str],
+        diagnostic_options: dict[str, Any],
     ) -> dict[str, object]:
         if result_mode == "structural":
             from .codemap.structural_locality import structural_locality_delta
@@ -593,19 +575,19 @@ class HashmarksMcpSurface:
         if result_mode == "bindings":
             self._map.sync()
             return self._map.repository_evidence_binding_delta(before, after)
-        self._diagnostic_endpoint(before, name="before")
-        self._diagnostic_endpoint(after, name="after")
         return self._map.diagnostic_observation_delta(
-            before, after, changed_paths=changed_paths
+            before, after, changed_paths=changed_paths, **diagnostic_options
         )
 
-    def evidence_comparison(
+    def evidence_comparison(  # noqa: PLR0913 - explicit diagnostic qualification inputs
         self,
         before: dict[str, Any],
         after: dict[str, Any],
         *,
         result_mode: str = operation_default_mode("evidence_comparison"),
         changed_paths: list[str] | None = None,
+        change_set_complete: bool = False,
+        relationship_evidence: dict[str, Any] | None = None,
     ) -> dict[str, object]:
         """Transport two explicit packets to their existing native comparison owner."""
         if result_mode not in ("structural", "bindings", "diagnostics"):
@@ -618,12 +600,36 @@ class HashmarksMcpSurface:
         after = _bounded_json(after, name="after", maximum=524_288, expected_type=dict)
         if result_mode != "diagnostics" and changed_paths:
             raise McpSurfaceError("changed_paths is only valid for diagnostics mode")
+        if type(change_set_complete) is not bool:
+            raise McpSurfaceError("change_set_complete must be a boolean")
+        if result_mode != "diagnostics" and (
+            change_set_complete or relationship_evidence is not None
+        ):
+            raise McpSurfaceError(
+                "diagnostic qualification inputs are only valid for diagnostics mode"
+            )
+        if relationship_evidence is not None:
+            from .codemap.evidence_correlation import CORRELATION_PACKET_MAX_BYTES
+
+            relationship_evidence = _bounded_json(
+                relationship_evidence,
+                name="relationship_evidence",
+                maximum=CORRELATION_PACKET_MAX_BYTES,
+                expected_type=dict,
+            )
         paths = _changed_paths(changed_paths) if changed_paths else []
 
         def project() -> dict[str, object]:
             try:
                 return self._compare_native_evidence(
-                    before, after, result_mode=result_mode, changed_paths=paths
+                    before,
+                    after,
+                    result_mode=result_mode,
+                    changed_paths=paths,
+                    diagnostic_options={
+                        "change_set_complete": change_set_complete,
+                        "relationship_evidence": relationship_evidence,
+                    },
                 )
             except ValueError as exc:
                 raise _surface_value_error(exc) from exc

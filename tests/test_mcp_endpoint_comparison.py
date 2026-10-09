@@ -231,8 +231,11 @@ def test_diagnostic_comparison_transports_revision_only_changes(tmp_path: Path) 
         assert delta["diagnostics"]["removed"] == []
         projection = present_repository_evidence(delta, format="compact")
         assert any(
-            row["source_ref"] == "/source_revisions"
-            for row in projection["unprojected_sections"]
+            row["kind"] == "diagnostic_source_revisions"
+            and row["details"] == delta["source_revisions"]
+            and row["assertion"] == "producer_claim"
+            for group in projection["groups"]
+            for row in group["findings"]
         )
         with pytest.raises(McpSurfaceError, match="source_revisions"):
             surface.evidence_comparison(
@@ -332,6 +335,8 @@ def test_sdk_comparisons_preserve_real_endpoints_in_all_formats(tmp_path: Path) 
             ("diagnostics", diagnostic_before, diagnostic_after),
         ):
             request = {"before": left, "after": right, "result_mode": mode}
+            if mode == "diagnostics":
+                request.update(changed_paths=["src/owner.py"], change_set_complete=True)
             baseline = await server.call_tool("evidence_comparison", request)
             assert baseline.is_error is not True
             native = baseline.structured_content
@@ -341,6 +346,10 @@ def test_sdk_comparisons_preserve_real_endpoints_in_all_formats(tmp_path: Path) 
                 if native["comparable"]:
                     assert native["dimension_delta"]["symbol_count"] == 1
             if mode == "diagnostics":
+                assert native["change_set"]["completeness"] == "caller-claimed-complete"
+                assert native["diagnostics"]["path_deltas"][0]["edit_relation"] == (
+                    "reported-changed"
+                )
                 assert (
                     native["diagnostics"]["qualification"][
                         "qualified_removed_identities"
