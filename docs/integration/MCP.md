@@ -151,6 +151,53 @@ Hashmarks intentionally exposes a small read-only repository-intelligence tool c
 | `repository_evidence` | exact evidence bindings or explicit changed-path coverage, using existing core producers and native qualification |
 | `repository_findings` | existing bounded import, cache, and concurrency repository findings |
 
+### Replacing exploratory native search with repository evidence
+
+A typical coding-agent trace runs `rg` across implementation and test folders,
+then `sed` over the resulting files and the Makefile. Hashmarks can reduce
+**discovery** calls without taking over exact source reads or command execution:
+
+| Unknown to the agent | Existing Hashmarks MCP evidence | Still consumer-owned |
+| --- | --- | --- |
+| ZIP writer / implementation owner | `task_evidence` behavior localization, candidate vs qualified owner, source range / exact next-read | Inspect and edit the selected body |
+| Where `ZipInfo` occurs in known paths | `source_observation` scoped literal occurrences | Broader regex search if literal evidence is insufficient |
+| Which tests verify the localized behavior | `task_evidence` selected verification evidence and provenance | Inspect tests, decide and run the test command |
+| The already-known `Makefile` recipe | Direct read is appropriate; Hashmarks makes no Make execution claim | Read the relevant lines and execute validation |
+
+Example MCP requests (the returned paths are illustrative, **not** claimed
+owner/verification results for this checkout):
+
+```json
+{"task":"Locate source ZIP creation and related verification tests","presentation":"compact"}
+```
+
+Pass that object to `task_evidence`. After it returns explicit paths, a scoped
+literal request to `source_observation` can be:
+
+```json
+{
+  "paths": ["hashmarks/archive.py", "tests/test_archive.py"],
+  "literal": "ZipInfo",
+  "result_mode": "scope",
+  "presentation": "compact"
+}
+```
+
+The paths above are examples only. The `scope` mode accepts at most 32 explicit
+paths and exactly one literal string per call; it never expands those paths to
+another repository scan. It is **case-sensitive literal**, not regex.
+`source_observation` returns the native revision-bound source packet alongside
+its optional presentation. Compact projection shows the first occurrence hits
+before the member inventory; omitted rows are counted and do not prove absence.
+A member-only or stale result cannot silently imply repository-wide completeness.
+
+The `task_evidence` presentation also shows independently referenced owner,
+source, verifier, verification-plan and ambiguity-discrimination rows. Owner
+candidates and suggested discrimination reads remain producer claims, and the
+verification plan is evidence, not a command performed by Hashmarks.
+The native packet is preserved, and its freshness, proof-scope completeness and
+negative-evidence limits remain authoritative.
+
 Typed finding presentations and conservative assertion semantics are specified in
 [Agent-native evidence](../reference/AGENT_NATIVE_EVIDENCE.md). These projections
 are not action recommendations and do not promote partial or producer-claimed
