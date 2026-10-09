@@ -710,6 +710,17 @@ class RepositoryDeltaMixin:
         if value and not 1 <= len(requested) <= 8:
             raise ValueError("anchor_context_lines requires 1 to 8 explicit lines")
 
+    @staticmethod
+    def _record_source_context_limits(
+        packet: dict[str, object], match_lines: int, anchor_lines: int
+    ) -> None:
+        """Keep absent optional preview limits absent from legacy packets."""
+        limits = cast("dict[str, int]", packet["limits"])
+        if match_lines:
+            limits["context_lines"] = match_lines
+        if anchor_lines:
+            limits["anchor_context_lines"] = anchor_lines
+
     def _source_observation_from_bytes(
         self, packet: dict[str, object], raw: bytes
     ) -> None:
@@ -828,12 +839,9 @@ class RepositoryDeltaMixin:
             "authority": "repository-evidence-only",
             "execution_effect": "none",
         }
-        if context_lines:
-            cast("dict[str, int]", packet["limits"])["context_lines"] = context_lines
-        if anchor_context_lines:
-            cast("dict[str, int]", packet["limits"])["anchor_context_lines"] = (
-                anchor_context_lines
-            )
+        self._record_source_context_limits(
+            packet, context_lines, anchor_context_lines
+        )
         if raw is None:
             return packet
         self._source_observation_from_bytes(packet, raw)
