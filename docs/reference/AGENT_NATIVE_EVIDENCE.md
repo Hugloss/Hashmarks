@@ -101,6 +101,34 @@ removals, transitions, and change axes retain endpoint provenance. Declaration
 claims stay explicit and producer-owned: no transitive correspondence,
 provider-name joins, or previous-observation replay state is introduced.
 
+## Discovery evidence for coding agents
+
+The existing `task_evidence` producer already separates retrieval, ownership,
+source evidence, next-read discrimination and verification. Optional presentation
+now additionally emits distinct, native-pointer-backed findings for admitted
+owner, owner candidate, owner source evidence, unresolved discrimination read,
+selected verifier, and verification plan. These are **presentations of existing
+records** rather than new owner selection or verification execution.
+
+The source row's context includes the native owner path, owner status and
+proof-scope completeness because the compact source record itself omits its
+containing owner path. An ambiguous candidate/next-read is a
+`producer_claim`, not a qualified owner, and a selected verifier or plan
+remains a producer claim. The complete native ownership/verification records
+remain visible in the original result. All projections preserve source
+pointers, current freshness and their producer-owned qualifications.
+
+For `source_observation`, the compact source group displays exact literal
+`occurrences` before `member_observations`. An explicit scope with many
+members must not displace the actual matches under the five-row display cap.
+Observed source counts and `omitted_from_presentation` still refer only to
+the supplied packet; they never prove repository-wide completeness or absence.
+
+This is not another parser, regex engine, multi-literal index, test runner,
+or agent-routing layer. The consumer uses `task_evidence` for unknown-path
+semantic localization, `source_observation` for exact literals in known
+paths, and native source reads when the full implementation matters.
+
 ## Qualified endpoint comparisons
 
 The read-only `evidence_comparison` MCP tool transports two explicit,
