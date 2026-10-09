@@ -9,9 +9,9 @@ import pytest
 
 import hashmarks.cli as cli
 import hashmarks.mcp_readiness as readiness
+from hashmarks.codemap.repository_intelligence_query import QUERY_SURFACES
 from hashmarks.mcp_contract import MCP_TOOL_NAMES
 from hashmarks.mcp_readiness import MCP_READINESS_SCHEMA, mcp_readiness
-from hashmarks.codemap.repository_intelligence_query import QUERY_SURFACES
 
 
 def test_native_server_advertises_restricted_query_surface(

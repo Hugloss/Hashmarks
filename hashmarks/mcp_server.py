@@ -186,8 +186,8 @@ def _register_agent_evidence_tools(
     # MCP derives the public input schema from this annotation. A projected
     # server must advertise the same allowlist enforced by the handler rather
     # than the complete canonical Literal used by an unprojected server.
-    repository_intelligence_query.__annotations__["surface_name"] = (
-        Literal.__getitem__(query_surfaces)
+    repository_intelligence_query.__annotations__["surface_name"] = Literal.__getitem__(
+        query_surfaces
     )
     server.tool(
         name=intelligence_contract.name,

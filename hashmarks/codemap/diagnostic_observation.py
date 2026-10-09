@@ -532,24 +532,25 @@ def _validate_delta_conservation(
                 )
 
 
+def _projection_accounting_entry(source_ref: str, value: object) -> dict[str, object]:
+    row: dict[str, object] = {
+        "source_ref": source_ref,
+        "reason": "not-copied-to-normalized-conformance-projection",
+    }
+    if isinstance(value, (Mapping, list, tuple)):
+        row["native_item_count"] = len(value)
+    if source_ref == "/relationship_evidence" and isinstance(value, Mapping):
+        identity = value.get("correlation_identity")
+        if isinstance(identity, str):
+            row["source_identity"] = identity
+    return row
+
+
 def _diagnostic_projection_accounting(
     payload: Mapping[str, object],
 ) -> list[dict[str, object]]:
     """Name diagnostic input facts not copied into consumer-normalized output."""
     omitted: list[dict[str, object]] = []
-
-    def account(source_ref: str, value: object) -> None:
-        row: dict[str, object] = {
-            "source_ref": source_ref,
-            "reason": "not-copied-to-normalized-conformance-projection",
-        }
-        if isinstance(value, (Mapping, list, tuple)):
-            row["native_item_count"] = len(value)
-        if source_ref == "/relationship_evidence" and isinstance(value, Mapping):
-            identity = value.get("correlation_identity")
-            if isinstance(identity, str):
-                row["source_identity"] = identity
-        omitted.append(row)
 
     for field in (
         "producer",
@@ -561,7 +562,7 @@ def _diagnostic_projection_accounting(
         "execution_effect",
     ):
         if field in payload:
-            account("/" + field, payload[field])
+            omitted.append(_projection_accounting_entry("/" + field, payload[field]))
 
     diagnostics = payload.get("diagnostics")
     if isinstance(diagnostics, Mapping):
@@ -577,7 +578,11 @@ def _diagnostic_projection_accounting(
             "qualification",
         ):
             if field in diagnostics:
-                account("/diagnostics/" + field, diagnostics[field])
+                omitted.append(
+                    _projection_accounting_entry(
+                        "/diagnostics/" + field, diagnostics[field]
+                    )
+                )
     return omitted
 
 

@@ -45,9 +45,7 @@ async def _observed_projection(
         schema = getattr(query_tool, "input_schema", None)
         properties = schema.get("properties") if isinstance(schema, Mapping) else None
         surface = (
-            properties.get("surface_name")
-            if isinstance(properties, Mapping)
-            else None
+            properties.get("surface_name") if isinstance(properties, Mapping) else None
         )
         choices = surface.get("enum") if isinstance(surface, Mapping) else None
         if isinstance(surface, Mapping) and isinstance(surface.get("const"), str):

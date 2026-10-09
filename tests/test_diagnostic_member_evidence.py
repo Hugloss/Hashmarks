@@ -128,8 +128,7 @@ def test_document_version_change_preserves_diagnostic_fact_identity() -> None:
     assert checked["normalized"]["source_provenance"] == delta["source_provenance"]
     assert checked["normalized"]["projection_coverage"] == "projection-only"
     omitted_refs = {
-        row["source_ref"]
-        for row in checked["normalized"]["unprojected_sections"]
+        row["source_ref"] for row in checked["normalized"]["unprojected_sections"]
     }
     assert omitted_refs == {
         "/producer",
@@ -460,12 +459,13 @@ def test_related_annotation_uses_qualified_native_evidence_without_short_name_fa
         for row in checked["normalized"]["unprojected_sections"]
         if row["source_ref"] == "/relationship_evidence"
     )
-    assert relationship_omission["source_identity"] == correlation[
-        "correlation_identity"
-    ]
-    assert checked["normalized"]["diagnostic_path_deltas"] == delta[
-        "diagnostics"
-    ]["path_deltas"]
+    assert (
+        relationship_omission["source_identity"] == correlation["correlation_identity"]
+    )
+    assert (
+        checked["normalized"]["diagnostic_path_deltas"]
+        == delta["diagnostics"]["path_deltas"]
+    )
     assert all(row["causation"] == "not-inferred" for row in rows.values())
 
 
