@@ -15,6 +15,20 @@ DIAGNOSTIC_PATH_LOCALITY_SCHEMA = "hashmarks.diagnostic-path-locality.v1"
 _MAX_REPORTED_CHANGED_PATHS = 256
 
 
+def indexed_diagnostic_rows(
+    packet: Mapping[str, object],
+) -> dict[str, Mapping[str, object]]:
+    """Reuse canonical delta's existing row-indexing semantics."""
+    rows = packet.get("diagnostics")
+    if not isinstance(rows, list):
+        return {}
+    return {
+        str(row["identity"]): row
+        for row in rows
+        if isinstance(row, Mapping) and row.get("identity")
+    }
+
+
 def _reported_paths(changed_paths: Sequence[str]) -> list[str]:
     if (
         isinstance(changed_paths, (str, bytes))
