@@ -140,6 +140,13 @@ producer actually ran against current source bytes: producer freshness,
 collection completeness, repository binding, execution outcome, and path scope
 remain separate evidence dimensions.
 
+The public `validate_repository_intelligence_evidence` validator accepts
+`unknown` freshness and preserves it as `freshness_state="unknown"` with
+`stale=None`; `require_fresh=True` rejects unknown or stale evidence. Its
+normalized external-freshness projection retains `change_set_completeness`
+and the original reason as `freshness_reason`, so conditional currentness
+remains distinguishable from an unchanged endpoint.
+
 Consumers that can independently prove a complete changed-path set may pass
 `change_set_complete=True`; callers with a filtered `git diff`, sampled
 watcher events, or otherwise partial set must leave the default unchanged.
