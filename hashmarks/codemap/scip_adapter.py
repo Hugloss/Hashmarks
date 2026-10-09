@@ -13,6 +13,14 @@ if TYPE_CHECKING:
 
 
 @dataclass(frozen=True)
+class ScipRelationship:
+    """A direct producer-asserted SCIP symbol relationship."""
+
+    kind: str
+    target_symbol: str
+
+
+@dataclass(frozen=True)
 class ScipOccurrence:
     path: str
     symbol: str
@@ -20,6 +28,8 @@ class ScipOccurrence:
     line: int
     end_line: int
     definition: bool
+    relationships: tuple[ScipRelationship, ...] = ()
+    relationships_truncated: bool = False
 
 
 def _field(value: dict[str, Any], camel: str, snake: str | None = None, default=None):
@@ -84,6 +94,31 @@ def parse_scip_json(value: dict[str, Any]) -> tuple[str, tuple[ScipOccurrence, .
         path = str(_field(document, "relativePath", "relative_path", "") or "")
         if not path:
             continue
+        # The declaring document is the only source authority for its
+        # SymbolInformation. Do not infer reverse or transitive relationships.
+        by_symbol: dict[str, set[ScipRelationship]] = {}
+        for info in document.get("symbols") or ():
+            if not isinstance(info, dict):
+                continue
+            owner = str(info.get("symbol") or "")
+            if not owner:
+                continue
+            for relation in info.get("relationships") or ():
+                if not isinstance(relation, dict):
+                    continue
+                target = str(relation.get("symbol") or "")
+                if not target:
+                    continue
+                for camel, snake, kind in (
+                    ("isReference", "is_reference", "reference"),
+                    ("isImplementation", "is_implementation", "implementation"),
+                    ("isTypeDefinition", "is_type_definition", "type_definition"),
+                    ("isDefinition", "is_definition", "definition"),
+                ):
+                    if _field(relation, camel, snake, False) is True:
+                        by_symbol.setdefault(owner, set()).add(
+                            ScipRelationship(kind=kind, target_symbol=target)
+                        )
         for occurrence in document.get("occurrences") or ():
             if not isinstance(occurrence, dict):
                 continue
@@ -92,6 +127,12 @@ def parse_scip_json(value: dict[str, Any]) -> tuple[str, tuple[ScipOccurrence, .
                 continue
             roles = int(_field(occurrence, "symbolRoles", "symbol_roles", 0) or 0)
             start, end = _range_lines(occurrence)
+            direct = sorted(
+                by_symbol.get(symbol, ()),
+                key=lambda row: (row.kind, row.target_symbol),
+            )
+            # Bounded evidence: omitted flags must never imply absence.
+            relationships = tuple(direct[:64]) if roles & 0x1 else ()
             out.append(
                 ScipOccurrence(
                     path=path.replace("\\", "/"),
@@ -100,6 +141,8 @@ def parse_scip_json(value: dict[str, Any]) -> tuple[str, tuple[ScipOccurrence, .
                     line=start,
                     end_line=end,
                     definition=bool(roles & 0x1),
+                    relationships=relationships,
+                    relationships_truncated=bool(roles & 0x1 and len(direct) > 64),
                 )
             )
     return producer, tuple(out)
