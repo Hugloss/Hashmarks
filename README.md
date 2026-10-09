@@ -139,6 +139,28 @@ native inspection; Hashmarks never executes `make`, tests, or another command.
 The agent retains responsibility for all next-tool, edit and verification
 decisions. See [MCP repository-discovery examples](docs/integration/MCP.md).
 
+For controlled harness experiments, Hashmarks can expose an explicit MCP tool
+projection with repeated `--tool`. When the selected tool includes
+`repository_intelligence_query`, repeated `--query-surface` can further restrict
+that one facade to named canonical surfaces:
+
+```bash
+hashmarks --workspace . mcp \
+  --tool repository_intelligence_query \
+  --query-surface verification-explanation
+```
+
+The restriction is server-enforced and projection-identity-bound. The projected
+server instructions, tool description, and `surface_name` input schema all
+name the permitted surfaces (`const` for one allowed surface, `enum` for more);
+calls to other `repository_intelligence_query` surfaces fail instead of silently
+falling back. The readiness receipt checks the advertised choices against the
+requested projection.
+`hashmarks doctor --mcp --mcp-tool repository_intelligence_query
+--mcp-query-surface verification-explanation` emits the model-free readiness
+receipt used by external harnesses. Omitting `--query-surface` preserves the
+complete canonical query facade and the existing tool-only projection behavior.
+
 ### Claude Code MCP server
 
 Create `.mcp.json` in the target project:

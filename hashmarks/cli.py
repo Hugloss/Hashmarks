@@ -303,6 +303,7 @@ def _doctor(args) -> int:
                 args.workspace,
                 state_dir=args.state_dir,
                 tool_names=args.mcp_tool,
+                query_surfaces=getattr(args, "mcp_query_surface", None),
             ),
         }
     _print(value)
@@ -312,7 +313,12 @@ def _doctor(args) -> int:
 def _mcp(args) -> int:
     from .mcp_server import run_stdio
 
-    run_stdio(args.workspace, state_dir=args.state_dir, tool_names=args.tool)
+    run_stdio(
+        args.workspace,
+        state_dir=args.state_dir,
+        tool_names=args.tool,
+        query_surfaces=getattr(args, "query_surface", None),
+    )
     return 0
 
 
@@ -450,6 +456,18 @@ def _add_identity_cli(sub) -> None:
         default=None,
         help="with --mcp, qualify an explicit canonical tool projection",
     )
+    from .codemap.repository_intelligence_query import QUERY_SURFACES
+
+    doctor.add_argument(
+        "--mcp-query-surface",
+        action="append",
+        choices=QUERY_SURFACES,
+        default=None,
+        help=(
+            "with --mcp, restrict repository_intelligence_query to selected "
+            "canonical query surfaces"
+        ),
+    )
     doctor.set_defaults(func=_doctor, automatic_update_check=True)
 
 
@@ -477,6 +495,18 @@ def main(argv: list[str] | None = None) -> int:
         choices=MCP_TOOL_NAMES,
         default=None,
         help="repeat to expose only the selected canonical MCP tools",
+    )
+    from .codemap.repository_intelligence_query import QUERY_SURFACES
+
+    mcp.add_argument(
+        "--query-surface",
+        action="append",
+        choices=QUERY_SURFACES,
+        default=None,
+        help=(
+            "repeat to restrict repository_intelligence_query to selected "
+            "canonical query surfaces"
+        ),
     )
     mcp.set_defaults(func=_mcp, automatic_update_check=False)
     install = sub.add_parser(
