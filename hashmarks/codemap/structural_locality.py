@@ -988,7 +988,6 @@ class StructuralLocalityMixin:
                 ),
             ),
             "verification_paths": verification_paths,
-            "native_semantic_relationships": native_semantic_relationships,
             "dimensions": dimensions,
             "claims": {
                 "refactor_recommendation": False,
@@ -997,6 +996,10 @@ class StructuralLocalityMixin:
                 "execution_authority": False,
             },
         }
+        # Avoid advertising a synthetic empty relationship row when no current
+        # SCIP definition was observed for this exact source locator.
+        if native_rows or native_source_truncated:
+            semantic["native_semantic_relationships"] = native_semantic_relationships
         return {**semantic, "evidence_identity": _identity(semantic)}
 
 
