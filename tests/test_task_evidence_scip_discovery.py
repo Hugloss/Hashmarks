@@ -85,12 +85,14 @@ def test_task_evidence_discovers_existing_scip_facts_without_reselecting_owner(
     assert after["semantic_relationships"] == {
         "authority": "scip-producer-claim-only",
         "subject": "src/engine.py::normalize_widget",
+        "observation_state": "direct-claims-observed",
         "observed_relationship_count": 1,
         "observed_kinds": ["implementation"],
         "producer_bindings": ["scip-python:test"],
         "truncated": False,
         "completeness": "unknown",
         "source_equivalence": "unknown",
+        "repository_revision_observation": "same-as-import-observation",
         "negative_evidence_admissible": False,
         "detail_surface": "structural_locality",
         "repository_freshness": after["freshness"]["state"],
@@ -146,3 +148,63 @@ def test_scip_discovery_does_not_promote_unresolved_or_denied_owners(
         codemap.import_scip(index)
         packet = codemap.task_evidence(_TASK)
         assert "semantic_relationships" not in packet
+
+
+
+def test_scip_observed_zero_claims_is_not_missing_provider_evidence(
+    tmp_path: Path,
+) -> None:
+    _repository(tmp_path)
+    index = _index(tmp_path, count=0)
+    with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
+        codemap.sync()
+        missing = codemap.task_evidence(_TASK, token_budget=256)
+        assert "semantic_relationships" not in missing
+
+        codemap.import_scip(index)
+        observed = codemap.task_evidence(_TASK, token_budget=256)
+
+    # Neither the owner nor verification authority is reselected.
+    assert observed["ownership"] == missing["ownership"]
+    assert observed["verification"] == missing["verification"]
+    discovery = observed["semantic_relationships"]
+    assert discovery["observation_state"] == "definition-observed-no-direct-claims"
+    assert discovery["observed_relationship_count"] == 0
+    assert discovery["observed_kinds"] == []
+    assert discovery["producer_bindings"] == ["scip-python:test"]
+    assert discovery["completeness"] == "unknown"
+    assert discovery["source_equivalence"] == "unknown"
+    assert discovery["repository_revision_observation"] == "same-as-import-observation"
+    assert discovery["negative_evidence_admissible"] is False
+
+    rendered = present_repository_evidence(observed, format="structured")
+    rows = [
+        row
+        for group in rendered["groups"]
+        for row in group["findings"]
+        if row["kind"] == "scip_semantic_discovery"
+    ]
+    assert len(rows) == 1
+    assert rows[0]["assertion"] == "producer_claim"
+    assert rows[0]["source_refs"] == ["/semantic_relationships"]
+
+
+def test_scip_empty_observation_invalidated_after_source_edit(
+    tmp_path: Path,
+) -> None:
+    _repository(tmp_path)
+    index = _index(tmp_path, count=0)
+    with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
+        codemap.sync()
+        codemap.import_scip(index)
+        assert codemap.task_evidence(_TASK)["semantic_relationships"][
+            "observation_state"
+        ] == "definition-observed-no-direct-claims"
+
+        (tmp_path / "src" / "engine.py").write_text(
+            "def normalize_widget(value: str) -> str:\n"
+            "    return value.strip().lower()\n",
+            encoding="utf-8",
+        )
+        codemap.sync(["src/engine.py"])
+        assert "semantic_relationships" not in codemap.task_evidence(_TASK)
