@@ -171,7 +171,19 @@ not a different ownership selector or a reason to choose an action.
 
 The compact record reports an exact `path::qualname` subject, direct observed
 relationship count and kinds, producer bindings, truncation, and the
-existing `structural_locality` detail surface. Its `evidence` field adds up to
+existing `structural_locality` detail surface.
+`observed_relationship_count_scope` explicitly identifies which count the
+summary represents: `exact-owner-scip-definition-outgoing` for captured SCIP
+definition flags, or `explicit-producer-claims-associated-with-owner` when
+there is no exact SCIP definition. The independently reported
+`associated_observed_relationship_count` counts the direct producer claims
+retained in `evidence`, which may include incoming SCIP relationships and
+request-local LSP captures. Its
+`associated_observed_relationship_count_scope` describes that wider scope.
+The two counts can differ without contradiction: a symbol can have **zero
+outgoing flags** while another definition contains a direct claim pointing
+to it. These counts are bounded observations, never exhaustive edge counts
+or agent-priority signals. Its `evidence` field adds up to
 eight direct claims, provider capability/collection/freshness qualifications,
 source correspondence and unresolved candidates, plus explicit presentation
 omission counts. `evidence_refs` point to the packet's admitted ownership,
