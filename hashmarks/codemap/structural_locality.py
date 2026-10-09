@@ -1023,6 +1023,38 @@ class StructuralLocalityMixin:
             ),
         )
 
+    def _scip_compact_discovery(
+        self, row: Mapping[str, object]
+    ) -> dict[str, object] | None:
+        """Summarize observed SCIP flags without relationship graph traversal.
+
+        Used only to describe available evidence for an already-selected exact
+        repository symbol. It neither resolves owners nor proves absent edges.
+        """
+        definitions, definition_truncated = self._fresh_native_definitions_for_path(
+            str(row["path"]), name=str(row["name"]), line=int(row["start_line"])
+        )
+        if not definitions:
+            return None
+        decoded, kinds, _revisions, relation_truncated = (
+            self._scip_decoded_relationships(definitions[:128])
+        )
+        count = sum(len(decoded[id(item)][0]) for item in definitions[:128])
+        if not count:
+            return None
+        return {
+            "authority": "scip-producer-claim-only",
+            "subject": f"{row['path']}::{row['qualname']}",
+            "observed_relationship_count": count,
+            "observed_kinds": sorted(set().union(*kinds.values())),
+            "producer_bindings": sorted(kinds),
+            "truncated": definition_truncated or relation_truncated,
+            "completeness": "unknown",
+            "source_equivalence": "unknown",
+            "negative_evidence_admissible": False,
+            "detail_surface": "structural_locality",
+        }
+
     def _scip_direct_relationships(
         self,
         target_row: Mapping[str, object],
