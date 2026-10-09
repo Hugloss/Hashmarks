@@ -101,6 +101,42 @@ never silently certify disappearance. This is a projection over existing
 external observations, not an execution check, workflow authority, or
 diagnostic identity replacement.
 
+## Post-edit diagnostic path locality (Hermes-inspired)
+
+The canonical `diagnostic_observation_delta` now projects
+`diagnostics.path_locality` over exactly the **same added/removed diagnostic
+identities** and existing `diagnostics.qualification` used elsewhere.
+
+For an explicitly caller-reported edit path set, each added and removed
+diagnostic receives one conservative locality:
+
+- `on-reported-changed-path` — the external diagnostic's explicit path
+  appears in the caller-reported changed set.
+- `outside-reported-changed-paths` — the external diagnostic names another
+  path. **This does not prove that path was unchanged, that an edit caused the
+  diagnostic, or that an import/reference/dependency relationship exists.**
+- `unknown` — no changed paths were reported, or a diagnostic path is absent
+  or invalid. An empty changed-path list is **not** a proven empty change set.
+
+The packet retains the exact normalized `changed_paths`, independent
+`change_set_completeness: unknown`, per-kind counts, and a per-diagnostic
+`collection_qualification` inherited from the existing diagnostic claim owner.
+An incomplete/timed-out collection cannot upgrade a removed fact to a
+resolved defect. Both raw `added` and `removed`, candidate relocation,
+source revision comparison and unchanged identity count remain intact.
+There is **no causality assertion**, test execution, or new timeline.
+
+The existing agent-native diagnostic presenter displays this native locality
+packet as a separate producer claim without hiding the original diagnostic
+records. In `compact`/`text` formats, native detail is retained beside the
+bounded presentation; raw identity claims are not strengthened by formatting.
+
+Implementation: `hashmarks.codemap.diagnostic_path_locality`, called by the
+existing `RepositoryDeltaMixin`; regression:
+`tests/test_diagnostic_path_locality.py`. The agent/harness still owns edits,
+verification execution, and interpreting whether an observed diagnostic on a
+different file is related to the edit.
+
 ## Source-backed location correspondence
 
 The member observer may emit bounded exact physical-line fingerprints for
