@@ -146,8 +146,7 @@ def mcp_readiness(
         normalized_tools == MCP_TOOL_NAMES
         and observed == selected
         and (
-            query_surfaces is None
-            or observed_query_surfaces == selected_query_surfaces
+            query_surfaces is None or observed_query_surfaces == selected_query_surfaces
         )
         and isinstance(summary.get("contract_identity"), str)
         and isinstance(summary.get("operation_contract_identity"), str)
@@ -173,9 +172,7 @@ def mcp_readiness(
                     state_dir=resolved_state,
                     tool_names=None if tool_names is None else selected,
                     query_surfaces=(
-                        None
-                        if query_surfaces is None
-                        else selected_query_surfaces
+                        None if query_surfaces is None else selected_query_surfaces
                     ),
                 )
             ),
