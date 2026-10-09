@@ -1056,7 +1056,9 @@ class StructuralLocalityMixin:
             "authority": "scip-producer-claim-only",
             "subject": f"{row['path']}::{row['qualname']}",
             "observation_state": (
-                "direct-claims-observed" if count else "definition-observed-no-direct-claims"
+                "direct-claims-observed"
+                if count
+                else "definition-observed-no-direct-claims"
             ),
             "observed_relationship_count": count,
             "observed_kinds": sorted(set().union(*kinds.values())),
