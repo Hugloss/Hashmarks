@@ -521,6 +521,7 @@ def validate_repository_intelligence_evidence(
                     "source_provenance",
                     "collection_by_path",
                     "diagnostic_path_deltas",
+                    "diagnostic_path_locality",
                     "diagnostic_change_set",
                     "diagnostic_scope_paths",
                     "source_revision_rows",

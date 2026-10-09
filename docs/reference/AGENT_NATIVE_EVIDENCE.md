@@ -120,6 +120,15 @@ observation or Git lifecycle is created.
   completeness, environment, path scope and candidate relocation authority
   stay visible. `changed_paths` is accepted only in this mode.
 
+Diagnostic comparisons now also expose `diagnostics.path_locality`, which
+separates added and removed diagnostics *on* reported edited members from
+diagnostics observed on *other* members. An empty or partial edited-path list
+does not become complete negative evidence; unreported scope remains unknown.
+The locality rows retain diagnostic identity, before/after membership, external
+collection qualification, and an explicit `causality: not-asserted`.
+The native packet and agent-native formatter preserve this distinction without
+turning cross-file coincidence into a proved dependency or an execution result.
+
 Two packets are required and individually bounded. This tool never starts
 a diagnostic producer, runs tests, mutates Git, derives historical snapshots,
 or chooses an agent action. The structural presenter renders incomparable

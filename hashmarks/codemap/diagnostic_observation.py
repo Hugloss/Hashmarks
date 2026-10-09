@@ -15,6 +15,10 @@ from hashmarks.operation_contract import operation_schema
 from hashmarks.paths import normalize_relative_path
 
 from .diagnostic_path_delta import _canonical_path, diagnostic_path_deltas
+from .diagnostic_path_locality import (
+    diagnostic_path_locality,
+    normalize_reported_changed_paths,
+)
 from .diagnostic_provenance import (
     COLLECTION_STATES,
     _revision_scope,
@@ -301,17 +305,16 @@ def diagnostic_observation_delta(  # noqa: PLR0913 - explicit optional endpoint 
 ) -> dict[str, object]:
     """Compare diagnostic identities; counts alone are never delta authority."""
 
+    reported_changed_paths = normalize_reported_changed_paths(changed_paths)
     before = {**before, **diagnostic_endpoint_claims(before)}
     after = {**after, **diagnostic_endpoint_claims(after)}
     old = validated_diagnostic_endpoint(before)
     new = validated_diagnostic_endpoint(after)
     old_ids = set(old)
     new_ids = set(new)
-    added_ids = sorted(new_ids - old_ids)
-    removed_ids = sorted(old_ids - new_ids)
-    scope = _revision_scope(changed_paths)
-    added = [deepcopy(new[identity]) for identity in added_ids]
-    removed = [deepcopy(old[identity]) for identity in removed_ids]
+    scope = set(reported_changed_paths)
+    added = [deepcopy(new[identity]) for identity in sorted(new_ids - old_ids)]
+    removed = [deepcopy(old[identity]) for identity in sorted(old_ids - new_ids)]
     added_in_changed_scope = [
         row for row in added if _canonical_path(row.get("path")) in scope
     ]
@@ -330,6 +333,13 @@ def diagnostic_observation_delta(  # noqa: PLR0913 - explicit optional endpoint 
         )
         if before_source is not None and after_source is not None
         else None
+    )
+    qualification = _diagnostic_claim_qualification(before, after, added, removed)
+    path_locality = diagnostic_path_locality(
+        added=added,
+        removed=removed,
+        changed_paths=reported_changed_paths,
+        qualification=qualification,
     )
 
     return {
@@ -387,16 +397,15 @@ def diagnostic_observation_delta(  # noqa: PLR0913 - explicit optional endpoint 
             "removed": removed,
             "unchanged_count": len(old_ids & new_ids),
             "added_in_changed_scope": added_in_changed_scope,
+            "path_locality": path_locality,
             "possible_relocations": possible_relocations,
             "source_correspondence": source_correspondence,
-            "qualification": _diagnostic_claim_qualification(
-                before, after, added, removed
-            ),
+            "qualification": qualification,
             "path_deltas": diagnostic_path_deltas(
                 before,
                 after,
                 (old, new),
-                changed_paths=changed_paths,
+                changed_paths=reported_changed_paths,
                 change_set_complete=change_set_complete,
                 relationship_evidence=relationship_evidence,
             ),
@@ -556,7 +565,15 @@ def validated_diagnostic_delta(payload: Mapping[str, object]) -> dict[str, objec
         raise ValueError(
             "diagnostic change_set must preserve caller-claimed completeness"
         )
-    changed = sorted(_revision_scope(change_set.get("paths")))
+    changed = normalize_reported_changed_paths(change_set.get("paths"))
+    expected_path_locality = diagnostic_path_locality(
+        added=value["added"],
+        removed=value["removed"],
+        changed_paths=changed,
+        qualification=expected_qualification,
+    )
+    if value.get("path_locality") != expected_path_locality:
+        raise ValueError("diagnostic path_locality contradicts retained evidence")
     relationships = payload.get("relationship_evidence")
     if relationships is not None and not isinstance(relationships, Mapping):
         raise ValueError("diagnostic relationship_evidence must be an object")
@@ -572,6 +589,7 @@ def validated_diagnostic_delta(payload: Mapping[str, object]) -> dict[str, objec
         raise ValueError("diagnostic path deltas contradict retained endpoint evidence")
     return {
         "diagnostic_path_deltas": deepcopy(rows),
+        "diagnostic_path_locality": deepcopy(expected_path_locality),
         "diagnostic_change_set": deepcopy(change_set),
         "diagnostic_scope_paths": deepcopy(payload["scope_paths"]),
         **{

@@ -171,6 +171,50 @@ def test_incomplete_diagnostics_never_imply_resolution(tmp_path: Path) -> None:
         surface.close()
 
 
+def test_diagnostic_comparison_transports_other_member_locality(
+    tmp_path: Path,
+) -> None:
+    scope = ["src/owner.py", "src/consumer.py"]
+
+    def observation(rows: list[dict[str, object]]) -> dict[str, object]:
+        return RepositoryDeltaMixin.external_diagnostic_observation(
+            producer="pyright",
+            binding=RepositoryGenerationBinding("repo-identity", 1),
+            diagnostics=rows,
+            outcome="fail",
+            collection_state="fresh-complete",
+            environment_identity="same-environment",
+            scope_paths=scope,
+        )
+
+    before = observation([{"tool": "pyright", "rule": "old", "path": "src/owner.py"}])
+    after = observation([{"tool": "pyright", "rule": "new", "path": "src/consumer.py"}])
+    surface = HashmarksMcpSurface(
+        str(_repo(tmp_path)), state_dir=str(tmp_path / "state")
+    )
+    try:
+        delta = surface.evidence_comparison(
+            before, after, result_mode="diagnostics", changed_paths=["src/owner.py"]
+        )
+        locality = delta["diagnostics"]["path_locality"]
+        rows = locality["rows"]
+        assert len(rows) == 2
+        assert {(row["change_kind"], row["locality"]) for row in rows} == {
+            ("removed", "on-reported-changed-path"),
+            ("added", "outside-reported-changed-paths"),
+        }
+        assert all(row["collection_qualification"] == "qualified" for row in rows)
+        assert all(row["causality"] == "not-asserted" for row in rows)
+        presentation = present_repository_evidence(delta, format="compact")
+        assert any(
+            finding["kind"] == "diagnostic_path_locality"
+            for group in presentation["groups"]
+            for finding in group["findings"]
+        )
+    finally:
+        surface.close()
+
+
 def test_diagnostic_comparison_transports_revision_only_changes(tmp_path: Path) -> None:
     before = _diagnostic(collection="fresh-complete", rows=[])
     after = {**before, "source_revisions": {"src/owner.py": "b" * 64}}
