@@ -184,10 +184,23 @@ generated from the same source bytes: `source_equivalence` and
 `negative_evidence_admissible: false`. Repository freshness is carried
 separately (`current` or `unknown`); a stale task packet is not enriched.
 
-No admitted owner, no unique current indexed symbol, or a deny policy means
-this optional record is absent. **Absence of the record does not prove absence
-of relationships.** Retained stale SCIP claims keep their explicit stale
-qualification; supplied empty/error captures keep collection/source evidence.
+An exact, current SCIP definition that reports no relationship flags is
+**observed evidence**, not the same thing as no provider observation:
+`observation_state: definition-observed-no-direct-claims` records zero
+observed flags and the SCIP producer binding. A positive count uses
+`direct-claims-observed`. Both remain non-exhaustive producer claims;
+neither zero flags nor an absent record proves that no relationships exist.
+
+`repository_revision_observation` records whether the current CodeMap file
+digest matches the repository bytes Hashmarks observed at SCIP import
+(`same-as-import-observation`, `differs-from-import-observation`, or
+`unknown`). This is **not** evidence that the SCIP producer analyzed those
+bytes and never upgrades `source_equivalence: unknown` into proven identity.
+
+No admitted owner, no unique current indexed symbol, no current SCIP
+definition or a deny policy means a SCIP discovery claim is absent.
+Retained stale SCIP claims keep their explicit stale qualification in the
+full evidence; supplied empty/error LSP captures keep collection/source evidence.
 For individual resolutions, full source bindings, and qualified deltas, query
 `structural_locality` with that exact subject and `result_mode="relationships"`.
 The optional `supplied_observations` argument (CLI `--supplied-observations`)
