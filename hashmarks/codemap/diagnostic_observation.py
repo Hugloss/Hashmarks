@@ -532,6 +532,55 @@ def _validate_delta_conservation(
                 )
 
 
+def _diagnostic_projection_accounting(
+    payload: Mapping[str, object],
+) -> list[dict[str, object]]:
+    """Name diagnostic input facts not copied into consumer-normalized output."""
+    omitted: list[dict[str, object]] = []
+
+    def account(source_ref: str, value: object) -> None:
+        row: dict[str, object] = {
+            "source_ref": source_ref,
+            "reason": "not-copied-to-normalized-conformance-projection",
+        }
+        if isinstance(value, (Mapping, list, tuple)):
+            row["native_item_count"] = len(value)
+        if source_ref == "/relationship_evidence" and isinstance(value, Mapping):
+            identity = value.get("correlation_identity")
+            if isinstance(identity, str):
+                row["source_identity"] = identity
+        omitted.append(row)
+
+    for field in (
+        "producer",
+        "producer_context",
+        "outcome",
+        "collection",
+        "relationship_evidence",
+        "authority",
+        "execution_effect",
+    ):
+        if field in payload:
+            account("/" + field, payload[field])
+
+    diagnostics = payload.get("diagnostics")
+    if isinstance(diagnostics, Mapping):
+        for field in (
+            "before_count",
+            "after_count",
+            "added",
+            "removed",
+            "unchanged_count",
+            "added_in_changed_scope",
+            "possible_relocations",
+            "source_correspondence",
+            "qualification",
+        ):
+            if field in diagnostics:
+                account("/diagnostics/" + field, diagnostics[field])
+    return omitted
+
+
 def validated_diagnostic_delta(payload: Mapping[str, object]) -> dict[str, object]:
     """Re-prove the optional per-path projection against its retained raw facts."""
     value = payload.get("diagnostics")
@@ -588,6 +637,8 @@ def validated_diagnostic_delta(payload: Mapping[str, object]) -> dict[str, objec
     if rows != expected:
         raise ValueError("diagnostic path deltas contradict retained endpoint evidence")
     return {
+        "projection_coverage": "projection-only",
+        "unprojected_sections": _diagnostic_projection_accounting(payload),
         "diagnostic_path_deltas": deepcopy(rows),
         "diagnostic_path_locality": deepcopy(expected_path_locality),
         "diagnostic_change_set": deepcopy(change_set),

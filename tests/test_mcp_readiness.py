@@ -11,6 +11,7 @@ import hashmarks.cli as cli
 import hashmarks.mcp_readiness as readiness
 from hashmarks.mcp_contract import MCP_TOOL_NAMES
 from hashmarks.mcp_readiness import MCP_READINESS_SCHEMA, mcp_readiness
+from hashmarks.codemap.repository_intelligence_query import QUERY_SURFACES
 
 
 def test_native_server_advertises_restricted_query_surface(
@@ -28,10 +29,55 @@ def test_native_server_advertises_restricted_query_surface(
         tools = asyncio.run(server.list_tools())
         assert [tool.name for tool in tools] == ["repository_intelligence_query"]
         assert "verification-explanation" in str(tools[0].description)
+        assert tools[0].input_schema["properties"]["surface_name"] == {
+            "const": "verification-explanation",
+            "title": "Surface Name",
+            "type": "string",
+        }
         assert server._hashmarks_projection_query_surfaces == (
             "verification-explanation",
         )
         assert server._hashmarks_query_surface_projection_explicit is True
+    finally:
+        server._hashmarks_surface.close()
+
+
+def test_native_server_advertises_full_query_surface_enum_by_default(
+    tmp_path: Path,
+) -> None:
+    pytest.importorskip("mcp")
+    from hashmarks.mcp_server import build_server
+
+    server = build_server(
+        tmp_path,
+        tool_names=("repository_intelligence_query",),
+    )
+    try:
+        tools = asyncio.run(server.list_tools())
+        assert tools[0].input_schema["properties"]["surface_name"]["enum"] == list(
+            QUERY_SURFACES
+        )
+    finally:
+        server._hashmarks_surface.close()
+
+
+def test_native_server_advertises_selected_query_surface_enum(
+    tmp_path: Path,
+) -> None:
+    pytest.importorskip("mcp")
+    from hashmarks.mcp_server import build_server
+
+    server = build_server(
+        tmp_path,
+        tool_names=("repository_intelligence_query",),
+        query_surfaces=("verification-explanation", "freshness"),
+    )
+    try:
+        tools = asyncio.run(server.list_tools())
+        assert tools[0].input_schema["properties"]["surface_name"]["enum"] == [
+            "verification-explanation",
+            "freshness",
+        ]
     finally:
         server._hashmarks_surface.close()
 
@@ -58,9 +104,9 @@ def test_mcp_readiness_projects_contract_and_launch(
     )
 
     async def observed(*_args, **_kwargs):
-        return MCP_TOOL_NAMES
+        return MCP_TOOL_NAMES, QUERY_SURFACES
 
-    monkeypatch.setattr(readiness, "_observed_projection_tools", observed)
+    monkeypatch.setattr(readiness, "_observed_projection", observed)
 
     result = mcp_readiness(workspace, state_dir=state)
 
@@ -167,9 +213,9 @@ def test_mcp_readiness_qualifies_explicit_tool_projection(
     )
 
     async def observed(*_args, **_kwargs):
-        return ("task_evidence",)
+        return ("task_evidence",), None
 
-    monkeypatch.setattr(readiness, "_observed_projection_tools", observed)
+    monkeypatch.setattr(readiness, "_observed_projection", observed)
 
     result = mcp_readiness(
         workspace,
@@ -209,22 +255,10 @@ def test_mcp_readiness_qualifies_query_surface_projection(
         lambda *_args, **_kwargs: canonical,
     )
 
-    async def observed_tools(*_args, **_kwargs):
-        return ("repository_intelligence_query",)
+    async def observed(*_args, **_kwargs):
+        return ("repository_intelligence_query",), ("verification-explanation",)
 
-    async def observed_surfaces(*_args, **_kwargs):
-        return ("verification-explanation",)
-
-    monkeypatch.setattr(
-        readiness,
-        "_observed_projection_tools",
-        observed_tools,
-    )
-    monkeypatch.setattr(
-        readiness,
-        "_observed_projection_query_surfaces",
-        observed_surfaces,
-    )
+    monkeypatch.setattr(readiness, "_observed_projection", observed)
 
     result = mcp_readiness(
         workspace,
@@ -271,22 +305,10 @@ def test_mcp_readiness_fails_closed_on_query_surface_observation_drift(
         lambda *_args, **_kwargs: canonical,
     )
 
-    async def observed_tools(*_args, **_kwargs):
-        return ("repository_intelligence_query",)
+    async def observed(*_args, **_kwargs):
+        return ("repository_intelligence_query",), ("freshness",)
 
-    async def observed_surfaces(*_args, **_kwargs):
-        return ("freshness",)
-
-    monkeypatch.setattr(
-        readiness,
-        "_observed_projection_tools",
-        observed_tools,
-    )
-    monkeypatch.setattr(
-        readiness,
-        "_observed_projection_query_surfaces",
-        observed_surfaces,
-    )
+    monkeypatch.setattr(readiness, "_observed_projection", observed)
 
     result = mcp_readiness(
         workspace,
@@ -298,6 +320,37 @@ def test_mcp_readiness_fails_closed_on_query_surface_observation_drift(
     assert result["projection"]["observed_repository_intelligence_query_surfaces"] == [
         "freshness"
     ]
+
+
+def test_mcp_readiness_checks_default_query_surface_schema(
+    tmp_path: Path, monkeypatch
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    canonical = {
+        "schema": "hashmarks.mcp-contract.v1",
+        "contract_identity": "sha256:contract",
+        "server_version": "0.test",
+        "tools": list(MCP_TOOL_NAMES),
+        "operation_contract_identity": "sha256:operations",
+        "error_schema": "hashmarks.mcp-error.v1",
+        "error_reasons": [],
+        "error_recovery_authority": "consumer-owned",
+    }
+    monkeypatch.setattr(
+        readiness,
+        "current_contract_summary",
+        lambda *_args, **_kwargs: canonical,
+    )
+
+    async def observed(*_args, **_kwargs):
+        return MCP_TOOL_NAMES, ("freshness",)
+
+    monkeypatch.setattr(readiness, "_observed_projection", observed)
+
+    result = mcp_readiness(workspace)
+
+    assert result["ready"] is False
 
 
 def test_doctor_parser_exposes_mcp_projection_tools() -> None:

@@ -126,6 +126,28 @@ def test_document_version_change_preserves_diagnostic_fact_identity() -> None:
     checked: Any = validate_repository_intelligence_evidence(delta)
     assert checked["valid"] is True
     assert checked["normalized"]["source_provenance"] == delta["source_provenance"]
+    assert checked["normalized"]["projection_coverage"] == "projection-only"
+    omitted_refs = {
+        row["source_ref"]
+        for row in checked["normalized"]["unprojected_sections"]
+    }
+    assert omitted_refs == {
+        "/producer",
+        "/producer_context",
+        "/outcome",
+        "/collection",
+        "/authority",
+        "/execution_effect",
+        "/diagnostics/before_count",
+        "/diagnostics/after_count",
+        "/diagnostics/added",
+        "/diagnostics/removed",
+        "/diagnostics/unchanged_count",
+        "/diagnostics/added_in_changed_scope",
+        "/diagnostics/possible_relocations",
+        "/diagnostics/source_correspondence",
+        "/diagnostics/qualification",
+    }
 
 
 @pytest.mark.parametrize(
@@ -431,7 +453,19 @@ def test_related_annotation_uses_qualified_native_evidence_without_short_name_fa
     assert rows["other.py"]["relationship"]["state"] == "unknown"
     assert rows["related.py"]["edit_relation"] == "unknown"
     assert len(delta["diagnostics"]["added"]) == 2
-    assert validate_repository_intelligence_evidence(delta)["valid"] is True
+    checked = validate_repository_intelligence_evidence(delta)
+    assert checked["valid"] is True
+    relationship_omission = next(
+        row
+        for row in checked["normalized"]["unprojected_sections"]
+        if row["source_ref"] == "/relationship_evidence"
+    )
+    assert relationship_omission["source_identity"] == correlation[
+        "correlation_identity"
+    ]
+    assert checked["normalized"]["diagnostic_path_deltas"] == delta[
+        "diagnostics"
+    ]["path_deltas"]
     assert all(row["causation"] == "not-inferred" for row in rows.values())
 
 

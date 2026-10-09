@@ -520,6 +520,8 @@ def validate_repository_intelligence_evidence(
                     "source_revisions",
                     "source_provenance",
                     "collection_by_path",
+                    "projection_coverage",
+                    "unprojected_sections",
                     "diagnostic_path_deltas",
                     "diagnostic_path_locality",
                     "diagnostic_change_set",

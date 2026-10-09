@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Mapping
 from pathlib import Path
 
 from .mcp_contract import (
@@ -16,13 +17,13 @@ from .paths import canonical_host_path
 MCP_READINESS_SCHEMA = "hashmarks.mcp-readiness.v1"
 
 
-async def _observed_projection_tools(
+async def _observed_projection(
     workspace: Path,
     *,
     state_dir: Path | None,
     tool_names: tuple[str, ...],
     query_surfaces: tuple[str, ...] | list[str] | None = None,
-) -> tuple[str, ...]:
+) -> tuple[tuple[str, ...], tuple[str, ...] | None]:
     from .mcp_server import build_server
 
     server = build_server(
@@ -33,33 +34,32 @@ async def _observed_projection_tools(
     )
     try:
         tools = await server.list_tools()
-        return tuple(str(tool.name) for tool in tools)
-    finally:
-        server._hashmarks_surface.close()
-
-
-async def _observed_projection_query_surfaces(
-    workspace: Path,
-    *,
-    state_dir: Path | None,
-    tool_names: tuple[str, ...],
-    query_surfaces: tuple[str, ...],
-) -> tuple[str, ...]:
-    from .mcp_server import build_server
-
-    server = build_server(
-        workspace,
-        state_dir=state_dir,
-        tool_names=tool_names,
-        query_surfaces=query_surfaces,
-    )
-    try:
-        observed = getattr(
-            server,
-            "_hashmarks_projection_query_surfaces",
-            (),
+        names = tuple(str(tool.name) for tool in tools)
+        query_tool = next(
+            (tool for tool in tools if tool.name == "repository_intelligence_query"),
+            None,
         )
-        return tuple(str(value) for value in observed)
+        if query_tool is None:
+            return names, None
+
+        schema = getattr(query_tool, "input_schema", None)
+        properties = schema.get("properties") if isinstance(schema, Mapping) else None
+        surface = (
+            properties.get("surface_name")
+            if isinstance(properties, Mapping)
+            else None
+        )
+        choices = surface.get("enum") if isinstance(surface, Mapping) else None
+        if isinstance(surface, Mapping) and isinstance(surface.get("const"), str):
+            observed_surfaces = (surface["const"],)
+        else:
+            observed_surfaces = (
+                tuple(choices)
+                if isinstance(choices, list)
+                and all(isinstance(value, str) for value in choices)
+                else ()
+            )
+        return names, observed_surfaces
     finally:
         server._hashmarks_surface.close()
 
@@ -105,24 +105,12 @@ def mcp_readiness(
             query_surfaces=query_surfaces,
         )
     )
-    observed = asyncio.run(
-        _observed_projection_tools(
+    observed, observed_query_surfaces = asyncio.run(
+        _observed_projection(
             workspace_path,
             state_dir=resolved_state,
             tool_names=selected,
             query_surfaces=query_surfaces,
-        )
-    )
-    observed_query_surfaces = (
-        None
-        if query_surfaces is None
-        else asyncio.run(
-            _observed_projection_query_surfaces(
-                workspace_path,
-                state_dir=resolved_state,
-                tool_names=selected,
-                query_surfaces=selected_query_surfaces,
-            )
         )
     )
     projection = (
@@ -134,10 +122,10 @@ def mcp_readiness(
             **(
                 {
                     "observed_repository_intelligence_query_surfaces": list(
-                        observed_query_surfaces
+                        observed_query_surfaces or ()
                     )
                 }
-                if observed_query_surfaces is not None
+                if "repository_intelligence_query" in selected
                 else {}
             ),
         }
@@ -146,7 +134,8 @@ def mcp_readiness(
         normalized_tools == MCP_TOOL_NAMES
         and observed == selected
         and (
-            query_surfaces is None or observed_query_surfaces == selected_query_surfaces
+            "repository_intelligence_query" not in selected
+            or observed_query_surfaces == selected_query_surfaces
         )
         and isinstance(summary.get("contract_identity"), str)
         and isinstance(summary.get("operation_contract_identity"), str)

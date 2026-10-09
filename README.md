@@ -151,8 +151,11 @@ hashmarks --workspace . mcp \
 ```
 
 The restriction is server-enforced and projection-identity-bound. The projected
-server instructions/tool description name the permitted surfaces; calls to other
-`repository_intelligence_query` surfaces fail instead of silently falling back.
+server instructions, tool description, and `surface_name` input schema all
+name the permitted surfaces (`const` for one allowed surface, `enum` for more);
+calls to other `repository_intelligence_query` surfaces fail instead of silently
+falling back. The readiness receipt checks the advertised choices against the
+requested projection.
 `hashmarks doctor --mcp --mcp-tool repository_intelligence_query
 --mcp-query-surface verification-explanation` emits the model-free readiness
 receipt used by external harnesses. Omitting `--query-surface` preserves the
