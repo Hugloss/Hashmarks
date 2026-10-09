@@ -185,8 +185,9 @@ def test_mcp_evidence_binding_and_coverage_reuse_core_qualification(
         surface.close()
 
 
-
-def test_task_evidence_projection_exposes_source_owner_and_verifier_separately() -> None:
+def test_task_evidence_projection_exposes_source_owner_and_verifier_separately() -> (
+    None
+):
     native = {
         "schema": "hashmarks.task-evidence.v5",
         "retrieval": {
