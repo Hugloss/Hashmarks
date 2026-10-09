@@ -7,6 +7,7 @@ from .mcp_contract import (
     MCP_TOOL_NAMES,
     current_contract_summary,
     mcp_projection_summary,
+    normalize_mcp_query_surfaces,
     normalize_mcp_tool_names,
 )
 from .mcp_launch import mcp_server_args
@@ -20,6 +21,7 @@ async def _observed_projection_tools(
     *,
     state_dir: Path | None,
     tool_names: tuple[str, ...],
+    query_surfaces: tuple[str, ...] | list[str] | None = None,
 ) -> tuple[str, ...]:
     from .mcp_server import build_server
 
@@ -27,10 +29,37 @@ async def _observed_projection_tools(
         workspace,
         state_dir=state_dir,
         tool_names=tool_names,
+        query_surfaces=query_surfaces,
     )
     try:
         tools = await server.list_tools()
         return tuple(str(tool.name) for tool in tools)
+    finally:
+        server._hashmarks_surface.close()
+
+
+async def _observed_projection_query_surfaces(
+    workspace: Path,
+    *,
+    state_dir: Path | None,
+    tool_names: tuple[str, ...],
+    query_surfaces: tuple[str, ...],
+) -> tuple[str, ...]:
+    from .mcp_server import build_server
+
+    server = build_server(
+        workspace,
+        state_dir=state_dir,
+        tool_names=tool_names,
+        query_surfaces=query_surfaces,
+    )
+    try:
+        observed = getattr(
+            server,
+            "_hashmarks_projection_query_surfaces",
+            (),
+        )
+        return tuple(str(value) for value in observed)
     finally:
         server._hashmarks_surface.close()
 
@@ -40,6 +69,7 @@ def mcp_readiness(
     *,
     state_dir: str | Path | None = None,
     tool_names: tuple[str, ...] | list[str] | None = None,
+    query_surfaces: tuple[str, ...] | list[str] | None = None,
 ) -> dict[str, object]:
     """Describe the local stdio MCP surface without claiming consumer admission.
 
@@ -65,24 +95,60 @@ def mcp_readiness(
         tuple(str(value) for value in tools) if isinstance(tools, list) else ()
     )
     selected = normalize_mcp_tool_names(tool_names)
+    selected_query_surfaces = normalize_mcp_query_surfaces(query_surfaces)
+    projection_summary = (
+        None
+        if tool_names is None and query_surfaces is None
+        else mcp_projection_summary(
+            summary,
+            selected,
+            query_surfaces=query_surfaces,
+        )
+    )
     observed = asyncio.run(
         _observed_projection_tools(
             workspace_path,
             state_dir=resolved_state,
             tool_names=selected,
+            query_surfaces=query_surfaces,
+        )
+    )
+    observed_query_surfaces = (
+        None
+        if query_surfaces is None
+        else asyncio.run(
+            _observed_projection_query_surfaces(
+                workspace_path,
+                state_dir=resolved_state,
+                tool_names=selected,
+                query_surfaces=selected_query_surfaces,
+            )
         )
     )
     projection = (
         None
-        if tool_names is None
+        if projection_summary is None
         else {
-            **mcp_projection_summary(summary, selected),
+            **projection_summary,
             "observed_tools": list(observed),
+            **(
+                {
+                    "observed_repository_intelligence_query_surfaces": list(
+                        observed_query_surfaces
+                    )
+                }
+                if observed_query_surfaces is not None
+                else {}
+            ),
         }
     )
     ready = (
         normalized_tools == MCP_TOOL_NAMES
         and observed == selected
+        and (
+            query_surfaces is None
+            or observed_query_surfaces == selected_query_surfaces
+        )
         and isinstance(summary.get("contract_identity"), str)
         and isinstance(summary.get("operation_contract_identity"), str)
         and isinstance(summary.get("server_version"), str)
@@ -106,6 +172,11 @@ def mcp_readiness(
                     workspace_path,
                     state_dir=resolved_state,
                     tool_names=None if tool_names is None else selected,
+                    query_surfaces=(
+                        None
+                        if query_surfaces is None
+                        else selected_query_surfaces
+                    ),
                 )
             ),
             "state_dir": None if resolved_state is None else str(resolved_state),
