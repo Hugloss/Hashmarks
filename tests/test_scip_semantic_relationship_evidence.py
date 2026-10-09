@@ -10,7 +10,6 @@ import pytest
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.structural_locality import structural_locality_delta
 
-
 _BASE = "scip-python python demo 0.1.0 `code`/Base#"
 _IMPL = "scip-python python demo 0.1.0 `code`/Impl#"
 
@@ -31,9 +30,7 @@ def _scip(root: Path, relations: list[dict[str, object]]) -> Path:
                 "documents": [
                     {
                         "relativePath": "code.py",
-                        "symbols": [
-                            {"symbol": _IMPL, "relationships": relations}
-                        ],
+                        "symbols": [{"symbol": _IMPL, "relationships": relations}],
                         "occurrences": [
                             {
                                 "range": [3, 6, 10],
@@ -82,8 +79,7 @@ def test_scip_relationship_flags_are_direct_and_provenance_bound(
         assert relations["negative_evidence_admissible"] is False
         assert relations["truncated"] is False
         assert {
-            (row["kind"], row["target_symbol"])
-            for row in relations["relationships"]
+            (row["kind"], row["target_symbol"]) for row in relations["relationships"]
         } == {
             ("implementation", _BASE),
             ("reference", _BASE),
@@ -96,9 +92,7 @@ def test_scip_relationship_flags_are_direct_and_provenance_bound(
             for row in relations["relationships"]
         )
         # SCIP implements-claims do not turn into proven call edges.
-        assert not any(
-            row.get("target_text") == _BASE for row in packet["edges"]
-        )
+        assert not any(row.get("target_text") == _BASE for row in packet["edges"])
 
         (tmp_path / "code.py").write_text(
             "class Base:\n    pass\n\nclass Impl(Base):\n    pass\n\n# changed\n",
@@ -115,10 +109,7 @@ def test_scip_relationship_truncation_and_reimport_replacement(
     _repository(tmp_path)
     index = _scip(
         tmp_path,
-        [
-            {"symbol": f"index-symbol-{i}", "isImplementation": True}
-            for i in range(65)
-        ],
+        [{"symbol": f"index-symbol-{i}", "isImplementation": True} for i in range(65)],
     )
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as cm:
         cm.sync()
