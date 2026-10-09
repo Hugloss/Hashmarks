@@ -352,9 +352,7 @@ def test_mcp_tool_projection_is_canonical_order_and_identity_bound() -> None:
 def test_mcp_query_surface_projection_is_canonical_and_identity_bound() -> None:
     canonical = {"contract_identity": "sha256:canonical"}
 
-    assert normalize_mcp_query_surfaces(
-        ["verification-explanation", "freshness"]
-    ) == (
+    assert normalize_mcp_query_surfaces(["verification-explanation", "freshness"]) == (
         "verification-explanation",
         "freshness",
     )
