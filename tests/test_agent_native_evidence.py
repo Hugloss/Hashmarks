@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from pathlib import Path
 
 import pytest
@@ -182,3 +183,131 @@ def test_mcp_evidence_binding_and_coverage_reuse_core_qualification(
             surface.repository_evidence({}, result_mode="unsupported")
     finally:
         surface.close()
+
+
+
+def test_task_evidence_projection_exposes_source_owner_and_verifier_separately() -> None:
+    native = {
+        "schema": "hashmarks.task-evidence.v5",
+        "retrieval": {
+            "results": [{"path": "src/archive.py", "name": "write_archive"}],
+            "bounds": {"canonical_completeness": "incomplete"},
+        },
+        "ownership": {
+            "status": "resolved",
+            "authority": "repository-ownership-only",
+            "proof_scope_complete": True,
+            "owner": {"path": "src/archive.py", "name": "write_archive"},
+            "candidate": None,
+            "source_evidence": {
+                "representation": "source-range",
+                "start_line": 12,
+                "end_line": 21,
+                "content": "ZipInfo(filename)",
+            },
+            "next_read": None,
+        },
+        "verification": {
+            "selected": {
+                "path": "tests/test_archive.py",
+                "name": "test_write_archive",
+            },
+            "plan": {"argv": ["python", "-m", "pytest", "-q", "tests/test_archive.py"]},
+            "authority": "repository-verification-evidence-only",
+        },
+        "evidence_receipt": {"freshness": "current"},
+    }
+    before = deepcopy(native)
+    projection = present_repository_evidence(native, format="compact")
+    groups = {group["family"]: group for group in projection["groups"]}
+    source = groups["source"]["findings"][0]
+    assert source["kind"] == "owner_source_evidence"
+    assert source["source_refs"] == ["/ownership/source_evidence"]
+    assert source["source_context"]["task_ownership"]["owner_path"] == "src/archive.py"
+    assert source["details"]["content"] == "ZipInfo(filename)"
+    ownership = groups["ownership_evidence"]["findings"]
+    assert ownership[0]["kind"] == "qualified_owner"
+    assert ownership[0]["source_refs"] == ["/ownership/owner"]
+    verifiers = groups["verification"]["findings"]
+    assert [row["kind"] for row in verifiers[:2]] == [
+        "selected_verifier",
+        "verification_plan",
+    ]
+    assert verifiers[0]["source_refs"] == ["/verification/selected"]
+    assert verifiers[1]["source_refs"] == ["/verification/plan"]
+    assert all(row["assertion"] == "producer_claim" for row in verifiers[:2])
+    assert projection["authority"] == "descriptive-only"
+    assert native == before
+    assert (
+        "owner_source_evidence"
+        in present_repository_evidence(native, format="text")["text"]
+    )
+
+
+def test_task_evidence_ambiguous_next_read_remains_non_authoritative() -> None:
+    native = {
+        "schema": "hashmarks.task-evidence.v5",
+        "retrieval": {"results": [], "bounds": {"canonical_truncation": "truncated"}},
+        "ownership": {
+            "status": "ambiguous",
+            "authority": "repository-ownership-only",
+            "proof_scope_complete": False,
+            "owner": None,
+            "candidate": {"path": "src/archive.py"},
+            "source_evidence": None,
+            "next_read": {
+                "path": "src/archive.py",
+                "reason": "ownership-ambiguity-discrimination",
+                "authority": "non-authoritative-discrimination",
+            },
+        },
+        "verification": {"selected": None, "plan": {}, "authority": ""},
+        "evidence_receipt": {},
+    }
+    groups = {
+        group["family"]: group
+        for group in present_repository_evidence(native, format="structured")["groups"]
+    }
+    rows = groups["ownership_evidence"]["findings"]
+    assert "qualified_owner" not in {row["kind"] for row in rows}
+    assert rows[0]["kind"] == "owner_candidate"
+    next_read = next(row for row in rows if row["kind"] == "discrimination_read")
+    assert next_read["assertion"] == "producer_claim"
+    assert next_read["source_context"]["task_ownership"]["status"] == "ambiguous"
+    assert next_read["details"]["authority"] == "non-authoritative-discrimination"
+
+
+def test_compact_scoped_source_projection_prioritizes_hits_over_member_inventory() -> None:
+    native = {
+        "schema": "hashmarks.scoped-source-occurrences.v1",
+        "member_observations": [
+            {"path": f"src/member_{number}.py", "state": "known-present"}
+            for number in range(8)
+        ],
+        "occurrences": [
+            {
+                "path": "src/member_7.py",
+                "line": 9,
+                "column": 4,
+                "literal": "ZipInfo",
+                "occurrence_kind": "identifier",
+            }
+        ],
+        "completeness": "incomplete",
+        "truncation": "complete",
+        "negative_evidence": "not-admissible",
+    }
+    projection = present_repository_evidence(native, format="compact")
+    sources = next(
+        group for group in projection["groups"] if group["family"] == "source"
+    )
+    assert sources["count_observed_in_packet"] == 9
+    assert sources["omitted_from_presentation"] == 4
+    assert sources["findings"][0]["kind"] == "occurrences"
+    assert sources["findings"][0]["source_refs"] == ["/occurrences/0"]
+    assert sources["findings"][0]["path"] == "src/member_7.py"
+    assert projection["coverage"] == "projection-only"
+    assert any(
+        item["source_ref"] == "" or item["source_ref"] == "/occurrences"
+        for item in projection["source_context"]
+    )
