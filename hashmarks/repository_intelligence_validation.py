@@ -7,6 +7,11 @@ from collections.abc import Mapping
 from typing import Any
 
 from .codemap.decision_contract import DecisionPacketContract
+from .codemap.diagnostic_source_revision import (
+    DIAGNOSTIC_SOURCE_REVISION_EVIDENCE_SCHEMA,
+    normalize_source_revision_claims,
+    validated_diagnostic_source_revision_evidence,
+)
 from .codemap.repository_delta import EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA
 from .freshness import FRESHNESS_STATES
 from .operation_contract import operation_schema
@@ -34,6 +39,7 @@ _CURRENT_EVIDENCE_KINDS: dict[str, str] = {
     "hashmarks.repository-intelligence-snapshot.v1": "repository-snapshot",
     "hashmarks.repository-intelligence-delta.v1": "repository-delta",
     EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA: "diagnostic-observation",
+    DIAGNOSTIC_SOURCE_REVISION_EVIDENCE_SCHEMA: "diagnostic-source-revision",
     operation_schema("evidence_comparison", "diagnostics"): "diagnostic-delta",
     "hashmarks.external-observation-freshness.v1": "observation-freshness",
 }
@@ -321,26 +327,64 @@ def _repository_delta(
     }
 
 
+def _diagnostic_binding(
+    payload: Mapping[str, object], reasons: list[str], *, generation_field: str
+) -> dict[str, object]:
+    repository_identity = payload.get("repository_identity")
+    generation = payload.get(generation_field)
+    if not isinstance(repository_identity, str) or not repository_identity:
+        reasons.append("missing-repository-identity")
+    if not _is_generation(generation):
+        reasons.append("invalid-codemap-generation")
+    return {
+        "repository_identity": repository_identity,
+        "codemap_generation": generation,
+    }
+
+
 def _diagnostic_observation(
     payload: Mapping[str, object],
     reasons: list[str],
 ) -> dict[str, object]:
     _require_authority(payload, authority="observation-only", reasons=reasons)
-    repository_identity = payload.get("repository_identity")
-    generation = payload.get("codemap_generation")
-    if not isinstance(repository_identity, str) or not repository_identity:
-        reasons.append("missing-repository-identity")
-    if not _is_generation(generation):
-        reasons.append("invalid-codemap-generation")
+    binding = _diagnostic_binding(
+        payload, reasons, generation_field="codemap_generation"
+    )
     diagnostics = payload.get("diagnostics")
     if not isinstance(diagnostics, list):
         reasons.append("invalid-diagnostics")
     elif payload.get("diagnostic_count") != len(diagnostics):
         reasons.append("diagnostic-count-mismatch")
+    try:
+        claims = normalize_source_revision_claims(
+            payload.get("source_revisions"), payload.get("scope_paths", ())
+        )
+    except (TypeError, ValueError):
+        reasons.append("invalid-source-revisions")
+        claims = None
     return {
-        "repository_identity": repository_identity,
-        "codemap_generation": generation,
+        **binding,
+        **({"source_revisions": claims} if "source_revisions" in payload else {}),
     }
+
+
+def _diagnostic_revision_evidence(
+    payload: Mapping[str, object], reasons: list[str]
+) -> dict[str, object]:
+    _require_authority(
+        payload,
+        authority="descriptive-source-revision-correspondence-only",
+        reasons=reasons,
+    )
+    binding = _diagnostic_binding(
+        payload, reasons, generation_field="diagnostic_generation"
+    )
+    try:
+        projection = validated_diagnostic_source_revision_evidence(payload)
+    except (TypeError, ValueError):
+        reasons.append("invalid-diagnostic-source-revision-evidence")
+        projection = {}
+    return {**binding, **projection}
 
 
 def _diagnostic_delta(
@@ -382,6 +426,7 @@ _VALIDATORS = {
     "hashmarks.repository-intelligence-snapshot.v1": _repository_snapshot,
     "hashmarks.repository-intelligence-delta.v1": _repository_delta,
     EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA: _diagnostic_observation,
+    DIAGNOSTIC_SOURCE_REVISION_EVIDENCE_SCHEMA: _diagnostic_revision_evidence,
     operation_schema("evidence_comparison", "diagnostics"): _diagnostic_delta,
     "hashmarks.external-observation-freshness.v1": _observation_freshness,
 }
@@ -455,7 +500,13 @@ def validate_repository_intelligence_evidence(
             "available": projection.get("available"),
             **{
                 field: projection[field]
-                for field in ("change_set_completeness", "freshness_reason")
+                for field in (
+                    "source_revisions",
+                    "source_revision_rows",
+                    "source_revision_coverage",
+                    "change_set_completeness",
+                    "freshness_reason",
+                )
                 if field in projection
             },
         }

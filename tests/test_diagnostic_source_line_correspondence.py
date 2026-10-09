@@ -94,6 +94,52 @@ def test_source_backed_unique_moved_line_preserves_raw_diagnostic_identities(
     assert proof["diagnostic_identity_authority"] is False
 
 
+@pytest.mark.parametrize("endpoint", ["before", "after"])
+@pytest.mark.parametrize("claim", ["matching", "different", "malformed"])
+def test_source_line_correspondence_respects_explicit_producer_revisions(
+    tmp_path: Path, endpoint: str, claim: str
+) -> None:
+    file = tmp_path / "src.py"
+    file.write_text("def example():\n    print(missing)\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before_source = codemap.source_observation("src.py", lines=[2])
+        before = _diagnostics(int(before_source["generation"]), 2)
+        file.write_text(
+            "def example():\n    other = 1\n    print(missing)\n", encoding="utf-8"
+        )
+        codemap.sync()
+        after_source = codemap.source_observation("src.py", lines=[3])
+        after = _diagnostics(int(after_source["generation"]), 3)
+    packet, source = (
+        (before, before_source) if endpoint == "before" else (after, after_source)
+    )
+    packet["source_revisions"] = {
+        "src.py": source["member"]["member_revision"]
+        if claim == "matching"
+        else "a" * 64
+    }
+    if claim == "malformed":
+        packet["source_revisions"] = {"outside.py": "not-a-revision"}
+        with pytest.raises(ValueError):
+            RepositoryDeltaMixin.diagnostic_observation_delta(
+                before, after, before_source=before_source, after_source=after_source
+            )
+        return
+    delta = RepositoryDeltaMixin.diagnostic_observation_delta(
+        before, after, before_source=before_source, after_source=after_source
+    )
+    correspondence = delta["diagnostics"]["source_correspondence"]
+    if claim == "matching":
+        assert len(correspondence["supported"]) == 1
+        assert correspondence["unresolved"] == []
+    else:
+        assert correspondence["supported"] == []
+        assert correspondence["unresolved"][0]["reason"] == (
+            "diagnostic-source-revision-mismatch"
+        )
+
+
 @pytest.mark.parametrize(
     ("old", "new", "reason"),
     [

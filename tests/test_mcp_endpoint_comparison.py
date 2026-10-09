@@ -171,6 +171,35 @@ def test_incomplete_diagnostics_never_imply_resolution(tmp_path: Path) -> None:
         surface.close()
 
 
+def test_diagnostic_comparison_transports_revision_only_changes(tmp_path: Path) -> None:
+    before = _diagnostic(collection="fresh-complete", rows=[])
+    after = {**before, "source_revisions": {"src/owner.py": "b" * 64}}
+    before["source_revisions"] = {"src/owner.py": "a" * 64}
+    surface = HashmarksMcpSurface(
+        str(_repo(tmp_path)), state_dir=str(tmp_path / "state")
+    )
+    try:
+        delta = surface.evidence_comparison(before, after, result_mode="diagnostics")
+        assert delta["source_revisions"]["changed"] is True
+        assert delta["source_revisions"]["before"] == before["source_revisions"]
+        assert delta["source_revisions"]["after"] == after["source_revisions"]
+        assert delta["diagnostics"]["added"] == []
+        assert delta["diagnostics"]["removed"] == []
+        projection = present_repository_evidence(delta, format="compact")
+        assert any(
+            row["source_ref"] == "/source_revisions"
+            for row in projection["unprojected_sections"]
+        )
+        with pytest.raises(McpSurfaceError, match="source_revisions"):
+            surface.evidence_comparison(
+                before,
+                {**after, "source_revisions": {"outside.py": "b" * 64}},
+                result_mode="diagnostics",
+            )
+    finally:
+        surface.close()
+
+
 def test_comparison_rejects_unsupported_modes_and_irrelevant_scope(
     tmp_path: Path,
 ) -> None:

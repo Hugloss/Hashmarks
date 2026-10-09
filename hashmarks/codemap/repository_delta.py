@@ -13,6 +13,13 @@ from hashmarks.paths import normalize_relative_path
 
 from .change_impact import ChangeImpactOptions
 from .decision_session import diagnostic_producer
+from .diagnostic_source_revision import (
+    EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA,
+    diagnostic_identity,
+    diagnostic_revision_delta,
+    diagnostic_source_revision_evidence,
+    normalize_source_revision_claims,
+)
 from .freshness_map import FreshnessMapOptions
 from .source_line_correspondence import (
     diagnostic_line_correspondence,
@@ -117,18 +124,16 @@ def _observer_descriptor() -> dict[str, object]:
 
 REPOSITORY_SNAPSHOT_SCHEMA = "hashmarks.repository-intelligence-snapshot.v1"
 REPOSITORY_DELTA_SCHEMA = "hashmarks.repository-intelligence-delta.v1"
-EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA = "hashmarks.external-diagnostic-observation.v1"
 DIAGNOSTIC_DELTA_SCHEMA = operation_schema("evidence_comparison", "diagnostics")
 
 
 class RepositoryDeltaMixin:
     """Bounded semantic snapshots and deltas over repository intelligence.
 
-    F3 owns no historical repository store.  A caller retains the earlier
-    producer snapshot and supplies it back after a later repository state has
-    been admitted.  Hashmarks derives the current snapshot from existing
-    ownership/impact/verification/freshness authority and emits only changed
-    facts plus compact semantic summaries.
+    Callers retain earlier producer snapshots and supply them after later
+    repository state is admitted. Existing ownership, impact, verification, and
+    freshness authority yields changed facts and compact summaries without
+    a historical repository store.
     """
 
     def _repository_observer_packet(self) -> dict[str, object]:
@@ -879,18 +884,11 @@ class RepositoryDeltaMixin:
     @staticmethod
     def _diagnostic_identity(row: Mapping[str, object]) -> str:
         """Canonical diagnostic identity independent of aggregate count/order."""
-        import hashlib
-        import json
+        return diagnostic_identity(row)
 
-        identity_fields = {
-            key: row.get(key)
-            for key in ("tool", "rule", "path", "symbol", "line", "column", "message")
-            if row.get(key) is not None
-        }
-        raw = json.dumps(
-            identity_fields, sort_keys=True, separators=(",", ":"), ensure_ascii=False
-        ).encode("utf-8")
-        return "sha256:" + hashlib.sha256(raw).hexdigest()
+    diagnostic_source_revision_evidence = staticmethod(
+        diagnostic_source_revision_evidence
+    )
 
     @staticmethod
     def external_diagnostic_observation(  # noqa: PLR0913 - additive producer fields
@@ -902,6 +900,7 @@ class RepositoryDeltaMixin:
         environment_identity: str | None = None,
         scope_paths: Sequence[str] = (),
         collection_state: str | None = None,
+        source_revisions: Mapping[str, str] | None = None,
     ) -> dict[str, object]:
         """Normalize externally produced diagnostics without executing the tool."""
         allowed_outcomes = {
@@ -925,6 +924,7 @@ class RepositoryDeltaMixin:
             "unknown",
         }:
             raise ValueError("unsupported diagnostic collection state")
+        revisions = normalize_source_revision_claims(source_revisions, scope_paths)
         rows = []
         for raw in diagnostics:
             row = dict(raw)
@@ -938,6 +938,7 @@ class RepositoryDeltaMixin:
             "codemap_generation": int(binding.codemap_generation),
             "environment_identity": environment_identity,
             "scope_paths": sorted({str(path) for path in scope_paths}),
+            **({"source_revisions": revisions} if revisions is not None else {}),
             "outcome": outcome,
             "diagnostics": rows,
             "diagnostic_count": len(rows),
@@ -1205,6 +1206,7 @@ class RepositoryDeltaMixin:
         return {
             "schema": DIAGNOSTIC_DELTA_SCHEMA,
             "producer": after.get("producer"),
+            "source_revisions": diagnostic_revision_delta(before, after),
             "repository": {
                 "before": before.get("repository_identity"),
                 "after": after.get("repository_identity"),
