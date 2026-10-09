@@ -265,6 +265,30 @@ class EvidenceGraphMixin:
                         "display_name": occurrence.display_name,
                         "line": occurrence.line,
                         "end_line": occurrence.end_line,
+                        "relationships_json": json.dumps(
+                            {
+                                "relationships": [
+                                    {
+                                        "kind": row.kind,
+                                        "target_symbol": row.target_symbol,
+                                    }
+                                    for row in occurrence.relationships
+                                ],
+                                "source_revision_observation": (
+                                    str(file_row["file_digest"])
+                                    if file_row.get("file_digest")
+                                    else None
+                                ),
+                                "source_revision_authority": (
+                                    "codemap-observed-at-scip-import"
+                                ),
+                                "producer_claimed_source_revision": None,
+                                "producer_source_revision_state": "not-captured-by-scip-adapter",
+                            },
+                            sort_keys=True,
+                            separators=(",", ":"),
+                        ),
+                        "relationships_truncated": occurrence.relationships_truncated,
                     }
                 )
                 continue

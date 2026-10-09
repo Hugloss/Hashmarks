@@ -712,6 +712,7 @@ def _locality(
             ("nodes", "repository_structure", "records"),
             ("edges", "relationship", "records"),
             ("unresolved_calls", "relationship", "records"),
+            ("native_semantic_relationships", "relationship", "record"),
             ("external_or_unindexed_calls", "relationship", "records"),
             ("verification_paths", "verification", "values"),
             ("dimensions", "evidence_measurement", "record"),
@@ -1221,6 +1222,37 @@ def _structural_comparison(
             ctx,
             assertion="observed_change",
         )
+    if "native_relationships_comparable" in packet:
+        p.add(
+            "qualification",
+            "scip_relationship_delta_comparable",
+            packet["native_relationships_comparable"],
+            (*ref, "native_relationships_comparable"),
+            ctx,
+        )
+        p.field(
+            packet,
+            "native_relationships_incomparability_reasons",
+            "qualification",
+            ref,
+            ctx,
+            kind="scip_relationship_delta_incomparability_reason",
+            shape="values",
+        )
+        for key, kind in (
+            ("native_relationships_added", "scip_relationship_claim_added"),
+            ("native_relationships_removed", "scip_relationship_claim_removed"),
+        ):
+            p.field(
+                packet,
+                key,
+                "relationship",
+                ref,
+                ctx,
+                kind=kind,
+                assertion="observed_change",
+                shape="values",
+            )
 
 
 def _projectors() -> dict[str, Any]:
