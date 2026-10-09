@@ -21,8 +21,7 @@ def _repository(root: Path) -> None:
     (root / "src").mkdir()
     (root / "tests").mkdir()
     (root / "src" / "engine.py").write_text(
-        "def normalize_widget(value: str) -> str:\n"
-        "    return value.strip()\n",
+        "def normalize_widget(value: str) -> str:\n    return value.strip()\n",
         encoding="utf-8",
     )
     (root / "tests" / "test_engine.py").write_text(
@@ -49,9 +48,7 @@ def _index(root: Path, *, count: int = 1) -> Path:
                 "documents": [
                     {
                         "relativePath": "src/engine.py",
-                        "symbols": [
-                            {"symbol": _SYMBOL, "relationships": relations}
-                        ],
+                        "symbols": [{"symbol": _SYMBOL, "relationships": relations}],
                         "occurrences": [
                             {
                                 "symbol": _SYMBOL,
@@ -122,7 +119,9 @@ def test_task_evidence_scip_discovery_is_bounded_and_stale_fails_closed(
         observed = codemap.task_evidence(_TASK)
         assert observed["semantic_relationships"]["observed_relationship_count"] == 64
         assert observed["semantic_relationships"]["truncated"] is True
-        assert observed["semantic_relationships"]["negative_evidence_admissible"] is False
+        assert (
+            observed["semantic_relationships"]["negative_evidence_admissible"] is False
+        )
 
         (tmp_path / "src" / "engine.py").write_text(
             "def normalize_widget(value: str) -> str:\n"
