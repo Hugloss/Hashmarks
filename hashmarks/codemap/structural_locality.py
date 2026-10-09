@@ -823,8 +823,8 @@ class StructuralLocalityMixin:
         self,
         target_row: Mapping[str, object],
         target_node: Mapping[str, object],
-    ) -> dict[str, object] | None:
-        """Project exact, generation-current SCIP flags; never infer graph edges."""
+    ) -> dict[str, object]:
+        """Project exact SCIP flags as an optional response fragment."""
         native_definitions, truncated = self._fresh_native_definitions_for_path(
             str(target_row["path"]),
             name=str(target_row["name"]),
@@ -833,7 +833,7 @@ class StructuralLocalityMixin:
         )
         native_rows = native_definitions[:128]
         if not native_rows and not truncated:
-            return None
+            return {}
         relations = sorted(
             [
                 {
@@ -856,13 +856,15 @@ class StructuralLocalityMixin:
             ),
         )
         return {
-            "authority": "scip-producer-claim-only",
-            "scope": "target-definition-start-line-only",
-            "producer_bindings": sorted({str(row["producer"]) for row in native_rows}),
-            "truncated": truncated
-            or any(bool(row["relationships_truncated"]) for row in native_rows),
-            "negative_evidence_admissible": False,
-            "relationships": relations,
+            "native_semantic_relationships": {
+                "authority": "scip-producer-claim-only",
+                "scope": "target-definition-start-line-only",
+                "producer_bindings": sorted({str(row["producer"]) for row in native_rows}),
+                "truncated": truncated
+                or any(bool(row["relationships_truncated"]) for row in native_rows),
+                "negative_evidence_admissible": False,
+                "relationships": relations,
+            }
         }
 
     def _structural_locality_impl(
@@ -896,7 +898,6 @@ class StructuralLocalityMixin:
             call_limit_per_symbol=call_limit_per_symbol,
             ref_limit_per_symbol=ref_limit_per_symbol,
         )
-        files = sorted({str(row["path"]) for row in ordered_nodes})
         verification_paths = sorted(
             {
                 str(path)
@@ -910,7 +911,7 @@ class StructuralLocalityMixin:
         )
         dimensions = {
             "symbol_count": len(ordered_nodes),
-            "file_count": len(files),
+            "file_count": len({str(row["path"]) for row in ordered_nodes}),
             "max_navigation_depth": max(
                 (int(row["navigation_depth"]) for row in ordered_nodes), default=0
             ),
@@ -995,9 +996,8 @@ class StructuralLocalityMixin:
                 "execution_authority": False,
             },
         }
-        # Keep missing native evidence distinct from an observed empty claim.
-        if (native := self._scip_direct_relationships(target_row, target_node)) is not None:
-            semantic["native_semantic_relationships"] = native
+        # Missing native evidence is not rendered as a claimed empty observation.
+        semantic.update(self._scip_direct_relationships(target_row, target_node))
         return {**semantic, "evidence_identity": _identity(semantic)}
 
 
