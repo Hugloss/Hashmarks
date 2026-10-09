@@ -79,6 +79,16 @@ def _observation() -> dict[str, Any]:
     }
 
 
+def test_scoped_literal_tool_description_stays_within_public_catalog_limit() -> None:
+    """Agent guidance must preserve strict discovery semantics within 220 chars."""
+    description = tool_contract("source_observation").description
+    assert len(description) < 220
+    assert "literal" in description
+    assert "not regex" in description
+    assert "32" in description
+    assert "repository-wide absence" in description
+
+
 def test_mcp_contract_manifest_is_deterministic_and_complete() -> None:
     first = qualify_mcp_observation(_observation())
     second = qualify_mcp_observation(copy.deepcopy(_observation()))
