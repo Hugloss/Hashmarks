@@ -1053,6 +1053,16 @@ def _task(
     # distinct source pointers before the aggregate fields.
     _task_ownership(p, packet, ref, ctx)
     _task_verification(p, packet, ref, ctx)
+    p.field(
+        packet,
+        "semantic_relationships",
+        "relationship",
+        ref,
+        ctx,
+        kind="scip_semantic_discovery",
+        shape="record",
+        assertion="producer_claim",
+    )
     _fields(
         p,
         packet,
