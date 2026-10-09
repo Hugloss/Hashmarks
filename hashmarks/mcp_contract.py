@@ -266,7 +266,8 @@ MCP_TOOL_CONTRACTS = (
         (
             "After localization, observe exact literals (not regex) in one member "
             "or up to 32 known paths. Return locations, revisions, coverage, scoped "
-            "absence and optional context excerpts; never infer repository-wide absence."
+            "absence, literal context, and bounded context for explicit lines; "
+            "never infer repository-wide absence."
         ),
         "source_observation",
     ),
