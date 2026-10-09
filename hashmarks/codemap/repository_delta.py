@@ -682,6 +682,34 @@ class RepositoryDeltaMixin:
                     literal_length=len(literal),
                 )
 
+    def _attach_source_anchor_context(
+        self, packet: dict[str, object], text: str
+    ) -> None:
+        """Attach preview text only to qualified anchors from stable source bytes."""
+        if not cast("dict[str, int]", packet["limits"]).get("anchor_context_lines", 0):
+            return
+        source_lines = text.split("\n")
+        if text.endswith("\n"):
+            source_lines.pop()
+        for anchor in cast("list[dict[str, object]]", packet["line_anchors"]):
+            if anchor["state"] != "observed":
+                continue
+            anchor["context_excerpt"] = self._source_context_excerpt(
+                source_lines,
+                line=cast("int", anchor["line"]),
+                column=1,
+                literal_length=0,
+                anchor_role="anchor",
+            )
+
+    @staticmethod
+    def _validate_anchor_context_lines(value: object, requested: Sequence[int]) -> None:
+        """Reject malformed and unbounded line-preview requests before source work."""
+        if type(value) is not int or value not in (0, 1):
+            raise ValueError("anchor_context_lines must be 0 or 1")
+        if value and not 1 <= len(requested) <= 8:
+            raise ValueError("anchor_context_lines requires 1 to 8 explicit lines")
+
     def _source_observation_from_bytes(
         self, packet: dict[str, object], raw: bytes
     ) -> None:
@@ -713,20 +741,7 @@ class RepositoryDeltaMixin:
             packet["line_anchors"], packet["line_coverage"] = source_line_anchors(
                 raw, requested=requested, member=member
             )
-            if cast("dict[str, int]", packet["limits"]).get("anchor_context_lines", 0):
-                source_lines = text.split("\n")
-                if text.endswith("\n"):
-                    source_lines.pop()
-                for anchor in cast("list[dict[str, object]]", packet["line_anchors"]):
-                    if anchor["state"] != "observed":
-                        continue
-                    anchor["context_excerpt"] = self._source_context_excerpt(
-                        source_lines,
-                        line=cast("int", anchor["line"]),
-                        column=1,
-                        literal_length=0,
-                        anchor_role="anchor",
-                    )
+            self._attach_source_anchor_context(packet, text)
         if literal is None:
             return
         symbols = (
@@ -784,10 +799,7 @@ class RepositoryDeltaMixin:
         if context_lines and literal is None:
             raise ValueError("context_lines requires a literal")
         requested = validated_source_lines(lines)
-        if type(anchor_context_lines) is not int or anchor_context_lines not in (0, 1):
-            raise ValueError("anchor_context_lines must be 0 or 1")
-        if anchor_context_lines and not 1 <= len(requested) <= 8:
-            raise ValueError("anchor_context_lines requires 1 to 8 explicit lines")
+        self._validate_anchor_context_lines(anchor_context_lines, requested)
         generation_before = self.store.generation()
         member, raw = self._bounded_source_observation(relpath, max_bytes)
         generation, identity_generation, stale = self._generation_status()
