@@ -495,6 +495,7 @@ class CodeMapService:
             limit=limit,
             per_role=per_role,
             token_budget=token_budget,
+            supplied_observations=request.get("supplied_observations"),
         )
         return {"ok": True, "task_evidence": result}
 
@@ -1054,6 +1055,7 @@ class CodeMapServiceClient:
         limit: int = TASK_EVIDENCE_DEFAULT_OPTIONS.limit,
         per_role: int = TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
         token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
+        supplied_observations: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         return dict(
             self.request(
@@ -1062,6 +1064,7 @@ class CodeMapServiceClient:
                 limit=limit,
                 per_role=per_role,
                 token_budget=token_budget,
+                supplied_observations=supplied_observations,
             )["task_evidence"]
         )
 

@@ -290,7 +290,7 @@ MCP_TOOL_CONTRACTS = (
         "structural_locality",
         (
             "Observe static calls, exact callers, unresolved targets, verifier paths "
-            "and direct SCIP relationship claims for one exact symbol; preserve "
+            "and direct SCIP or supplied LSP relationship claims for one exact symbol; preserve "
             "provenance, coverage and uncertainty."
         ),
         "structural_locality",
@@ -298,7 +298,7 @@ MCP_TOOL_CONTRACTS = (
     McpToolContract(
         "evidence_comparison",
         (
-            "Compare structural, binding, or diagnostic observation endpoints. "
+            "Compare structural, binding, diagnostic, or qualified relationship endpoints. "
             "Keep native incomparability and collection uncertainty; never infer fixes."
         ),
         "evidence_comparison",

@@ -72,6 +72,7 @@ _EXPECTED = {
         "structural": "hashmarks.structural-locality-delta.v1",
         "bindings": "hashmarks.repository-evidence-binding-delta.v1",
         "diagnostics": "hashmarks.diagnostic-observation-delta.v1",
+        "relationships": "hashmarks.semantic-relationship-delta.v1",
     },
     "projects": {"default": "hashmarks.codemap-projects.v1"},
     "outline": {"default": "hashmarks.outline.v1"},
@@ -81,8 +82,14 @@ _EXPECTED = {
     "source": {"default": "hashmarks.source.v1"},
     "affected": {"default": "hashmarks.codemap-affected.v1"},
     "tests": {"default": "hashmarks.codemap-tests.v1"},
-    "structural_locality": {"default": "hashmarks.structural-locality.v1"},
-    "structural_locality_delta": {"default": "hashmarks.structural-locality-delta.v1"},
+    "structural_locality": {
+        "default": "hashmarks.structural-locality.v1",
+        "relationships": "hashmarks.semantic-relationship-observation.v1",
+    },
+    "structural_locality_delta": {
+        "default": "hashmarks.structural-locality-delta.v1",
+        "relationships": "hashmarks.semantic-relationship-delta.v1",
+    },
     "context": {"default": "hashmarks.context-pack.v2"},
     "repository_findings": {"default": "hashmarks.repository-findings.v1"},
     "import_ownership": {"default": "hashmarks.import-ownership.v2"},
@@ -363,14 +370,6 @@ _FIXED_MODE_CORE_BOUNDARIES = {
     "source": ("hashmarks/codemap/query_surface.py", "source"),
     "affected": ("hashmarks/codemap/query_surface.py", "affected"),
     "tests": ("hashmarks/codemap/query_surface.py", "tests"),
-    "structural_locality": (
-        "hashmarks/codemap/structural_locality.py",
-        "structural_locality",
-    ),
-    "structural_locality_delta": (
-        "hashmarks/codemap/structural_locality.py",
-        "structural_locality_delta",
-    ),
     "context": ("hashmarks/codemap/model.py", "ContextPack.as_dict"),
     "repository_findings": (
         "hashmarks/codemap/ownership_analysis.py",

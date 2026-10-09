@@ -116,6 +116,7 @@ OPERATION_CONTRACTS = (
             ("structural", "hashmarks.structural-locality-delta.v1"),
             ("bindings", "hashmarks.repository-evidence-binding-delta.v1"),
             ("diagnostics", "hashmarks.diagnostic-observation-delta.v1"),
+            ("relationships", "hashmarks.semantic-relationship-delta.v1"),
         ),
     ),
     OperationContract("projects", (("default", "hashmarks.codemap-projects.v1"),)),
@@ -134,11 +135,17 @@ OPERATION_CONTRACTS = (
     OperationContract("tests", (("default", "hashmarks.codemap-tests.v1"),)),
     OperationContract(
         "structural_locality",
-        (("default", "hashmarks.structural-locality.v1"),),
+        (
+            ("default", "hashmarks.structural-locality.v1"),
+            ("relationships", "hashmarks.semantic-relationship-observation.v1"),
+        ),
     ),
     OperationContract(
         "structural_locality_delta",
-        (("default", "hashmarks.structural-locality-delta.v1"),),
+        (
+            ("default", "hashmarks.structural-locality-delta.v1"),
+            ("relationships", "hashmarks.semantic-relationship-delta.v1"),
+        ),
     ),
     OperationContract("context", (("default", "hashmarks.context-pack.v2"),)),
     OperationContract(

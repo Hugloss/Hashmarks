@@ -1071,27 +1071,75 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         return [dict(row) for row in rows]
 
     def native_definitions_for_path(
-        self, path: str, *, name: str, line: int, limit: int = 129
+        self,
+        path: str,
+        *,
+        name: str,
+        line: int,
+        limit: int = 129,
+        producer: str | None = None,
     ) -> list[dict]:
         """Bounded SCIP definitions for one exact admitted source locator."""
+        scope = " AND producer=?" if producer is not None else ""
+        parameters = (
+            (path, name, line, producer, limit)
+            if producer is not None
+            else (path, name, line, limit)
+        )
         with self._lock:
             rows = self._db.execute(
                 "SELECT * FROM native_definition "
-                "WHERE path=? AND display_name=? AND line=? "
+                f"WHERE path=? AND display_name=? AND line=?{scope} "
                 "ORDER BY symbol,producer LIMIT ?",
-                (path, name, line, limit),
+                parameters,
             ).fetchall()
         return [dict(row) for row in rows]
 
     def native_definitions_for_symbol(
-        self, symbol: str, *, producer: str, limit: int = 65
+        self,
+        symbol: str,
+        *,
+        producer: str,
+        limit: int = 65,
+        document_path: str | None = None,
     ) -> list[dict]:
         """Bounded exact SCIP definition candidates for one producer symbol."""
+        scope = " AND path=?" if document_path is not None else ""
+        parameters = (
+            (symbol, producer, document_path, limit)
+            if document_path is not None
+            else (symbol, producer, limit)
+        )
         with self._lock:
             rows = self._db.execute(
                 "SELECT * FROM native_definition "
-                "WHERE symbol=? AND producer=? ORDER BY path,line LIMIT ?",
-                (symbol, producer, limit),
+                f"WHERE symbol=? AND producer=?{scope} ORDER BY path,line LIMIT ?",
+                parameters,
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def native_relationships_mentioning(
+        self,
+        symbols: list[str],
+        *,
+        producer: str,
+        document_path: str,
+        limit: int = 129,
+    ) -> list[dict]:
+        """Select explicit producer records, preserving their original direction."""
+        if not symbols:
+            return []
+        placeholders = ",".join("?" for _ in symbols)
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT DISTINCT d.* FROM native_definition d, "
+                "json_each(CASE WHEN json_type(d.relationships_json)='array' "
+                "THEN d.relationships_json ELSE json_extract(d.relationships_json,'$.relationships') END) r "
+                "WHERE d.producer=? "
+                f"AND json_extract(r.value,'$.target_symbol') IN ({placeholders}) "
+                "AND (json_extract(r.value,'$.target_symbol') NOT LIKE 'local %' OR d.path=?) "
+                "ORDER BY d.path,d.symbol,d.line LIMIT ?",
+                (producer, *symbols, document_path, limit),
             ).fetchall()
         return [dict(row) for row in rows]
 

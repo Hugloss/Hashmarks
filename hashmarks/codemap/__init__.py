@@ -33,6 +33,7 @@ from .repository_declaration_provider import (
     RepositoryDeclarationProviderResult,
 )
 from .repository_intelligence_query import RepositoryIntelligenceQueryOptions
+from .semantic_relationship_delta import semantic_relationship_delta
 from .service import CodeMapService, CodeMapServiceClient, default_codemap_socket
 from .structural_locality import structural_locality_delta
 from .worktree_overlay import WorktreeOverlay, WorktreeOverlayBaseChangedError
@@ -61,6 +62,7 @@ __all__ = [
     "WorktreeOverlay",
     "WorktreeOverlayBaseChangedError",
     "structural_locality_delta",
+    "semantic_relationship_delta",
     "COMPACT_PROJECT_IMPACT_SCHEMA",
     "compact_project_impact",
     "expand_project_impact",
