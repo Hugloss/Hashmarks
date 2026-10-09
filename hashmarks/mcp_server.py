@@ -183,6 +183,7 @@ def _register_agent_evidence_tools(
         literal: str | None = None,
         result_mode: _SourceObservationResultMode = source_contract.default_response_mode,
         limit: int = 50,
+        context_lines: int = 0,
         presentation: _Presentation = "none",
     ) -> dict[str, object]:
         return _call_surface(
@@ -194,6 +195,7 @@ def _register_agent_evidence_tools(
             result_mode=result_mode,
             response_mode=result_mode,
             limit=limit,
+            context_lines=context_lines,
             presentation=presentation,
         )
 
