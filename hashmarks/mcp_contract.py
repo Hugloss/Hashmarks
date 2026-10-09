@@ -48,9 +48,11 @@ MCP_SERVER_INSTRUCTIONS = (
     "authority, resolve a unique owner when admissible, preserve ambiguity when it cannot, "
     "return bounded source evidence or an exact next-read, select verification evidence "
     "and a verification plan, and report freshness. Prefer that semantic reduction over "
-    "reconstructing ownership from repeated native search/read calls. Use native read for "
-    "a unique known path or for the targeted next-read returned by Hashmarks. For a known "
-    "exact symbol whose path is unknown, use find. After explicit changed paths exist, "
+    "reconstructing ownership from repeated native search/read calls. For exact literal "
+    "occurrences within already known paths, use source_observation with an explicit "
+    "bounded member scope; it is not regex or repository-wide search. Use native read for "
+    "a unique known path, a targeted next-read, or a source body needed for editing. For "
+    "a known exact symbol whose path is unknown, use find. After changed paths exist, "
     "use change_impact or post_change when relevant. Caller-visible tool failures carry "
     "hashmarks.mcp-error.v1 JSON with consumer-owned recovery. Hashmarks does not replace "
     "editing, shell, tests, or git."
@@ -262,8 +264,10 @@ MCP_TOOL_CONTRACTS = (
     McpToolContract(
         "source_observation",
         (
-            "Observe exact source occurrences for one member or an explicit bounded "
-            "member set, with exact revisions, coverage and qualified absence."
+            "After localization, observe literal (not regex) occurrences in one known "
+            "member or up to 32 explicit paths; return exact line/column, revisions, "
+            "coverage, and scoped qualified absence. Prefer to repeated native grep "
+            "inside those files; do not infer repository-wide absence."
         ),
         "source_observation",
     ),
