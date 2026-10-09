@@ -1169,12 +1169,8 @@ def structural_locality_delta(
         issues.append("dimensions")
     before_verifiers = _string_set(before, "verification_paths")
     after_verifiers = _string_set(after, "verification_paths")
-    before_producers, before_relations, before_valid = _native_relation_evidence(
-        before
-    )
-    after_producers, after_relations, after_valid = _native_relation_evidence(
-        after
-    )
+    before_producers, before_relations, before_valid = _native_relation_evidence(before)
+    after_producers, after_relations, after_valid = _native_relation_evidence(after)
     native_comparable = (
         before_valid
         and after_valid
