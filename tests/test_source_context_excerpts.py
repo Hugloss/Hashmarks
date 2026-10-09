@@ -172,7 +172,6 @@ def test_invalid_context_fails_before_source_observation(
             )
 
 
-
 def test_source_line_keywords_remain_supported_but_typos_fail_early(
     tmp_path: Path,
 ) -> None:
@@ -181,7 +180,9 @@ def test_source_line_keywords_remain_supported_but_typos_fail_early(
         codemap.sync()
         with pytest.raises(TypeError, match="unexpected source observation keyword"):
             codemap.source_observation(
-                "sample.py", literal="needle", context_line=1  # type: ignore[call-arg]
+                "sample.py",
+                literal="needle",
+                context_line=1,  # type: ignore[call-arg]
             )
         observed = codemap.source_observation(
             "sample.py", literal="needle", lines=(1,), context_lines=1
