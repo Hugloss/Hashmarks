@@ -56,6 +56,61 @@ The exact member source observation is now also exposed through the existing
 read-only `source_observation` MCP tool. This is transport over the same CodeMap
 owner; it adds no independent index or execution backend.
 
+## Optional contextual match excerpts (Hermes harness borrowing)
+
+Hermes's `search_files` can return source context around matching lines. Hashmarks
+already owns admitted, revision-bound exact literal occurrences, but a hit
+previously returned a location without nearby source text. Consumers could
+need another `sed` or file-read call even when a brief context window would
+suffice to classify the match.
+
+Use **the existing** source observer, not another search engine:
+
+```python
+with CodeMap(".") as codemap:
+    codemap.sync()
+    packet = codemap.source_observation(
+        "src/example.py", literal="target", context_lines=1
+    )
+    hit = packet["occurrences"][0]
+    excerpt = hit["context_excerpt"]
+```
+
+The existing read-only `source_observation` MCP tool accepts
+`context_lines=1` in both `member` and `scope` modes. Omit it (or use
+`context_lines=0`) for byte-for-byte-compatible existing packets.
+Only `0` or `1` is valid; requesting context without an exact
+single-line literal fails before source observation.
+
+- A displayed match contains its original physical line and at most one
+  neighbor on each side. Every excerpt line supplies its original 1-based
+  `line`, 1-based `start_column`, `role` (`match` or `context`),
+  source `text` clipped to **320 Unicode codepoints**, and explicit
+  `truncated_left` / `truncated_right` flags. The match-line window is
+  positioned to retain the entire literal (maximum 256 codepoints).
+- Only the *original admitted and stable* member byte capture is used; no
+  second filesystem read, recursive scan, index, cache, or persistent history.
+  All source visibility, exact path admission, per-member and scoped byte
+  budgets, and canonical revisions remain unchanged. Denied, unavailable,
+  oversized, binary, invalid UTF-8 and unreconciled sources reveal no excerpt.
+- Context is **display-only**, not an independent ownership assertion,
+  negative-evidence proof, or verification result. An occurrence's existing
+  `evidence_identity`, exact line/column and revision do not change when
+  context is requested. The enclosing observation identity *does* distinguish
+  a context-bearing request from the original location-only response.
+- CRLF's terminal `\\r` is omitted from displayed text; line and column
+  coordinates continue to refer to the original source. Long lines have
+  explicit clipping metadata and may require a native source read to edit.
+- Up to the existing 50 MCP occurrence rows may be returned, with at most
+  three short excerpt lines each. Returned context never proves unseen
+  matches or missing symbols; completeness, freshness and negative-evidence
+  qualifications remain under the existing source owner.
+
+This borrows a useful evidence **shape** from Hermes without taking over
+agent tool selection, arbitrary regex search, code-editing, or runtime
+read-deduplication. Regression coverage:
+`tests/test_source_context_excerpts.py`.
+
 ## Exact scoped multi-member observation (H1 follow-up)
 
 ```python
