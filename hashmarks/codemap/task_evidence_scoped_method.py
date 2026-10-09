@@ -190,6 +190,17 @@ class TaskEvidenceScopedMethodMixin:
             packet["semantic_relationships"] = {
                 **(discovery or compact),
                 "repository_freshness": freshness["state"],
+                "observed_relationship_count_scope": (
+                    "exact-owner-scip-definition-outgoing"
+                    if discovery is not None
+                    else "explicit-producer-claims-associated-with-owner"
+                ),
+                "associated_observed_relationship_count": compact[
+                    "observed_relationship_count"
+                ],
+                "associated_observed_relationship_count_scope": (
+                    "explicit-producer-claims-associated-with-owner"
+                ),
                 "evidence": compact,
                 "evidence_refs": {
                     "ownership": "/ownership",
