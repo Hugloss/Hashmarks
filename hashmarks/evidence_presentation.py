@@ -686,9 +686,11 @@ def _source(
         ref,
         ctx,
         (
+            # Literal hits are more useful to an agent than a long member
+            # inventory; compact presentation must show hits before inventory.
+            ("occurrences", "source", "records"),
             ("member", "source", "record"),
             ("member_observations", "source", "records"),
-            ("occurrences", "source", "records"),
             ("source_shape", "evidence_measurement", "record"),
         ),
     )
@@ -912,6 +914,80 @@ def _find(
     p.field(packet, "results", "retrieval_evidence", ref, ctx)
 
 
+def _task_ownership(
+    p: _Projection,
+    packet: Mapping[str, object],
+    ref: tuple[object, ...],
+    ctx: Mapping[str, object],
+) -> None:
+    """Present existing ownership facts without choosing or upgrading an owner."""
+    ownership = packet.get("ownership")
+    if isinstance(ownership, Mapping):
+        owner = ownership.get("owner")
+        owner_path = owner.get("path") if isinstance(owner, Mapping) else None
+        ownership_context = {
+            **ctx,
+            "task_ownership": {
+                "status": ownership.get("status"),
+                "authority": ownership.get("authority"),
+                "proof_scope_complete": ownership.get("proof_scope_complete"),
+                "owner_path": owner_path,
+            },
+        }
+        for key, family, kind, assertion in (
+            ("owner", "ownership_evidence", "qualified_owner", "observed_fact"),
+            ("candidate", "ownership_evidence", "owner_candidate", "producer_claim"),
+            ("source_evidence", "source", "owner_source_evidence", "observed_fact"),
+            (
+                "next_read",
+                "ownership_evidence",
+                "discrimination_read",
+                "producer_claim",
+            ),
+        ):
+            if isinstance(ownership.get(key), Mapping):
+                p.field(
+                    ownership,
+                    key,
+                    family,
+                    (*ref, "ownership"),
+                    ownership_context,
+                    kind=kind,
+                    shape="record",
+                    assertion=assertion,
+                )
+
+
+def _task_verification(
+    p: _Projection,
+    packet: Mapping[str, object],
+    ref: tuple[object, ...],
+    ctx: Mapping[str, object],
+) -> None:
+    """Show producer-owned verification choices without executing them."""
+    verification = packet.get("verification")
+    if isinstance(verification, Mapping):
+        verification_context = {
+            **ctx,
+            "verification_authority": verification.get("authority"),
+        }
+        for key, kind in (
+            ("selected", "selected_verifier"),
+            ("plan", "verification_plan"),
+        ):
+            if isinstance(verification.get(key), Mapping):
+                p.field(
+                    verification,
+                    key,
+                    "verification",
+                    (*ref, "verification"),
+                    verification_context,
+                    kind=kind,
+                    shape="record",
+                    assertion="producer_claim",
+                )
+
+
 def _task(
     p: _Projection,
     packet: Mapping[str, object],
@@ -938,6 +1014,10 @@ def _task(
             retrieval, "results", "retrieval_evidence", retrieval_ref, retrieval_context
         )
         p.used.add(_pointer(retrieval_ref))
+    # Preserve native ownership and verification records, but surface their
+    # distinct source pointers before the aggregate fields.
+    _task_ownership(p, packet, ref, ctx)
+    _task_verification(p, packet, ref, ctx)
     _fields(
         p,
         packet,

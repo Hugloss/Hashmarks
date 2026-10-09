@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import re
 from pathlib import Path
 from typing import Any
 
@@ -76,6 +77,16 @@ def _observation() -> dict[str, Any]:
             for contract in MCP_TOOL_CONTRACTS
         ],
     }
+
+
+def test_scoped_literal_tool_description_stays_within_public_catalog_limit() -> None:
+    """Agent guidance must preserve strict discovery semantics within 220 chars."""
+    description = tool_contract("source_observation").description
+    assert len(description) < 220
+    assert "literal" in description
+    assert "not regex" in description
+    assert "32" in description
+    assert "repository-wide absence" in description
 
 
 def test_mcp_contract_manifest_is_deterministic_and_complete() -> None:
@@ -348,3 +359,12 @@ def test_mcp_tool_projection_rejects_empty_duplicate_and_unknown_tools() -> None
 
 def test_full_projection_preserves_canonical_server_instructions() -> None:
     assert mcp_projection_instructions(MCP_TOOL_NAMES) == MCP_SERVER_INSTRUCTIONS
+
+
+def test_public_readme_lists_exact_canonical_mcp_tool_catalog() -> None:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    tool_section = readme.split("## MCP server for coding agents", 1)[1].split(
+        "### From exploratory grep to qualified evidence", 1
+    )[0]
+    documented = re.findall(r"^\| `([a-z_]+)` \|", tool_section, re.MULTILINE)
+    assert documented == list(MCP_TOOL_NAMES)
