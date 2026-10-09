@@ -217,6 +217,7 @@ def test_task_evidence_projection_exposes_source_owner_and_verifier_separately()
             "authority": "repository-verification-evidence-only",
         },
         "evidence_receipt": {"freshness": "current"},
+        "freshness": {"state": "current", "reason": None},
     }
     before = deepcopy(native)
     projection = present_repository_evidence(native, format="compact")
@@ -228,6 +229,7 @@ def test_task_evidence_projection_exposes_source_owner_and_verifier_separately()
     assert source["details"]["content"] == "ZipInfo(filename)"
     ownership = groups["ownership_evidence"]["findings"]
     assert ownership[0]["kind"] == "qualified_owner"
+    assert ownership[0]["source_context"]["task_ownership"]["freshness_state"] == "current"
     assert ownership[0]["source_refs"] == ["/ownership/owner"]
     verifiers = groups["verification"]["findings"]
     assert [row["kind"] for row in verifiers[:2]] == [
