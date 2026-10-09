@@ -265,7 +265,7 @@ MCP_TOOL_CONTRACTS = (
         "source_observation",
         (
             "After localization, observe exact literals in one member or up to 32 "
-            "explicit paths (no regex). Show optional match or named-line context. "
+            "explicit paths (not regex). Show optional match or named-line context. "
             "Return revisions and scoped coverage; never claim repository-wide absence."
         ),
         "source_observation",
