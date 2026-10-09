@@ -97,6 +97,11 @@ def test_task_evidence_discovers_existing_scip_facts_without_reselecting_owner(
         "negative_evidence_admissible": False,
         "detail_surface": "structural_locality",
         "repository_freshness": after["freshness"]["state"],
+        "observed_relationship_count_scope": "exact-owner-scip-definition-outgoing",
+        "associated_observed_relationship_count": 1,
+        "associated_observed_relationship_count_scope": (
+            "explicit-producer-claims-associated-with-owner"
+        ),
     }
     assert {key: after["semantic_relationships"][key] for key in expected} == expected
     enriched = after["semantic_relationships"]["evidence"]
@@ -183,6 +188,10 @@ def test_scip_observed_zero_claims_is_not_missing_provider_evidence(
     discovery = observed["semantic_relationships"]
     assert discovery["observation_state"] == "definition-observed-no-direct-claims"
     assert discovery["observed_relationship_count"] == 0
+    assert discovery["observed_relationship_count_scope"] == (
+        "exact-owner-scip-definition-outgoing"
+    )
+    assert discovery["associated_observed_relationship_count"] == 0
     assert discovery["observed_kinds"] == []
     assert discovery["producer_bindings"] == ["scip-python:test"]
     assert discovery["completeness"] == "unknown"
@@ -222,3 +231,54 @@ def test_scip_empty_observation_invalidated_after_source_edit(
         )
         codemap.sync(["src/engine.py"])
         assert "semantic_relationships" not in codemap.task_evidence(_TASK)
+
+
+def test_incoming_only_scip_claim_is_not_misreported_as_outgoing(
+    tmp_path: Path,
+) -> None:
+    _repository(tmp_path)
+    source = tmp_path / "src" / "engine.py"
+    source.write_text(
+        source.read_text(encoding="utf-8")
+        + "\n\ndef forward_widget(value: str) -> str:\n"
+        + "    return normalize_widget(value)\n",
+        encoding="utf-8",
+    )
+    index = _index(tmp_path, count=0)
+    native = json.loads(index.read_text(encoding="utf-8"))
+    document = native["documents"][0]
+    forward = "scip-python python example 0.1.0 `src.engine`/forward_widget()."
+    document["symbols"].append(
+        {
+            "symbol": forward,
+            "relationships": [{"symbol": _SYMBOL, "isReference": True}],
+        }
+    )
+    document["occurrences"].append(
+        {"symbol": forward, "range": [3, 4, 18], "symbolRoles": 1}
+    )
+    index.write_text(json.dumps(native), encoding="utf-8")
+
+    with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
+        codemap.sync()
+        codemap.import_scip(index)
+        packet = codemap.task_evidence(_TASK, token_budget=256)
+
+    discovery = packet["semantic_relationships"]
+    assert packet["ownership"]["owner"]["path"] == "src/engine.py"
+    assert packet["ownership"]["owner"]["qualname"] == "normalize_widget"
+    assert discovery["observation_state"] == "definition-observed-no-direct-claims"
+    assert discovery["observed_relationship_count"] == 0
+    assert discovery["observed_relationship_count_scope"] == (
+        "exact-owner-scip-definition-outgoing"
+    )
+    assert discovery["associated_observed_relationship_count"] == 1
+    assert discovery["associated_observed_relationship_count_scope"] == (
+        "explicit-producer-claims-associated-with-owner"
+    )
+    claims = discovery["evidence"]["claims"]
+    assert len(claims) == 1
+    assert claims[0]["kind"] == "reference"
+    assert claims[0]["source"]["key"]["symbol"] == forward
+    assert claims[0]["target"]["key"]["symbol"] == _SYMBOL
+    assert discovery["negative_evidence_admissible"] is False
