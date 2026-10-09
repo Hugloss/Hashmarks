@@ -172,6 +172,24 @@ def test_invalid_context_fails_before_source_observation(
             )
 
 
+
+def test_source_line_keywords_remain_supported_but_typos_fail_early(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "sample.py").write_text("needle\\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(TypeError, match="unexpected source observation keyword"):
+            codemap.source_observation(
+                "sample.py", literal="needle", context_line=1  # type: ignore[call-arg]
+            )
+        observed = codemap.source_observation(
+            "sample.py", literal="needle", lines=(1,), context_lines=1
+        )
+    assert observed["requested_lines"] == [1]
+    assert observed["line_coverage"] == "complete"
+    assert observed["occurrences"][0]["context_excerpt"][0]["role"] == "match"
+
 def test_context_requires_literal_and_does_not_read_file_for_preview(
     tmp_path: Path,
 ) -> None:
