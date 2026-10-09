@@ -29,7 +29,7 @@ def indexed_diagnostic_rows(
     }
 
 
-def _reported_paths(changed_paths: Sequence[str]) -> list[str]:
+def normalize_reported_changed_paths(changed_paths: Sequence[str]) -> list[str]:
     if (
         isinstance(changed_paths, (str, bytes))
         or not isinstance(changed_paths, Sequence)
@@ -99,7 +99,7 @@ def diagnostic_path_locality(
     and collection qualification. This projection references those same
     identities without altering or independently validating their authority.
     """
-    normalized = _reported_paths(changed_paths)
+    normalized = normalize_reported_changed_paths(changed_paths)
     changed = set(normalized)
     qualified_added = set(qualification["qualified_added_identities"])
     qualified_removed = set(qualification["qualified_removed_identities"])
