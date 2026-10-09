@@ -8,6 +8,7 @@ from typing import Any
 
 from .codemap.decision_contract import DecisionPacketContract
 from .codemap.repository_delta import EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA
+from .freshness import FRESHNESS_STATES
 from .operation_contract import operation_schema
 from .producer_identity import native_producer_implementation_identity
 
@@ -356,9 +357,17 @@ def _observation_freshness(
 ) -> dict[str, object]:
     _require_authority(payload, authority="observation-freshness-only", reasons=reasons)
     state = payload.get("state")
-    if state not in {"current", "stale"}:
+    if not isinstance(state, str) or state not in FRESHNESS_STATES:
         reasons.append("invalid-freshness-state")
-    return {"freshness_state": state, "stale": state != "current"}
+    completeness = payload.get("change_set_completeness")
+    if completeness not in ("caller-claimed-complete", "unknown"):
+        reasons.append("invalid-change-set-completeness")
+    return {
+        "freshness_state": state,
+        "stale": None if state == "unknown" else state != "current",
+        "change_set_completeness": completeness,
+        "freshness_reason": payload.get("reason"),
+    }
 
 
 _VALIDATORS = {
@@ -444,6 +453,11 @@ def validate_repository_intelligence_evidence(
             "stale": stale,
             "freshness_state": projection.get("freshness_state"),
             "available": projection.get("available"),
+            **{
+                field: projection[field]
+                for field in ("change_set_completeness", "freshness_reason")
+                if field in projection
+            },
         }
 
     return {
