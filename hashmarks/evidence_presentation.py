@@ -568,6 +568,18 @@ def _diagnostic(
             assertion="producer_claim",
             kind=kind,
         )
+    locality = value.get("path_locality")
+    if isinstance(locality, Mapping) and locality.get("rows"):
+        p.field(
+            value,
+            "path_locality",
+            "diagnostic",
+            field_ref,
+            ctx,
+            assertion="producer_claim",
+            kind="diagnostic_path_locality",
+            shape="record",
+        )
     p.field(
         value,
         "possible_relocations",
