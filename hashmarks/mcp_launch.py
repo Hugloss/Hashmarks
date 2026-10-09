@@ -12,6 +12,7 @@ def mcp_server_args(
     *,
     state_dir: str | Path | None = None,
     tool_names: tuple[str, ...] | list[str] | None = None,
+    query_surfaces: tuple[str, ...] | list[str] | None = None,
 ) -> tuple[str, ...]:
     args = ["--workspace", str(workspace)]
     if state_dir is not None:
@@ -19,6 +20,8 @@ def mcp_server_args(
     args.append("mcp")
     for name in tool_names or ():
         args.extend(("--tool", str(name)))
+    for surface in query_surfaces or ():
+        args.extend(("--query-surface", str(surface)))
     return tuple(args)
 
 
@@ -28,6 +31,7 @@ def installed_mcp_command(
     *,
     state_dir: str | Path | None = None,
     tool_names: tuple[str, ...] | list[str] | None = None,
+    query_surfaces: tuple[str, ...] | list[str] | None = None,
 ) -> tuple[str, ...]:
     return (
         str(executable),
@@ -35,6 +39,7 @@ def installed_mcp_command(
             workspace,
             state_dir=state_dir,
             tool_names=tool_names,
+            query_surfaces=query_surfaces,
         ),
     )
 
@@ -43,8 +48,13 @@ def source_mcp_command(
     workspace: str | Path = ".",
     *,
     tool_names: tuple[str, ...] | list[str] | None = None,
+    query_surfaces: tuple[str, ...] | list[str] | None = None,
 ) -> tuple[str, ...]:
     return (
         *SOURCE_MCP_PREFIX,
-        *mcp_server_args(workspace, tool_names=tool_names),
+        *mcp_server_args(
+            workspace,
+            tool_names=tool_names,
+            query_surfaces=query_surfaces,
+        ),
     )
