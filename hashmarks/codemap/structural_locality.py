@@ -819,6 +819,52 @@ class StructuralLocalityMixin:
                 refresh=refresh,
             )
 
+    def _scip_direct_relationships(
+        self,
+        target_row: Mapping[str, object],
+        target_node: Mapping[str, object],
+    ) -> dict[str, object] | None:
+        """Project exact, generation-current SCIP flags; never infer graph edges."""
+        native_definitions, truncated = self._fresh_native_definitions_for_path(
+            str(target_row["path"]),
+            name=str(target_row["name"]),
+            line=int(target_row["start_line"]),
+            limit=129,
+        )
+        native_rows = native_definitions[:128]
+        if not native_rows and not truncated:
+            return None
+        relations = sorted(
+            [
+                {
+                    "producer": row["producer"],
+                    "path": row["path"],
+                    "line": row["line"],
+                    "source_symbol": row["symbol"],
+                    "kind": item["kind"],
+                    "target_symbol": item["target_symbol"],
+                    "source_identity": target_node["symbol_source_identity"],
+                }
+                for row in native_rows
+                for item in json.loads(str(row["relationships_json"]))
+            ],
+            key=lambda item: (
+                str(item["producer"]),
+                str(item["source_symbol"]),
+                str(item["kind"]),
+                str(item["target_symbol"]),
+            ),
+        )
+        return {
+            "authority": "scip-producer-claim-only",
+            "scope": "target-definition-start-line-only",
+            "producer_bindings": sorted({str(row["producer"]) for row in native_rows}),
+            "truncated": truncated
+            or any(bool(row["relationships_truncated"]) for row in native_rows),
+            "negative_evidence_admissible": False,
+            "relationships": relations,
+        }
+
     def _structural_locality_impl(
         self,
         target: str,
@@ -862,53 +908,6 @@ class StructuralLocalityMixin:
         target_node = next(
             row for row in ordered_nodes if row["symbol_id"] == _symbol_id(target_row)
         )
-        # Direct SCIP facts belong to the target's exact definition. Their
-        # relation flags are producer claims, not inferred repository graph
-        # edges, resolved call sites, or safe-refactor recommendations.
-        native_definitions, native_source_truncated = (
-            self._fresh_native_definitions_for_path(
-                str(target_row["path"]),
-                name=str(target_row["name"]),
-                line=int(target_row["start_line"]),
-                limit=129,
-            )
-        )
-        native_rows = [
-            row
-            for row in native_definitions[:128]
-            if str(row["display_name"]) == str(target_row["name"])
-            and int(row["line"]) == int(target_row["start_line"])
-        ]
-        native_relations = sorted(
-            [
-                {
-                    "producer": row["producer"],
-                    "path": row["path"],
-                    "line": row["line"],
-                    "source_symbol": row["symbol"],
-                    "kind": item["kind"],
-                    "target_symbol": item["target_symbol"],
-                    "source_identity": target_node["symbol_source_identity"],
-                }
-                for row in native_rows
-                for item in json.loads(str(row["relationships_json"]))
-            ],
-            key=lambda item: (
-                str(item["producer"]),
-                str(item["source_symbol"]),
-                str(item["kind"]),
-                str(item["target_symbol"]),
-            ),
-        )
-        native_semantic_relationships = {
-            "authority": "scip-producer-claim-only",
-            "scope": "target-definition-start-line-only",
-            "producer_bindings": sorted({str(row["producer"]) for row in native_rows}),
-            "truncated": native_source_truncated
-            or any(bool(row["relationships_truncated"]) for row in native_rows),
-            "negative_evidence_admissible": False,
-            "relationships": native_relations,
-        }
         dimensions = {
             "symbol_count": len(ordered_nodes),
             "file_count": len(files),
@@ -996,10 +995,9 @@ class StructuralLocalityMixin:
                 "execution_authority": False,
             },
         }
-        # Avoid advertising a synthetic empty relationship row when no current
-        # SCIP definition was observed for this exact source locator.
-        if native_rows or native_source_truncated:
-            semantic["native_semantic_relationships"] = native_semantic_relationships
+        # Keep missing native evidence distinct from an observed empty claim.
+        if (native := self._scip_direct_relationships(target_row, target_node)) is not None:
+            semantic["native_semantic_relationships"] = native
         return {**semantic, "evidence_identity": _identity(semantic)}
 
 
