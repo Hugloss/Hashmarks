@@ -40,6 +40,7 @@ _CONTEXT_KEYS = frozenset(
         "source",
         "observer",
         "producer",
+        "producer_context",
         "provenance",
         "generation",
         "identity_generation",
@@ -577,7 +578,88 @@ def _diagnostic(
         assertion="candidate_correspondence",
         kind="possible_diagnostic_relocation",
     )
+    p.field(
+        value,
+        "path_deltas",
+        "qualification",
+        field_ref,
+        ctx,
+        assertion="producer_claim",
+        kind="diagnostic_path_delta",
+    )
+    for field in (
+        "source_revisions",
+        "source_provenance",
+        "collection_by_path",
+        "change_set",
+        "scope_paths",
+    ):
+        p.field(
+            packet,
+            field,
+            "qualification",
+            ref,
+            ctx,
+            shape="record",
+            assertion="producer_claim",
+            kind=f"diagnostic_{field}",
+        )
     p.account(value, field_ref, {})
+
+
+def _diagnostic_observation_projection(
+    p: _Projection,
+    packet: Mapping[str, object],
+    ref: tuple[object, ...],
+    ctx: Mapping[str, object],
+) -> None:
+    p.field(
+        packet,
+        "diagnostics",
+        "diagnostic",
+        ref,
+        ctx,
+        assertion="producer_claim",
+        kind="diagnostic_observed",
+    )
+    for field in ("source_revisions", "source_provenance", "collection_by_path"):
+        p.field(
+            packet,
+            field,
+            "qualification",
+            ref,
+            ctx,
+            shape="record",
+            assertion="producer_claim",
+            kind=f"diagnostic_{field}",
+        )
+
+
+def _diagnostic_revision_projection(
+    p: _Projection,
+    packet: Mapping[str, object],
+    ref: tuple[object, ...],
+    ctx: Mapping[str, object],
+) -> None:
+    p.field(
+        packet,
+        "rows",
+        "source",
+        ref,
+        ctx,
+        assertion="producer_claim",
+        kind="diagnostic_source_revision_correspondence",
+    )
+    p.field(
+        packet,
+        "source_provenance",
+        "qualification",
+        ref,
+        ctx,
+        shape="record",
+        assertion="producer_claim",
+        kind="diagnostic_source_provenance",
+    )
 
 
 def _source(
@@ -1042,6 +1124,8 @@ def _projectors() -> dict[str, Any]:
         REPOSITORY_SNAPSHOT_SCHEMA: _snapshot,
         REPOSITORY_DELTA_SCHEMA: _delta,
         DIAGNOSTIC_DELTA_SCHEMA: _diagnostic,
+        "hashmarks.external-diagnostic-observation.v1": _diagnostic_observation_projection,
+        "hashmarks.diagnostic-source-revision-evidence.v1": _diagnostic_revision_projection,
         EVIDENCE_PROFILE_SCHEMA: _profile,
         CHANGE_INTELLIGENCE_SCHEMA: _brief,
         FRESHNESS_MAP_SCHEMA: _freshness,

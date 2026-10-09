@@ -13,16 +13,23 @@ from hashmarks.paths import normalize_relative_path
 
 from .change_impact import ChangeImpactOptions
 from .decision_session import diagnostic_producer
+from .diagnostic_observation import (
+    DIAGNOSTIC_DELTA_SCHEMA as DIAGNOSTIC_DELTA_SCHEMA,
+)
+from .diagnostic_observation import (
+    RepositoryGenerationBinding as RepositoryGenerationBinding,
+)
+from .diagnostic_observation import (
+    diagnostic_observation_delta,
+    external_diagnostic_observation,
+)
 from .diagnostic_source_revision import (
     EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA,
     diagnostic_identity,
-    diagnostic_revision_delta,
     diagnostic_source_revision_evidence,
-    normalize_source_revision_claims,
 )
 from .freshness_map import FreshnessMapOptions
 from .source_line_correspondence import (
-    diagnostic_line_correspondence,
     source_line_anchors,
     source_shape,
     validated_source_lines,
@@ -32,12 +39,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from .engine import CodeMap
-
-
-@dataclass(frozen=True, slots=True)
-class RepositoryGenerationBinding:
-    repository_identity: str
-    codemap_generation: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,7 +125,6 @@ def _observer_descriptor() -> dict[str, object]:
 
 REPOSITORY_SNAPSHOT_SCHEMA = "hashmarks.repository-intelligence-snapshot.v1"
 REPOSITORY_DELTA_SCHEMA = "hashmarks.repository-intelligence-delta.v1"
-DIAGNOSTIC_DELTA_SCHEMA = operation_schema("evidence_comparison", "diagnostics")
 
 
 class RepositoryDeltaMixin:
@@ -890,66 +890,7 @@ class RepositoryDeltaMixin:
         diagnostic_source_revision_evidence
     )
 
-    @staticmethod
-    def external_diagnostic_observation(  # noqa: PLR0913 - additive producer fields
-        *,
-        producer: str,
-        binding: RepositoryGenerationBinding,
-        diagnostics: Sequence[Mapping[str, object]],
-        outcome: str,
-        environment_identity: str | None = None,
-        scope_paths: Sequence[str] = (),
-        collection_state: str | None = None,
-        source_revisions: Mapping[str, str] | None = None,
-    ) -> dict[str, object]:
-        """Normalize externally produced diagnostics without executing the tool."""
-        allowed_outcomes = {
-            "pass",
-            "fail",
-            "not-run",
-            "blocked-environment",
-            "blocked-supply",
-            "blocked-permission",
-            "invalid-baseline",
-            "stale",
-        }
-        if outcome not in allowed_outcomes:
-            raise ValueError("unsupported external observation outcome")
-        if collection_state is not None and collection_state not in {
-            "fresh-complete",
-            "fresh-partial",
-            "timed-out",
-            "unavailable",
-            "source-mismatch",
-            "unknown",
-        }:
-            raise ValueError("unsupported diagnostic collection state")
-        revisions = normalize_source_revision_claims(source_revisions, scope_paths)
-        rows = []
-        for raw in diagnostics:
-            row = dict(raw)
-            row["identity"] = RepositoryDeltaMixin._diagnostic_identity(row)
-            rows.append(row)
-        rows.sort(key=lambda row: str(row["identity"]))
-        return {
-            "schema": EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA,
-            "producer": producer,
-            "repository_identity": binding.repository_identity,
-            "codemap_generation": int(binding.codemap_generation),
-            "environment_identity": environment_identity,
-            "scope_paths": sorted({str(path) for path in scope_paths}),
-            **({"source_revisions": revisions} if revisions is not None else {}),
-            "outcome": outcome,
-            "diagnostics": rows,
-            "diagnostic_count": len(rows),
-            "collection": (
-                {"state": collection_state, "authority": "producer-claimed"}
-                if collection_state is not None
-                else None
-            ),
-            "authority": "observation-only",
-            "execution_effect": "none",
-        }
+    external_diagnostic_observation = staticmethod(external_diagnostic_observation)
 
     def verification_relationship_evidence(
         self,
@@ -1032,215 +973,7 @@ class RepositoryDeltaMixin:
             "execution_effect": "none",
         }
 
-    @staticmethod
-    def _possible_diagnostic_relocations(
-        before: Mapping[str, object],
-        after: Mapping[str, object],
-        removed: Sequence[Mapping[str, object]],
-        added: Sequence[Mapping[str, object]],
-    ) -> list[dict[str, object]]:
-        """Non-authoritative candidates; never suppress added/removed evidence."""
-        if before.get("repository_identity") != after.get(
-            "repository_identity"
-        ) or before.get("producer") != after.get("producer"):
-            return []
-
-        def facts(row: Mapping[str, object]) -> tuple[object, ...]:
-            return tuple(
-                row.get(field)
-                for field in ("tool", "rule", "path", "symbol", "message")
-            )
-
-        old: dict[tuple[object, ...], list[Mapping[str, object]]] = {}
-        new: dict[tuple[object, ...], list[Mapping[str, object]]] = {}
-        for row in removed:
-            old.setdefault(facts(row), []).append(row)
-        for row in added:
-            new.setdefault(facts(row), []).append(row)
-        possible: list[dict[str, object]] = []
-        for key in sorted(old, key=repr):
-            before_rows = old[key]
-            after_rows = new.get(key, [])
-            if len(before_rows) != 1 or len(after_rows) != 1:
-                continue
-            prior, subsequent = before_rows[0], after_rows[0]
-            if (
-                prior.get("line") is None
-                or subsequent.get("line") is None
-                or (prior.get("line"), prior.get("column"))
-                == (subsequent.get("line"), subsequent.get("column"))
-            ):
-                continue
-            possible.append(
-                {
-                    "before_identity": prior["identity"],
-                    "after_identity": subsequent["identity"],
-                    "before_line": prior["line"],
-                    "after_line": subsequent["line"],
-                    "path": prior.get("path"),
-                    "basis": "unique-equal-nonlocational-diagnostic-fields",
-                    "state": "possible",
-                    "identity_authority": False,
-                }
-            )
-        return possible
-
-    @staticmethod
-    def _diagnostic_claim_qualification(
-        before: Mapping[str, object],
-        after: Mapping[str, object],
-        added: Sequence[Mapping[str, object]],
-        removed: Sequence[Mapping[str, object]],
-    ) -> dict[str, object]:
-        """Qualify diagnostic absence using declared external collection coverage.
-
-        Raw identity additions/removals are retained; this only marks which
-        claims can be drawn from producer-claimed collection completeness.
-        """
-        prior = before.get("collection")
-        current = after.get("collection")
-        prior_state = prior.get("state") if isinstance(prior, Mapping) else None
-        current_state = current.get("state") if isinstance(current, Mapping) else None
-        prior_scope = before.get("scope_paths")
-        current_scope = after.get("scope_paths")
-        before_paths = set(prior_scope) if isinstance(prior_scope, list) else set()
-        after_paths = set(current_scope) if isinstance(current_scope, list) else set()
-        same_context = all(
-            (
-                before.get("producer"),
-                before.get("producer") == after.get("producer"),
-                before.get("repository_identity"),
-                before.get("repository_identity") == after.get("repository_identity"),
-                before.get("environment_identity"),
-                before.get("environment_identity") == after.get("environment_identity"),
-                before.get("outcome") in {"pass", "fail"},
-                after.get("outcome") in {"pass", "fail"},
-            )
-        )
-        qualified_added = sorted(
-            str(row["identity"])
-            for row in added
-            if same_context
-            and prior_state == "fresh-complete"
-            and current_state in {"fresh-complete", "fresh-partial"}
-            and row.get("path") in before_paths & after_paths
-        )
-        qualified_removed = sorted(
-            str(row["identity"])
-            for row in removed
-            if same_context
-            and prior_state in {"fresh-complete", "fresh-partial"}
-            and current_state == "fresh-complete"
-            and row.get("path") in before_paths & after_paths
-        )
-        return {
-            "schema": "hashmarks.diagnostic-delta-qualification.v1",
-            "basis": "producer-claimed-collection-and-explicit-path-scope",
-            "shared_context": same_context,
-            "collection_before": prior_state or "unknown",
-            "collection_after": current_state or "unknown",
-            "qualified_added_identities": qualified_added,
-            "qualified_removed_identities": qualified_removed,
-            "unqualified_added_identities": sorted(
-                {str(row["identity"]) for row in added} - set(qualified_added)
-            ),
-            "unqualified_removed_identities": sorted(
-                {str(row["identity"]) for row in removed} - set(qualified_removed)
-            ),
-            "identity_authority": False,
-            "execution_effect": "none",
-        }
-
-    @staticmethod
-    def diagnostic_observation_delta(
-        before: Mapping[str, object],
-        after: Mapping[str, object],
-        *,
-        changed_paths: Sequence[str] = (),
-        before_source: Mapping[str, object] | None = None,
-        after_source: Mapping[str, object] | None = None,
-    ) -> dict[str, object]:
-        """Compare diagnostic identities; counts alone are never delta authority."""
-
-        def indexed(packet: Mapping[str, object]) -> dict[str, Mapping[str, object]]:
-            rows = packet.get("diagnostics")
-            if not isinstance(rows, list):
-                return {}
-            return {
-                str(row["identity"]): row
-                for row in rows
-                if isinstance(row, Mapping) and row.get("identity")
-            }
-
-        old = indexed(before)
-        new = indexed(after)
-        old_ids = set(old)
-        new_ids = set(new)
-        added_ids = sorted(new_ids - old_ids)
-        removed_ids = sorted(old_ids - new_ids)
-        scope = {str(path) for path in changed_paths}
-        added = [deepcopy(new[identity]) for identity in added_ids]
-        removed = [deepcopy(old[identity]) for identity in removed_ids]
-        added_in_changed_scope = [
-            row for row in added if str(row.get("path") or "") in scope
-        ]
-        possible_relocations = RepositoryDeltaMixin._possible_diagnostic_relocations(
-            before, after, removed, added
-        )
-        if (before_source is None) != (after_source is None):
-            raise ValueError(
-                "source correspondence requires both endpoint observations"
-            )
-        source_correspondence = (
-            diagnostic_line_correspondence(
-                candidates=possible_relocations,
-                before_diagnostic=before,
-                after_diagnostic=after,
-                before_source=before_source,
-                after_source=after_source,
-            )
-            if before_source is not None and after_source is not None
-            else None
-        )
-
-        return {
-            "schema": DIAGNOSTIC_DELTA_SCHEMA,
-            "producer": after.get("producer"),
-            "source_revisions": diagnostic_revision_delta(before, after),
-            "repository": {
-                "before": before.get("repository_identity"),
-                "after": after.get("repository_identity"),
-                "changed": before.get("repository_identity")
-                != after.get("repository_identity"),
-            },
-            "generation": {
-                "before": before.get("codemap_generation"),
-                "after": after.get("codemap_generation"),
-            },
-            "outcome": {
-                "before": before.get("outcome"),
-                "after": after.get("outcome"),
-            },
-            "collection": {
-                "before": before.get("collection"),
-                "after": after.get("collection"),
-            },
-            "diagnostics": {
-                "before_count": len(old),
-                "after_count": len(new),
-                "added": added,
-                "removed": removed,
-                "unchanged_count": len(old_ids & new_ids),
-                "added_in_changed_scope": added_in_changed_scope,
-                "possible_relocations": possible_relocations,
-                "source_correspondence": source_correspondence,
-                "qualification": RepositoryDeltaMixin._diagnostic_claim_qualification(
-                    before, after, added, removed
-                ),
-            },
-            "authority": "observation-only",
-            "execution_effect": "none",
-        }
+    diagnostic_observation_delta = staticmethod(diagnostic_observation_delta)
 
     @diagnostic_producer
     def repository_intelligence_snapshot(

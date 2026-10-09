@@ -237,6 +237,163 @@ engine, external runner, or ninth MCP tool is added.
 
 Regression tests: `tests/test_diagnostic_source_revisions.py`.
 
+### Document-version provenance and the external producer handoff
+
+`external_diagnostic_observation` also accepts optional `source_provenance`:
+
+```python
+from hashmarks.digest import FILE_DOMAIN, hash_bytes
+
+# The external client retains this snapshot when synchronizing the document,
+# rather than reading whichever bytes happen to exist when diagnostics arrive.
+captured_text = "print(missing)\r\n"
+revision = hash_bytes(captured_text.encode("utf-8"), domain=FILE_DOMAIN).hash
+diagnostic = RepositoryDeltaMixin.external_diagnostic_observation(
+    producer="pyright",
+    binding=RepositoryGenerationBinding("repo-id", 7),
+    environment_identity="producer-config-id",
+    outcome="fail",
+    collection_state="fresh-complete",
+    scope_paths=["src/example.py"],
+    source_revisions={"src/example.py": revision},
+    source_provenance={
+        "src/example.py": {
+            "producer_session": "server-session:1",
+            "document_lifetime": "document-open:3",
+            "document_version": 12,
+            "source_kind": "buffer",
+            "binding_basis": "reported-version",
+        }
+    },
+    diagnostics=[],
+)
+```
+
+Each provenance record has exactly these five fields. Session and document
+lifetime are nonempty opaque strings of at most 256 characters. The version is
+a signed 32-bit integer or null; Hashmarks preserves it without choosing an LSP
+publication winner. `source_kind` is `buffer` or `disk`. `binding_basis` is
+`reported-version`, `synchronized-request`, `producer-snapshot`, or `unknown`.
+`reported-version` requires a non-null version. A known binding requires an
+explicit `source_revisions` entry; an explicitly unknown binding forbids one.
+Legacy revision claims without provenance remain accepted.
+
+Both maps use canonical repository-relative paths, are bounded to 32 members,
+and must stay inside the explicit diagnostic scope. Aliases are normalized;
+duplicate normalized members and unknown provenance fields are rejected.
+Records are copied, so later mutation of producer input does not alter evidence.
+
+The external producer must implement the acquisition side of this contract:
+
+1. Retain immutable snapshots keyed by producer session, document lifetime,
+   path, and document version. A reopen starts a new document lifetime; a server
+   restart starts a new producer session. Counters alone are not identities.
+2. Bind a publication's reported version to its retained snapshot, including
+   delayed publications. Never replace the revision with the latest disk or
+   editor content. Snapshot eviction makes binding unknown rather than granting
+   permission to reconstruct the old revision from newer bytes.
+3. Hash disk bytes in the existing file digest domain. For unsaved buffers,
+   hash the exact synchronized text encoded as UTF-8 without newline or Unicode
+   normalization. Encoding or BOM differences can therefore produce different
+   byte identities even when displayed text looks alike.
+4. Versionless push publications stay unbound unless the producer supplies an
+   independent exact snapshot guarantee. Receipt order, a quiet interval, and
+   the latest editor version are insufficient. `synchronized-request` describes
+   a producer-bound pull acquisition with stable synchronized input, not a
+   guarantee inferred by Hashmarks.
+5. Pull reports marked unchanged may reuse diagnostic facts only. Bind the new
+   acquisition to its own source snapshot, or report unknown. A pull result ID
+   is not a member revision. Related-document reports need their own bindings;
+   the requested document's version does not identify another file's bytes.
+
+Hashmarks preserves provenance through observation validation, source revision
+comparison, diagnostic deltas, and evidence presentation. The separate
+`source_provenance` delta axis reports before/after claims and whether they
+changed; changing document versions never changes diagnostic fact identity.
+Source revision comparison still describes equality with explicitly supplied
+repository bytes, not producer execution or repository-wide freshness.
+
+### Per-file diagnostic changes and collection coverage
+
+`external_diagnostic_observation` accepts optional `collection_by_path`, mapping
+up to 32 explicitly scoped members to the existing collection states:
+`fresh-complete`, `fresh-partial`, `timed-out`, `unavailable`, `source-mismatch`,
+or `unknown`. When this map is omitted or null, the batch collection claim
+applies to its declared paths. When a map is supplied, an omitted member is
+unknown: a complete report for one file cannot fill in another file's missing
+report. A complete empty report remains distinct from an unavailable, partial,
+or missing report.
+
+```python
+delta = RepositoryDeltaMixin.diagnostic_observation_delta(
+    diagnostic_before,
+    diagnostic_after,
+    changed_paths=["src/example.py"],
+    change_set_complete=False,
+    relationship_evidence=explicit_current_correlation,  # optional
+)
+rows = delta["diagnostics"]["path_deltas"]
+```
+
+The same optional `change_set_complete` and `relationship_evidence` parameters
+are available through MCP `evidence_comparison(result_mode="diagnostics")`.
+Other comparison modes reject diagnostic qualification inputs. The external
+producer's existing `source_revisions`, `source_provenance`, and
+`collection_by_path` travel inside the supplied observation endpoints.
+
+Every diagnostic identity is accounted for in deterministic `path_deltas`,
+including unchanged facts, explicitly scoped empty files, unscoped diagnostic
+paths, and a null-path group for diagnostics without a valid relative
+locator. Each row contains before/after, added, removed, and unchanged identity
+lists; endpoint scope and collection claims; member revision and document
+provenance claims; edit relation; relationship evidence; and
+`causation="not-inferred"`.
+
+`edit_relation` is `reported-changed` for explicitly listed paths. Other paths
+are `unknown` by default, or `caller-claimed-unchanged` when the external caller
+explicitly declares the change set complete. An unlocated diagnostic always
+keeps unknown edit status. These are path-reporting claims, not canonical proof
+that the caller reported every edit. Changes in other files remain present
+regardless of relatedness, and unchanged member bytes do not imply unchanged
+diagnostics.
+
+Optional relationship annotations consume an existing canonical
+`hashmarks.evidence-correlation.v2` packet. Hashmarks reuses its native
+correlation and binding integrity validators and requires a current repository
+binding matching the after endpoint's repository and generation. An indexed
+edge must correspond to an explicit, uniquely resolved qualified module/symbol
+anchor. Short-name calls never supply that proof. Retained annotations name the
+original directed edge and target-resolution JSON pointers; they do not derive
+transitive relationships or claim the edit caused a diagnostic change.
+Positive edges retain their native bounds. Missing, stale, foreign, ambiguous,
+or unobserved relationships stay unknown rather than proving unrelatedness.
+
+Per-file complete coverage qualifies external additions/removals using the
+existing endpoint-context rules. Explicit document provenance additionally
+requires matching sessions and document lifetimes, with known bindings on both
+sides. Unknown bindings or changed acquisition contexts never upgrade a missing
+diagnostic into a qualified removal. Raw additions/removals remain visible.
+The delta retains both scope and producer/environment contexts, so public
+validation can re-prove per-file membership, counts, edit classifications,
+collection states, revision claims, relationship annotations, and qualification.
+
+Structured, compact, and text presentation expose these as producer claims and
+account for omitted records without changing the native delta. No view claims
+that an empty bounded projection proves no cross-file diagnostics.
+
+Ownership note:
+
+```text
+Observed repository fact/evidence: exact claimed source provenance and per-file diagnostic changes.
+Authority source: external producer claims plus separately qualified canonical member/relationship observations.
+Completeness/freshness behavior: per-member collection and changed-path completeness remain explicit; unknown stays unknown.
+Existing Hashmarks owner extended: external diagnostic observation, source revision correspondence, and evidence comparison.
+Consumer/execution responsibility explicitly not acquired: LSP synchronization, snapshot retention, publication precedence, collection, edits, or reruns.
+Decision: SPLIT — descriptive evidence belongs here; producer acquisition stays external.
+```
+
+Regression and handoff fixtures: `tests/test_diagnostic_member_evidence.py`.
+
 ### Source-backed diagnostic line correspondence
 
 The canonical `CodeMap.source_observation(path, lines=[N])` can now include up to
@@ -321,8 +478,12 @@ possible relocation projection remain unchanged.
 
 ## Existing owners and non-goals
 
-All new facts stay within `RepositoryDeltaMixin` and its existing canonical
-member observation, repository index, freshness, and diagnostic-delta owners.
+`RepositoryDeltaMixin` retains the public diagnostic methods. Their pure
+normalization and comparison owner is `codemap/diagnostic_observation.py`;
+`diagnostic_provenance.py` owns bounded member claims and
+`diagnostic_path_delta.py` owns conserved path projections. Canonical member
+observation, repository indexes, and freshness remain with their existing
+owners.
 
 No new daemon protocol, persistence schema, source corpus, agent-call cache,
 workflow state, native verifier invocation, model tool-routing rule, or
@@ -330,7 +491,9 @@ history/branch/merge authority is introduced.
 
 ## Qualification
 
-Regression tests: `tests/test_source_observation_evidence.py`.
+Regression tests: `tests/test_source_observation_evidence.py`,
+`tests/test_diagnostic_member_evidence.py`, `tests/test_diagnostic_source_revisions.py`,
+and `tests/test_mcp_endpoint_comparison.py`.
 
 Relevant negative scenarios include denied source, unchanged repeated observations,
 unreconciled same-path replacement, byte-size ceilings, partial location results,

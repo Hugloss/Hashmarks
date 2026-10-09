@@ -16,6 +16,8 @@ from copy import deepcopy
 from hashmarks.operation_contract import operation_schema
 from hashmarks.paths import normalize_relative_path
 
+from .diagnostic_provenance import _revision_scope, diagnostic_member_claims
+
 _FILE_REVISION = re.compile(r"[0-9a-f]{64}\Z")
 _MAX_MEMBERS = 32
 EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA = "hashmarks.external-diagnostic-observation.v1"
@@ -35,17 +37,6 @@ def diagnostic_identity(row: Mapping[str, object]) -> str:
         facts, sort_keys=True, separators=(",", ":"), ensure_ascii=False
     ).encode("utf-8")
     return "sha256:" + hashlib.sha256(raw).hexdigest()
-
-
-def _revision_scope(scope_paths: object) -> set[str]:
-    """Resolve the explicit scope admitted for producer revision claims."""
-    if (
-        not isinstance(scope_paths, Sequence)
-        or isinstance(scope_paths, (str, bytes))
-        or any(not isinstance(path, str) for path in scope_paths)
-    ):
-        raise ValueError("scope_paths must be a sequence of strings")
-    return {normalize_relative_path(path, allow_root=False) for path in scope_paths}
 
 
 def normalize_source_revision_claims(
@@ -233,6 +224,7 @@ def diagnostic_source_revision_evidence(
         raise ValueError("diagnostic source_revisions must be a mapping")
     scoped = normalize_source_revision_claims(claims, diagnostic.get("scope_paths", ()))
     claims_by_path = scoped or {}
+    provenance = diagnostic_member_claims(diagnostic).get("source_provenance")
     endpoints, unused = _indexed_source_packets(source_observations, claims_by_path)
     rows = [
         _member_comparison(
@@ -253,6 +245,16 @@ def diagnostic_source_revision_evidence(
         "repository_identity": diagnostic.get("repository_identity"),
         "diagnostic_generation": diagnostic.get("codemap_generation"),
         "producer": diagnostic.get("producer"),
+        **(
+            {
+                "source_provenance": provenance,
+                "scope_paths": sorted(
+                    _revision_scope(diagnostic.get("scope_paths", ()))
+                ),
+            }
+            if provenance is not None
+            else {}
+        ),
         "collection": diagnostic.get("collection"),
         "diagnostic_outcome": diagnostic.get("outcome"),
         "rows": rows,
@@ -332,9 +334,23 @@ def validated_diagnostic_source_revision_evidence(
     rows = _validated_revision_rows(payload.get("rows"), generation)
     summary = _revision_summary(rows)
     _validate_revision_summary(payload, summary)
+    member_claims = diagnostic_member_claims(
+        {
+            "scope_paths": payload.get("scope_paths", ()),
+            "source_revisions": {
+                row["path"]: row["producer_claimed_member_revision"] for row in rows
+            },
+            **(
+                {"source_provenance": payload["source_provenance"]}
+                if "source_provenance" in payload
+                else {}
+            ),
+        }
+    )
     return {
         "source_revision_rows": deepcopy(rows),
         "source_revision_coverage": summary["coverage"],
+        **member_claims,
     }
 
 
