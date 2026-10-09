@@ -299,6 +299,17 @@ class EvidenceFreshnessMixin:
             if self._evidence_fresh("scip", str(row.get("producer") or ""))[0]
         ]
 
+    def _fresh_native_definitions_for_path(
+        self, path: str, *, limit: int = 129
+    ) -> list[dict]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        return [
+            row
+            for row in self.store.native_definitions_for_path(path, limit=limit)
+            if self._evidence_fresh("scip", str(row.get("producer") or ""))[0]
+        ]
+
     def _fresh_native_refs(self, query: str, *, limit: int = 200) -> list[dict]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
