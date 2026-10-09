@@ -122,7 +122,10 @@ def parse_scip_json(value: dict[str, Any]) -> tuple[str, tuple[ScipOccurrence, .
                         # proves truncation without unbounded relationship state.
                         if len(bucket) > 65:
                             bucket.remove(
-                                max(bucket, key=lambda row: (row.kind, row.target_symbol))
+                                max(
+                                    bucket,
+                                    key=lambda row: (row.kind, row.target_symbol),
+                                )
                             )
         for occurrence in document.get("occurrences") or ():
             if not isinstance(occurrence, dict):
