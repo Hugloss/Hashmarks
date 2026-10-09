@@ -718,6 +718,82 @@ def _locality(
             ("dimensions", "evidence_measurement", "record"),
         ),
     )
+    supplied = packet.get("supplied_relationship_observation")
+    if isinstance(supplied, Mapping):
+        p.project(supplied, (*ref, "supplied_relationship_observation"), ctx)
+
+
+def _direct_relationships(
+    p: _Projection,
+    packet: Mapping[str, object],
+    ref: tuple[object, ...],
+    ctx: Mapping[str, object],
+) -> None:
+    p.field(packet, "coverage", "qualification", ref, ctx, shape="record")
+    observations = packet.get("observations", [])
+    if not isinstance(observations, list):
+        return
+    for index, observation in enumerate(observations):
+        observation_ref = (*ref, "observations", index)
+        for field, family, kind in (
+            ("claims", "relationship", "direct_semantic_relationship"),
+            ("source_bindings", "source", "relationship_source_binding"),
+        ):
+            p.field(
+                observation,
+                field,
+                family,
+                observation_ref,
+                ctx,
+                shape="records",
+                assertion="producer_claim",
+                kind=kind,
+            )
+        p.add(
+            "qualification",
+            "relationship_observation_qualification",
+            {
+                key: value
+                for key, value in observation.items()
+                if key not in ("claims", "source_bindings")
+            },
+            observation_ref,
+            ctx,
+            assertion="producer_claim",
+        )
+
+
+def _direct_relationship_delta(
+    p: _Projection,
+    packet: Mapping[str, object],
+    ref: tuple[object, ...],
+    ctx: Mapping[str, object],
+) -> None:
+    p.field(
+        packet,
+        "producer_deltas",
+        "relationship",
+        ref,
+        ctx,
+        shape="records",
+        assertion="observed_change",
+        kind="semantic_relationship_delta",
+    )
+    p.add(
+        "qualification",
+        "semantic_relationships_comparable",
+        packet["comparable"],
+        (*ref, "comparable"),
+        ctx,
+    )
+    p.field(
+        packet, "incomparability_reasons", "qualification", ref, ctx, shape="values"
+    )
+    p.field(packet, "observation_changes", "qualification", ref, ctx, shape="record")
+    for endpoint in ("before", "after"):
+        value = packet.get(endpoint)
+        if isinstance(value, Mapping):
+            p.project(value, (*ref, endpoint), ctx)
 
 
 def _bindings(
@@ -1070,6 +1146,7 @@ def _task(
         ctx,
         (
             ("ownership", "ownership_evidence", "record"),
+            ("supplied_observation_accounting", "qualification", "record"),
             ("verification", "verification", "record"),
             ("explicit_target", "ownership_evidence", "record"),
             ("evidence_receipt", "qualification", "record"),
@@ -1304,6 +1381,10 @@ def _projectors() -> dict[str, Any]:
         CORRELATION_DELTA_SCHEMA: _correlation,
         REPOSITORY_BINDING_DELTA_SCHEMA: _binding_delta,
         operation_schema("structural_locality_delta"): _structural_comparison,
+        operation_schema("structural_locality", "relationships"): _direct_relationships,
+        operation_schema(
+            "evidence_comparison", "relationships"
+        ): _direct_relationship_delta,
         operation_schema("repository_context"): _context_packet,
         operation_schema("find"): _find,
         operation_schema("task_evidence"): _task,

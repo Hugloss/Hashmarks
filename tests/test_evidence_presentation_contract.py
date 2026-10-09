@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 
-from hashmarks.codemap import CodeMap
+from hashmarks.codemap import CodeMap, semantic_relationship_delta
 from hashmarks.codemap.repository_delta import (
     RepositoryDeltaMixin,
     RepositoryGenerationBinding,
@@ -216,6 +216,22 @@ def native_packets(
                 _fixture_diagnostic_delta(paths),
             ),
         ]
+        packets.append(
+            (
+                "structural_locality",
+                "relationships",
+                codemap.structural_locality(
+                    "src/owner.py::widget", result_mode="relationships"
+                ),
+            )
+        )
+        packets.append(
+            (
+                "evidence_comparison",
+                "relationships",
+                semantic_relationship_delta(packets[-1][2], packets[-1][2]),
+            )
+        )
         owner.write_text("import sys\ndef widget(): return 2\n", encoding="utf-8")
         packets.append(
             (

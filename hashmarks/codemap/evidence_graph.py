@@ -10,9 +10,12 @@ from hashmarks.paths import normalize_relative_path
 from .model import EvidenceVisibility
 from .repository_domains import is_test_path
 from .scip_adapter import load_scip_json
+from .scip_import import collect_scip_rows, publish_scip_claim_metadata
+from .scip_relationship_adapter import scip_import_provenance
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable
+    from collections.abc import Callable, Iterable, Mapping
+    from typing import Any
 
     from .engine import CodeMap
 
@@ -229,8 +232,10 @@ class EvidenceGraphMixin:
             is not EvidenceVisibility.DENY
         }
 
-    def import_scip(self, path: str | Path) -> dict[str, object]:
-        """Import compiler/language-server definitions and references from SCIP."""
+    def import_scip(
+        self, path: str | Path, *, provenance: Mapping[str, Any] | None = None
+    ) -> dict[str, object]:
+        """Import admitted native records and their direct producer claims atomically."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         self._ensure_map_ready()
@@ -240,103 +245,33 @@ class EvidenceGraphMixin:
         producer, occurrences, warnings = load_scip_json(
             raw_path, workspace=self.workspace
         )
-        definitions: list[dict[str, object]] = []
-        edges: list[dict[str, object]] = []
-        skipped = 0
-        for occurrence in occurrences:
-            try:
-                rel = normalize_relative_path(occurrence.path, allow_root=False)
-            except ValueError:
-                skipped += 1
-                continue
-            file_row = self._session_file_row(rel)
-            if (
-                file_row is None
-                or EvidenceVisibility(str(file_row["evidence_visibility"]))
-                is EvidenceVisibility.DENY
-            ):
-                skipped += 1
-                continue
-            if occurrence.definition:
-                definitions.append(
-                    {
-                        "path": rel,
-                        "symbol": occurrence.symbol,
-                        "display_name": occurrence.display_name,
-                        "line": occurrence.line,
-                        "end_line": occurrence.end_line,
-                        "relationships_json": json.dumps(
-                            {
-                                "relationships": [
-                                    {
-                                        "kind": row.kind,
-                                        "target_symbol": row.target_symbol,
-                                    }
-                                    for row in occurrence.relationships
-                                ],
-                                "source_revision_observation": (
-                                    str(file_row["file_digest"])
-                                    if file_row.get("file_digest")
-                                    else None
-                                ),
-                                "source_revision_authority": (
-                                    "codemap-observed-at-scip-import"
-                                ),
-                                "producer_claimed_source_revision": None,
-                                "producer_source_revision_state": "not-captured-by-scip-adapter",
-                            },
-                            sort_keys=True,
-                            separators=(",", ":"),
-                        ),
-                        "relationships_truncated": occurrence.relationships_truncated,
-                    }
-                )
-                continue
-            enclosing = None
-            candidates = [
-                row
-                for row in self._session_symbols_for_path(rel)
-                if int(row["start_line"]) <= occurrence.line <= int(row["end_line"])
-            ]
-            if candidates:
-                candidates.sort(
-                    key=lambda row: (
-                        int(row["end_line"]) - int(row["start_line"]),
-                        -int(row["start_line"]),
-                    )
-                )
-                enclosing = str(candidates[0]["qualname"])
-            edges.append(
-                {
-                    "path": rel,
-                    "source": enclosing,
-                    "target_symbol": occurrence.symbol,
-                    "target_name": occurrence.display_name,
-                    "line": occurrence.line,
-                }
-            )
+        qualified_provenance = scip_import_provenance(
+            provenance, sorted({row.path for row in occurrences})
+        )
+        rows = collect_scip_rows(self, producer, occurrences, qualified_provenance)
         with self.store.publication_transaction():
             previous_generation = self.store.generation()
             generation = self.store.bump_generation()
             self._carry_forward_evidence_generation(
-                previous_generation=previous_generation,
-                generation=generation,
+                previous_generation=previous_generation, generation=generation
             )
-            self.store.replace_native_occurrences(producer, definitions, edges)
+            self.store.replace_native_occurrences(
+                producer, rows.definitions, rows.references
+            )
             self._record_evidence_snapshot(
-                "scip",
-                producer,
-                bind_generation=True,
-                generation=generation,
+                "scip", producer, bind_generation=True, generation=generation
             )
+            publish_scip_claim_metadata(self, producer, rows, qualified_provenance)
             self.store.set_meta("scip_last_import_unix", str(time.time()))
         return {
             "schema": "hashmarks.scip-import.v1",
             "producer": producer,
-            "definitions": len(definitions),
-            "references": len(edges),
-            "skipped": skipped,
+            "definitions": len(rows.definitions),
+            "references": len(rows.references),
+            "skipped": rows.skipped,
             "warnings": list(warnings),
+            "unlocated_relationship_claims": len(rows.unlocated),
+            "unlocated_relationship_omitted": rows.unlocated_omitted,
         }
 
     @staticmethod

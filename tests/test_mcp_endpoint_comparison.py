@@ -268,7 +268,12 @@ def test_comparison_rejects_unsupported_modes_and_irrelevant_scope(
 
 def test_comparison_contract_is_mode_specific_and_read_only() -> None:
     contract = tool_contract("evidence_comparison")
-    assert contract.response_modes == ("structural", "bindings", "diagnostics")
+    assert contract.response_modes == (
+        "structural",
+        "bindings",
+        "diagnostics",
+        "relationships",
+    )
     assert contract.response_schema_for_mode("bindings") == operation_schema(
         "evidence_comparison", "bindings"
     )

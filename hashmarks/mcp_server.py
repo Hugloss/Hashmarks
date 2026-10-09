@@ -271,7 +271,11 @@ def _register_agent_evidence_tools(
         annotations=annotations,
     )
     def structural_locality(
-        target: str, max_depth: int = 2, presentation: _Presentation = "none"
+        target: str,
+        max_depth: int = 2,
+        presentation: _Presentation = "none",
+        result_mode: Literal["default", "relationships"] = "default",
+        supplied_observations: list[dict[str, Any]] | None = None,
     ) -> dict[str, object]:
         return _call_surface(
             locality_contract,
@@ -279,6 +283,9 @@ def _register_agent_evidence_tools(
             surface.structural_locality,
             target,
             max_depth=max_depth,
+            result_mode=result_mode,
+            supplied_observations=supplied_observations,
+            response_mode=result_mode,
             presentation=presentation,
         )
 
@@ -428,6 +435,7 @@ def build_server(
         per_role: int = TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
         token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
         presentation: _Presentation = "none",
+        supplied_observations: list[dict[str, Any]] | None = None,
     ) -> dict[str, object]:
         return _call_surface(
             task_evidence_contract,
@@ -437,6 +445,7 @@ def build_server(
             limit=limit,
             per_role=per_role,
             token_budget=token_budget,
+            supplied_observations=supplied_observations,
             presentation=presentation,
         )
 
