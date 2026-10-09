@@ -165,6 +165,9 @@ def mcp_readiness(
         "operation_contract_identity": summary.get("operation_contract_identity"),
         "tool_count": len(normalized_tools),
         "tools": list(normalized_tools),
+        "repository_intelligence_query_surfaces": list(
+            normalize_mcp_query_surfaces(None)
+        ),
         "launch": {
             "args": list(
                 mcp_server_args(
