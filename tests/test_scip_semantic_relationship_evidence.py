@@ -177,8 +177,12 @@ def test_scip_relation_claim_delta_requires_same_untruncated_producer(
         after = cm.structural_locality("code.py::Impl", refresh=False)
         delta = structural_locality_delta(before, after)
         assert delta["native_relationships_comparable"] is True
-        assert any(row[2] == "type_definition" for row in delta["native_relationships_added"])
-        assert any(row[2] == "implementation" for row in delta["native_relationships_removed"])
+        assert any(
+            row[2] == "type_definition" for row in delta["native_relationships_added"]
+        )
+        assert any(
+            row[2] == "implementation" for row in delta["native_relationships_removed"]
+        )
 
         incomplete = dict(after)
         incomplete["native_semantic_relationships"] = {
