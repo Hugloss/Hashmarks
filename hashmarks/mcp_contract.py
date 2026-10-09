@@ -264,10 +264,9 @@ MCP_TOOL_CONTRACTS = (
     McpToolContract(
         "source_observation",
         (
-            "After localization, observe literal (not regex) occurrences in one known "
-            "member or up to 32 explicit paths; return exact line/column, revisions, "
-            "coverage, and scoped qualified absence. Prefer to repeated native grep "
-            "inside those files; do not infer repository-wide absence."
+            "After localization, observe exact case-sensitive literals (not regex) "
+            "in one member or up to 32 known paths. Return line/column, revisions, "
+            "coverage and scoped absence; never infer repository-wide absence."
         ),
         "source_observation",
     ),
