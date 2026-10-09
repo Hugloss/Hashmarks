@@ -945,6 +945,7 @@ def _task_ownership(
                     assertion=assertion,
                 )
 
+
 def _task_verification(
     p: _Projection,
     packet: Mapping[str, object],
