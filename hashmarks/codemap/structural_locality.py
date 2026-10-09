@@ -1036,21 +1036,35 @@ class StructuralLocalityMixin:
         )
         if not definitions:
             return None
-        decoded, kinds, _revisions, relation_truncated = (
+        decoded, kinds, revisions, relation_truncated = (
             self._scip_decoded_relationships(definitions[:128])
         )
         count = sum(len(decoded[id(item)][0]) for item in definitions[:128])
-        if not count:
-            return None
+        file_row = self._session_file_row(str(row["path"]))
+        current_revision = (
+            str(file_row["file_digest"])
+            if file_row is not None and file_row.get("file_digest")
+            else None
+        )
+        if not revisions or current_revision is None:
+            revision_observation = "unknown"
+        elif all(revision == current_revision for revision in revisions):
+            revision_observation = "same-as-import-observation"
+        else:
+            revision_observation = "differs-from-import-observation"
         return {
             "authority": "scip-producer-claim-only",
             "subject": f"{row['path']}::{row['qualname']}",
+            "observation_state": (
+                "direct-claims-observed" if count else "definition-observed-no-direct-claims"
+            ),
             "observed_relationship_count": count,
             "observed_kinds": sorted(set().union(*kinds.values())),
             "producer_bindings": sorted(kinds),
             "truncated": definition_truncated or relation_truncated,
             "completeness": "unknown",
             "source_equivalence": "unknown",
+            "repository_revision_observation": revision_observation,
             "negative_evidence_admissible": False,
             "detail_surface": "structural_locality",
         }
