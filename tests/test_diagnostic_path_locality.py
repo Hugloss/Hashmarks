@@ -80,9 +80,7 @@ def test_direct_and_other_member_changes_preserve_both_delta_directions() -> Non
     assert len(delta["diagnostics"]["removed"]) == 2
     assert len(delta["diagnostics"]["added_in_changed_scope"]) == 1
     assert len(rows) == 4
-    assert {
-        (row["change_kind"], row["path"]): row["locality"] for row in rows
-    } == {
+    assert {(row["change_kind"], row["path"]): row["locality"] for row in rows} == {
         ("added", _DIRECT): "on-reported-changed-path",
         ("removed", _DIRECT): "on-reported-changed-path",
         ("added", _OTHER): "outside-reported-changed-paths",
@@ -177,10 +175,13 @@ def test_repeat_observation_and_revision_only_delta_have_no_phantom_paths() -> N
 def test_path_aliases_are_normalized_but_outputs_remain_deterministic() -> None:
     first = _delta([], [_diagnostic(_DIRECT, "new")], changed_paths=["./src/owner.py"])
     second = _delta(
-        [], [_diagnostic(_DIRECT, "new")],
+        [],
+        [_diagnostic(_DIRECT, "new")],
         changed_paths=["src/owner.py", "./src/owner.py"],
     )
-    assert first["diagnostics"]["path_locality"] == second["diagnostics"]["path_locality"]
+    assert (
+        first["diagnostics"]["path_locality"] == second["diagnostics"]["path_locality"]
+    )
     assert first["diagnostics"]["path_locality"]["changed_paths"] == [_DIRECT]
 
 
@@ -201,7 +202,9 @@ def test_invalid_reported_changed_paths_fail_before_locality_projection(
     after = _observation([_diagnostic(_DIRECT, "new")])
     with pytest.raises(ValueError, match="changed_paths|relative"):
         RepositoryDeltaMixin.diagnostic_observation_delta(
-            before, after, changed_paths=changed  # type: ignore[arg-type]
+            before,
+            after,
+            changed_paths=changed,  # type: ignore[arg-type]
         )
 
 
@@ -215,11 +218,11 @@ def test_agent_native_presentation_preserves_original_and_locality_findings() ->
     compact = present_repository_evidence(delta, format="compact")
     for projection in (structured, compact):
         findings = [
-            finding
-            for group in projection["groups"]
-            for finding in group["findings"]
+            finding for group in projection["groups"] for finding in group["findings"]
         ]
-        locality = [row for row in findings if row["kind"] == "diagnostic_path_locality"]
+        locality = [
+            row for row in findings if row["kind"] == "diagnostic_path_locality"
+        ]
         added = [row for row in findings if row["kind"] == "diagnostic_added"]
         assert len(added) == 1
         assert len(locality) == 1
