@@ -502,3 +502,48 @@ def test_backend_decorator_context_does_not_expose_literals_in_outline(
     else:
         assert row["state"] == "unresolved"
     assert "/secret-route" not in json.dumps(result)
+
+
+def test_mcp_backend_decorator_context_tracks_current_source_after_edit(
+    tmp_path: Path,
+) -> None:
+    _repo(tmp_path)
+    source = tmp_path / PATH
+    source.write_text(
+        '@router.get("/before")\n'
+        "def process_widget(value):\n"
+        "    return value\n",
+        encoding="utf-8",
+    )
+    surface = HashmarksMcpSurface(str(tmp_path))
+    try:
+        request = [{"path": PATH, "start_line": 1, "end_line": 1}]
+        before = surface.change_impact(TASK, [PATH], changed_line_spans=request)
+        repeated = surface.change_impact(TASK, [PATH], changed_line_spans=request)
+        source.write_text(
+            '@router.get("/after")\n'
+            "def process_widget(value):\n"
+            "    return value\n",
+            encoding="utf-8",
+        )
+        after = surface.change_impact(TASK, [PATH], changed_line_spans=request)
+    finally:
+        surface.close()
+
+    def first_literal(packet: dict[str, object]) -> str:
+        observations = packet["changed_line_evidence"]["observations"]
+        context = observations[0]["decorator_associations"]["associations"][0][
+            "decorator_context"
+        ]
+        return context["observations"][0]["arguments"]["first_positional_string"][
+            "value"
+        ]
+
+    assert first_literal(before) == "/before"
+    assert first_literal(repeated) == "/before"
+    assert first_literal(after) == "/after"
+    assert before["changed_line_evidence"] == repeated["changed_line_evidence"]
+    assert (
+        before["changed_line_evidence"]["observations"][0]["member_revision"]
+        != after["changed_line_evidence"]["observations"][0]["member_revision"]
+    )
