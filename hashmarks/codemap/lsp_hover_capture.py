@@ -6,6 +6,7 @@ repository definitions, types, trusted instructions or relationship edges.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from typing import Any
 
@@ -59,7 +60,8 @@ def _marked_string(value: object) -> object:
 
 def normalize_hover_observation(capture: Mapping[str, Any]) -> dict[str, Any]:
     """Admit LSP 3.x Hover/MarkedString variants without making semantic claims."""
-    if capture.get("partial_results"):
+    partial = capture.get("partial_results", [])
+    if not isinstance(partial, list) or partial:
         raise ValueError("LSP hover does not support partial result batches")
     response = capture["response"]
     if "error" in response:
@@ -84,8 +86,6 @@ def normalize_hover_observation(capture: Mapping[str, Any]) -> dict[str, Any]:
         )
         state = "hover-returned"
     # Limit aggregate transported values separately from the capture input limit.
-    import json
-
     if len(json.dumps(contents, ensure_ascii=False).encode("utf-8")) > _MAX_HOVER_BYTES:
         raise ValueError("LSP hover aggregate contents exceed byte bound")
     return {
@@ -96,3 +96,46 @@ def normalize_hover_observation(capture: Mapping[str, Any]) -> dict[str, Any]:
         "semantic_correspondence": "not-established",
         "negative_evidence_admissible": False,
     }
+
+
+def validate_hover_observation(value: object, *, response_error: object) -> None:
+    """Reject invented hover authority even when the outer digest is recomputed."""
+    if not isinstance(value, Mapping) or set(value) != {
+        "state",
+        "contents",
+        "range",
+        "authority",
+        "semantic_correspondence",
+        "negative_evidence_admissible",
+    }:
+        raise ValueError("invalid normalized hover evidence fields")
+    if (
+        value["authority"] != "caller-supplied-producer-claim"
+        or value["semantic_correspondence"] != "not-established"
+        or value["negative_evidence_admissible"] is not False
+    ):
+        raise ValueError("LSP hover cannot grant semantic or absence authority")
+    if value["state"] not in (
+        "hover-returned",
+        "no-hover-returned",
+        "producer-error",
+    ):
+        raise ValueError("invalid LSP hover observation state")
+    if (value["state"] == "producer-error") != (response_error is not None):
+        raise ValueError("LSP hover error state contradicts response provenance")
+    if value["state"] != "hover-returned":
+        if value["contents"] is not None or value["range"] is not None:
+            raise ValueError("missing/error hover cannot carry result contents")
+        return
+    normalized = _contents(value["contents"])
+    if normalized != value["contents"]:
+        raise ValueError("hover contents not canonical")
+    if value["range"] is not None:
+        normalized_range = validated_range(value["range"])
+        if normalized_range != value["range"]:
+            raise ValueError("hover range not canonical")
+    if (
+        len(json.dumps(value["contents"], ensure_ascii=False).encode("utf-8"))
+        > _MAX_HOVER_BYTES
+    ):
+        raise ValueError("LSP hover aggregate contents exceed byte bound")
