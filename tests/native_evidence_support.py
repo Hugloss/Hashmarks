@@ -16,6 +16,7 @@ from hashmarks.evidence_presentation import FORMATS, presentation_response
 
 CORPUS = Path(__file__).parent / "fixtures" / "dependency_dogfood"
 SCIP_CORPUS = Path(__file__).parent / "fixtures" / "native_scip"
+TASK = "Change normalize_widget in src/engine.py to lowercase the trimmed value and verify its semantics."
 
 
 def materialize_scip(root: Path, source: Path) -> None:
@@ -91,7 +92,7 @@ def dependency_capture(
 def assert_projection(native: Any, operation: str, mode: str = "default") -> None:
     """Check exact selected evidence and explicit exclusions across all encodings."""
     for format in FORMATS:
-        response = presentation_response(
+        response: Any = presentation_response(
             operation, native, format=format, result_mode=mode
         )
         if format == "none":

@@ -95,6 +95,13 @@ applicable Git patch. `~` lines keep locator, source-binding, capability,
 configuration, collection and resolution changes separate. An incomparable
 comparison stays explicit even when there are no paired producer deltas.
 
+Dependency comparison projections select `change_axes` and component selection
+transitions before large component and relationship lists consume the row cap.
+Text starts with comparability, causation qualification, and exact change axes;
+displayed transitions preserve the producer's removed/added selections. This
+ordering does not classify transitions as upgrades or downgrades. The native
+packet remains complete, and omitted presentation rows remain counted.
+
 ## Current producer coverage
 
 The projector covers all eight query surfaces: change intelligence, verification

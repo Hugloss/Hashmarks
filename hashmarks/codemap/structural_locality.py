@@ -811,7 +811,10 @@ class StructuralLocalityMixin:
     ) -> dict[str, object]:
         """Return one generation-scoped structural-locality observation."""
         from .lsp_relationship_adapter import normalize_lsp_captures
-        from .semantic_relationship_observation import semantic_relationship_observation
+        from .semantic_relationship_observation import (
+            exact_relationship_target,
+            semantic_relationship_observation,
+        )
 
         captures = normalize_lsp_captures(supplied_observations)
         if TYPE_CHECKING:
@@ -826,7 +829,7 @@ class StructuralLocalityMixin:
         with self.decision_session():
             if result_mode == "relationships":
                 result = semantic_relationship_observation(
-                    self, self._exact_locality_target(target), captures
+                    self, exact_relationship_target(self, target), captures
                 )
             else:
                 result = self._structural_locality_impl(

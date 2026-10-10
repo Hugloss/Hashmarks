@@ -130,7 +130,7 @@ def capture_scip(source: Path, destination: Path, language: str) -> None:
 
 
 def _capture_maven(
-    root: Path, destination: Path, *, profile: str | None = None
+    root: Path, destination: Path, *, repository: Path, profile: str | None = None
 ) -> None:
     destination.mkdir(parents=True, exist_ok=True)
     producer = _tool("mvn")
@@ -152,7 +152,7 @@ def _capture_maven(
         ]
         if profile:
             arguments.append("-P" + profile)
-        _run([producer, *arguments], root)
+        _run([producer, "-Dmaven.repo.local=" + str(repository), *arguments], root)
         assert output.is_file() and output.stat().st_size, "Maven emitted no capture"
         commands.append(arguments)
     assert before == _source_revisions(root, (".xml",)), "Maven changed fixture inputs"
@@ -167,7 +167,7 @@ def _capture_maven(
     )
 
 
-def _install_maven_fixture(root: Path, manifest: Path) -> None:
+def _install_maven_fixture(root: Path, manifest: Path, repository: Path) -> None:
     jar = root / "dummy-dep.jar"
     with zipfile.ZipFile(jar, "w") as archive:
         archive.writestr("META-INF/MANIFEST.MF", manifest.read_bytes())
@@ -175,6 +175,7 @@ def _install_maven_fixture(root: Path, manifest: Path) -> None:
         _run(
             [
                 _tool("mvn"),
+                "-Dmaven.repo.local=" + str(repository),
                 "-B",
                 "-q",
                 "-Dstyle.color=never",
@@ -208,19 +209,20 @@ def capture_dependencies(source: Path, destination: Path) -> None:
                 ).hexdigest(),
             },
         )
+    repository = destination / "maven-repository"
     _install_maven_fixture(
-        destination / "maven", source / "maven" / "dummy-dep-manifest.mf"
+        destination / "maven", source / "maven" / "dummy-dep-manifest.mf", repository
     )
     for state in ("absent", "v1", "v2"):
         root = destination / "maven" / state
-        _capture_maven(root, root)
+        _capture_maven(root, root, repository=repository)
     for scenario in ("transitive-upgrade", "mediation", "exclusion"):
         for state in ("before", "after"):
             root = destination / "maven" / scenario / state
-            _capture_maven(root, root)
+            _capture_maven(root, root, repository=repository)
     profiles = destination / "maven" / "profiles"
-    _capture_maven(profiles, profiles / "default")
-    _capture_maven(profiles, profiles / "extra", profile="extra")
+    _capture_maven(profiles, profiles / "default", repository=repository)
+    _capture_maven(profiles, profiles / "extra", repository=repository, profile="extra")
 
 
 def main(argv: list[str] | None = None) -> int:

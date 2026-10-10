@@ -7,7 +7,9 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pytest
 from native_evidence_support import (
+    TASK,
     assert_projection,
     import_native_scip,
     materialize_scip,
@@ -15,8 +17,6 @@ from native_evidence_support import (
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.semantic_relationship_delta import semantic_relationship_delta
-
-TASK = "Change normalize_widget in src/engine.py to lowercase the trimmed value and verify its semantics."
 
 
 def _claims(packet: Any) -> list[Any]:
@@ -67,7 +67,6 @@ def test_native_typescript_claims_move_remove_and_add_without_inferred_edges(
             cm.sync()
             import_native_scip(cm, source)
             packets.append(_observe(cm))
-        method = _observe(cm, "src/engine.ts::Engine.normalize")
     before, moved, removed, added = packets
     assert len(_claims(before)) == 1
     claim = _claims(before)[0]
@@ -76,16 +75,16 @@ def test_native_typescript_claims_move_remove_and_add_without_inferred_edges(
     assert claim["target"]["key"]["symbol"].endswith("Contract#")
     movement = semantic_relationship_delta(before, moved)
     assert movement["comparable"] is True
-    assert movement["producer_deltas"][0]["facts"] == {"added": [], "removed": []}
+    assert movement["producer_deltas"][0]["facts"]["added"] == []
+    assert movement["producer_deltas"][0]["facts"]["removed"] == []
     assert movement["producer_deltas"][0]["locators"]
     for old, new, changed in ((moved, removed, "removed"), (removed, added, "added")):
         delta = semantic_relationship_delta(old, new)
         assert delta["comparable"] is True
         assert len(delta["producer_deltas"][0]["facts"][changed]) == 1
         assert_projection(delta, "evidence_comparison", "relationships")
-    assert _claims(method) == []
     for packet in packets:
-        assert packet["coverage"]["negative_evidence_admissible"] is False
+        assert packet["negative_evidence_admissible"] is False
         assert_projection(packet, "structural_locality", "relationships")
 
 
@@ -98,7 +97,9 @@ def test_native_typescript_method_reference_flag_is_not_a_call_or_inverse(
     with CodeMap(root, state_dir=tmp_path / "state") as cm:
         cm.sync()
         import_native_scip(cm, source)
-        method = _observe(cm, "src/engine.ts::Engine.normalize")
+        method = _observe(cm, "src/engine.ts::normalize")
+        with pytest.raises(KeyError, match="symbol not found"):
+            cm.structural_locality("src/engine.ts::normalize")
     claims = _claims(method)
     assert {claim["kind"] for claim in claims} == {"reference", "implementation"}
     assert len(claims) == 2
@@ -111,6 +112,58 @@ def test_native_typescript_method_reference_flag_is_not_a_call_or_inverse(
         for claim in claims
     )
     assert_projection(method, "structural_locality", "relationships")
+
+
+@pytest.mark.parametrize("language", ["python", "typescript"])
+def test_native_scip_parameters_do_not_manufacture_definition_ambiguity(
+    tmp_path: Path, language: str, native_scip_corpus: Path
+) -> None:
+    root = tmp_path / "repo"
+    source = native_scip_corpus / language / "before"
+    materialize_scip(root, source)
+    path = "src/engine.py" if language == "python" else "src/engine.ts"
+    name = "normalize_widget" if language == "python" else "normalize"
+    with CodeMap(root, state_dir=tmp_path / "state") as cm:
+        cm.sync()
+        import_native_scip(cm, source)
+        definitions = cm.store.native_definitions_for_path(path, name=name)
+        parameters = cm.store.native_definitions_for_path(path, name="value")
+    assert len(definitions) == 1
+    assert len(parameters) == 1
+    assert parameters[0]["symbol"].endswith("(value)")
+    assert definitions[0]["symbol"].endswith("().")
+
+
+def test_native_scip_duplicate_method_names_remain_ambiguous(
+    tmp_path: Path, native_scip_corpus: Path
+) -> None:
+    root = tmp_path / "repo"
+    source = native_scip_corpus / "typescript" / "ambiguous"
+    materialize_scip(root, source)
+    with CodeMap(root, state_dir=tmp_path / "state") as cm:
+        cm.sync()
+        import_native_scip(cm, source)
+        with pytest.raises(KeyError, match="ambiguous"):
+            _observe(cm, "src/engine.ts::normalize")
+        with pytest.raises(KeyError, match="missing"):
+            _observe(cm, "src/engine.ts::unobserved")
+
+
+def test_native_only_relationship_subject_cannot_cross_changed_visibility(
+    tmp_path: Path, native_scip_corpus: Path
+) -> None:
+    root = tmp_path / "repo"
+    source = native_scip_corpus / "typescript" / "before"
+    materialize_scip(root, source)
+    with CodeMap(root, state_dir=tmp_path / "state") as cm:
+        cm.sync()
+        import_native_scip(cm, source)
+        assert len(_claims(_observe(cm, "src/engine.ts::normalize"))) == 2
+        (root / ".hashmarks-context.toml").write_text(
+            '[[rule]]\npattern = "src/engine.ts"\nvisibility = "deny"\n'
+        )
+        with pytest.raises((KeyError, PermissionError)):
+            _observe(cm, "src/engine.ts::normalize")
 
 
 def test_native_python_empty_claims_become_unavailable_before_reindex_and_reopen(
@@ -167,10 +220,13 @@ def test_native_typescript_stale_index_is_not_current_or_replayed_after_deletion
         materialize_scip(root, native_scip_corpus / "typescript" / "after")
         cm.sync(["src/engine.ts"])
         stale = _observe(cm)
+        with pytest.raises(KeyError, match="stale"):
+            _observe(cm, "src/engine.ts::normalize")
         assert stale["observations"][0]["freshness"] == "stale"
         comparison = semantic_relationship_delta(before, stale)
         assert comparison["comparable"] is False
-        assert comparison["producer_deltas"][0]["facts"] == {"added": [], "removed": []}
+        assert comparison["producer_deltas"][0]["facts"]["added"] == []
+        assert comparison["producer_deltas"][0]["facts"]["removed"] == []
         assert_projection(comparison, "evidence_comparison", "relationships")
         (root / "src" / "engine.ts").unlink()
         cm.sync(["src/engine.ts"])

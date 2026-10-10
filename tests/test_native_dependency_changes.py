@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from copy import deepcopy
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from native_evidence_support import (
-    CORPUS,
     assert_projection,
     dependency_capture,
     input_revisions,
@@ -71,16 +70,16 @@ def test_native_dependency_sequence_binds_real_inputs_and_reopens(
 
 @pytest.mark.parametrize("producer", ["uv", "maven"])
 def test_old_native_capture_keeps_input_mismatch_visible(
-    tmp_path: Path, producer: str
+    tmp_path: Path, producer: str, native_dependency_corpus: Path
 ) -> None:
     root = tmp_path / "repo"
-    before_source = CORPUS / producer / "v1"
+    before_source = native_dependency_corpus / producer / "v1"
     paths = materialize_dependency(root, before_source)
     raw = dependency_capture(producer, before_source, input_revisions(root, paths))
     with CodeMap(root, state_dir=tmp_path / "state") as cm:
         cm.sync()
         before: Any = cm.dependency_resolution_evidence(raw)
-        materialize_dependency(root, CORPUS / producer / "v2")
+        materialize_dependency(root, native_dependency_corpus / producer / "v2")
         cm.sync()
         reused: Any = cm.dependency_resolution_evidence(raw)
         delta: Any = cm.dependency_resolution_delta(before, reused)
@@ -96,10 +95,10 @@ def test_old_native_capture_keeps_input_mismatch_visible(
 
 @pytest.mark.parametrize("producer", ["uv", "maven"])
 def test_native_dependency_formatting_change_is_not_resolution_change(
-    tmp_path: Path, producer: str
+    tmp_path: Path, producer: str, native_dependency_corpus: Path
 ) -> None:
     root = tmp_path / "repo"
-    source = CORPUS / producer / "v1"
+    source = native_dependency_corpus / producer / "v1"
     paths = materialize_dependency(root, source)
     raw = dependency_capture(producer, source, input_revisions(root, paths))
     with CodeMap(root, state_dir=tmp_path / "state") as cm:
@@ -147,7 +146,7 @@ def test_native_maven_file_changes_preserve_expected_delta_and_projection(
     native_dependency_corpus: Path,
 ) -> None:
     root = tmp_path / "repo"
-    observations = []
+    observations: list[Any] = []
     with CodeMap(root, state_dir=tmp_path / "state") as cm:
         for endpoint in ("before", "after"):
             source = native_dependency_corpus / "maven" / scenario / endpoint
@@ -184,9 +183,10 @@ def test_native_maven_file_changes_preserve_expected_delta_and_projection(
 
 def test_native_uv_grouped_bounds_and_incomplete_inventory_cannot_prove_absence(
     tmp_path: Path,
+    native_dependency_corpus: Path,
 ) -> None:
     root = tmp_path / "repo"
-    source = CORPUS / "uv" / "grouped"
+    source = native_dependency_corpus / "uv" / "grouped"
     paths = materialize_dependency(root, source)
     raw = dependency_capture("uv", source, input_revisions(root, paths))
     with CodeMap(root, state_dir=tmp_path / "state") as cm:
@@ -198,8 +198,11 @@ def test_native_uv_grouped_bounds_and_incomplete_inventory_cannot_prove_absence(
             "context": "lock",
         }
         results = [
-            cm.dependency_resolution_queries(
-                observation, [{**request, "max_results": limit}]
+            cast(
+                Any,
+                cm.dependency_resolution_queries(
+                    observation, [{**request, "max_results": limit}]
+                ),
             )["results"][0]
             for limit in (1, 16)
         ]
@@ -208,12 +211,109 @@ def test_native_uv_grouped_bounds_and_incomplete_inventory_cannot_prove_absence(
             row["completeness"] = "incomplete"
         partial: Any = cm.dependency_resolution_evidence(incomplete)
         response = cm.dependency_codemap(incomplete)
-        missing: Any = cm.dependency_resolution_queries(
-            partial,
-            [{"operation": "inventory", "node_id": "unobserved", "context": "lock"}],
+        missing = cast(
+            Any,
+            cm.dependency_resolution_queries(
+                partial,
+                [
+                    {
+                        "operation": "inventory",
+                        "node_id": "unobserved",
+                        "context": "lock",
+                    }
+                ],
+            ),
         )["results"][0]
     assert all(result["negative_evidence"] == "not-applicable" for result in results)
     assert observation["resolution_identity"] == partial["resolution_identity"]
     assert missing["result"] == []
     assert missing["negative_evidence"] == "not-admissible"
+    assert_projection(response, "dependency_codemap", "observation")
+
+
+def test_native_maven_bounded_search_does_not_turn_unvisited_into_absent(
+    tmp_path: Path, native_dependency_corpus: Path
+) -> None:
+    root = tmp_path / "repo"
+    source = native_dependency_corpus / "maven" / "transitive-upgrade" / "after"
+    paths = materialize_dependency(root, source)
+    with CodeMap(root, state_dir=tmp_path / "state") as cm:
+        cm.sync()
+        observation: Any = cm.dependency_resolution_evidence(
+            dependency_capture("maven", source, input_revisions(root, paths))
+        )
+        target = next(
+            row["node_id"]
+            for row in observation["selections"]
+            if row["component_id"] == "com.squareup.okio:okio-jvm"
+        )
+        request = {
+            "operation": "paths",
+            "node_id": observation["roots"][0]["node_id"],
+            "target_id": target,
+            "context": "compile",
+        }
+        bounded = cast(
+            Any,
+            cm.dependency_resolution_queries(
+                observation, [{**request, "max_visits": 1}]
+            ),
+        )["results"][0]
+        complete = cast(Any, cm.dependency_resolution_queries(observation, [request]))[
+            "results"
+        ][0]
+    assert bounded["result"] == []
+    assert bounded["negative_evidence"] == "not-admissible"
+    assert bounded["omissions"]
+    assert complete["result"]
+
+
+def test_native_maven_profiles_do_not_promote_context_absence_to_global_absence(
+    tmp_path: Path, native_dependency_corpus: Path
+) -> None:
+    from hashmarks.adapters import maven_dependency_observation
+
+    root = tmp_path / "repo"
+    source = native_dependency_corpus / "maven" / "profiles"
+    paths = materialize_dependency(root, source)
+    contexts = ("default", "extra")
+    raw = maven_dependency_observation(
+        trees={
+            context: (source / context / "tree.json").read_bytes()
+            for context in contexts
+        },
+        inventories={
+            context: (source / context / "list.txt").read_bytes()
+            for context in contexts
+        },
+        complete_tree_contexts=contexts,
+        complete_inventory_contexts=contexts,
+        repository_inputs=input_revisions(root, paths),
+    )
+    with CodeMap(root, state_dir=tmp_path / "state") as cm:
+        cm.sync()
+        observation: Any = cm.dependency_resolution_evidence(raw)
+        selection = next(
+            row
+            for row in observation["selections"]
+            if row["component_id"] == "org.apache.commons:commons-compress"
+        )
+        assert selection["contexts"] == ["extra"]
+        request = {"operation": "inventory", "node_id": selection["node_id"]}
+        default = cast(
+            Any,
+            cm.dependency_resolution_queries(
+                observation, [{**request, "context": "default"}]
+            ),
+        )["results"][0]
+        extra = cast(
+            Any,
+            cm.dependency_resolution_queries(
+                observation, [{**request, "context": "extra"}]
+            ),
+        )["results"][0]
+        response = cm.dependency_codemap(raw)
+    assert default["result"] == []
+    assert default["negative_evidence"] == "admissible-within-declared-scope"
+    assert extra["result"] and extra["negative_evidence"] == "not-applicable"
     assert_projection(response, "dependency_codemap", "observation")

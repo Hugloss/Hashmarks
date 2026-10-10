@@ -1075,21 +1075,24 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         path: str,
         *,
         name: str,
-        line: int,
+        line: int | None = None,
         limit: int = 129,
         producer: str | None = None,
     ) -> list[dict]:
-        """Bounded SCIP definitions for one exact admitted source locator."""
-        scope = " AND producer=?" if producer is not None else ""
-        parameters = (
-            (path, name, line, producer, limit)
-            if producer is not None
-            else (path, name, line, limit)
-        )
+        """Bounded exact path/name definitions, optionally at one source locator."""
+        conditions = ["path=?", "display_name=?"]
+        parameters: list[object] = [path, name]
+        if line is not None:
+            conditions.append("line=?")
+            parameters.append(line)
+        if producer is not None:
+            conditions.append("producer=?")
+            parameters.append(producer)
+        parameters.append(limit)
         with self._lock:
             rows = self._db.execute(
                 "SELECT * FROM native_definition "
-                f"WHERE path=? AND display_name=? AND line=?{scope} "
+                f"WHERE {' AND '.join(conditions)} "
                 "ORDER BY symbol,producer LIMIT ?",
                 parameters,
             ).fetchall()

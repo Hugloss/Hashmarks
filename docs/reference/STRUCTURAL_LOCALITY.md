@@ -149,6 +149,15 @@ MCP uses the same structural mode and `evidence_comparison(...,
 result_mode="relationships")`. Existing structural and comparison tools own
 these modes; no language-server process is started.
 
+Relationship mode also accepts an exact `path::display_name` present only in
+the native index, such as a TypeScript method that the lexical parser does not
+index. The existing native-definition store must return exactly one admitted,
+current definition for that path and name within its bounded read. Duplicate
+method names, missing definitions, denied paths, and stale producers remain
+unresolved. Hashmarks does not infer a qualified class/member name from SCIP
+descriptors. This native lookup applies only to relationship observations;
+default structural locality and edit ownership retain their existing owners.
+
 `hashmarks.semantic-relationship-observation.v1` retains direct producer
 claims mentioning the exact subject, including incoming SCIP claims in their
 original direction and relationship-only records lacking a definition.
@@ -260,7 +269,7 @@ durable provider state or later calls.
 Ownership note:
 
 ```text
-Observed repository fact/evidence: bounded direct producer implementation/type/definition claims and qualified deltas.
+Observed repository fact/evidence: bounded direct producer implementation/type/definition claims, exact native-only relationship subjects, and qualified deltas.
 Authority source: explicit SCIP records or caller-supplied LSP captures, correlated with existing stable member and CodeMap authorities.
 Completeness/freshness behavior: independent producer collection, source correspondence, repository freshness, candidates, and projection bounds; no negative evidence.
 Existing Hashmarks owner extended: CodeMap native evidence, structural endpoint comparison, task evidence, and presentation.

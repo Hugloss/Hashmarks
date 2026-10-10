@@ -36,16 +36,34 @@ def fake_maven_wrapper():
 
 
 @pytest.fixture(scope="session")
-def native_dependency_corpus():
+def native_dependency_corpus(tmp_path_factory):
+    import os
+
     from native_evidence_support import CORPUS
 
+    if os.environ.get("HASHMARKS_NATIVE_EVIDENCE_LIVE") == "1":
+        from scripts.native_evidence_capture import capture_dependencies
+
+        destination = tmp_path_factory.mktemp("native-dependencies") / "corpus"
+        capture_dependencies(CORPUS, destination)
+        return destination
     return CORPUS
 
 
 @pytest.fixture(scope="session")
-def native_scip_corpus():
+def native_scip_corpus(tmp_path_factory):
+    import os
+
     from native_evidence_support import SCIP_CORPUS
 
+    if os.environ.get("HASHMARKS_NATIVE_EVIDENCE_LIVE") == "1":
+        from scripts.native_evidence_capture import capture_scip
+
+        destination = tmp_path_factory.mktemp("native-scip")
+        for language in ("python", "typescript"):
+            for source in sorted((SCIP_CORPUS / language).iterdir()):
+                capture_scip(source, destination / language / source.name, language)
+        return destination
     return SCIP_CORPUS
 
 
