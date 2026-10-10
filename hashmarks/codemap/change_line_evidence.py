@@ -19,6 +19,28 @@ MAX_CHANGED_SPAN_LINES = 128
 MAX_OVERLAPPING_SYMBOLS = 32
 
 
+def _checked_line_bounds(start: object, end: object) -> tuple[int, int]:
+    if type(start) is not int or type(end) is not int:
+        raise ValueError("changed line span requires integer line bounds")
+    if not 1 <= start <= end or end - start + 1 > MAX_CHANGED_SPAN_LINES:
+        raise ValueError("changed line span requires 1–128 positive lines")
+    return start, end
+
+
+def _admit_span(raw: object, allowed: set[str]) -> dict[str, Any]:
+    if not isinstance(raw, Mapping) or set(raw) != {
+        "path", "start_line", "end_line"
+    }:
+        raise ValueError("changed line span requires path/start_line/end_line")
+    if not isinstance(raw["path"], str):
+        raise ValueError("changed line span path must be a string")
+    path = normalize_relative_path(raw["path"], allow_root=False)
+    start, end = _checked_line_bounds(raw["start_line"], raw["end_line"])
+    if path not in allowed:
+        raise ValueError("changed line span must refer to a reported changed path")
+    return {"path": path, "start_line": start, "end_line": end}
+
+
 def normalize_changed_line_spans(
     spans: object,
     changed_paths: Sequence[str],
@@ -28,32 +50,15 @@ def normalize_changed_line_spans(
         return ()
     if not isinstance(spans, list) or len(spans) > MAX_CHANGED_SPANS:
         raise ValueError("changed_line_spans must be a list of at most 16 ranges")
-    allowed = set(changed_paths)
     selected: list[dict[str, Any]] = []
     seen: set[tuple[str, int, int]] = set()
     for raw in spans:
-        if not isinstance(raw, Mapping) or set(raw) != {
-            "path", "start_line", "end_line"
-        }:
-            raise ValueError("changed line span requires path/start_line/end_line")
-        if not isinstance(raw["path"], str):
-            raise ValueError("changed line span path must be a string")
-        path = normalize_relative_path(raw["path"], allow_root=False)
-        start, end = raw["start_line"], raw["end_line"]
-        if (
-            type(start) is not int
-            or type(end) is not int
-            or not 1 <= start <= end
-            or end - start + 1 > MAX_CHANGED_SPAN_LINES
-        ):
-            raise ValueError("changed line span requires 1–128 positive lines")
-        if path not in allowed:
-            raise ValueError("changed line span must refer to a reported changed path")
-        key = (path, start, end)
+        span = _admit_span(raw, set(changed_paths))
+        key = (span["path"], span["start_line"], span["end_line"])
         if key in seen:
             raise ValueError("changed line spans must be distinct")
         seen.add(key)
-        selected.append({"path": path, "start_line": start, "end_line": end})
+        selected.append(span)
     return tuple(sorted(selected, key=lambda row: (
         row["path"], row["start_line"], row["end_line"]
     )))
