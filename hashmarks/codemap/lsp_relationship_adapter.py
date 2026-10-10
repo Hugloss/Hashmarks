@@ -116,6 +116,22 @@ def _documents(value: object) -> dict[str, dict[str, Any]]:
     return result
 
 
+def _hover_request_params(params: Mapping[str, Any]) -> None:
+    expected = {"textDocument", "position"}
+    if not expected <= set(params) <= expected | {"workDoneToken"}:
+        raise ValueError(
+            "hover requires textDocument, position and optional workDoneToken"
+        )
+    if "workDoneToken" in params:
+        token = params["workDoneToken"]
+        if type(token) not in (str, int) or (
+            type(token) is int and not -(2**31) <= token < 2**31
+        ):
+            raise ValueError(
+                "hover workDoneToken must be a string or signed 32-bit integer"
+            )
+
+
 def _document_request_params(method: str, params: Mapping[str, Any]) -> None:
     expected = {"textDocument", "position"}
     if method == "textDocument/references":
@@ -128,6 +144,8 @@ def _document_request_params(method: str, params: Mapping[str, Any]) -> None:
             or type(context["includeDeclaration"]) is not bool
         ):
             raise ValueError("references includeDeclaration must be a boolean")
+    elif method == "textDocument/hover":
+        _hover_request_params(params)
     elif set(params) != expected:
         raise ValueError("LSP request requires textDocument and position")
     document = params["textDocument"]

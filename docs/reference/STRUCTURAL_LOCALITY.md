@@ -323,7 +323,10 @@ fourteen MCP tools and operation defaults are unchanged.
 The capture supplies the same request ID, explicit file URI/cursor, producer,
 configuration, declared `hoverProvider` capability, collection state, source
 snapshot(s), revision and position encoding required by other direct LSP
-observations. The response may be:
+observations. Hover requests may also carry the optional `workDoneToken`, a
+string or signed 32-bit integer. The token is retained as request provenance;
+it adds no progress-tracking or execution responsibility. Hover does not admit
+`partialResultToken` or other extra request fields. The response may be:
 
 - an LSP `Hover` with `contents` (plain `MarkedString`, language/value
   marked string, bounded list of marked strings, or `MarkupContent` with

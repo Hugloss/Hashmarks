@@ -14,6 +14,7 @@ from hashmarks.adapters import (
 )
 from hashmarks.digest import FILE_DOMAIN, hash_bytes
 from hashmarks.evidence_presentation import FORMATS, presentation_response
+from hashmarks.evidence_presentation_conformance import validate_evidence_presentation
 
 CORPUS = Path(__file__).parent / "fixtures" / "dependency_dogfood"
 SCIP_CORPUS = Path(__file__).parent / "fixtures" / "native_scip"
@@ -169,6 +170,51 @@ def assert_projection(native: Any, operation: str, mode: str = "default") -> Non
                     key = part.replace("~1", "/").replace("~0", "~")
                     value = value[int(key)] if isinstance(value, list) else value[key]
                 assert row["details"] == value
+
+
+def assert_hover_capture(packet: Any, capture: Any) -> Any:
+    """A genuine hover's exact text remains an attributed, non-relational claim."""
+    row = next(
+        row for row in packet["observations"] if row["producer"] == capture["producer"]
+    )
+    result = capture["response"]["result"]
+    assert row["capability"]["hover_observation"] == {
+        "state": "no-hover-returned" if result is None else "hover-returned",
+        "contents": None if result is None else result["contents"],
+        "range": None if result is None else result.get("range"),
+        "authority": "caller-supplied-producer-claim",
+        "semantic_correspondence": "not-established",
+        "negative_evidence_admissible": False,
+    }
+    assert row["capability"]["observed_operation"] == "textDocument/hover"
+    assert row["capability"]["authority"] == "producer-claimed"
+    assert row["claims"] == []
+    assert row["accounting"]["received"] == row["accounting"]["retained"] == 0
+    assert row["negative_evidence_admissible"] is False
+    assert packet["negative_evidence_admissible"] is False
+    return row
+
+
+def assert_hover_presentation(packet: Any, presentation: Any, capture: Any) -> None:
+    """Check the transported context, including its independent qualifications."""
+    row = assert_hover_capture(packet, capture)
+    assert validate_evidence_presentation(packet, presentation)["valid"] is True
+    (context,) = [
+        context["details"]["relationship_observation"]
+        for context in presentation["source_context"]
+        if context["details"].get("relationship_observation", {}).get("producer")
+        == capture["producer"]
+    ]
+    for field in ("capability", "freshness", "scope", "capture_identity"):
+        assert context[field] == row[field]
+    if presentation["format"] == "text":
+        contents = json.dumps(
+            row["capability"]["hover_observation"]["contents"],
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        assert contents in presentation["text"]
 
 
 def semantic_dependency_fields(observation: Any) -> Any:

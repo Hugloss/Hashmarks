@@ -203,6 +203,8 @@ class FixtureSession:
             }
             if row["method"] == "textDocument/references":
                 params["context"] = {"includeDeclaration": row["includeDeclaration"]}
+            if "workDoneToken" in row:
+                params["workDoneToken"] = row["workDoneToken"]
         request, response = self.client.request(row["method"], params)
         if row["method"] == "textDocument/prepareCallHierarchy":
             items = response["result"]

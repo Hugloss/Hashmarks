@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from copy import deepcopy
 from pathlib import Path
+from typing import Any
 
 import pytest
+from native_evidence_support import lsp_capture, materialize_scip
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.lsp_relationship_adapter import (
@@ -14,6 +16,7 @@ from hashmarks.codemap.lsp_relationship_adapter import (
 )
 from hashmarks.codemap.semantic_relationship_model import (
     content_identity,
+    producer_claim_correspondence,
     validate_relationship_observation,
 )
 from hashmarks.digest import FILE_DOMAIN, hash_bytes
@@ -204,6 +207,69 @@ def test_hover_rejects_partial_result_and_request_id_mismatch(repo: Path) -> Non
         normalize_lsp_captures([mismatched])
 
 
+@pytest.mark.parametrize("token", ["", "hover:target", -(2**31), 0, 2**31 - 1])
+def test_hover_progress_token_is_preserved_as_request_provenance(
+    repo: Path, token: object
+) -> None:
+    capture = _capture(repo, {"contents": "documented"})
+    capture["request"]["params"]["workDoneToken"] = token
+    (normalized,) = normalize_lsp_captures([capture])
+    assert normalized["request"] == capture["request"]
+
+
+@pytest.mark.parametrize("token", [True, False, None, 1.5, [], {}, -(2**31) - 1, 2**31])
+def test_hover_rejects_invalid_progress_tokens(repo: Path, token: object) -> None:
+    capture = _capture(repo, {"contents": "documented"})
+    capture["request"]["params"]["workDoneToken"] = token
+    with pytest.raises(ValueError, match="workDoneToken"):
+        normalize_lsp_captures([capture])
+
+
+@pytest.mark.parametrize("field", ["partialResultToken", "unknown"])
+def test_hover_progress_does_not_admit_other_request_fields(
+    repo: Path, field: str
+) -> None:
+    capture = _capture(repo, {"contents": "documented"})
+    capture["request"]["params"][field] = "token"
+    with pytest.raises(ValueError):
+        normalize_lsp_captures([capture])
+
+
+@pytest.mark.parametrize(
+    ("contents", "admitted"),
+    [
+        ("é" * 2048, True),
+        ("é" * 2049, False),
+        (["x" * 4096, "x" * 4088], True),
+        (["x" * 4096, "x" * 4089], False),
+    ],
+)
+def test_hover_utf8_block_and_aggregate_byte_boundaries(
+    repo: Path, contents: object, admitted: bool
+) -> None:
+    capture = _capture(repo, {"contents": contents})
+    if admitted:
+        packet = _observed(repo, capture)
+        assert _hover(packet)["capability"]["hover_observation"]["contents"] == contents
+        validate_relationship_observation(packet)
+        return
+    with pytest.raises(ValueError, match="bound"):
+        normalize_lsp_captures([capture])
+    forged = _observed(repo, _capture(repo, {"contents": "valid"}))
+    row = next(
+        row for row in forged["observations"] if row["producer"] == "fixture-lsp"
+    )
+    row["capability"]["hover_observation"]["contents"] = contents
+    row["observation_identity"] = content_identity(
+        {key: value for key, value in row.items() if key != "observation_identity"}
+    )
+    forged["evidence_identity"] = content_identity(
+        {key: value for key, value in forged.items() if key != "evidence_identity"}
+    )
+    with pytest.raises(ValueError, match="bound"):
+        validate_relationship_observation(forged)
+
+
 def test_changed_snapshot_is_not_current_hover_semantic_evidence(repo: Path) -> None:
     capture = _capture(repo, {"contents": "original"})
     (repo / "source.py").write_text(
@@ -254,18 +320,45 @@ def test_rehashed_forged_hover_cannot_promote_authority(
         validate_relationship_observation(forged)
 
 
-def test_rehashed_hover_claim_cannot_masquerade_as_relationship(repo: Path) -> None:
-    packet = _observed(repo, _capture(repo, {"contents": "documented"}))
-    row = next(r for r in packet["observations"] if r["producer"] == "fixture-lsp")
+def test_rehashed_hover_claim_cannot_masquerade_as_relationship(
+    tmp_path: Path, native_lsp_corpus: Path
+) -> None:
+    root = tmp_path / "repo"
+    source = native_lsp_corpus / "python" / "hover"
+    materialize_scip(root, source)
+    with CodeMap(root) as cm:
+        cm.sync()
+        packets: list[Any] = [
+            cm.structural_locality(
+                "src/source.py::target",
+                result_mode="relationships",
+                supplied_observations=[lsp_capture(root, source, name)],
+            )
+            for name in ("hover-disk", "references")
+        ]
+    packet, references = packets
+    # The negative control proves these edges are otherwise valid producer claims.
+    validate_relationship_observation(references)
+    reference_row = next(
+        row
+        for row in references["observations"]
+        if row["producer"] == "pyright-langserver"
+    )
+    assert reference_row["claims"]
     forged = deepcopy(packet)
-    row = next(r for r in forged["observations"] if r["producer"] == "fixture-lsp")
-    row["claims"].append({"producer": "fixture-lsp", "kind": "reference"})
-    row["accounting"]["retained"] = 1
+    row = next(
+        row for row in forged["observations"] if row["producer"] == "pyright-langserver"
+    )
+    row["claims"] = deepcopy(reference_row["claims"])
+    row["accounting"] = deepcopy(reference_row["accounting"])
     row["observation_identity"] = content_identity(
         {key: value for key, value in row.items() if key != "observation_identity"}
+    )
+    forged["producer_correspondence"] = producer_claim_correspondence(
+        forged["observations"]
     )
     forged["evidence_identity"] = content_identity(
         {key: value for key, value in forged.items() if key != "evidence_identity"}
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="LSP hover cannot assert relationship edges"):
         validate_relationship_observation(forged)

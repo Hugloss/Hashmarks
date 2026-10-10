@@ -20,6 +20,15 @@ unresolved even though its document bytes match. Matching file bytes alone do
 not prove the query symbol. Call ranges belong to the caller document; Pyright
 may give a prepared item's range that covers only its declaration name.
 
+The Python `hover` fixture records genuine plaintext hover text with Unicode
+documentation, string and integer work-done tokens, a null result, reference
+claims, and an unsaved type/documentation edit followed by close/reopen. The
+offline save test writes that exact captured buffer text to disk without
+changing the capture, then compares the matching observations. Source binding,
+document lifetime, and producer text remain independent of semantic authority;
+hover never supplies relationship or absence facts. Its raw requests and
+responses also pass through the real CLI and official MCP stdio transport.
+
 TypeScript uses the same sources as the genuine SCIP fixtures. Its methods are
 native-only targets and must stay unavailable to lexical edit lookup. Tests
 combine actual captures from both producers without filling in SCIP's omitted

@@ -1,0 +1,900 @@
+[
+  {
+    "capture": {
+      "capabilities": {
+        "callHierarchyProvider": true,
+        "codeActionProvider": {
+          "codeActionKinds": [
+            "quickfix",
+            "source.organizeImports"
+          ],
+          "workDoneProgress": true
+        },
+        "completionProvider": {
+          "completionItem": {
+            "labelDetailsSupport": true
+          },
+          "resolveProvider": true,
+          "triggerCharacters": [
+            ".",
+            "[",
+            "\"",
+            "'"
+          ],
+          "workDoneProgress": true
+        },
+        "declarationProvider": {
+          "workDoneProgress": true
+        },
+        "definitionProvider": {
+          "workDoneProgress": true
+        },
+        "documentHighlightProvider": {
+          "workDoneProgress": true
+        },
+        "documentSymbolProvider": {
+          "workDoneProgress": true
+        },
+        "executeCommandProvider": {
+          "commands": [],
+          "workDoneProgress": true
+        },
+        "hoverProvider": {
+          "workDoneProgress": true
+        },
+        "referencesProvider": {
+          "workDoneProgress": true
+        },
+        "renameProvider": {
+          "prepareProvider": true,
+          "workDoneProgress": true
+        },
+        "signatureHelpProvider": {
+          "triggerCharacters": [
+            "(",
+            ",",
+            ")"
+          ],
+          "workDoneProgress": true
+        },
+        "textDocumentSync": 2,
+        "typeDefinitionProvider": {
+          "workDoneProgress": true
+        },
+        "workspace": {
+          "workspaceFolders": {
+            "changeNotifications": true,
+            "supported": true
+          }
+        },
+        "workspaceSymbolProvider": {
+          "workDoneProgress": true
+        }
+      },
+      "collection_state": "fresh-complete",
+      "configuration_identity": "sha256:2efcdb90261c2ff5b80c5fda9c2b3f26d6096e33006d51ce4cf8e837f8369b5d",
+      "documents": {
+        "src/source.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "def target(value: str) -> str:\n    \"\"\"Return caf\u00e9 text.\"\"\"\n    return value\n\n\ndef caller() -> str:\n    return target(\"caf\u00e9\")\n"
+        }
+      },
+      "position_encoding": "utf-16",
+      "producer": "pyright-langserver",
+      "request": {
+        "id": 2,
+        "jsonrpc": "2.0",
+        "method": "textDocument/hover",
+        "params": {
+          "position": {
+            "character": 5,
+            "line": 0
+          },
+          "textDocument": {
+            "uri": "file:///tmp/hashmarks-hover-capture-3kpqb84g/hover/src/source.py"
+          }
+        }
+      },
+      "response": {
+        "id": 2,
+        "jsonrpc": "2.0",
+        "result": {
+          "contents": {
+            "kind": "plaintext",
+            "value": "(function) def target(value: str) -> str\n\nReturn caf\u00e9 text."
+          },
+          "range": {
+            "end": {
+              "character": 10,
+              "line": 0
+            },
+            "start": {
+              "character": 4,
+              "line": 0
+            }
+          }
+        }
+      },
+      "schema": "hashmarks.lsp-relationship-capture.v1"
+    },
+    "name": "hover-disk",
+    "subject": "src/source.py::target"
+  },
+  {
+    "capture": {
+      "capabilities": {
+        "callHierarchyProvider": true,
+        "codeActionProvider": {
+          "codeActionKinds": [
+            "quickfix",
+            "source.organizeImports"
+          ],
+          "workDoneProgress": true
+        },
+        "completionProvider": {
+          "completionItem": {
+            "labelDetailsSupport": true
+          },
+          "resolveProvider": true,
+          "triggerCharacters": [
+            ".",
+            "[",
+            "\"",
+            "'"
+          ],
+          "workDoneProgress": true
+        },
+        "declarationProvider": {
+          "workDoneProgress": true
+        },
+        "definitionProvider": {
+          "workDoneProgress": true
+        },
+        "documentHighlightProvider": {
+          "workDoneProgress": true
+        },
+        "documentSymbolProvider": {
+          "workDoneProgress": true
+        },
+        "executeCommandProvider": {
+          "commands": [],
+          "workDoneProgress": true
+        },
+        "hoverProvider": {
+          "workDoneProgress": true
+        },
+        "referencesProvider": {
+          "workDoneProgress": true
+        },
+        "renameProvider": {
+          "prepareProvider": true,
+          "workDoneProgress": true
+        },
+        "signatureHelpProvider": {
+          "triggerCharacters": [
+            "(",
+            ",",
+            ")"
+          ],
+          "workDoneProgress": true
+        },
+        "textDocumentSync": 2,
+        "typeDefinitionProvider": {
+          "workDoneProgress": true
+        },
+        "workspace": {
+          "workspaceFolders": {
+            "changeNotifications": true,
+            "supported": true
+          }
+        },
+        "workspaceSymbolProvider": {
+          "workDoneProgress": true
+        }
+      },
+      "collection_state": "fresh-complete",
+      "configuration_identity": "sha256:2efcdb90261c2ff5b80c5fda9c2b3f26d6096e33006d51ce4cf8e837f8369b5d",
+      "documents": {
+        "src/source.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "def target(value: str) -> str:\n    \"\"\"Return caf\u00e9 text.\"\"\"\n    return value\n\n\ndef caller() -> str:\n    return target(\"caf\u00e9\")\n"
+        }
+      },
+      "position_encoding": "utf-16",
+      "producer": "pyright-langserver",
+      "request": {
+        "id": 3,
+        "jsonrpc": "2.0",
+        "method": "textDocument/hover",
+        "params": {
+          "position": {
+            "character": 5,
+            "line": 0
+          },
+          "textDocument": {
+            "uri": "file:///tmp/hashmarks-hover-capture-3kpqb84g/hover/src/source.py"
+          },
+          "workDoneToken": "hover:target"
+        }
+      },
+      "response": {
+        "id": 3,
+        "jsonrpc": "2.0",
+        "result": {
+          "contents": {
+            "kind": "plaintext",
+            "value": "(function) def target(value: str) -> str\n\nReturn caf\u00e9 text."
+          },
+          "range": {
+            "end": {
+              "character": 10,
+              "line": 0
+            },
+            "start": {
+              "character": 4,
+              "line": 0
+            }
+          }
+        }
+      },
+      "schema": "hashmarks.lsp-relationship-capture.v1"
+    },
+    "name": "hover-string-token",
+    "subject": "src/source.py::target"
+  },
+  {
+    "capture": {
+      "capabilities": {
+        "callHierarchyProvider": true,
+        "codeActionProvider": {
+          "codeActionKinds": [
+            "quickfix",
+            "source.organizeImports"
+          ],
+          "workDoneProgress": true
+        },
+        "completionProvider": {
+          "completionItem": {
+            "labelDetailsSupport": true
+          },
+          "resolveProvider": true,
+          "triggerCharacters": [
+            ".",
+            "[",
+            "\"",
+            "'"
+          ],
+          "workDoneProgress": true
+        },
+        "declarationProvider": {
+          "workDoneProgress": true
+        },
+        "definitionProvider": {
+          "workDoneProgress": true
+        },
+        "documentHighlightProvider": {
+          "workDoneProgress": true
+        },
+        "documentSymbolProvider": {
+          "workDoneProgress": true
+        },
+        "executeCommandProvider": {
+          "commands": [],
+          "workDoneProgress": true
+        },
+        "hoverProvider": {
+          "workDoneProgress": true
+        },
+        "referencesProvider": {
+          "workDoneProgress": true
+        },
+        "renameProvider": {
+          "prepareProvider": true,
+          "workDoneProgress": true
+        },
+        "signatureHelpProvider": {
+          "triggerCharacters": [
+            "(",
+            ",",
+            ")"
+          ],
+          "workDoneProgress": true
+        },
+        "textDocumentSync": 2,
+        "typeDefinitionProvider": {
+          "workDoneProgress": true
+        },
+        "workspace": {
+          "workspaceFolders": {
+            "changeNotifications": true,
+            "supported": true
+          }
+        },
+        "workspaceSymbolProvider": {
+          "workDoneProgress": true
+        }
+      },
+      "collection_state": "fresh-complete",
+      "configuration_identity": "sha256:2efcdb90261c2ff5b80c5fda9c2b3f26d6096e33006d51ce4cf8e837f8369b5d",
+      "documents": {
+        "src/source.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "def target(value: str) -> str:\n    \"\"\"Return caf\u00e9 text.\"\"\"\n    return value\n\n\ndef caller() -> str:\n    return target(\"caf\u00e9\")\n"
+        }
+      },
+      "position_encoding": "utf-16",
+      "producer": "pyright-langserver",
+      "request": {
+        "id": 4,
+        "jsonrpc": "2.0",
+        "method": "textDocument/hover",
+        "params": {
+          "position": {
+            "character": 5,
+            "line": 0
+          },
+          "textDocument": {
+            "uri": "file:///tmp/hashmarks-hover-capture-3kpqb84g/hover/src/source.py"
+          },
+          "workDoneToken": 0
+        }
+      },
+      "response": {
+        "id": 4,
+        "jsonrpc": "2.0",
+        "result": {
+          "contents": {
+            "kind": "plaintext",
+            "value": "(function) def target(value: str) -> str\n\nReturn caf\u00e9 text."
+          },
+          "range": {
+            "end": {
+              "character": 10,
+              "line": 0
+            },
+            "start": {
+              "character": 4,
+              "line": 0
+            }
+          }
+        }
+      },
+      "schema": "hashmarks.lsp-relationship-capture.v1"
+    },
+    "name": "hover-integer-token",
+    "subject": "src/source.py::target"
+  },
+  {
+    "capture": {
+      "capabilities": {
+        "callHierarchyProvider": true,
+        "codeActionProvider": {
+          "codeActionKinds": [
+            "quickfix",
+            "source.organizeImports"
+          ],
+          "workDoneProgress": true
+        },
+        "completionProvider": {
+          "completionItem": {
+            "labelDetailsSupport": true
+          },
+          "resolveProvider": true,
+          "triggerCharacters": [
+            ".",
+            "[",
+            "\"",
+            "'"
+          ],
+          "workDoneProgress": true
+        },
+        "declarationProvider": {
+          "workDoneProgress": true
+        },
+        "definitionProvider": {
+          "workDoneProgress": true
+        },
+        "documentHighlightProvider": {
+          "workDoneProgress": true
+        },
+        "documentSymbolProvider": {
+          "workDoneProgress": true
+        },
+        "executeCommandProvider": {
+          "commands": [],
+          "workDoneProgress": true
+        },
+        "hoverProvider": {
+          "workDoneProgress": true
+        },
+        "referencesProvider": {
+          "workDoneProgress": true
+        },
+        "renameProvider": {
+          "prepareProvider": true,
+          "workDoneProgress": true
+        },
+        "signatureHelpProvider": {
+          "triggerCharacters": [
+            "(",
+            ",",
+            ")"
+          ],
+          "workDoneProgress": true
+        },
+        "textDocumentSync": 2,
+        "typeDefinitionProvider": {
+          "workDoneProgress": true
+        },
+        "workspace": {
+          "workspaceFolders": {
+            "changeNotifications": true,
+            "supported": true
+          }
+        },
+        "workspaceSymbolProvider": {
+          "workDoneProgress": true
+        }
+      },
+      "collection_state": "fresh-complete",
+      "configuration_identity": "sha256:2efcdb90261c2ff5b80c5fda9c2b3f26d6096e33006d51ce4cf8e837f8369b5d",
+      "documents": {
+        "src/source.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "def target(value: str) -> str:\n    \"\"\"Return caf\u00e9 text.\"\"\"\n    return value\n\n\ndef caller() -> str:\n    return target(\"caf\u00e9\")\n"
+        }
+      },
+      "position_encoding": "utf-16",
+      "producer": "pyright-langserver",
+      "request": {
+        "id": 5,
+        "jsonrpc": "2.0",
+        "method": "textDocument/hover",
+        "params": {
+          "position": {
+            "character": 0,
+            "line": 0
+          },
+          "textDocument": {
+            "uri": "file:///tmp/hashmarks-hover-capture-3kpqb84g/hover/src/source.py"
+          }
+        }
+      },
+      "response": {
+        "id": 5,
+        "jsonrpc": "2.0",
+        "result": null
+      },
+      "schema": "hashmarks.lsp-relationship-capture.v1"
+    },
+    "name": "hover-null",
+    "subject": "src/source.py::target"
+  },
+  {
+    "capture": {
+      "capabilities": {
+        "callHierarchyProvider": true,
+        "codeActionProvider": {
+          "codeActionKinds": [
+            "quickfix",
+            "source.organizeImports"
+          ],
+          "workDoneProgress": true
+        },
+        "completionProvider": {
+          "completionItem": {
+            "labelDetailsSupport": true
+          },
+          "resolveProvider": true,
+          "triggerCharacters": [
+            ".",
+            "[",
+            "\"",
+            "'"
+          ],
+          "workDoneProgress": true
+        },
+        "declarationProvider": {
+          "workDoneProgress": true
+        },
+        "definitionProvider": {
+          "workDoneProgress": true
+        },
+        "documentHighlightProvider": {
+          "workDoneProgress": true
+        },
+        "documentSymbolProvider": {
+          "workDoneProgress": true
+        },
+        "executeCommandProvider": {
+          "commands": [],
+          "workDoneProgress": true
+        },
+        "hoverProvider": {
+          "workDoneProgress": true
+        },
+        "referencesProvider": {
+          "workDoneProgress": true
+        },
+        "renameProvider": {
+          "prepareProvider": true,
+          "workDoneProgress": true
+        },
+        "signatureHelpProvider": {
+          "triggerCharacters": [
+            "(",
+            ",",
+            ")"
+          ],
+          "workDoneProgress": true
+        },
+        "textDocumentSync": 2,
+        "typeDefinitionProvider": {
+          "workDoneProgress": true
+        },
+        "workspace": {
+          "workspaceFolders": {
+            "changeNotifications": true,
+            "supported": true
+          }
+        },
+        "workspaceSymbolProvider": {
+          "workDoneProgress": true
+        }
+      },
+      "collection_state": "fresh-complete",
+      "configuration_identity": "sha256:2efcdb90261c2ff5b80c5fda9c2b3f26d6096e33006d51ce4cf8e837f8369b5d",
+      "documents": {
+        "src/source.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "def target(value: str) -> str:\n    \"\"\"Return caf\u00e9 text.\"\"\"\n    return value\n\n\ndef caller() -> str:\n    return target(\"caf\u00e9\")\n"
+        }
+      },
+      "position_encoding": "utf-16",
+      "producer": "pyright-langserver",
+      "request": {
+        "id": 6,
+        "jsonrpc": "2.0",
+        "method": "textDocument/references",
+        "params": {
+          "context": {
+            "includeDeclaration": true
+          },
+          "position": {
+            "character": 5,
+            "line": 0
+          },
+          "textDocument": {
+            "uri": "file:///tmp/hashmarks-hover-capture-3kpqb84g/hover/src/source.py"
+          }
+        }
+      },
+      "response": {
+        "id": 6,
+        "jsonrpc": "2.0",
+        "result": [
+          {
+            "range": {
+              "end": {
+                "character": 10,
+                "line": 0
+              },
+              "start": {
+                "character": 4,
+                "line": 0
+              }
+            },
+            "uri": "file:///tmp/hashmarks-hover-capture-3kpqb84g/hover/src/source.py"
+          },
+          {
+            "range": {
+              "end": {
+                "character": 17,
+                "line": 6
+              },
+              "start": {
+                "character": 11,
+                "line": 6
+              }
+            },
+            "uri": "file:///tmp/hashmarks-hover-capture-3kpqb84g/hover/src/source.py"
+          }
+        ]
+      },
+      "schema": "hashmarks.lsp-relationship-capture.v1"
+    },
+    "name": "references",
+    "subject": "src/source.py::target"
+  },
+  {
+    "capture": {
+      "capabilities": {
+        "callHierarchyProvider": true,
+        "codeActionProvider": {
+          "codeActionKinds": [
+            "quickfix",
+            "source.organizeImports"
+          ],
+          "workDoneProgress": true
+        },
+        "completionProvider": {
+          "completionItem": {
+            "labelDetailsSupport": true
+          },
+          "resolveProvider": true,
+          "triggerCharacters": [
+            ".",
+            "[",
+            "\"",
+            "'"
+          ],
+          "workDoneProgress": true
+        },
+        "declarationProvider": {
+          "workDoneProgress": true
+        },
+        "definitionProvider": {
+          "workDoneProgress": true
+        },
+        "documentHighlightProvider": {
+          "workDoneProgress": true
+        },
+        "documentSymbolProvider": {
+          "workDoneProgress": true
+        },
+        "executeCommandProvider": {
+          "commands": [],
+          "workDoneProgress": true
+        },
+        "hoverProvider": {
+          "workDoneProgress": true
+        },
+        "referencesProvider": {
+          "workDoneProgress": true
+        },
+        "renameProvider": {
+          "prepareProvider": true,
+          "workDoneProgress": true
+        },
+        "signatureHelpProvider": {
+          "triggerCharacters": [
+            "(",
+            ",",
+            ")"
+          ],
+          "workDoneProgress": true
+        },
+        "textDocumentSync": 2,
+        "typeDefinitionProvider": {
+          "workDoneProgress": true
+        },
+        "workspace": {
+          "workspaceFolders": {
+            "changeNotifications": true,
+            "supported": true
+          }
+        },
+        "workspaceSymbolProvider": {
+          "workDoneProgress": true
+        }
+      },
+      "collection_state": "fresh-complete",
+      "configuration_identity": "sha256:2efcdb90261c2ff5b80c5fda9c2b3f26d6096e33006d51ce4cf8e837f8369b5d",
+      "documents": {
+        "src/source.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 2,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "def target(value: int) -> int:\n    \"\"\"Return caf\u00e9 count.\"\"\"\n    return value + 1\n\n\ndef caller() -> int:\n    return target(1)\n"
+        }
+      },
+      "position_encoding": "utf-16",
+      "producer": "pyright-langserver",
+      "request": {
+        "id": 7,
+        "jsonrpc": "2.0",
+        "method": "textDocument/hover",
+        "params": {
+          "position": {
+            "character": 5,
+            "line": 0
+          },
+          "textDocument": {
+            "uri": "file:///tmp/hashmarks-hover-capture-3kpqb84g/hover/src/source.py"
+          }
+        }
+      },
+      "response": {
+        "id": 7,
+        "jsonrpc": "2.0",
+        "result": {
+          "contents": {
+            "kind": "plaintext",
+            "value": "(function) def target(value: int) -> int\n\nReturn caf\u00e9 count."
+          },
+          "range": {
+            "end": {
+              "character": 10,
+              "line": 0
+            },
+            "start": {
+              "character": 4,
+              "line": 0
+            }
+          }
+        }
+      },
+      "schema": "hashmarks.lsp-relationship-capture.v1"
+    },
+    "name": "hover-buffer",
+    "subject": "src/source.py::target"
+  },
+  {
+    "capture": {
+      "capabilities": {
+        "callHierarchyProvider": true,
+        "codeActionProvider": {
+          "codeActionKinds": [
+            "quickfix",
+            "source.organizeImports"
+          ],
+          "workDoneProgress": true
+        },
+        "completionProvider": {
+          "completionItem": {
+            "labelDetailsSupport": true
+          },
+          "resolveProvider": true,
+          "triggerCharacters": [
+            ".",
+            "[",
+            "\"",
+            "'"
+          ],
+          "workDoneProgress": true
+        },
+        "declarationProvider": {
+          "workDoneProgress": true
+        },
+        "definitionProvider": {
+          "workDoneProgress": true
+        },
+        "documentHighlightProvider": {
+          "workDoneProgress": true
+        },
+        "documentSymbolProvider": {
+          "workDoneProgress": true
+        },
+        "executeCommandProvider": {
+          "commands": [],
+          "workDoneProgress": true
+        },
+        "hoverProvider": {
+          "workDoneProgress": true
+        },
+        "referencesProvider": {
+          "workDoneProgress": true
+        },
+        "renameProvider": {
+          "prepareProvider": true,
+          "workDoneProgress": true
+        },
+        "signatureHelpProvider": {
+          "triggerCharacters": [
+            "(",
+            ",",
+            ")"
+          ],
+          "workDoneProgress": true
+        },
+        "textDocumentSync": 2,
+        "typeDefinitionProvider": {
+          "workDoneProgress": true
+        },
+        "workspace": {
+          "workspaceFolders": {
+            "changeNotifications": true,
+            "supported": true
+          }
+        },
+        "workspaceSymbolProvider": {
+          "workDoneProgress": true
+        }
+      },
+      "collection_state": "fresh-complete",
+      "configuration_identity": "sha256:2efcdb90261c2ff5b80c5fda9c2b3f26d6096e33006d51ce4cf8e837f8369b5d",
+      "documents": {
+        "src/source.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-2",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "def target(value: str) -> str:\n    \"\"\"Return caf\u00e9 text.\"\"\"\n    return value\n\n\ndef caller() -> str:\n    return target(\"caf\u00e9\")\n"
+        }
+      },
+      "position_encoding": "utf-16",
+      "producer": "pyright-langserver",
+      "request": {
+        "id": 8,
+        "jsonrpc": "2.0",
+        "method": "textDocument/hover",
+        "params": {
+          "position": {
+            "character": 5,
+            "line": 0
+          },
+          "textDocument": {
+            "uri": "file:///tmp/hashmarks-hover-capture-3kpqb84g/hover/src/source.py"
+          }
+        }
+      },
+      "response": {
+        "id": 8,
+        "jsonrpc": "2.0",
+        "result": {
+          "contents": {
+            "kind": "plaintext",
+            "value": "(function) def target(value: str) -> str\n\nReturn caf\u00e9 text."
+          },
+          "range": {
+            "end": {
+              "character": 10,
+              "line": 0
+            },
+            "start": {
+              "character": 4,
+              "line": 0
+            }
+          }
+        }
+      },
+      "schema": "hashmarks.lsp-relationship-capture.v1"
+    },
+    "name": "hover-reopened",
+    "subject": "src/source.py::target"
+  }
+]
