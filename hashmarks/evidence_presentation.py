@@ -1594,4 +1594,3 @@ def presentation_response(
         "authority": "descriptive-only",
         "execution_effect": "none",
     }
-
