@@ -15,6 +15,7 @@ from hashmarks.codemap.change_line_evidence import (
 from hashmarks.evidence_presentation import present_repository_evidence
 from hashmarks.evidence_presentation_conformance import validate_evidence_presentation
 from hashmarks.mcp_surface import HashmarksMcpSurface
+from hashmarks.repository_cli import _changed_line_span_args
 
 PATH = "src/backend.py"
 TASK = "Fix the backend widget returned from process_widget"
@@ -219,3 +220,18 @@ def test_mcp_native_and_compact_reuse_same_source_owner(tmp_path: Path) -> None:
         value["changed_line_evidence"]["observations"][0]["symbols"][0]["subject"]
         == "src/backend.py::process_widget"
     )
+
+
+def test_cli_span_parser_is_explicit_and_leaves_proof_to_core() -> None:
+    assert _changed_line_span_args(None) is None
+    assert _changed_line_span_args(["src/backend.py:2:3"]) == [
+        {"path": "src/backend.py", "start_line": 2, "end_line": 3}
+    ]
+
+
+@pytest.mark.parametrize("value", ["src/backend.py:2", "src/backend.py:x:2", "src/backend.py:-1:2"])
+def test_cli_span_parser_rejects_malformed_bounds_without_new_exception_owner(
+    value: str,
+) -> None:
+    with pytest.raises(ValueError, match="changed-line-span"):
+        _changed_line_span_args([value])
