@@ -86,6 +86,14 @@ Hashmarks owns what is structurally observable. A consumer such as agentsCookboo
 
 ## Direct SCIP semantic relationship evidence
 
+SCIP relationship kinds describe producer flags, independently of CodeMap's
+static call/reference graph. In particular, `reference` represents SCIP
+`is_reference`: inclusion of related symbols in reference searches. It does
+not assert a source occurrence, call edge, or inverse repository relationship.
+`implementation`, `type_definition`, and `definition` retain their explicit
+SCIP flag meanings and original source-to-target direction. See the
+[SCIP relationship protocol](https://github.com/scip-code/scip/blob/main/scip.proto).
+
 For an exact target definition, `structural_locality` carries a bounded
 `native_semantic_relationships` observation if an already imported, current
 SCIP producer supplies matching `SymbolInformation.relationships`.
@@ -132,6 +140,7 @@ in disposable CodeMap state with the same SCIP generation/freshness authority.
 hashmarks --workspace . structural-locality contract.py::Interface --result-mode relationships
 hashmarks --workspace . structural-locality contract.py::Interface --result-mode relationships --supplied-observations captures.json
 hashmarks structural-locality-delta --result-mode relationships --before before.json --after after.json
+hashmarks structural-locality-delta --result-mode relationships --before before.json --after after.json --presentation text
 ```
 
 Python uses `CodeMap.structural_locality(target, result_mode="relationships",
@@ -139,6 +148,15 @@ supplied_observations=[...])` and `semantic_relationship_delta(before, after)`.
 MCP uses the same structural mode and `evidence_comparison(...,
 result_mode="relationships")`. Existing structural and comparison tools own
 these modes; no language-server process is started.
+
+Relationship mode also accepts an exact `path::display_name` present only in
+the native index, such as a TypeScript method that the lexical parser does not
+index. The existing native-definition store must return exactly one admitted,
+current definition for that path and name within its bounded read. Duplicate
+method names, missing definitions, denied paths, and stale producers remain
+unresolved. Hashmarks does not infer a qualified class/member name from SCIP
+descriptors. This native lookup applies only to relationship observations;
+default structural locality and edit ownership retain their existing owners.
 
 `hashmarks.semantic-relationship-observation.v1` retains direct producer
 claims mentioning the exact subject, including incoming SCIP claims in their
@@ -251,7 +269,7 @@ durable provider state or later calls.
 Ownership note:
 
 ```text
-Observed repository fact/evidence: bounded direct producer implementation/type/definition claims and qualified deltas.
+Observed repository fact/evidence: bounded direct producer implementation/type/definition claims, exact native-only relationship subjects, and qualified deltas.
 Authority source: explicit SCIP records or caller-supplied LSP captures, correlated with existing stable member and CodeMap authorities.
 Completeness/freshness behavior: independent producer collection, source correspondence, repository freshness, candidates, and projection bounds; no negative evidence.
 Existing Hashmarks owner extended: CodeMap native evidence, structural endpoint comparison, task evidence, and presentation.

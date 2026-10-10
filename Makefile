@@ -36,6 +36,8 @@ help:
 	  '  make test-diagnostic-capabilities  Show hosted capability inventory' \
 	  '  make test-profile   Run full suite and report slowest 25 tests >=1s' \
 	  '  make dependency-dogfood  Check genuine uv/Maven dependency add, change, and removal evidence' \
+	  '  make semantic-evidence-dogfood  Check offline native dependency/SCIP changes and CLI/MCP evidence' \
+	  '  make semantic-evidence-live  Regenerate the bounded corpus with installed Maven, uv and SCIP producers' \
 	  '  make check          Junior-friendly local check: setup + compile + CodeMap + tests' \
 	  '  make bootstrap      Offline runtime-only bootstrap (CI/prepared environments)' \
 	  '  make start          Bootstrap and start the identity daemon' \
@@ -208,9 +210,15 @@ ruff: ruff-check ruff-format-check
 
 lint: ruff lint-debt
 
-.PHONY: dependency-dogfood
+.PHONY: dependency-dogfood semantic-evidence-dogfood semantic-evidence-live
 dependency-dogfood:
 	@$(UV_RUN) --offline --no-sync --group test python -m pytest -v tests/test_dependency_dogfood.py
+
+semantic-evidence-dogfood:
+	@$(UV_RUN) --offline --no-sync --group test python -m pytest -v tests/test_native_dependency_changes.py tests/test_native_scip_changes.py tests/test_native_evidence_transport.py
+
+semantic-evidence-live:
+	@HASHMARKS_NATIVE_EVIDENCE_LIVE=1 $(UV_RUN) --offline --no-sync --group test python -m pytest -v tests/test_native_dependency_changes.py tests/test_native_scip_changes.py tests/test_native_evidence_transport.py
 
 source-hygiene:
 	@git ls-files -z -- '*.py' '*.pyi' | xargs -0 -r python3 -m scripts.source_hygiene

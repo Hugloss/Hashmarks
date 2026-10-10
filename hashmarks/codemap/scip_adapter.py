@@ -69,6 +69,9 @@ def _range_lines(occurrence: dict[str, Any]) -> tuple[int, int]:
 def _display_name(symbol: str) -> str:
     if symbol.startswith("local "):
         return symbol
+    parameter = re.search(r"[\(\[](`[^`]+`|[A-Za-z_$][\w$-]*)[\)\]]$", symbol)
+    if parameter:
+        return parameter.group(1).strip("`")
     # SCIP descriptors end in / # . () etc. Prefer the final backtick-escaped
     # or identifier-like descriptor name without attempting to reimplement the
     # full SCIP symbol grammar.

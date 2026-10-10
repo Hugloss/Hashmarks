@@ -17,6 +17,7 @@ from .codemap.evidence_packet import TASK_EVIDENCE_DEFAULT_OPTIONS
 from .codemap.find_engine import FIND_DEFAULT_OPTIONS
 from .codemap.verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 from .errors import RepositoryCliError
+from .evidence_presentation import FORMATS, presentation_response
 from .operation_contract import validate_operation_response
 from .repository_retry import (
     is_transient_repository_race,
@@ -38,8 +39,12 @@ def _print_operation(
     value: object,
     *,
     mode: str | None = None,
+    presentation: str = "none",
 ) -> None:
-    _print(validate_operation_response(operation, value, mode=mode))
+    native = validate_operation_response(operation, value, mode=mode)
+    _print(
+        presentation_response(operation, native, format=presentation, result_mode=mode)
+    )
 
 
 _T = TypeVar("_T")
@@ -306,7 +311,12 @@ def _structural_locality_code(args) -> int:
             supplied_observations=supplied,
         ),
     )
-    _print_operation("structural_locality", value, mode=args.result_mode)
+    _print_operation(
+        "structural_locality",
+        value,
+        mode=args.result_mode,
+        presentation=args.presentation,
+    )
     return 0
 
 
@@ -325,6 +335,7 @@ def _structural_locality_delta_code(args) -> int:
         "structural_locality_delta",
         value,
         mode=args.result_mode,
+        presentation=args.presentation,
     )
     return 0
 
@@ -355,7 +366,7 @@ def _task_evidence_code(args) -> int:
             supplied_observations=supplied,
         ),
     )
-    _print_operation("task_evidence", value)
+    _print_operation("task_evidence", value, presentation=args.presentation)
     return 0
 
 
@@ -416,8 +427,17 @@ def _post_change_code(args) -> int:
             per_role=args.per_role,
         ),
     )
-    _print_operation("post_change", value)
+    _print_operation("post_change", value, presentation=args.presentation)
     return 0
+
+
+def _add_evidence_presentation_cli(parser) -> None:
+    parser.add_argument(
+        "--presentation",
+        choices=FORMATS,
+        default="none",
+        help="optional evidence projection alongside canonical JSON",
+    )
 
 
 def _add_map_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
@@ -663,11 +683,18 @@ def _add_graph_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
     tests_code.add_argument("--max-depth", type=int, default=12)
     tests_code.set_defaults(func=_tests_code, automatic_update_check=True)
 
+    _add_structural_locality_cli(sub, add_common_arguments=add_common_arguments)
+
+
+def _add_structural_locality_cli(
+    sub, *, add_common_arguments: Callable[..., None]
+) -> None:
     locality = sub.add_parser(
         "structural-locality",
         help="project bounded structural locality facts for one exact path::qualname",
     )
     add_common_arguments(locality, inherited=True)
+    _add_evidence_presentation_cli(locality)
     locality.add_argument("target", help="exact repository-relative path::qualname")
     locality.add_argument("--max-depth", type=int, default=2)
     locality.add_argument("--call-limit", type=int, default=64)
@@ -685,6 +712,7 @@ def _add_graph_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
         help="compare two structural-locality evidence packets without policy",
     )
     add_common_arguments(locality_delta, inherited=True)
+    _add_evidence_presentation_cli(locality_delta)
     locality_delta.add_argument("--before", required=True)
     locality_delta.add_argument("--after", required=True)
     locality_delta.add_argument(
@@ -726,6 +754,7 @@ def _add_task_evidence_cli(sub, *, add_common_arguments: Callable[..., None]) ->
         help="resolve one task into bounded edit/verify/source repository evidence",
     )
     add_common_arguments(task_evidence, inherited=True)
+    _add_evidence_presentation_cli(task_evidence)
     task_evidence.add_argument("task")
     task_evidence.add_argument(
         "--supplied-observations", help="JSON file containing captured LSP observations"
@@ -805,6 +834,7 @@ def _add_change_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
         help="refresh reported changed paths and emit changed/reusable repository evidence",
     )
     add_common_arguments(post_change, inherited=True)
+    _add_evidence_presentation_cli(post_change)
     post_change.add_argument("task")
     post_change.add_argument(
         "--changed",

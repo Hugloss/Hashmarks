@@ -207,6 +207,9 @@ def test_task_lsp_projection_preserves_owner_verifier_and_request_locality(
         captured: Any = cm.task_evidence(
             task, supplied_observations=[_capture(tmp_path)]
         )
+        delta: Any = cm.task_post_change_delta(
+            task, ["contract.py"], previous_evidence=captured
+        )
         after: Any = cm.task_evidence(task)
     assert captured["ownership"] == before["ownership"] == after["ownership"]
     assert captured["verification"] == before["verification"] == after["verification"]
@@ -216,6 +219,9 @@ def test_task_lsp_projection_preserves_owner_verifier_and_request_locality(
     relationships = captured["semantic_relationships"]
     assert captured["supplied_observation_accounting"]["retained"] == 1
     assert relationships["evidence"]["claims"]
+    assert delta["semantic_relationships"]["before"]["claims_omitted_from_summary"] == 1
+    assert delta["semantic_relationships"]["after"] is None
+    assert delta["semantic_relationships"]["claim_set_comparison"] == "not-performed"
     for pointer in relationships["evidence_refs"].values():
         value = captured
         for key in pointer.strip("/").split("/"):
@@ -287,6 +293,88 @@ def test_cli_relationship_capture_and_comparison_use_the_same_authority(
         == 0
     )
     assert printed.pop() == semantic_relationship_delta(packet, packet)
+    assert (
+        main(
+            [
+                "structural-locality-delta",
+                "--result-mode",
+                "relationships",
+                "--before",
+                str(endpoint),
+                "--after",
+                str(endpoint),
+                "--presentation",
+                "text",
+            ]
+        )
+        == 0
+    )
+    formatted = printed.pop()
+    assert formatted["result"] == semantic_relationship_delta(packet, packet)
+    assert (
+        "Comparison: qualified producer claim sets" in formatted["presentation"]["text"]
+    )
+
+
+def test_cli_task_and_post_change_present_request_local_evidence_without_replay(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from hashmarks.cli import main
+
+    _repository(tmp_path)
+    captures = tmp_path.parent / f"{tmp_path.name}-captures.json"
+    captures.write_text(json.dumps({"observations": [_capture(tmp_path)]}))
+    printed: list[Any] = []
+    monkeypatch.setattr("hashmarks.repository_cli._print", printed.append)
+    monkeypatch.setenv("HASHMARKS_NO_UPDATE_CHECK", "1")
+    task = "Change Interface in contract.py to document its behavior."
+    assert (
+        main(
+            [
+                "--workspace",
+                str(tmp_path),
+                "task-evidence",
+                task,
+                "--supplied-observations",
+                str(captures),
+                "--presentation",
+                "text",
+            ]
+        )
+        == 0
+    )
+    formatted = printed.pop()
+    previous = formatted["result"]
+    assert previous["semantic_relationships"]["evidence"]["claims"]
+    assert "Semantic subject:" in formatted["presentation"]["text"]
+    endpoint = tmp_path.parent / f"{tmp_path.name}-task.json"
+    endpoint.write_text(json.dumps(previous))
+    assert (
+        main(
+            [
+                "--workspace",
+                str(tmp_path),
+                "post-change",
+                task,
+                "--changed",
+                "contract.py",
+                "--previous-evidence",
+                str(endpoint),
+                "--presentation",
+                "text",
+            ]
+        )
+        == 0
+    )
+    formatted = printed.pop()
+    delta = formatted["result"]["semantic_relationships"]
+    assert delta["before"]["claims_omitted_from_summary"] == 1
+    assert delta["after"] is None
+    assert delta["claim_set_comparison"] == "not-performed"
+    assert (
+        "after: unavailable in task projection (unknown)"
+        in formatted["presentation"]["text"]
+    )
 
 
 def test_warm_service_client_and_dispatch_preserve_supplied_capture(
@@ -601,6 +689,26 @@ def test_mcp_comparison_and_presentations_preserve_relationship_endpoints(
     assert any(row["kind"] == "relationship_source_binding" for row in findings)
     assert delta == semantic_relationship_delta(before, after)
     assert validate_repository_intelligence_evidence(delta)["valid"] is True
+    for finding in findings:
+        native: Any = delta
+        for part in finding["source_refs"][0].split("/")[1:]:
+            key = part.replace("~1", "/").replace("~0", "~")
+            native = native[int(key)] if isinstance(native, list) else native[key]
+        assert finding["details"] == native
+    direct = next(
+        row for row in findings if row["kind"] == "direct_semantic_relationship"
+    )
+    qualification = direct["source_context"]["relationship_observation"]
+    assert qualification["freshness"] == "current"
+    assert qualification["collection_state"] == "fresh-complete"
+    assert "claims" not in qualification
+    assert "source_bindings" not in qualification
+    if format == "text":
+        assert "Comparison: qualified producer claim sets" in projection["text"]
+        assert "- qualified producer claim:" in projection["text"]
+        assert projection["text"].index("Comparison:") < projection["text"].index(
+            "Metadata:"
+        )
 
 
 def test_relationship_tampering_is_rejected_and_delta_is_reproved(
@@ -687,6 +795,11 @@ def test_scip_line_movement_changes_locators_not_fact_identity(tmp_path: Path) -
     assert row["facts"]["unchanged_count"] == 1
     assert len(row["locators"]) == 1
     assert row["source_bindings"]["changed"] is True
+    projection: Any = present_repository_evidence(delta, format="text")
+    assert "~ locators:" in projection["text"]
+    assert "~ source_bindings: before=" in projection["text"]
+    assert "+ qualified producer claim:" not in projection["text"]
+    assert "- qualified producer claim:" not in projection["text"]
 
 
 @pytest.mark.parametrize(
@@ -716,6 +829,15 @@ def test_incompatible_observations_preserve_delivered_changes_without_fact_remov
     assert all(not row["facts"]["removed"] for row in delta["producer_deltas"])
     assert delta["before"] == before and delta["after"] == after
     assert validate_repository_intelligence_evidence(delta)["valid"] is True
+    projection: Any = present_repository_evidence(delta, format="text")
+    if change != "ambiguous_capture":
+        assert (
+            "Comparison: delivered subsets only (not comparable)" in projection["text"]
+        )
+        assert "- delivered producer claim:" in projection["text"]
+    assert "- qualified producer claim:" not in projection["text"]
+    assert "Endpoint comparison: not comparable" in projection["text"]
+    assert "Repository absence is not inferred." in projection["text"]
 
 
 @pytest.mark.parametrize(

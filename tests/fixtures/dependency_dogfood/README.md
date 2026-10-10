@@ -64,3 +64,20 @@ large-transitive, mediation, exclusion, BOM, reactor, and profile-context checks
 producer captures. The observations carry caller-claimed producer authority:
 this corpus proves Hashmarks' translation and query behavior for these bytes,
 not independent correctness of uv or Maven resolution.
+
+`make semantic-evidence-dogfood` adds real-file change sequences, stale capture
+binding, formatting-only edits, bounded/incomplete negative evidence, reopen
+versus fresh reconstruction, and all presentation encodings. It also includes
+the [native SCIP corpus](../native_scip/README.md) and real CLI/MCP transports.
+These normal tests use committed captures and perform no dependency resolution.
+
+`make semantic-evidence-live` regenerates temporary captures using installed
+`uv`, `mvn`, `scip-python`, `scip-typescript`, and `scip` before exercising the
+same assertions. The bounded live dependency cases are absent/v1/v2/grouped uv
+and absent/v1/v2, transitive-upgrade, mediation, exclusion, and profiles Maven.
+Maven uses a temporary local repository; it may download plugins and artifacts.
+uv resolves the local fixture packages offline. Missing tools, failed producer
+commands, or missing output fail this explicitly selected ring. Captures never
+fall back to committed output or rewrite repository fixtures or the root lock.
+This manual development ring has no dedicated CI job and makes no claim that
+producer resolution itself is correct.

@@ -96,35 +96,50 @@ def test_repository_cli_operation_projection_validates_before_print(
     assert printed == [packet]
 
 
-def test_repository_cli_projects_all_canonical_cli_operations_through_one_guard() -> (
-    None
-):
-    from pathlib import Path
+@pytest.mark.parametrize(
+    ("command", "operation"),
+    [
+        (("orient",), "repository_context"),
+        (("find", "Widget.run"), "find"),
+        (("task-evidence", "Change Widget.run"), "task_evidence"),
+        (
+            ("change-impact", "Change Widget.run", "--changed", "widget.py"),
+            "change_impact",
+        ),
+        (("post-change", "Change Widget.run", "--changed", "widget.py"), "post_change"),
+    ],
+)
+def test_repository_cli_projects_all_canonical_cli_operations_through_one_guard(
+    command: tuple[str, ...], operation: str, tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import argparse
 
     import hashmarks.repository_cli as repository_cli
+    from hashmarks.operation_contract import operation_schema
 
-    source = Path(repository_cli.__file__).read_text(encoding="utf-8")
-    expected = {
-        '_print_operation("repository_context", value)',
-        '_print_operation("find", value)',
-        '_print_operation("task_evidence", value)',
-        '_print_operation("change_impact", value)',
-        '_print_operation("post_change", value)',
-    }
-    assert all(call in source for call in expected)
+    parser = argparse.ArgumentParser()
+    sub = parser.add_subparsers(dest="command", required=True)
+    repository_cli.add_repository_cli(
+        sub, add_common_arguments=lambda *_args, **_kwargs: None
+    )
+    if operation == "post_change":
+        previous = tmp_path / "previous.json"
+        previous.write_text("{}", encoding="utf-8")
+        command = (*command, "--previous-evidence", str(previous))
+    parsed = parser.parse_args(command)
 
-    for function_name in (
-        "_map_orient",
-        "_find_code",
-        "_task_evidence_code",
-        "_change_impact_code",
-        "_post_change_code",
-    ):
-        start = source.index(f"def {function_name}(")
-        next_def = source.find("\ndef ", start + 1)
-        body = source[start:] if next_def < 0 else source[start:next_def]
-        assert "_print_operation(" in body
-        assert "_print(value)" not in body
+    packet = {"schema": operation_schema(operation)}
+    printed: list[object] = []
+    monkeypatch.setattr(repository_cli, "_call_codemap", lambda *_args: packet)
+    monkeypatch.setattr(repository_cli, "_print", printed.append)
+    assert parsed.func(parsed) == 0
+    assert printed == [packet]
+
+    printed.clear()
+    packet["schema"] = "hashmarks.invalid-response.v1"
+    with pytest.raises(RuntimeError, match="operation response schema drift"):
+        parsed.func(parsed)
+    assert printed == []
 
 
 def test_repository_context_defaults_have_one_owner() -> None:

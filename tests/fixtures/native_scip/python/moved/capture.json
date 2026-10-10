@@ -1,0 +1,28 @@
+{
+  "binary_sha256": "2cd1e718479bbc72f4593c4542ca6590666f8d587b6af33c547fb30498e4b906",
+  "configuration": {
+    "arguments": [
+      "index",
+      "--output",
+      "index.scip",
+      "--project-name",
+      "hashmarks-native-python",
+      "--project-version",
+      "1.0.0",
+      "--environment",
+      "environment.json"
+    ],
+    "configuration": {
+      "environment.json": "[]\n",
+      "pyrightconfig.json": "{\"include\":[\"src\"],\"exclude\":[]}\n"
+    },
+    "producer": "scip-python",
+    "version": "0.6.6"
+  },
+  "decoder_version": "scip version v0.10.0",
+  "json_sha256": "2ec72d2c49cfb775de42c189777d69393114575e754a168b7f1860fea50c65f5",
+  "qualification_authority": "external-capture-caller-claim",
+  "source_revisions": {
+    "src/engine.py": "16b8ee68eae0ab03e364f042701f8c6b4fc8fe9ffeac509a36087f0c68e8a81e"
+  }
+}
