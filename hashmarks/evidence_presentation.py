@@ -1210,6 +1210,7 @@ def _impact(
         ctx,
         (
             ("changed", "source", "records"),
+            ("changed_line_evidence", "source", "record"),
             ("path_changes", "source", "records"),
             ("invalidated", "source", "values"),
             ("reused", "source", "values"),

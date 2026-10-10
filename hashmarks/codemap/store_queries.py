@@ -127,6 +127,32 @@ class WorkspaceMapQueryMixin:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def symbols_overlapping_lines(
+        self, path: str, start_line: int, end_line: int, *, limit: int = 33
+    ) -> list[dict]:
+        """Bounded direct symbol-range intersection; no call-graph inference."""
+        if TYPE_CHECKING:
+            self = cast("WorkspaceMapStore", self)
+        if (
+            type(start_line) is not int
+            or type(end_line) is not int
+            or not 1 <= start_line <= end_line
+            or type(limit) is not int
+            or not 1 <= limit <= 1024
+        ):
+            raise ValueError("invalid indexed symbol overlap bounds")
+        self._count_read("symbols_overlapping_lines")
+        with self._lock:
+            rows = self._db.execute(
+                """SELECT s.*,f.evidence_visibility FROM symbol s
+                JOIN file_map f ON f.path=s.path
+                WHERE s.path=? AND s.start_line<=? AND s.end_line>=?
+                  AND f.evidence_visibility='source'
+                ORDER BY (s.end_line-s.start_line),s.start_line,s.qualname LIMIT ?""",
+                (path, end_line, start_line, limit),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def symbol_candidates_at_path(
         self, path: str, query: str, *, limit: int = 33
     ) -> list[dict]:

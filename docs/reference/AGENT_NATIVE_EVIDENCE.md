@@ -281,6 +281,27 @@ they are never replayed into the current task observation or durable state.
 Use the exact relationship detail mode and its endpoint comparison for claim
 additions/removals.
 
+## Backend changed-line evidence: direct correlation without impact inference
+
+The existing `change_impact` owner can optionally include
+`changed_line_evidence`, with individually source-revision-bound spans,
+bounded symbol intersection rows, exact direct-relationship follow-up
+arguments, unresolved cases, and hard coverage limits. This **does not**
+re-rank or change its existing `surfaces` (owner-path/verification/contract
+observations), and never asserts that a syntactically overlapping symbol is
+behaviorally impacted. It also does not produce a new test-coverage claim.
+A missing symbol overlap, even on a current indexed member, is *not*
+negative evidence about runtime behavior or semantic relationships.
+
+The agent-native `source` projection has a stable native pointer to
+`/changed_line_evidence`; native and compact conformance share the same
+observation. Existing `post_change` packets remain the independent
+before/after owner: changed semantic evidence there records observation
+transition, not a downstream effect. A later direct
+`structural_locality(target="path::qualname", result_mode="relationships")`
+request requires its own current proof; the range evidence cannot smuggle
+LSP/SCIP edges into change-impact.
+
 ## Qualified endpoint comparisons
 
 The read-only `evidence_comparison` MCP tool transports two explicit,

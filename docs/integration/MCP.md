@@ -151,6 +151,47 @@ Hashmarks intentionally exposes a small read-only repository-intelligence tool c
 | `repository_evidence` | exact evidence bindings or explicit changed-path coverage, using existing core producers and native qualification |
 | `repository_findings` | existing bounded import, cache, and concurrency repository findings |
 
+### Backend changed-line correspondence (B01–B05)
+
+`change_impact` now optionally accepts `changed_line_spans` alongside the
+already-required caller-reported `changed_paths`. These are 1-based,
+inclusive physical source ranges in *already named* changed members. This is
+the H04 exact-range gap closure, built on the existing owner/verifier and
+relationship authorities. For example:
+
+```json
+{
+  "task": "Investigate the backend response handler",
+  "changed_paths": ["src/backend.py"],
+  "changed_line_spans": [
+    {"path": "src/backend.py", "start_line": 20, "end_line": 24}
+  ],
+  "presentation": "compact"
+}
+```
+
+A caller may provide at most 16 distinct spans, each of at most 128 lines.
+Bounds and path membership are checked before repository refresh. Hashmarks
+reads the current admitted source, checks the indexed member revision, and
+queries only bounded symbol rows whose physical source ranges intersect that
+span. It returns at most 32 direct indexed symbols per span with an explicit
+overflow indication and exact `path::qualname` detail arguments for the
+existing `structural_locality(result_mode="relationships")` tool.
+
+`changed_line_evidence` is a **source/index correspondence observation**,
+not proof the caller edited those exact bytes, that the function behavior
+changed, that direct calls actually executed, or that a test covers the
+change. The original `surfaces` continue to own owner/verifier relevance.
+A missing, denied, stale, non-UTF-8 or out-of-range source produces
+`state: unresolved` and `symbol_coverage: unknown`, without disclosing
+source text or inventing absence. Full and compact transport carry the same
+native evidence; bounded presentation has separate omission accounting.
+The default result is byte-structure-compatible when no spans are supplied.
+
+CLI equivalent: `hashmarks change-impact "task" --changed src/backend.py
+--changed-line-span src/backend.py:20:24`. This reads evidence only; edit
+and test execution remain the agent's responsibility.
+
 ### Replacing exploratory native search with repository evidence
 
 A typical coding-agent trace runs `rg` across implementation and test folders,
