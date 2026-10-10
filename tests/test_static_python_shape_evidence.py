@@ -133,6 +133,22 @@ def test_nested_scopes_dynamic_returns_and_unsupported_keys_are_unknown(
     assert body["coverage"] == "incomplete"
 
 
+def test_literal_writes_and_deletes_are_not_consumer_reads(tmp_path: Path) -> None:
+    (tmp_path / "service.py").write_text(
+        '@app.post("/values")\\n'
+        "def values(payload):\\n"
+        '    payload["write"] = 1\\n'
+        '    del payload["delete"]\\n'
+        '    value = payload["read"]\\n'
+        '    return {"ok": value}\\n'
+    )
+    body = _value(_observe(tmp_path))["static_body_syntax"]
+    assert [site["literal_key"] for site in body["literal_subscript_accesses"]] == [
+        "read"
+    ]
+    assert body["coverage"] == "incomplete"
+
+
 def test_multiple_selected_decorators_preserve_distinct_route_scopes(
     tmp_path: Path,
 ) -> None:
