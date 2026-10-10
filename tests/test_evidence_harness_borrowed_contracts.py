@@ -297,7 +297,6 @@ def test_stale_or_unbound_cross_provider_claims_are_not_compared() -> None:
     assert result["unresolved_claims"] == 1
 
 
-
 def test_cli_captured_reference_preserves_canonical_packet(
     repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -313,14 +312,31 @@ def test_cli_captured_reference_preserves_canonical_packet(
     printed = []
     monkeypatch.setattr("hashmarks.repository_cli._print", printed.append)
     monkeypatch.setenv("HASHMARKS_NO_UPDATE_CHECK", "1")
-    assert main([
-        "--workspace", str(repo), "structural-locality", "source.py::target",
-        "--result-mode", "relationships", "--supplied-observations", str(captures),
-        "--presentation", "compact",
-    ]) == 0
+    assert (
+        main(
+            [
+                "--workspace",
+                str(repo),
+                "structural-locality",
+                "source.py::target",
+                "--result-mode",
+                "relationships",
+                "--supplied-observations",
+                str(captures),
+                "--presentation",
+                "compact",
+            ]
+        )
+        == 0
+    )
     output = printed.pop()
-    assert output["result"]["schema"] == "hashmarks.semantic-relationship-observation.v1"
-    assert validate_evidence_presentation(
-        output["result"], output["presentation"]
-    )["valid"] is True
+    assert (
+        output["result"]["schema"] == "hashmarks.semantic-relationship-observation.v1"
+    )
+    assert (
+        validate_evidence_presentation(output["result"], output["presentation"])[
+            "valid"
+        ]
+        is True
+    )
     assert output["result"]["negative_evidence_admissible"] is False
