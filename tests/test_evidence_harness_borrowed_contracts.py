@@ -17,6 +17,8 @@ from hashmarks.codemap.lsp_relationship_adapter import (
 from hashmarks.digest import FILE_DOMAIN, hash_bytes
 from hashmarks.evidence_presentation import present_repository_evidence
 from hashmarks.evidence_presentation_conformance import validate_evidence_presentation
+from hashmarks.evidence_context import describe_evidence_binding_reacquisition
+from hashmarks.codemap.semantic_relationship_model import producer_claim_correspondence
 
 
 def _range(line: int, start: int, end: int) -> dict:
@@ -203,3 +205,69 @@ def test_projection_rejects_claim_upgrade_and_omitted_context() -> None:
     if omitted != projection:
         with pytest.raises(ValueError, match="differs"):
             validate_evidence_presentation(packet, omitted)
+
+
+def test_reacquisition_reference_is_scope_only_not_current_proof(repo: Path) -> None:
+    with CodeMap(repo) as cm:
+        cm.sync()
+        packet = cm.repository_evidence_bindings(
+            [{"binding_id": "consumer:source", "evidence": [
+                {"scope": "lines", "path": "source.py", "start_line": 1, "end_line": 2},
+                {"scope": "member", "path": "source.py"},
+            ]}],
+            include_relationships=False,
+        )
+    reference = describe_evidence_binding_reacquisition(
+        packet, binding_id="consumer:source"
+    )
+    assert reference["source_packet_identity"] == packet["bindings_identity"]
+    assert reference["current_freshness_proven"] is False
+    assert reference["requery"]["include_relationships"] is False
+    assert len(reference["requery"]["evidence"]) == 2
+    assert reference["requery"]["binding_id"] == "consumer:source"
+
+
+def _producer_claim(producer: str, *, matching: bool) -> dict:
+    def endpoint(symbol: str) -> dict:
+        return {
+            "key": {"repository_symbol": symbol},
+            "source_binding": {"state": "matching" if matching else "different"},
+        }
+    return {
+        "producer": producer,
+        "capture_identity": producer + ":capture",
+        "scope": {"subject": "source.py::target"},
+        "configuration_identity": "config",
+        "claims": [{
+            "kind": "implementation",
+            "source": endpoint("source.py::caller"),
+            "target": endpoint("source.py::target"),
+        }],
+        "collection_state": "fresh-complete",
+        "freshness": "current",
+        "truncated": False,
+        "accounting": {"denied_or_unadmitted": 0},
+    }
+
+
+def test_cross_provider_agreement_is_only_claim_alignment() -> None:
+    result = producer_claim_correspondence([
+        _producer_claim("scip", matching=True),
+        _producer_claim("lsp", matching=True),
+    ])
+    assert len(result["pairs"]) == 1
+    assert result["pairs"][0]["aligned_claims"] == [
+        ["implementation", "source.py::caller", "source.py::target"]
+    ]
+    assert result["pairs"][0]["absence_or_conflict_inferred"] is False
+    assert result["negative_evidence_admissible"] is False
+
+
+def test_stale_or_unbound_cross_provider_claims_are_not_compared() -> None:
+    result = producer_claim_correspondence([
+        _producer_claim("scip", matching=True),
+        _producer_claim("lsp", matching=False),
+    ])
+    assert result["pairs"] == []
+    assert result["incompatible_pairs"] == 1
+    assert result["unresolved_claims"] == 1
