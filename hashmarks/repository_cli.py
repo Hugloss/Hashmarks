@@ -394,6 +394,24 @@ def _verification_relevance_code(args) -> int:
     return 0
 
 
+def _changed_line_span_args(values: list[str] | None) -> list[dict[str, object]] | None:
+    if values is None:
+        return None
+    rows: list[dict[str, object]] = []
+    for value in values:
+        parts = value.rsplit(":", 2)
+        if len(parts) != 3:
+            raise ValueError("--changed-line-span requires PATH:START:END")
+        path, start, end = parts
+        try:
+            rows.append({
+                "path": path, "start_line": int(start), "end_line": int(end)
+            })
+        except ValueError as exc:
+            raise ValueError("--changed-line-span requires integer line bounds") from exc
+    return rows
+
+
 def _change_impact_code(args) -> int:
     value = _call_codemap(
         args,
@@ -407,6 +425,7 @@ def _change_impact_code(args) -> int:
                 max_depth=args.max_depth,
                 project_impact_limit=args.project_impact_limit,
                 project_impact_encoding=args.project_impact_encoding,
+                changed_line_spans=_changed_line_span_args(args.changed_line_span),
             ),
         ),
     )
@@ -804,6 +823,12 @@ def _add_change_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
         action="append",
         required=True,
         help="repository-relative changed path; repeatable",
+    )
+    change_impact.add_argument(
+        "--changed-line-span",
+        action="append",
+        metavar="PATH:START:END",
+        help="explicit 1-based inclusive source lines; repeatable, requires --changed",
     )
     defaults = CHANGE_IMPACT_DEFAULT_REQUEST
     options = defaults.options
