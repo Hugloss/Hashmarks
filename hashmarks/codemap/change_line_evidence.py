@@ -78,7 +78,9 @@ def _unavailable(
     }
 
 
-def _direct_symbol(row: Mapping[str, object], span: Mapping[str, Any]) -> dict[str, object]:
+def _direct_symbol(
+    row: Mapping[str, object], span: Mapping[str, Any]
+) -> dict[str, object]:
     start, end = int(row["start_line"]), int(row["end_line"])
     subject = f"{span['path']}::{row['qualname']}"
     return {
@@ -106,15 +108,15 @@ def observe_changed_line_spans(
     rows: list[dict[str, object]] = []
     for span in spans:
         path = str(span["path"])
-        member, raw = codemap._repository_member_observation(
-            path, include_bytes=True
-        )
+        member, raw = codemap._repository_member_observation(path, include_bytes=True)
         if (
             member.get("state") != "known-present"
             or member.get("index_state") != "indexed"
             or raw is None
         ):
-            rows.append(_unavailable(span, member, str(member.get("reason") or "not-indexed")))
+            rows.append(
+                _unavailable(span, member, str(member.get("reason") or "not-indexed"))
+            )
             continue
         try:
             raw.decode("utf-8")
@@ -126,7 +128,9 @@ def observe_changed_line_spans(
             rows.append(_unavailable(span, member, "span-outside-current-source"))
             continue
         candidates = codemap.store.symbols_overlapping_lines(
-            path, span["start_line"], span["end_line"],
+            path,
+            span["start_line"],
+            span["end_line"],
             limit=MAX_OVERLAPPING_SYMBOLS + 1,
         )
         # Reading outside the indexed source is not proof of its correspondence.
@@ -139,21 +143,25 @@ def observe_changed_line_spans(
             rows.append(_unavailable(span, after, "source-changed-during-observation"))
             continue
         truncated = len(candidates) > MAX_OVERLAPPING_SYMBOLS
-        rows.append({
-            **span,
-            "state": "source-index-correspondence-observed",
-            "member_state": "known-present",
-            "member_revision": member["member_revision"],
-            "evidence_visibility": member["evidence_visibility"],
-            "symbol_coverage": "bounded" if truncated else "complete-index-range-query",
-            "symbol_observed_count": len(candidates),
-            "symbol_retained_count": min(len(candidates), MAX_OVERLAPPING_SYMBOLS),
-            "symbols": [
-                _direct_symbol(candidate, span)
-                for candidate in candidates[:MAX_OVERLAPPING_SYMBOLS]
-            ],
-            "negative_evidence_admissible": False,
-        })
+        rows.append(
+            {
+                **span,
+                "state": "source-index-correspondence-observed",
+                "member_state": "known-present",
+                "member_revision": member["member_revision"],
+                "evidence_visibility": member["evidence_visibility"],
+                "symbol_coverage": "bounded"
+                if truncated
+                else "complete-index-range-query",
+                "symbol_observed_count": len(candidates),
+                "symbol_retained_count": min(len(candidates), MAX_OVERLAPPING_SYMBOLS),
+                "symbols": [
+                    _direct_symbol(candidate, span)
+                    for candidate in candidates[:MAX_OVERLAPPING_SYMBOLS]
+                ],
+                "negative_evidence_admissible": False,
+            }
+        )
     return {
         "input_authority": "caller-reported-line-spans",
         "correspondence": "source-revision-and-indexed-line-intersection-only",
