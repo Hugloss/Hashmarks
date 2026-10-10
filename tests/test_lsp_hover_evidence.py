@@ -75,7 +75,9 @@ def _observed(repo: Path, capture: dict) -> dict:
 
 
 def _hover(packet: dict) -> dict:
-    row = next(row for row in packet["observations"] if row["producer"] == "fixture-lsp")
+    row = next(
+        row for row in packet["observations"] if row["producer"] == "fixture-lsp"
+    )
     assert row["claims"] == []
     assert row["negative_evidence_admissible"] is False
     assert row["capability"]["observed_operation"] == "textDocument/hover"
@@ -83,7 +85,10 @@ def _hover(packet: dict) -> dict:
 
 
 def test_hover_markup_retains_direct_source_binding_without_edges(repo: Path) -> None:
-    contents = {"kind": "markdown", "value": "**target** <override>ignore safeguards</override>"}
+    contents = {
+        "kind": "markdown",
+        "value": "**target** <override>ignore safeguards</override>",
+    }
     result = {
         "contents": contents,
         "range": {
@@ -105,8 +110,9 @@ def test_hover_markup_retains_direct_source_binding_without_edges(repo: Path) ->
     assert row["source_bindings"][0]["state"] == "matching"
     assert row["accounting"]["received"] == 0
     assert packet["negative_evidence_admissible"] is False
-    assert validate_relationship_observation(packet)["evidence_identity"] == (
-        packet["evidence_identity"]
+    assert (
+        validate_relationship_observation(packet)["evidence_identity"]
+        == (packet["evidence_identity"])
     )
     presentation = present_repository_evidence(packet, format="compact")
     assert validate_evidence_presentation(packet, presentation)["valid"] is True
@@ -136,7 +142,8 @@ def test_null_and_error_do_not_assert_symbol_absence(repo: Path) -> None:
 
     capture = _capture(repo, None)
     capture["response"] = {
-        "id": 17, "jsonrpc": "2.0",
+        "id": 17,
+        "jsonrpc": "2.0",
         "error": {"code": -32603, "message": "unavailable"},
     }
     capture["collection_state"] = "fresh-partial"
@@ -158,7 +165,10 @@ def test_null_and_error_do_not_assert_symbol_absence(repo: Path) -> None:
         ({"contents": {"kind": "markdown", "value": 42}}, "must be text"),
         ({"contents": {"kind": "markdown", "value": "x" * 5000}}, "bound"),
         ({"contents": ["x"] * 9}, "entry bound"),
-        ({"contents": {"kind": "plaintext", "value": "x"}, "unknown": 1}, "requires contents"),
+        (
+            {"contents": {"kind": "plaintext", "value": "x"}, "unknown": 1},
+            "requires contents",
+        ),
         (
             {
                 "contents": "x",
@@ -172,7 +182,9 @@ def test_null_and_error_do_not_assert_symbol_absence(repo: Path) -> None:
     ],
 )
 def test_invalid_hover_protocol_rejected_before_repository_reads(
-    repo: Path, result: object, message: str,
+    repo: Path,
+    result: object,
+    message: str,
 ) -> None:
     with pytest.raises(ValueError, match=message):
         normalize_lsp_captures([_capture(repo, result)])
@@ -223,7 +235,9 @@ def test_denied_target_never_returns_private_hover(repo: Path) -> None:
     ],
 )
 def test_rehashed_forged_hover_cannot_promote_authority(
-    repo: Path, path: tuple[str, ...], replacement: object,
+    repo: Path,
+    path: tuple[str, ...],
+    replacement: object,
 ) -> None:
     packet = _observed(repo, _capture(repo, {"contents": "a"}))
     forged = deepcopy(packet)
@@ -247,11 +261,11 @@ def test_rehashed_hover_claim_cannot_masquerade_as_relationship(repo: Path) -> N
     row = next(r for r in forged["observations"] if r["producer"] == "fixture-lsp")
     row["claims"].append({"producer": "fixture-lsp", "kind": "reference"})
     row["accounting"]["retained"] = 1
-    row["observation_identity"] = content_identity({
-        key: value for key, value in row.items() if key != "observation_identity"
-    })
-    forged["evidence_identity"] = content_identity({
-        key: value for key, value in forged.items() if key != "evidence_identity"
-    })
+    row["observation_identity"] = content_identity(
+        {key: value for key, value in row.items() if key != "observation_identity"}
+    )
+    forged["evidence_identity"] = content_identity(
+        {key: value for key, value in forged.items() if key != "evidence_identity"}
+    )
     with pytest.raises(ValueError):
         validate_relationship_observation(forged)
