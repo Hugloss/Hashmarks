@@ -184,6 +184,54 @@ class ScopedSourceLiteralsMixin:
             )
         return selected_paths, selected_literals
 
+    @staticmethod
+    def _literal_set_qualification(
+        coverage: bool, freshness: str, count: int, displayed: int
+    ) -> dict[str, object]:
+        if not coverage:
+            return {
+                "exact_match_count": None,
+                "completeness": "unknown",
+                "truncation": "unknown",
+                "negative_evidence": "not-admissible",
+            }
+        truncated = count > displayed
+        return {
+            "exact_match_count": count,
+            "completeness": "incomplete" if truncated else "complete",
+            "truncation": "truncated" if truncated else "complete",
+            "negative_evidence": (
+                "admissible-within-explicit-member-and-literal-set"
+                if freshness == "current" and count == 0
+                else "not-admissible"
+            ),
+        }
+
+    @staticmethod
+    def _literal_set_facts(
+        state: _LiteralSetState,
+        selected: list[dict[str, object]],
+        *,
+        coverage: bool,
+        qualified: bool,
+    ) -> list[dict[str, object]]:
+        return [
+            {
+                "literal": literal,
+                "observed_match_count": state.counts[literal],
+                "exact_match_count": state.counts[literal] if coverage else None,
+                "returned_occurrence_count": sum(
+                    row["literal"] == literal for row in selected
+                ),
+                "negative_evidence": (
+                    "admissible-within-explicit-member-set"
+                    if qualified and state.counts[literal] == 0
+                    else "not-admissible"
+                ),
+            }
+            for literal in state.literals
+        ]
+
     def _literal_set_result(self, state: _LiteralSetState) -> dict[str, object]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -192,9 +240,6 @@ class ScopedSourceLiteralsMixin:
         freshness = freshness_state(stale) if coverage else "stale"
         selected = state.selected_hits()
         count = sum(state.counts.values())
-        exact = count if coverage else None
-        truncated = count > len(selected)
-        qualified = coverage and freshness == "current"
         result: dict[str, object] = {
             "schema": operation_schema("source_observation", "literals"),
             "observation_scope": "explicit-member-and-literal-set-only",
@@ -204,38 +249,17 @@ class ScopedSourceLiteralsMixin:
             "identity_generation": identity_generation,
             "freshness": freshness,
             "member_observations": state.members,
-            "literal_observations": [
-                {
-                    "literal": literal,
-                    "observed_match_count": state.counts[literal],
-                    "exact_match_count": state.counts[literal] if coverage else None,
-                    "returned_occurrence_count": sum(
-                        row["literal"] == literal for row in selected
-                    ),
-                    "negative_evidence": (
-                        "admissible-within-explicit-member-set"
-                        if qualified and state.counts[literal] == 0
-                        else "not-admissible"
-                    ),
-                }
-                for literal in state.literals
-            ],
+            "literal_observations": self._literal_set_facts(
+                state,
+                selected,
+                coverage=coverage,
+                qualified=coverage and freshness == "current",
+            ),
             "source_coverage": "complete" if coverage else "unknown",
             "observed_match_count": count,
-            "exact_match_count": exact,
             "occurrences": selected,
             "selection_order": "round-robin-by-literal",
-            "completeness": (
-                "unknown" if not coverage else "incomplete" if truncated else "complete"
-            ),
-            "truncation": (
-                "unknown" if not coverage else "truncated" if truncated else "complete"
-            ),
-            "negative_evidence": (
-                "admissible-within-explicit-member-and-literal-set"
-                if qualified and exact == 0
-                else "not-admissible"
-            ),
+            **self._literal_set_qualification(coverage, freshness, count, len(selected)),
             "limits": {
                 "returned_occurrences": state.limit,
                 "max_total_bytes": state.max_total_bytes,
