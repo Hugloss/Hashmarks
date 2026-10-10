@@ -277,3 +277,30 @@ The invariant is: **canonicalization may normalize order, but it must never coll
 Repository evidence bindings are read-only repository intelligence.
 
 They may expose repository facts, identities, relationships, freshness, completeness, uncertainty, provenance, and deltas. They do not acquire consumer reasoning, workflow, admission, execution, result, or certification authority.
+
+## Neutral source reacquisition descriptor
+
+A consumer can derive a small, portable description of the exact binding
+scope from an **already obtained** native bindings packet:
+
+```python
+from hashmarks.evidence_context import describe_evidence_binding_reacquisition
+
+reference = describe_evidence_binding_reacquisition(
+    binding_packet, binding_id="consumer:contract-a"
+)
+```
+
+The descriptor contains the original packet, binding-definition and binding
+observation identities, repository identity/generation/freshness **at capture**,
+and the explicit evidence members/spans, declared dependencies, and relationship
+observation configuration needed to make a *new* call to the existing
+`repository_evidence_bindings` operation.
+
+It is not a get-by-hash endpoint, a retained packet, a session cursor, a
+promise of identical bytes, or proof that the old evidence is currently
+applicable. `current_freshness_proven: false` is intentional. The consumer
+reobserves the explicitly declared scopes and uses the existing binding delta
+and coverage contracts to distinguish preserved localized evidence from
+changed/unknown or noncomparable evidence. Hashmarks never stores the agent's
+history or decides whether to resume work.
