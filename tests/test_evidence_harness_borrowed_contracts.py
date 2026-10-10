@@ -80,7 +80,7 @@ def _capture(root: Path, method: str) -> dict:
                     "producer_session": "s1",
                     "document_lifetime": "open1",
                     "document_version": 1,
-                    "source_kind": "file",
+                    "source_kind": "disk",
                     "binding_basis": "producer-snapshot",
                 },
             }
