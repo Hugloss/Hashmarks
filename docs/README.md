@@ -39,6 +39,7 @@ This is the single catalog for the current maintained documentation in `docs/`.
 ## Plans
 
 - [`plans/COMPETITOR_EVIDENCE_CONSOLIDATED.md`](plans/COMPETITOR_EVIDENCE_CONSOLIDATED.md) — single-PR admission and implementation checklist for competitor-inspired repository evidence.
+- [`plans/COMPETITOR_EVIDENCE_FOLLOWUP.md`](plans/COMPETITOR_EVIDENCE_FOLLOWUP.md) — post-#415 checkpoint boundaries, opt-in static handler syntax and deferred provider/measurement work.
 
 ## Qualification
 
