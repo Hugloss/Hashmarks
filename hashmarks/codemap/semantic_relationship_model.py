@@ -146,9 +146,11 @@ def _qualified_symbol(endpoint: object) -> str | None:
     if symbol:
         return symbol
     key = endpoint.get("key")
-    if not isinstance(key, Mapping) or not isinstance(binding, Mapping):
-        return None
-    if binding.get("state") != "matching":
+    if (
+        not isinstance(key, Mapping)
+        or not isinstance(binding, Mapping)
+        or binding.get("state") != "matching"
+    ):
         return None
     for field in ("repository_symbol", "supplied_subject"):
         value = key.get(field)
