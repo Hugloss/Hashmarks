@@ -36,6 +36,7 @@ class ScipOccurrence:
     locator: dict[str, Any] | None = None
     document_metadata: dict[str, Any] | None = None
     declaration_metadata: dict[str, Any] | None = None
+    occurrence_roles: dict[str, Any] | None = None
 
 
 def _field(
@@ -134,6 +135,66 @@ def _scip_document_relationships(
     }
 
 
+_SCIP_KNOWN_OCCURRENCE_ROLES = (
+    (0x01, "definition"),
+    (0x02, "import"),
+    (0x04, "write_access"),
+    (0x08, "read_access"),
+    (0x10, "generated"),
+    (0x20, "test"),
+)
+_SCIP_DOCUMENTATION_MAX_ITEMS = 8
+_SCIP_DOCUMENTATION_MAX_CHARS = 8_192
+_SCIP_DOCUMENTATION_MAX_ITEM_CHARS = 2_048
+
+
+def _scip_occurrence_roles(value: int) -> dict[str, Any]:
+    """Describe producer role flags without inferring missing semantic edges."""
+    if value < 0:
+        raise ValueError("SCIP occurrence roles must be nonnegative")
+    known_mask = sum(bit for bit, _ in _SCIP_KNOWN_OCCURRENCE_ROLES)
+    return {
+        "producer_role_bits": value,
+        "observed_roles": [
+            name for bit, name in _SCIP_KNOWN_OCCURRENCE_ROLES if value & bit
+        ],
+        "unrecognized_role_bits": value & ~known_mask,
+        "authority": "direct-scip-occurrence-flags",
+        "negative_evidence_admissible": False,
+    }
+
+
+def _scip_symbol_documentation(info: dict[str, Any]) -> dict[str, Any]:
+    """Keep bounded producer documentation, with explicit omission accounting."""
+    if "documentation" not in info:
+        return {"documentation_state": "not-supplied"}
+    value = info["documentation"]
+    if not isinstance(value, list) or any(not isinstance(row, str) for row in value):
+        raise ValueError("SCIP symbol documentation must be an array of strings")
+    retained: list[str] = []
+    omitted = 0
+    clipped = 0
+    remaining = _SCIP_DOCUMENTATION_MAX_CHARS
+    for row in value:
+        if len(retained) >= _SCIP_DOCUMENTATION_MAX_ITEMS or remaining == 0:
+            omitted += 1
+            continue
+        chunk = row[: min(_SCIP_DOCUMENTATION_MAX_ITEM_CHARS, remaining)]
+        if len(chunk) < len(row):
+            clipped += 1
+        retained.append(chunk)
+        remaining -= len(chunk)
+    return {
+        "documentation_state": "supplied",
+        "documentation": retained,
+        "documentation_omitted": omitted,
+        "documentation_clipped_entries": clipped,
+        "documentation_truncated": bool(omitted or clipped),
+        "authority": "scip-producer-supplied",
+        "negative_evidence_admissible": False,
+    }
+
+
 def _scip_occurrence(
     path: str,
     occurrence: dict[str, Any],
@@ -160,6 +221,7 @@ def _scip_occurrence(
         locator=_scip_locator(occurrence, document_metadata["position_encoding"]),
         document_metadata=document_metadata,
         declaration_metadata=information.get(symbol),
+        occurrence_roles=_scip_occurrence_roles(roles),
     )
 
 
@@ -217,6 +279,7 @@ def _scip_symbol_information(document: dict[str, Any]) -> dict[str, dict[str, An
         str(info["symbol"]): {
             "display_name": _field(info, "displayName", "display_name"),
             "kind": info.get("kind"),
+            **_scip_symbol_documentation(info),
         }
         for info in document.get("symbols") or ()
         if isinstance(info, dict) and isinstance(info.get("symbol"), str)

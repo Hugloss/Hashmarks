@@ -35,6 +35,28 @@ uv run --frozen -m scripts.agent_evaluation.agent_evidence_format_study emit \
   --output encoding-trials.jsonl
 ```
 
+## Serialized evidence size measurement
+
+Every emitted trial now contains `exported_response_utf8_bytes`, computed over
+the **frozen export encoding**: the exact string for `encoding-only`, or a
+canonical minified JSON representation of the complete
+`production-response` object. It is deterministically recomputed on
+summarization when present and cannot be altered without rejection.
+Only an absent field receives legacy treatment. A supplied null, boolean,
+non-integer, negative count, or mismatching count is rejected.
+
+When a caller supplies a host capture, its audit also records
+`model_visible_utf8_bytes` for the exact captured UTF-8 string alongside
+`model_visible_sha256` and the corresponding exported size. This permits
+distinguishing actual host serialization overhead from producer payload shape.
+Host captures remain **consumer claims**; their inclusion in an agent's actual
+model request still requires host-native evidence.
+
+Neither byte measurement estimates tokenizer-specific tokens, guarantees the
+model saw the captured text, or proves agent comprehension or quality.
+Measurements must not be used to silently change default formats. Existing
+trial identities remain based on their frozen semantic payload.
+
 ## Frozen trial identities and host-capture reconciliation
 
 Every emitted trial has a deterministic `trial_identity` SHA-256 digest of

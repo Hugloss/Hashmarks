@@ -18,6 +18,15 @@ inverse relationships, or transitive edges. `ambiguous` contains two classes
 with the same method name and proves that exact native subject lookup does not
 choose between them.
 
+Python `metadata-before` and `metadata-after` change Unicode documentation while
+retaining two reads of the same parameter at different columns on one line.
+`metadata-bounded` contains 130 actual producer-reported reads on one line to
+exercise bounded retention. Its `fmt: off` region keeps that deliberate source
+shape intact through repository formatting; all captured hashes and revisions
+still bind the exact producer inputs. These captures exercise reference roles,
+source binding, documentation changes, and durable reopening without mocking
+producer output or Hashmarks publication.
+
 Tests materialize only `src` and project configuration inside the observed
 repository. Captures stay outside it. They replace source files, import native
 bytes through CodeMap, edit before reindexing, delete files, reopen durable

@@ -21,6 +21,7 @@ This is the single catalog for the current maintained documentation in `docs/`.
 - [`reference/SOURCE_OBSERVATION.md`](reference/SOURCE_OBSERVATION.md) — bounded source occurrences, observable scope, diagnostic correspondence, and source-shape evidence.
 - [`reference/STATE_AND_SEMANTIC_OWNERS.md`](reference/STATE_AND_SEMANTIC_OWNERS.md) — canonical state families, semantic owners, and reuse-before-new-owner rules.
 - [`reference/STRUCTURAL_LOCALITY.md`](reference/STRUCTURAL_LOCALITY.md) — bounded structural-locality evidence for repository symbols.
+- [`reference/STATIC_INTERFACE_EVIDENCE.md`](reference/STATIC_INTERFACE_EVIDENCE.md) — selected static Python route/tool syntax and bounded SCIP symbol evidence.
 
 ## Integration
 
@@ -34,6 +35,10 @@ This is the single catalog for the current maintained documentation in `docs/`.
 - [`maintainers/SEMANTIC_IDENTITY_WITHOUT_REPOSITORY_OWNERSHIP.md`](maintainers/SEMANTIC_IDENTITY_WITHOUT_REPOSITORY_OWNERSHIP.md) — accepted decision for semantic-subject/declaration/observation identity without branch, merge, mutation, or history ownership.
 - [`maintainers/RELEASING.md`](maintainers/RELEASING.md) — current release procedure.
 - [`maintainers/RESPONSIBILITY_REFACTORING.md`](maintainers/RESPONSIBILITY_REFACTORING.md) — responsibility-first refactoring policy.
+
+## Plans
+
+- [`plans/COMPETITOR_EVIDENCE_CONSOLIDATED.md`](plans/COMPETITOR_EVIDENCE_CONSOLIDATED.md) — single-PR admission and implementation checklist for competitor-inspired repository evidence.
 
 ## Qualification
 

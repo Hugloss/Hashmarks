@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from hashmarks.paths import normalize_relative_path
 
-from .scip_relationship_adapter import scip_occurrence_payload
+from .scip_relationship_adapter import scip_occurrence_payload, scip_source_snapshot
 from .semantic_relationship_model import CLAIM_LIMIT, content_identity
 
 if TYPE_CHECKING:
@@ -27,7 +27,11 @@ class ScipImportRows:
 
 
 def _reference(
-    codemap: CodeMap, occurrence: ScipOccurrence, path: str
+    codemap: CodeMap,
+    occurrence: ScipOccurrence,
+    path: str,
+    revision: str | None,
+    provenance: Mapping[str, Any],
 ) -> dict[str, Any]:
     candidates = [
         row
@@ -46,7 +50,46 @@ def _reference(
         "target_symbol": occurrence.symbol,
         "target_name": occurrence.display_name,
         "line": occurrence.line,
+        "occurrence_metadata": {
+            "locator": occurrence.locator,
+            "occurrence_roles": occurrence.occurrence_roles,
+        },
+        "source_snapshot": scip_source_snapshot(
+            scip_occurrence_payload(occurrence, revision, provenance)
+        ),
     }
+
+
+def scip_reference_rows(references: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Retain bounded occurrence evidence inside the existing grouped edge key."""
+    grouped: dict[tuple[str, str, int], dict[str, Any]] = {}
+    occurrences: dict[tuple[str, str, int], list[dict[str, Any]]] = {}
+    for row in references:
+        key = (row["path"], row["target_symbol"], row["line"])
+        grouped[key] = {
+            key: value for key, value in row.items() if key != "occurrence_metadata"
+        }
+        occurrences.setdefault(key, []).append(row["occurrence_metadata"])
+    for key, row in grouped.items():
+        supplied = occurrences[key]
+        distinct = {
+            json.dumps(value, sort_keys=True, separators=(",", ":")): value
+            for value in supplied
+        }
+        retained = [distinct[identity] for identity in sorted(distinct)[:CLAIM_LIMIT]]
+        omitted = len(distinct) - len(retained)
+        row["occurrence_metadata"] = {
+            "source_snapshot": row.pop("source_snapshot"),
+            "state": "supplied",
+            "occurrences": retained,
+            "received": len(supplied),
+            "retained": len(retained),
+            "duplicates": len(supplied) - len(distinct),
+            "omitted": omitted,
+            "truncated": bool(omitted),
+            "negative_evidence_admissible": False,
+        }
+    return [grouped[key] for key in sorted(grouped)]
 
 
 def _definition(
@@ -121,7 +164,9 @@ def _append_occurrence(
             _definition(occurrence, path, member.get("file_digest"), provenance)
         )
     else:
-        rows.references.append(_reference(codemap, occurrence, path))
+        rows.references.append(
+            _reference(codemap, occurrence, path, member.get("file_digest"), provenance)
+        )
 
 
 def publish_scip_claim_metadata(

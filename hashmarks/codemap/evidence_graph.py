@@ -10,7 +10,11 @@ from hashmarks.paths import normalize_relative_path
 from .model import EvidenceVisibility
 from .repository_domains import is_test_path
 from .scip_adapter import load_scip_json
-from .scip_import import collect_scip_rows, publish_scip_claim_metadata
+from .scip_import import (
+    collect_scip_rows,
+    publish_scip_claim_metadata,
+    scip_reference_rows,
+)
 from .scip_relationship_adapter import scip_import_provenance
 
 if TYPE_CHECKING:
@@ -256,7 +260,7 @@ class EvidenceGraphMixin:
                 previous_generation=previous_generation, generation=generation
             )
             self.store.replace_native_occurrences(
-                producer, rows.definitions, rows.references
+                producer, rows.definitions, scip_reference_rows(rows.references)
             )
             self._record_evidence_snapshot(
                 "scip", producer, bind_generation=True, generation=generation
