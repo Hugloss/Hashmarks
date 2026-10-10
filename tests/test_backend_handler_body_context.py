@@ -28,9 +28,9 @@ def _change(cm: CodeMap) -> dict[str, object]:
 
 
 def _association(result: dict[str, object]) -> dict[str, object]:
-    return result["changed_line_evidence"]["observations"][0][
-        "decorator_associations"
-    ]["associations"][0]
+    return result["changed_line_evidence"]["observations"][0]["decorator_associations"][
+        "associations"
+    ][0]
 
 
 def test_body_context_reuses_existing_provider_oracle_and_exact_index(
@@ -75,17 +75,16 @@ def test_body_context_reuses_existing_provider_oracle_and_exact_index(
     expected = provider["declarations"]["groups"][0]["declarations"][0]["value"][
         "static_body_syntax"
     ]
-    assert body["literal_dictionary_returns"] == expected[
-        "literal_dictionary_returns"
-    ]
-    assert body["literal_subscript_accesses"] == expected[
-        "literal_subscript_accesses"
-    ]
+    assert body["literal_dictionary_returns"] == expected["literal_dictionary_returns"]
+    assert body["literal_subscript_accesses"] == expected["literal_subscript_accesses"]
     assert body["return_sites_observed"] == 1
     assert body["subscript_sites_observed"] == 2
-    assert validate_evidence_presentation(
-        augmented, present_repository_evidence(augmented, format="compact")
-    )["valid"] is True
+    assert (
+        validate_evidence_presentation(
+            augmented, present_repository_evidence(augmented, format="compact")
+        )["valid"]
+        is True
+    )
 
 
 def test_body_context_excludes_nested_scopes_and_preserves_dynamic_returns(
@@ -142,8 +141,7 @@ def test_body_site_overflow_degrades_locally_without_dropping_handler(
 ) -> None:
     source = "@auth.required\ndef handler(payload):\n"
     source += "".join(
-        f"    if payload == {n}:\n        return {{'key': {n}}}\n"
-        for n in range(17)
+        f"    if payload == {n}:\n        return {{'key': {n}}}\n" for n in range(17)
     )
     (tmp_path / PATH).write_text(source, encoding="utf-8")
     with CodeMap(tmp_path) as cm:
