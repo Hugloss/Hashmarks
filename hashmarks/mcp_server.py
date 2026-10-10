@@ -204,7 +204,7 @@ def _register_agent_evidence_tools(
     )
     def source_observation(
         paths: list[str],
-        literal: str | None = None,
+        literal: str | list[str] | None = None,
         result_mode: _SourceObservationResultMode = source_contract.default_response_mode,
         limit: int = 50,
         context_lines: int | dict[str, object] = 0,
@@ -215,7 +215,8 @@ def _register_agent_evidence_tools(
             tool_error,
             surface.source_observation,
             paths,
-            literal=literal,
+            literal=literal if isinstance(literal, str) else None,
+            literals=literal if isinstance(literal, list) else None,
             result_mode=result_mode,
             response_mode=result_mode,
             limit=limit,

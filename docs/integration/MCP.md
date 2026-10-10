@@ -186,9 +186,15 @@ literal request to `source_observation` can be:
 The paths above are examples only. The `scope` mode accepts at most 32 explicit
 paths and exactly one literal string per call; it never expands those paths to
 another repository scan. It is **case-sensitive literal**, not regex.
+`source_observation` also supports `result_mode="literals"` with 1–8
+distinct case-sensitive literal strings across up to 32 explicit paths. The MCP `literal` input accepts an array of exact strings only in
+`literals` mode, and retains its existing single-string shape in other modes. One canonical stable read per member yields exact
+per-literal observed and (when qualified) total counts with independently
+qualified scoped absence. It is not regex or a repository-wide search.
+
 `source_observation` returns the native revision-bound source packet alongside
-its optional presentation. Compact projection shows the first occurrence hits
-before the member inventory; omitted rows are counted and do not prove absence.
+its optional presentation. Compact projection shows occurrence hits before
+the member inventory; omitted rows are counted and do not prove absence.
 A member-only or stale result cannot silently imply repository-wide completeness.
 
 The `task_evidence` presentation also shows independently referenced owner,

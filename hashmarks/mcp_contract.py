@@ -50,7 +50,9 @@ MCP_SERVER_INSTRUCTIONS = (
     "and a verification plan, and report freshness. Prefer that semantic reduction over "
     "reconstructing ownership from repeated native search/read calls. For exact literal "
     "occurrences within already known paths, use source_observation with an explicit "
-    "bounded member scope; it is not regex or repository-wide search. Use native read for "
+    "bounded member scope; literals mode observes up to eight distinct exact strings "
+    "using one stable source read per member, not regex or repository-wide search. "
+    "Use native read for "
     "a unique known path, a targeted next-read, or a source body needed for editing. For "
     "a known exact symbol whose path is unknown, use find. After changed paths exist, "
     "use change_impact or post_change when relevant. Caller-visible tool failures carry "
@@ -264,9 +266,9 @@ MCP_TOOL_CONTRACTS = (
     McpToolContract(
         "source_observation",
         (
-            "After localization, observe exact literals in one member or up to 32 "
-            "explicit paths (not regex). Show optional match or named-line context. "
-            "Return revisions and scoped coverage; never claim repository-wide absence."
+            "Observe exact literals (not regex) in up to 32 known paths; use "
+            "array-valued literal in literals mode for up to 8 terms. Preserve "
+            "revisions and scoped coverage; never infer repository-wide absence."
         ),
         "source_observation",
     ),

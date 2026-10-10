@@ -29,6 +29,7 @@ from .diagnostic_source_revision import (
     diagnostic_source_revision_evidence,
 )
 from .freshness_map import FreshnessMapOptions
+from .scoped_source_literals import ScopedSourceLiteralsMixin
 from .source_line_correspondence import (
     source_line_anchors,
     source_shape,
@@ -136,7 +137,7 @@ REPOSITORY_SNAPSHOT_SCHEMA = "hashmarks.repository-intelligence-snapshot.v1"
 REPOSITORY_DELTA_SCHEMA = "hashmarks.repository-intelligence-delta.v1"
 
 
-class RepositoryDeltaMixin:
+class RepositoryDeltaMixin(ScopedSourceLiteralsMixin):
     """Bounded semantic snapshots and deltas over repository intelligence.
 
     Callers retain earlier producer snapshots and supply them after later

@@ -101,6 +101,7 @@ OPERATION_CONTRACTS = (
         (
             ("member", "hashmarks.source-observation.v1"),
             ("scope", "hashmarks.scoped-source-occurrences.v1"),
+            ("literals", "hashmarks.scoped-source-literal-set.v1"),
         ),
     ),
     OperationContract(

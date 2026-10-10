@@ -315,3 +315,61 @@ def test_compact_source_hits_precede_member_inventory() -> None:
     assert projection["source_context"][0]["details"]["negative_evidence"] == (
         "not-admissible"
     )
+
+
+def test_literal_set_mcp_surface_preserves_modes_and_presentation(
+    tmp_path: Path,
+) -> None:
+    repo = _repo(tmp_path)
+    (repo / "src" / "alpha.py").write_text(
+        "def ZipInfo():\n    return ZIP_DEFLATED\n", encoding="utf-8"
+    )
+    surface = HashmarksMcpSurface(str(repo), state_dir=str(tmp_path / "state"))
+    try:
+        response = surface.source_observation(
+            ["src/alpha.py"],
+            literals=["ZIP_DEFLATED", "ZipInfo", "not-here"],
+            result_mode="literals",
+            limit=2,
+        )
+        assert response["schema"] == "hashmarks.scoped-source-literal-set.v1"
+        assert response["observed_match_count"] == 2
+        assert response["exact_match_count"] == 2
+        presentation = present_repository_evidence(response, format="compact")
+        groups = {group["family"]: group for group in presentation["groups"]}
+        hits = groups["source"]["findings"]
+        assert [row["details"]["literal"] for row in hits[:2]] == [
+            "ZIP_DEFLATED",
+            "ZipInfo",
+        ]
+        qualifications = groups["qualification"]["findings"]
+        assert len(qualifications) == 3
+        assert all(
+            row["source_refs"] == [f"/literal_observations/{index}"]
+            for index, row in enumerate(qualifications)
+        )
+        assert presentation["coverage"] == "projection-only"
+        assert presentation["authority"] == "descriptive-only"
+        with pytest.raises(McpSurfaceError, match="forbids literal"):
+            surface.source_observation(
+                ["src/alpha.py"],
+                literal="ZipInfo",
+                literals=["ZIP_DEFLATED"],
+                result_mode="literals",
+            )
+        with pytest.raises(McpSurfaceError, match="requires literals result_mode"):
+            surface.source_observation(
+                ["src/alpha.py"], literals=["ZipInfo"], result_mode="member"
+            )
+        with pytest.raises(McpSurfaceError, match="distinct"):
+            surface.source_observation(
+                ["src/alpha.py"],
+                literals=["ZipInfo", "ZipInfo"],
+                result_mode="literals",
+            )
+        with pytest.raises(McpSurfaceError, match="exact single-line"):
+            surface.source_observation(
+                ["src/alpha.py"], literals=["bad\nquery"], result_mode="literals"
+            )
+    finally:
+        surface.close()

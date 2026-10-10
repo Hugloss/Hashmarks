@@ -215,10 +215,10 @@ dependency-dogfood:
 	@$(UV_RUN) --offline --no-sync --group test python -m pytest -v tests/test_dependency_dogfood.py
 
 semantic-evidence-dogfood:
-	@$(UV_RUN) --offline --no-sync --group test python -m pytest -v tests/test_native_dependency_changes.py tests/test_native_dependency_workflows.py tests/test_native_scip_changes.py tests/test_native_scip_metadata_changes.py tests/test_native_lsp_changes.py tests/test_native_evidence_reacquisition.py tests/test_native_evidence_transport.py
+	@$(UV_RUN) --offline --no-sync --group test python -m pytest -v tests/test_native_dependency_changes.py tests/test_native_dependency_workflows.py tests/test_native_scip_changes.py tests/test_native_scip_metadata_changes.py tests/test_native_lsp_changes.py tests/test_native_evidence_reacquisition.py tests/test_native_evidence_transport.py tests/test_scoped_source_literal_workflows.py
 
 semantic-evidence-live:
-	@HASHMARKS_NATIVE_EVIDENCE_LIVE=1 $(UV_RUN) --offline --no-sync --group test python -m pytest -v tests/test_native_dependency_changes.py tests/test_native_dependency_workflows.py tests/test_native_scip_changes.py tests/test_native_scip_metadata_changes.py tests/test_native_lsp_changes.py tests/test_native_evidence_reacquisition.py tests/test_native_evidence_transport.py
+	@HASHMARKS_NATIVE_EVIDENCE_LIVE=1 $(UV_RUN) --offline --no-sync --group test python -m pytest -v tests/test_native_dependency_changes.py tests/test_native_dependency_workflows.py tests/test_native_scip_changes.py tests/test_native_scip_metadata_changes.py tests/test_native_lsp_changes.py tests/test_native_evidence_reacquisition.py tests/test_native_evidence_transport.py tests/test_scoped_source_literal_workflows.py
 
 source-hygiene:
 	@git ls-files -z -- '*.py' '*.pyi' | xargs -0 -r python3 -m scripts.source_hygiene
