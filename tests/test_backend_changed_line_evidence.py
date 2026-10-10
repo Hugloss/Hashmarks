@@ -229,7 +229,9 @@ def test_cli_span_parser_is_explicit_and_leaves_proof_to_core() -> None:
     ]
 
 
-@pytest.mark.parametrize("value", ["src/backend.py:2", "src/backend.py:x:2", "src/backend.py:-1:2"])
+@pytest.mark.parametrize(
+    "value", ["src/backend.py:2", "src/backend.py:x:2", "src/backend.py:-1:2"]
+)
 def test_cli_span_parser_rejects_malformed_bounds_without_new_exception_owner(
     value: str,
 ) -> None:
