@@ -22,6 +22,9 @@ _MAX_PATHS = 32
 _MAX_GROUPS = 128
 _MAX_SOURCE_CHARS = 262_144
 _MAX_LITERAL_CHARS = 1_024
+_MAX_BODY_SITES = 16
+_MAX_RETURN_KEYS = 32
+_MAX_ACCESS_KEY_CHARS = 128
 
 
 def _explicit_literal(node: ast.expr | None) -> tuple[str, str | None]:
@@ -32,6 +35,103 @@ def _explicit_literal(node: ast.expr | None) -> tuple[str, str | None]:
             return "over-bound", None
         return "literal", node.value
     return "dynamic-or-unsupported", None
+
+
+class _HandlerBodySyntax(ast.NodeVisitor):
+    """Only direct handler-body syntax; nested scopes never belong to this handler."""
+
+    def __init__(self) -> None:
+        self.returns: list[tuple[int, int, dict[str, object]]] = []
+        self.accesses: list[tuple[int, int, dict[str, object]]] = []
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        return  # A nested handler is a different scope.
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        return
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        return
+
+    def visit_Lambda(self, node: ast.Lambda) -> None:
+        return
+
+    def visit_Return(self, node: ast.Return) -> None:
+        value = node.value
+        keys: list[str] | None = None
+        if isinstance(value, ast.Dict) and len(value.keys) <= _MAX_RETURN_KEYS:
+            if all(
+                isinstance(key, ast.Constant)
+                and type(key.value) is str
+                and len(key.value) <= _MAX_ACCESS_KEY_CHARS
+                for key in value.keys
+            ):
+                keys = [
+                    key.value for key in value.keys if isinstance(key, ast.Constant)
+                ]
+        self.returns.append(
+            (
+                node.lineno,
+                node.col_offset,
+                {
+                    "line": node.lineno,
+                    "end_line": node.end_lineno or node.lineno,
+                    "syntax": "literal-dict-return"
+                    if keys is not None
+                    else "unresolved-return",
+                    "literal_keys_in_source_order": keys,
+                },
+            )
+        )
+        if len(self.returns) > _MAX_BODY_SITES:
+            raise ValueError("handler return syntax site bound exceeded")
+        self.generic_visit(node)
+
+    def visit_Subscript(self, node: ast.Subscript) -> None:
+        if (
+            isinstance(node.ctx, ast.Load)
+            and isinstance(node.value, ast.Name)
+            and isinstance(node.slice, ast.Constant)
+            and type(node.slice.value) is str
+            and len(node.slice.value) <= _MAX_ACCESS_KEY_CHARS
+        ):
+            self.accesses.append(
+                (
+                    node.lineno,
+                    node.col_offset,
+                    {
+                        "line": node.lineno,
+                        "end_line": node.end_lineno or node.lineno,
+                        "receiver_syntax": node.value.id,
+                        "literal_key": node.slice.value,
+                    },
+                )
+            )
+            if len(self.accesses) > _MAX_BODY_SITES:
+                raise ValueError("handler literal access site bound exceeded")
+        self.generic_visit(node)
+
+
+def _handler_body_syntax(
+    declaration: ast.FunctionDef | ast.AsyncFunctionDef,
+) -> dict[str, object]:
+    visitor = _HandlerBodySyntax()
+    for statement in declaration.body:
+        visitor.visit(statement)
+    return {
+        "authority": "direct-static-syntax-only",
+        "coverage": "incomplete",
+        "runtime_response_shape": "unknown",
+        "cross_artifact_correspondence": "unresolved",
+        # AST fields group dictionary keys/values and call args/keywords; their
+        # traversal order is not physical source order, even on the same line.
+        "literal_dictionary_returns": [
+            site for _, _, site in sorted(visitor.returns, key=lambda row: row[:2])
+        ],
+        "literal_subscript_accesses": [
+            site for _, _, site in sorted(visitor.accesses, key=lambda row: row[:2])
+        ],
+    }
 
 
 def _observed_decorator(
@@ -102,6 +202,17 @@ def _declaration_group(
         "handler_syntax": declaration.name,
         "decorator_line": decorator.lineno,
     }
+    body_syntax = observed.get("static_body_syntax")
+    extra_evidence: list[dict[str, object]] = []
+    if body_syntax is not None:
+        sites = [
+            *body_syntax["literal_dictionary_returns"],
+            *body_syntax["literal_subscript_accesses"],
+        ]
+        spans = sorted({(site["line"], site["end_line"]) for site in sites})
+        extra_evidence = [
+            {"path": path, "start_line": start, "end_line": end} for start, end in spans
+        ]
     return {
         "group_id": group_id,
         "concept": {"kind": observed["kind"], "syntax": "python-decorator"},
@@ -137,7 +248,8 @@ def _declaration_group(
                         "path": path,
                         "start_line": decorator.lineno,
                         "end_line": declaration.lineno,
-                    }
+                    },
+                    *extra_evidence,
                 ],
             }
         ],
@@ -161,20 +273,36 @@ def _source_groups(
     route_objects: frozenset[str],
     tool_objects: frozenset[str],
     provider: str,
+    include_literal_shape_syntax: bool = False,
 ) -> list[dict[str, object]]:
     groups: list[dict[str, object]] = []
     for declaration in ast.parse(source, filename=path).body:
         if not isinstance(declaration, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
+        body_syntax: dict[str, object] | None = None
         for ordinal, decorator in enumerate(declaration.decorator_list):
             observed = _observed_decorator(
                 decorator, route_objects=route_objects, tool_objects=tool_objects
             )
             if observed is None:
                 continue
+            if include_literal_shape_syntax and body_syntax is None:
+                body_syntax = _handler_body_syntax(declaration)
             groups.append(
                 _declaration_group(
-                    path, declaration, decorator, ordinal, observed, provider=provider
+                    path,
+                    declaration,
+                    decorator,
+                    ordinal,
+                    {
+                        **observed,
+                        **(
+                            {"static_body_syntax": body_syntax}
+                            if body_syntax is not None
+                            else {}
+                        ),
+                    },
+                    provider=provider,
                 )
             )
             if len(groups) > _MAX_GROUPS:
@@ -195,8 +323,11 @@ class StaticPythonInterfaceDeclarations:
     name: str = "static-python-interface"
     route_objects: tuple[str, ...] = ("app", "router")
     tool_objects: tuple[str, ...] = ("mcp", "server")
+    include_literal_shape_syntax: bool = False
 
     def __post_init__(self) -> None:
+        if type(self.include_literal_shape_syntax) is not bool:
+            raise ValueError("include_literal_shape_syntax must be boolean")
         if not 1 <= len(self.paths) <= _MAX_PATHS:
             raise ValueError("interface provider requires 1..32 exact paths")
         if any(
@@ -239,6 +370,7 @@ class StaticPythonInterfaceDeclarations:
                     route_objects=frozenset(self.route_objects),
                     tool_objects=frozenset(self.tool_objects),
                     provider=self.name,
+                    include_literal_shape_syntax=self.include_literal_shape_syntax,
                 )
             )
             if len(groups) > _MAX_GROUPS:
@@ -250,6 +382,11 @@ class StaticPythonInterfaceDeclarations:
                 "parser": "python-ast",
                 "file_scope": sorted(self.paths),
                 "semantics": "direct-decorator-syntax-not-runtime-registration",
+                **(
+                    {"handler_body": "bounded-literal-syntax-not-response-contract"}
+                    if self.include_literal_shape_syntax
+                    else {}
+                ),
                 "missing_selected_paths": sorted(unavailable),
             },
         )
