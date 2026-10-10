@@ -9,6 +9,8 @@ from typing import Any
 
 import pytest
 from native_evidence_support import (
+    assert_hover_capture,
+    assert_hover_presentation,
     assert_projection,
     import_native_scip,
     lsp_capture,
@@ -16,10 +18,12 @@ from native_evidence_support import (
 )
 
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.semantic_relationship_delta import semantic_relationship_delta
 from hashmarks.codemap.semantic_relationship_model import (
     validate_relationship_observation,
 )
 from hashmarks.digest import FILE_DOMAIN, hash_bytes
+from hashmarks.evidence_presentation import FORMATS, present_repository_evidence
 
 
 def observe(cm: CodeMap, root: Path, source: Path, name: str) -> Any:
@@ -49,12 +53,21 @@ def lsp_row(packet: Any) -> Any:
     )
 
 
+def _assert_hover_formats(packet: Any, capture: Any) -> None:
+    for format in FORMATS:
+        if format != "none":
+            assert_hover_presentation(
+                packet, present_repository_evidence(packet, format=format), capture
+            )
+
+
 @pytest.mark.parametrize(
     "language,state",
     [
         ("python", "before"),
         ("python", "moved"),
         ("python", "after"),
+        ("python", "hover"),
         ("typescript", "before"),
         ("typescript", "moved"),
         ("typescript", "after"),
@@ -90,6 +103,117 @@ def test_native_lsp_raw_capture_integrity_and_uri_only_replay(
                 (tmp_path / path).as_uri(), metadata["original_root_uri"] + "/" + path
             )
         assert json.loads(restored) == row["capture"]
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["hover-disk", "hover-string-token", "hover-integer-token", "hover-null"],
+)
+def test_native_hover_accepts_exact_protocol_responses_without_edges(
+    tmp_path: Path, name: str, native_lsp_corpus: Path
+) -> None:
+    root = tmp_path / "repo"
+    source = native_lsp_corpus / "python" / "hover"
+    materialize_scip(root, source)
+    capture = lsp_capture(root, source, name)
+    with CodeMap(root) as cm:
+        cm.sync()
+        packet = observe(cm, root, source, name)
+    row = assert_hover_capture(packet, capture)
+    assert row["freshness"] == "current"
+    assert row["source_bindings"][0]["state"] == "matching"
+    assert row["capability"]["request_id"] == capture["request"]["id"]
+    assert_projection(packet, "structural_locality", "relationships")
+    _assert_hover_formats(packet, capture)
+
+
+def test_native_hover_unsaved_buffer_and_document_reopen_preserve_authority(
+    tmp_path: Path, native_lsp_corpus: Path
+) -> None:
+    root = tmp_path / "repo"
+    source = native_lsp_corpus / "python" / "hover"
+    materialize_scip(root, source)
+    old_capture = lsp_capture(root, source, "hover-disk")
+    changed_capture = lsp_capture(root, source, "hover-buffer")
+    with CodeMap(root) as cm:
+        cm.sync()
+        before = observe(cm, root, source, "hover-disk")
+        old = assert_hover_capture(before, old_capture)
+        unsaved = observe(cm, root, source, "hover-buffer")
+        changed = assert_hover_capture(unsaved, changed_capture)
+        assert changed["freshness"] == "unknown"
+        assert changed["source_bindings"][0]["state"] == "different"
+        unqualified = semantic_relationship_delta(before, unsaved)
+        assert unqualified["comparable"] is False
+        assert (
+            "after-producer-freshness-unproven"
+            in unqualified["incomparability_reasons"]
+        )
+        assert_projection(unqualified, "evidence_comparison", "relationships")
+        _assert_hover_formats(unsaved, changed_capture)
+        reopened = observe(cm, root, source, "hover-reopened")
+        reopened_capture = lsp_capture(root, source, "hover-reopened")
+        reopened_row = assert_hover_capture(reopened, reopened_capture)
+        assert reopened_row["freshness"] == "current"
+        assert reopened_row["source_bindings"][0]["state"] == "matching"
+        assert (
+            reopened_row["source_bindings"][0]["provenance"]["document_lifetime"]
+            != old["source_bindings"][0]["provenance"]["document_lifetime"]
+        )
+        _assert_hover_formats(reopened, reopened_capture)
+
+
+def test_native_hover_save_delta_and_codemap_reopen_do_not_replay(
+    tmp_path: Path, native_lsp_corpus: Path
+) -> None:
+    root, state = tmp_path / "repo", tmp_path / "state"
+    source = native_lsp_corpus / "python" / "hover"
+    materialize_scip(root, source)
+    old_capture = lsp_capture(root, source, "hover-disk")
+    changed_capture = lsp_capture(root, source, "hover-buffer")
+    with CodeMap(root, state_dir=state) as cm:
+        cm.sync()
+        before = observe(cm, root, source, "hover-disk")
+        old = assert_hover_capture(before, old_capture)
+
+        # Save the exact text the real server observed; neither capture is edited.
+        (root / "src/source.py").write_text(
+            changed_capture["documents"]["src/source.py"]["text"], encoding="utf-8"
+        )
+        cm.sync()
+        after = observe(cm, root, source, "hover-buffer")
+        saved = assert_hover_capture(after, changed_capture)
+        assert saved["freshness"] == "current"
+        assert saved["source_bindings"][0]["state"] == "matching"
+        stale = observe(cm, root, source, "hover-disk")
+        assert assert_hover_capture(stale, old_capture)["freshness"] == "unknown"
+        delta = semantic_relationship_delta(before, after)
+        assert delta["comparable"] is True
+        (change,) = delta["producer_deltas"]
+        assert change["capability"]["changed"] is True
+        assert (
+            change["capability"]["before"]["hover_observation"]
+            == (old["capability"]["hover_observation"])
+        )
+        assert (
+            change["capability"]["after"]["hover_observation"]
+            == (saved["capability"]["hover_observation"])
+        )
+        assert change["facts"]["added"] == change["facts"]["removed"] == []
+        assert (
+            change["observed_claim_set_changes"]["repository_absence_inferred"] is False
+        )
+        assert_projection(delta, "evidence_comparison", "relationships")
+        _assert_hover_formats(after, changed_capture)
+    with CodeMap(root, state_dir=state) as cm:
+        cm.sync()
+        current: Any = cm.structural_locality(
+            "src/source.py::target", result_mode="relationships"
+        )
+    assert all(
+        row["producer"] != changed_capture["producer"]
+        for row in current["observations"]
+    )
 
 
 @pytest.mark.parametrize(

@@ -13,9 +13,12 @@ from typing import Any
 import pytest
 from native_evidence_support import (
     TASK,
+    assert_hover_capture,
+    assert_hover_presentation,
     assert_literal_returned_counts,
     dependency_capture,
     input_revisions,
+    lsp_capture,
     materialize_dependency,
     materialize_scip,
 )
@@ -357,6 +360,166 @@ def test_native_lsp_cli_stdout_keeps_unproven_body_query(
             == "src/callee.py::target"
         )
         assert native["producer_correspondence"]["unresolved_claims"] == 1
+
+
+def _assert_hover_response(response: Any, capture: Any, format: str) -> Any:
+    native = response if format == "none" else response["result"]
+    assert assert_hover_capture(native, capture)["freshness"] == "current"
+    if format != "none":
+        assert_hover_presentation(native, response["presentation"], capture)
+    return native
+
+
+def _assert_hover_delta(response: Any, before: Any, after: Any, format: str) -> None:
+    delta = response if format == "none" else response["result"]
+    assert delta["before"] == before
+    assert delta["after"] == after
+    assert delta["comparable"] is True
+    (change,) = delta["producer_deltas"]
+    assert change["facts"]["added"] == change["facts"]["removed"] == []
+    assert change["capability"]["changed"] is True
+    assert (
+        change["capability"]["before"]["hover_observation"]
+        == (before["observations"][0]["capability"]["hover_observation"])
+    )
+    assert (
+        change["capability"]["after"]["hover_observation"]
+        == (after["observations"][0]["capability"]["hover_observation"])
+    )
+    if format == "text":
+        assert response["presentation"]["text"].startswith("Subject:")
+        assert "~ capability: before=" in response["presentation"]["text"]
+
+
+def test_native_hover_cli_formats_and_saved_change_roundtrip(
+    tmp_path: Path, native_lsp_corpus: Path
+) -> None:
+    root, state = tmp_path / "repo", tmp_path / "state"
+    source = native_lsp_corpus / "python" / "hover"
+    materialize_scip(root, source)
+    capture_file = tmp_path / "hover.json"
+    endpoints = []
+    for name in ("hover-integer-token", "hover-buffer"):
+        raw = lsp_capture(root, source, name)
+        if name == "hover-buffer":
+            (root / "src/source.py").write_text(
+                raw["documents"]["src/source.py"]["text"], encoding="utf-8"
+            )
+        capture_file.write_text(json.dumps({"observations": [raw]}))
+        native = None
+        for format in FORMATS:
+            response = _cli(
+                root,
+                state,
+                "structural-locality",
+                "src/source.py::target",
+                "--result-mode",
+                "relationships",
+                "--supplied-observations",
+                str(capture_file),
+                "--presentation",
+                format,
+            )
+            native = _assert_hover_response(response, raw, format)
+        assert native is not None
+        saved = tmp_path / f"{name}.json"
+        saved.write_text(json.dumps(native))
+        endpoints.append(saved)
+    before, after = [json.loads(path.read_text()) for path in endpoints]
+    for format in FORMATS:
+        response = _cli(
+            root,
+            state,
+            "structural-locality-delta",
+            "--before",
+            str(endpoints[0]),
+            "--after",
+            str(endpoints[1]),
+            "--result-mode",
+            "relationships",
+            "--presentation",
+            format,
+        )
+        _assert_hover_delta(response, before, after, format)
+
+
+@pytest.mark.host_mcp_sdk
+def test_native_hover_mcp_stdio_formats_save_delta_and_request_locality(
+    tmp_path: Path, native_lsp_corpus: Path
+) -> None:
+    pytest.importorskip("mcp")
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
+
+    root, state = tmp_path / "repo", tmp_path / "state"
+    source = native_lsp_corpus / "python" / "hover"
+    materialize_scip(root, source)
+
+    async def exercise() -> None:
+        parameters = StdioServerParameters(
+            command=sys.executable,
+            args=[
+                "-m",
+                "hashmarks.mcp_server",
+                "--workspace",
+                str(root),
+                "--state-dir",
+                str(state),
+            ],
+        )
+        async with stdio_client(parameters) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                endpoints = []
+                for name in ("hover-string-token", "hover-buffer"):
+                    raw = lsp_capture(root, source, name)
+                    if name == "hover-buffer":
+                        (root / "src/source.py").write_text(
+                            raw["documents"]["src/source.py"]["text"], encoding="utf-8"
+                        )
+                    native = None
+                    for format in FORMATS:
+                        reply = await session.call_tool(
+                            "structural_locality",
+                            {
+                                "target": "src/source.py::target",
+                                "result_mode": "relationships",
+                                "supplied_observations": [raw],
+                                "presentation": format,
+                            },
+                        )
+                        assert reply.is_error is not True
+                        (text,) = [
+                            part.text for part in reply.content if part.type == "text"
+                        ]
+                        assert json.loads(text) == reply.structured_content
+                        native = _assert_hover_response(
+                            reply.structured_content, raw, format
+                        )
+                    assert native is not None
+                    endpoints.append(native)
+                for format in FORMATS:
+                    reply = await session.call_tool(
+                        "evidence_comparison",
+                        {
+                            "before": endpoints[0],
+                            "after": endpoints[1],
+                            "result_mode": "relationships",
+                            "presentation": format,
+                        },
+                    )
+                    assert reply.is_error is not True
+                    _assert_hover_delta(
+                        reply.structured_content, endpoints[0], endpoints[1], format
+                    )
+                reply = await session.call_tool(
+                    "structural_locality",
+                    {"target": "src/source.py::target", "result_mode": "relationships"},
+                )
+                assert reply.is_error is not True
+                assert reply.structured_content["observations"] == []
+
+    asyncio.run(exercise())
 
 
 def _copy_dependency_inputs(root: Path, source: Path) -> list[str]:

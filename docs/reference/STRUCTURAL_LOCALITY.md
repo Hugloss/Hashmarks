@@ -310,3 +310,59 @@ truth. `distinct_observed_claims` is not a contradiction or negative fact.
 Incomparable/partial observations and unresolved endpoints are accounted
 separately. The report is a request-local projection and does not form a new
 cross-provider graph or an execution policy.
+
+## H06: explicitly captured LSP hover (non-relationship evidence)
+
+The existing `structural_locality(..., result_mode="relationships",
+supplied_observations=[...])` method accepts the caller-supplied LSP
+`textDocument/hover` request/response pair under
+`hashmarks.lsp-relationship-capture.v1`. No LSP server is launched, no
+repository discovery is performed on behalf of the agent, and the existing
+fourteen MCP tools and operation defaults are unchanged.
+
+The capture supplies the same request ID, explicit file URI/cursor, producer,
+configuration, declared `hoverProvider` capability, collection state, source
+snapshot(s), revision and position encoding required by other direct LSP
+observations. Hover requests may also carry the optional `workDoneToken`, a
+string or signed 32-bit integer. The token is retained as request provenance;
+it adds no progress-tracking or execution responsibility. Hover does not admit
+`partialResultToken` or other extra request fields. The response may be:
+
+- an LSP `Hover` with `contents` (plain `MarkedString`, language/value
+  marked string, bounded list of marked strings, or `MarkupContent` with
+  `kind: plaintext|markdown`) and optional LSP `range`;
+- JSON-RPC `result: null`, recorded as `no-hover-returned`;
+- a captured JSON-RPC error, recorded as `producer-error`, but never as a
+  fresh complete response.
+
+The native observation retains `capability.hover_observation` with exactly
+the supplied bounded contents, optional protocol range and one of the states
+`hover-returned | no-hover-returned | producer-error`. Markdown and raw
+strings remain **untrusted producer text**; Hashmarks does not execute them,
+interpret their instructions, convert them into authoritative type/signature
+facts, or infer a source-level symbol relationship from the hover range.
+`semantic_correspondence: not-established`,
+`authority: caller-supplied-producer-claim` and
+`negative_evidence_admissible: false` are invariant.
+
+Hover creates **zero relationship claims**. A null, empty or error response
+does not prove a symbol has no documentation, type or references. The
+qualified cursor and source binding live in the existing observation scope
+and `source_bindings`: if the supplied document revision does not match the
+current admitted member, producer freshness remains unknown and text is never
+promoted into repository truth. The exact request/response bytes still
+participate in the caller-supplied capture identity.
+
+Admission rejects malformed JSON-RPC, mixed/extra hover fields, invalid LSP
+ranges, unsupported markup kinds, non-text values, unexpected nonempty partial
+result batches and oversized content before repository reads. Bounds are
+4,096 UTF-8 bytes per text block, eight marked strings and 8,192 UTF-8
+serialized bytes total per hover result, in addition to the existing capture
+and packet bounds. A user-supplied packet that rehashes maliciously altered
+hover authority or includes fabricated hover relationship edges is rejected
+by public packet validation.
+
+As with prepared call hierarchy, the hover observation is carried on an
+existing read-only evidence surface rather than emitted as an edge. Consumer
+routing, tool selection, model visibility, LSP lifecycle and verification
+remain external responsibilities.

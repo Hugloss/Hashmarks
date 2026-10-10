@@ -370,9 +370,36 @@ def _validate_producer_observation(observation: object, subject: str) -> None:
         raise ValueError("invalid relationship claim count")
     for claim in claims:
         _validate_claim(claim, producer)
+    _validate_hover_context(observation, claims)
     _validate_accounting(observation, len(claims))
     if observation.get("negative_evidence_admissible") is not False:
         raise ValueError("producer observation cannot prove negative evidence")
+
+
+def _validate_hover_context(
+    observation: Mapping[str, Any], claims: list[dict[str, Any]]
+) -> None:
+    capability = observation["capability"]
+    scope = observation["scope"]
+    if (
+        scope.get("method") == "textDocument/hover"
+        or capability.get("observed_operation") == "textDocument/hover"
+    ):
+        if (
+            scope.get("method") != "textDocument/hover"
+            or capability.get("observed_operation") != "textDocument/hover"
+            or claims
+        ):
+            raise ValueError("LSP hover cannot assert relationship edges")
+        # Imported at packet-validation time to avoid the source-resolver cycle.
+        from .lsp_hover_capture import validate_hover_observation
+
+        validate_hover_observation(
+            capability.get("hover_observation"),
+            response_error=capability.get("response_error"),
+        )
+    elif "hover_observation" in capability:
+        raise ValueError("non-hover relationship cannot carry hover evidence")
 
 
 def _validate_producer_context(observation: Mapping[str, Any], subject: str) -> None:

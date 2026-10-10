@@ -1,0 +1,61 @@
+[
+  {
+    "name": "hover-disk",
+    "method": "textDocument/hover",
+    "subject": "src/source.py::target",
+    "path": "src/source.py",
+    "position": {"line": 0, "character": 5}
+  },
+  {
+    "name": "hover-string-token",
+    "method": "textDocument/hover",
+    "subject": "src/source.py::target",
+    "path": "src/source.py",
+    "position": {"line": 0, "character": 5},
+    "workDoneToken": "hover:target"
+  },
+  {
+    "name": "hover-integer-token",
+    "method": "textDocument/hover",
+    "subject": "src/source.py::target",
+    "path": "src/source.py",
+    "position": {"line": 0, "character": 5},
+    "workDoneToken": 0
+  },
+  {
+    "name": "hover-null",
+    "method": "textDocument/hover",
+    "subject": "src/source.py::target",
+    "path": "src/source.py",
+    "position": {"line": 0, "character": 0}
+  },
+  {
+    "name": "references",
+    "method": "textDocument/references",
+    "subject": "src/source.py::target",
+    "path": "src/source.py",
+    "position": {"line": 0, "character": 5},
+    "includeDeclaration": true
+  },
+  {
+    "action": "change",
+    "path": "src/source.py",
+    "text": "def target(value: int) -> int:\n    \"\"\"Return café count.\"\"\"\n    return value + 1\n\n\ndef caller() -> int:\n    return target(1)\n"
+  },
+  {
+    "name": "hover-buffer",
+    "method": "textDocument/hover",
+    "subject": "src/source.py::target",
+    "path": "src/source.py",
+    "position": {"line": 0, "character": 5}
+  },
+  {"action": "close", "path": "src/source.py"},
+  {"action": "open", "path": "src/source.py"},
+  {
+    "name": "hover-reopened",
+    "method": "textDocument/hover",
+    "subject": "src/source.py::target",
+    "path": "src/source.py",
+    "position": {"line": 0, "character": 5}
+  }
+]

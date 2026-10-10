@@ -1,7 +1,6 @@
 # Post-#415 repository evidence checkpoint ledger
 
-**Baseline:** `main@f4c18cfb05891505cbf8b8377b729ff03cb9abca`,
-the merged #415 result. This is a follow-on to the historical single-PR
+**Original baseline:** merged #415 (`f4c18cfb05891505cbf8b8377b729ff03cb9abca`); follow-on work now builds on merged #416 (`c7a2b05986410c4e9ac8ceb6a4d4ed8c20d18f70`). This is a follow-on to the historical single-PR
 H01–H16 admission plan, not a claim that every conditional item in that
 historical plan shipped.
 
@@ -19,15 +18,27 @@ The additional handler capture is **opt-in** and uses the
 repository-declaration discovery. There is no new MCP tool, index, service,
 cache, LSP process or historical authority.
 
+## H06 follow-on checkpoint bundle
+
+| Checkpoint | Classification | Implementation / proof boundary |
+| --- | --- | --- |
+| H06a | EXTEND_EXISTING_OWNER | Explicit caller-supplied LSP `textDocument/hover` capture, existing source-binding and generation authority; zero relationship claims |
+| H06b | REGRESSION | Bounded modern/legacy hover forms, nullable/error states, strict unknown/dynamic semantics, malformed and oversized capture rejection |
+| H06c | REGRESSION | Rehashed packet forgery cannot assert relationship edges, trusted semantics or negative evidence from hover |
+| H06d | PRESENTATION/DOCS | Existing native/presentation parity, documentation and source-revision contract; no new MCP method or agent-harness behavior |
+
+H06 document-symbol captures remain conditional: their different request shape
+and scope cannot be forced into cursor-bound relationship queries without an
+explicit non-edge ownership plan.
+
 ## Open conditional checkpoints
 
 - **H04:** changed-line → symbol/relationship claims require a direct
   revision-bound source/range oracle and a demonstrated gap in existing
   repository delta/change-impact/structural-locality. No inferred impact.
-- **H06:** LSP hover/symbol captures require explicit protocol validation,
-  source equivalence, and an existing-owned non-edge observation form. The
-  current LSP relationship adapter must not turn hover or symbol lists into
-  semantic relationship edges.
+- **H06 remaining:** document-symbol or other LSP observations require exact
+  producer scopes and protocol validation; do not force symbol lists into the
+  hover/relationship edge owner.
 - **H09 (remaining):** a future explicit provider may attest normalized
   producer/consumer field correspondence; without attributable evidence no
   mismatch, breaking-change or absence judgment is admitted.
