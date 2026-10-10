@@ -42,6 +42,8 @@ the **frozen export encoding**: the exact string for `encoding-only`, or a
 canonical minified JSON representation of the complete
 `production-response` object. It is deterministically recomputed on
 summarization when present and cannot be altered without rejection.
+Only an absent field receives legacy treatment. A supplied null, boolean,
+non-integer, negative count, or mismatching count is rejected.
 
 When a caller supplies a host capture, its audit also records
 `model_visible_utf8_bytes` for the exact captured UTF-8 string alongside

@@ -105,7 +105,7 @@ def _payload(row: Mapping[str, Any]) -> dict[str, Any]:
     return {"relationships": value} if isinstance(value, list) else dict(value)
 
 
-def _snapshot(payload: Mapping[str, Any]) -> dict[str, Any]:
+def scip_source_snapshot(payload: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "revision": payload.get("producer_claimed_source_revision"),
         "revision_kind": payload.get("revision_kind", "member-bytes"),
@@ -113,6 +113,24 @@ def _snapshot(payload: Mapping[str, Any]) -> dict[str, Any]:
         "provenance": payload.get("source_provenance"),
         "observed_at_import": payload.get("source_revision_observation"),
     }
+
+
+def qualify_scip_reference_rows(
+    codemap: CodeMap, rows: Sequence[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Bind retained reference metadata through the existing source-equivalence owner."""
+    resolver = RelationshipSourceResolver(codemap)
+    qualified = []
+    for row in rows:
+        metadata = row.get("occurrence_metadata")
+        if metadata is None:
+            qualified.append(row)
+            continue
+        payload = dict(metadata)
+        snapshot = payload.pop("source_snapshot", {})
+        payload["source_binding"] = resolver.binding(row["path"], snapshot)
+        qualified.append({**row, "occurrence_metadata": payload})
+    return qualified
 
 
 def _symbol_key(producer: str, symbol: str, path: str) -> dict[str, Any]:
@@ -131,7 +149,7 @@ def _source_endpoint(
     path = row["path"]
     locator = payload.get("locator")
     resolution = resolver.candidates(
-        path, locator, _snapshot(payload), name=row["display_name"]
+        path, locator, scip_source_snapshot(payload), name=row["display_name"]
     )
     return {
         "key": _symbol_key(row["producer"], row["symbol"], path),
@@ -145,7 +163,7 @@ def _source_endpoint(
         ),
         "provider_display_name": row["display_name"],
         "resolution": resolution,
-        "source_binding": resolver.binding(path, _snapshot(payload)),
+        "source_binding": resolver.binding(path, scip_source_snapshot(payload)),
     }
 
 
@@ -292,7 +310,7 @@ def _producer_observation(
             content_identity(binding): binding
             for binding in [
                 *(
-                    resolver.binding(row["path"], _snapshot(_payload(row)))
+                    resolver.binding(row["path"], scip_source_snapshot(_payload(row)))
                     for row in rows[:CLAIM_LIMIT]
                     if resolver.admitted(row["path"])
                 ),

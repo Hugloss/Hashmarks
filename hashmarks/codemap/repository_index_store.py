@@ -359,6 +359,7 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
               target_name TEXT NOT NULL,
               line INTEGER NOT NULL,
               producer TEXT NOT NULL,
+              occurrence_metadata_json TEXT,
               PRIMARY KEY(path,target_symbol,line,producer)
             );
             CREATE INDEX IF NOT EXISTS native_edge_target_idx ON native_edge(target_name);
@@ -546,6 +547,14 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
             "producer",
             "relationships_json",
             "relationships_truncated",
+        ) or self._column_names(self._db, "native_edge") != (
+            "path",
+            "source",
+            "target_symbol",
+            "target_name",
+            "line",
+            "producer",
+            "occurrence_metadata_json",
         ):
             return False
         if self._column_names(self._db, "edge") != (
@@ -1040,7 +1049,7 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                 ],
             )
             self._db.executemany(
-                "INSERT OR REPLACE INTO native_edge(path,source,target_symbol,target_name,line,producer) VALUES (?,?,?,?,?,?)",
+                "INSERT OR REPLACE INTO native_edge(path,source,target_symbol,target_name,line,producer,occurrence_metadata_json) VALUES (?,?,?,?,?,?,?)",
                 [
                     (
                         row["path"],
@@ -1049,6 +1058,13 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                         row["target_name"],
                         int(row["line"]),
                         producer,
+                        json.dumps(
+                            row["occurrence_metadata"],
+                            sort_keys=True,
+                            separators=(",", ":"),
+                        )
+                        if row.get("occurrence_metadata") is not None
+                        else None,
                     )
                     for row in edges
                 ],
@@ -1153,7 +1169,16 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                 "SELECT * FROM native_edge WHERE lower(target_name) LIKE ? OR lower(target_symbol) LIKE ? ORDER BY path,line LIMIT ?",
                 (q, q, limit),
             ).fetchall()
-        return [dict(row) for row in rows]
+        return [self._native_reference_value(row) for row in rows]
+
+    @staticmethod
+    def _native_reference_value(row: sqlite3.Row) -> dict:
+        value = dict(row)
+        metadata = value.pop("occurrence_metadata_json")
+        value["occurrence_metadata"] = (
+            json.loads(metadata) if metadata is not None else None
+        )
+        return value
 
     def native_edges_from(
         self, path: str, source: str | None = None, limit: int = 200
@@ -1169,7 +1194,7 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                     "SELECT * FROM native_edge WHERE path=? AND source=? ORDER BY line LIMIT ?",
                     (path, source, limit),
                 ).fetchall()
-        return [dict(row) for row in rows]
+        return [self._native_reference_value(row) for row in rows]
 
     def replace_project_graph(self, producer: str, nodes, edges) -> None:
         def replace_locked() -> None:

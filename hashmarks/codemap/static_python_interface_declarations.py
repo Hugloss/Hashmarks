@@ -68,6 +68,15 @@ def _observed_decorator(
     else:
         return None
     state, literal = _explicit_literal(argument)
+    if (
+        argument is None
+        and call is not None
+        and (
+            any(keyword.arg is None for keyword in call.keywords)
+            or (kind == "mcp-tool-decorator" and call.args)
+        )
+    ):
+        state = "dynamic-or-unsupported"
     return {
         "kind": kind,
         "object_name": obj,

@@ -21,9 +21,13 @@ from native_evidence_support import (
 
 from hashmarks.codemap import CodeMap
 from hashmarks.evidence_presentation import FORMATS
+from scripts.agent_evaluation.agent_evidence_format_study import (
+    emit_trials,
+    summarize_grades,
+)
 
 
-def _cli(root: Path, state: Path, *command: str) -> Any:
+def _cli_stdout(root: Path, state: Path, *command: str) -> bytes:
     result = subprocess.run(
         [
             sys.executable,
@@ -36,13 +40,26 @@ def _cli(root: Path, state: Path, *command: str) -> Any:
             *command,
         ],
         cwd=Path(__file__).parents[1],
-        env={**os.environ, "HASHMARKS_NO_UPDATE_CHECK": "1"},
+        env={**os.environ, "HASHMARKS_NO_UPDATE_CHECK": "1", "PYTHONUTF8": "1"},
         capture_output=True,
-        text=True,
         check=False,
     )
     assert result.returncode == 0, result.stderr
-    return json.loads(result.stdout)
+    return result.stdout
+
+
+def _cli(root: Path, state: Path, *command: str) -> Any:
+    return json.loads(_cli_stdout(root, state, *command))
+
+
+def _transport_capture(trial: Any, text: str) -> dict[str, Any]:
+    return {
+        "case_id": trial["case_id"],
+        "model": "transport-fixture",
+        "variant": trial["variant"],
+        "trial_identity": trial["trial_identity"],
+        "model_visible_response": text,
+    }
 
 
 def test_native_scip_cli_change_roundtrips_exact_packets(
@@ -92,6 +109,127 @@ def test_native_scip_cli_change_roundtrips_exact_packets(
     assert len(delta["producer_deltas"][0]["facts"]["removed"]) == 1
     assert "- qualified producer claim:" in response["presentation"]["text"]
     assert response["presentation"]["text"].startswith("Subject:")
+
+
+def test_native_scip_cli_refs_preserve_each_same_line_occurrence(
+    tmp_path: Path,
+    native_scip_corpus: Path,
+) -> None:
+    root, state = tmp_path / "repo", tmp_path / "state"
+    source = native_scip_corpus / "python" / "metadata-before"
+    materialize_scip(root, source)
+    _cli(root, state, "map", "sync")
+    _cli(
+        root,
+        state,
+        "map",
+        "import-scip",
+        str(source / "index.json"),
+        "--provenance",
+        str(source / "provenance.json"),
+    )
+    (reference,) = _cli(root, state, "refs", "value")["native_references"]
+    metadata = reference["occurrence_metadata"]
+    assert metadata["received"] == metadata["retained"] == 2
+    assert [
+        row["occurrence_roles"]["producer_role_bits"] for row in metadata["occurrences"]
+    ] == [8, 8]
+    assert [
+        row["locator"]["start"]["character"] for row in metadata["occurrences"]
+    ] == [11, 19]
+
+
+def test_real_cli_unicode_delta_has_independently_measured_export_and_host_bytes(
+    tmp_path: Path,
+) -> None:
+    root, state = tmp_path / "repo", tmp_path / "state"
+    root.mkdir()
+    source = root / "räknare.py"
+    source.write_text('def räkna():\n    return "före😀"\n', encoding="utf-8")
+    task = "Change räkna in räknare.py to return efter😀."
+    previous = tmp_path / "previous.json"
+    previous.write_bytes(_cli_stdout(root, state, "task-evidence", task))
+    source.write_text('def räkna():\n    return "efter😀"\n', encoding="utf-8")
+    stdout = _cli_stdout(
+        root,
+        state,
+        "post-change",
+        task,
+        "--changed",
+        "räknare.py",
+        "--previous-evidence",
+        str(previous),
+    )
+    packet = json.loads(stdout)
+    manifest = {
+        "cases": [
+            {
+                "id": "unicode-source-edit",
+                "prompt": task,
+                "operation": "post_change",
+                "result_mode": "default",
+                "packet": packet,
+            }
+        ]
+    }
+    trials = emit_trials(manifest)
+    capture = _transport_capture(trials[0], stdout.decode("utf-8"))
+    report: Any = summarize_grades(
+        [], trials=trials, models=["transport-fixture"], captures=[capture]
+    )
+    (measurement,) = report["capture_audit"]["capture_digests"]
+    expected_export = json.dumps(
+        packet, sort_keys=True, ensure_ascii=False, separators=(",", ":")
+    ).encode("utf-8")
+    assert b"r\xc3\xa4knare.py" in expected_export
+    assert stdout.endswith(b"\n")
+    assert measurement["model_visible_utf8_bytes"] == len(stdout)
+    assert measurement["exported_response_utf8_bytes"] == len(expected_export)
+    assert measurement["content_equivalent"] is True
+    assert report["capture_audit"]["host_authenticity_proven"] is False
+    assert report["complete_pairs"] == 0
+    _assert_consumer_encodings(packet, trials, expected_export)
+    _assert_study_encodings(manifest)
+
+
+def _assert_consumer_encodings(
+    packet: Any, trials: Any, expected_export: bytes
+) -> None:
+    for escaped in (False, True):
+        text = json.dumps(packet, ensure_ascii=escaped, indent=2) + "\n"
+        encoded_capture = _transport_capture(trials[0], text)
+        encoded_report: Any = summarize_grades(
+            [], trials=trials, models=["transport-fixture"], captures=[encoded_capture]
+        )
+        (observed,) = encoded_report["capture_audit"]["capture_digests"]
+        assert observed["model_visible_utf8_bytes"] == len(text.encode("utf-8"))
+        assert observed["content_equivalent"] is True
+        assert observed["exported_response_utf8_bytes"] == len(expected_export)
+    changed_capture = _transport_capture(
+        trials[0], json.dumps({**packet, "schema": "altered-schema"})
+    )
+    altered: Any = summarize_grades(
+        [], trials=trials, models=["transport-fixture"], captures=[changed_capture]
+    )
+    assert altered["capture_audit"]["content_equivalent_captures"] == 0
+    missing: Any = summarize_grades(
+        [], trials=trials, models=["transport-fixture"], captures=[]
+    )
+    assert missing["capture_audit"]["observed_captures"] == 0
+
+
+def _assert_study_encodings(manifest: Any) -> None:
+    for axis in ("production-response", "encoding-only"):
+        for trial in emit_trials(manifest, axis=axis):
+            response = trial["tool_response"]
+            frozen = (
+                response
+                if isinstance(response, str)
+                else json.dumps(
+                    response, sort_keys=True, ensure_ascii=False, separators=(",", ":")
+                )
+            )
+            assert trial["exported_response_utf8_bytes"] == len(frozen.encode("utf-8"))
 
 
 def test_native_python_cli_post_change_does_not_replay_index(
@@ -319,5 +457,100 @@ def test_native_mcp_stdio_lsp_and_dependency_comparison_keep_semantic_facts(
                             if group["family"] == "dependency"
                         )
                         assert group["findings"][1]["details"] == transition
+
+    asyncio.run(exercise())
+
+
+@pytest.mark.host_mcp_sdk
+def test_real_mcp_unicode_delta_text_content_matches_frozen_format_trials(
+    tmp_path: Path,
+) -> None:
+    pytest.importorskip("mcp")
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
+
+    from hashmarks.codemap.repository_intelligence_query import (
+        RepositoryIntelligenceQueryOptions,
+    )
+
+    root, state = tmp_path / "repo", tmp_path / "state"
+    root.mkdir()
+    source = root / "räknare.py"
+    source.write_text('def räkna():\n    return "före😀"\n', encoding="utf-8")
+    task = "Change räkna in räknare.py to return efter😀."
+    with CodeMap(root, state_dir=state) as cm:
+        cm.sync()
+        before = cm.repository_intelligence_snapshot(task, ["räknare.py"])
+        source.write_text('def räkna():\n    return "efter😀"\n', encoding="utf-8")
+        cm.sync(["räknare.py"])
+        packet = cm.repository_intelligence_query(
+            "delta",
+            task,
+            ["räknare.py"],
+            options=RepositoryIntelligenceQueryOptions(previous_snapshot=before),
+        )
+    trials = emit_trials(
+        {
+            "cases": [
+                {
+                    "id": "unicode-native-delta",
+                    "prompt": task,
+                    "operation": "repository_intelligence_query",
+                    "result_mode": "default",
+                    "packet": packet,
+                }
+            ]
+        }
+    )
+
+    async def exercise() -> None:
+        parameters = StdioServerParameters(
+            command=sys.executable,
+            args=[
+                "-m",
+                "hashmarks.mcp_server",
+                "--workspace",
+                str(root),
+                "--state-dir",
+                str(state),
+            ],
+        )
+        captures = []
+        async with stdio_client(parameters) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                for trial, format in zip(trials, FORMATS, strict=True):
+                    reply = await session.call_tool(
+                        "repository_intelligence_query",
+                        {
+                            "surface_name": "delta",
+                            "task": task,
+                            "changed_paths": ["räknare.py"],
+                            "previous_snapshot": before,
+                            "presentation": format,
+                        },
+                    )
+                    assert reply.is_error is not True
+                    assert reply.structured_content == trial["tool_response"]
+                    (text,) = [
+                        part.text for part in reply.content if part.type == "text"
+                    ]
+                    assert json.loads(text) == trial["tool_response"]
+                    captures.append(_transport_capture(trial, text))
+        report: Any = summarize_grades(
+            [], trials=trials, models=["transport-fixture"], captures=captures
+        )
+        assert report["capture_audit"]["content_equivalent_captures"] == 4
+        assert (
+            report["capture_audit"]["authority"]
+            == "consumer-supplied-capture-content-only"
+        )
+        assert report["capture_audit"]["host_authenticity_proven"] is False
+        for capture, measurement in zip(
+            captures, report["capture_audit"]["capture_digests"], strict=True
+        ):
+            assert measurement["model_visible_utf8_bytes"] == len(
+                capture["model_visible_response"].encode("utf-8")
+            )
 
     asyncio.run(exercise())

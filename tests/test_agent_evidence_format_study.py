@@ -471,3 +471,37 @@ def test_forged_exported_byte_measurement_rejected() -> None:
     corrupted[0]["exported_response_utf8_bytes"] += 1
     with pytest.raises(ValueError, match="byte size mismatch"):
         summarize_grades(_grades(corrupted), trials=corrupted, models=["model-x"])
+
+
+@pytest.mark.parametrize("invalid", [None, True, False, 1.0, -1, "12"])
+def test_supplied_byte_counts_are_checked_even_when_null(invalid: object) -> None:
+    trials = emit_trials(_manifest())
+    trials[0]["exported_response_utf8_bytes"] = invalid
+    with pytest.raises(ValueError, match="byte size mismatch"):
+        summarize_grades(_grades(trials), trials=trials, models=["model-x"])
+
+
+def test_legacy_omitted_byte_count_remains_accepted() -> None:
+    trials = emit_trials(_manifest())
+    for trial in trials:
+        trial.pop("exported_response_utf8_bytes")
+    assert (
+        summarize_grades(_grades(trials), trials=trials, models=["model-x"])[
+            "complete_pairs"
+        ]
+        == 1
+    )
+
+
+@pytest.mark.parametrize(
+    ("response", "expected"),
+    [
+        ("räkna😀\n", b"r\xc3\xa4kna\xf0\x9f\x98\x80\n"),
+        ({"message": "räkna😀"}, b'{"message":"r\xc3\xa4kna\xf0\x9f\x98\x80"}'),
+        ({"message": 'line\n"quote"'}, b'{"message":"line\\n\\"quote\\""}'),
+    ],
+)
+def test_exported_size_matches_literal_utf8_bytes(
+    response: object, expected: bytes
+) -> None:
+    assert exported_response_utf8_bytes(response) == len(expected)

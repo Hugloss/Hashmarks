@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
-from hashmarks import CodeMap
+from hashmarks.codemap import CodeMap
+from hashmarks.codemap.repository_declaration_provider import (
+    RepositoryDeclarationProviderError,
+)
 from hashmarks.codemap.static_python_interface_declarations import (
     StaticPythonInterfaceDeclarations,
 )
@@ -130,7 +134,7 @@ def test_replay_is_deterministic_and_source_mutation_changes_observation(
         assert original["observation_identity"] == replay["observation_identity"]
         source.write_text('@app.get("/v2")\ndef handler():\n    pass\n')
         cm.sync(["service.py"])
-        newer = cm.discover_repository_declarations(
+        newer: Any = cm.discover_repository_declarations(
             [provider], previous_observation=original
         )
     assert newer["observation_identity"] != original["observation_identity"]
@@ -140,3 +144,187 @@ def test_replay_is_deterministic_and_source_mutation_changes_observation(
         ]
         == "/v2"
     )
+
+
+@pytest.mark.parametrize(
+    ("decorator", "state", "literal"),
+    [
+        ("@router.get(**route_options)", "dynamic-or-unsupported", None),
+        ("@mcp.tool(**tool_options)", "dynamic-or-unsupported", None),
+        ('@mcp.tool("positional_name")', "dynamic-or-unsupported", None),
+        ("@mcp.tool(*tool_arguments)", "dynamic-or-unsupported", None),
+        ("@router.get(*route_arguments)", "dynamic-or-unsupported", None),
+        ('@router.get(path="/explicit", **options)', "literal", "/explicit"),
+        ('@mcp.tool(name="explicit", **options)', "literal", "explicit"),
+        ("@mcp.tool()", "not-supplied", None),
+        ("@mcp.tool", "not-supplied", None),
+    ],
+)
+def test_expanded_and_unsupported_arguments_preserve_syntactic_uncertainty(
+    tmp_path: Path,
+    decorator: str,
+    state: str,
+    literal: str | None,
+) -> None:
+    (tmp_path / "service.py").write_text(
+        f"{decorator}\nasync def lookup():\n    return []\n"
+    )
+    packet = _observe(tmp_path)
+    (group,) = packet["declarations"]["groups"]
+    value = group["declarations"][0]["value"]
+    assert value["argument_state"] == state
+    assert value["literal_argument"] == literal
+    assert group["coverage"]["state"] == "incomplete"
+    assert group["correspondence"]["state"] == "unresolved"
+    assert group["absence"]["state"] == "unknown"
+
+
+def _interface_values(packet: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        group["declarations"][0]["value"] for group in packet["declarations"]["groups"]
+    ]
+
+
+def test_multifile_interfaces_edit_rename_delete_and_reopen_without_replay(
+    tmp_path: Path,
+) -> None:
+    root, state = tmp_path / "repo", tmp_path / "state"
+    root.mkdir()
+    api = root / "api.py"
+    api.write_text(
+        'raise RuntimeError("source must never execute")\n'
+        '@router.get(\n    path="/räknare"\n)\n'
+        '@router.post("/räknare")\n'
+        "async def counters():\n    return []\n",
+        encoding="utf-8",
+    )
+    (root / "tools.py").write_text(
+        '@mcp.tool(name="lookup_counters")\ndef lookup():\n    return []\n'
+    )
+    provider = StaticPythonInterfaceDeclarations(paths=("api.py", "tools.py"))
+    with CodeMap(root, state_dir=state) as cm:
+        cm.sync()
+        before: Any = cm.discover_repository_declarations([provider])
+        assert len(_interface_values(before)) == 3
+        assert {row["literal_argument"] for row in _interface_values(before)} == {
+            "/räknare",
+            "lookup_counters",
+        }
+        binding_id = before["declarations"]["groups"][0]["declarations"][0][
+            "binding_id"
+        ]
+        binding = next(
+            row
+            for row in before["declarations"]["repository_evidence"]["bindings"]
+            if row["binding_id"] == binding_id
+        )
+        evidence = binding["evidence"][0]
+        assert evidence["start_line"] == 2
+        assert evidence["end_line"] == 6
+        api.write_text(api.read_text().replace("/räknare", "/räknare/v2"))
+        with pytest.raises(
+            RepositoryDeclarationProviderError, match="input changed while reading"
+        ):
+            cm.discover_repository_declarations([provider], previous_observation=before)
+        cm.sync(["api.py"])
+        changed: Any = cm.discover_repository_declarations(
+            [provider], previous_observation=before
+        )
+        assert changed["observation_identity"] != before["observation_identity"]
+        assert {row["literal_argument"] for row in _interface_values(changed)} == {
+            "/räknare/v2",
+            "lookup_counters",
+        }
+        assert changed["delta_from_previous"]["declarations"]["changed_groups"]
+        api.rename(root / "routes.py")
+        cm.sync(["api.py", "routes.py"])
+        renamed: Any = cm.discover_repository_declarations(
+            [
+                StaticPythonInterfaceDeclarations(
+                    paths=("api.py", "routes.py", "tools.py")
+                )
+            ],
+            previous_observation=changed,
+        )
+        assert renamed["providers"][0]["provenance"]["missing_selected_paths"] == [
+            "api.py"
+        ]
+        assert len(_interface_values(renamed)) == 3
+    with CodeMap(root, state_dir=state) as cm:
+        tools: Any = cm.discover_repository_declarations(
+            [StaticPythonInterfaceDeclarations(paths=("tools.py",))],
+            previous_observation=renamed,
+        )
+        assert [row["literal_argument"] for row in _interface_values(tools)] == [
+            "lookup_counters"
+        ]
+        assert _interface_values(cm.discover_repository_declarations([])) == []
+        (root / "tools.py").unlink()
+        cm.sync(["tools.py"])
+        deleted: Any = cm.discover_repository_declarations(
+            [provider], previous_observation=tools
+        )
+        assert _interface_values(deleted) == []
+    with CodeMap(root, state_dir=state) as cm:
+        assert _interface_values(cm.discover_repository_declarations([provider])) == []
+
+
+def test_actual_nested_hashmarks_handlers_are_unsupported_not_missing_tools(
+    tmp_path: Path,
+) -> None:
+    import hashmarks.mcp_server as mcp_server
+
+    assert mcp_server.__file__ is not None
+    (tmp_path / "server.py").write_bytes(Path(mcp_server.__file__).read_bytes())
+    packet = _observe(tmp_path, paths=("server.py",))
+    assert packet["providers"][0]["state"] == "collected"
+    assert packet["declarations"]["groups"] == []
+    assert packet["authority"] == "repository-intelligence-only"
+
+
+def test_selected_denied_source_does_not_leak_decorator_literals(
+    tmp_path: Path,
+) -> None:
+    import json
+
+    (tmp_path / "service.py").write_text(
+        '@router.get("/private-route")\ndef hidden():\n    pass\n'
+    )
+    (tmp_path / "tools.py").write_text(
+        '@mcp.tool(name="public_tool")\ndef public():\n    pass\n'
+    )
+    (tmp_path / ".hashmarks-context.toml").write_text(
+        '[[rule]]\npattern = "service.py"\nvisibility = "deny"\n'
+    )
+    with pytest.raises(RepositoryDeclarationProviderError) as failure:
+        _observe(tmp_path, paths=("service.py", "tools.py"))
+    assert "/private-route" not in str(failure.value)
+    packet = _observe(tmp_path, paths=("tools.py",))
+    assert [row["literal_argument"] for row in _interface_values(packet)] == [
+        "public_tool"
+    ]
+    assert "/private-route" not in json.dumps(packet)
+
+
+@pytest.mark.parametrize("boundary", ["groups", "source", "syntax"])
+def test_interface_input_bounds_and_invalid_syntax_fail_without_publishing(
+    tmp_path: Path,
+    boundary: str,
+) -> None:
+    source = {
+        "groups": "".join(
+            f'@router.get("/{index}")\ndef handler_{index}():\n    pass\n'
+            for index in range(129)
+        ),
+        "source": "#" + "x" * 262144,
+        "syntax": '@router.get("/broken")\ndef handler(:\n',
+    }[boundary]
+    (tmp_path / "service.py").write_text(source)
+    with CodeMap(tmp_path) as cm:
+        cm.sync()
+        with pytest.raises(RepositoryDeclarationProviderError):
+            cm.discover_repository_declarations(
+                [StaticPythonInterfaceDeclarations(paths=("service.py",))]
+            )
+        packet: Any = cm.discover_repository_declarations([])
+        assert packet["declarations"]["groups"] == []

@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Any, cast
 from hashmarks.freshness import FRESHNESS_STATES, freshness_state
 from hashmarks.paths import normalize_relative_path
 
+from .scip_relationship_adapter import qualify_scip_reference_rows
+
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
@@ -321,22 +323,32 @@ class EvidenceFreshnessMixin:
     def _fresh_native_refs(self, query: str, *, limit: int = 200) -> list[dict]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        return [
-            row
-            for row in self.store.native_refs(query, limit=limit)
-            if self._evidence_fresh("scip", str(row.get("producer") or ""))[0]
-        ]
+        rows = self.store.native_refs(query, limit=limit)
+        for path in sorted({str(row["path"]) for row in rows}):
+            self._ensure_path_current(path)
+        return qualify_scip_reference_rows(
+            self,
+            [
+                row
+                for row in rows
+                if self._evidence_fresh("scip", str(row.get("producer") or ""))[0]
+            ],
+        )
 
     def _fresh_native_edges_from(
         self, path: str, source: str | None = None, *, limit: int = 200
     ) -> list[dict]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        return [
-            row
-            for row in self.store.native_edges_from(path, source, limit=limit)
-            if self._evidence_fresh("scip", str(row.get("producer") or ""))[0]
-        ]
+        self._ensure_path_current(path)
+        return qualify_scip_reference_rows(
+            self,
+            [
+                row
+                for row in self.store.native_edges_from(path, source, limit=limit)
+                if self._evidence_fresh("scip", str(row.get("producer") or ""))[0]
+            ],
+        )
 
     def _fresh_project_nodes(self) -> list[dict]:
         if TYPE_CHECKING:

@@ -1,0 +1,7 @@
+{
+  "collection_state": "fresh-complete",
+  "configuration_identity": "sha256:3c730a55a312108ca18312eef0f690e02a0868dee6a3f19ccbab97dc3234b712",
+  "source_revisions": {
+    "src/engine.py": "efbe74cb24e60b1ee7fb3f1d2a2cd5685be419c526074f35856101c62224ab7d"
+  }
+}

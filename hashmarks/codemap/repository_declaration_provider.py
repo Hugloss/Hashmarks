@@ -214,7 +214,10 @@ class _RepositoryDeclarationProviderContext:
 class RepositoryDeclarationProvider(Protocol):
     """Explicit read-only producer for repository declaration claims."""
 
-    name: str
+    @property
+    def name(self) -> str:
+        """Read the producer identifier without requiring mutation authority."""
+        ...
 
     def detect(self, context: RepositoryDeclarationProviderContext) -> bool:
         """Return whether this provider applies to the workspace."""

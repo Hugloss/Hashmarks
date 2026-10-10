@@ -34,6 +34,10 @@ Only a literal route string or a literal explicit tool-name argument is
 recorded as such. A dynamic argument remains
 `argument_state=dynamic-or-unsupported`. A bare tool decorator has
 `argument_state=not-supplied`; no default name is inferred.
+Keyword expansion (`**options`) and unsupported positional tool arguments also
+remain dynamic/unsupported when no supported explicit argument is observable.
+An explicit literal beside an expansion describes that syntax only, not the
+framework's eventual argument binding or registration.
 
 Each observation carries its exact source span, canonical bound member
 revision via existing repository evidence bindings, directly observed
@@ -77,6 +81,19 @@ Occurrence roles retain the original integer bitmask, direct named role flags,
 and unrecognized bits. They do not create new reference/implementation graph
 edges or prove reference-set completeness. Both fields stay inside the existing
 native producer observation and source-equivalence/freshness authority.
+
+Reference reads (`CodeMap.refs`, `CodeMap.deps`, and the corresponding CLI
+commands) expose additive `occurrence_metadata` on existing native rows.
+Different ranges or masks on the same symbol/line remain separate occurrences;
+they are not combined into one mask or extra graph edges. Each row retains a
+canonical ordering of at most 128 distinct occurrences and reports received,
+retained, duplicate, and omitted counts, plus truncation. Received equals
+retained plus duplicates plus omitted. Bounds never qualify negative evidence.
+The metadata's `source_binding` uses the existing producer-to-current-source
+correspondence owner: matching, different, and unknown remain distinct, including
+when an older index is imported again against changed source. Missing metadata
+is null, not evidence of zero role flags. Incompatible generated native caches
+are discarded through the existing cache schema rule and require reimport.
 
 ## Qualification
 

@@ -214,10 +214,11 @@ def _trial_key(trial: object) -> tuple[str, str, str]:
 
 
 def _validate_exported_size(trial: dict[str, Any]) -> None:
-    measured_size = trial.get("exported_response_utf8_bytes")
-    if measured_size is not None and (
-        type(measured_size) is not int
-        or measured_size != exported_response_utf8_bytes(trial["tool_response"])
+    if "exported_response_utf8_bytes" not in trial:
+        return
+    measured_size = trial["exported_response_utf8_bytes"]
+    if type(measured_size) is not int or measured_size != exported_response_utf8_bytes(
+        trial["tool_response"]
     ):
         raise ValueError("trial exported response byte size mismatch")
 
