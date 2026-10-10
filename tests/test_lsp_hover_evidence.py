@@ -139,7 +139,7 @@ def test_null_and_error_do_not_assert_symbol_absence(repo: Path) -> None:
         "id": 17, "jsonrpc": "2.0",
         "error": {"code": -32603, "message": "unavailable"},
     }
-    capture["collection_state"] = "partial"
+    capture["collection_state"] = "fresh-partial"
     error_row = _hover(_observed(repo, capture))
     hover = error_row["capability"]["hover_observation"]
     assert hover["state"] == "producer-error"
@@ -207,7 +207,7 @@ def test_denied_target_never_returns_private_hover(repo: Path) -> None:
     (repo / ".hashmarks-context.toml").write_text(
         '[[rule]]\npattern = "source.py"\nvisibility = "deny"\n'
     )
-    capture = _capture(repo, {"contents": "PRIVATE"} )
+    capture = _capture(repo, {"contents": "PRIVATE"})
     with pytest.raises((PermissionError, KeyError, ValueError)):
         _observed(repo, capture)
 
