@@ -125,7 +125,7 @@ def observe_changed_line_spans(
             limit=MAX_OVERLAPPING_SYMBOLS + 1,
         )
         # Reading outside the indexed source is not proof of its correspondence.
-        after, _ = codemap._repository_member_observation(path, include_bytes=False)
+        after, _ = codemap._repository_member_observation(path, include_bytes=True)
         if (
             after.get("state") != "known-present"
             or after.get("member_revision") != member.get("member_revision")
