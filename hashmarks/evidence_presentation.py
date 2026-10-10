@@ -687,8 +687,6 @@ def _source(
         ref,
         ctx,
         (
-            # Literal hits are more useful to an agent than a long member
-            # inventory; compact presentation must show hits before inventory.
             ("occurrences", "source", "records"),
             ("literal_observations", "qualification", "records"),
             ("line_anchors", "source", "records"),
@@ -1162,7 +1160,6 @@ def _task(
         )
         p.used.add(_pointer(retrieval_ref))
     # Preserve native ownership and verification records, but surface their
-    # distinct source pointers before the aggregate fields.
     _task_ownership(p, packet, ref, ctx)
     _task_verification(p, packet, ref, ctx)
     p.field(
