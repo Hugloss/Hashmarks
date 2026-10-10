@@ -439,9 +439,9 @@ def test_backend_decorator_call_arguments_preserve_dynamic_and_unpacking(
     with CodeMap(tmp_path) as cm:
         cm.sync()
         result = cm.task_change_impact(TASK, [PATH], options=_options(start=1, end=1))
-    ctx = result["changed_line_evidence"]["observations"][0][
-        "decorator_associations"
-    ]["associations"][0]["decorator_context"]
+    ctx = result["changed_line_evidence"]["observations"][0]["decorator_associations"][
+        "associations"
+    ][0]["decorator_context"]
     (site,) = ctx["observations"]
     assert site["callee_syntax"]["member_syntax"] == "get"
     assert site["arguments"]["first_positional_string"] == {
@@ -464,9 +464,7 @@ def test_backend_decorator_context_prioritizes_edited_under_bound(
     (tmp_path / PATH).write_text("\n".join(lines) + "\n", encoding="utf-8")
     with CodeMap(tmp_path) as cm:
         cm.sync()
-        result = cm.task_change_impact(
-            TASK, [PATH], options=_options(start=10, end=10)
-        )
+        result = cm.task_change_impact(TASK, [PATH], options=_options(start=10, end=10))
     context = result["changed_line_evidence"]["observations"][0][
         "decorator_associations"
     ]["associations"][0]["decorator_context"]
@@ -476,9 +474,7 @@ def test_backend_decorator_context_prioritizes_edited_under_bound(
     edited = [s for s in context["observations"] if s["intersects_reported_span"]]
     assert len(edited) == 1
     assert edited[0]["start_line"] == 10
-    assert edited[0]["arguments"]["first_positional_string"] == {
-        "state": "over-bound"
-    }
+    assert edited[0]["arguments"]["first_positional_string"] == {"state": "over-bound"}
     assert context["negative_evidence_admissible"] is False
 
 
@@ -487,9 +483,7 @@ def test_backend_decorator_context_does_not_expose_literals_in_outline(
 ) -> None:
     _repo(tmp_path)
     (tmp_path / PATH).write_text(
-        '@router.get("/secret-route")\n'
-        "def process_widget(value):\n"
-        "    return value\n",
+        '@router.get("/secret-route")\ndef process_widget(value):\n    return value\n',
         encoding="utf-8",
     )
     (tmp_path / ".hashmarks-context.toml").write_text(
