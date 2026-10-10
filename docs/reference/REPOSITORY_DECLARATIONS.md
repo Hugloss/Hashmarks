@@ -585,3 +585,49 @@ This contract does not:
 - expand repository analysis into external dependency source.
 
 Producer integrations should be admitted only when they expose a reusable repository-intelligence primitive or translate their native syntax into this producer-neutral contract.
+
+## Opt-in Python interface handler syntax (H09/H10)
+
+`StaticPythonInterfaceDeclarations(paths=(...), include_literal_shape_syntax=True)`
+extends the explicitly selected, source-bound Python decorator provider. The
+default is `False` and retains the previous native packet and identity.
+Only recognized top-level `@app.get(...)`, `@router.post(...)`, or
+`@mcp.tool(...)` declarations are considered. No code is evaluated.
+
+Each recognized handler retains its **own** decorator/route-scope declaration
+and can additionally expose `value.static_body_syntax`:
+
+- `literal_dictionary_returns`: source-ordered `return {"key": ...}`
+  syntax sites with literal string keys, or explicitly `unresolved-return`
+  for dynamic/non-literal expressions (including unpacking). Multiple return
+  statements remain independent; keys are not combined into a response schema.
+- `literal_subscript_accesses`: source-ordered `name["key"]` syntax with
+  the exact receiver identifier and string key. No receiver-to-response,
+  return-to-route, cross-function, or cross-file correspondence is inferred.
+- Each recorded site includes its physical start/end lines, and the canonical
+  repository-evidence binding covers those source spans. Private/unadmitted or
+  changed sources cannot supply facts; producer records use the existing
+  repository declarations generation/freshness and identity authority.
+
+A literal dictionary return is **not** a declared API response type. Framework
+serialization, conditional control flow, middleware, decorators, name binding,
+aliases, dynamic dispatch, consumer expectations, protocol compatibility, and
+runtime breakage are unknown. The explicit
+`runtime_response_shape: unknown`,
+`cross_artifact_correspondence: unresolved`, and `coverage: incomplete`
+must not be upgraded by any projection or agent. Even an empty syntax record
+never establishes the absence of keys, responses, consumers or routes.
+
+The opt-in scan is capped at sixteen return and sixteen subscript sites per
+selected handler, with at most 32 keys per literal dictionary. Larger or
+non-literal dictionaries remain unresolved rather than presenting a partial
+key set as a complete shape. Excessive handler sites reject the provider
+observation before publication. Nested functions, classes and lambdas are
+excluded from the outer handler scope. The existing 32-file, 128-group and
+262,144-character source bounds still apply.
+
+H09 is **direct source syntax evidence only**, not the provider-normalized
+response/consumer correspondence envisioned in the consolidated plan. H10's
+route-local association is only the existing explicitly observed decorator and
+handler syntax, not downstream API impact. Both remain deliberately
+conservative until a separate producer can furnish attributable correspondence.
