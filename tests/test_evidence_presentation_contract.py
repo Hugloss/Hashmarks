@@ -186,6 +186,11 @@ def native_packets(
                 "scope",
                 codemap.scoped_source_occurrences(paths, literal="widget"),
             ),
+            (
+                "source_observation",
+                "literals",
+                codemap.scoped_source_literals(paths, ["widget", "missing"]),
+            ),
             ("repository_evidence", "observation", binding),
             (
                 "repository_evidence",

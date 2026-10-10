@@ -253,6 +253,10 @@ This mode is registered as the canonical
   retains the observed count from successfully scanned members if coverage is
   incomplete. The aggregate count is a sum of per-literal occurrences and may
   count overlapping locations more than once by design.
+- Member and per-literal `returned_occurrence_count` values count only rows
+  retained in the final `occurrences` list after the shared display cap. Each
+  set of returned counts sums to that list's length; scanned match counts stay
+  independent of the display cap.
 - A per-literal zero can be `admissible-within-explicit-member-set` only if
   source coverage is complete and repository freshness is current. Denial,
   binary/invalid UTF-8, budget exhaustion, revision mismatch, stale generation

@@ -63,6 +63,7 @@ _EXPECTED = {
     "source_observation": {
         "member": "hashmarks.source-observation.v1",
         "scope": "hashmarks.scoped-source-occurrences.v1",
+        "literals": "hashmarks.scoped-source-literal-set.v1",
     },
     "repository_evidence": {
         "observation": "hashmarks.repository-evidence-bindings.v1",

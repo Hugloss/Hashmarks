@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, cast
@@ -132,7 +133,6 @@ class ScopedSourceLiteralsMixin:
         record.update(
             availability="observed",
             observed_match_counts=counts,
-            returned_occurrence_count=sum(len(rows) for rows in empty.values()),
         )
         return record, empty, len(raw)
 
@@ -231,6 +231,12 @@ class ScopedSourceLiteralsMixin:
         coverage = state.complete and generation == state.start_generation
         freshness = freshness_state(stale) if coverage else "stale"
         selected = state.selected_hits()
+        returned_by_path = Counter(cast("str", row["path"]) for row in selected)
+        for member in state.members:
+            if member["availability"] == "observed":
+                member["returned_occurrence_count"] = returned_by_path[
+                    cast("str", member["path"])
+                ]
         count = sum(state.counts.values())
         result: dict[str, object] = {
             "schema": operation_schema("source_observation", "literals"),

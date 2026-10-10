@@ -13,6 +13,7 @@ from typing import Any
 import pytest
 from native_evidence_support import (
     TASK,
+    assert_literal_returned_counts,
     dependency_capture,
     input_revisions,
     materialize_dependency,
@@ -457,6 +458,160 @@ def test_native_mcp_stdio_lsp_and_dependency_comparison_keep_semantic_facts(
                             if group["family"] == "dependency"
                         )
                         assert group["findings"][1]["details"] == transition
+
+    asyncio.run(exercise())
+
+
+async def _literal_wire_reply(session: Any, arguments: dict[str, Any]) -> Any:
+    reply = await session.call_tool("source_observation", arguments)
+    assert reply.is_error is not True
+    (text,) = [part.text for part in reply.content if part.type == "text"]
+    assert json.loads(text) == reply.structured_content
+    return reply.structured_content
+
+
+def _assert_literal_wire_schema(tool: Any) -> None:
+    properties = tool.input_schema["properties"]
+    assert len(properties) == 6
+    assert properties["result_mode"]["enum"] == ["member", "scope", "literals"]
+    assert {row["type"] for row in properties["literal"]["anyOf"]} == {
+        "string",
+        "array",
+        "null",
+    }
+    assert (
+        next(row for row in properties["literal"]["anyOf"] if row["type"] == "array")[
+            "items"
+        ]["type"]
+        == "string"
+    )
+    assert len(tool.description) < 220
+    assert "repository-wide absence" in tool.description
+
+
+def _assert_literal_wire_packet(response: Any, format: str) -> Any:
+    native = response if format == "none" else response["result"]
+    assert native["exact_match_count"] == 4
+    assert len(native["occurrences"]) == 2
+    assert native["truncation"] == "truncated"
+    assert_literal_returned_counts(native)
+    assert native["member_observations"][1]["returned_occurrence_count"] == 0
+    assert any(
+        "café" in line["text"]
+        for row in native["occurrences"]
+        for line in row["context_excerpt"]
+    )
+    if format != "none":
+        qualifications = next(
+            group
+            for group in response["presentation"]["groups"]
+            if group["family"] == "qualification"
+        )
+        assert [row["details"] for row in qualifications["findings"]] == (
+            native["literal_observations"]
+        )
+        assert [row["source_refs"] for row in qualifications["findings"]] == [
+            [f"/literal_observations/{index}"] for index in range(3)
+        ]
+    return native
+
+
+@pytest.mark.host_mcp_sdk
+def test_real_mcp_literal_set_wire_preserves_counts_context_and_edits(
+    tmp_path: Path,
+) -> None:
+    pytest.importorskip("mcp")
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
+
+    root, state = tmp_path / "repo", tmp_path / "state"
+    (root / "src").mkdir(parents=True)
+    (root / "tests").mkdir()
+    source = root / "src" / "archive.py"
+    source.write_text(
+        "# café archive\nfrom zipfile import ZipInfo, ZIP_DEFLATED\n"
+        "def archive():\n"
+        "    return ZipInfo('café.zip'), ZIP_DEFLATED\n",
+        encoding="utf-8",
+    )
+    (root / "tests" / "test_archive.py").write_text(
+        "from src.archive import archive\ndef test_archive():\n    assert archive()\n",
+        encoding="utf-8",
+    )
+    arguments = {
+        "paths": ["tests/test_archive.py", "src/archive.py"],
+        "literal": ["ZipInfo", "ZIP_DEFLATED", "missing"],
+        "result_mode": "literals",
+        "limit": 2,
+        "context_lines": 1,
+    }
+
+    async def exercise() -> None:
+        parameters = StdioServerParameters(
+            command=sys.executable,
+            args=[
+                "-m",
+                "hashmarks.mcp_server",
+                "--workspace",
+                str(root),
+                "--state-dir",
+                str(state),
+            ],
+            env={**os.environ, "PYTHONUTF8": "1"},
+        )
+        async with stdio_client(parameters) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                tools = await session.list_tools()
+                _assert_literal_wire_schema(
+                    next(
+                        tool
+                        for tool in tools.tools
+                        if tool.name == "source_observation"
+                    )
+                )
+                baseline = None
+                for format in FORMATS:
+                    response = await _literal_wire_reply(
+                        session, {**arguments, "presentation": format}
+                    )
+                    native = _assert_literal_wire_packet(response, format)
+                    if baseline is None:
+                        baseline = native
+                    assert native == baseline
+                assert baseline is not None
+                for invalid in (
+                    {"paths": ["src/archive.py"], "result_mode": "member"},
+                    {"result_mode": "scope"},
+                    {"literal": "ZipInfo"},
+                    {"literal": ["ZipInfo", "ZipInfo"]},
+                    {"literal": [f"term{index}" for index in range(9)]},
+                ):
+                    reply = await session.call_tool(
+                        "source_observation", {**arguments, **invalid}
+                    )
+                    assert reply.is_error is True
+                source.write_text(
+                    "def archive():\n    return 'café ZipInfo.zip'\n", encoding="utf-8"
+                )
+                edited = await _literal_wire_reply(session, arguments)
+                assert edited["exact_match_count"] == 1
+                assert edited["occurrences"][0]["occurrence_kind"] == "string-literal"
+                assert any(
+                    "café" in row["text"]
+                    for row in edited["occurrences"][0]["context_excerpt"]
+                )
+                assert (
+                    edited["occurrences"][0]["member_revision"]
+                    != baseline["occurrences"][0]["member_revision"]
+                )
+                assert_literal_returned_counts(edited)
+                source.rename(root / "src" / "moved.py")
+                missing = await _literal_wire_reply(session, arguments)
+                assert missing["source_coverage"] == "unknown"
+                assert missing["exact_match_count"] is None
+                assert missing["occurrences"] == []
+                assert missing["negative_evidence"] == "not-admissible"
 
     asyncio.run(exercise())
 

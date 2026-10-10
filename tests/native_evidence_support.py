@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import shutil
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +19,26 @@ CORPUS = Path(__file__).parent / "fixtures" / "dependency_dogfood"
 SCIP_CORPUS = Path(__file__).parent / "fixtures" / "native_scip"
 LSP_CORPUS = Path(__file__).parent / "fixtures" / "native_lsp"
 TASK = "Change normalize_widget in src/engine.py to lowercase the trimmed value and verify its semantics."
+
+
+def assert_literal_returned_counts(packet: Any) -> None:
+    """Every advertised returned count accounts for the emitted rows only."""
+    rows = packet["occurrences"]
+    members = [
+        row
+        for row in packet["member_observations"]
+        if row["availability"] == "observed"
+    ]
+    by_path = Counter(row["path"] for row in rows)
+    by_literal = Counter(row["literal"] for row in rows)
+    assert sum(row["returned_occurrence_count"] for row in members) == len(rows)
+    assert sum(
+        row["returned_occurrence_count"] for row in packet["literal_observations"]
+    ) == len(rows)
+    for row in members:
+        assert row["returned_occurrence_count"] == by_path[row["path"]]
+    for row in packet["literal_observations"]:
+        assert row["returned_occurrence_count"] == by_literal[row["literal"]]
 
 
 def _replace_inputs(root: Path, source: Path, paths: list[str]) -> list[str]:
