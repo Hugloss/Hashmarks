@@ -14,7 +14,9 @@ from hashmarks.codemap.scip_adapter import parse_scip_json
 from hashmarks.codemap.scip_relationship_adapter import scip_occurrence_payload
 
 
-def _index(*, roles: int = 9, documentation: object = None, supply_docs: bool = True) -> dict:
+def _index(
+    *, roles: int = 9, documentation: object = None, supply_docs: bool = True
+) -> dict:
     symbol = {
         "symbol": "scip-python python pkg 1.0 api/validate().",
         "displayName": "validate",
