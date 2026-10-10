@@ -138,6 +138,11 @@ def _source_endpoint(
         "locator": None if locator is None else {**locator, "path": path},
         "definition_observed": not payload.get("relationship_only", False),
         "declaration": payload.get("declaration"),
+        **(
+            {"occurrence_roles": payload["occurrence_roles"]}
+            if "occurrence_roles" in payload
+            else {}
+        ),
         "provider_display_name": row["display_name"],
         "resolution": resolution,
         "source_binding": resolver.binding(path, _snapshot(payload)),
