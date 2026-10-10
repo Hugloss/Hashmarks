@@ -24,7 +24,7 @@ from hashmarks.evidence_presentation_conformance import validate_evidence_presen
 @pytest.fixture
 def repo(tmp_path: Path) -> Path:
     (tmp_path / "source.py").write_text(
-        "def target():\\n    return 1\\n\\ndef caller():\\n    return target()\\n",
+        "def target():\n    return 1\n\ndef caller():\n    return target()\n",
         encoding="utf-8",
     )
     return tmp_path
@@ -195,7 +195,7 @@ def test_hover_rejects_partial_result_and_request_id_mismatch(repo: Path) -> Non
 def test_changed_snapshot_is_not_current_hover_semantic_evidence(repo: Path) -> None:
     capture = _capture(repo, {"contents": "original"})
     (repo / "source.py").write_text(
-        "def target():\\n    return 2\\n\\ndef caller():\\n    return target()\\n"
+        "def target():\n    return 2\n\ndef caller():\n    return target()\n"
     )
     row = _hover(_observed(repo, capture))
     assert row["freshness"] == "unknown"
@@ -205,7 +205,7 @@ def test_changed_snapshot_is_not_current_hover_semantic_evidence(repo: Path) -> 
 
 def test_denied_target_never_returns_private_hover(repo: Path) -> None:
     (repo / ".hashmarks-context.toml").write_text(
-        '[[rule]]\\npattern = "source.py"\\nvisibility = "deny"\\n'
+        '[[rule]]\npattern = "source.py"\nvisibility = "deny"\n'
     )
     capture = _capture(repo, {"contents": "PRIVATE"} )
     with pytest.raises((PermissionError, KeyError, ValueError)):
