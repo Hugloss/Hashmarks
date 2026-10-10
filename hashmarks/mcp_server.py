@@ -461,6 +461,7 @@ def build_server(
         task: str,
         changed_paths: list[str],
         max_depth: int = CHANGE_IMPACT_DEFAULT_REQUEST.options.max_depth,
+        changed_line_spans: list[dict[str, object]] | None = None,
         presentation: _Presentation = "none",
     ) -> dict[str, object]:
         return _call_surface(
@@ -470,6 +471,7 @@ def build_server(
             task,
             changed_paths,
             max_depth=max_depth,
+            changed_line_spans=changed_line_spans,
             presentation=presentation,
         )
 
