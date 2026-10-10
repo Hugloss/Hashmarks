@@ -72,6 +72,37 @@ coverage or evidence of a real edit. Ordinary symbol overlaps remain
 unchanged. No new index/schema/MCP tool/state owner, workflow, or source
 scanner is admitted; non-Python files retain their prior output.
 
+## Backend B07–B10: qualified decorator context (after #420)
+
+The B06 change-line association supplies an exact handler target for a directly
+overlapping decorator, but not the syntax of adjacent declarations on the
+same handler. A backend agent changing `@auth.required` could still need
+another exploratory source read to see that `@router.get(...)` is adjacent.
+This bundle adds direct syntax within the existing request-local B06 producer:
+
+- **B07 – direct callee:** attribute or name syntax of selected decorators,
+  with explicit `dynamic-or-unsupported` for chained/unknown expressions;
+  no framework/route registration classification.
+- **B08 – locality:** identify which decorator ranges overlap the caller's
+  changed span versus other syntactically adjacent decorators on that same
+  exact indexed declaration. Edited decorators take retention precedence,
+  then rows are rendered in source order.
+- **B09 – bounded literal argument facts:** preserve first positional string
+  and named `path`/`name` string syntax independently; expanded argument
+  syntax and unknown/over-bound string values cannot become route truth.
+  Up to six decorator observations per handler and 128 characters per
+  retained literal. Caller-supplied changed spans remain bounded by B03.
+- **B10 – evidence and privacy:** admit decorator call syntax only for the
+  canonical `source` visibility level; `outline` does not expose literal
+  arguments. Preserve the existing second member-revision read, truncation,
+  independent uncertainty, default change-impact output and exact
+  repository-intelligence-only product boundary.
+
+This is not a runtime API catalog, route resolver, or graph search. The
+original indexed symbol location is unchanged. The existing optional MCP
+`change_impact(changed_line_spans=...)` transports these observations;
+there is no new public tool or persistent schema.
+
 ## Open conditional checkpoints
 
 - **H04:** changed-line → symbol/relationship claims require a direct
