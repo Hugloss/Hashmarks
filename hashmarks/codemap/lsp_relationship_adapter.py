@@ -114,6 +114,30 @@ def _documents(value: object) -> dict[str, dict[str, Any]]:
     return result
 
 
+def _document_request_params(method: str, params: Mapping[str, Any]) -> None:
+    expected = {"textDocument", "position"}
+    if method == "textDocument/references":
+        if set(params) != expected | {"context"}:
+            raise ValueError("references require textDocument, position and context")
+        context = params["context"]
+        if (
+            not isinstance(context, Mapping)
+            or set(context) != {"includeDeclaration"}
+            or type(context["includeDeclaration"]) is not bool
+        ):
+            raise ValueError("references includeDeclaration must be a boolean")
+    elif set(params) != expected:
+        raise ValueError("LSP request requires textDocument and position")
+    document = params["textDocument"]
+    if (
+        not isinstance(document, Mapping)
+        or set(document) != {"uri"}
+        or not isinstance(document["uri"], str)
+    ):
+        raise ValueError("LSP request requires an explicit document URI")
+    validated_position(params["position"])
+
+
 def _request(value: object) -> dict[str, Any]:
     if (
         not isinstance(value, Mapping)
@@ -137,24 +161,9 @@ def _request(value: object) -> dict[str, Any]:
             raise ValueError("call hierarchy request requires exactly one item")
         _call_item(params["item"])
     else:
-        expected = {"textDocument", "position"}
-        if value["method"] == "textDocument/references":
-            if set(params) != expected | {"context"}:
-                raise ValueError("references require textDocument, position and context")
-            context = params["context"]
-            if not isinstance(context, Mapping) or set(context) != {"includeDeclaration"} or type(context["includeDeclaration"]) is not bool:
-                raise ValueError("references includeDeclaration must be a boolean")
-        elif set(params) != expected:
-            raise ValueError("LSP request requires textDocument and position")
-        document = params["textDocument"]
-        if (
-            not isinstance(document, Mapping)
-            or set(document) != {"uri"}
-            or not isinstance(document["uri"], str)
-        ):
-            raise ValueError("LSP request requires an explicit document URI")
-        validated_position(params["position"])
+        _document_request_params(value["method"], params)
     return dict(value)
+
 
 
 def _response(capture: Mapping[str, Any]) -> None:
