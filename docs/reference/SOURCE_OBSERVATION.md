@@ -222,7 +222,7 @@ term. Use the `source_observation` MCP tool with `result_mode="literals"`:
 ```json
 {
   "paths": ["src/archive.py", "tests/test_archive.py"],
-  "literals": ["ZipInfo", "ZIP_DEFLATED"],
+  "literal": ["ZipInfo", "ZIP_DEFLATED"],
   "result_mode": "literals",
   "limit": 20,
   "presentation": "compact"
