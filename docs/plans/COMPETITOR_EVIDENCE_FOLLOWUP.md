@@ -31,6 +31,22 @@ H06 document-symbol captures remain conditional: their different request shape
 and scope cannot be forced into cursor-bound relationship queries without an
 explicit non-edge ownership plan.
 
+## Backend B01–B05 bundle (H04 exact range closure)
+
+| Checkpoint | Decision | Authority |
+| --- | --- | --- |
+| B01 owner | Reuse | `task_evidence` + existing `change_impact.surfaces` |
+| B02 relationships | Reuse + exact locator | Current direct SCIP/LSP/structural evidence; overlap supplies exact query arguments, never graph edges |
+| B03 changed-line to symbol | Extend existing owner | Caller-reported range + source-revision-bound indexed symbol overlap, bounded and opt-in |
+| B04 verification | Reuse | Existing verification surfaces; no test coverage inferred from overlaps |
+| B05 after-change | Reuse | Existing `post_change` ownership/freshness/semantic invalidation/delta |
+| B01–B05 regressions | Add | No default drift, denied/stale/malformed/overflow fail-safe, MCP/CLI and presentation parity |
+
+No global graph, runtime execution, second source authority, new MCP tool,
+new search/indexer, history engine or agent workflow is admitted. A future
+more-precise line-level *edit* oracle must be producer-supplied with revision
+binding and separate qualification; reported spans alone prove no actual edit.
+
 ## Open conditional checkpoints
 
 - **H04:** changed-line → symbol/relationship claims require a direct
