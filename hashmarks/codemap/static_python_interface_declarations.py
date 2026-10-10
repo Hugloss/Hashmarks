@@ -176,7 +176,6 @@ def _declaration_group(
     observed: dict[str, object],
     *,
     provider: str,
-    body_syntax: dict[str, object] | None = None,
 ) -> dict[str, object]:
     group_id = f"{path}:{declaration.lineno}:{decorator.lineno}:{ordinal}"
     scope = {
@@ -184,6 +183,7 @@ def _declaration_group(
         "handler_syntax": declaration.name,
         "decorator_line": decorator.lineno,
     }
+    body_syntax = observed.get("static_body_syntax")
     extra_evidence: list[dict[str, object]] = []
     if body_syntax is not None:
         sites = [
@@ -214,11 +214,6 @@ def _declaration_group(
                 "value": {
                     **observed,
                     "handler_declared_name": declaration.name,
-                    **(
-                        {"static_body_syntax": body_syntax}
-                        if body_syntax is not None
-                        else {}
-                    ),
                     "handler_kind": (
                         "async"
                         if isinstance(declaration, ast.AsyncFunctionDef)
@@ -281,9 +276,15 @@ def _source_groups(
                     declaration,
                     decorator,
                     ordinal,
-                    observed,
+                    {
+                        **observed,
+                        **(
+                            {"static_body_syntax": body_syntax}
+                            if body_syntax is not None
+                            else {}
+                        ),
+                    },
                     provider=provider,
-                    body_syntax=body_syntax,
                 )
             )
             if len(groups) > _MAX_GROUPS:
