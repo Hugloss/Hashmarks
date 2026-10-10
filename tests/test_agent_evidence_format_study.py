@@ -456,9 +456,9 @@ def test_exported_sizes_and_captured_model_bytes_are_distinct_authorities() -> N
         assert row["model_visible_utf8_bytes"] == len(
             captured["model_visible_response"].encode("utf-8")
         )
-        assert row["exported_response_utf8_bytes"] == trial[
-            "exported_response_utf8_bytes"
-        ]
+        assert (
+            row["exported_response_utf8_bytes"] == trial["exported_response_utf8_bytes"]
+        )
         assert row["content_equivalent"] is True
     assert report["capture_audit"]["authority"] == (
         "consumer-supplied-capture-content-only"
