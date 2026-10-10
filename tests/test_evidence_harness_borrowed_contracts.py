@@ -218,10 +218,20 @@ def test_reacquisition_reference_is_scope_only_not_current_proof(repo: Path) -> 
     with CodeMap(repo) as cm:
         cm.sync()
         packet = cm.repository_evidence_bindings(
-            [{"binding_id": "consumer:source", "evidence": [
-                {"scope": "lines", "path": "source.py", "start_line": 1, "end_line": 2},
-                {"scope": "member", "path": "source.py"},
-            ]}],
+            [
+                {
+                    "binding_id": "consumer:source",
+                    "evidence": [
+                        {
+                            "scope": "lines",
+                            "path": "source.py",
+                            "start_line": 1,
+                            "end_line": 2,
+                        },
+                        {"scope": "member", "path": "source.py"},
+                    ],
+                }
+            ],
             include_relationships=False,
         )
     reference = describe_evidence_binding_reacquisition(
@@ -240,16 +250,19 @@ def _producer_claim(producer: str, *, matching: bool) -> dict:
             "key": {"repository_symbol": symbol},
             "source_binding": {"state": "matching" if matching else "different"},
         }
+
     return {
         "producer": producer,
         "capture_identity": producer + ":capture",
         "scope": {"subject": "source.py::target"},
         "configuration_identity": "config",
-        "claims": [{
-            "kind": "implementation",
-            "source": endpoint("source.py::caller"),
-            "target": endpoint("source.py::target"),
-        }],
+        "claims": [
+            {
+                "kind": "implementation",
+                "source": endpoint("source.py::caller"),
+                "target": endpoint("source.py::target"),
+            }
+        ],
         "collection_state": "fresh-complete",
         "freshness": "current",
         "truncated": False,
@@ -258,10 +271,12 @@ def _producer_claim(producer: str, *, matching: bool) -> dict:
 
 
 def test_cross_provider_agreement_is_only_claim_alignment() -> None:
-    result = producer_claim_correspondence([
-        _producer_claim("scip", matching=True),
-        _producer_claim("lsp", matching=True),
-    ])
+    result = producer_claim_correspondence(
+        [
+            _producer_claim("scip", matching=True),
+            _producer_claim("lsp", matching=True),
+        ]
+    )
     assert len(result["pairs"]) == 1
     assert result["pairs"][0]["aligned_claims"] == [
         ["implementation", "source.py::caller", "source.py::target"]
@@ -271,10 +286,12 @@ def test_cross_provider_agreement_is_only_claim_alignment() -> None:
 
 
 def test_stale_or_unbound_cross_provider_claims_are_not_compared() -> None:
-    result = producer_claim_correspondence([
-        _producer_claim("scip", matching=True),
-        _producer_claim("lsp", matching=False),
-    ])
+    result = producer_claim_correspondence(
+        [
+            _producer_claim("scip", matching=True),
+            _producer_claim("lsp", matching=False),
+        ]
+    )
     assert result["pairs"] == []
     assert result["incompatible_pairs"] == 1
     assert result["unresolved_claims"] == 1
