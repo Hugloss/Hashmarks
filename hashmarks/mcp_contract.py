@@ -218,7 +218,9 @@ MCP_TOOL_CONTRACTS = (
         "change_impact",
         (
             "Use after explicit changed paths exist for bounded structural impact and "
-            "verification relevance. For pre-edit evidence, use task_evidence."
+            "verification relevance; optional changed_line_spans provide current "
+            "source-revision-bound direct indexed symbol overlaps, never inferred impact. "
+            "For pre-edit evidence, use task_evidence."
         ),
         "change_impact",
     ),
