@@ -10,6 +10,7 @@ from hashmarks.codemap.repository_intelligence_query import repository_query_res
 from hashmarks.mcp_contract import mcp_projection_summary
 from scripts.agent_evaluation.agent_evidence_format_study import (
     emit_trials,
+    exported_response_utf8_bytes,
     summarize_grades,
     trial_identity,
 )
@@ -423,3 +424,50 @@ def test_legacy_trial_without_projection_keeps_unqualified_catalog_authority() -
         item["projection_equivalent"] is None
         for item in result["capture_audit"]["capture_digests"]
     )
+
+
+def test_exported_sizes_and_captured_model_bytes_are_distinct_authorities() -> None:
+    trials = emit_trials(_manifest())
+    for trial in trials:
+        expected = exported_response_utf8_bytes(trial["tool_response"])
+        assert trial["exported_response_utf8_bytes"] == expected
+        assert expected > 0
+
+    captures = []
+    for trial in trials:
+        visible = json.dumps(
+            trial["tool_response"], sort_keys=True, ensure_ascii=False, indent=2
+        )
+        captures.append(
+            {
+                "case_id": trial["case_id"],
+                "model": "model-x",
+                "variant": trial["variant"],
+                "trial_identity": trial["trial_identity"],
+                "model_visible_response": visible,
+            }
+        )
+    report = summarize_grades(
+        _grades(trials), trials=trials, models=["model-x"], captures=captures
+    )
+    rows = report["capture_audit"]["capture_digests"]
+    assert len(rows) == len(trials)
+    for trial, captured, row in zip(trials, captures, rows, strict=True):
+        assert row["model_visible_utf8_bytes"] == len(
+            captured["model_visible_response"].encode("utf-8")
+        )
+        assert row["exported_response_utf8_bytes"] == trial[
+            "exported_response_utf8_bytes"
+        ]
+        assert row["content_equivalent"] is True
+    assert report["capture_audit"]["authority"] == (
+        "consumer-supplied-capture-content-only"
+    )
+
+
+def test_forged_exported_byte_measurement_rejected() -> None:
+    trials = emit_trials(_manifest())
+    corrupted = copy.deepcopy(trials)
+    corrupted[0]["exported_response_utf8_bytes"] += 1
+    with pytest.raises(ValueError, match="byte size mismatch"):
+        summarize_grades(_grades(corrupted), trials=corrupted, models=["model-x"])
