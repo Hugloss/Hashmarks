@@ -317,7 +317,6 @@ def test_compact_source_hits_precede_member_inventory() -> None:
     )
 
 
-
 def test_literal_set_mcp_surface_preserves_modes_and_presentation(
     tmp_path: Path,
 ) -> None:
