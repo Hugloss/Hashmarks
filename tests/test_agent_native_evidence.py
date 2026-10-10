@@ -318,7 +318,9 @@ def test_compact_source_hits_precede_member_inventory() -> None:
 
 
 
-def test_literal_set_mcp_surface_preserves_modes_and_presentation(tmp_path: Path) -> None:
+def test_literal_set_mcp_surface_preserves_modes_and_presentation(
+    tmp_path: Path,
+) -> None:
     repo = _repo(tmp_path)
     (repo / "src" / "alpha.py").write_text(
         "def ZipInfo():\n    return ZIP_DEFLATED\n", encoding="utf-8"
@@ -338,7 +340,8 @@ def test_literal_set_mcp_surface_preserves_modes_and_presentation(tmp_path: Path
         groups = {group["family"]: group for group in presentation["groups"]}
         hits = groups["source"]["findings"]
         assert [row["details"]["literal"] for row in hits[:2]] == [
-            "ZIP_DEFLATED", "ZipInfo"
+            "ZIP_DEFLATED",
+            "ZipInfo",
         ]
         qualifications = groups["qualification"]["findings"]
         assert len(qualifications) == 3
