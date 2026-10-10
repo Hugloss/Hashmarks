@@ -105,10 +105,12 @@ def _decorator_context(
             "observations": [],
             "negative_evidence_admissible": False,
         }
+
     def intersects(node: ast.expr) -> bool:
-        return node.lineno <= span["end_line"] and (
-            node.end_lineno or node.lineno
-        ) >= span["start_line"]
+        return (
+            node.lineno <= span["end_line"]
+            and (node.end_lineno or node.lineno) >= span["start_line"]
+        )
 
     edited = [node for node in decorators if intersects(node)]
     adjacent = [node for node in decorators if not intersects(node)]
@@ -151,6 +153,7 @@ def _decorator_hits(
         if matched:
             hits.append((node.lineno, node.name, matched, node.decorator_list))
     return sorted(hits, key=lambda row: (row[2][0]["start_line"], row[0], row[1]))
+
 
 def _qualified_declaration(
     store: _SymbolRangeStore, path: str, line: int, name: str
@@ -198,7 +201,9 @@ def observe_python_decorator_associations(
 
     associations: list[dict[str, object]] = []
     unresolved = 0
-    for declaration_line, name, decorators, all_decorators in hits[:MAX_DECORATOR_ASSOCIATIONS]:
+    for declaration_line, name, decorators, all_decorators in hits[
+        :MAX_DECORATOR_ASSOCIATIONS
+    ]:
         row = _qualified_declaration(store, path, declaration_line, name)
         if row is None:
             unresolved += 1
