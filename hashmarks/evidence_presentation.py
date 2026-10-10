@@ -1159,7 +1159,6 @@ def _task(
             retrieval, "results", "retrieval_evidence", retrieval_ref, retrieval_context
         )
         p.used.add(_pointer(retrieval_ref))
-    # Preserve native ownership and verification records, but surface their
     _task_ownership(p, packet, ref, ctx)
     _task_verification(p, packet, ref, ctx)
     p.field(
