@@ -119,94 +119,108 @@ class ProducerRelationshipObservation:
         return {**deepcopy(value), "observation_identity": content_identity(value)}
 
 
-def _qualified_symbol(endpoint: Mapping[str, Any]) -> str | None:
-    """Return only an exact current CodeMap candidate, never name/line similarity."""
+def _resolved_candidate(endpoint: Mapping[str, Any]) -> str | None:
+    resolution = endpoint.get("resolution")
+    if not isinstance(resolution, Mapping) or resolution.get("state") != "unique-candidate":
+        return None
+    candidates = resolution.get("candidates")
+    if not isinstance(candidates, list) or len(candidates) != 1:
+        return None
+    candidate = candidates[0]
+    if not isinstance(candidate, Mapping):
+        return None
+    symbol = candidate.get("symbol_id")
+    if isinstance(symbol, str) and symbol:
+        return symbol
+    return _qualified_symbol(candidate)
+
+
+def _qualified_symbol(endpoint: object) -> str | None:
+    """Use only revision-matched exact repository candidates, never a name join."""
+    if not isinstance(endpoint, Mapping):
+        return None
     binding = endpoint.get("source_binding")
     if isinstance(binding, Mapping) and binding.get("state") != "matching":
         return None
-    resolution = endpoint.get("resolution")
-    if isinstance(resolution, Mapping) and resolution.get("state") == "unique-candidate":
-        candidates = resolution.get("candidates")
-        if isinstance(candidates, list) and len(candidates) == 1:
-            candidate = candidates[0]
-            if not isinstance(candidate, Mapping):
-                return None
-            symbol = candidate.get("symbol_id")
-            if isinstance(symbol, str) and symbol:
-                return symbol
-            nested = candidate.get("resolution")
-            if isinstance(nested, Mapping):
-                return _qualified_symbol(candidate)
+    symbol = _resolved_candidate(endpoint)
+    if symbol:
+        return symbol
     key = endpoint.get("key")
-    if isinstance(key, Mapping) and isinstance(key.get("repository_symbol"), str):
-        return str(key["repository_symbol"]) if isinstance(binding, Mapping) and binding.get("state") == "matching" else None
-    # The query subject is explicitly admitted by structural_locality; it is
-    # comparable only when its own captured document matches repository bytes.
-    if isinstance(key, Mapping) and isinstance(key.get("supplied_subject"), str):
-        return str(key["supplied_subject"]) if isinstance(binding, Mapping) and binding.get("state") == "matching" else None
+    if not isinstance(key, Mapping) or not isinstance(binding, Mapping):
+        return None
+    if binding.get("state") != "matching":
+        return None
+    for field in ("repository_symbol", "supplied_subject"):
+        value = key.get(field)
+        if isinstance(value, str) and value:
+            return value
     return None
+
+
+def _correspondence_row(observation: Mapping[str, Any]) -> dict[str, Any]:
+    keys: set[tuple[str, str, str]] = set()
+    unresolved = 0
+    for claim in observation.get("claims", []):
+        if not isinstance(claim, Mapping):
+            unresolved += 1
+            continue
+        source = _qualified_symbol(claim.get("source"))
+        target = _qualified_symbol(claim.get("target"))
+        if source is None or target is None:
+            unresolved += 1
+        else:
+            keys.add((str(claim["kind"]), source, target))
+    return {
+        "producer": observation["producer"],
+        "capture_identity": observation["capture_identity"],
+        "scope": observation["scope"],
+        "configuration_identity": observation["configuration_identity"],
+        "qualified_claims": sorted(keys),
+        "unresolved_claims": unresolved,
+        "complete": (
+            observation["collection_state"] == "fresh-complete"
+            and observation["freshness"] == "current"
+            and not observation["truncated"]
+            and observation["accounting"].get("denied_or_unadmitted", 0) == 0
+            and unresolved == 0
+        ),
+    }
+
+
+def _correspondence_pair(
+    left: Mapping[str, Any], right: Mapping[str, Any]
+) -> dict[str, Any]:
+    a = set(tuple(x) for x in left["qualified_claims"])
+    b = set(tuple(x) for x in right["qualified_claims"])
+    aligned = sorted(a & b)
+    distinct = sorted(a ^ b)
+    return {
+        "producers": [left["producer"], right["producer"]],
+        "captures": [left["capture_identity"], right["capture_identity"]],
+        "aligned_claims": [list(row) for row in aligned[:32]],
+        "distinct_observed_claims": [list(row) for row in distinct[:32]],
+        "aligned_omitted": max(0, len(aligned) - 32),
+        "distinct_omitted": max(0, len(distinct) - 32),
+        "semantic_authority": "direct-producer-claim-correspondence-only",
+        "absence_or_conflict_inferred": False,
+    }
 
 
 def producer_claim_correspondence(
     observations: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
-    """Bounded cross-producer *claim* correspondence, not a truth vote.
-
-    Producer capture and qualification stay independent. A missing claim never
-    becomes a contradiction or negative repository evidence.
-    """
-    rows: list[dict[str, Any]] = []
-    for observation in observations:
-        keys: set[tuple[str, str, str]] = set()
-        unresolved = 0
-        for claim in observation.get("claims", []):
-            if not isinstance(claim, Mapping):
-                unresolved += 1
-                continue
-            source = _qualified_symbol(claim.get("source", {}))
-            target = _qualified_symbol(claim.get("target", {}))
-            if source is None or target is None:
-                unresolved += 1
-            else:
-                keys.add((str(claim["kind"]), source, target))
-        rows.append({
-            "producer": observation["producer"],
-            "capture_identity": observation["capture_identity"],
-            "scope": observation["scope"],
-            "configuration_identity": observation["configuration_identity"],
-            "qualified_claims": sorted(keys),
-            "unresolved_claims": unresolved,
-            "complete": (
-                observation["collection_state"] == "fresh-complete"
-                and observation["freshness"] == "current"
-                and not observation["truncated"]
-                and observation["accounting"].get("denied_or_unadmitted", 0) == 0
-                and unresolved == 0
-            ),
-        })
+    """Describe qualified producer claim overlap without inferring truth or absence."""
+    rows = [_correspondence_row(row) for row in observations]
     comparable_pairs: list[dict[str, Any]] = []
     incompatible_pairs = 0
-    for i, left in enumerate(rows):
-        for right in rows[i + 1:]:
+    for index, left in enumerate(rows):
+        for right in rows[index + 1:]:
             if left["producer"] == right["producer"]:
                 continue
             if not left["complete"] or not right["complete"]:
                 incompatible_pairs += 1
                 continue
-            a = set(tuple(x) for x in left["qualified_claims"])
-            b = set(tuple(x) for x in right["qualified_claims"])
-            aligned = sorted(a & b)
-            distinct = sorted(a ^ b)
-            comparable_pairs.append({
-                "producers": [left["producer"], right["producer"]],
-                "captures": [left["capture_identity"], right["capture_identity"]],
-                "aligned_claims": [list(row) for row in aligned[:32]],
-                "distinct_observed_claims": [list(row) for row in distinct[:32]],
-                "aligned_omitted": max(0, len(aligned) - 32),
-                "distinct_omitted": max(0, len(distinct) - 32),
-                "semantic_authority": "direct-producer-claim-correspondence-only",
-                "absence_or_conflict_inferred": False,
-            })
+            comparable_pairs.append(_correspondence_pair(left, right))
     return {
         "schema": "hashmarks.semantic-relationship-correspondence.v1",
         "pairs": comparable_pairs[:32],
@@ -217,6 +231,7 @@ def producer_claim_correspondence(
         "authority": "descriptive-producer-claims-only",
         "execution_effect": "none",
     }
+
 
 
 def finish_observation(
@@ -320,13 +335,13 @@ def validate_relationship_observation(payload: Mapping[str, Any]) -> dict[str, A
         )
     _verify_identity(value, "evidence_identity")
     _validate_observation_context(value)
-    if value.get("producer_correspondence") != producer_claim_correspondence(value["observations"]):
-        raise ValueError("relationship cross-producer correspondence does not match claims")
     observations = value.get("observations")
     if not isinstance(observations, list) or len(observations) > OBSERVATION_LIMIT:
         raise ValueError("invalid relationship observation count")
     for observation in observations:
         _validate_producer_observation(observation, value["target"])
+    if value.get("producer_correspondence") != producer_claim_correspondence(value["observations"]):
+        raise ValueError("relationship cross-producer correspondence does not match claims")
     coverage = value.get("coverage")
     if not isinstance(coverage, Mapping) or coverage.get(
         "retained_observations"
