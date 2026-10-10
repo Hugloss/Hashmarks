@@ -103,6 +103,40 @@ original indexed symbol location is unchanged. The existing optional MCP
 `change_impact(changed_line_spans=...)` transports these observations;
 there is no new public tool or persistent schema.
 
+## Backend B11–B14: direct indexed handler body context (after #421)
+
+B06–B10 established an exact source/index association and bounded decorator
+call syntax for a caller-reported changed decorator. The existing selected
+`StaticPythonInterfaceDeclarations` producer already directly extracts
+literal dictionary-return sites and handler-local literal subscript accesses,
+but those facts are not in the changed-line packet. Repeated exploratory
+source reads are therefore still needed to inspect basic handler response and
+access syntax after a decorator edit.
+
+This bundle **reuses that exact handler-body extractor** (no second AST
+semantics owner) within the existing request-local decorator association:
+
+- **B11:** retain an exact, bounded indexed declaration signature and attach
+  the direct function-body syntax to the already-qualified indexed handler;
+  classes are explicitly not function-body evidence.
+- **B12:** distinguish independently ordered literal dictionary-return sites
+  from `unresolved-return` sites and handler-local `name["key"]` syntax;
+  nested scopes are not attributed to the outer handler. Up to eight sites
+  of each kind are retained with observed and omitted counts.
+- **B13:** every body observation remains incomplete direct static syntax,
+  with runtime response shape unknown, cross-artifact correspondence
+  unresolved, and negative evidence inadmissible. The shared extractor's
+  overflow causes a local unresolved body state, not a failed change-impact
+  operation or a false empty body.
+- **B14:** reuse CodeMap's source visibility and second stable revision read;
+  never show handler source values on outline/deny paths. Verify equality
+  with the opt-in declaration provider and exact current-source MCP replay
+  after an edit.
+
+No route runtime, typed API compatibility, consumer schema matching,
+verification selection, new public tool, durable state or semantic graph is
+introduced. No `changed_line_spans` means the old result is unchanged.
+
 ## Open conditional checkpoints
 
 - **H04:** changed-line → symbol/relationship claims require a direct
