@@ -108,7 +108,7 @@ Hashmarks exposes one local, read-only **stdio MCP server** with a focused repos
 | `repository_declarations` | cross-file/format declarations with exact evidence, ambiguity, qualified absence, and disagreement |
 | `post_change` | refreshed evidence and deltas after the caller changes files |
 | `repository_intelligence_query` | existing snapshot, profile, verification explanation, freshness and delta facets |
-| `source_observation` | exact revision-bound literal occurrences for explicit members or a bounded member set |
+| `source_observation` | exact revision-bound single or bounded multi-literal occurrences in explicit members |
 | `repository_evidence` | exact evidence bindings and caller-supplied changed-path coverage |
 | `repository_findings` | bounded repository import, cache and concurrency findings |
 | `structural_locality` | static calls, callers and related verifier paths for an exact symbol |
@@ -126,12 +126,14 @@ next-reads, verification relevance, and freshness. The optional `compact`,
 verifier records separately with exact JSON-pointer references to the native
 packet; the producer's evidence and authority do not change.
 
-Once the agent knows the paths, `source_observation` supports **one exact literal**
-per call over one member or up to 32 explicitly named members. It reports qualified
-line/column occurrences, revisions, completeness, and scoped negative evidence.
-For example, after localizing archive generation, observe the literal `ZipInfo`
-in the returned source and test paths rather than re-scanning those known files.
-It is not regex search and cannot establish repository-wide absence.
+Once the agent knows the paths, `source_observation` supports one exact literal
+(`member`/`scope` modes) or up to eight distinct literals together (`literals`
+mode) over up to 32 explicitly named members. The new mode reuses one stable,
+revision-checked source read per admitted member and returns separate literal counts
+and per-literal scoped negative-evidence qualifications. For example, after
+localizing archive generation, observe `ZipInfo` and `ZIP_DEFLATED` in the
+returned source and test paths rather than re-scanning those known files.
+These are case-sensitive literal searches, never regex or repository-wide absence.
 
 Use direct source reads when an exact file is already known or the actual code
 body matters. Source declarations such as Makefile targets can still require
