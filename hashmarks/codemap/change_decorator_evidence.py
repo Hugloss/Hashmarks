@@ -33,11 +33,111 @@ def _unresolved(reason: str) -> dict[str, object]:
     }
 
 
+MAX_HANDLER_DECORATOR_CONTEXT = 6
+MAX_DECORATOR_LITERAL_CHARS = 128
+
+
+def _literal_string(node: ast.expr | None) -> dict[str, object]:
+    if node is None:
+        return {"state": "not-supplied"}
+    if not isinstance(node, ast.Constant) or type(node.value) is not str:
+        return {"state": "dynamic-or-unsupported"}
+    if len(node.value) > MAX_DECORATOR_LITERAL_CHARS:
+        return {"state": "over-bound"}
+    return {"state": "literal", "value": node.value}
+
+
+def _keyword_string(call: ast.Call, key: str) -> dict[str, object]:
+    matches = [keyword.value for keyword in call.keywords if keyword.arg == key]
+    if len(matches) > 1:
+        return {"state": "ambiguous-duplicate-syntax"}
+    return _literal_string(matches[0] if matches else None)
+
+
+def _callee_syntax(node: ast.expr) -> dict[str, object]:
+    if isinstance(node, ast.Name):
+        return {"state": "simple-name", "name_syntax": node.id}
+    if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
+        return {
+            "state": "simple-member",
+            "receiver_syntax": node.value.id,
+            "member_syntax": node.attr,
+        }
+    return {"state": "dynamic-or-unsupported"}
+
+
+def _direct_decorator_syntax(
+    node: ast.expr, *, intersects_reported_span: bool
+) -> dict[str, object]:
+    call = node if isinstance(node, ast.Call) else None
+    target = call.func if call is not None else node
+    record: dict[str, object] = {
+        "start_line": node.lineno,
+        "end_line": node.end_lineno or node.lineno,
+        "intersects_reported_span": intersects_reported_span,
+        "form": "call" if call is not None else "bare",
+        "callee_syntax": _callee_syntax(target),
+    }
+    if call is not None:
+        record["arguments"] = {
+            "first_positional_string": _literal_string(
+                call.args[0] if call.args else None
+            ),
+            "path_keyword_string": _keyword_string(call, "path"),
+            "name_keyword_string": _keyword_string(call, "name"),
+            "has_argument_expansion": any(
+                isinstance(arg, ast.Starred) for arg in call.args
+            )
+            or any(keyword.arg is None for keyword in call.keywords),
+        }
+    return record
+
+
+def _decorator_context(
+    decorators: list[ast.expr],
+    span: Mapping[str, int],
+    *,
+    allow_source_syntax: bool,
+) -> dict[str, object]:
+    if not allow_source_syntax:
+        return {
+            "state": "source-visibility-required",
+            "observations": [],
+            "negative_evidence_admissible": False,
+        }
+
+    def intersects(node: ast.expr) -> bool:
+        return (
+            node.lineno <= span["end_line"]
+            and (node.end_lineno or node.lineno) >= span["start_line"]
+        )
+
+    edited = [node for node in decorators if intersects(node)]
+    adjacent = [node for node in decorators if not intersects(node)]
+    retained = sorted(
+        (edited + adjacent)[:MAX_HANDLER_DECORATOR_CONTEXT],
+        key=lambda node: (node.lineno, node.col_offset),
+    )
+    return {
+        "state": "bounded-current-python-ast-decorator-syntax",
+        "authority": "direct-static-syntax-only",
+        "runtime_registration": "not-asserted",
+        "declaration_decorator_count": len(decorators),
+        "retained_count": len(retained),
+        "omitted_count": len(decorators) - len(retained),
+        "observations": [
+            _direct_decorator_syntax(node, intersects_reported_span=intersects(node))
+            for node in retained
+        ],
+        "negative_evidence_admissible": False,
+    }
+
+
 def _decorator_hits(
     source: str, path: str, start_line: int, end_line: int
-) -> list[tuple[int, str, list[dict[str, int]]]]:
+) -> list[tuple[int, str, list[dict[str, int]], list[ast.expr]]]:
     tree = ast.parse(source, filename=path)
-    hits: list[tuple[int, str, list[dict[str, int]]]] = []
+    hits: list[tuple[int, str, list[dict[str, int]], list[ast.expr]]] = []
     for node in ast.walk(tree):
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             continue
@@ -51,7 +151,7 @@ def _decorator_hits(
             and (decorator.end_lineno or decorator.lineno) >= start_line
         ]
         if matched:
-            hits.append((node.lineno, node.name, matched))
+            hits.append((node.lineno, node.name, matched, node.decorator_list))
     return sorted(hits, key=lambda row: (row[2][0]["start_line"], row[0], row[1]))
 
 
@@ -80,6 +180,8 @@ def observe_python_decorator_associations(
     path: str,
     raw: bytes,
     span: Mapping[str, int],
+    *,
+    allow_source_syntax: bool = True,
 ) -> dict[str, object] | None:
     """Associate edited decorators with *current* indexed declarations only.
 
@@ -99,7 +201,9 @@ def observe_python_decorator_associations(
 
     associations: list[dict[str, object]] = []
     unresolved = 0
-    for declaration_line, name, decorators in hits[:MAX_DECORATOR_ASSOCIATIONS]:
+    for declaration_line, name, decorators, all_decorators in hits[
+        :MAX_DECORATOR_ASSOCIATIONS
+    ]:
         row = _qualified_declaration(store, path, declaration_line, name)
         if row is None:
             unresolved += 1
@@ -118,6 +222,9 @@ def observe_python_decorator_associations(
                     "end_line": row["end_line"],
                 },
                 "overlapping_decorator_ranges": decorators,
+                "decorator_context": _decorator_context(
+                    all_decorators, span, allow_source_syntax=allow_source_syntax
+                ),
                 "relationship_detail": {
                     "target": subject,
                     "result_mode": "relationships",

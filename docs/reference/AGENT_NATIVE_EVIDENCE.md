@@ -326,6 +326,27 @@ reachable, a test covers the code, or downstream behavior changed.
 Non-Python members do not gain this field. No new persistent parser state,
 relationship index, MCP tool or agent operation is introduced.
 
+### Changed backend decorator context (B07–B10)
+
+Within an exact B06 `decorator_associations.associations[]`, a
+`decorator_context` names the reported-span-intersecting decorators and a
+bounded set of adjacent decorators attached to that **same** declaration.
+Each observation keeps its own source range,
+`intersects_reported_span`, `form` and simple callee syntax; `arguments`
+can retain a directly written first positional string or `path`/`name`
+keyword string, plus unknown/over-bound and argument-expansion state.
+Neither a receiver named `router` nor a member named `get` proves
+framework identity, route registration, runtime behavior or a call edge.
+
+The context is **not** exposed on outline-only evidence: the state becomes
+`source-visibility-required` and its observation array is empty. At most
+six decorators per indexed declaration are retained, edited decorators
+taking priority under truncation. Omitted counts prevent absence claims.
+Changed-line and owner/verifier evidence are unchanged. Source revision
+binding and read-after-query race qualification remain with the existing
+changed-line observation; the presentation is a projection, not a separate
+freshness authority.
+
 ## Qualified endpoint comparisons
 
 The read-only `evidence_comparison` MCP tool transports two explicit,
