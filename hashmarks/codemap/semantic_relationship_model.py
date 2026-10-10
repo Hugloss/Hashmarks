@@ -121,7 +121,10 @@ class ProducerRelationshipObservation:
 
 def _resolved_candidate(endpoint: Mapping[str, Any]) -> str | None:
     resolution = endpoint.get("resolution")
-    if not isinstance(resolution, Mapping) or resolution.get("state") != "unique-candidate":
+    if (
+        not isinstance(resolution, Mapping)
+        or resolution.get("state") != "unique-candidate"
+    ):
         return None
     candidates = resolution.get("candidates")
     if not isinstance(candidates, list) or len(candidates) != 1:
@@ -216,7 +219,7 @@ def producer_claim_correspondence(
     comparable_pairs: list[dict[str, Any]] = []
     incompatible_pairs = 0
     for index, left in enumerate(rows):
-        for right in rows[index + 1:]:
+        for right in rows[index + 1 :]:
             if left["producer"] == right["producer"]:
                 continue
             if not left["complete"] or not right["complete"]:
@@ -233,7 +236,6 @@ def producer_claim_correspondence(
         "authority": "descriptive-producer-claims-only",
         "execution_effect": "none",
     }
-
 
 
 def finish_observation(
@@ -342,8 +344,12 @@ def validate_relationship_observation(payload: Mapping[str, Any]) -> dict[str, A
         raise ValueError("invalid relationship observation count")
     for observation in observations:
         _validate_producer_observation(observation, value["target"])
-    if value.get("producer_correspondence") != producer_claim_correspondence(value["observations"]):
-        raise ValueError("relationship cross-producer correspondence does not match claims")
+    if value.get("producer_correspondence") != producer_claim_correspondence(
+        value["observations"]
+    ):
+        raise ValueError(
+            "relationship cross-producer correspondence does not match claims"
+        )
     coverage = value.get("coverage")
     if not isinstance(coverage, Mapping) or coverage.get(
         "retained_observations"
