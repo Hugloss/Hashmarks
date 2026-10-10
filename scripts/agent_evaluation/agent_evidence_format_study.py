@@ -213,6 +213,15 @@ def _trial_key(trial: object) -> tuple[str, str, str]:
     return case, variant, axis
 
 
+def _validate_exported_size(trial: dict[str, Any]) -> None:
+    measured_size = trial.get("exported_response_utf8_bytes")
+    if measured_size is not None and (
+        type(measured_size) is not int
+        or measured_size != exported_response_utf8_bytes(trial["tool_response"])
+    ):
+        raise ValueError("trial exported response byte size mismatch")
+
+
 def _expected_trials(
     trials: list[dict[str, Any]], models: list[str]
 ) -> dict[str, set[str]]:
@@ -238,12 +247,7 @@ def _expected_trials(
             trial
         ):
             raise ValueError("trial identity mismatch")
-        measured_size = trial.get("exported_response_utf8_bytes")
-        if measured_size is not None and (
-            type(measured_size) is not int
-            or measured_size != exported_response_utf8_bytes(trial["tool_response"])
-        ):
-            raise ValueError("trial exported response byte size mismatch")
+        _validate_exported_size(trial)
         if variant in expected[case]:
             raise ValueError("duplicate expected trial")
         axes.add(axis)
