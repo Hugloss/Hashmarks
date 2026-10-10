@@ -42,10 +42,7 @@ def _observed_decorator(
 ) -> dict[str, object] | None:
     call = expression if isinstance(expression, ast.Call) else None
     target = call.func if call is not None else expression
-    if not (
-        isinstance(target, ast.Attribute)
-        and isinstance(target.value, ast.Name)
-    ):
+    if not (isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name)):
         return None
     obj, member = target.value.id, target.attr
     if obj in route_objects and member in _HTTP_METHODS:
@@ -79,6 +76,101 @@ def _observed_decorator(
         "literal_argument": literal,
         "form": "call" if call is not None else "bare",
     }
+
+
+def _declaration_group(
+    path: str,
+    declaration: ast.FunctionDef | ast.AsyncFunctionDef,
+    decorator: ast.expr,
+    ordinal: int,
+    observed: dict[str, object],
+    *,
+    provider: str,
+) -> dict[str, object]:
+    group_id = f"{path}:{declaration.lineno}:{decorator.lineno}:{ordinal}"
+    scope = {
+        "path": path,
+        "handler_syntax": declaration.name,
+        "decorator_line": decorator.lineno,
+    }
+    return {
+        "group_id": group_id,
+        "concept": {"kind": observed["kind"], "syntax": "python-decorator"},
+        "scope": scope,
+        "correspondence": {
+            "state": "unresolved",
+            "basis": {
+                "producer": provider,
+                "reason": "syntax-does-not-prove-runtime-registration",
+            },
+        },
+        "declarations": [
+            {
+                "declaration_id": "direct-decorator",
+                "semantic_role": {"kind": "syntactic-handler-declaration"},
+                "value_state": "resolved",
+                "value": {
+                    **observed,
+                    "handler_declared_name": declaration.name,
+                    "handler_kind": (
+                        "async"
+                        if isinstance(declaration, ast.AsyncFunctionDef)
+                        else "sync"
+                    ),
+                },
+                "producer": {
+                    "provider": provider,
+                    "parser": "python-ast",
+                    "authority": "direct-static-syntax-only",
+                },
+                "evidence": [
+                    {
+                        "path": path,
+                        "start_line": decorator.lineno,
+                        "end_line": declaration.lineno,
+                    }
+                ],
+            }
+        ],
+        "coverage": {
+            "state": "incomplete",
+            "truncation": "complete",
+            "expected_declaration_ids": [],
+            "scope": scope,
+            "provenance": {
+                "producer": provider,
+                "reason": "selected-top-level-decorators-only",
+            },
+        },
+    }
+
+
+def _source_groups(
+    path: str,
+    source: str,
+    *,
+    route_objects: frozenset[str],
+    tool_objects: frozenset[str],
+    provider: str,
+) -> list[dict[str, object]]:
+    groups: list[dict[str, object]] = []
+    for declaration in ast.parse(source, filename=path).body:
+        if not isinstance(declaration, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        for ordinal, decorator in enumerate(declaration.decorator_list):
+            observed = _observed_decorator(
+                decorator, route_objects=route_objects, tool_objects=tool_objects
+            )
+            if observed is None:
+                continue
+            groups.append(
+                _declaration_group(
+                    path, declaration, decorator, ordinal, observed, provider=provider
+                )
+            )
+            if len(groups) > _MAX_GROUPS:
+                raise ValueError("interface provider group bound exceeded")
+    return groups
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,87 +223,17 @@ class StaticPythonInterfaceDeclarations:
             source = context.read_text(path)
             if len(source) > _MAX_SOURCE_CHARS:
                 raise ValueError("interface provider source exceeds bounded AST input")
-            tree = ast.parse(source, filename=path)
-            for declaration in tree.body:
-                if not isinstance(
-                    declaration, (ast.FunctionDef, ast.AsyncFunctionDef)
-                ):
-                    continue
-                for ordinal, decorator in enumerate(declaration.decorator_list):
-                    observed = _observed_decorator(
-                        decorator,
-                        route_objects=frozenset(self.route_objects),
-                        tool_objects=frozenset(self.tool_objects),
-                    )
-                    if observed is None:
-                        continue
-                    if len(groups) >= _MAX_GROUPS:
-                        raise ValueError("interface provider group bound exceeded")
-                    group_id = f"{path}:{declaration.lineno}:{decorator.lineno}:{ordinal}"
-                    scope = {
-                        "path": path,
-                        "handler_syntax": declaration.name,
-                        "decorator_line": decorator.lineno,
-                    }
-                    groups.append(
-                        {
-                            "group_id": group_id,
-                            "concept": {
-                                "kind": observed["kind"],
-                                "syntax": "python-decorator",
-                            },
-                            "scope": scope,
-                            "correspondence": {
-                                "state": "unresolved",
-                                "basis": {
-                                    "producer": self.name,
-                                    "reason": "syntax-does-not-prove-runtime-registration",
-                                },
-                            },
-                            "declarations": [
-                                {
-                                    "declaration_id": "direct-decorator",
-                                    "semantic_role": {
-                                        "kind": "syntactic-handler-declaration"
-                                    },
-                                    "value_state": "resolved",
-                                    "value": {
-                                        **observed,
-                                        "handler_declared_name": declaration.name,
-                                        "handler_kind": (
-                                            "async"
-                                            if isinstance(
-                                                declaration, ast.AsyncFunctionDef
-                                            )
-                                            else "sync"
-                                        ),
-                                    },
-                                    "producer": {
-                                        "provider": self.name,
-                                        "parser": "python-ast",
-                                        "authority": "direct-static-syntax-only",
-                                    },
-                                    "evidence": [
-                                        {
-                                            "path": path,
-                                            "start_line": decorator.lineno,
-                                            "end_line": declaration.lineno,
-                                        }
-                                    ],
-                                }
-                            ],
-                            "coverage": {
-                                "state": "incomplete",
-                                "truncation": "complete",
-                                "expected_declaration_ids": [],
-                                "scope": scope,
-                                "provenance": {
-                                    "producer": self.name,
-                                    "reason": "selected-top-level-decorators-only",
-                                },
-                            },
-                        }
-                    )
+            groups.extend(
+                _source_groups(
+                    path,
+                    source,
+                    route_objects=frozenset(self.route_objects),
+                    tool_objects=frozenset(self.tool_objects),
+                    provider=self.name,
+                )
+            )
+            if len(groups) > _MAX_GROUPS:
+                raise ValueError("interface provider group bound exceeded")
         return RepositoryDeclarationProviderResult(
             groups=tuple(groups),
             provenance={
