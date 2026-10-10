@@ -295,6 +295,7 @@ class HashmarksMcpSurface:
         changed_paths: list[str],
         *,
         max_depth: int = CHANGE_IMPACT_DEFAULT_REQUEST.options.max_depth,
+        changed_line_spans: list[dict[str, object]] | None = None,
     ) -> dict[str, object]:
         task = _bounded_text(task, name="task", maximum=_MAX_TASK_CHARS)
         paths = _changed_paths(changed_paths)
@@ -312,6 +313,7 @@ class HashmarksMcpSurface:
                     max_depth=max_depth,
                     project_impact_limit=options.project_impact_limit,
                     project_impact_encoding="compact",
+                    changed_line_spans=changed_line_spans,
                 ),
             )
         )
