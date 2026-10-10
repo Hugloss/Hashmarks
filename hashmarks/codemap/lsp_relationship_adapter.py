@@ -10,6 +10,7 @@ from hashmarks.digest import FILE_DOMAIN, hash_bytes
 from hashmarks.paths import normalize_relative_path
 
 from .diagnostic_provenance import COLLECTION_STATES, diagnostic_member_claims
+from .lsp_hover_capture import normalize_hover_observation
 from .semantic_relationship_model import (
     CLAIM_LIMIT,
     OBSERVATION_LIMIT,
@@ -32,6 +33,7 @@ _METHODS = {
     "textDocument/typeDefinition": ("type_definition", "typeDefinitionProvider"),
     "textDocument/definition": ("definition", "definitionProvider"),
     "textDocument/references": ("reference", "referencesProvider"),
+    "textDocument/hover": ("hover", "hoverProvider"),
     "textDocument/prepareCallHierarchy": ("prepare", "callHierarchyProvider"),
     "callHierarchy/incomingCalls": ("call", "callHierarchyProvider"),
     "callHierarchy/outgoingCalls": ("call", "callHierarchyProvider"),
@@ -230,6 +232,8 @@ def _normalize_capture(capture: object) -> dict[str, Any]:
     result["request"] = _request(result["request"])
     result["documents"] = _documents(result["documents"])
     _response(result)
+    if result["request"]["method"] == "textDocument/hover":
+        normalize_hover_observation(result)
     _locations(result)  # Reject malformed locators before repository reads.
     return result
 
@@ -353,6 +357,8 @@ def _call_rows(capture: Mapping[str, Any]) -> list[dict[str, Any]]:
 
 def _locations(capture: Mapping[str, Any]) -> list[dict[str, Any]]:
     method = capture["request"]["method"]
+    if method == "textDocument/hover":
+        return []  # A hover is an opaque fact, never a relationship location.
     if method in ("callHierarchy/incomingCalls", "callHierarchy/outgoingCalls"):
         return _call_rows(capture)
     batches = capture.get("partial_results", [])
@@ -506,6 +512,10 @@ def lsp_relationship_observation(
         if query["source_binding"]["state"] == "matching"
         else "unknown",
     )
+    if method == "textDocument/hover":
+        observation.capability["hover_observation"] = normalize_hover_observation(
+            capture
+        )
     locations = _locations(capture)
     unique = {content_identity(row): row for row in locations}
     prepare = method == "textDocument/prepareCallHierarchy"
