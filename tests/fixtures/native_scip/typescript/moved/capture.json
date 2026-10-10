@@ -1,0 +1,24 @@
+{
+  "binary_sha256": "0913cc9180d10cdbae0dd1000f9892b16b33fa86b367014749a67c8e09022cce",
+  "configuration": {
+    "arguments": [
+      "index",
+      "--output",
+      "index.scip",
+      "--no-progress-bar"
+    ],
+    "configuration": {
+      "package.json": "{\"name\":\"hashmarks-native-typescript\",\"version\":\"1.0.0\",\"private\":true}\n",
+      "tsconfig.json": "{\"compilerOptions\":{\"strict\":true,\"target\":\"ES2022\"},\"include\":[\"src/**/*.ts\"]}\n"
+    },
+    "producer": "scip-typescript",
+    "version": "0.4.0"
+  },
+  "decoder_version": "scip version v0.10.0",
+  "json_sha256": "d330bd347a771efce4460d215f4e5fe5fd3f099a455e5fcbea9c1675be569240",
+  "qualification_authority": "external-capture-caller-claim",
+  "source_revisions": {
+    "src/contract.ts": "0ec020f4eb3276fdca18d3a2b61fc11a81fd0c272e8062d7847d4e097244c377",
+    "src/engine.ts": "7f6e8ffccff214171ac05869ca90f598ad6bbbeca793be92ebc19fb25e13bdb8"
+  }
+}

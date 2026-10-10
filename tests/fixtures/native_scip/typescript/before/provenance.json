@@ -1,0 +1,8 @@
+{
+  "collection_state": "fresh-complete",
+  "configuration_identity": "sha256:b952dc667320caf65dbe67acbea73a6a5a436598b932cb03c06afd562e71201a",
+  "source_revisions": {
+    "src/contract.ts": "0ec020f4eb3276fdca18d3a2b61fc11a81fd0c272e8062d7847d4e097244c377",
+    "src/engine.ts": "b989047b3cb6c9d7df522fa97057baa84178b33a5c529de34375271593fd3188"
+  }
+}

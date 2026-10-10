@@ -840,6 +840,17 @@ def _dependency(
     ref: tuple[object, ...],
     ctx: Mapping[str, object],
 ) -> None:
+    _fields(
+        p,
+        packet,
+        ref,
+        ctx,
+        (
+            ("change_axes", "dependency", "record"),
+            ("component_selection_transitions", "dependency", "records"),
+        ),
+        assertion="producer_claim",
+    )
     p.nested(packet, "observation", ref, ctx)
     _fields(
         p,
@@ -884,8 +895,6 @@ def _dependency(
         ref,
         ctx,
         (
-            ("component_selection_transitions", "dependency", "records"),
-            ("change_axes", "dependency", "record"),
             ("semantic_result", "dependency", "record"),
             ("derivation", "dependency", "record"),
         ),

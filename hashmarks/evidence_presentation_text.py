@@ -72,7 +72,7 @@ def _task_delta_lines(value: Mapping[str, Any]) -> list[str]:
 
 
 def _semantic_summary(result: Mapping[str, Any]) -> list[str]:
-    lines = _endpoint_comparison_lines(result)
+    lines = _endpoint_comparison_lines(result) + _dependency_lines(result)
     for group in result["groups"]:
         for row in group["findings"]:
             value = row["details"]
@@ -97,6 +97,28 @@ def _semantic_summary(result: Mapping[str, Any]) -> list[str]:
                 ):
                     if key in value:
                         lines.append(f"{key}: {_encode(value[key])}")
+    return lines
+
+
+def _dependency_lines(result: Mapping[str, Any]) -> list[str]:
+    lines: list[str] = []
+    for group in result["groups"]:
+        for row in group["findings"]:
+            if row["kind"] == "change_axes":
+                context = row["source_context"]
+                lines.extend(
+                    [
+                        "Dependency comparison: "
+                        + str(context.get("comparability", "unknown")),
+                        "Causation: " + str(context.get("causation", "not-inferred")),
+                        "~ change axes: " + _encode(row["details"]),
+                    ]
+                )
+            elif row["kind"] == "component_selection_transitions":
+                lines.append(
+                    "Displayed producer selection transition: "
+                    + _encode(row["details"])
+                )
     return lines
 
 

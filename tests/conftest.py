@@ -36,6 +36,20 @@ def fake_maven_wrapper():
 
 
 @pytest.fixture(scope="session")
+def native_dependency_corpus():
+    from native_evidence_support import CORPUS
+
+    return CORPUS
+
+
+@pytest.fixture(scope="session")
+def native_scip_corpus():
+    from native_evidence_support import SCIP_CORPUS
+
+    return SCIP_CORPUS
+
+
+@pytest.fixture(scope="session")
 def repository_qualification_plan():
     """One immutable repository qualification snapshot for read-only contract tests."""
     from hashmarks.qualification_units import qualification_owner_plan
