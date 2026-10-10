@@ -118,7 +118,6 @@ def validate_evidence_context(
     }
 
 
-
 def describe_evidence_binding_reacquisition(
     packet: Mapping[str, object], *, binding_id: str
 ) -> dict[str, object]:
@@ -139,7 +138,8 @@ def describe_evidence_binding_reacquisition(
     if not isinstance(rows, list) or len(rows) > 256:
         raise ValueError("reacquisition requires bounded binding rows")
     matches = [
-        row for row in rows
+        row
+        for row in rows
         if isinstance(row, dict) and row.get("binding_id") == binding_id
     ]
     if len(matches) != 1:
@@ -150,12 +150,20 @@ def describe_evidence_binding_reacquisition(
         if not isinstance(row, dict) or row.get("scope") not in ("member", "lines"):
             raise ValueError("invalid evidence scope")
         path = row.get("path")
-        if not isinstance(path, str) or normalize_relative_path(path, allow_root=False) != path:
+        if (
+            not isinstance(path, str)
+            or normalize_relative_path(path, allow_root=False) != path
+        ):
             raise ValueError("invalid reacquisition path")
         scope = {"scope": row["scope"], "path": path}
         if row["scope"] == "lines":
             start, end = row.get("start_line"), row.get("end_line")
-            if type(start) is not int or type(end) is not int or start < 1 or end < start:
+            if (
+                type(start) is not int
+                or type(end) is not int
+                or start < 1
+                or end < start
+            ):
                 raise ValueError("invalid reacquisition span")
             scope.update(start_line=start, end_line=end)
         scopes.append(scope)
@@ -164,7 +172,10 @@ def describe_evidence_binding_reacquisition(
         raise ValueError("invalid evidence dependencies")
     paths = sorted({row["path"] for row in dependencies})
     relations = binding.get("relationships", {})
-    if not isinstance(relations, dict) or relations.get("state") not in ("observed", "not-requested"):
+    if not isinstance(relations, dict) or relations.get("state") not in (
+        "observed",
+        "not-requested",
+    ):
         raise ValueError("invalid relationship observation state")
     limit = relations.get("bounds", {}).get("limit_per_path")
     if type(limit) is not int or not 1 <= limit <= 1000:
@@ -179,7 +190,8 @@ def describe_evidence_binding_reacquisition(
         "binding_observation_identity": binding.get("binding_observation_identity"),
         "repository": dict(repository),
         "requery": {
-            "binding_id": binding_id, "evidence": scopes,
+            "binding_id": binding_id,
+            "evidence": scopes,
             "dependency_paths": paths,
             "include_relationships": relations["state"] == "observed",
             "relationship_limit_per_path": limit,
