@@ -187,9 +187,8 @@ The paths above are examples only. The `scope` mode accepts at most 32 explicit
 paths and exactly one literal string per call; it never expands those paths to
 another repository scan. It is **case-sensitive literal**, not regex.
 `source_observation` also supports `result_mode="literals"` with 1–8
-distinct case-sensitive literal strings across up to 32 explicit paths. The
-`literals` input is separate from the existing single `literal` input and
-is only valid in that mode. One canonical stable read per member yields exact
+distinct case-sensitive literal strings across up to 32 explicit paths. The MCP `literal` input accepts an array of exact strings only in
+`literals` mode, and retains its existing single-string shape in other modes. One canonical stable read per member yields exact
 per-literal observed and (when qualified) total counts with independently
 qualified scoped absence. It is not regex or a repository-wide search.
 
