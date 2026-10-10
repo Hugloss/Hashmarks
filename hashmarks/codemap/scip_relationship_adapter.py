@@ -92,6 +92,11 @@ def scip_occurrence_payload(
         "locator": occurrence.locator,
         "relationship_only": occurrence.relationship_only,
         "declaration": occurrence.declaration_metadata,
+        **(
+            {"occurrence_roles": occurrence.occurrence_roles}
+            if occurrence.occurrence_roles is not None
+            else {}
+        ),
     }
 
 
