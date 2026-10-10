@@ -127,6 +127,10 @@ def validate_hover_observation(value: object, *, response_error: object) -> None
         if value["contents"] is not None or value["range"] is not None:
             raise ValueError("missing/error hover cannot carry result contents")
         return
+    _validate_returned_hover(value)
+
+
+def _validate_returned_hover(value: Mapping[str, Any]) -> None:
     normalized = _contents(value["contents"])
     if normalized != value["contents"]:
         raise ValueError("hover contents not canonical")
