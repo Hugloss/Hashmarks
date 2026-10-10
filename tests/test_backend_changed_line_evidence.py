@@ -244,14 +244,14 @@ def test_backend_route_decorator_maps_to_handler_without_false_symbol_overlap(
 ) -> None:
     _repo(tmp_path)
     (tmp_path / PATH).write_text(
-        '@router.get(\n'
+        "@router.get(\n"
         '    "/widgets"\n'
-        ')\n'
-        '@cached\n'
-        'async def process_widget(value):\n'
-        '    return value\n\n'
-        'def other_widget(value):\n'
-        '    return value\n',
+        ")\n"
+        "@cached\n"
+        "async def process_widget(value):\n"
+        "    return value\n\n"
+        "def other_widget(value):\n"
+        "    return value\n",
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as cm:
@@ -339,8 +339,7 @@ def test_backend_decorator_evidence_absent_when_source_is_denied(
 ) -> None:
     _repo(tmp_path)
     (tmp_path / PATH).write_text(
-        '@router.get("/secret")\ndef process_widget(value):\n'
-        "    return value\n",
+        '@router.get("/secret")\ndef process_widget(value):\n    return value\n',
         encoding="utf-8",
     )
     (tmp_path / ".hashmarks-context.toml").write_text(
