@@ -160,7 +160,7 @@ def test_order_is_deterministic_and_max_span_count_is_inclusive() -> None:
 
 def test_source_denial_does_not_expose_symbol_names(tmp_path: Path) -> None:
     _repo(tmp_path)
-    (tmp_path / ".hashmarks.toml").write_text(
+    (tmp_path / ".hashmarks-context.toml").write_text(
         '[[rule]]\npattern = "src/backend.py"\nvisibility = "deny"\n'
     )
     with CodeMap(tmp_path) as cm:
