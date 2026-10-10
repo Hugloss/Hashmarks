@@ -25,7 +25,7 @@ CLAIM_LIMIT = 128
 CANDIDATE_LIMIT = 64
 COMPACT_CLAIM_LIMIT = 8
 RELATIONSHIP_KINDS = frozenset(
-    {"implementation", "type_definition", "definition", "reference"}
+    {"implementation", "type_definition", "definition", "reference", "call"}
 )
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
 
