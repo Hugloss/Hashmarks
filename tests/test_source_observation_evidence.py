@@ -463,3 +463,155 @@ def test_missing_explicit_producer_scope_cannot_prove_absence() -> None:
     ]["qualification"]
     assert proof["qualified_removed_identities"] == []
     assert len(proof["unqualified_removed_identities"]) == 1
+
+
+def test_literal_set_reuses_one_member_read_and_qualifies_each_literal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "a.py").write_text(
+        "from zipfile import ZIP_DEFLATED, ZipInfo\n"
+        "def write_zip():\n"
+        "    return ZipInfo('a.zip')\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "b.py").write_text(
+        "def another_zip():\n    return ZIP_DEFLATED\n", encoding="utf-8"
+    )
+    reads: list[str] = []
+    original = CodeMap._bounded_source_observation
+
+    def observing_read(
+        self: CodeMap, path: str, max_bytes: int
+    ) -> tuple[dict[str, object], bytes | None]:
+        reads.append(path)
+        return original(self, path, max_bytes)
+
+    monkeypatch.setattr(CodeMap, "_bounded_source_observation", observing_read)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        first = codemap.scoped_source_literals(
+            ["b.py", "a.py", "a.py"],
+            ["ZipInfo", "ZIP_DEFLATED", "not-present"],
+        )
+        reads_first = list(reads)
+        reads.clear()
+        second = codemap.scoped_source_literals(
+            ["a.py", "b.py"], ["not-present", "ZIP_DEFLATED", "ZipInfo"]
+        )
+
+    assert first["schema"] == "hashmarks.scoped-source-literal-set.v1"
+    assert first["paths"] == ["a.py", "b.py"]
+    assert first["literals"] == ["ZIP_DEFLATED", "ZipInfo", "not-present"]
+    assert reads_first == ["a.py", "b.py"]
+    assert reads == ["a.py", "b.py"]
+    assert first["observation_identity"] == second["observation_identity"]
+    assert first["observed_match_count"] == 5
+    assert first["exact_match_count"] == 5
+    assert first["source_coverage"] == "complete"
+    assert first["truncation"] == "complete"
+    assert first["execution_effect"] == "none"
+    facts = {row["literal"]: row for row in first["literal_observations"]}
+    assert facts["ZIP_DEFLATED"]["exact_match_count"] == 2
+    assert facts["ZipInfo"]["exact_match_count"] == 3
+    assert facts["not-present"]["exact_match_count"] == 0
+    if first["freshness"] == "current":
+        assert facts["not-present"]["negative_evidence"] == (
+            "admissible-within-explicit-member-set"
+        )
+    assert all(
+        hit["member_revision"] and hit["evidence_identity"].startswith("sha256:")
+        for hit in first["occurrences"]
+    )
+
+
+def test_literal_set_balances_display_and_retains_exact_counts(tmp_path: Path) -> None:
+    (tmp_path / "mod.py").write_text(
+        "left left left left right right\n", encoding="utf-8"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.scoped_source_literals(
+            ["mod.py"], ["right", "left", "absent"], limit=2
+        )
+    assert [hit["literal"] for hit in packet["occurrences"]] == ["left", "right"]
+    assert packet["observed_match_count"] == 6
+    assert packet["exact_match_count"] == 6
+    assert packet["source_coverage"] == "complete"
+    assert packet["truncation"] == "truncated"
+    assert packet["completeness"] == "incomplete"
+    assert packet["negative_evidence"] == "not-admissible"
+    facts = {row["literal"]: row for row in packet["literal_observations"]}
+    assert facts["left"]["exact_match_count"] == 4
+    assert facts["right"]["exact_match_count"] == 2
+    assert facts["absent"]["exact_match_count"] == 0
+    if packet["freshness"] == "current":
+        assert facts["absent"]["negative_evidence"] == (
+            "admissible-within-explicit-member-set"
+        )
+
+
+def test_literal_set_denied_member_never_claims_qualified_absence(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "safe.py").write_text("ZipInfo\n", encoding="utf-8")
+    (tmp_path / ".env").write_text("SECRET=ZIP_DEFLATED\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.scoped_source_literals(
+            ["safe.py", ".env"], ["ZipInfo", "ZIP_DEFLATED", "absent"]
+        )
+    assert packet["observed_match_count"] == 1
+    assert packet["exact_match_count"] is None
+    assert packet["source_coverage"] == "unknown"
+    assert packet["completeness"] == "unknown"
+    assert packet["negative_evidence"] == "not-admissible"
+    assert all(
+        item["exact_match_count"] is None
+        and item["negative_evidence"] == "not-admissible"
+        for item in packet["literal_observations"]
+    )
+
+
+def test_literal_set_byte_limit_and_edited_member_fail_closed(tmp_path: Path) -> None:
+    first = tmp_path / "a.py"
+    other = tmp_path / "b.py"
+    first.write_text("one\n", encoding="utf-8")
+    other.write_text("two\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        bounded = codemap.scoped_source_literals(
+            ["a.py", "b.py"], ["one", "two"], max_total_bytes=4
+        )
+        first.write_text("changed\n", encoding="utf-8")
+        mismatched = codemap.scoped_source_literals(
+            ["a.py"], ["one", "absent"]
+        )
+    assert bounded["observed_source_bytes"] == 4
+    assert bounded["source_coverage"] == "unknown"
+    assert bounded["member_observations"][1]["reason"] == (
+        "scope-byte-budget-exhausted"
+    )
+    assert bounded["exact_match_count"] is None
+    assert mismatched["source_coverage"] == "unknown"
+    assert mismatched["exact_match_count"] is None
+    assert mismatched["negative_evidence"] == "not-admissible"
+
+
+@pytest.mark.parametrize(
+    "literals",
+    [[], ["a"] * 9, ["a", "a"], [""], ["a\nb"], ["x" * 257], ["a", 3]],
+)
+def test_literal_set_rejects_invalid_literals_before_member_read(
+    tmp_path: Path, literals: list[str]
+) -> None:
+    (tmp_path / "a.py").write_text("a", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError):
+            codemap.scoped_source_literals(["a.py"], literals)
+
+
+def test_literal_set_rejects_bad_source_paths_before_read(tmp_path: Path) -> None:
+    with CodeMap(tmp_path) as codemap:
+        with pytest.raises(ValueError):
+            codemap.scoped_source_literals(["../elsewhere.py"], ["a"])
