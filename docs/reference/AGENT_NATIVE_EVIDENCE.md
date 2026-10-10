@@ -302,6 +302,30 @@ transition, not a downstream effect. A later direct
 request requires its own current proof; the range evidence cannot smuggle
 LSP/SCIP edges into change-impact.
 
+### Backend decorator-only edits (B06)
+
+Python decorators occur before a function/method/class declaration's canonical
+indexed `start_line`. A changed `@router.get(...)`, for example, is not
+necessarily within the indexed handler range. Optional changed-line evidence
+now keeps that ordinary indexed-symbol intersection **unchanged** and adds
+`observations[].decorator_associations` for Python source.
+
+Each association derives from a direct current-source Python AST decorator
+range that intersects the reported span and uniquely matches an indexed
+declaration at its own start line. It supplies a `path::qualname` follow-up
+target with independently labelled `overlapping_decorator_ranges` and
+`indexed_symbol_range`. It does **not** make the decorator part of the symbol
+range. Source visibility, member revision and the second stable read are
+shared with the enclosing observation. Request-local syntax parsing is capped
+at 256 KiB and association retention at 16 per span; unknown, unresolved and
+omitted cases are explicit and never constitute negative evidence.
+
+A decorator association is *only syntax*. It proves neither API/framework
+registration nor that an edit occurred, a method was called, a route is
+reachable, a test covers the code, or downstream behavior changed.
+Non-Python members do not gain this field. No new persistent parser state,
+relationship index, MCP tool or agent operation is introduced.
+
 ## Qualified endpoint comparisons
 
 The read-only `evidence_comparison` MCP tool transports two explicit,
