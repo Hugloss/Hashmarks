@@ -583,9 +583,7 @@ def test_literal_set_byte_limit_and_edited_member_fail_closed(tmp_path: Path) ->
             ["a.py", "b.py"], ["one", "two"], max_total_bytes=4
         )
         first.write_text("changed\n", encoding="utf-8")
-        mismatched = codemap.scoped_source_literals(
-            ["a.py"], ["one", "absent"]
-        )
+        mismatched = codemap.scoped_source_literals(["a.py"], ["one", "absent"])
     assert bounded["observed_source_bytes"] == 4
     assert bounded["source_coverage"] == "unknown"
     assert bounded["member_observations"][1]["reason"] == (
