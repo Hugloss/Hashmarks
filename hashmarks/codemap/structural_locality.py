@@ -1109,6 +1109,10 @@ class StructuralLocalityMixin:
             "repository_revision_observation": revision_observation,
             "negative_evidence_admissible": False,
             "detail_surface": "structural_locality",
+            "detail_arguments": {
+                "target": f"{row['path']}::{row['qualname']}",
+                "result_mode": "relationships",
+            },
         }
 
     def _scip_direct_relationships(

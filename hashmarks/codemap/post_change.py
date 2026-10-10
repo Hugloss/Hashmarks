@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Mapping, Sequence
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
@@ -37,6 +38,59 @@ POST_CHANGE_DEFAULT_OPTIONS = PostChangeOptions()
 
 
 class PostChangeMixin(ChangeImpactMixin):
+    @staticmethod
+    def _post_change_relationship_evidence(
+        previous: Mapping[str, object], current: Mapping[str, object]
+    ) -> dict[str, object] | None:
+        """Compare bounded task projections without deriving claim-set removals."""
+        endpoints: list[dict[str, object] | None] = []
+        for packet in (previous, current):
+            observation = packet.get("semantic_relationships")
+            if not isinstance(observation, Mapping):
+                endpoints.append(None)
+                continue
+            summary = {
+                key: deepcopy(value)
+                for key, value in observation.items()
+                if key not in {"evidence", "evidence_refs"}
+            }
+            evidence = observation.get("evidence")
+            if isinstance(evidence, Mapping):
+                summary["evidence"] = {
+                    key: deepcopy(value)
+                    for key, value in evidence.items()
+                    if key != "claims"
+                }
+                summary["claims_omitted_from_summary"] = len(evidence.get("claims", []))
+            endpoints.append(summary)
+        before, after = endpoints
+        if before is None and after is None:
+            return None
+        return {
+            "authority": "task-semantic-evidence-comparison-only",
+            "scope": "bounded-task-evidence-projection",
+            "claim_set_comparison": "not-performed",
+            "negative_evidence_admissible": False,
+            "before": before,
+            "after": after,
+            "changed": before != after,
+        }
+
+    def _post_change_attach_relationship_evidence(
+        self,
+        result: dict[str, object],
+        previous: Mapping[str, object],
+        current: Mapping[str, object],
+    ) -> None:
+        relationships = self._post_change_relationship_evidence(previous, current)
+        if relationships is None:
+            return
+        result["semantic_relationships"] = relationships
+        key = "invalidated" if relationships["changed"] else "reused"
+        cast("list[str]", result[key]).append("semantic-relationship-evidence")
+        if relationships["changed"]:
+            result["change"] = "changed"
+
     @staticmethod
     def _post_change_previous_value(packet: Mapping[str, object], key: str) -> object:
         ownership = (
@@ -420,6 +474,9 @@ class PostChangeMixin(ChangeImpactMixin):
                 "scope": "changed-paths-only",
                 "consumer_owner": "external",
             }
+            self._post_change_attach_relationship_evidence(
+                result, previous_evidence, current
+            )
             if previous_index_binding != "current":
                 result["previous_index_binding"] = previous_index_binding
             if any(

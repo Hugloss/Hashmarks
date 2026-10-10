@@ -86,6 +86,14 @@ Hashmarks owns what is structurally observable. A consumer such as agentsCookboo
 
 ## Direct SCIP semantic relationship evidence
 
+SCIP relationship kinds describe producer flags, independently of CodeMap's
+static call/reference graph. In particular, `reference` represents SCIP
+`is_reference`: inclusion of related symbols in reference searches. It does
+not assert a source occurrence, call edge, or inverse repository relationship.
+`implementation`, `type_definition`, and `definition` retain their explicit
+SCIP flag meanings and original source-to-target direction. See the
+[SCIP relationship protocol](https://github.com/scip-code/scip/blob/main/scip.proto).
+
 For an exact target definition, `structural_locality` carries a bounded
 `native_semantic_relationships` observation if an already imported, current
 SCIP producer supplies matching `SymbolInformation.relationships`.
@@ -132,6 +140,7 @@ in disposable CodeMap state with the same SCIP generation/freshness authority.
 hashmarks --workspace . structural-locality contract.py::Interface --result-mode relationships
 hashmarks --workspace . structural-locality contract.py::Interface --result-mode relationships --supplied-observations captures.json
 hashmarks structural-locality-delta --result-mode relationships --before before.json --after after.json
+hashmarks structural-locality-delta --result-mode relationships --before before.json --after after.json --presentation text
 ```
 
 Python uses `CodeMap.structural_locality(target, result_mode="relationships",

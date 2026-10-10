@@ -11,6 +11,12 @@ All fourteen current MCP tools accept `presentation` with the ordered values
 `repository_intelligence_query` and `none` for the other thirteen tools.
 Snapshot density (`compact`, `standard`, `audit`) is an independent selector.
 
+The CLI commands `task-evidence`, `structural-locality`,
+`structural-locality-delta`, and `post-change` accept the same optional
+`--presentation` selector. Their default remains native JSON. Service task and
+post-change responses carry the same native evidence; query/service formatting
+continues to use the existing query selector.
+
 `none` returns the native response unchanged. For the other tools, a selected
 format returns this envelope:
 
@@ -81,6 +87,13 @@ projection”; it never claims repository absence.
 Text encodes the same selected findings, locators, qualifications, source
 identities, references, and exclusions as its structured backing. JSON escaping
 keeps multiline native values identifiable without inventing new assertions.
+Semantic comparison text leads with the subject, endpoint comparability and
+reasons before its exact-record encoding. `+` and `-` lines identify either
+**qualified producer claims** or changes to **delivered producer subsets**,
+as labelled beside the lines. They never assert repository absence or form an
+applicable Git patch. `~` lines keep locator, source-binding, capability,
+configuration, collection and resolution changes separate. An incomparable
+comparison stays explicit even when there are no paired producer deltas.
 
 ## Current producer coverage
 
@@ -172,6 +185,8 @@ not a different ownership selector or a reason to choose an action.
 The compact record reports an exact `path::qualname` subject, direct observed
 relationship count and kinds, producer bindings, truncation, and the
 existing `structural_locality` detail surface.
+`detail_arguments` supplies the exact `target` and
+`result_mode: relationships`, including on the nested compact evidence.
 `observed_relationship_count_scope` explicitly identifies which count the
 summary represents: `exact-owner-scip-definition-outgoing` for captured SCIP
 definition flags, or `explicit-producer-claims-associated-with-owner` when
@@ -229,17 +244,51 @@ The structured evidence presentation exposes
 projection. The existing source/owner/verification authority and MCP tool
 count are unchanged.
 
+The default structural-locality presentation displays its SCIP summary and
+supplied direct claims before call edges, preserving their `producer_claim`
+assertion under the shared display cap. Direct claim rows carry the containing
+producer's qualification in `source_context.relationship_observation`; these
+qualifications also survive outside row caps. The displayed collection-state
+qualification points to that exact native scalar rather than a filtered copy
+of the complete observation. Task presentation identity uses the producer's
+`evidence_packet_identity`.
+
+### Semantic evidence after a source change
+
+`post_change` emits `semantic_relationships` when either task endpoint exposed
+semantic evidence. Its `before` and `after` contain bounded task summaries,
+original observation identities, counts, scopes, source bindings and producer
+qualifications. `changed` describes those evidence observations; it does not
+assert a semantic claim-set change. Changed evidence is named in `invalidated`;
+unchanged evidence is named in `reused`.
+
+Direct claims are omitted from these summaries with
+`claims_omitted_from_summary` accounting. Existing task presentation omissions
+and coverage remain separate. `claim_set_comparison: not-performed` and
+`negative_evidence_admissible: false` prohibit reading a missing endpoint as
+relationship absence. A null endpoint means unavailable in that task
+projection. Source edits can turn an observed empty SCIP definition into an
+unavailable observation, or retained claims into explicitly stale evidence.
+Request-local LSP captures from the prior packet remain comparison input only;
+they are never replayed into the current task observation or durable state.
+Use the exact relationship detail mode and its endpoint comparison for claim
+additions/removals.
+
 ## Qualified endpoint comparisons
 
 The read-only `evidence_comparison` MCP tool transports two explicit,
 caller-supplied producer packets to their existing CodeMap comparison owners.
-Its `result_mode` is one of `structural`, `bindings` or `diagnostics`.
+Its `result_mode` is one of `structural`, `bindings`, `diagnostics` or `relationships`.
 Each mode retains its native schema; no additional persistent history, new
 observation or Git lifecycle is created.
 
 - `structural` invokes the existing locality delta. Unmatched provider,
   target, evidence identity, measurement settings, freshness or repository
   state yields explicit incomparability, not a proven structural change.
+- `relationships` invokes the existing direct producer-claim comparison.
+  Subject, scope, producer configuration, collection, freshness and source
+  correspondence qualify claim-set comparisons. Incompatible endpoints keep
+  delivered-subset changes separately from qualified additions/removals.
 - `bindings` invokes the current repository binding delta, which rejects
   invalid, foreign or mismatched binding packets.
 - `diagnostics` accepts existing producer-claimed diagnostic observation
@@ -279,6 +328,9 @@ presentation, including previously hidden details and qualifications.
 Authority source: existing CodeMap/domain producers and operation contracts.
 Completeness/freshness behavior: preserved independently of display bounds.
 Existing Hashmarks owner extended: evidence presentation, MCP, and query transport.
+The post-change owner additionally describes bounded semantic-evidence
+observation transitions; it does not compare truncated task claim sets or
+acquire provider, consumer, execution or persistent-history authority.
 Consumer/execution responsibility explicitly not acquired: interpretation,
 actions, agent execution, scheduling, and certification.
 Decision: **OBSERVER**.

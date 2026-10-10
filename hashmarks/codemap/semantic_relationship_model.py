@@ -409,7 +409,11 @@ def compact_relationships(payload: Mapping[str, Any]) -> dict[str, Any]:
         ],
         "coverage": deepcopy(payload["coverage"]),
         "negative_evidence_admissible": False,
-        "detail_surface": "structural_locality:relationships",
+        "detail_surface": "structural_locality",
+        "detail_arguments": {
+            "target": payload["target"],
+            "result_mode": "relationships",
+        },
     }
 
 

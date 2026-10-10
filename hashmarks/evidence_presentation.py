@@ -11,6 +11,7 @@ from collections.abc import Mapping
 from copy import deepcopy
 from typing import Any, Literal, TypedDict, Unpack, cast, get_args
 
+from hashmarks.evidence_presentation_text import evidence_projection_text
 from hashmarks.operation_contract import (
     operation_default_mode,
     operation_schema,
@@ -703,6 +704,18 @@ def _locality(
     ref: tuple[object, ...],
     ctx: Mapping[str, object],
 ) -> None:
+    p.field(
+        packet,
+        "native_semantic_relationships",
+        "relationship",
+        ref,
+        ctx,
+        shape="record",
+        assertion="producer_claim",
+    )
+    supplied = packet.get("supplied_relationship_observation")
+    if isinstance(supplied, Mapping):
+        p.project(supplied, (*ref, "supplied_relationship_observation"), ctx)
     _fields(
         p,
         packet,
@@ -712,15 +725,11 @@ def _locality(
             ("nodes", "repository_structure", "records"),
             ("edges", "relationship", "records"),
             ("unresolved_calls", "relationship", "records"),
-            ("native_semantic_relationships", "relationship", "record"),
             ("external_or_unindexed_calls", "relationship", "records"),
             ("verification_paths", "verification", "values"),
             ("dimensions", "evidence_measurement", "record"),
         ),
     )
-    supplied = packet.get("supplied_relationship_observation")
-    if isinstance(supplied, Mapping):
-        p.project(supplied, (*ref, "supplied_relationship_observation"), ctx)
 
 
 def _direct_relationships(
@@ -735,6 +744,17 @@ def _direct_relationships(
         return
     for index, observation in enumerate(observations):
         observation_ref = (*ref, "observations", index)
+        observation_context = {
+            **ctx,
+            "relationship_observation": {
+                key: deepcopy(value)
+                for key, value in observation.items()
+                if key not in ("claims", "source_bindings")
+            },
+        }
+        p.contexts.append(
+            {"source_ref": _pointer(observation_ref), "details": observation_context}
+        )
         for field, family, kind in (
             ("claims", "relationship", "direct_semantic_relationship"),
             ("source_bindings", "source", "relationship_source_binding"),
@@ -744,7 +764,7 @@ def _direct_relationships(
                 field,
                 family,
                 observation_ref,
-                ctx,
+                observation_context,
                 shape="records",
                 assertion="producer_claim",
                 kind=kind,
@@ -752,13 +772,9 @@ def _direct_relationships(
         p.add(
             "qualification",
             "relationship_observation_qualification",
-            {
-                key: value
-                for key, value in observation.items()
-                if key not in ("claims", "source_bindings")
-            },
-            observation_ref,
-            ctx,
+            observation["collection_state"],
+            (*observation_ref, "collection_state"),
+            observation_context,
             assertion="producer_claim",
         )
 
@@ -769,6 +785,7 @@ def _direct_relationship_delta(
     ref: tuple[object, ...],
     ctx: Mapping[str, object],
 ) -> None:
+    ctx = {**ctx, "semantic_subject": packet["target"]}
     p.field(
         packet,
         "producer_deltas",
@@ -1161,6 +1178,16 @@ def _impact(
     ref: tuple[object, ...],
     ctx: Mapping[str, object],
 ) -> None:
+    p.field(
+        packet,
+        "semantic_relationships",
+        "relationship",
+        ref,
+        ctx,
+        kind="task_semantic_evidence_delta",
+        shape="record",
+        assertion="producer_claim",
+    )
     _fields(
         p,
         packet,
@@ -1444,56 +1471,6 @@ def _require_fields(packet: Mapping[str, object], schema: str) -> None:
         )
 
 
-def evidence_projection_text(result: Mapping[str, Any]) -> str:
-    """Encode exactly the supplied selection and metadata as grouped text."""
-    groups = result["groups"]
-
-    def encode(value: object) -> str:
-        return json.dumps(
-            value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-        )
-
-    lines = [
-        "Metadata: "
-        + encode(
-            {
-                key: value
-                for key, value in result.items()
-                if key not in {"groups", "text"}
-            }
-        )
-    ]
-    for group in groups:
-        lines.append(
-            f"{group['family']}: {group['count_observed_in_packet']} observed ({group['omitted_from_presentation']} omitted from presentation)"
-        )
-        for item in group["findings"]:
-            locator = {
-                key: value
-                for key, value in item.items()
-                if key
-                not in {
-                    "assertion",
-                    "kind",
-                    "details",
-                    "basis",
-                    "source_refs",
-                    "source_context",
-                }
-            }
-            lines.append(
-                f"  [{item['assertion']}] {item['kind']} locator={encode(locator)} details={encode(item['details'])} basis={item['basis']} refs={encode(item['source_refs'])} context={encode(item['source_context'])}"
-            )
-    if not groups:
-        lines.append(
-            "No displayed findings in this projection"
-            if result["supported"]
-            else "Unsupported evidence schema"
-        )
-    lines.append("Unprojected sections: " + encode(result["unprojected_sections"]))
-    return "\n".join(lines)
-
-
 def presentation_source_identity(packet: Mapping[str, object]) -> object:
     """Return only an aggregate identity explicitly provided by this producer."""
     return deepcopy(
@@ -1510,6 +1487,7 @@ def presentation_source_identity(packet: Mapping[str, object]) -> object:
                     "coverage_identity",
                     "correlation_identity",
                     "packet_identity",
+                    "evidence_packet_identity",
                     "brief_identity",
                     "explanation_identity",
                     "freshness_map_identity",
