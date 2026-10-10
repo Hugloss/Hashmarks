@@ -374,3 +374,137 @@ def test_backend_python_decorator_parse_bound_is_explicit() -> None:
     assert evidence["state"] == "unresolved"
     assert evidence["reason"] == "python-decorator-source-over-bound"
     assert evidence["negative_evidence_admissible"] is False
+
+
+def test_backend_changed_auth_decorator_shows_adjacent_route_syntax(
+    tmp_path: Path,
+) -> None:
+    _repo(tmp_path)
+    (tmp_path / PATH).write_text(
+        "@auth.required\n"
+        "@router.get(\n"
+        '    "/widgets"\n'
+        ")\n"
+        "async def process_widget(value):\n"
+        "    return value\n",
+        encoding="utf-8",
+    )
+    with CodeMap(tmp_path) as cm:
+        cm.sync()
+        result = cm.task_change_impact(TASK, [PATH], options=_options(start=1, end=1))
+    row = result["changed_line_evidence"]["observations"][0]
+    assert row["symbols"] == []
+    (association,) = row["decorator_associations"]["associations"]
+    context = association["decorator_context"]
+    assert context["state"] == "bounded-current-python-ast-decorator-syntax"
+    assert context["runtime_registration"] == "not-asserted"
+    assert context["negative_evidence_admissible"] is False
+    assert context["omitted_count"] == 0
+    assert len(context["observations"]) == 2
+    auth, route = context["observations"]
+    assert auth["intersects_reported_span"] is True
+    assert auth["callee_syntax"] == {
+        "state": "simple-member",
+        "receiver_syntax": "auth",
+        "member_syntax": "required",
+    }
+    assert route["intersects_reported_span"] is False
+    assert route["start_line"] == 2
+    assert route["end_line"] == 4
+    assert route["callee_syntax"] == {
+        "state": "simple-member",
+        "receiver_syntax": "router",
+        "member_syntax": "get",
+    }
+    assert route["arguments"]["first_positional_string"] == {
+        "state": "literal",
+        "value": "/widgets",
+    }
+    assert route["arguments"]["path_keyword_string"] == {"state": "not-supplied"}
+    assert route["arguments"]["has_argument_expansion"] is False
+    presentation = present_repository_evidence(result, format="compact")
+    assert validate_evidence_presentation(result, presentation)["valid"] is True
+
+
+def test_backend_decorator_call_arguments_preserve_dynamic_and_unpacking(
+    tmp_path: Path,
+) -> None:
+    _repo(tmp_path)
+    (tmp_path / PATH).write_text(
+        "@router.get(make_path(), **route_options)\n"
+        "async def process_widget(value):\n"
+        "    return value\n",
+        encoding="utf-8",
+    )
+    with CodeMap(tmp_path) as cm:
+        cm.sync()
+        result = cm.task_change_impact(TASK, [PATH], options=_options(start=1, end=1))
+    ctx = result["changed_line_evidence"]["observations"][0][
+        "decorator_associations"
+    ]["associations"][0]["decorator_context"]
+    (site,) = ctx["observations"]
+    assert site["callee_syntax"]["member_syntax"] == "get"
+    assert site["arguments"]["first_positional_string"] == {
+        "state": "dynamic-or-unsupported"
+    }
+    assert site["arguments"]["path_keyword_string"] == {"state": "not-supplied"}
+    assert site["arguments"]["has_argument_expansion"] is True
+
+
+def test_backend_decorator_context_prioritizes_edited_under_bound(
+    tmp_path: Path,
+) -> None:
+    _repo(tmp_path)
+    lines = [f"@dec_{i}" for i in range(9)]
+    lines += [
+        "@router.post(" + repr("/" + "x" * 129) + ")",
+        "def process_widget(value):",
+        "    return value",
+    ]
+    (tmp_path / PATH).write_text("\n".join(lines) + "\n", encoding="utf-8")
+    with CodeMap(tmp_path) as cm:
+        cm.sync()
+        result = cm.task_change_impact(
+            TASK, [PATH], options=_options(start=10, end=10)
+        )
+    context = result["changed_line_evidence"]["observations"][0][
+        "decorator_associations"
+    ]["associations"][0]["decorator_context"]
+    assert context["declaration_decorator_count"] == 10
+    assert context["retained_count"] == 6
+    assert context["omitted_count"] == 4
+    edited = [s for s in context["observations"] if s["intersects_reported_span"]]
+    assert len(edited) == 1
+    assert edited[0]["start_line"] == 10
+    assert edited[0]["arguments"]["first_positional_string"] == {
+        "state": "over-bound"
+    }
+    assert context["negative_evidence_admissible"] is False
+
+
+def test_backend_decorator_context_does_not_expose_literals_in_outline(
+    tmp_path: Path,
+) -> None:
+    _repo(tmp_path)
+    (tmp_path / PATH).write_text(
+        '@router.get("/secret-route")\n'
+        "def process_widget(value):\n"
+        "    return value\n",
+        encoding="utf-8",
+    )
+    (tmp_path / ".hashmarks-context.toml").write_text(
+        '[[rule]]\npattern = "src/backend.py"\nvisibility = "outline"\n'
+    )
+    with CodeMap(tmp_path) as cm:
+        cm.sync()
+        result = cm.task_change_impact(TASK, [PATH], options=_options(start=1, end=1))
+    row = result["changed_line_evidence"]["observations"][0]
+    if row["state"] == "source-index-correspondence-observed":
+        assert all(
+            a["decorator_context"]["state"] == "source-visibility-required"
+            and a["decorator_context"]["observations"] == []
+            for a in row["decorator_associations"]["associations"]
+        )
+    else:
+        assert row["state"] == "unresolved"
+    assert "/secret-route" not in json.dumps(result)
