@@ -87,7 +87,8 @@ class ScopedSourceLiteralsMixin:
                 0,
             )
         member, raw = self._bounded_source_observation(
-            path, min(state.max_total_bytes - state.observed_bytes, state.max_member_bytes)
+            path,
+            min(state.max_total_bytes - state.observed_bytes, state.max_member_bytes),
         )
         record = {
             "path": path,
@@ -172,9 +173,7 @@ class ScopedSourceLiteralsMixin:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         for literal in selected_literals:
-            self._validate_source_observation(
-                literal, limit, max_member_bytes, 2_000
-            )
+            self._validate_source_observation(literal, limit, max_member_bytes, 2_000)
         return selected_paths, selected_literals
 
     @staticmethod
@@ -252,7 +251,9 @@ class ScopedSourceLiteralsMixin:
             "observed_match_count": count,
             "occurrences": selected,
             "selection_order": "round-robin-by-literal",
-            **self._literal_set_qualification(coverage, freshness, count, len(selected)),
+            **self._literal_set_qualification(
+                coverage, freshness, count, len(selected)
+            ),
             "limits": {
                 "returned_occurrences": state.limit,
                 "max_total_bytes": state.max_total_bytes,
