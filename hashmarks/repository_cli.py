@@ -404,11 +404,11 @@ def _changed_line_span_args(values: list[str] | None) -> list[dict[str, object]]
             raise ValueError("--changed-line-span requires PATH:START:END")
         path, start, end = parts
         try:
-            rows.append({
-                "path": path, "start_line": int(start), "end_line": int(end)
-            })
+            rows.append({"path": path, "start_line": int(start), "end_line": int(end)})
         except ValueError as exc:
-            raise ValueError("--changed-line-span requires integer line bounds") from exc
+            raise ValueError(
+                "--changed-line-span requires integer line bounds"
+            ) from exc
     return rows
 
 
