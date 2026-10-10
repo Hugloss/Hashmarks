@@ -87,9 +87,7 @@ def test_metadata_survives_native_index_reopen_and_is_not_graph_authority(
         cm.sync()
         reopened = _read_source_metadata(cm)
     assert reopened == original
-    assert original["declaration"]["documentation"] == [
-        "Implementation documentation"
-    ]
+    assert original["declaration"]["documentation"] == ["Implementation documentation"]
     assert original["declaration"]["authority"] == "scip-producer-supplied"
     assert original["occurrence_roles"]["observed_roles"] == [
         "definition",
