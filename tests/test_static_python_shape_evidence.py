@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -31,6 +32,61 @@ def _group(packet: dict) -> dict:
 
 def _value(packet: dict) -> dict:
     return _group(packet)["declarations"][0]["value"]
+
+
+@pytest.mark.parametrize(
+    ("expression", "expected_keys", "expected_lines"),
+    [
+        (
+            "    return {\n"
+            '        payload["key1"]: payload["value1"],\n'
+            '        payload["key2"]: payload["value2"],\n'
+            "    }\n",
+            ["key1", "value1", "key2", "value2"],
+            [4, 4, 5, 5],
+        ),
+        (
+            '    return {payload["key1"]: payload["value1"], '
+            'payload["key2"]: payload["value2"]}\n',
+            ["key1", "value1", "key2", "value2"],
+            [3, 3, 3, 3],
+        ),
+        (
+            "    return await build(\n"
+            '        answer=payload["first"],\n'
+            '        *payload["second"],\n'
+            "    )\n",
+            ["first", "second"],
+            [4, 5],
+        ),
+        (
+            '    return await build(answer=payload["first"], *payload["second"])\n',
+            ["first", "second"],
+            [3, 3],
+        ),
+    ],
+    ids=["multiline-dict", "same-line-dict", "multiline-call", "same-line-call"],
+)
+def test_literal_reads_follow_physical_source_order(
+    tmp_path: Path,
+    expression: str,
+    expected_keys: list[str],
+    expected_lines: list[int],
+) -> None:
+    (tmp_path / "service.py").write_text(
+        '@router.get("/values")\nasync def values(payload):\n' + expression,
+        encoding="utf-8",
+    )
+    body = _value(_observe(tmp_path))["static_body_syntax"]
+    sites = body["literal_subscript_accesses"]
+    assert [site["literal_key"] for site in sites] == expected_keys
+    assert [site["line"] for site in sites] == expected_lines
+    assert all(
+        set(site) == {"line", "end_line", "receiver_syntax", "literal_key"}
+        for site in sites
+    )
+    assert body["literal_dictionary_returns"][0]["syntax"] == "unresolved-return"
+    assert body["coverage"] == "incomplete"
 
 
 def test_selected_handler_syntax_is_source_bound_and_unresolved(tmp_path: Path) -> None:
@@ -189,6 +245,72 @@ def test_site_limit_fails_before_provider_publication(tmp_path: Path) -> None:
                 ]
             )
         assert cm.discover_repository_declarations([])["declarations"]["groups"] == []
+
+
+@pytest.mark.parametrize("kind", ["returns", "reads"])
+def test_site_bound_accepts_sixteen_and_rejects_seventeen(
+    tmp_path: Path, kind: str
+) -> None:
+    def handler(count: int) -> str:
+        statements = (
+            f'    if payload:\n        return {{"key_{n}": {n}}}\n'
+            if kind == "returns"
+            else f'    payload["key_{n}"]\n'
+            for n in range(count)
+        )
+        return '@router.get("/values")\ndef values(payload):\n' + "".join(statements)
+
+    source = tmp_path / "service.py"
+    source.write_text(handler(16), encoding="utf-8")
+    provider = StaticPythonInterfaceDeclarations(
+        paths=("service.py",), include_literal_shape_syntax=True
+    )
+    field = (
+        "literal_dictionary_returns"
+        if kind == "returns"
+        else "literal_subscript_accesses"
+    )
+    with CodeMap(tmp_path) as cm:
+        cm.sync()
+        before = cm.discover_repository_declarations([provider])
+        assert len(_value(before)["static_body_syntax"][field]) == 16
+        source.write_text(handler(17), encoding="utf-8")
+        cm.sync(["service.py"])
+        with pytest.raises(RepositoryDeclarationProviderError, match="site bound"):
+            cm.discover_repository_declarations([provider], previous_observation=before)
+        empty: dict[str, Any] = cm.discover_repository_declarations([])
+        assert empty["declarations"]["groups"] == []
+        source.write_text(handler(16), encoding="utf-8")
+        cm.sync(["service.py"])
+        repaired = cm.discover_repository_declarations(
+            [provider], previous_observation=before
+        )
+        assert _value(repaired) == _value(before)
+
+
+@pytest.mark.parametrize("key_count", [32, 33])
+@pytest.mark.parametrize("key_chars", [128, 129])
+def test_large_dictionary_never_publishes_a_partial_key_set(
+    tmp_path: Path, key_count: int, key_chars: int
+) -> None:
+    keys = ["é" * key_chars, *(f"field_{n}" for n in range(key_count - 1))]
+    expression = ", ".join(f"{key!r}: 1" for key in keys)
+    (tmp_path / "service.py").write_text(
+        '@router.get("/values")\ndef values():\n    return {' + expression + "}\n",
+        encoding="utf-8",
+    )
+    packet = _observe(tmp_path)
+    body = _value(packet)["static_body_syntax"]
+    (site,) = body["literal_dictionary_returns"]
+    if key_count == 32 and key_chars == 128:
+        assert site["syntax"] == "literal-dict-return"
+        assert site["literal_keys_in_source_order"] == keys
+    else:
+        assert site["syntax"] == "unresolved-return"
+        assert site["literal_keys_in_source_order"] is None
+    assert body["runtime_response_shape"] == "unknown"
+    assert body["coverage"] == "incomplete"
+    assert _group(packet)["absence"]["state"] == "unknown"
 
 
 def test_stale_source_cannot_reuse_old_literal_facts(tmp_path: Path) -> None:

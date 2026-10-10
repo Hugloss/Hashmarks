@@ -41,8 +41,8 @@ class _HandlerBodySyntax(ast.NodeVisitor):
     """Only direct handler-body syntax; nested scopes never belong to this handler."""
 
     def __init__(self) -> None:
-        self.returns: list[dict[str, object]] = []
-        self.accesses: list[dict[str, object]] = []
+        self.returns: list[tuple[int, int, dict[str, object]]] = []
+        self.accesses: list[tuple[int, int, dict[str, object]]] = []
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         return  # A nested handler is a different scope.
@@ -70,14 +70,18 @@ class _HandlerBodySyntax(ast.NodeVisitor):
                     key.value for key in value.keys if isinstance(key, ast.Constant)
                 ]
         self.returns.append(
-            {
-                "line": node.lineno,
-                "end_line": node.end_lineno or node.lineno,
-                "syntax": "literal-dict-return"
-                if keys is not None
-                else "unresolved-return",
-                "literal_keys_in_source_order": keys,
-            }
+            (
+                node.lineno,
+                node.col_offset,
+                {
+                    "line": node.lineno,
+                    "end_line": node.end_lineno or node.lineno,
+                    "syntax": "literal-dict-return"
+                    if keys is not None
+                    else "unresolved-return",
+                    "literal_keys_in_source_order": keys,
+                },
+            )
         )
         if len(self.returns) > _MAX_BODY_SITES:
             raise ValueError("handler return syntax site bound exceeded")
@@ -92,12 +96,16 @@ class _HandlerBodySyntax(ast.NodeVisitor):
             and len(node.slice.value) <= _MAX_ACCESS_KEY_CHARS
         ):
             self.accesses.append(
-                {
-                    "line": node.lineno,
-                    "end_line": node.end_lineno or node.lineno,
-                    "receiver_syntax": node.value.id,
-                    "literal_key": node.slice.value,
-                }
+                (
+                    node.lineno,
+                    node.col_offset,
+                    {
+                        "line": node.lineno,
+                        "end_line": node.end_lineno or node.lineno,
+                        "receiver_syntax": node.value.id,
+                        "literal_key": node.slice.value,
+                    },
+                )
             )
             if len(self.accesses) > _MAX_BODY_SITES:
                 raise ValueError("handler literal access site bound exceeded")
@@ -115,8 +123,14 @@ def _handler_body_syntax(
         "coverage": "incomplete",
         "runtime_response_shape": "unknown",
         "cross_artifact_correspondence": "unresolved",
-        "literal_dictionary_returns": visitor.returns,
-        "literal_subscript_accesses": visitor.accesses,
+        # AST fields group dictionary keys/values and call args/keywords; their
+        # traversal order is not physical source order, even on the same line.
+        "literal_dictionary_returns": [
+            site for _, _, site in sorted(visitor.returns, key=lambda row: row[:2])
+        ],
+        "literal_subscript_accesses": [
+            site for _, _, site in sorted(visitor.accesses, key=lambda row: row[:2])
+        ],
     }
 
 

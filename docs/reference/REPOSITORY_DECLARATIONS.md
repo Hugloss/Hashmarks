@@ -602,7 +602,10 @@ and can additionally expose `value.static_body_syntax`:
   for dynamic/non-literal expressions (including unpacking). Multiple return
   statements remain independent; keys are not combined into a response schema.
 - `literal_subscript_accesses`: source-ordered `name["key"]` syntax with
-  the exact receiver identifier and string key. No receiver-to-response,
+  the exact receiver identifier and string key, limited to read expressions.
+  Write/delete targets are excluded. Sites follow physical source positions,
+  including multiple sites on one line; this does not imply execution order.
+  No receiver-to-response,
   return-to-route, cross-function, or cross-file correspondence is inferred.
 - Each recorded site includes its physical start/end lines, and the canonical
   repository-evidence binding covers those source spans. Private/unadmitted or
