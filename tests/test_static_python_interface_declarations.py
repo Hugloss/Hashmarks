@@ -37,10 +37,7 @@ def test_observes_route_and_mcp_tool_syntax_without_runtime_authority(
     assert packet["providers"][0]["state"] == "collected"
     groups = packet["declarations"]["groups"]
     assert len(groups) == 2
-    observed = {
-        row["concept"]["kind"]: row
-        for row in groups
-    }
+    observed = {row["concept"]["kind"]: row for row in groups}
     route = observed["http-route-decorator"]
     tool = observed["mcp-tool-decorator"]
     assert route["correspondence"]["state"] == "unresolved"
@@ -63,9 +60,7 @@ def test_dynamic_decorator_argument_is_explicitly_unresolved_syntax(
     tmp_path: Path,
 ) -> None:
     (tmp_path / "service.py").write_text(
-        '@router.get(path_for("users"))\n'
-        "def handler():\n"
-        "    return None\n",
+        '@router.get(path_for("users"))\ndef handler():\n    return None\n',
         encoding="utf-8",
     )
     packet = _observe(tmp_path)
@@ -100,9 +95,7 @@ def test_missing_selected_file_does_not_prove_missing_routes(
     tmp_path: Path,
 ) -> None:
     (tmp_path / "service.py").write_text(
-        '@app.post("/users")\n'
-        "def create():\n"
-        "    pass\n",
+        '@app.post("/users")\ndef create():\n    pass\n',
         encoding="utf-8",
     )
     packet = _observe(tmp_path, paths=("service.py", "unknown.py"))
@@ -141,6 +134,9 @@ def test_replay_is_deterministic_and_source_mutation_changes_observation(
             [provider], previous_observation=original
         )
     assert newer["observation_identity"] != original["observation_identity"]
-    assert newer["declarations"]["groups"][0]["declarations"][0]["value"][
-        "literal_argument"
-    ] == "/v2"
+    assert (
+        newer["declarations"]["groups"][0]["declarations"][0]["value"][
+            "literal_argument"
+        ]
+        == "/v2"
+    )
