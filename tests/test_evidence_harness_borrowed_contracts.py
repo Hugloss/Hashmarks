@@ -15,10 +15,8 @@ from hashmarks.codemap.lsp_relationship_adapter import (
     normalize_lsp_captures,
 )
 from hashmarks.digest import FILE_DOMAIN, hash_bytes
-from hashmarks.evidence_presentation import (
-    present_repository_evidence,
-    validate_evidence_presentation,
-)
+from hashmarks.evidence_presentation import present_repository_evidence
+from hashmarks.evidence_presentation_conformance import validate_evidence_presentation
 
 
 def _range(line: int, start: int, end: int) -> dict:
