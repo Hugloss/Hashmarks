@@ -424,3 +424,17 @@ MCP must not add tools for:
 - remote repository tenancy.
 
 Those responsibilities remain with the external consumer. Local stdio is the only supported Hashmarks MCP transport in the initial contract; remote HTTP is a separate future product decision.
+
+### Caller-supplied reference and call-hierarchy evidence
+
+The existing `structural_locality` relationship result mode accepts
+`textDocument/references` and the three LSP call-hierarchy methods through
+the same request-local `supplied_observations` contract. This extension
+requires no LSP process, additional MCP tool, new persisted index, or default
+catalog change. Consult
+[qualified relationship observations](../reference/STRUCTURAL_LOCALITY.md)
+for the captured protocol shapes and claim/completeness restrictions.
+
+Pure native-to-presentation conformance and portable evidence binding
+reacquisition are public Python helpers over existing native packets, not
+new MCP operations. Host-model delivery receipts remain outside the server.
