@@ -510,9 +510,7 @@ def test_mcp_backend_decorator_context_tracks_current_source_after_edit(
     _repo(tmp_path)
     source = tmp_path / PATH
     source.write_text(
-        '@router.get("/before")\n'
-        "def process_widget(value):\n"
-        "    return value\n",
+        '@router.get("/before")\ndef process_widget(value):\n    return value\n',
         encoding="utf-8",
     )
     surface = HashmarksMcpSurface(str(tmp_path))
@@ -521,9 +519,7 @@ def test_mcp_backend_decorator_context_tracks_current_source_after_edit(
         before = surface.change_impact(TASK, [PATH], changed_line_spans=request)
         repeated = surface.change_impact(TASK, [PATH], changed_line_spans=request)
         source.write_text(
-            '@router.get("/after")\n'
-            "def process_widget(value):\n"
-            "    return value\n",
+            '@router.get("/after")\ndef process_widget(value):\n    return value\n',
             encoding="utf-8",
         )
         after = surface.change_impact(TASK, [PATH], changed_line_spans=request)
