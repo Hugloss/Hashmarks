@@ -1556,7 +1556,8 @@ def present_repository_evidence(
         "unprojected_sections": projection.unprojected,
         "authority": "descriptive-only",
         "execution_effect": "none",
-    }    if format == "text":
+    }
+    if format == "text":
         result["text"] = evidence_projection_text(result)
     return result
 
