@@ -11,6 +11,8 @@ from typing import TYPE_CHECKING, Any
 
 from hashmarks.paths import normalize_relative_path
 
+from .change_decorator_evidence import observe_python_decorator_associations
+
 if TYPE_CHECKING:
     from .engine import CodeMap
 
@@ -133,6 +135,9 @@ def observe_changed_line_spans(
             span["end_line"],
             limit=MAX_OVERLAPPING_SYMBOLS + 1,
         )
+        decorator_evidence = observe_python_decorator_associations(
+            codemap.store, path, raw, span
+        )
         # Reading outside the indexed source is not proof of its correspondence.
         after, _ = codemap._repository_member_observation(path, include_bytes=True)
         if (
@@ -160,6 +165,11 @@ def observe_changed_line_spans(
                     for candidate in candidates[:MAX_OVERLAPPING_SYMBOLS]
                 ],
                 "negative_evidence_admissible": False,
+                **(
+                    {"decorator_associations": decorator_evidence}
+                    if decorator_evidence is not None
+                    else {}
+                ),
             }
         )
     return {

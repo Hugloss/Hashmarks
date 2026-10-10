@@ -237,3 +237,140 @@ def test_cli_span_parser_rejects_malformed_bounds_without_new_exception_owner(
 ) -> None:
     with pytest.raises(ValueError, match="changed-line-span"):
         _changed_line_span_args([value])
+
+
+def test_backend_route_decorator_maps_to_handler_without_false_symbol_overlap(
+    tmp_path: Path,
+) -> None:
+    _repo(tmp_path)
+    (tmp_path / PATH).write_text(
+        "@router.get(\n"
+        '    "/widgets"\n'
+        ")\n"
+        "@cached\n"
+        "async def process_widget(value):\n"
+        "    return value\n\n"
+        "def other_widget(value):\n"
+        "    return value\n",
+        encoding="utf-8",
+    )
+    with CodeMap(tmp_path) as cm:
+        cm.sync()
+        impact = cm.task_change_impact(TASK, [PATH], options=_options(start=2, end=2))
+    row = impact["changed_line_evidence"]["observations"][0]
+    assert row["state"] == "source-index-correspondence-observed"
+    assert row["symbols"] == []  # Def starts after the edited decorator.
+    evidence = row["decorator_associations"]
+    assert evidence["state"] == "bounded-python-decorator-syntax"
+    assert evidence["negative_evidence_admissible"] is False
+    assert evidence["unresolved_count"] == 0
+    assert evidence["omitted_count"] == 0
+    assert len(evidence["associations"]) == 1
+    observed = evidence["associations"][0]
+    assert observed["subject"] == "src/backend.py::process_widget"
+    assert observed["declaration_line"] == 5
+    assert observed["indexed_symbol_range"]["start_line"] == 5
+    assert observed["overlapping_decorator_ranges"] == [
+        {"start_line": 1, "end_line": 3}
+    ]
+    assert observed["runtime_registration"] == "not-asserted"
+    assert observed["semantic_impact"] == "not-asserted"
+    presentation = present_repository_evidence(impact, format="compact")
+    assert validate_evidence_presentation(impact, presentation)["valid"] is True
+
+
+def test_backend_nested_method_decorator_is_not_confused_with_enclosing_class(
+    tmp_path: Path,
+) -> None:
+    _repo(tmp_path)
+    (tmp_path / PATH).write_text(
+        "class WidgetView:\n"
+        '    @router.post("/widgets")\n'
+        "    def process_widget(self, value):\n"
+        "        return value\n",
+        encoding="utf-8",
+    )
+    with CodeMap(tmp_path) as cm:
+        cm.sync()
+        impact = cm.task_change_impact(TASK, [PATH], options=_options(start=2, end=2))
+    row = impact["changed_line_evidence"]["observations"][0]
+    # The enclosing class overlaps the edited line; the method declaration
+    # starts later. The separate syntax association must bind exactly.
+    assert [s["qualname"] for s in row["symbols"]] == ["WidgetView"]
+    associations = row["decorator_associations"]["associations"]
+    assert len(associations) == 1
+    assert associations[0]["subject"] == "src/backend.py::WidgetView.process_widget"
+    assert associations[0]["declaration_line"] == 3
+
+
+def test_backend_decorator_association_is_bounded_and_never_negative(
+    tmp_path: Path,
+) -> None:
+    _repo(tmp_path)
+    lines = []
+    for number in range(20):
+        lines.extend(
+            [
+                "@decorator",
+                f"def handler_{number}():",
+                "    return 1",
+            ]
+        )
+    (tmp_path / PATH).write_text("\n".join(lines) + "\n", encoding="utf-8")
+    with CodeMap(tmp_path) as cm:
+        cm.sync()
+        impact = cm.task_change_impact(
+            TASK, [PATH], options=_options(start=1, end=len(lines))
+        )
+    evidence = impact["changed_line_evidence"]["observations"][0][
+        "decorator_associations"
+    ]
+    assert evidence["matched_declaration_count"] == 20
+    assert evidence["retained_count"] == 16
+    assert evidence["omitted_count"] == 4
+    assert evidence["negative_evidence_admissible"] is False
+    assert [x["name"] for x in evidence["associations"]] == [
+        f"handler_{number}" for number in range(16)
+    ]
+
+
+def test_backend_decorator_evidence_absent_when_source_is_denied(
+    tmp_path: Path,
+) -> None:
+    _repo(tmp_path)
+    (tmp_path / PATH).write_text(
+        '@router.get("/secret")\ndef process_widget(value):\n    return value\n',
+        encoding="utf-8",
+    )
+    (tmp_path / ".hashmarks-context.toml").write_text(
+        '[[rule]]\npattern = "src/backend.py"\nvisibility = "deny"\n'
+    )
+    with CodeMap(tmp_path) as cm:
+        cm.sync()
+        impact = cm.task_change_impact(TASK, [PATH], options=_options(start=1, end=1))
+    row = impact["changed_line_evidence"]["observations"][0]
+    assert row["state"] == "unresolved"
+    assert row["symbols"] == []
+    assert "decorator_associations" not in row
+
+
+def test_backend_python_decorator_parse_bound_is_explicit() -> None:
+    from hashmarks.codemap.change_decorator_evidence import (
+        MAX_DECORATOR_SOURCE_BYTES,
+        observe_python_decorator_associations,
+    )
+
+    class _NoIndex:
+        def symbols_overlapping_lines(self, *args, **kwargs):
+            raise AssertionError("index work before input-size admission")
+
+    evidence = observe_python_decorator_associations(
+        _NoIndex(),
+        PATH,
+        b"#" * (MAX_DECORATOR_SOURCE_BYTES + 1),
+        {"start_line": 1, "end_line": 1},
+    )
+    assert evidence is not None
+    assert evidence["state"] == "unresolved"
+    assert evidence["reason"] == "python-decorator-source-over-bound"
+    assert evidence["negative_evidence_admissible"] is False

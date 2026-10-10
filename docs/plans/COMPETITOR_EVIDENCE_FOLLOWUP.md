@@ -47,6 +47,31 @@ new search/indexer, history engine or agent workflow is admitted. A future
 more-precise line-level *edit* oracle must be producer-supplied with revision
 binding and separate qualification; reported spans alone prove no actual edit.
 
+## B06 backend decorator source correspondence (following merged #419)
+
+The changed-line B03 index-range query intentionally starts at a Python
+function/class declaration line. A changed `@router.get`, `@app.post`,
+`@mcp.tool`, or other decorator above the declaration is therefore **not**
+an indexed-symbol-range overlap. This reproducible backend handler locality
+gap must not be repaired by pretending the symbol starts earlier.
+
+B06 extends the existing optional `changed_line_evidence` packet with a
+**separate direct syntax observation** for current Python source only.
+It parses at most 256 KiB of already source-admitted bytes per span, finds
+decorator expressions that directly overlap reported lines and binds each to
+an exact current indexed function, method or class at its declaration line.
+A bounded query must establish unique source/index correspondence; otherwise
+the association is unresolved and never promoted to a selected owner.
+At most 16 associations are retained per span with explicit omission and
+unresolved counts. Only unchanged source revisions survive the existing
+read-after-query qualification.
+
+The handler/decorator association is **syntactic**, not runtime route
+registration, call graph connectivity, affected execution, verification
+coverage or evidence of a real edit. Ordinary symbol overlaps remain
+unchanged. No new index/schema/MCP tool/state owner, workflow, or source
+scanner is admitted; non-Python files retain their prior output.
+
 ## Open conditional checkpoints
 
 - **H04:** changed-line → symbol/relationship claims require a direct
