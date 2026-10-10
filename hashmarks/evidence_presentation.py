@@ -739,6 +739,15 @@ def _direct_relationships(
     ctx: Mapping[str, object],
 ) -> None:
     p.field(packet, "coverage", "qualification", ref, ctx, shape="record")
+    p.field(
+        packet,
+        "producer_correspondence",
+        "correspondence",
+        ref,
+        ctx,
+        shape="record",
+        assertion="producer_claim",
+    )
     observations = packet.get("observations", [])
     if not isinstance(observations, list):
         return

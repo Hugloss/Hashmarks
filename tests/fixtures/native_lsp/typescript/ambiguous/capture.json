@@ -1,0 +1,18 @@
+{
+  "captures_sha256": "79f06215670498259c3d68b625ec0803529c5ba99fa46c091148ebe08a78f0c7",
+  "configuration": {
+    "package.json": "{\"name\":\"hashmarks-native-typescript\",\"version\":\"1.0.0\",\"private\":true}\n",
+    "tsconfig.json": "{\"compilerOptions\":{\"strict\":true,\"target\":\"ES2022\"},\"include\":[\"src/**/*.ts\"]}\n"
+  },
+  "original_root_uri": "file:///tmp/hashmarks-lsp-captured/typescript/ambiguous",
+  "producer": "typescript-language-server",
+  "producer_version": "5.3.0",
+  "qualification_authority": "external-capture-caller-claim",
+  "source_revisions": {
+    "src/contract.ts": "0ec020f4eb3276fdca18d3a2b61fc11a81fd0c272e8062d7847d4e097244c377",
+    "src/engine.ts": "b1f316aabfdf11d7b235af56f7648257825c4cd618937b122225e5162ffa42d9"
+  },
+  "transcript_sha256": "b33e6bf77b3e7d8c3b57d41a8b8073deb899e750a32b93b6b5b4eb7c7895288d",
+  "typescript_runtime": "/tmp/hashmarks-native-tools/node_modules/typescript/lib/tsserver.js",
+  "typescript_runtime_sha256": "e3ccfeec65ec5c470b8ffc5611878a31182650c7e8a062c38a719f83b523edcb"
+}

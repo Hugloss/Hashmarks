@@ -341,3 +341,24 @@ acquire provider, consumer, execution or persistent-history authority.
 Consumer/execution responsibility explicitly not acquired: interpretation,
 actions, agent execution, scheduling, and certification.
 Decision: **OBSERVER**.
+
+## Producer-to-presentation conformance
+
+`hashmarks.evidence_presentation_conformance.validate_evidence_presentation`
+is a pure, repository-free conformance check. It reproduces the existing
+`structured`, `compact` or `text` projection from a supplied native packet
+and rejects a mismatched presentation, including dropped uncertainty, forged
+`source_refs`, changed assertions, and omitted qualifications. The producer
+packet is still the semantic authority; this check does not attest a host's
+submitted model request.
+
+`none` remains an unwrapped canonical native response. Formatted MCP
+responses retain the native result **as well as** their bounded presentation,
+so choosing `compact` is not proof of total payload/token reduction.
+No projection-only model transport is enabled without separate measured
+admission and an independently sufficient omission/identity contract.
+
+Cross-producer relationship correspondence is shown with
+`assertion: producer_claim`: agreement of two tool claims is not independent
+source proof or admissible negative evidence. Host execution, request-inclusion
+receipts, attention, causal attribution and compaction stay consumer-owned.

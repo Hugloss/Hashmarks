@@ -1,0 +1,86 @@
+[
+  {
+    "name": "definition",
+    "method": "textDocument/definition",
+    "subject": "src/callee.py::target",
+    "path": "src/callee.py",
+    "position": {
+      "line": 0,
+      "character": 4
+    }
+  },
+  {
+    "name": "body-definition",
+    "method": "textDocument/definition",
+    "subject": "src/caller.py::caller",
+    "path": "src/caller.py",
+    "position": {
+      "line": 4,
+      "character": 11
+    }
+  },
+  {
+    "name": "duplicate-definition",
+    "method": "textDocument/definition",
+    "subject": "src/duplicate.py::duplicate",
+    "path": "src/duplicate.py",
+    "position": {
+      "line": 4,
+      "character": 11
+    }
+  },
+  {
+    "name": "references-true",
+    "method": "textDocument/references",
+    "subject": "src/callee.py::target",
+    "path": "src/callee.py",
+    "position": {
+      "line": 0,
+      "character": 4
+    },
+    "includeDeclaration": true
+  },
+  {
+    "name": "references-false",
+    "method": "textDocument/references",
+    "subject": "src/callee.py::target",
+    "path": "src/callee.py",
+    "position": {
+      "line": 0,
+      "character": 4
+    },
+    "includeDeclaration": false
+  },
+  {
+    "name": "prepare-target",
+    "method": "textDocument/prepareCallHierarchy",
+    "subject": "src/callee.py::target",
+    "path": "src/callee.py",
+    "position": {
+      "line": 0,
+      "character": 4
+    }
+  },
+  {
+    "name": "incoming",
+    "method": "callHierarchy/incomingCalls",
+    "subject": "src/callee.py::target",
+    "prepared": "prepare-target"
+  },
+  {
+    "name": "prepare-caller",
+    "method": "textDocument/prepareCallHierarchy",
+    "subject": "src/caller.py::caller",
+    "path": "src/caller.py",
+    "position": {
+      "line": 3,
+      "character": 4
+    }
+  },
+  {
+    "name": "outgoing",
+    "method": "callHierarchy/outgoingCalls",
+    "subject": "src/caller.py::caller",
+    "prepared": "prepare-caller"
+  }
+]

@@ -63,7 +63,7 @@ def semantic_relationship_observation(
     subject = f"{target['path']}::{target['qualname']}"
     observations = scip_relationship_observations(codemap, target, resolver)
     observations.extend(
-        lsp_relationship_observation(capture, subject, resolver) for capture in captures
+        lsp_relationship_observation(capture, target, resolver) for capture in captures
     )
     freshness = codemap._query_freshness_fields()
     stale = freshness.get("stale")

@@ -1,0 +1,925 @@
+[
+  {
+    "sent": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "method": "initialize",
+      "params": {
+        "capabilities": {
+          "general": {
+            "positionEncodings": [
+              "utf-16"
+            ]
+          },
+          "textDocument": {
+            "callHierarchy": {
+              "dynamicRegistration": false
+            }
+          }
+        },
+        "initializationOptions": {},
+        "processId": null,
+        "rootUri": "file:///tmp/hashmarks-lsp-captured/python/before",
+        "workspaceFolders": [
+          {
+            "name": "fixture",
+            "uri": "file:///tmp/hashmarks-lsp-captured/python/before"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "received": {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "message": "Pyright language server 1.1.414 starting",
+        "type": 3
+      }
+    }
+  },
+  {
+    "received": {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "message": "Server root directory: file:///home/hl2/Bolagsverket/code/projects/Hashmarks/.venv/lib/python3.11/site-packages/pyright/dist/dist",
+        "type": 3
+      }
+    }
+  },
+  {
+    "received": {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "message": "Starting service instance \"fixture\"",
+        "type": 3
+      }
+    }
+  },
+  {
+    "received": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "capabilities": {
+          "callHierarchyProvider": true,
+          "codeActionProvider": {
+            "codeActionKinds": [
+              "quickfix",
+              "source.organizeImports"
+            ],
+            "workDoneProgress": true
+          },
+          "completionProvider": {
+            "completionItem": {
+              "labelDetailsSupport": true
+            },
+            "resolveProvider": true,
+            "triggerCharacters": [
+              ".",
+              "[",
+              "\"",
+              "'"
+            ],
+            "workDoneProgress": true
+          },
+          "declarationProvider": {
+            "workDoneProgress": true
+          },
+          "definitionProvider": {
+            "workDoneProgress": true
+          },
+          "documentHighlightProvider": {
+            "workDoneProgress": true
+          },
+          "documentSymbolProvider": {
+            "workDoneProgress": true
+          },
+          "executeCommandProvider": {
+            "commands": [],
+            "workDoneProgress": true
+          },
+          "hoverProvider": {
+            "workDoneProgress": true
+          },
+          "referencesProvider": {
+            "workDoneProgress": true
+          },
+          "renameProvider": {
+            "prepareProvider": true,
+            "workDoneProgress": true
+          },
+          "signatureHelpProvider": {
+            "triggerCharacters": [
+              "(",
+              ",",
+              ")"
+            ],
+            "workDoneProgress": true
+          },
+          "textDocumentSync": 2,
+          "typeDefinitionProvider": {
+            "workDoneProgress": true
+          },
+          "workspace": {
+            "workspaceFolders": {
+              "changeNotifications": true,
+              "supported": true
+            }
+          },
+          "workspaceSymbolProvider": {
+            "workDoneProgress": true
+          }
+        }
+      }
+    }
+  },
+  {
+    "sent": {
+      "jsonrpc": "2.0",
+      "method": "initialized",
+      "params": {}
+    }
+  },
+  {
+    "sent": {
+      "jsonrpc": "2.0",
+      "method": "textDocument/didOpen",
+      "params": {
+        "textDocument": {
+          "languageId": "python",
+          "text": "def target():\n    return 1\n",
+          "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/callee.py",
+          "version": 1
+        }
+      }
+    }
+  },
+  {
+    "sent": {
+      "jsonrpc": "2.0",
+      "method": "textDocument/didOpen",
+      "params": {
+        "textDocument": {
+          "languageId": "python",
+          "text": "from callee import target\n\n\ndef caller():\n    return target()\n",
+          "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/caller.py",
+          "version": 1
+        }
+      }
+    }
+  },
+  {
+    "sent": {
+      "jsonrpc": "2.0",
+      "method": "textDocument/didOpen",
+      "params": {
+        "textDocument": {
+          "languageId": "python",
+          "text": "from other import target as other_target\n\n\ndef duplicate():\n    return other_target()\n",
+          "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/duplicate.py",
+          "version": 1
+        }
+      }
+    }
+  },
+  {
+    "sent": {
+      "jsonrpc": "2.0",
+      "method": "textDocument/didOpen",
+      "params": {
+        "textDocument": {
+          "languageId": "python",
+          "text": "def target():\n    return 3\n",
+          "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/other.py",
+          "version": 1
+        }
+      }
+    }
+  },
+  {
+    "sent": {
+      "id": 2,
+      "jsonrpc": "2.0",
+      "method": "textDocument/definition",
+      "params": {
+        "position": {
+          "character": 4,
+          "line": 0
+        },
+        "textDocument": {
+          "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/callee.py"
+        }
+      }
+    }
+  },
+  {
+    "received": {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "message": "Loading configuration file at /tmp/hashmarks-lsp-captured/python/before/pyrightconfig.json",
+        "type": 3
+      }
+    }
+  },
+  {
+    "received": {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "message": "Auto-excluding **/node_modules",
+        "type": 3
+      }
+    }
+  },
+  {
+    "received": {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "message": "Auto-excluding **/__pycache__",
+        "type": 3
+      }
+    }
+  },
+  {
+    "received": {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "message": "Auto-excluding **/.*",
+        "type": 3
+      }
+    }
+  },
+  {
+    "received": {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "message": "Auto-excluding **/__editable__.*",
+        "type": 3
+      }
+    }
+  },
+  {
+    "received": {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "message": "Unable to get Python version from interpreter",
+        "type": 3
+      }
+    }
+  },
+  {
+    "received": {
+      "id": 2,
+      "jsonrpc": "2.0",
+      "result": [
+        {
+          "range": {
+            "end": {
+              "character": 10,
+              "line": 0
+            },
+            "start": {
+              "character": 4,
+              "line": 0
+            }
+          },
+          "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/callee.py"
+        }
+      ]
+    }
+  },
+  {
+    "sent": {
+      "id": 3,
+      "jsonrpc": "2.0",
+      "method": "textDocument/definition",
+      "params": {
+        "position": {
+          "character": 11,
+          "line": 4
+        },
+        "textDocument": {
+          "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/caller.py"
+        }
+      }
+    }
+  },
+  {
+    "received": {
+      "id": 3,
+      "jsonrpc": "2.0",
+      "result": [
+        {
+          "range": {
+            "end": {
+              "character": 10,
+              "line": 0
+            },
+            "start": {
+              "character": 4,
+              "line": 0
+            }
+          },
+          "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/callee.py"
+        }
+      ]
+    }
+  },
+  {
+    "sent": {
+      "id": 4,
+      "jsonrpc": "2.0",
+      "method": "textDocument/definition",
+      "params": {
+        "position": {
+          "character": 11,
+          "line": 4
+        },
+        "textDocument": {
+          "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/duplicate.py"
+        }
+      }
+    }
+  },
+  {
+    "received": {
+      "id": 4,
+      "jsonrpc": "2.0",
+      "result": [
+        {
+          "range": {
+            "end": {
+              "character": 10,
+              "line": 0
+            },
+            "start": {
+              "character": 4,
+              "line": 0
+            }
+          },
+          "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/other.py"
+        }
+      ]
+    }
+  },
+  {
+    "sent": {
+      "id": 5,
+      "jsonrpc": "2.0",
+      "method": "textDocument/references",
+      "params": {
+        "context": {
+          "includeDeclaration": true
+        },
+        "position": {
+          "character": 4,
+          "line": 0
+        },
+        "textDocument": {
+          "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/callee.py"
+        }
+      }
+    }
+  },
+  {
+    "received": {
+      "id": 5,
+      "jsonrpc": "2.0",
+      "result": [
+        {
+          "range": {
+            "end": {
+              "character": 10,
+              "line": 0
+            },
+            "start": {
+              "character": 4,
+              "line": 0
+            }
+          },
+          "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/callee.py"
+        },
+        {
+          "range": {
+            "end": {
+              "character": 25,
+              "line": 0
+            },
+            "start": {
+              "character": 19,
+              "line": 0
+            }
+          },
+          "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/caller.py"
+        },
+        {
+          "range": {
+            "end": {
+              "character": 17,
+              "line": 4
+            },
+            "start": {
+              "character": 11,
+              "line": 4
+            }
+          },
+          "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/caller.py"
+        }
+      ]
+    }
+  },
+  {
+    "sent": {
+      "id": 6,
+      "jsonrpc": "2.0",
+      "method": "textDocument/references",
+      "params": {
+        "context": {
+          "includeDeclaration": false
+        },
+        "position": {
+          "character": 4,
+          "line": 0
+        },
+        "textDocument": {
+          "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/callee.py"
+        }
+      }
+    }
+  },
+  {
+    "received": {
+      "id": 6,
+      "jsonrpc": "2.0",
+      "result": [
+        {
+          "range": {
+            "end": {
+              "character": 25,
+              "line": 0
+            },
+            "start": {
+              "character": 19,
+              "line": 0
+            }
+          },
+          "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/caller.py"
+        },
+        {
+          "range": {
+            "end": {
+              "character": 17,
+              "line": 4
+            },
+            "start": {
+              "character": 11,
+              "line": 4
+            }
+          },
+          "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/caller.py"
+        }
+      ]
+    }
+  },
+  {
+    "sent": {
+      "id": 7,
+      "jsonrpc": "2.0",
+      "method": "textDocument/prepareCallHierarchy",
+      "params": {
+        "position": {
+          "character": 4,
+          "line": 0
+        },
+        "textDocument": {
+          "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/callee.py"
+        }
+      }
+    }
+  },
+  {
+    "received": {
+      "id": 7,
+      "jsonrpc": "2.0",
+      "result": [
+        {
+          "detail": "(callee.py)",
+          "kind": 12,
+          "name": "target",
+          "range": {
+            "end": {
+              "character": 10,
+              "line": 0
+            },
+            "start": {
+              "character": 4,
+              "line": 0
+            }
+          },
+          "selectionRange": {
+            "end": {
+              "character": 10,
+              "line": 0
+            },
+            "start": {
+              "character": 4,
+              "line": 0
+            }
+          },
+          "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/callee.py"
+        }
+      ]
+    }
+  },
+  {
+    "sent": {
+      "id": 8,
+      "jsonrpc": "2.0",
+      "method": "callHierarchy/incomingCalls",
+      "params": {
+        "item": {
+          "detail": "(callee.py)",
+          "kind": 12,
+          "name": "target",
+          "range": {
+            "end": {
+              "character": 10,
+              "line": 0
+            },
+            "start": {
+              "character": 4,
+              "line": 0
+            }
+          },
+          "selectionRange": {
+            "end": {
+              "character": 10,
+              "line": 0
+            },
+            "start": {
+              "character": 4,
+              "line": 0
+            }
+          },
+          "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/callee.py"
+        }
+      }
+    }
+  },
+  {
+    "received": {
+      "id": 8,
+      "jsonrpc": "2.0",
+      "result": [
+        {
+          "from": {
+            "detail": "(caller.py)",
+            "kind": 12,
+            "name": "caller",
+            "range": {
+              "end": {
+                "character": 10,
+                "line": 3
+              },
+              "start": {
+                "character": 4,
+                "line": 3
+              }
+            },
+            "selectionRange": {
+              "end": {
+                "character": 10,
+                "line": 3
+              },
+              "start": {
+                "character": 4,
+                "line": 3
+              }
+            },
+            "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/caller.py"
+          },
+          "fromRanges": [
+            {
+              "end": {
+                "character": 17,
+                "line": 4
+              },
+              "start": {
+                "character": 11,
+                "line": 4
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "sent": {
+      "id": 9,
+      "jsonrpc": "2.0",
+      "method": "textDocument/prepareCallHierarchy",
+      "params": {
+        "position": {
+          "character": 4,
+          "line": 3
+        },
+        "textDocument": {
+          "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/caller.py"
+        }
+      }
+    }
+  },
+  {
+    "received": {
+      "id": 9,
+      "jsonrpc": "2.0",
+      "result": [
+        {
+          "detail": "(caller.py)",
+          "kind": 12,
+          "name": "caller",
+          "range": {
+            "end": {
+              "character": 10,
+              "line": 3
+            },
+            "start": {
+              "character": 4,
+              "line": 3
+            }
+          },
+          "selectionRange": {
+            "end": {
+              "character": 10,
+              "line": 3
+            },
+            "start": {
+              "character": 4,
+              "line": 3
+            }
+          },
+          "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/caller.py"
+        }
+      ]
+    }
+  },
+  {
+    "sent": {
+      "id": 10,
+      "jsonrpc": "2.0",
+      "method": "callHierarchy/outgoingCalls",
+      "params": {
+        "item": {
+          "detail": "(caller.py)",
+          "kind": 12,
+          "name": "caller",
+          "range": {
+            "end": {
+              "character": 10,
+              "line": 3
+            },
+            "start": {
+              "character": 4,
+              "line": 3
+            }
+          },
+          "selectionRange": {
+            "end": {
+              "character": 10,
+              "line": 3
+            },
+            "start": {
+              "character": 4,
+              "line": 3
+            }
+          },
+          "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/caller.py"
+        }
+      }
+    }
+  },
+  {
+    "received": {
+      "id": 10,
+      "jsonrpc": "2.0",
+      "result": [
+        {
+          "fromRanges": [
+            {
+              "end": {
+                "character": 17,
+                "line": 4
+              },
+              "start": {
+                "character": 11,
+                "line": 4
+              }
+            }
+          ],
+          "to": {
+            "detail": "(callee.py) \u00b7 Workspace",
+            "kind": 12,
+            "name": "target",
+            "range": {
+              "end": {
+                "character": 10,
+                "line": 0
+              },
+              "start": {
+                "character": 4,
+                "line": 0
+              }
+            },
+            "selectionRange": {
+              "end": {
+                "character": 10,
+                "line": 0
+              },
+              "start": {
+                "character": 4,
+                "line": 0
+              }
+            },
+            "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/callee.py"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "sent": {
+      "jsonrpc": "2.0",
+      "method": "textDocument/didChange",
+      "params": {
+        "contentChanges": [
+          {
+            "text": "def target():\n    return 22\n"
+          }
+        ],
+        "textDocument": {
+          "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/callee.py",
+          "version": 2
+        }
+      }
+    }
+  },
+  {
+    "sent": {
+      "id": 11,
+      "jsonrpc": "2.0",
+      "method": "textDocument/definition",
+      "params": {
+        "position": {
+          "character": 4,
+          "line": 0
+        },
+        "textDocument": {
+          "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/callee.py"
+        }
+      }
+    }
+  },
+  {
+    "received": {
+      "id": 11,
+      "jsonrpc": "2.0",
+      "result": [
+        {
+          "range": {
+            "end": {
+              "character": 10,
+              "line": 0
+            },
+            "start": {
+              "character": 4,
+              "line": 0
+            }
+          },
+          "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/callee.py"
+        }
+      ]
+    }
+  },
+  {
+    "sent": {
+      "jsonrpc": "2.0",
+      "method": "textDocument/didClose",
+      "params": {
+        "textDocument": {
+          "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/callee.py"
+        }
+      }
+    }
+  },
+  {
+    "sent": {
+      "jsonrpc": "2.0",
+      "method": "textDocument/didOpen",
+      "params": {
+        "textDocument": {
+          "languageId": "python",
+          "text": "def target():\n    return 1\n",
+          "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/callee.py",
+          "version": 1
+        }
+      }
+    }
+  },
+  {
+    "sent": {
+      "id": 12,
+      "jsonrpc": "2.0",
+      "method": "textDocument/definition",
+      "params": {
+        "position": {
+          "character": 4,
+          "line": 0
+        },
+        "textDocument": {
+          "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/callee.py"
+        }
+      }
+    }
+  },
+  {
+    "received": {
+      "jsonrpc": "2.0",
+      "method": "textDocument/publishDiagnostics",
+      "params": {
+        "diagnostics": [],
+        "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/callee.py"
+      }
+    }
+  },
+  {
+    "received": {
+      "jsonrpc": "2.0",
+      "method": "pyright/beginProgress",
+      "params": [
+        null
+      ]
+    }
+  },
+  {
+    "received": {
+      "jsonrpc": "2.0",
+      "method": "pyright/reportProgress",
+      "params": [
+        "3 files to analyze"
+      ]
+    }
+  },
+  {
+    "received": {
+      "id": 12,
+      "jsonrpc": "2.0",
+      "result": [
+        {
+          "range": {
+            "end": {
+              "character": 10,
+              "line": 0
+            },
+            "start": {
+              "character": 4,
+              "line": 0
+            }
+          },
+          "uri": "file:///tmp/hashmarks-lsp-captured/python/before/src/callee.py"
+        }
+      ]
+    }
+  },
+  {
+    "sent": {
+      "id": 13,
+      "jsonrpc": "2.0",
+      "method": "shutdown",
+      "params": {}
+    }
+  },
+  {
+    "received": {
+      "id": 13,
+      "jsonrpc": "2.0",
+      "result": null
+    }
+  },
+  {
+    "sent": {
+      "jsonrpc": "2.0",
+      "method": "exit",
+      "params": {}
+    }
+  }
+]

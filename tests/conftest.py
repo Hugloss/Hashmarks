@@ -68,6 +68,32 @@ def native_scip_corpus(tmp_path_factory):
 
 
 @pytest.fixture(scope="session")
+def native_lsp_corpus(tmp_path_factory):
+    import os
+
+    from native_evidence_support import LSP_CORPUS
+
+    if os.environ.get("HASHMARKS_NATIVE_EVIDENCE_LIVE") == "1":
+        import compileall
+        import shutil
+
+        from scripts.native_lsp_capture import capture_lsp
+
+        destination = tmp_path_factory.mktemp("native-lsp")
+        for language in ("python", "typescript"):
+            for source in sorted((LSP_CORPUS / language).iterdir()):
+                if language == "python":
+                    # Real interpreter output must never become a source snapshot.
+                    prepared = destination / "compiled-inputs" / source.name
+                    shutil.copytree(source, prepared)
+                    assert compileall.compile_dir(prepared / "src", quiet=1)
+                    source = prepared
+                capture_lsp(source, destination / language / source.name, language)
+        return destination
+    return LSP_CORPUS
+
+
+@pytest.fixture(scope="session")
 def repository_qualification_plan():
     """One immutable repository qualification snapshot for read-only contract tests."""
     from hashmarks.qualification_units import qualification_owner_plan

@@ -81,3 +81,15 @@ commands, or missing output fail this explicitly selected ring. Captures never
 fall back to committed output or rewrite repository fixtures or the root lock.
 This manual development ring has no dedicated CI job and makes no claim that
 producer resolution itself is correct.
+
+The real-file workflow ring additionally replaces BOM and reactor POMs in the
+admitted repository. Every root and nested POM is revision-bound: changing only
+`alpha/pom.xml` makes the old reactor capture's input correspondence mismatch,
+and a fresh capture observes Guava changes in both alpha and beta contexts.
+Version transitions must remain among the first projected dependency findings.
+
+`uv/workspace` retains genuine offline uv locks for a local member version change,
+member move, orphan removal, and removal of the root project declaration. The
+last state preserves the existing explicit unsupported-project-root result;
+workspace membership alone does not prove module ownership. Fixture replacement
+removes old owned manifests instead of overlaying renamed/deleted members.

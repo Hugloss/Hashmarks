@@ -1,0 +1,1605 @@
+[
+  {
+    "capture": {
+      "capabilities": {
+        "callHierarchyProvider": true,
+        "codeActionProvider": {
+          "codeActionKinds": [
+            "quickfix",
+            "source.organizeImports"
+          ],
+          "workDoneProgress": true
+        },
+        "completionProvider": {
+          "completionItem": {
+            "labelDetailsSupport": true
+          },
+          "resolveProvider": true,
+          "triggerCharacters": [
+            ".",
+            "[",
+            "\"",
+            "'"
+          ],
+          "workDoneProgress": true
+        },
+        "declarationProvider": {
+          "workDoneProgress": true
+        },
+        "definitionProvider": {
+          "workDoneProgress": true
+        },
+        "documentHighlightProvider": {
+          "workDoneProgress": true
+        },
+        "documentSymbolProvider": {
+          "workDoneProgress": true
+        },
+        "executeCommandProvider": {
+          "commands": [],
+          "workDoneProgress": true
+        },
+        "hoverProvider": {
+          "workDoneProgress": true
+        },
+        "referencesProvider": {
+          "workDoneProgress": true
+        },
+        "renameProvider": {
+          "prepareProvider": true,
+          "workDoneProgress": true
+        },
+        "signatureHelpProvider": {
+          "triggerCharacters": [
+            "(",
+            ",",
+            ")"
+          ],
+          "workDoneProgress": true
+        },
+        "textDocumentSync": 2,
+        "typeDefinitionProvider": {
+          "workDoneProgress": true
+        },
+        "workspace": {
+          "workspaceFolders": {
+            "changeNotifications": true,
+            "supported": true
+          }
+        },
+        "workspaceSymbolProvider": {
+          "workDoneProgress": true
+        }
+      },
+      "collection_state": "fresh-complete",
+      "configuration_identity": "sha256:ad9db6e6457d9d64eb7199f260ece2d9232575d7c39e6efb475ca8d554623117",
+      "documents": {
+        "src/callee.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "def target():\n    return 2\n"
+        },
+        "src/caller.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "from callee import target\n\n\ndef caller():\n    return target()\n"
+        },
+        "src/duplicate.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "from other import target as other_target\n\n\ndef duplicate():\n    return other_target()\n"
+        },
+        "src/other.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "def target():\n    return 3\n"
+        }
+      },
+      "position_encoding": "utf-16",
+      "producer": "pyright-langserver",
+      "request": {
+        "id": 2,
+        "jsonrpc": "2.0",
+        "method": "textDocument/definition",
+        "params": {
+          "position": {
+            "character": 4,
+            "line": 0
+          },
+          "textDocument": {
+            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/callee.py"
+          }
+        }
+      },
+      "response": {
+        "id": 2,
+        "jsonrpc": "2.0",
+        "result": [
+          {
+            "range": {
+              "end": {
+                "character": 10,
+                "line": 0
+              },
+              "start": {
+                "character": 4,
+                "line": 0
+              }
+            },
+            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/callee.py"
+          }
+        ]
+      },
+      "schema": "hashmarks.lsp-relationship-capture.v1"
+    },
+    "name": "definition",
+    "subject": "src/callee.py::target"
+  },
+  {
+    "capture": {
+      "capabilities": {
+        "callHierarchyProvider": true,
+        "codeActionProvider": {
+          "codeActionKinds": [
+            "quickfix",
+            "source.organizeImports"
+          ],
+          "workDoneProgress": true
+        },
+        "completionProvider": {
+          "completionItem": {
+            "labelDetailsSupport": true
+          },
+          "resolveProvider": true,
+          "triggerCharacters": [
+            ".",
+            "[",
+            "\"",
+            "'"
+          ],
+          "workDoneProgress": true
+        },
+        "declarationProvider": {
+          "workDoneProgress": true
+        },
+        "definitionProvider": {
+          "workDoneProgress": true
+        },
+        "documentHighlightProvider": {
+          "workDoneProgress": true
+        },
+        "documentSymbolProvider": {
+          "workDoneProgress": true
+        },
+        "executeCommandProvider": {
+          "commands": [],
+          "workDoneProgress": true
+        },
+        "hoverProvider": {
+          "workDoneProgress": true
+        },
+        "referencesProvider": {
+          "workDoneProgress": true
+        },
+        "renameProvider": {
+          "prepareProvider": true,
+          "workDoneProgress": true
+        },
+        "signatureHelpProvider": {
+          "triggerCharacters": [
+            "(",
+            ",",
+            ")"
+          ],
+          "workDoneProgress": true
+        },
+        "textDocumentSync": 2,
+        "typeDefinitionProvider": {
+          "workDoneProgress": true
+        },
+        "workspace": {
+          "workspaceFolders": {
+            "changeNotifications": true,
+            "supported": true
+          }
+        },
+        "workspaceSymbolProvider": {
+          "workDoneProgress": true
+        }
+      },
+      "collection_state": "fresh-complete",
+      "configuration_identity": "sha256:ad9db6e6457d9d64eb7199f260ece2d9232575d7c39e6efb475ca8d554623117",
+      "documents": {
+        "src/callee.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "def target():\n    return 2\n"
+        },
+        "src/caller.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "from callee import target\n\n\ndef caller():\n    return target()\n"
+        },
+        "src/duplicate.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "from other import target as other_target\n\n\ndef duplicate():\n    return other_target()\n"
+        },
+        "src/other.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "def target():\n    return 3\n"
+        }
+      },
+      "position_encoding": "utf-16",
+      "producer": "pyright-langserver",
+      "request": {
+        "id": 3,
+        "jsonrpc": "2.0",
+        "method": "textDocument/definition",
+        "params": {
+          "position": {
+            "character": 11,
+            "line": 4
+          },
+          "textDocument": {
+            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/caller.py"
+          }
+        }
+      },
+      "response": {
+        "id": 3,
+        "jsonrpc": "2.0",
+        "result": [
+          {
+            "range": {
+              "end": {
+                "character": 10,
+                "line": 0
+              },
+              "start": {
+                "character": 4,
+                "line": 0
+              }
+            },
+            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/callee.py"
+          }
+        ]
+      },
+      "schema": "hashmarks.lsp-relationship-capture.v1"
+    },
+    "name": "body-definition",
+    "subject": "src/caller.py::caller"
+  },
+  {
+    "capture": {
+      "capabilities": {
+        "callHierarchyProvider": true,
+        "codeActionProvider": {
+          "codeActionKinds": [
+            "quickfix",
+            "source.organizeImports"
+          ],
+          "workDoneProgress": true
+        },
+        "completionProvider": {
+          "completionItem": {
+            "labelDetailsSupport": true
+          },
+          "resolveProvider": true,
+          "triggerCharacters": [
+            ".",
+            "[",
+            "\"",
+            "'"
+          ],
+          "workDoneProgress": true
+        },
+        "declarationProvider": {
+          "workDoneProgress": true
+        },
+        "definitionProvider": {
+          "workDoneProgress": true
+        },
+        "documentHighlightProvider": {
+          "workDoneProgress": true
+        },
+        "documentSymbolProvider": {
+          "workDoneProgress": true
+        },
+        "executeCommandProvider": {
+          "commands": [],
+          "workDoneProgress": true
+        },
+        "hoverProvider": {
+          "workDoneProgress": true
+        },
+        "referencesProvider": {
+          "workDoneProgress": true
+        },
+        "renameProvider": {
+          "prepareProvider": true,
+          "workDoneProgress": true
+        },
+        "signatureHelpProvider": {
+          "triggerCharacters": [
+            "(",
+            ",",
+            ")"
+          ],
+          "workDoneProgress": true
+        },
+        "textDocumentSync": 2,
+        "typeDefinitionProvider": {
+          "workDoneProgress": true
+        },
+        "workspace": {
+          "workspaceFolders": {
+            "changeNotifications": true,
+            "supported": true
+          }
+        },
+        "workspaceSymbolProvider": {
+          "workDoneProgress": true
+        }
+      },
+      "collection_state": "fresh-complete",
+      "configuration_identity": "sha256:ad9db6e6457d9d64eb7199f260ece2d9232575d7c39e6efb475ca8d554623117",
+      "documents": {
+        "src/callee.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "def target():\n    return 2\n"
+        },
+        "src/caller.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "from callee import target\n\n\ndef caller():\n    return target()\n"
+        },
+        "src/duplicate.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "from other import target as other_target\n\n\ndef duplicate():\n    return other_target()\n"
+        },
+        "src/other.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "def target():\n    return 3\n"
+        }
+      },
+      "position_encoding": "utf-16",
+      "producer": "pyright-langserver",
+      "request": {
+        "id": 4,
+        "jsonrpc": "2.0",
+        "method": "textDocument/definition",
+        "params": {
+          "position": {
+            "character": 11,
+            "line": 4
+          },
+          "textDocument": {
+            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/duplicate.py"
+          }
+        }
+      },
+      "response": {
+        "id": 4,
+        "jsonrpc": "2.0",
+        "result": [
+          {
+            "range": {
+              "end": {
+                "character": 10,
+                "line": 0
+              },
+              "start": {
+                "character": 4,
+                "line": 0
+              }
+            },
+            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/other.py"
+          }
+        ]
+      },
+      "schema": "hashmarks.lsp-relationship-capture.v1"
+    },
+    "name": "duplicate-definition",
+    "subject": "src/duplicate.py::duplicate"
+  },
+  {
+    "capture": {
+      "capabilities": {
+        "callHierarchyProvider": true,
+        "codeActionProvider": {
+          "codeActionKinds": [
+            "quickfix",
+            "source.organizeImports"
+          ],
+          "workDoneProgress": true
+        },
+        "completionProvider": {
+          "completionItem": {
+            "labelDetailsSupport": true
+          },
+          "resolveProvider": true,
+          "triggerCharacters": [
+            ".",
+            "[",
+            "\"",
+            "'"
+          ],
+          "workDoneProgress": true
+        },
+        "declarationProvider": {
+          "workDoneProgress": true
+        },
+        "definitionProvider": {
+          "workDoneProgress": true
+        },
+        "documentHighlightProvider": {
+          "workDoneProgress": true
+        },
+        "documentSymbolProvider": {
+          "workDoneProgress": true
+        },
+        "executeCommandProvider": {
+          "commands": [],
+          "workDoneProgress": true
+        },
+        "hoverProvider": {
+          "workDoneProgress": true
+        },
+        "referencesProvider": {
+          "workDoneProgress": true
+        },
+        "renameProvider": {
+          "prepareProvider": true,
+          "workDoneProgress": true
+        },
+        "signatureHelpProvider": {
+          "triggerCharacters": [
+            "(",
+            ",",
+            ")"
+          ],
+          "workDoneProgress": true
+        },
+        "textDocumentSync": 2,
+        "typeDefinitionProvider": {
+          "workDoneProgress": true
+        },
+        "workspace": {
+          "workspaceFolders": {
+            "changeNotifications": true,
+            "supported": true
+          }
+        },
+        "workspaceSymbolProvider": {
+          "workDoneProgress": true
+        }
+      },
+      "collection_state": "fresh-complete",
+      "configuration_identity": "sha256:ad9db6e6457d9d64eb7199f260ece2d9232575d7c39e6efb475ca8d554623117",
+      "documents": {
+        "src/callee.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "def target():\n    return 2\n"
+        },
+        "src/caller.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "from callee import target\n\n\ndef caller():\n    return target()\n"
+        },
+        "src/duplicate.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "from other import target as other_target\n\n\ndef duplicate():\n    return other_target()\n"
+        },
+        "src/other.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "def target():\n    return 3\n"
+        }
+      },
+      "position_encoding": "utf-16",
+      "producer": "pyright-langserver",
+      "request": {
+        "id": 5,
+        "jsonrpc": "2.0",
+        "method": "textDocument/references",
+        "params": {
+          "context": {
+            "includeDeclaration": true
+          },
+          "position": {
+            "character": 4,
+            "line": 0
+          },
+          "textDocument": {
+            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/callee.py"
+          }
+        }
+      },
+      "response": {
+        "id": 5,
+        "jsonrpc": "2.0",
+        "result": [
+          {
+            "range": {
+              "end": {
+                "character": 10,
+                "line": 0
+              },
+              "start": {
+                "character": 4,
+                "line": 0
+              }
+            },
+            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/callee.py"
+          },
+          {
+            "range": {
+              "end": {
+                "character": 25,
+                "line": 0
+              },
+              "start": {
+                "character": 19,
+                "line": 0
+              }
+            },
+            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/caller.py"
+          },
+          {
+            "range": {
+              "end": {
+                "character": 17,
+                "line": 4
+              },
+              "start": {
+                "character": 11,
+                "line": 4
+              }
+            },
+            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/caller.py"
+          }
+        ]
+      },
+      "schema": "hashmarks.lsp-relationship-capture.v1"
+    },
+    "name": "references-true",
+    "subject": "src/callee.py::target"
+  },
+  {
+    "capture": {
+      "capabilities": {
+        "callHierarchyProvider": true,
+        "codeActionProvider": {
+          "codeActionKinds": [
+            "quickfix",
+            "source.organizeImports"
+          ],
+          "workDoneProgress": true
+        },
+        "completionProvider": {
+          "completionItem": {
+            "labelDetailsSupport": true
+          },
+          "resolveProvider": true,
+          "triggerCharacters": [
+            ".",
+            "[",
+            "\"",
+            "'"
+          ],
+          "workDoneProgress": true
+        },
+        "declarationProvider": {
+          "workDoneProgress": true
+        },
+        "definitionProvider": {
+          "workDoneProgress": true
+        },
+        "documentHighlightProvider": {
+          "workDoneProgress": true
+        },
+        "documentSymbolProvider": {
+          "workDoneProgress": true
+        },
+        "executeCommandProvider": {
+          "commands": [],
+          "workDoneProgress": true
+        },
+        "hoverProvider": {
+          "workDoneProgress": true
+        },
+        "referencesProvider": {
+          "workDoneProgress": true
+        },
+        "renameProvider": {
+          "prepareProvider": true,
+          "workDoneProgress": true
+        },
+        "signatureHelpProvider": {
+          "triggerCharacters": [
+            "(",
+            ",",
+            ")"
+          ],
+          "workDoneProgress": true
+        },
+        "textDocumentSync": 2,
+        "typeDefinitionProvider": {
+          "workDoneProgress": true
+        },
+        "workspace": {
+          "workspaceFolders": {
+            "changeNotifications": true,
+            "supported": true
+          }
+        },
+        "workspaceSymbolProvider": {
+          "workDoneProgress": true
+        }
+      },
+      "collection_state": "fresh-complete",
+      "configuration_identity": "sha256:ad9db6e6457d9d64eb7199f260ece2d9232575d7c39e6efb475ca8d554623117",
+      "documents": {
+        "src/callee.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "def target():\n    return 2\n"
+        },
+        "src/caller.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "from callee import target\n\n\ndef caller():\n    return target()\n"
+        },
+        "src/duplicate.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "from other import target as other_target\n\n\ndef duplicate():\n    return other_target()\n"
+        },
+        "src/other.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "def target():\n    return 3\n"
+        }
+      },
+      "position_encoding": "utf-16",
+      "producer": "pyright-langserver",
+      "request": {
+        "id": 6,
+        "jsonrpc": "2.0",
+        "method": "textDocument/references",
+        "params": {
+          "context": {
+            "includeDeclaration": false
+          },
+          "position": {
+            "character": 4,
+            "line": 0
+          },
+          "textDocument": {
+            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/callee.py"
+          }
+        }
+      },
+      "response": {
+        "id": 6,
+        "jsonrpc": "2.0",
+        "result": [
+          {
+            "range": {
+              "end": {
+                "character": 25,
+                "line": 0
+              },
+              "start": {
+                "character": 19,
+                "line": 0
+              }
+            },
+            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/caller.py"
+          },
+          {
+            "range": {
+              "end": {
+                "character": 17,
+                "line": 4
+              },
+              "start": {
+                "character": 11,
+                "line": 4
+              }
+            },
+            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/caller.py"
+          }
+        ]
+      },
+      "schema": "hashmarks.lsp-relationship-capture.v1"
+    },
+    "name": "references-false",
+    "subject": "src/callee.py::target"
+  },
+  {
+    "capture": {
+      "capabilities": {
+        "callHierarchyProvider": true,
+        "codeActionProvider": {
+          "codeActionKinds": [
+            "quickfix",
+            "source.organizeImports"
+          ],
+          "workDoneProgress": true
+        },
+        "completionProvider": {
+          "completionItem": {
+            "labelDetailsSupport": true
+          },
+          "resolveProvider": true,
+          "triggerCharacters": [
+            ".",
+            "[",
+            "\"",
+            "'"
+          ],
+          "workDoneProgress": true
+        },
+        "declarationProvider": {
+          "workDoneProgress": true
+        },
+        "definitionProvider": {
+          "workDoneProgress": true
+        },
+        "documentHighlightProvider": {
+          "workDoneProgress": true
+        },
+        "documentSymbolProvider": {
+          "workDoneProgress": true
+        },
+        "executeCommandProvider": {
+          "commands": [],
+          "workDoneProgress": true
+        },
+        "hoverProvider": {
+          "workDoneProgress": true
+        },
+        "referencesProvider": {
+          "workDoneProgress": true
+        },
+        "renameProvider": {
+          "prepareProvider": true,
+          "workDoneProgress": true
+        },
+        "signatureHelpProvider": {
+          "triggerCharacters": [
+            "(",
+            ",",
+            ")"
+          ],
+          "workDoneProgress": true
+        },
+        "textDocumentSync": 2,
+        "typeDefinitionProvider": {
+          "workDoneProgress": true
+        },
+        "workspace": {
+          "workspaceFolders": {
+            "changeNotifications": true,
+            "supported": true
+          }
+        },
+        "workspaceSymbolProvider": {
+          "workDoneProgress": true
+        }
+      },
+      "collection_state": "fresh-complete",
+      "configuration_identity": "sha256:ad9db6e6457d9d64eb7199f260ece2d9232575d7c39e6efb475ca8d554623117",
+      "documents": {
+        "src/callee.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "def target():\n    return 2\n"
+        },
+        "src/caller.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "from callee import target\n\n\ndef caller():\n    return target()\n"
+        },
+        "src/duplicate.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "from other import target as other_target\n\n\ndef duplicate():\n    return other_target()\n"
+        },
+        "src/other.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "def target():\n    return 3\n"
+        }
+      },
+      "position_encoding": "utf-16",
+      "producer": "pyright-langserver",
+      "request": {
+        "id": 7,
+        "jsonrpc": "2.0",
+        "method": "textDocument/prepareCallHierarchy",
+        "params": {
+          "position": {
+            "character": 4,
+            "line": 0
+          },
+          "textDocument": {
+            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/callee.py"
+          }
+        }
+      },
+      "response": {
+        "id": 7,
+        "jsonrpc": "2.0",
+        "result": [
+          {
+            "detail": "(callee.py)",
+            "kind": 12,
+            "name": "target",
+            "range": {
+              "end": {
+                "character": 10,
+                "line": 0
+              },
+              "start": {
+                "character": 4,
+                "line": 0
+              }
+            },
+            "selectionRange": {
+              "end": {
+                "character": 10,
+                "line": 0
+              },
+              "start": {
+                "character": 4,
+                "line": 0
+              }
+            },
+            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/callee.py"
+          }
+        ]
+      },
+      "schema": "hashmarks.lsp-relationship-capture.v1"
+    },
+    "name": "prepare-target",
+    "subject": "src/callee.py::target"
+  },
+  {
+    "capture": {
+      "capabilities": {
+        "callHierarchyProvider": true,
+        "codeActionProvider": {
+          "codeActionKinds": [
+            "quickfix",
+            "source.organizeImports"
+          ],
+          "workDoneProgress": true
+        },
+        "completionProvider": {
+          "completionItem": {
+            "labelDetailsSupport": true
+          },
+          "resolveProvider": true,
+          "triggerCharacters": [
+            ".",
+            "[",
+            "\"",
+            "'"
+          ],
+          "workDoneProgress": true
+        },
+        "declarationProvider": {
+          "workDoneProgress": true
+        },
+        "definitionProvider": {
+          "workDoneProgress": true
+        },
+        "documentHighlightProvider": {
+          "workDoneProgress": true
+        },
+        "documentSymbolProvider": {
+          "workDoneProgress": true
+        },
+        "executeCommandProvider": {
+          "commands": [],
+          "workDoneProgress": true
+        },
+        "hoverProvider": {
+          "workDoneProgress": true
+        },
+        "referencesProvider": {
+          "workDoneProgress": true
+        },
+        "renameProvider": {
+          "prepareProvider": true,
+          "workDoneProgress": true
+        },
+        "signatureHelpProvider": {
+          "triggerCharacters": [
+            "(",
+            ",",
+            ")"
+          ],
+          "workDoneProgress": true
+        },
+        "textDocumentSync": 2,
+        "typeDefinitionProvider": {
+          "workDoneProgress": true
+        },
+        "workspace": {
+          "workspaceFolders": {
+            "changeNotifications": true,
+            "supported": true
+          }
+        },
+        "workspaceSymbolProvider": {
+          "workDoneProgress": true
+        }
+      },
+      "collection_state": "fresh-complete",
+      "configuration_identity": "sha256:ad9db6e6457d9d64eb7199f260ece2d9232575d7c39e6efb475ca8d554623117",
+      "documents": {
+        "src/callee.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "def target():\n    return 2\n"
+        },
+        "src/caller.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "from callee import target\n\n\ndef caller():\n    return target()\n"
+        },
+        "src/duplicate.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "from other import target as other_target\n\n\ndef duplicate():\n    return other_target()\n"
+        },
+        "src/other.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "def target():\n    return 3\n"
+        }
+      },
+      "position_encoding": "utf-16",
+      "producer": "pyright-langserver",
+      "request": {
+        "id": 8,
+        "jsonrpc": "2.0",
+        "method": "callHierarchy/incomingCalls",
+        "params": {
+          "item": {
+            "detail": "(callee.py)",
+            "kind": 12,
+            "name": "target",
+            "range": {
+              "end": {
+                "character": 10,
+                "line": 0
+              },
+              "start": {
+                "character": 4,
+                "line": 0
+              }
+            },
+            "selectionRange": {
+              "end": {
+                "character": 10,
+                "line": 0
+              },
+              "start": {
+                "character": 4,
+                "line": 0
+              }
+            },
+            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/callee.py"
+          }
+        }
+      },
+      "response": {
+        "id": 8,
+        "jsonrpc": "2.0",
+        "result": [
+          {
+            "from": {
+              "detail": "(caller.py)",
+              "kind": 12,
+              "name": "caller",
+              "range": {
+                "end": {
+                  "character": 10,
+                  "line": 3
+                },
+                "start": {
+                  "character": 4,
+                  "line": 3
+                }
+              },
+              "selectionRange": {
+                "end": {
+                  "character": 10,
+                  "line": 3
+                },
+                "start": {
+                  "character": 4,
+                  "line": 3
+                }
+              },
+              "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/caller.py"
+            },
+            "fromRanges": [
+              {
+                "end": {
+                  "character": 17,
+                  "line": 4
+                },
+                "start": {
+                  "character": 11,
+                  "line": 4
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "schema": "hashmarks.lsp-relationship-capture.v1"
+    },
+    "name": "incoming",
+    "subject": "src/callee.py::target"
+  },
+  {
+    "capture": {
+      "capabilities": {
+        "callHierarchyProvider": true,
+        "codeActionProvider": {
+          "codeActionKinds": [
+            "quickfix",
+            "source.organizeImports"
+          ],
+          "workDoneProgress": true
+        },
+        "completionProvider": {
+          "completionItem": {
+            "labelDetailsSupport": true
+          },
+          "resolveProvider": true,
+          "triggerCharacters": [
+            ".",
+            "[",
+            "\"",
+            "'"
+          ],
+          "workDoneProgress": true
+        },
+        "declarationProvider": {
+          "workDoneProgress": true
+        },
+        "definitionProvider": {
+          "workDoneProgress": true
+        },
+        "documentHighlightProvider": {
+          "workDoneProgress": true
+        },
+        "documentSymbolProvider": {
+          "workDoneProgress": true
+        },
+        "executeCommandProvider": {
+          "commands": [],
+          "workDoneProgress": true
+        },
+        "hoverProvider": {
+          "workDoneProgress": true
+        },
+        "referencesProvider": {
+          "workDoneProgress": true
+        },
+        "renameProvider": {
+          "prepareProvider": true,
+          "workDoneProgress": true
+        },
+        "signatureHelpProvider": {
+          "triggerCharacters": [
+            "(",
+            ",",
+            ")"
+          ],
+          "workDoneProgress": true
+        },
+        "textDocumentSync": 2,
+        "typeDefinitionProvider": {
+          "workDoneProgress": true
+        },
+        "workspace": {
+          "workspaceFolders": {
+            "changeNotifications": true,
+            "supported": true
+          }
+        },
+        "workspaceSymbolProvider": {
+          "workDoneProgress": true
+        }
+      },
+      "collection_state": "fresh-complete",
+      "configuration_identity": "sha256:ad9db6e6457d9d64eb7199f260ece2d9232575d7c39e6efb475ca8d554623117",
+      "documents": {
+        "src/callee.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "def target():\n    return 2\n"
+        },
+        "src/caller.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "from callee import target\n\n\ndef caller():\n    return target()\n"
+        },
+        "src/duplicate.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "from other import target as other_target\n\n\ndef duplicate():\n    return other_target()\n"
+        },
+        "src/other.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "def target():\n    return 3\n"
+        }
+      },
+      "position_encoding": "utf-16",
+      "producer": "pyright-langserver",
+      "request": {
+        "id": 9,
+        "jsonrpc": "2.0",
+        "method": "textDocument/prepareCallHierarchy",
+        "params": {
+          "position": {
+            "character": 4,
+            "line": 3
+          },
+          "textDocument": {
+            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/caller.py"
+          }
+        }
+      },
+      "response": {
+        "id": 9,
+        "jsonrpc": "2.0",
+        "result": [
+          {
+            "detail": "(caller.py)",
+            "kind": 12,
+            "name": "caller",
+            "range": {
+              "end": {
+                "character": 10,
+                "line": 3
+              },
+              "start": {
+                "character": 4,
+                "line": 3
+              }
+            },
+            "selectionRange": {
+              "end": {
+                "character": 10,
+                "line": 3
+              },
+              "start": {
+                "character": 4,
+                "line": 3
+              }
+            },
+            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/caller.py"
+          }
+        ]
+      },
+      "schema": "hashmarks.lsp-relationship-capture.v1"
+    },
+    "name": "prepare-caller",
+    "subject": "src/caller.py::caller"
+  },
+  {
+    "capture": {
+      "capabilities": {
+        "callHierarchyProvider": true,
+        "codeActionProvider": {
+          "codeActionKinds": [
+            "quickfix",
+            "source.organizeImports"
+          ],
+          "workDoneProgress": true
+        },
+        "completionProvider": {
+          "completionItem": {
+            "labelDetailsSupport": true
+          },
+          "resolveProvider": true,
+          "triggerCharacters": [
+            ".",
+            "[",
+            "\"",
+            "'"
+          ],
+          "workDoneProgress": true
+        },
+        "declarationProvider": {
+          "workDoneProgress": true
+        },
+        "definitionProvider": {
+          "workDoneProgress": true
+        },
+        "documentHighlightProvider": {
+          "workDoneProgress": true
+        },
+        "documentSymbolProvider": {
+          "workDoneProgress": true
+        },
+        "executeCommandProvider": {
+          "commands": [],
+          "workDoneProgress": true
+        },
+        "hoverProvider": {
+          "workDoneProgress": true
+        },
+        "referencesProvider": {
+          "workDoneProgress": true
+        },
+        "renameProvider": {
+          "prepareProvider": true,
+          "workDoneProgress": true
+        },
+        "signatureHelpProvider": {
+          "triggerCharacters": [
+            "(",
+            ",",
+            ")"
+          ],
+          "workDoneProgress": true
+        },
+        "textDocumentSync": 2,
+        "typeDefinitionProvider": {
+          "workDoneProgress": true
+        },
+        "workspace": {
+          "workspaceFolders": {
+            "changeNotifications": true,
+            "supported": true
+          }
+        },
+        "workspaceSymbolProvider": {
+          "workDoneProgress": true
+        }
+      },
+      "collection_state": "fresh-complete",
+      "configuration_identity": "sha256:ad9db6e6457d9d64eb7199f260ece2d9232575d7c39e6efb475ca8d554623117",
+      "documents": {
+        "src/callee.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "def target():\n    return 2\n"
+        },
+        "src/caller.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "from callee import target\n\n\ndef caller():\n    return target()\n"
+        },
+        "src/duplicate.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "from other import target as other_target\n\n\ndef duplicate():\n    return other_target()\n"
+        },
+        "src/other.py": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "def target():\n    return 3\n"
+        }
+      },
+      "position_encoding": "utf-16",
+      "producer": "pyright-langserver",
+      "request": {
+        "id": 10,
+        "jsonrpc": "2.0",
+        "method": "callHierarchy/outgoingCalls",
+        "params": {
+          "item": {
+            "detail": "(caller.py)",
+            "kind": 12,
+            "name": "caller",
+            "range": {
+              "end": {
+                "character": 10,
+                "line": 3
+              },
+              "start": {
+                "character": 4,
+                "line": 3
+              }
+            },
+            "selectionRange": {
+              "end": {
+                "character": 10,
+                "line": 3
+              },
+              "start": {
+                "character": 4,
+                "line": 3
+              }
+            },
+            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/caller.py"
+          }
+        }
+      },
+      "response": {
+        "id": 10,
+        "jsonrpc": "2.0",
+        "result": [
+          {
+            "fromRanges": [
+              {
+                "end": {
+                  "character": 17,
+                  "line": 4
+                },
+                "start": {
+                  "character": 11,
+                  "line": 4
+                }
+              }
+            ],
+            "to": {
+              "detail": "(callee.py) \u00b7 Workspace",
+              "kind": 12,
+              "name": "target",
+              "range": {
+                "end": {
+                  "character": 10,
+                  "line": 0
+                },
+                "start": {
+                  "character": 4,
+                  "line": 0
+                }
+              },
+              "selectionRange": {
+                "end": {
+                  "character": 10,
+                  "line": 0
+                },
+                "start": {
+                  "character": 4,
+                  "line": 0
+                }
+              },
+              "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/callee.py"
+            }
+          }
+        ]
+      },
+      "schema": "hashmarks.lsp-relationship-capture.v1"
+    },
+    "name": "outgoing",
+    "subject": "src/caller.py::caller"
+  }
+]

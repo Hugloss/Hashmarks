@@ -116,3 +116,117 @@ def validate_evidence_context(
         "reasons": list(dict.fromkeys(reasons)),
         "context_identity": claimed or None,
     }
+
+
+def _reacquisition_scopes(rows: object) -> list[dict[str, object]]:
+    from .paths import normalize_relative_path
+
+    if not isinstance(rows, list) or len(rows) > 256:
+        raise ValueError("invalid bounded evidence scopes")
+    scopes: list[dict[str, object]] = []
+    for row in rows:
+        if not isinstance(row, dict) or row.get("scope") not in ("member", "lines"):
+            raise ValueError("invalid evidence scope")
+        path = row.get("path")
+        if (
+            not isinstance(path, str)
+            or normalize_relative_path(path, allow_root=False) != path
+        ):
+            raise ValueError("invalid reacquisition path")
+        scope: dict[str, object] = {"scope": row["scope"], "path": path}
+        if row["scope"] == "lines":
+            start, end = row.get("start_line"), row.get("end_line")
+            if (
+                type(start) is not int
+                or type(end) is not int
+                or start < 1
+                or end < start
+            ):
+                raise ValueError("invalid reacquisition span")
+            scope.update(start_line=start, end_line=end)
+        scopes.append(scope)
+    return scopes
+
+
+def _reacquisition_dependencies(rows: object) -> list[str]:
+    from .paths import normalize_relative_path
+
+    if not isinstance(rows, list) or len(rows) > 512:
+        raise ValueError("invalid evidence dependencies")
+    paths = []
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError("invalid declared dependency")
+        path = row.get("path")
+        if (
+            not isinstance(path, str)
+            or normalize_relative_path(path, allow_root=False) != path
+        ):
+            raise ValueError("invalid declared dependency path")
+        paths.append(path)
+    return sorted(set(paths))
+
+
+def _reacquisition_relationships(row: object) -> tuple[bool, int]:
+    if not isinstance(row, dict) or row.get("state") not in (
+        "observed",
+        "not-requested",
+    ):
+        raise ValueError("invalid relationship observation state")
+    bounds = row.get("bounds")
+    if not isinstance(bounds, dict):
+        raise ValueError("missing relationship observation bounds")
+    limit = bounds.get("limit_per_path")
+    if type(limit) is not int or not 1 <= limit <= 1000:
+        raise ValueError("invalid relationship observation bound")
+    return row["state"] == "observed", limit
+
+
+def describe_evidence_binding_reacquisition(
+    packet: Mapping[str, object], *, binding_id: str
+) -> dict[str, object]:
+    """Describe explicit reobservation inputs, without claiming current freshness."""
+    from .operation_contract import operation_schema
+
+    if packet.get("schema") != operation_schema("repository_evidence", "observation"):
+        raise ValueError("reacquisition requires native repository evidence bindings")
+    if packet.get("authority") != "repository-intelligence-only":
+        raise ValueError("unqualified evidence binding authority")
+    source_identity = packet.get("bindings_identity")
+    if not isinstance(source_identity, str) or not _SHA.fullmatch(source_identity):
+        raise ValueError("unqualified source packet identity")
+    rows = packet.get("bindings")
+    if not isinstance(rows, list) or len(rows) > 256:
+        raise ValueError("reacquisition requires bounded binding rows")
+    matches = [
+        row
+        for row in rows
+        if isinstance(row, dict) and row.get("binding_id") == binding_id
+    ]
+    if len(matches) != 1:
+        raise ValueError("reacquisition requires one exact binding")
+    binding = matches[0]
+    scopes = _reacquisition_scopes(binding.get("evidence"))
+    dependencies = _reacquisition_dependencies(binding.get("dependencies"))
+    include, limit = _reacquisition_relationships(binding.get("relationships"))
+    repository = packet.get("repository")
+    if not isinstance(repository, dict):
+        raise ValueError("invalid repository binding")
+    require_generation(repository.get("codemap_generation"), field="codemap_generation")
+    return {
+        "schema": "hashmarks.evidence-binding-reacquisition.v1",
+        "source_packet_identity": source_identity,
+        "binding_definition_identity": binding.get("binding_definition_identity"),
+        "binding_observation_identity": binding.get("binding_observation_identity"),
+        "repository": dict(repository),
+        "requery": {
+            "binding_id": binding_id,
+            "evidence": scopes,
+            "dependency_paths": dependencies,
+            "include_relationships": include,
+            "relationship_limit_per_path": limit,
+        },
+        "authority": "consumer-reacquisition-description-only",
+        "current_freshness_proven": False,
+        "execution_effect": "none",
+    }

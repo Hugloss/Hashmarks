@@ -190,25 +190,48 @@ def _install_maven_fixture(root: Path, manifest: Path, repository: Path) -> None
         )
 
 
+def _capture_uv(root: Path) -> None:
+    uv = _tool("uv")
+    (root / "uv.lock").unlink(missing_ok=True)
+    arguments = ["lock", "--offline", "--python", sys.executable]
+    _run([uv, *arguments], root)
+    _write_json(
+        root / "capture.json",
+        {
+            "producer_version": _run([uv, "--version"], root).strip(),
+            "arguments": arguments,
+            "lock_sha256": hashlib.sha256((root / "uv.lock").read_bytes()).hexdigest(),
+            "repository_inputs": _source_revisions(root, (".toml",)),
+        },
+    )
+
+
+def _capture_reactor(root: Path, repository: Path) -> None:
+    _run(
+        [
+            _tool("mvn"),
+            "-Dmaven.repo.local=" + str(repository),
+            "-B",
+            "-q",
+            "-Dstyle.color=never",
+            "-DskipTests",
+            "install",
+        ],
+        root,
+    )
+    for context in ("alpha", "beta"):
+        _capture_maven(
+            root / context, root / "captures" / context, repository=repository
+        )
+
+
 def capture_dependencies(source: Path, destination: Path) -> None:
     """Regenerate only the bounded scenarios used by the integration ring."""
     shutil.copytree(source, destination)
-    uv = _tool("uv")
     for state in ("absent", "v1", "v2", "grouped"):
-        root = destination / "uv" / state
-        (root / "uv.lock").unlink()
-        arguments = ["lock", "--offline", "--python", sys.executable]
-        _run([uv, *arguments], root)
-        _write_json(
-            root / "capture.json",
-            {
-                "producer_version": _run([uv, "--version"], root).strip(),
-                "arguments": arguments,
-                "lock_sha256": hashlib.sha256(
-                    (root / "uv.lock").read_bytes()
-                ).hexdigest(),
-            },
-        )
+        _capture_uv(destination / "uv" / state)
+    for root in sorted((destination / "uv" / "workspace").iterdir()):
+        _capture_uv(root)
     repository = destination / "maven-repository"
     _install_maven_fixture(
         destination / "maven", source / "maven" / "dummy-dep-manifest.mf", repository
@@ -216,10 +239,12 @@ def capture_dependencies(source: Path, destination: Path) -> None:
     for state in ("absent", "v1", "v2"):
         root = destination / "maven" / state
         _capture_maven(root, root, repository=repository)
-    for scenario in ("transitive-upgrade", "mediation", "exclusion"):
+    for scenario in ("transitive-upgrade", "mediation", "exclusion", "bom-upgrade"):
         for state in ("before", "after"):
             root = destination / "maven" / scenario / state
             _capture_maven(root, root, repository=repository)
+    for state in ("before", "after"):
+        _capture_reactor(destination / "maven" / "multi-module" / state, repository)
     profiles = destination / "maven" / "profiles"
     _capture_maven(profiles, profiles / "default", repository=repository)
     _capture_maven(profiles, profiles / "extra", repository=repository, profile="extra")
@@ -227,12 +252,25 @@ def capture_dependencies(source: Path, destination: Path) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("family", choices=("dependencies", "python", "typescript"))
+    parser.add_argument(
+        "family",
+        choices=(
+            "dependencies",
+            "python",
+            "typescript",
+            "lsp-python",
+            "lsp-typescript",
+        ),
+    )
     parser.add_argument("source", type=Path)
     parser.add_argument("destination", type=Path)
     args = parser.parse_args(argv)
     if args.family == "dependencies":
         capture_dependencies(args.source.resolve(), args.destination.resolve())
+    elif args.family.startswith("lsp-"):
+        from scripts.native_lsp_capture import capture_lsp
+
+        capture_lsp(args.source.resolve(), args.destination.resolve(), args.family[4:])
     else:
         capture_scip(args.source.resolve(), args.destination.resolve(), args.family)
     return 0

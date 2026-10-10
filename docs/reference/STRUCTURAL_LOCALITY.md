@@ -276,3 +276,37 @@ Existing Hashmarks owner extended: CodeMap native evidence, structural endpoint 
 Consumer/execution responsibility explicitly not acquired: server lifecycle, semantic inference, edit/verification decisions, execution, or certification.
 Decision: OBSERVER
 ```
+
+## Additional read-only LSP observations (reference and call hierarchy)
+
+The existing caller-supplied `hashmarks.lsp-relationship-capture.v1`
+contract also admits `textDocument/references`,
+`textDocument/prepareCallHierarchy`, `callHierarchy/incomingCalls`,
+and `callHierarchy/outgoingCalls`.
+
+- Reference requests include `textDocument`, `position`, and a real
+  `context.includeDeclaration` boolean. Each result is a reference-site
+  **producer claim** pointing to the queried symbol, not a proven index edge.
+- Prepare requests contain `textDocument` and `position`. Returned
+  `CallHierarchyItem` records are preserved as qualified *navigation
+  candidates*, never fabricated call edges.
+- Incoming and outgoing requests contain a validated `params.item`
+  `CallHierarchyItem`. Responses use the corresponding
+  `{from, fromRanges}` or `{to, fromRanges}` protocol shape. Incoming
+  evidence retains caller → queried callee, and outgoing retains queried
+  caller → callee. `fromRanges` remain caller-provided **call-site** ranges,
+  distinct from both declaration/selection ranges.
+- Only explicit bounded captures are interpreted. Capabilities, request IDs,
+  producer session, source snapshots, UTF-8/16/32 position encoding, partial
+  collection, errors, source equivalence and omissions remain separate.
+- Unresolved/ambiguous locators, missing snapshots, changed buffers, exterior
+  paths and bounded result sets remain non-authoritative; no empty capture
+  proves missing repository references or callers.
+
+The native `producer_correspondence` section compares direct, revision-bound
+producer claims sharing comparable CodeMap symbols. `aligned_claims` means
+two independent producers described a matching *claim*; it does not prove
+truth. `distinct_observed_claims` is not a contradiction or negative fact.
+Incomparable/partial observations and unresolved endpoints are accounted
+separately. The report is a request-local projection and does not form a new
+cross-provider graph or an execution policy.
