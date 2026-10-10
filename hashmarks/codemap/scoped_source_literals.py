@@ -142,8 +142,8 @@ class ScopedSourceLiteralsMixin:
         )
         return record, empty, len(raw)
 
-    @staticmethod
     def _literal_set_request(
+        self,
         paths: Sequence[str],
         literals: Sequence[str],
         limit: int,
@@ -164,10 +164,10 @@ class ScopedSourceLiteralsMixin:
             raise ValueError("max_total_bytes must be between 1 and 8388608")
         if type(context_lines) is not int or context_lines not in (0, 1):
             raise ValueError("context_lines must be 0 or 1")
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         for literal in literals:
-            from .repository_delta import RepositoryDeltaMixin
-
-            RepositoryDeltaMixin._validate_source_observation(
+            self._validate_source_observation(
                 literal, limit, max_member_bytes, 2_000
             )
         selected_paths = sorted(
