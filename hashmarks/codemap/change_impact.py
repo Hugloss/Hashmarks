@@ -8,6 +8,10 @@ from typing import TYPE_CHECKING, Any, cast
 from hashmarks.operation_contract import operation_schema, validate_operation_response
 from hashmarks.paths import normalize_relative_path
 
+from .change_line_evidence import (
+    normalize_changed_line_spans,
+    observe_changed_line_spans,
+)
 from .decision_session import diagnostic_producer
 from .model import EvidenceVisibility
 from .project_impact_codec import compact_project_impact
@@ -27,6 +31,7 @@ class ChangeImpactOptions:
     max_depth: int = 4
     project_impact_limit: int | None = None
     project_impact_encoding: str = "verbose"
+    changed_line_spans: list[dict[str, object]] | None = None
 
     def validate(self) -> None:
         if self.impact_limit_per_surface < 1:
@@ -632,6 +637,7 @@ class ChangeImpactMixin:
             raise ValueError(
                 "changed_paths must contain at least one repository-relative path"
             )
+        spans = normalize_changed_line_spans(options.changed_line_spans, normalized)
 
         # A standalone CLI/service call may arrive before a warm map exists.
         # Establish the repository map once, then keep the post-change refresh
@@ -671,4 +677,8 @@ class ChangeImpactMixin:
             result = self._project_change_impact(
                 state, decision_generation, options, declared_refresh
             )
+            if spans:
+                result["changed_line_evidence"] = observe_changed_line_spans(
+                    self, spans
+                )
             return validate_operation_response("change_impact", result)
