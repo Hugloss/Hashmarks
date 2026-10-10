@@ -487,7 +487,10 @@ class HashmarksMcpSurface:
 
     @staticmethod
     def _validate_source_request(
-        paths: list[str], literal: str | None, result_mode: str
+        paths: list[str],
+        literal: str | None,
+        result_mode: str,
+        literals: list[str] | None = None,
     ) -> None:
         if not isinstance(paths, list) or not 1 <= len(paths) <= 32:
             raise McpSurfaceError(
@@ -495,8 +498,32 @@ class HashmarksMcpSurface:
             )
         if not all(isinstance(path, str) and path for path in paths):
             raise McpSurfaceError("paths must contain nonblank strings")
-        if result_mode not in ("member", "scope"):
-            raise McpSurfaceError("result_mode must be one of: member, scope")
+        if result_mode not in ("member", "scope", "literals"):
+            raise McpSurfaceError(
+                "result_mode must be one of: member, scope, literals"
+            )
+        if result_mode == "literals":
+            if literal is not None:
+                raise McpSurfaceError("literals mode forbids literal")
+            if (
+                not isinstance(literals, list)
+                or not 1 <= len(literals) <= 8
+                or any(
+                    not isinstance(value, str)
+                    or not value
+                    or len(value) > 256
+                    or "\n" in value
+                    or "\r" in value
+                    for value in literals
+                )
+            ):
+                raise McpSurfaceError(
+                    "literals must contain 1 to 8 exact single-line strings"
+                )
+            if len(set(literals)) != len(literals):
+                raise McpSurfaceError("literals must be distinct")
+        elif literals is not None:
+            raise McpSurfaceError("literals requires literals result_mode")
         if result_mode == "member" and len(paths) != 1:
             raise McpSurfaceError("member mode requires exactly one path")
         if result_mode == "scope" and literal is None:
@@ -507,16 +534,21 @@ class HashmarksMcpSurface:
         paths: list[str],
         *,
         literal: str | None = None,
+        literals: list[str] | None = None,
         result_mode: str = operation_default_mode("source_observation"),
         limit: int = 50,
         context_lines: int | dict[str, object] = 0,
     ) -> dict[str, object]:
-        self._validate_source_request(paths, literal, result_mode)
+        self._validate_source_request(paths, literal, result_mode, literals)
         if literal is not None:
             literal = _bounded_text(literal, name="literal", maximum=_MAX_QUERY_CHARS)
         limit = _bounded_int(limit, name="limit", minimum=1, maximum=50)
         literal_context, requested_lines, anchor_context = _source_context_request(
-            context_lines, literal=literal, result_mode=result_mode
+            context_lines,
+            literal=literal if literal is not None else (
+                literals[0] if literals is not None else None
+            ),
+            result_mode=result_mode,
         )
 
         def project() -> dict[str, object]:
@@ -530,6 +562,11 @@ class HashmarksMcpSurface:
                         context_lines=literal_context,
                         lines=requested_lines,
                         anchor_context_lines=anchor_context,
+                    )
+                if result_mode == "literals":
+                    assert literals is not None
+                    return self._map.scoped_source_literals(
+                        paths, literals, limit=limit, context_lines=literal_context
                     )
                 assert literal is not None
                 return self._map.scoped_source_occurrences(
