@@ -28,9 +28,7 @@ def _checked_line_bounds(start: object, end: object) -> tuple[int, int]:
 
 
 def _admit_span(raw: object, allowed: set[str]) -> dict[str, Any]:
-    if not isinstance(raw, Mapping) or set(raw) != {
-        "path", "start_line", "end_line"
-    }:
+    if not isinstance(raw, Mapping) or set(raw) != {"path", "start_line", "end_line"}:
         raise ValueError("changed line span requires path/start_line/end_line")
     if not isinstance(raw["path"], str):
         raise ValueError("changed line span path must be a string")
@@ -59,9 +57,11 @@ def normalize_changed_line_spans(
             raise ValueError("changed line spans must be distinct")
         seen.add(key)
         selected.append(span)
-    return tuple(sorted(selected, key=lambda row: (
-        row["path"], row["start_line"], row["end_line"]
-    )))
+    return tuple(
+        sorted(
+            selected, key=lambda row: (row["path"], row["start_line"], row["end_line"])
+        )
+    )
 
 
 def _unavailable(
