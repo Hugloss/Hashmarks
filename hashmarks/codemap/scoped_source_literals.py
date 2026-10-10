@@ -142,6 +142,24 @@ class ScopedSourceLiteralsMixin:
         )
         return record, empty, len(raw)
 
+    @staticmethod
+    def _validated_literal_set(literals: Sequence[str]) -> tuple[str, ...]:
+        if isinstance(literals, (str, bytes)) or not 1 <= len(literals) <= 8:
+            raise ValueError("literals must contain between 1 and 8 exact strings")
+        if any(not isinstance(value, str) for value in literals):
+            raise ValueError("literals must contain only strings")
+        if len(set(literals)) != len(literals):
+            raise ValueError("literals must be distinct")
+        return tuple(sorted(literals))
+
+    @staticmethod
+    def _validated_literal_paths(paths: Sequence[str]) -> list[str]:
+        if isinstance(paths, (str, bytes)) or not 1 <= len(paths) <= 32:
+            raise ValueError("scope must contain between 1 and 32 explicit paths")
+        return sorted(
+            {normalize_relative_path(path, allow_root=False) for path in paths}
+        )
+
     def _literal_set_request(
         self,
         paths: Sequence[str],
@@ -151,29 +169,20 @@ class ScopedSourceLiteralsMixin:
         max_member_bytes: int,
         context_lines: int,
     ) -> tuple[list[str], tuple[str, ...]]:
-        """Reject invalid scope and literals before any source observation."""
-        if isinstance(paths, (str, bytes)) or not 1 <= len(paths) <= 32:
-            raise ValueError("scope must contain between 1 and 32 explicit paths")
-        if isinstance(literals, (str, bytes)) or not 1 <= len(literals) <= 8:
-            raise ValueError("literals must contain between 1 and 8 exact strings")
-        if any(not isinstance(value, str) for value in literals):
-            raise ValueError("literals must contain only strings")
-        if len(set(literals)) != len(literals):
-            raise ValueError("literals must be distinct")
+        """Reject invalid input before source observation and generation reads."""
         if not 1 <= max_total_bytes <= 8_388_608:
             raise ValueError("max_total_bytes must be between 1 and 8388608")
         if type(context_lines) is not int or context_lines not in (0, 1):
             raise ValueError("context_lines must be 0 or 1")
+        selected_literals = self._validated_literal_set(literals)
+        selected_paths = self._validated_literal_paths(paths)
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        for literal in literals:
+        for literal in selected_literals:
             self._validate_source_observation(
                 literal, limit, max_member_bytes, 2_000
             )
-        selected_paths = sorted(
-            {normalize_relative_path(path, allow_root=False) for path in paths}
-        )
-        return selected_paths, tuple(sorted(literals))
+        return selected_paths, selected_literals
 
     def _literal_set_result(self, state: _LiteralSetState) -> dict[str, object]:
         if TYPE_CHECKING:
