@@ -118,7 +118,6 @@ def validate_evidence_context(
     }
 
 
-
 def _reacquisition_scopes(rows: object) -> list[dict[str, object]]:
     from .paths import normalize_relative_path
 
@@ -200,7 +199,8 @@ def describe_evidence_binding_reacquisition(
     if not isinstance(rows, list) or len(rows) > 256:
         raise ValueError("reacquisition requires bounded binding rows")
     matches = [
-        row for row in rows
+        row
+        for row in rows
         if isinstance(row, dict) and row.get("binding_id") == binding_id
     ]
     if len(matches) != 1:
