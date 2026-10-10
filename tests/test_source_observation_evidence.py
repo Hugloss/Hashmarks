@@ -486,9 +486,9 @@ def test_literal_set_reuses_one_member_read_and_qualifies_each_literal(
         reads.append(path)
         return original(self, path, max_bytes)
 
-    monkeypatch.setattr(CodeMap, "_bounded_source_observation", observing_read)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
+        monkeypatch.setattr(CodeMap, "_bounded_source_observation", observing_read)
         first = codemap.scoped_source_literals(
             ["b.py", "a.py", "a.py"],
             ["ZipInfo", "ZIP_DEFLATED", "not-present"],
