@@ -78,7 +78,8 @@ def test_direct_changed_lines_preserve_owner_and_verifier_surfaces(
     assert symbols[0]["overlap"] == {"start_line": 2, "end_line": 3}
     assert symbols[0]["semantic_impact"] == "not-asserted"
     assert symbols[0]["relationship_detail"] == {
-        "target": "src/backend.py::process_widget", "result_mode": "relationships"
+        "target": "src/backend.py::process_widget",
+        "result_mode": "relationships",
     }
     presentation = present_repository_evidence(augmented, format="compact")
     assert validate_evidence_presentation(augmented, presentation)["valid"] is True
@@ -124,19 +125,24 @@ def test_changed_lines_outside_source_never_claim_missing_symbol(
         [{"path": "../secret.py", "start_line": 1, "end_line": 2}],
         [{"path": PATH, "start_line": 1, "end_line": 2, "trust": True}],
         [{"path": PATH, "start_line": 1, "end_line": 2}] * 2,
-        [{"path": PATH, "start_line": n + 1, "end_line": n + 1}
-         for n in range(MAX_CHANGED_SPANS + 1)],
+        [
+            {"path": PATH, "start_line": n + 1, "end_line": n + 1}
+            for n in range(MAX_CHANGED_SPANS + 1)
+        ],
     ],
 )
 def test_bad_spans_fail_before_sync(tmp_path: Path, spans: object) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as cm:
+
         def forbidden_sync(*args, **kwargs):
             raise AssertionError("work before range admission")
+
         cm.sync = forbidden_sync  # type: ignore[method-assign]
         with pytest.raises(ValueError):
             cm.task_change_impact(
-                TASK, [PATH],
+                TASK,
+                [PATH],
                 options=ChangeImpactOptions(changed_line_spans=spans),  # type: ignore[arg-type]
             )
 
@@ -155,7 +161,7 @@ def test_order_is_deterministic_and_max_span_count_is_inclusive() -> None:
 def test_source_denial_does_not_expose_symbol_names(tmp_path: Path) -> None:
     _repo(tmp_path)
     (tmp_path / ".hashmarks.toml").write_text(
-        "[[rule]]\npattern = \"src/backend.py\"\nvisibility = \"deny\"\n"
+        '[[rule]]\npattern = "src/backend.py"\nvisibility = "deny"\n'
     )
     with CodeMap(tmp_path) as cm:
         cm.sync()
@@ -171,7 +177,8 @@ def test_sparse_source_or_unsupported_file_has_unknown_coverage(tmp_path: Path) 
     with CodeMap(tmp_path) as cm:
         cm.sync()
         impact = cm.task_change_impact(
-            TASK, [PATH, "src/other.txt"],
+            TASK,
+            [PATH, "src/other.txt"],
             options=_options(path="src/other.txt", start=1, end=1),
         )
     row = impact["changed_line_evidence"]["observations"][0]
@@ -188,7 +195,9 @@ def test_overlap_is_bounded_with_excess_reported(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as cm:
         cm.sync()
         impact = cm.task_change_impact(
-            TASK, [PATH], options=_options(start=1, end=80),
+            TASK,
+            [PATH],
+            options=_options(start=1, end=80),
         )
     row = impact["changed_line_evidence"]["observations"][0]
     assert row["symbol_retained_count"] <= 32
@@ -200,11 +209,13 @@ def test_mcp_native_and_compact_reuse_same_source_owner(tmp_path: Path) -> None:
     surface = HashmarksMcpSurface(str(tmp_path))
     try:
         value = surface.change_impact(
-            TASK, [PATH],
+            TASK,
+            [PATH],
             changed_line_spans=[{"path": PATH, "start_line": 2, "end_line": 3}],
         )
     finally:
         surface.close()
-    assert value["changed_line_evidence"]["observations"][0]["symbols"][0][
-        "subject"
-    ] == "src/backend.py::process_widget"
+    assert (
+        value["changed_line_evidence"]["observations"][0]["symbols"][0]["subject"]
+        == "src/backend.py::process_widget"
+    )
