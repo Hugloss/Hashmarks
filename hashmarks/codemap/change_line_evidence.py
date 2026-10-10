@@ -136,7 +136,11 @@ def observe_changed_line_spans(
             limit=MAX_OVERLAPPING_SYMBOLS + 1,
         )
         decorator_evidence = observe_python_decorator_associations(
-            codemap.store, path, raw, span
+            codemap.store,
+            path,
+            raw,
+            span,
+            allow_source_syntax=member.get("evidence_visibility") == "source",
         )
         # Reading outside the indexed source is not proof of its correspondence.
         after, _ = codemap._repository_member_observation(path, include_bytes=True)
