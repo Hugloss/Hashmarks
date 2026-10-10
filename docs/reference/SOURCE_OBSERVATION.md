@@ -213,6 +213,58 @@ The same scoped observation is also available through the `source_observation`
 MCP tool in `scope` mode. Neither Python nor MCP requests expand the given
 scope, schedule verification, or create a new source index.
 
+## Exact scoped multi-literal evidence
+
+The same `CodeMap` source observer can qualify several **literal** terms over
+one explicit member set without repeating the canonical source read for each
+term. Use the `source_observation` MCP tool with `result_mode="literals"`:
+
+```json
+{
+  "paths": ["src/archive.py", "tests/test_archive.py"],
+  "literals": ["ZipInfo", "ZIP_DEFLATED"],
+  "result_mode": "literals",
+  "limit": 20,
+  "presentation": "compact"
+}
+```
+
+These paths are illustrative, not verified paths in this repository. The
+equivalent Python method is `CodeMap.scoped_source_literals(paths, literals)`.
+This mode is registered as the canonical
+`hashmarks.scoped-source-literal-set.v1` operation response; `member` and
+`scope` modes and schemas remain unchanged.
+
+- Accepts 1–32 explicit member paths and 1–8 **distinct**, nonempty, single-line
+  case-sensitive literals (each at most 256 codepoints). It is not regex and
+  performs no repository-wide path discovery. Inputs are validated before reads.
+- Stable source bytes are read **once per member** via existing admission,
+  visibility, identity and indexed-revision checks. Python token classifications,
+  enclosing symbols and context excerpts retain the existing producer basis.
+  Independent literal matches may overlap; counts refer to exact requested terms,
+  not an inferred semantic fact.
+- The per-request source-byte budget defaults to 4 MiB and cannot exceed 8 MiB;
+  the per-member default is 1 MiB. One overall hit-display cap is shared by the
+  terms. Display selection round-robins across sorted literals; within each
+  literal, members are sorted and occurrence order is preserved. Display limits
+  never establish absence.
+- `literal_observations` contains the exact per-literal count **only when all
+  requested members are fully observed in the same generation**. It separately
+  retains the observed count from successfully scanned members if coverage is
+  incomplete. The aggregate count is a sum of per-literal occurrences and may
+  count overlapping locations more than once by design.
+- A per-literal zero can be `admissible-within-explicit-member-set` only if
+  source coverage is complete and repository freshness is current. Denial,
+  binary/invalid UTF-8, budget exhaustion, revision mismatch, stale generation
+  or unobserved members yield `unknown`/`not-admissible` rather than absence.
+  Zero matches in this explicit file set **never** proves absence elsewhere.
+- The native packet retains member revisions, source occurrence identities,
+  coverage, generation and observation identity. The optional presentation
+  only rearranges existing evidence and counts omitted rows.
+
+This is a bounded evidence operation, not a multi-regex search service,
+agent-owned routing strategy, additional index, source archive, or test runner.
+
 ## External diagnostic collection and correspondence (H2)
 
 ```python
