@@ -66,12 +66,16 @@ class _HandlerBodySyntax(ast.NodeVisitor):
                 and len(key.value) <= _MAX_ACCESS_KEY_CHARS
                 for key in value.keys
             ):
-                keys = [key.value for key in value.keys if isinstance(key, ast.Constant)]
+                keys = [
+                    key.value for key in value.keys if isinstance(key, ast.Constant)
+                ]
         self.returns.append(
             {
                 "line": node.lineno,
                 "end_line": node.end_lineno or node.lineno,
-                "syntax": "literal-dict-return" if keys is not None else "unresolved-return",
+                "syntax": "literal-dict-return"
+                if keys is not None
+                else "unresolved-return",
                 "literal_keys_in_source_order": keys,
             }
         )
@@ -192,8 +196,7 @@ def _declaration_group(
         ]
         spans = sorted({(site["line"], site["end_line"]) for site in sites})
         extra_evidence = [
-            {"path": path, "start_line": start, "end_line": end}
-            for start, end in spans
+            {"path": path, "start_line": start, "end_line": end} for start, end in spans
         ]
     return {
         "group_id": group_id,
