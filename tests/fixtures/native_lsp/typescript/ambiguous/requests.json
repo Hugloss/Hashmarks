@@ -1,0 +1,76 @@
+[
+  {
+    "name": "class-definition",
+    "method": "textDocument/definition",
+    "subject": "src/engine.ts::Engine",
+    "path": "src/engine.ts",
+    "position": {
+      "line": 2,
+      "character": 13
+    }
+  },
+  {
+    "name": "method-definition",
+    "method": "textDocument/definition",
+    "subject": "src/engine.ts::normalize",
+    "path": "src/engine.ts",
+    "position": {
+      "line": 3,
+      "character": 4
+    }
+  },
+  {
+    "name": "implementations",
+    "method": "textDocument/implementation",
+    "subject": "src/contract.ts::Contract",
+    "path": "src/contract.ts",
+    "position": {
+      "line": 0,
+      "character": 17
+    }
+  },
+  {
+    "name": "references-true",
+    "method": "textDocument/references",
+    "subject": "src/engine.ts::normalize",
+    "path": "src/engine.ts",
+    "position": {
+      "line": 3,
+      "character": 4
+    },
+    "includeDeclaration": true
+  },
+  {
+    "name": "references-false",
+    "method": "textDocument/references",
+    "subject": "src/engine.ts::normalize",
+    "path": "src/engine.ts",
+    "position": {
+      "line": 3,
+      "character": 4
+    },
+    "includeDeclaration": false
+  },
+  {
+    "name": "prepare-method",
+    "method": "textDocument/prepareCallHierarchy",
+    "subject": "src/engine.ts::normalize",
+    "path": "src/engine.ts",
+    "position": {
+      "line": 3,
+      "character": 4
+    }
+  },
+  {
+    "name": "incoming",
+    "method": "callHierarchy/incomingCalls",
+    "subject": "src/engine.ts::normalize",
+    "prepared": "prepare-method"
+  },
+  {
+    "name": "outgoing",
+    "method": "callHierarchy/outgoingCalls",
+    "subject": "src/engine.ts::normalize",
+    "prepared": "prepare-method"
+  }
+]

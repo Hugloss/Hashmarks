@@ -1,0 +1,177 @@
+[
+  {
+    "capture": {
+      "capabilities": {
+        "callHierarchyProvider": true,
+        "codeActionProvider": true,
+        "codeLensProvider": {
+          "resolveProvider": true
+        },
+        "completionProvider": {
+          "resolveProvider": true,
+          "triggerCharacters": [
+            ".",
+            "\"",
+            "'",
+            "/",
+            "@",
+            "<"
+          ]
+        },
+        "definitionProvider": true,
+        "documentFormattingProvider": true,
+        "documentHighlightProvider": true,
+        "documentRangeFormattingProvider": true,
+        "documentSymbolProvider": true,
+        "executeCommandProvider": {
+          "commands": [
+            "_typescript.applyRefactoring",
+            "_typescript.configurePlugin",
+            "_typescript.organizeImports",
+            "_typescript.applyRenameFile",
+            "_typescript.goToSourceDefinition",
+            "_typescript.applyCodeActionCommand",
+            "_typescript.applyFixAllCodeAction",
+            "typescript.tsserverRequest"
+          ]
+        },
+        "foldingRangeProvider": true,
+        "hoverProvider": true,
+        "implementationProvider": true,
+        "inlayHintProvider": true,
+        "linkedEditingRangeProvider": false,
+        "referencesProvider": true,
+        "renameProvider": true,
+        "selectionRangeProvider": true,
+        "semanticTokensProvider": {
+          "documentSelector": null,
+          "full": true,
+          "legend": {
+            "tokenModifiers": [
+              "declaration",
+              "static",
+              "async",
+              "readonly",
+              "defaultLibrary",
+              "local"
+            ],
+            "tokenTypes": [
+              "class",
+              "enum",
+              "interface",
+              "namespace",
+              "typeParameter",
+              "type",
+              "parameter",
+              "variable",
+              "enumMember",
+              "property",
+              "function",
+              "member"
+            ]
+          },
+          "range": true
+        },
+        "signatureHelpProvider": {
+          "retriggerCharacters": [
+            ")"
+          ],
+          "triggerCharacters": [
+            "(",
+            ",",
+            "<"
+          ]
+        },
+        "textDocumentSync": 2,
+        "typeDefinitionProvider": true,
+        "workspace": {
+          "fileOperations": {
+            "willRename": {
+              "filters": [
+                {
+                  "pattern": {
+                    "glob": "**/*.{ts,js,jsx,tsx,mjs,mts,cjs,cts}",
+                    "matches": "file"
+                  },
+                  "scheme": "file"
+                },
+                {
+                  "pattern": {
+                    "glob": "**",
+                    "matches": "folder"
+                  },
+                  "scheme": "file"
+                }
+              ]
+            }
+          }
+        },
+        "workspaceSymbolProvider": true
+      },
+      "collection_state": "fresh-complete",
+      "configuration_identity": "sha256:939dc8dd6304d183a25dc68176a4fc1449264ff28af87183959ca495be8fba1f",
+      "documents": {
+        "src/contract.ts": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "export interface Contract {\n    normalize(value: string): string;\n}\n"
+        },
+        "src/engine.ts": {
+          "provenance": {
+            "binding_basis": "producer-snapshot",
+            "document_lifetime": "open-1",
+            "document_version": 1,
+            "producer_session": "fixture-session",
+            "source_kind": "buffer"
+          },
+          "revision_kind": "utf8-document-text",
+          "text": "import { Contract } from \"./contract\";\n\nexport class Engine {\n    normalize(value: string): string {\n        return value.trim();\n    }\n}\n"
+        }
+      },
+      "position_encoding": "utf-16",
+      "producer": "typescript-language-server",
+      "request": {
+        "id": 2,
+        "jsonrpc": "2.0",
+        "method": "textDocument/definition",
+        "params": {
+          "position": {
+            "character": 4,
+            "line": 3
+          },
+          "textDocument": {
+            "uri": "file:///tmp/hashmarks-lsp-captured/typescript/after/src/engine.ts"
+          }
+        }
+      },
+      "response": {
+        "id": 2,
+        "jsonrpc": "2.0",
+        "result": [
+          {
+            "range": {
+              "end": {
+                "character": 13,
+                "line": 3
+              },
+              "start": {
+                "character": 4,
+                "line": 3
+              }
+            },
+            "uri": "file:///tmp/hashmarks-lsp-captured/typescript/after/src/engine.ts"
+          }
+        ]
+      },
+      "schema": "hashmarks.lsp-relationship-capture.v1"
+    },
+    "name": "method-definition",
+    "subject": "src/engine.ts::normalize"
+  }
+]

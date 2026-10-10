@@ -253,6 +253,11 @@ def _producer_claim(producer: str, *, matching: bool) -> dict:
         return {
             "key": {"repository_symbol": symbol},
             "source_binding": {"state": "matching" if matching else "different"},
+            "resolution": {
+                "state": "unique-candidate" if matching else "unresolved",
+                "candidates": [{"symbol_id": symbol}],
+                "truncated": False,
+            },
         }
 
     return {

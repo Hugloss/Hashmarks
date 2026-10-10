@@ -1,0 +1,265 @@
+[
+  {
+    "sent": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "method": "initialize",
+      "params": {
+        "capabilities": {
+          "general": {
+            "positionEncodings": [
+              "utf-16"
+            ]
+          },
+          "textDocument": {
+            "callHierarchy": {
+              "dynamicRegistration": false
+            }
+          }
+        },
+        "initializationOptions": {
+          "tsserver": {
+            "path": "/tmp/hashmarks-native-tools/node_modules/typescript/lib/tsserver.js"
+          }
+        },
+        "processId": null,
+        "rootUri": "file:///tmp/hashmarks-lsp-captured/typescript/after",
+        "workspaceFolders": [
+          {
+            "name": "fixture",
+            "uri": "file:///tmp/hashmarks-lsp-captured/typescript/after"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "received": {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "message": "Using Typescript version (user-setting) 5.9.3 from path \"/tmp/hashmarks-native-tools/node_modules/typescript/lib/tsserver.js\"",
+        "type": 3
+      }
+    }
+  },
+  {
+    "received": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "capabilities": {
+          "callHierarchyProvider": true,
+          "codeActionProvider": true,
+          "codeLensProvider": {
+            "resolveProvider": true
+          },
+          "completionProvider": {
+            "resolveProvider": true,
+            "triggerCharacters": [
+              ".",
+              "\"",
+              "'",
+              "/",
+              "@",
+              "<"
+            ]
+          },
+          "definitionProvider": true,
+          "documentFormattingProvider": true,
+          "documentHighlightProvider": true,
+          "documentRangeFormattingProvider": true,
+          "documentSymbolProvider": true,
+          "executeCommandProvider": {
+            "commands": [
+              "_typescript.applyRefactoring",
+              "_typescript.configurePlugin",
+              "_typescript.organizeImports",
+              "_typescript.applyRenameFile",
+              "_typescript.goToSourceDefinition",
+              "_typescript.applyCodeActionCommand",
+              "_typescript.applyFixAllCodeAction",
+              "typescript.tsserverRequest"
+            ]
+          },
+          "foldingRangeProvider": true,
+          "hoverProvider": true,
+          "implementationProvider": true,
+          "inlayHintProvider": true,
+          "linkedEditingRangeProvider": false,
+          "referencesProvider": true,
+          "renameProvider": true,
+          "selectionRangeProvider": true,
+          "semanticTokensProvider": {
+            "documentSelector": null,
+            "full": true,
+            "legend": {
+              "tokenModifiers": [
+                "declaration",
+                "static",
+                "async",
+                "readonly",
+                "defaultLibrary",
+                "local"
+              ],
+              "tokenTypes": [
+                "class",
+                "enum",
+                "interface",
+                "namespace",
+                "typeParameter",
+                "type",
+                "parameter",
+                "variable",
+                "enumMember",
+                "property",
+                "function",
+                "member"
+              ]
+            },
+            "range": true
+          },
+          "signatureHelpProvider": {
+            "retriggerCharacters": [
+              ")"
+            ],
+            "triggerCharacters": [
+              "(",
+              ",",
+              "<"
+            ]
+          },
+          "textDocumentSync": 2,
+          "typeDefinitionProvider": true,
+          "workspace": {
+            "fileOperations": {
+              "willRename": {
+                "filters": [
+                  {
+                    "pattern": {
+                      "glob": "**/*.{ts,js,jsx,tsx,mjs,mts,cjs,cts}",
+                      "matches": "file"
+                    },
+                    "scheme": "file"
+                  },
+                  {
+                    "pattern": {
+                      "glob": "**",
+                      "matches": "folder"
+                    },
+                    "scheme": "file"
+                  }
+                ]
+              }
+            }
+          },
+          "workspaceSymbolProvider": true
+        }
+      }
+    }
+  },
+  {
+    "sent": {
+      "jsonrpc": "2.0",
+      "method": "initialized",
+      "params": {}
+    }
+  },
+  {
+    "sent": {
+      "jsonrpc": "2.0",
+      "method": "textDocument/didOpen",
+      "params": {
+        "textDocument": {
+          "languageId": "typescript",
+          "text": "export interface Contract {\n    normalize(value: string): string;\n}\n",
+          "uri": "file:///tmp/hashmarks-lsp-captured/typescript/after/src/contract.ts",
+          "version": 1
+        }
+      }
+    }
+  },
+  {
+    "sent": {
+      "jsonrpc": "2.0",
+      "method": "textDocument/didOpen",
+      "params": {
+        "textDocument": {
+          "languageId": "typescript",
+          "text": "import { Contract } from \"./contract\";\n\nexport class Engine {\n    normalize(value: string): string {\n        return value.trim();\n    }\n}\n",
+          "uri": "file:///tmp/hashmarks-lsp-captured/typescript/after/src/engine.ts",
+          "version": 1
+        }
+      }
+    }
+  },
+  {
+    "sent": {
+      "id": 2,
+      "jsonrpc": "2.0",
+      "method": "textDocument/definition",
+      "params": {
+        "position": {
+          "character": 4,
+          "line": 3
+        },
+        "textDocument": {
+          "uri": "file:///tmp/hashmarks-lsp-captured/typescript/after/src/engine.ts"
+        }
+      }
+    }
+  },
+  {
+    "received": {
+      "jsonrpc": "2.0",
+      "method": "$/typescriptVersion",
+      "params": {
+        "source": "user-setting",
+        "version": "5.9.3"
+      }
+    }
+  },
+  {
+    "received": {
+      "id": 2,
+      "jsonrpc": "2.0",
+      "result": [
+        {
+          "range": {
+            "end": {
+              "character": 13,
+              "line": 3
+            },
+            "start": {
+              "character": 4,
+              "line": 3
+            }
+          },
+          "uri": "file:///tmp/hashmarks-lsp-captured/typescript/after/src/engine.ts"
+        }
+      ]
+    }
+  },
+  {
+    "sent": {
+      "id": 3,
+      "jsonrpc": "2.0",
+      "method": "shutdown",
+      "params": {}
+    }
+  },
+  {
+    "received": {
+      "id": 3,
+      "jsonrpc": "2.0",
+      "result": null
+    }
+  },
+  {
+    "sent": {
+      "jsonrpc": "2.0",
+      "method": "exit",
+      "params": {}
+    }
+  }
+]

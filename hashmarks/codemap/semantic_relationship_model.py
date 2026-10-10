@@ -145,21 +145,7 @@ def _qualified_symbol(endpoint: object) -> str | None:
     binding = endpoint.get("source_binding")
     if isinstance(binding, Mapping) and binding.get("state") != "matching":
         return None
-    symbol = _resolved_candidate(endpoint)
-    if symbol:
-        return symbol
-    key = endpoint.get("key")
-    if (
-        not isinstance(key, Mapping)
-        or not isinstance(binding, Mapping)
-        or binding.get("state") != "matching"
-    ):
-        return None
-    for field in ("repository_symbol", "supplied_subject"):
-        value = key.get(field)
-        if isinstance(value, str) and value:
-            return value
-    return None
+    return _resolved_candidate(endpoint)
 
 
 def _correspondence_row(observation: Mapping[str, Any]) -> dict[str, Any]:

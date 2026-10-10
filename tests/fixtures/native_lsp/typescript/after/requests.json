@@ -1,0 +1,12 @@
+[
+  {
+    "name": "method-definition",
+    "method": "textDocument/definition",
+    "subject": "src/engine.ts::normalize",
+    "path": "src/engine.ts",
+    "position": {
+      "line": 3,
+      "character": 4
+    }
+  }
+]

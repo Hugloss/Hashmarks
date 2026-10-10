@@ -1,0 +1,14 @@
+{
+  "producer_version": "uv 0.12.17 (x86_64-unknown-linux-gnu)",
+  "arguments": [
+    "lock",
+    "--offline",
+    "--python",
+    "caller-supplied-interpreter"
+  ],
+  "lock_sha256": "19dd8ee7c14c711741f9712be876e9d06a52e3d7bcc5dfa4afb213c44beac509",
+  "repository_inputs": {
+    "pyproject.toml": "e39b00a660e4833c23df66760cd5f78366169ecaaa2bd114e674d8c6bf2198df",
+    "packages/core/pyproject.toml": "26b05bceed8b298f62416401cee322258a267a0790ad76c6429657ab2abf9a92"
+  }
+}

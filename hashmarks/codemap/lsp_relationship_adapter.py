@@ -381,8 +381,11 @@ def _locations(capture: Mapping[str, Any]) -> list[dict[str, Any]]:
 
 
 def _query_endpoint(
-    capture: Mapping[str, Any], subject: str, resolver: RelationshipSourceResolver
+    capture: Mapping[str, Any],
+    target: Mapping[str, Any],
+    resolver: RelationshipSourceResolver,
 ) -> dict[str, Any]:
+    subject = f"{target['path']}::{target['qualname']}"
     params = capture["request"]["params"]
     item = params.get("item")
     if item is not None:
@@ -398,19 +401,29 @@ def _query_endpoint(
         or path not in capture["documents"]
     ):
         raise ValueError("LSP request must name the subject's admitted snapshot")
-    row = resolver.codemap.store.symbol_at(path, subject.split("::", 1)[1])
-    if row is None or not int(row["start_line"]) <= position["line"] + 1 <= int(
-        row["end_line"]
+    if (
+        not int(target["start_line"])
+        <= position["line"] + 1
+        <= int(target.get("end_line", target["start_line"]))
     ):
         raise ValueError("LSP request position is outside the supplied query subject")
+    locator = {
+        "path": path,
+        "start": position,
+        "end": position,
+        "position_encoding": capture["position_encoding"],
+    }
+    resolution = resolver.candidates(
+        path, locator, capture["documents"][path], name=str(target["name"])
+    )
+    if resolution["state"] == "unique-candidate" and (
+        resolution["candidates"][0]["symbol_id"] != subject
+    ):
+        resolution["state"] = "unresolved"
     return {
         "key": {"namespace": capture["producer"], "supplied_subject": subject},
-        "locator": {
-            "path": path,
-            "start": position,
-            "end": position,
-            "position_encoding": capture["position_encoding"],
-        },
+        "locator": locator,
+        "resolution": resolution,
         "source_binding": resolver.binding(path, capture["documents"][path]),
         "subject_authority": "caller-supplied-query-subject",
     }
@@ -463,16 +476,18 @@ def _result_endpoint(
 
 
 def lsp_relationship_observation(
-    capture: Mapping[str, Any], subject: str, resolver: RelationshipSourceResolver
+    capture: Mapping[str, Any],
+    target: Mapping[str, Any],
+    resolver: RelationshipSourceResolver,
 ) -> dict[str, Any]:
-    query = _query_endpoint(capture, subject, resolver)
+    query = _query_endpoint(capture, target, resolver)
     method = capture["request"]["method"]
     kind, capability = _METHODS[method]
     observation = ProducerRelationshipObservation(
         producer=capture["producer"],
         configuration_identity=capture["configuration_identity"],
         scope={
-            "subject": subject,
+            "subject": f"{target['path']}::{target['qualname']}",
             "method": method,
             "authority": "caller-declared-request-scope",
         },
@@ -529,24 +544,25 @@ def lsp_relationship_observation(
         if endpoint is None:
             observation.accounting["denied_or_unadmitted"] += 1
             continue
-        source, target = (
-            (endpoint, query)
-            if kind == "implementation"
-            or method in ("textDocument/references", "callHierarchy/incomingCalls")
-            else (query, endpoint)
+        result_to_query = kind == "implementation" or method in (
+            "textDocument/references",
+            "callHierarchy/incomingCalls",
+        )
+        source, destination = (
+            (endpoint, query) if result_to_query else (query, endpoint)
         )
         observation.claims.append(
             direct_claim(
                 capture["producer"],
                 kind,
                 source,
-                target,
+                destination,
                 {
                     "format": "lsp",
                     "method": method,
                     "request_id": capture["request"]["id"],
                     "direction": "result-to-query"
-                    if kind == "implementation"
+                    if result_to_query
                     else "query-to-result",
                     "captured_location": location,
                     "fromRanges": location.get("fromRanges", [])

@@ -16,12 +16,31 @@ from hashmarks.evidence_presentation import FORMATS, presentation_response
 
 CORPUS = Path(__file__).parent / "fixtures" / "dependency_dogfood"
 SCIP_CORPUS = Path(__file__).parent / "fixtures" / "native_scip"
+LSP_CORPUS = Path(__file__).parent / "fixtures" / "native_lsp"
 TASK = "Change normalize_widget in src/engine.py to lowercase the trimmed value and verify its semantics."
 
 
-def materialize_scip(root: Path, source: Path) -> None:
+def _replace_inputs(root: Path, source: Path, paths: list[str]) -> list[str]:
+    """Replace exactly the previous fixture's files, preserving unrelated inputs."""
+    ownership = root.parent / (root.name + ".fixture-inputs.json")
+    if ownership.exists():
+        for name in json.loads(ownership.read_text()):
+            (root / name).unlink(missing_ok=True)
     root.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(source / "src", root / "src", dirs_exist_ok=True)
+    for name in paths:
+        destination = root / name
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source / name, destination)
+    ownership.write_text(json.dumps(paths))
+    return paths
+
+
+def materialize_scip(root: Path, source: Path) -> None:
+    paths = [
+        path.relative_to(source).as_posix()
+        for path in sorted((source / "src").rglob("*"))
+        if path.is_file() and path.suffix in (".py", ".ts")
+    ]
     for name in (
         "pyproject.toml",
         "pyrightconfig.json",
@@ -30,7 +49,34 @@ def materialize_scip(root: Path, source: Path) -> None:
         "tsconfig.json",
     ):
         if (source / name).exists():
-            shutil.copyfile(source / name, root / name)
+            paths.append(name)
+    _replace_inputs(root, source, paths)
+
+
+def lsp_capture(root: Path, source: Path, name: str) -> dict[str, Any]:
+    """Rebase only fixture-owned file URIs; raw capture bytes remain untouched."""
+    metadata = json.loads((source / "capture.json").read_text())
+    original = metadata["original_root_uri"]
+    owned = {
+        original + "/" + path: (root / path).as_uri()
+        for path in metadata["source_revisions"]
+    }
+
+    def rebase(value: Any) -> Any:
+        if isinstance(value, str):
+            return owned.get(value, value)
+        if isinstance(value, list):
+            return [rebase(item) for item in value]
+        if isinstance(value, dict):
+            return {key: rebase(item) for key, item in value.items()}
+        return value
+
+    row = next(
+        row
+        for row in json.loads((source / "captures.json").read_text())
+        if row["name"] == name
+    )
+    return rebase(row["capture"])
 
 
 def import_native_scip(cm: Any, source: Path) -> None:
@@ -42,23 +88,12 @@ def import_native_scip(cm: Any, source: Path) -> None:
 
 def materialize_dependency(root: Path, source: Path) -> list[str]:
     """Replace admitted inputs; captures remain outside the observed repository."""
-    for name in ("vendor", "pyproject.toml", "uv.lock", "pom.xml"):
-        path = root / name
-        if path.is_dir():
-            shutil.rmtree(path)
-        elif path.exists():
-            path.unlink()
-    root.mkdir(parents=True, exist_ok=True)
-    paths = []
-    for path in sorted(source.rglob("*")):
-        if path.name not in {"pyproject.toml", "uv.lock", "pom.xml"}:
-            continue
-        relative = path.relative_to(source)
-        destination = root / relative
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(path, destination)
-        paths.append(relative.as_posix())
-    return paths
+    paths = [
+        path.relative_to(source).as_posix()
+        for path in sorted(source.rglob("*"))
+        if path.name in {"pyproject.toml", "uv.lock", "pom.xml"}
+    ]
+    return _replace_inputs(root, source, paths)
 
 
 def input_revisions(root: Path, paths: list[str]) -> list[dict[str, str]]:

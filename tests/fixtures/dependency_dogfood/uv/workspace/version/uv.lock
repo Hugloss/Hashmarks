@@ -1,0 +1,31 @@
+version = 1
+revision = 3
+requires-python = ">=3.11"
+
+[manifest]
+members = [
+    "workspace-lib",
+    "workspace-orphan",
+    "workspace-root",
+]
+
+[[package]]
+name = "workspace-lib"
+version = "2.0.0"
+source = { editable = "packages/lib" }
+
+[[package]]
+name = "workspace-orphan"
+version = "1.0.0"
+source = { virtual = "packages/orphan" }
+
+[[package]]
+name = "workspace-root"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "workspace-lib" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "workspace-lib", editable = "packages/lib" }]

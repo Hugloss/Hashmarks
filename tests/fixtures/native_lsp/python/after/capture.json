@@ -1,0 +1,19 @@
+{
+  "captures_sha256": "c5c60165b0450e058dc501cacd24ca48e5eabea0213542fe926ab54ace077e6d",
+  "configuration": {
+    "pyrightconfig.json": "{\n  \"include\": [\n    \"src\"\n  ],\n  \"extraPaths\": [\n    \"src\"\n  ],\n  \"typeCheckingMode\": \"basic\"\n}\n"
+  },
+  "original_root_uri": "file:///tmp/hashmarks-lsp-captured/python/after",
+  "producer": "pyright-langserver",
+  "producer_version": "pyright 1.1.414",
+  "qualification_authority": "external-capture-caller-claim",
+  "source_revisions": {
+    "src/callee.py": "6ce5d5596b9bfe0e92d12399a6e02ae8d212d0c1c1aa5bdd764ae37b2efcf20b",
+    "src/caller.py": "8b8b03e7cf8b25b0a23e32dac91f67b4f54f360e7a10223a2696543481d3bfc2",
+    "src/duplicate.py": "668e2faefb1fb839119c590db7cad73bdfcb3dc26d36f1e659a87d5117d03d4c",
+    "src/other.py": "f63a27724791ca6e6af36ef4754e371f44f1693bf0d05c11bc983a41ceddfc59"
+  },
+  "transcript_sha256": "d4782bd34119a7a1bc980ab94af4356e90de1c2a836721954a8abed591a02d6e",
+  "typescript_runtime": null,
+  "typescript_runtime_sha256": null
+}
