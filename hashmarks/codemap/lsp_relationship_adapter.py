@@ -156,14 +156,16 @@ def _request(value: object) -> dict[str, Any]:
     params = value["params"]
     if not isinstance(params, Mapping):
         raise ValueError("LSP request parameters must be an object")
-    if value["method"] in ("callHierarchy/incomingCalls", "callHierarchy/outgoingCalls"):
+    if value["method"] in (
+        "callHierarchy/incomingCalls",
+        "callHierarchy/outgoingCalls",
+    ):
         if set(params) != {"item"}:
             raise ValueError("call hierarchy request requires exactly one item")
         _call_item(params["item"])
     else:
         _document_request_params(value["method"], params)
     return dict(value)
-
 
 
 def _response(capture: Mapping[str, Any]) -> None:
@@ -272,32 +274,50 @@ def _location(value: object, encoding: str) -> dict[str, Any]:
 
 def _call_item(value: object) -> dict[str, Any]:
     """Validate only protocol-owned CallHierarchyItem fields, without executing LSP."""
-    if not isinstance(value, Mapping) or not {"name", "kind", "uri", "range", "selectionRange"} <= set(value) or set(value) - {
-        "name", "kind", "uri", "range", "selectionRange", "detail", "tags", "data"
-    }:
+    if (
+        not isinstance(value, Mapping)
+        or not {"name", "kind", "uri", "range", "selectionRange"} <= set(value)
+        or set(value)
+        - {"name", "kind", "uri", "range", "selectionRange", "detail", "tags", "data"}
+    ):
         raise ValueError("invalid LSP CallHierarchyItem")
     bounded_token(value["name"], "call hierarchy item name")
     bounded_token(value["uri"], "call hierarchy item URI")
     if type(value["kind"]) is not int or not 1 <= value["kind"] <= 26:
         raise ValueError("invalid LSP call hierarchy symbol kind")
-    if "detail" in value and (not isinstance(value["detail"], str) or len(value["detail"]) > 1024):
+    if "detail" in value and (
+        not isinstance(value["detail"], str) or len(value["detail"]) > 1024
+    ):
         raise ValueError("invalid LSP call hierarchy detail")
-    if "tags" in value and (not isinstance(value["tags"], list) or any(type(tag) is not int for tag in value["tags"]) or len(value["tags"]) > 16):
+    if "tags" in value and (
+        not isinstance(value["tags"], list)
+        or any(type(tag) is not int for tag in value["tags"])
+        or len(value["tags"]) > 16
+    ):
         raise ValueError("invalid LSP call hierarchy tags")
     full = validated_range(value["range"])
     selected = validated_range(value["selectionRange"])
-    if (selected["start"]["line"], selected["start"]["character"]) < (full["start"]["line"], full["start"]["character"]) or (selected["end"]["line"], selected["end"]["character"]) > (full["end"]["line"], full["end"]["character"]):
+    if (selected["start"]["line"], selected["start"]["character"]) < (
+        full["start"]["line"],
+        full["start"]["character"],
+    ) or (selected["end"]["line"], selected["end"]["character"]) > (
+        full["end"]["line"],
+        full["end"]["character"],
+    ):
         raise ValueError("CallHierarchyItem selectionRange exceeds range")
     return dict(value)
 
 
 def _call_location(item: object, encoding: str) -> dict[str, Any]:
     row = _call_item(item)
-    return _location({
-        "targetUri": row["uri"],
-        "targetRange": row["range"],
-        "targetSelectionRange": row["selectionRange"],
-    }, encoding)
+    return _location(
+        {
+            "targetUri": row["uri"],
+            "targetRange": row["range"],
+            "targetSelectionRange": row["selectionRange"],
+        },
+        encoding,
+    )
 
 
 def _call_rows(capture: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -305,7 +325,9 @@ def _call_rows(capture: Mapping[str, Any]) -> list[dict[str, Any]]:
     method = capture["request"]["method"]
     result = capture["response"].get("result")
     batches = capture.get("partial_results", [])
-    if not isinstance(batches, list) or any(not isinstance(batch, list) for batch in batches):
+    if not isinstance(batches, list) or any(
+        not isinstance(batch, list) for batch in batches
+    ):
         raise ValueError("call hierarchy partial results must be arrays")
     if result is not None and not isinstance(result, list):
         raise ValueError("call hierarchy result must be an array or null")
@@ -319,11 +341,13 @@ def _call_rows(capture: Mapping[str, Any]) -> list[dict[str, Any]]:
             raise ValueError("call hierarchy call requires endpoint and fromRanges")
         if not isinstance(row["fromRanges"], list) or len(row["fromRanges"]) > 128:
             raise ValueError("call hierarchy fromRanges must be a bounded array")
-        normalized.append({
-            "location": _call_location(row[key], capture["position_encoding"]),
-            "fromRanges": [validated_range(r) for r in row["fromRanges"]],
-            "item": _call_item(row[key]),
-        })
+        normalized.append(
+            {
+                "location": _call_location(row[key], capture["position_encoding"]),
+                "fromRanges": [validated_range(r) for r in row["fromRanges"]],
+                "item": _call_item(row[key]),
+            }
+        )
     return normalized
 
 
@@ -343,7 +367,10 @@ def _locations(capture: Mapping[str, Any]) -> list[dict[str, Any]]:
         if len(items) > 512:
             raise ValueError("call hierarchy prepare exceeds item bound")
         return [
-            {"location": _call_location(item, capture["position_encoding"]), "item": _call_item(item)}
+            {
+                "location": _call_location(item, capture["position_encoding"]),
+                "item": _call_item(item),
+            }
             for item in items
         ]
     return [
@@ -497,15 +524,15 @@ def lsp_relationship_observation(
         if prepare:
             continue  # Preparation produces navigation candidates, never call edges.
         endpoint = _result_endpoint(
-            location["location"] if kind == "call" else location,
-            capture, resolver
+            location["location"] if kind == "call" else location, capture, resolver
         )
         if endpoint is None:
             observation.accounting["denied_or_unadmitted"] += 1
             continue
         source, target = (
             (endpoint, query)
-            if kind == "implementation" or method in ("textDocument/references", "callHierarchy/incomingCalls")
+            if kind == "implementation"
+            or method in ("textDocument/references", "callHierarchy/incomingCalls")
             else (query, endpoint)
         )
         observation.claims.append(
@@ -522,8 +549,12 @@ def lsp_relationship_observation(
                     if kind == "implementation"
                     else "query-to-result",
                     "captured_location": location,
-                    "fromRanges": location.get("fromRanges", []) if kind == "call" else [],
-                    "fromRanges_authority": "caller-supplied-call-site-ranges" if kind == "call" else None,
+                    "fromRanges": location.get("fromRanges", [])
+                    if kind == "call"
+                    else [],
+                    "fromRanges_authority": "caller-supplied-call-site-ranges"
+                    if kind == "call"
+                    else None,
                 },
             )
         )
