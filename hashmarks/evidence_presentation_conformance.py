@@ -1,4 +1,5 @@
 """Pure producer-packet to rendered-projection conformance check."""
+
 from __future__ import annotations
 
 import json
@@ -20,20 +21,25 @@ def validate_evidence_presentation(
         raise ValueError("evidence presentation must be a mapping")
     mode = projection.get("format")
     if mode not in ("structured", "compact", "text"):
-        raise ValueError("evidence presentation format must be structured, compact or text")
+        raise ValueError(
+            "evidence presentation format must be structured, compact or text"
+        )
     expected = present_repository_evidence(packet, format=str(mode))
+
     def canonical(value: object) -> bytes:
         try:
             return json.dumps(
-                value, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+                value,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
                 allow_nan=False,
             ).encode("utf-8")
         except (TypeError, ValueError) as exc:
             raise ValueError("evidence presentation contains nonportable data") from exc
+
     if canonical(dict(projection)) != canonical(expected):
-        raise ValueError(
-            "evidence presentation differs from native source projection"
-        )
+        raise ValueError("evidence presentation differs from native source projection")
     return {
         "valid": True,
         "format": mode,
