@@ -66,22 +66,15 @@ class ScopedSourceLiteralsMixin:
     """Explicit multi-literal composition over the canonical source observer."""
 
     def _scoped_literal_set_member(
-        self,
-        path: str,
-        literals: tuple[str, ...],
-        *,
-        remaining_bytes: int,
-        max_member_bytes: int,
-        limit: int,
-        context_lines: int,
+        self, path: str, state: _LiteralSetState
     ) -> tuple[dict[str, object], dict[str, list[dict[str, object]]], int]:
         """Observe one canonical byte capture for every requested literal."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         empty: dict[str, list[dict[str, object]]] = {
-            literal: [] for literal in literals
+            literal: [] for literal in state.literals
         }
-        if remaining_bytes < 1:
+        if state.observed_bytes >= state.max_total_bytes:
             return (
                 {
                     "path": path,
@@ -94,7 +87,7 @@ class ScopedSourceLiteralsMixin:
                 0,
             )
         member, raw = self._bounded_source_observation(
-            path, min(remaining_bytes, max_member_bytes)
+            path, min(state.max_total_bytes - state.observed_bytes, state.max_member_bytes)
         )
         record = {
             "path": path,
@@ -121,17 +114,17 @@ class ScopedSourceLiteralsMixin:
         )
         token_kinds = self._python_source_token_kinds(text, path)
         counts: dict[str, int] = {}
-        for literal in literals:
+        for literal in state.literals:
             hits, count = self._source_occurrences(
                 text,
                 literal,
                 member=member,
-                limit=limit,
+                limit=state.limit,
                 symbols=symbols,
                 token_kinds=token_kinds,
             )
             self._source_evidenced_hits(
-                hits, text=text, literal=literal, context_lines=context_lines
+                hits, text=text, literal=literal, context_lines=state.context_lines
             )
             empty[literal] = hits
             counts[literal] = count
@@ -304,13 +297,6 @@ class ScopedSourceLiteralsMixin:
             context_lines=context_lines,
         )
         for path in state.paths:
-            record, hits, consumed = self._scoped_literal_set_member(
-                path,
-                state.literals,
-                remaining_bytes=state.max_total_bytes - state.observed_bytes,
-                max_member_bytes=state.max_member_bytes,
-                limit=state.limit,
-                context_lines=state.context_lines,
-            )
+            record, hits, consumed = self._scoped_literal_set_member(path, state)
             state.add(record, hits, consumed)
         return self._literal_set_result(state)
