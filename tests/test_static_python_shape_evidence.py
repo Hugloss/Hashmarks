@@ -113,17 +113,18 @@ def test_nested_scopes_dynamic_returns_and_unsupported_keys_are_unknown(
 ) -> None:
     (tmp_path / "service.py").write_text(
         '@app.post("/x")\n'
-        'def handler(payload):\n'
-        '    def nested():\n'
+        "def handler(payload):\n"
+        "    def nested():\n"
         '        return {"not_handler": 1}\n'
         '    obj = lambda value: value["not_handler"]\n'
-        '    if flag:\n'
+        "    if flag:\n"
         '        return {**payload, "known": 1}\n'
         '    return {42: "numeric", "key": 3}\n'
     )
     body = _value(_observe(tmp_path))["static_body_syntax"]
     assert [row["syntax"] for row in body["literal_dictionary_returns"]] == [
-        "unresolved-return", "unresolved-return",
+        "unresolved-return",
+        "unresolved-return",
     ]
     assert all(
         row["literal_keys_in_source_order"] is None
@@ -155,7 +156,7 @@ def test_multiple_selected_decorators_preserve_distinct_route_scopes(
     (tmp_path / "service.py").write_text(
         '@app.get("/first")\n'
         '@router.post("/second")\n'
-        'def handler():\n'
+        "def handler():\n"
         '    return {"ok": True}\n'
     )
     packet = _observe(tmp_path)
@@ -164,7 +165,8 @@ def test_multiple_selected_decorators_preserve_distinct_route_scopes(
     assert all(
         group["declarations"][0]["value"]["static_body_syntax"][
             "literal_dictionary_returns"
-        ][0]["literal_keys_in_source_order"] == ["ok"]
+        ][0]["literal_keys_in_source_order"]
+        == ["ok"]
         for group in groups
     )
     assert all(group["correspondence"]["state"] == "unresolved" for group in groups)
@@ -173,16 +175,18 @@ def test_multiple_selected_decorators_preserve_distinct_route_scopes(
 def test_site_limit_fails_before_provider_publication(tmp_path: Path) -> None:
     (tmp_path / "service.py").write_text(
         '@router.get("/many")\n'
-        'def many(payload):\n'
-        + "".join(f'    payload["key_{n}"]\n' for n in range(17))
+        "def many(payload):\n" + "".join(f'    payload["key_{n}"]\n' for n in range(17))
     )
     with CodeMap(tmp_path) as cm:
         cm.sync()
         with pytest.raises(RepositoryDeclarationProviderError, match="site bound"):
             cm.discover_repository_declarations(
-                [StaticPythonInterfaceDeclarations(
-                    paths=("service.py",), include_literal_shape_syntax=True,
-                )]
+                [
+                    StaticPythonInterfaceDeclarations(
+                        paths=("service.py",),
+                        include_literal_shape_syntax=True,
+                    )
+                ]
             )
         assert cm.discover_repository_declarations([])["declarations"]["groups"] == []
 
@@ -191,7 +195,8 @@ def test_stale_source_cannot_reuse_old_literal_facts(tmp_path: Path) -> None:
     source = tmp_path / "service.py"
     source.write_text('@app.get("/x")\ndef x():\n    return {"old": 1}\n')
     provider = StaticPythonInterfaceDeclarations(
-        paths=("service.py",), include_literal_shape_syntax=True,
+        paths=("service.py",),
+        include_literal_shape_syntax=True,
     )
     with CodeMap(tmp_path) as cm:
         cm.sync()
@@ -201,7 +206,8 @@ def test_stale_source_cannot_reuse_old_literal_facts(tmp_path: Path) -> None:
             cm.discover_repository_declarations([provider], previous_observation=first)
         cm.sync(["service.py"])
         second = cm.discover_repository_declarations(
-            [provider], previous_observation=first,
+            [provider],
+            previous_observation=first,
         )
     assert first["observation_identity"] != second["observation_identity"]
     assert _value(second)["static_body_syntax"]["literal_dictionary_returns"][0][
@@ -211,8 +217,7 @@ def test_stale_source_cannot_reuse_old_literal_facts(tmp_path: Path) -> None:
 
 def test_denied_input_never_leaks_literal_keys(tmp_path: Path) -> None:
     (tmp_path / "service.py").write_text(
-        '@app.get("/private")\ndef secret():\n'
-        '    return {"SECRET_PRIVATE_KEY": 1}\n'
+        '@app.get("/private")\ndef secret():\n    return {"SECRET_PRIVATE_KEY": 1}\n'
     )
     (tmp_path / ".hashmarks-context.toml").write_text(
         '[[rule]]\npattern = "service.py"\nvisibility = "deny"\n'
@@ -226,5 +231,6 @@ def test_denied_input_never_leaks_literal_keys(tmp_path: Path) -> None:
 def test_shape_opt_in_requires_boolean(bad: object) -> None:
     with pytest.raises(ValueError, match="boolean"):
         StaticPythonInterfaceDeclarations(
-            paths=("service.py",), include_literal_shape_syntax=bad,  # type: ignore[arg-type]
+            paths=("service.py",),
+            include_literal_shape_syntax=bad,  # type: ignore[arg-type]
         )
