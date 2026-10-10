@@ -158,3 +158,24 @@ observations, qualified negative evidence, dependency version changes, body-only
 revisions, and bounded projections in held-out cases. Review correctness and
 unsupported claims before choosing defaults. No new default or demonstrated
 agent benefit follows from the repository-only tests.
+
+## Cross-harness qualification boundary
+
+Hermes, Pi, OpenCode and DeepSeek Code Mode can invoke a repository evidence
+tool while emitting only a selected intermediary to the next model request.
+Tool invocation or MCP return alone therefore **cannot** prove that a model
+received the canonical packet, any specific finding, or its uncertainty.
+
+A host-neutral evaluator such as agentsCookbook should distinguish catalog
+exposure, invocation, validated producer return, final submitted-request
+inclusion, and later observable follow-through. A host lacking a captured
+submitted-request boundary must report inclusion as **unknown**. The exact
+source response identity, projection selection and host-delivered serialized
+representation are independent identities. No Hashmarks packet may assert
+`model_visible`, `agent_used`, or model comprehension from its own return.
+
+Current `production-response` arms retain the full native result. In contrast
+`encoding-only` uses exactly the same selected facts and is the correct
+control for testing text/JSON encoding preference. Host-specific truncation,
+elision, spill files, deferred tools and session compaction are not Hashmarks
+repository evidence authorities.
