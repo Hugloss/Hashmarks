@@ -355,20 +355,23 @@ def test_backend_decorator_evidence_absent_when_source_is_denied(
     assert "decorator_associations" not in row
 
 
-def test_backend_python_decorator_parse_bound_is_explicit(tmp_path: Path) -> None:
-    _repo(tmp_path)
-    (tmp_path / PATH).write_text(
-        "# " + "x" * 262_144 + "\n"
-        '@route.get("/items")\n'
-        "def process_widget(value):\n"
-        "    return value\n",
-        encoding="utf-8",
+def test_backend_python_decorator_parse_bound_is_explicit() -> None:
+    from hashmarks.codemap.change_decorator_evidence import (
+        MAX_DECORATOR_SOURCE_BYTES,
+        observe_python_decorator_associations,
     )
-    with CodeMap(tmp_path) as cm:
-        cm.sync()
-        impact = cm.task_change_impact(TASK, [PATH], options=_options(start=2, end=2))
-    row = impact["changed_line_evidence"]["observations"][0]
-    evidence = row["decorator_associations"]
+
+    class _NoIndex:
+        def symbols_overlapping_lines(self, *args, **kwargs):
+            raise AssertionError("index work before input-size admission")
+
+    evidence = observe_python_decorator_associations(
+        _NoIndex(),
+        PATH,
+        b"#" * (MAX_DECORATOR_SOURCE_BYTES + 1),
+        {"start_line": 1, "end_line": 1},
+    )
+    assert evidence is not None
     assert evidence["state"] == "unresolved"
     assert evidence["reason"] == "python-decorator-source-over-bound"
     assert evidence["negative_evidence_admissible"] is False
