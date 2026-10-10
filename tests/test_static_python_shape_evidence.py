@@ -17,7 +17,8 @@ from hashmarks.codemap.static_python_interface_declarations import (
 
 def _observe(root: Path, *, include: bool = True) -> dict:
     provider = StaticPythonInterfaceDeclarations(
-        paths=("service.py",), include_literal_shape_syntax=include,
+        paths=("service.py",),
+        include_literal_shape_syntax=include,
     )
     with CodeMap(root) as cm:
         cm.sync()
@@ -36,11 +37,11 @@ def test_selected_handler_syntax_is_source_bound_and_unresolved(tmp_path: Path) 
     (tmp_path / "service.py").write_text(
         'raise RuntimeError("do not execute")\n'
         '@router.get("/users")\n'
-        'def users(payload):\n'
+        "def users(payload):\n"
         '    user_id = payload["id"]\n'
-        '    if user_id:\n'
+        "    if user_id:\n"
         '        return {"id": user_id, "ok": True}\n'
-        '    return build_response()\n',
+        "    return build_response()\n",
         encoding="utf-8",
     )
     packet = _observe(tmp_path)
@@ -52,18 +53,24 @@ def test_selected_handler_syntax_is_source_bound_and_unresolved(tmp_path: Path) 
     assert body["cross_artifact_correspondence"] == "unresolved"
     assert body["literal_dictionary_returns"] == [
         {
-            "line": 6, "end_line": 6, "syntax": "literal-dict-return",
+            "line": 6,
+            "end_line": 6,
+            "syntax": "literal-dict-return",
             "literal_keys_in_source_order": ["id", "ok"],
         },
         {
-            "line": 7, "end_line": 7, "syntax": "unresolved-return",
+            "line": 7,
+            "end_line": 7,
+            "syntax": "unresolved-return",
             "literal_keys_in_source_order": None,
         },
     ]
     assert body["literal_subscript_accesses"] == [
         {
-            "line": 4, "end_line": 4,
-            "receiver_syntax": "payload", "literal_key": "id",
+            "line": 4,
+            "end_line": 4,
+            "receiver_syntax": "payload",
+            "literal_key": "id",
         }
     ]
     declaration = _group(packet)["declarations"][0]
@@ -74,7 +81,10 @@ def test_selected_handler_syntax_is_source_bound_and_unresolved(tmp_path: Path) 
         if row["binding_id"] == declaration["binding_id"]
     )
     assert {(row["start_line"], row["end_line"]) for row in binding["evidence"]} == {
-        (2, 3), (4, 4), (6, 6), (7, 7),
+        (2, 3),
+        (4, 4),
+        (6, 6),
+        (7, 7),
     }
     assert _group(packet)["correspondence"]["state"] == "unresolved"
     assert _group(packet)["absence"]["state"] == "unknown"
@@ -83,7 +93,7 @@ def test_selected_handler_syntax_is_source_bound_and_unresolved(tmp_path: Path) 
 def test_default_contract_is_unchanged_by_opt_in(tmp_path: Path) -> None:
     (tmp_path / "service.py").write_text(
         '@mcp.tool(name="search")\n'
-        'def search(data):\n'
+        "def search(data):\n"
         '    return {"answer": data["query"]}\n'
     )
     native = _observe(tmp_path, include=False)
