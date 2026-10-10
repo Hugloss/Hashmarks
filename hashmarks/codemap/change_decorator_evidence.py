@@ -12,6 +12,8 @@ import ast
 from collections.abc import Mapping
 from typing import Protocol
 
+from .static_python_interface_declarations import _handler_body_syntax
+
 MAX_DECORATOR_SOURCE_BYTES = 262_144
 MAX_DECORATOR_ASSOCIATIONS = 16
 MAX_DECLARATION_POINT_CANDIDATES = 33
@@ -35,6 +37,8 @@ def _unresolved(reason: str) -> dict[str, object]:
 
 MAX_HANDLER_DECORATOR_CONTEXT = 6
 MAX_DECORATOR_LITERAL_CHARS = 128
+MAX_HANDLER_BODY_SITES_PER_KIND = 8
+MAX_INDEXED_SIGNATURE_CHARS = 1024
 
 
 def _literal_string(node: ast.expr | None) -> dict[str, object]:
@@ -133,11 +137,88 @@ def _decorator_context(
     }
 
 
+def _handler_body_context(
+    node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef,
+    *,
+    allow_source_syntax: bool,
+) -> dict[str, object]:
+    """Reuse the source provider's one direct handler-body syntax oracle."""
+    if not allow_source_syntax:
+        return {
+            "state": "source-visibility-required",
+            "coverage": "unknown",
+            "negative_evidence_admissible": False,
+        }
+    if isinstance(node, ast.ClassDef):
+        return {
+            "state": "not-a-function-declaration",
+            "coverage": "unknown",
+            "negative_evidence_admissible": False,
+        }
+    try:
+        observed = _handler_body_syntax(node)
+    except (ValueError, RecursionError):
+        return {
+            "state": "unresolved",
+            "reason": "handler-body-syntax-over-bound-or-unavailable",
+            "coverage": "unknown",
+            "negative_evidence_admissible": False,
+        }
+    returns = observed["literal_dictionary_returns"]
+    accesses = observed["literal_subscript_accesses"]
+    return {
+        "state": "bounded-direct-handler-body-syntax",
+        "authority": observed["authority"],
+        "coverage": observed["coverage"],
+        "runtime_response_shape": observed["runtime_response_shape"],
+        "cross_artifact_correspondence": observed["cross_artifact_correspondence"],
+        "declaration_syntax": (
+            "async" if isinstance(node, ast.AsyncFunctionDef) else "sync"
+        ),
+        "return_sites_observed": len(returns),
+        "return_sites_omitted": max(0, len(returns) - MAX_HANDLER_BODY_SITES_PER_KIND),
+        "literal_dictionary_returns": returns[:MAX_HANDLER_BODY_SITES_PER_KIND],
+        "subscript_sites_observed": len(accesses),
+        "subscript_sites_omitted": max(
+            0, len(accesses) - MAX_HANDLER_BODY_SITES_PER_KIND
+        ),
+        "literal_subscript_accesses": accesses[:MAX_HANDLER_BODY_SITES_PER_KIND],
+        "negative_evidence_admissible": False,
+    }
+
+
+def _indexed_signature(
+    row: Mapping[str, object], *, allow_source_syntax: bool
+) -> dict[str, object]:
+    if not allow_source_syntax:
+        return {"state": "source-visibility-required"}
+    value = row.get("signature")
+    if not isinstance(value, str):
+        return {"state": "unavailable"}
+    if len(value) > MAX_INDEXED_SIGNATURE_CHARS:
+        return {"state": "over-bound"}
+    return {"state": "indexed-declaration", "value": value}
+
+
 def _decorator_hits(
     source: str, path: str, start_line: int, end_line: int
-) -> list[tuple[int, str, list[dict[str, int]], list[ast.expr]]]:
+) -> list[
+    tuple[
+        int,
+        str,
+        list[dict[str, int]],
+        ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef,
+    ]
+]:
     tree = ast.parse(source, filename=path)
-    hits: list[tuple[int, str, list[dict[str, int]], list[ast.expr]]] = []
+    hits: list[
+        tuple[
+            int,
+            str,
+            list[dict[str, int]],
+            ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef,
+        ]
+    ] = []
     for node in ast.walk(tree):
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             continue
@@ -151,7 +232,7 @@ def _decorator_hits(
             and (decorator.end_lineno or decorator.lineno) >= start_line
         ]
         if matched:
-            hits.append((node.lineno, node.name, matched, node.decorator_list))
+            hits.append((node.lineno, node.name, matched, node))
     return sorted(hits, key=lambda row: (row[2][0]["start_line"], row[0], row[1]))
 
 
@@ -196,12 +277,12 @@ def observe_python_decorator_associations(
         hits = _decorator_hits(
             raw.decode("utf-8"), path, span["start_line"], span["end_line"]
         )
-    except (SyntaxError, UnicodeDecodeError, ValueError):
+    except (SyntaxError, UnicodeDecodeError, ValueError, RecursionError):
         return _unresolved("python-decorator-syntax-unavailable")
 
     associations: list[dict[str, object]] = []
     unresolved = 0
-    for declaration_line, name, decorators, all_decorators in hits[
+    for declaration_line, name, decorators, declaration in hits[
         :MAX_DECORATOR_ASSOCIATIONS
     ]:
         row = _qualified_declaration(store, path, declaration_line, name)
@@ -223,7 +304,15 @@ def observe_python_decorator_associations(
                 },
                 "overlapping_decorator_ranges": decorators,
                 "decorator_context": _decorator_context(
-                    all_decorators, span, allow_source_syntax=allow_source_syntax
+                    declaration.decorator_list,
+                    span,
+                    allow_source_syntax=allow_source_syntax,
+                ),
+                "indexed_declaration_signature": _indexed_signature(
+                    row, allow_source_syntax=allow_source_syntax
+                ),
+                "handler_body_context": _handler_body_context(
+                    declaration, allow_source_syntax=allow_source_syntax
                 ),
                 "relationship_detail": {
                     "target": subject,
