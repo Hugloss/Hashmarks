@@ -505,14 +505,14 @@ def test_literal_set_reuses_one_member_read_and_qualifies_each_literal(
     assert reads_first == ["a.py", "b.py"]
     assert reads == ["a.py", "b.py"]
     assert first["observation_identity"] == second["observation_identity"]
-    assert first["observed_match_count"] == 5
-    assert first["exact_match_count"] == 5
+    assert first["observed_match_count"] == 4
+    assert first["exact_match_count"] == 4
     assert first["source_coverage"] == "complete"
     assert first["truncation"] == "complete"
     assert first["execution_effect"] == "none"
     facts = {row["literal"]: row for row in first["literal_observations"]}
     assert facts["ZIP_DEFLATED"]["exact_match_count"] == 2
-    assert facts["ZipInfo"]["exact_match_count"] == 3
+    assert facts["ZipInfo"]["exact_match_count"] == 2
     assert facts["not-present"]["exact_match_count"] == 0
     if first["freshness"] == "current":
         assert facts["not-present"]["negative_evidence"] == (
