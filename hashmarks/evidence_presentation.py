@@ -690,6 +690,7 @@ def _source(
             # Literal hits are more useful to an agent than a long member
             # inventory; compact presentation must show hits before inventory.
             ("occurrences", "source", "records"),
+            ("literal_observations", "qualification", "records"),
             ("line_anchors", "source", "records"),
             ("member", "source", "record"),
             ("member_observations", "source", "records"),
@@ -1439,6 +1440,7 @@ def _projectors() -> dict[str, Any]:
         operation_schema("repository_findings"): _findings,
         operation_schema("source_observation", "member"): _source,
         operation_schema("source_observation", "scope"): _source,
+        operation_schema("source_observation", "literals"): _source,
         operation_schema("repository_evidence", "observation"): _bindings,
         operation_schema("repository_evidence", "coverage"): _bindings,
         operation_schema("dependency_codemap", "observation"): _dependency,
@@ -1458,6 +1460,11 @@ def _require_fields(packet: Mapping[str, object], schema: str) -> None:
         operation_schema("source_observation", "member"): ("member", "occurrences"),
         operation_schema("source_observation", "scope"): (
             "member_observations",
+            "occurrences",
+        ),
+        operation_schema("source_observation", "literals"): (
+            "member_observations",
+            "literal_observations",
             "occurrences",
         ),
         operation_schema("structural_locality"): ("nodes", "edges"),
