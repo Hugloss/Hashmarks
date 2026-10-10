@@ -15,7 +15,11 @@ from hashmarks.codemap.lsp_relationship_adapter import (
     CAPTURE_SCHEMA,
     normalize_lsp_captures,
 )
-from hashmarks.codemap.semantic_relationship_model import producer_claim_correspondence
+from hashmarks.codemap.semantic_relationship_model import (
+    content_identity,
+    producer_claim_correspondence,
+    validate_relationship_observation,
+)
 from hashmarks.digest import FILE_DOMAIN, hash_bytes
 from hashmarks.evidence_context import describe_evidence_binding_reacquisition
 from hashmarks.evidence_presentation import present_repository_evidence
@@ -340,3 +344,33 @@ def test_cli_captured_reference_preserves_canonical_packet(
         is True
     )
     assert output["result"]["negative_evidence_admissible"] is False
+
+def test_legacy_relationship_packet_without_correspondence_still_validates(
+    repo: Path,
+) -> None:
+    with CodeMap(repo) as cm:
+        cm.sync()
+        packet = cm.structural_locality(
+            "source.py::target", result_mode="relationships"
+        )
+    legacy = deepcopy(packet)
+    legacy.pop("producer_correspondence")
+    legacy.pop("evidence_identity")
+    legacy["evidence_identity"] = content_identity(legacy)
+    assert validate_relationship_observation(legacy)["evidence_identity"] == (
+        legacy["evidence_identity"]
+    )
+
+
+def test_forged_cross_producer_correspondence_is_rejected(repo: Path) -> None:
+    with CodeMap(repo) as cm:
+        cm.sync()
+        packet = cm.structural_locality(
+            "source.py::target", result_mode="relationships"
+        )
+    tampered = deepcopy(packet)
+    tampered["producer_correspondence"]["negative_evidence_admissible"] = True
+    tampered.pop("evidence_identity")
+    tampered["evidence_identity"] = content_identity(tampered)
+    with pytest.raises(ValueError, match="correspondence"):
+        validate_relationship_observation(tampered)
