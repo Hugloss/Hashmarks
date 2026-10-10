@@ -344,8 +344,10 @@ def validate_relationship_observation(payload: Mapping[str, Any]) -> dict[str, A
         raise ValueError("invalid relationship observation count")
     for observation in observations:
         _validate_producer_observation(observation, value["target"])
-    if value.get("producer_correspondence") != producer_claim_correspondence(
-        value["observations"]
+    if (
+        "producer_correspondence" in value
+        and value["producer_correspondence"]
+        != producer_claim_correspondence(value["observations"])
     ):
         raise ValueError(
             "relationship cross-producer correspondence does not match claims"
