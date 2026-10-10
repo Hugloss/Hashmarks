@@ -85,7 +85,8 @@ class _HandlerBodySyntax(ast.NodeVisitor):
 
     def visit_Subscript(self, node: ast.Subscript) -> None:
         if (
-            isinstance(node.value, ast.Name)
+            isinstance(node.ctx, ast.Load)
+            and isinstance(node.value, ast.Name)
             and isinstance(node.slice, ast.Constant)
             and type(node.slice.value) is str
             and len(node.slice.value) <= _MAX_ACCESS_KEY_CHARS
