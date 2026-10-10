@@ -81,9 +81,7 @@ def normalize_hover_observation(capture: Mapping[str, Any]) -> dict[str, Any]:
         ):
             raise ValueError("LSP hover result requires contents and optional range")
         contents = _contents(result["contents"])
-        source_range = (
-            validated_range(result["range"]) if "range" in result else None
-        )
+        source_range = validated_range(result["range"]) if "range" in result else None
         state = "hover-returned"
     # Limit aggregate transported values separately from the capture input limit.
     if len(json.dumps(contents, ensure_ascii=False).encode("utf-8")) > _MAX_HOVER_BYTES:
