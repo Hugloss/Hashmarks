@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, cast
 
 from hashmarks.freshness import freshness_state
@@ -9,6 +10,56 @@ from hashmarks.paths import normalize_relative_path
 
 if TYPE_CHECKING:
     from .engine import CodeMap
+
+
+@dataclass(slots=True)
+class _LiteralSetState:
+    """Request-scoped aggregation; never an independent source/index owner."""
+
+    paths: list[str]
+    literals: tuple[str, ...]
+    start_generation: int
+    limit: int
+    max_total_bytes: int
+    max_member_bytes: int
+    context_lines: int
+    members: list[dict[str, object]] = field(default_factory=list)
+    observed_bytes: int = 0
+    complete: bool = True
+    counts: dict[str, int] = field(init=False)
+    hits: dict[str, list[dict[str, object]]] = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.counts = dict.fromkeys(self.literals, 0)
+        self.hits = {literal: [] for literal in self.literals}
+
+    def add(
+        self,
+        record: dict[str, object],
+        hits: dict[str, list[dict[str, object]]],
+        consumed: int,
+    ) -> None:
+        self.members.append(record)
+        self.observed_bytes += consumed
+        counts = record["observed_match_counts"]
+        if not isinstance(counts, dict):
+            self.complete = False
+            return
+        for literal in self.literals:
+            self.counts[literal] += cast("int", counts[literal])
+            selected = self.hits[literal]
+            selected.extend(hits[literal][: max(0, self.limit - len(selected))])
+
+    def selected_hits(self) -> list[dict[str, object]]:
+        """Balance capped rows across literals, preserving each term's file order."""
+        selected: list[dict[str, object]] = []
+        for index in range(self.limit):
+            for literal in self.literals:
+                if index < len(self.hits[literal]):
+                    selected.append(self.hits[literal][index])
+                    if len(selected) == self.limit:
+                        return selected
+        return selected
 
 
 class ScopedSourceLiteralsMixin:
@@ -91,19 +142,16 @@ class ScopedSourceLiteralsMixin:
         )
         return record, empty, len(raw)
 
-    def scoped_source_literals(
-        self,
+    @staticmethod
+    def _literal_set_request(
         paths: Sequence[str],
         literals: Sequence[str],
-        *,
-        limit: int = 100,
-        max_total_bytes: int = 4_194_304,
-        max_member_bytes: int = 1_048_576,
-        context_lines: int = 0,
-    ) -> dict[str, object]:
-        """Bounded literal-set evidence, sharing each stable member byte read."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+        limit: int,
+        max_total_bytes: int,
+        max_member_bytes: int,
+        context_lines: int,
+    ) -> tuple[list[str], tuple[str, ...]]:
+        """Reject invalid scope and literals before any source observation."""
         if isinstance(paths, (str, bytes)) or not 1 <= len(paths) <= 32:
             raise ValueError("scope must contain between 1 and 32 explicit paths")
         if isinstance(literals, (str, bytes)) or not 1 <= len(literals) <= 8:
@@ -117,86 +165,56 @@ class ScopedSourceLiteralsMixin:
         if type(context_lines) is not int or context_lines not in (0, 1):
             raise ValueError("context_lines must be 0 or 1")
         for literal in literals:
-            self._validate_source_observation(literal, limit, max_member_bytes, 2_000)
+            from .repository_delta import RepositoryDeltaMixin
+
+            RepositoryDeltaMixin._validate_source_observation(
+                literal, limit, max_member_bytes, 2_000
+            )
         selected_paths = sorted(
             {normalize_relative_path(path, allow_root=False) for path in paths}
         )
-        selected_literals = tuple(sorted(literals))
-        generation_before = self.store.generation()
-        members: list[dict[str, object]] = []
-        observed_bytes = 0
-        complete = True
-        observed_counts = dict.fromkeys(selected_literals, 0)
-        hits_by_literal: dict[str, list[dict[str, object]]] = {
-            literal: [] for literal in selected_literals
-        }
-        for path in selected_paths:
-            record, member_hits, source_bytes = self._scoped_literal_set_member(
-                path,
-                selected_literals,
-                remaining_bytes=max_total_bytes - observed_bytes,
-                max_member_bytes=max_member_bytes,
-                limit=limit,
-                context_lines=context_lines,
-            )
-            members.append(record)
-            observed_bytes += source_bytes
-            member_counts = record["observed_match_counts"]
-            if not isinstance(member_counts, dict):
-                complete = False
-                continue
-            for literal in selected_literals:
-                observed_counts[literal] += cast("int", member_counts[literal])
-                selected = hits_by_literal[literal]
-                selected.extend(member_hits[literal][: max(0, limit - len(selected))])
-        occurrences: list[dict[str, object]] = []
-        # One hit per literal per round prevents the first term from consuming
-        # all presentation slots. Each term's hits retain path/line order.
-        for index in range(limit):
-            for literal in selected_literals:
-                if index < len(hits_by_literal[literal]):
-                    occurrences.append(hits_by_literal[literal][index])
-                    if len(occurrences) == limit:
-                        break
-            if len(occurrences) == limit:
-                break
+        return selected_paths, tuple(sorted(literals))
+
+    def _literal_set_result(self, state: _LiteralSetState) -> dict[str, object]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         generation, identity_generation, stale = self._generation_status()
-        coverage = complete and generation == generation_before
-        freshness = (
-            freshness_state(stale) if coverage else "stale"
-        )
-        exact = sum(observed_counts.values()) if coverage else None
-        truncated = sum(observed_counts.values()) > len(occurrences)
+        coverage = state.complete and generation == state.start_generation
+        freshness = freshness_state(stale) if coverage else "stale"
+        selected = state.selected_hits()
+        count = sum(state.counts.values())
+        exact = count if coverage else None
+        truncated = count > len(selected)
         qualified = coverage and freshness == "current"
         result: dict[str, object] = {
             "schema": operation_schema("source_observation", "literals"),
             "observation_scope": "explicit-member-and-literal-set-only",
-            "paths": selected_paths,
-            "literals": list(selected_literals),
+            "paths": state.paths,
+            "literals": list(state.literals),
             "generation": generation,
             "identity_generation": identity_generation,
             "freshness": freshness,
-            "member_observations": members,
+            "member_observations": state.members,
             "literal_observations": [
                 {
                     "literal": literal,
-                    "observed_match_count": observed_counts[literal],
-                    "exact_match_count": observed_counts[literal] if coverage else None,
+                    "observed_match_count": state.counts[literal],
+                    "exact_match_count": state.counts[literal] if coverage else None,
                     "returned_occurrence_count": sum(
-                        row["literal"] == literal for row in occurrences
+                        row["literal"] == literal for row in selected
                     ),
                     "negative_evidence": (
                         "admissible-within-explicit-member-set"
-                        if qualified and observed_counts[literal] == 0
+                        if qualified and state.counts[literal] == 0
                         else "not-admissible"
                     ),
                 }
-                for literal in selected_literals
+                for literal in state.literals
             ],
             "source_coverage": "complete" if coverage else "unknown",
-            "observed_match_count": sum(observed_counts.values()),
+            "observed_match_count": count,
             "exact_match_count": exact,
-            "occurrences": occurrences,
+            "occurrences": selected,
             "selection_order": "round-robin-by-literal",
             "completeness": (
                 "unknown" if not coverage else "incomplete" if truncated else "complete"
@@ -210,13 +228,13 @@ class ScopedSourceLiteralsMixin:
                 else "not-admissible"
             ),
             "limits": {
-                "returned_occurrences": limit,
-                "max_total_bytes": max_total_bytes,
-                "max_member_bytes": max_member_bytes,
-                "literal_count": len(selected_literals),
-                "context_lines": context_lines,
+                "returned_occurrences": state.limit,
+                "max_total_bytes": state.max_total_bytes,
+                "max_member_bytes": state.max_member_bytes,
+                "literal_count": len(state.literals),
+                "context_lines": state.context_lines,
             },
-            "observed_source_bytes": observed_bytes,
+            "observed_source_bytes": state.observed_bytes,
             "authority": "repository-evidence-only",
             "execution_effect": "none",
         }
@@ -227,3 +245,39 @@ class ScopedSourceLiteralsMixin:
             "source_observation", result, mode="literals"
         )
 
+    def scoped_source_literals(
+        self,
+        paths: Sequence[str],
+        literals: Sequence[str],
+        *,
+        limit: int = 100,
+        max_total_bytes: int = 4_194_304,
+        max_member_bytes: int = 1_048_576,
+        context_lines: int = 0,
+    ) -> dict[str, object]:
+        """One stable source read per member, with qualified per-literal counts."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        selected_paths, selected_literals = self._literal_set_request(
+            paths, literals, limit, max_total_bytes, max_member_bytes, context_lines
+        )
+        state = _LiteralSetState(
+            paths=selected_paths,
+            literals=selected_literals,
+            start_generation=self.store.generation(),
+            limit=limit,
+            max_total_bytes=max_total_bytes,
+            max_member_bytes=max_member_bytes,
+            context_lines=context_lines,
+        )
+        for path in state.paths:
+            record, hits, consumed = self._scoped_literal_set_member(
+                path,
+                state.literals,
+                remaining_bytes=state.max_total_bytes - state.observed_bytes,
+                max_member_bytes=state.max_member_bytes,
+                limit=state.limit,
+                context_lines=state.context_lines,
+            )
+            state.add(record, hits, consumed)
+        return self._literal_set_result(state)
