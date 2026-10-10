@@ -740,8 +740,13 @@ def _direct_relationships(
 ) -> None:
     p.field(packet, "coverage", "qualification", ref, ctx, shape="record")
     p.field(
-        packet, "producer_correspondence", "correspondence", ref, ctx,
-        shape="record", assertion="producer_claim",
+        packet,
+        "producer_correspondence",
+        "correspondence",
+        ref,
+        ctx,
+        shape="record",
+        assertion="producer_claim",
     )
     observations = packet.get("observations", [])
     if not isinstance(observations, list):
@@ -1551,8 +1556,7 @@ def present_repository_evidence(
         "unprojected_sections": projection.unprojected,
         "authority": "descriptive-only",
         "execution_effect": "none",
-    }
-    if format == "text":
+    }    if format == "text":
         result["text"] = evidence_projection_text(result)
     return result
 
