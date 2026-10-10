@@ -15,11 +15,11 @@ from hashmarks.codemap.lsp_relationship_adapter import (
     CAPTURE_SCHEMA,
     normalize_lsp_captures,
 )
+from hashmarks.codemap.semantic_relationship_model import producer_claim_correspondence
 from hashmarks.digest import FILE_DOMAIN, hash_bytes
+from hashmarks.evidence_context import describe_evidence_binding_reacquisition
 from hashmarks.evidence_presentation import present_repository_evidence
 from hashmarks.evidence_presentation_conformance import validate_evidence_presentation
-from hashmarks.evidence_context import describe_evidence_binding_reacquisition
-from hashmarks.codemap.semantic_relationship_model import producer_claim_correspondence
 
 
 def _range(line: int, start: int, end: int) -> dict:
