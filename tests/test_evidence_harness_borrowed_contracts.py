@@ -345,6 +345,7 @@ def test_cli_captured_reference_preserves_canonical_packet(
     )
     assert output["result"]["negative_evidence_admissible"] is False
 
+
 def test_legacy_relationship_packet_without_correspondence_still_validates(
     repo: Path,
 ) -> None:
@@ -357,8 +358,9 @@ def test_legacy_relationship_packet_without_correspondence_still_validates(
     legacy.pop("producer_correspondence")
     legacy.pop("evidence_identity")
     legacy["evidence_identity"] = content_identity(legacy)
-    assert validate_relationship_observation(legacy)["evidence_identity"] == (
-        legacy["evidence_identity"]
+    assert (
+        validate_relationship_observation(legacy)["evidence_identity"]
+        == (legacy["evidence_identity"])
     )
 
 
