@@ -134,6 +134,22 @@ def _encoding_arms(packet: dict[str, Any]) -> dict[str, object]:
     }
 
 
+def exported_response_utf8_bytes(response: object) -> int:
+    """Size of the frozen export encoding, not verified model-visible tokens."""
+    serialized = (
+        response
+        if isinstance(response, str)
+        else json.dumps(
+            response,
+            sort_keys=True,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+    )
+    return len(serialized.encode("utf-8"))
+
+
 def emit_trials(
     manifest: dict[str, Any], *, axis: str = "production-response"
 ) -> list[dict[str, object]]:
@@ -165,6 +181,7 @@ def emit_trials(
                 "tool_response": response,
                 "study_axis": axis,
                 "source_schema": packet["schema"],
+                "exported_response_utf8_bytes": exported_response_utf8_bytes(response),
             }
             if projection is not None:
                 trial["mcp_projection"] = deepcopy(projection)
@@ -221,6 +238,12 @@ def _expected_trials(
             trial
         ):
             raise ValueError("trial identity mismatch")
+        measured_size = trial.get("exported_response_utf8_bytes")
+        if measured_size is not None and (
+            type(measured_size) is not int
+            or measured_size != exported_response_utf8_bytes(trial["tool_response"])
+        ):
+            raise ValueError("trial exported response byte size mismatch")
         if variant in expected[case]:
             raise ValueError("duplicate expected trial")
         axes.add(axis)
@@ -381,6 +404,10 @@ def _capture_audit(
                 "variant": key[2],
                 "model_visible_sha256": "sha256:"
                 + hashlib.sha256(visible.encode("utf-8")).hexdigest(),
+                "model_visible_utf8_bytes": len(visible.encode("utf-8")),
+                "exported_response_utf8_bytes": exported_response_utf8_bytes(
+                    trial["tool_response"]
+                ),
                 "content_equivalent": content_equivalent,
                 "projection_equivalent": projection_equivalent,
             }
