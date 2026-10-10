@@ -559,9 +559,9 @@ class HashmarksMcpSurface:
         limit = _bounded_int(limit, name="limit", minimum=1, maximum=50)
         literal_context, requested_lines, anchor_context = _source_context_request(
             context_lines,
-            literal=literal if literal is not None else (
-                literals[0] if literals is not None else None
-            ),
+            literal=literal
+            if literal is not None
+            else (literals[0] if literals is not None else None),
             result_mode=result_mode,
         )
 
