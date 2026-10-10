@@ -268,7 +268,8 @@ MCP_TOOL_CONTRACTS = (
         (
             "After localization, observe exact case-sensitive literals in one member, "
             "up to 32 explicit paths, or up to 8 distinct literals across those paths "
-            "in literals mode (not regex). Preserve revision, scoped coverage, "
+            "in literals mode via an array-valued literal (not regex). "
+            "Preserve revision, scoped coverage, "
             "per-literal qualified absence, and optional bounded match context."
         ),
         "source_observation",
