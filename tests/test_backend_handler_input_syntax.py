@@ -27,9 +27,9 @@ def _write(root: Path, content: str) -> None:
 
 
 def _input(result: dict[str, object]) -> dict[str, object]:
-    return result["changed_line_evidence"]["observations"][0][
-        "decorator_associations"
-    ]["associations"][0]["handler_input_context"]
+    return result["changed_line_evidence"]["observations"][0]["decorator_associations"][
+        "associations"
+    ][0]["handler_input_context"]
 
 
 def _change(cm: CodeMap) -> dict[str, object]:
@@ -86,9 +86,7 @@ def test_shared_input_oracle_and_default_declaration_identity(tmp_path: Path) ->
     assert input_syntax["authority"] == "direct-static-syntax-only"
     assert input_syntax["coverage"] == "incomplete"
     assert input_syntax["parameters_observed"] == 4
-    assert input_syntax["signature_source_range"] == {
-        "start_line": 2, "end_line": 8
-    }
+    assert input_syntax["signature_source_range"] == {"start_line": 2, "end_line": 8}
     assert input_syntax["runtime_request_validation"] == "unknown"
     assert input_syntax["cross_artifact_correspondence"] == "unresolved"
     assert input_syntax["dependency_resolution"] == "not-established"
@@ -107,15 +105,12 @@ def test_shared_input_oracle_and_default_declaration_identity(tmp_path: Path) ->
     assert meta["state"] == "direct-annotated-metadata-syntax"
     assert meta["sites"][0]["callee"] == {"state": "name-syntax", "name": "Depends"}
     assert meta["sites"][0]["first_argument_reference"] == {
-        "state": "name-syntax", "name": "authorize"
+        "state": "name-syntax",
+        "name": "authorize",
     }
-    assert params[2]["default"]["callee"] == {
-        "state": "name-syntax", "name": "Query"
-    }
+    assert params[2]["default"]["callee"] == {"state": "name-syntax", "name": "Query"}
     assert params[2]["default"]["keyword_names"] == ["ge"]
-    assert params[3]["default"]["callee"] == {
-        "state": "name-syntax", "name": "Header"
-    }
+    assert params[3]["default"]["callee"] == {"state": "name-syntax", "name": "Header"}
     assert params[3]["default"]["keyword_names"] == ["default"]
     assert input_syntax["return_annotation"]["text"] == "dict[str, int]"
     assert (
@@ -140,12 +135,18 @@ def test_positional_defaults_and_keyword_kinds_are_not_inferred(tmp_path: Path) 
         result = _input(_change(cm))
     params = result["parameters"]
     assert [x["kind"] for x in params] == [
-        "positional-only", "positional-or-keyword", "variadic-positional",
-        "keyword-only", "variadic-keyword"
+        "positional-only",
+        "positional-or-keyword",
+        "variadic-positional",
+        "keyword-only",
+        "variadic-keyword",
     ]
     assert [x["default"]["state"] for x in params] == [
-        "not-supplied", "literal-kind-only", "not-supplied",
-        "literal-kind-only", "not-supplied"
+        "not-supplied",
+        "literal-kind-only",
+        "not-supplied",
+        "literal-kind-only",
+        "not-supplied",
     ]
     assert params[1]["default"]["kind"] == "integer"
     assert params[3]["default"]["kind"] == "bool"
@@ -167,11 +168,10 @@ def test_default_literals_never_disclose_values_and_dynamic_stays_unknown(
         cm.sync()
         result = _input(_change(cm))
     assert result["parameters"][0]["default"] == {
-        "state": "literal-kind-only", "kind": "string"
+        "state": "literal-kind-only",
+        "kind": "string",
     }
-    assert result["parameters"][1]["default"] == {
-        "state": "dynamic-or-unsupported"
-    }
+    assert result["parameters"][1]["default"] == {"state": "dynamic-or-unsupported"}
     assert result["parameters"][2]["default"]["state"] == "direct-call-syntax"
     assert result["parameters"][2]["default"]["has_argument_expansion"] is True
     assert "UNIQUE_SECRET_VALUE" not in str(result)
@@ -233,7 +233,9 @@ def test_decorated_class_cannot_claim_handler_parameters(tmp_path: Path) -> None
     assert result["coverage"] == "unknown"
 
 
-def test_source_visibility_prevents_signature_literal_disclosure(tmp_path: Path) -> None:
+def test_source_visibility_prevents_signature_literal_disclosure(
+    tmp_path: Path,
+) -> None:
     _write(tmp_path, _fixture())
     (tmp_path / ".hashmarks-context.toml").write_text(
         '[[rule]]\npattern = "service.py"\nvisibility = "outline"\n',
