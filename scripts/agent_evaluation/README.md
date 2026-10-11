@@ -14,4 +14,13 @@ Key rules:
 - Invoke executable evaluation modules from the repository root with `python -m scripts.agent_evaluation.<module>` (normally through `make evaluation-help` targets), so package ownership and imports remain explicit.
 - Evaluation schema versions describe serialized contracts; evaluation family identifiers describe semantic protocols/fixtures and must not be coupled to the Hashmarks package version.
 
+A source-equivalent backend evidence A/B export is available as
+`uv run -m scripts.agent_evaluation.backend_navigation_ablation`. It
+freezes **syntax-only versus navigation-augmented** provider observations
+from one source revision. This is an offline input for an externally owned
+paired host/agent evaluation, **not** a recorded agent run, a tool delivery
+receipt, or a claim of improved performance. See
+`benchmarks/agent_evaluation/README.md` for the bounded manifest format,
+failure modes, privacy constraints and experiment ownership.
+
 Current product contracts live under `docs/reference/`. Superseded benchmark contracts and development experiments remain recoverable from Git and merged pull requests rather than a parallel historical-document tree.
