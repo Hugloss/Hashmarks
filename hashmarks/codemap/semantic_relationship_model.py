@@ -329,6 +329,7 @@ def _validate_call_site_source(claim: Mapping[str, Any]) -> None:
         "outside-repository",
         "unadmitted",
         "snapshot-unavailable",
+        "empty-call-sites",
     )
     if site["state"] not in allowed:
         raise ValueError("unsupported call-site qualification state")
