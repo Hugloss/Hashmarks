@@ -243,6 +243,37 @@ It does not inspect files, discover dependencies, choose edits/tests, execute
 tools or prove runtime API compatibility. The producer/consumer work merged in
 #424 remains under its separate source-declaration authority.
 
+## Cross-artifact C05–C08: bounded per-site literal syntax projection
+
+Follow merged #424 and #428. The caller-nominated C01–C04 source pairs
+carry independently observed return/key-read sites, but force an agent to
+manually compare the literal spelling at each site. The **optional**
+`StaticPythonInterfaceDeclarations(include_pair_key_site_projection=True)`
+reuses only those existing source-bound sites and their exact locations:
+
+- **C05:** for each retained consumer `receiver["key"]` load, project up
+  to eight producer return sites and tag each as
+  `same-literal-key-at-site`, `different-literal-key-at-site`, or
+  `producer-return-syntax-unresolved`. Those are **independent syntax
+  strings**, not a producer/consumer runtime correspondence or a missing key.
+- **C06:** distinct producer return branches remain distinct and unknown
+  dynamic/opaque returns stay unresolved; aliases, writes, nested functions,
+  and consumer receivers other than the explicit nomination do not enter.
+- **C07:** the pure projection caps both consumer and producer sites at
+  eight, reports observed/retained/omitted counts for both dimensions, and
+  never infers completeness from an empty site collection.
+- **C08:** strict opt-in boolean validation before reads, default identity
+  parity, source admission and revision binding through the existing
+  repository-declaration owner, presentation conformance and adversarial
+  tests. `runtime_compatibility=not-asserted`,
+  `missing_field_conclusion=not-admissible`, coverage incomplete, and
+  negative evidence inadmissible.
+
+No second AST extractor, new MCP tool, source scanner, graph, runtime route
+binding, HTTP API compatibility analysis, test oracle, or automatic agent
+routing. The projection lives within the existing consumer declaration's
+provider-claimed `value`; no new independent authority is created.
+
 ## Open conditional checkpoints
 
 - **H04:** changed-line → symbol/relationship claims require a direct
