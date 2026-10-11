@@ -304,3 +304,38 @@ reobserves the explicitly declared scopes and uses the existing binding delta
 and coverage contracts to distinguish preserved localized evidence from
 changed/unknown or noncomparable evidence. Hashmarks never stores the agent's
 history or decides whether to resume work.
+
+## Descriptor integrity and reobservation comparison
+
+A newly produced `describe_evidence_binding_reacquisition` result adds
+`descriptor_identity`, a deterministic domain-separated SHA-256 identity
+over its canonical, portable JSON description. The helper remains
+repository-read-free and does not create a session cursor or an evidence
+lookup service.
+
+```python
+from hashmarks.evidence_reacquisition_integrity import (
+    validate_reacquisition_descriptor,
+    compare_reacquisition_observation,
+)
+
+validated = validate_reacquisition_descriptor(reference)
+comparison = compare_reacquisition_observation(reference, new_binding_packet)
+```
+
+Validation rejects modified selectors, noncanonical paths and member/span
+scopes, invalid bounds, changed authority flags and descriptor identity
+mismatches. Comparison reports equality of explicitly supplied repository,
+binding definition and binding observation identity **claims**, independently.
+It always sets `current_freshness_proven: false`, even if packet identity
+and observation identity match.
+
+A descriptor digest is **not** a signature or producer authentication. This
+helper does **not** revalidate a caller-supplied binding packet, prove current
+repository bytes, or decide whether work should resume. To qualify actual
+producer packets and local preservation/change, callers must obtain a fresh
+CodeMap observation and use the existing
+`CodeMap.repository_evidence_binding_delta(before, after)` contract with
+both original and fresh native packets. When the original native packet has
+not been retained, its opaque identity alone cannot reconstruct that proof.
+Do not promote a descriptor's old freshness to current evidence.
