@@ -367,6 +367,17 @@ def _validate_consumer_pairs(
         raise ValueError("consumer_pairs must be unique")
 
 
+def _validate_pair_site_projection(
+    enabled: object,
+    pairs: tuple[tuple[str, str, str, str, str], ...],
+) -> None:
+    """Fail invalid source-pair opt-in before repository reads."""
+    if type(enabled) is not bool:
+        raise ValueError("include_pair_key_site_projection must be boolean")
+    if enabled and not pairs:
+        raise ValueError("pair key site projection requires consumer_pairs")
+
+
 def _unique_top_level(
     tree: ast.Module, name: str
 ) -> ast.FunctionDef | ast.AsyncFunctionDef | None:
@@ -584,10 +595,9 @@ class StaticPythonInterfaceDeclarations:
         if type(self.include_input_contract_syntax) is not bool:
             raise ValueError("include_input_contract_syntax must be boolean")
         _validate_consumer_pairs(self.consumer_pairs, self.paths)
-        if type(self.include_pair_key_site_projection) is not bool:
-            raise ValueError("include_pair_key_site_projection must be boolean")
-        if self.include_pair_key_site_projection and not self.consumer_pairs:
-            raise ValueError("pair key site projection requires consumer_pairs")
+        _validate_pair_site_projection(
+            self.include_pair_key_site_projection, self.consumer_pairs
+        )
         if not 1 <= len(self.paths) <= _MAX_PATHS:
             raise ValueError("interface provider requires 1..32 exact paths")
         if any(
