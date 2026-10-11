@@ -63,7 +63,7 @@ def _pair(packet: dict) -> dict:
     return group
 
 
-def test_b15_b18_pair_has_two_exact_bindings_but_no_compatibility_claim(
+def test_c01_c04_pair_has_two_exact_bindings_but_no_compatibility_claim(
     tmp_path: Path,
 ) -> None:
     _repo(tmp_path)
