@@ -34,6 +34,18 @@ def _locator(value: Any) -> Any:
     return {key: item for key, item in value.items() if key not in omitted}
 
 
+def _encode_task_matches(relevance: dict[str, Any]) -> None:
+    matches = relevance.get("task_matches")
+    if not isinstance(matches, dict) or not isinstance(matches.get("matches"), list):
+        return
+    columns = ["path", "matched_term_count", "evidence_visibility"]
+    rows = matches["matches"]
+    if not all(isinstance(row, dict) and set(row) == set(columns) for row in rows):
+        return
+    matches["matches_encoding"] = {"kind": "columns-rows.v1", "columns": columns}
+    matches["matches"] = [[row[key] for key in columns] for row in rows]
+
+
 def initial_task_evidence(packet: dict[str, Any]) -> dict[str, Any]:
     """Project existing facts, retaining qualifiers and accounting for detail loss."""
     validate_operation_response("task_evidence", packet)
@@ -78,6 +90,7 @@ def initial_task_evidence(packet: dict[str, Any]) -> dict[str, Any]:
     verification["selected"] = _locator(verification.get("selected"))
     relevance = verification.get("relevance")
     if isinstance(relevance, dict):
+        _encode_task_matches(relevance)
         relevance["selected"] = _locator(relevance.get("selected"))
         candidates = relevance.get("candidates", [])
         selected = relevance.get("selected")

@@ -49,6 +49,27 @@ def _change_cli_arguments(inputs: dict[str, Any]) -> list[str]:
     return args
 
 
+def _source_cli_arguments(inputs: dict[str, Any]) -> list[str]:
+    if (
+        set(inputs) - {"paths", "context_lines", "result_mode"}
+        or len(inputs["paths"]) != 1
+        or inputs.get("result_mode", "member") != "member"
+    ):
+        raise ValueError("backend CLI source capture requires one member")
+    args = ["source-observation", inputs["paths"][0]]
+    context = inputs.get("context_lines", 0)
+    if isinstance(context, dict):
+        if set(context) != {"lines", "radius"} or context["radius"] != 1:
+            raise ValueError(
+                "backend CLI source capture requires matching line context"
+            )
+        for line in context["lines"]:
+            args.extend(("--line", str(line)))
+    elif context != 0:
+        raise ValueError("backend CLI source capture requires matching line context")
+    return args
+
+
 def _cli_arguments(operation: str, inputs: dict[str, Any]) -> list[str]:
     if operation == "task_evidence":
         args = ["task-evidence", inputs["task"]]
@@ -74,8 +95,12 @@ def _cli_arguments(operation: str, inputs: dict[str, Any]) -> list[str]:
             "--result-mode",
             inputs.get("result_mode", "default"),
         ]
-    if operation == "change_impact":
-        return _change_cli_arguments(inputs)
+    source_captures = {
+        "change_impact": _change_cli_arguments,
+        "source_observation": _source_cli_arguments,
+    }
+    if operation in source_captures:
+        return source_captures[operation](inputs)
     raise ValueError(f"backend CLI transport is not available for {operation}")
 
 

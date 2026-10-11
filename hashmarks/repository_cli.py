@@ -15,6 +15,7 @@ from .codemap.change_impact import (
 from .codemap.context_defaults import REPOSITORY_CONTEXT_DEFAULTS
 from .codemap.evidence_packet import TASK_EVIDENCE_DEFAULT_OPTIONS
 from .codemap.find_engine import FIND_DEFAULT_OPTIONS
+from .codemap.source_line_correspondence import validated_source_lines
 from .codemap.verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 from .errors import RepositoryCliError
 from .evidence_presentation import FORMATS, presentation_response
@@ -459,6 +460,24 @@ def _post_change_code(args) -> int:
     return 0
 
 
+def _source_observation_code(args) -> int:
+    requested = validated_source_lines(args.line or ())
+
+    def observe(codemap):
+        codemap.sync([args.path])
+        return codemap.source_observation(
+            args.path,
+            lines=requested,
+            anchor_context_lines=1 if requested else 0,
+        )
+
+    value = _call_codemap(args, observe)
+    _print_operation(
+        "source_observation", value, mode="member", presentation=args.presentation
+    )
+    return 0
+
+
 def _add_evidence_presentation_cli(parser) -> None:
     parser.add_argument(
         "--presentation",
@@ -466,6 +485,22 @@ def _add_evidence_presentation_cli(parser) -> None:
         default="none",
         help="optional evidence projection alongside canonical JSON",
     )
+
+
+def _add_source_observation_cli(
+    sub, *, add_common_arguments: Callable[..., None]
+) -> None:
+    source = sub.add_parser(
+        "source-observation",
+        help="observe one repository member and exact caller-selected source lines",
+    )
+    add_common_arguments(source, inherited=True)
+    _add_evidence_presentation_cli(source)
+    source.add_argument("path")
+    source.add_argument(
+        "--line", type=int, action="append", help="1-based source line; repeatable"
+    )
+    source.set_defaults(func=_source_observation_code, automatic_update_check=True)
 
 
 def _add_map_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
@@ -911,3 +946,4 @@ def add_repository_cli(sub, *, add_common_arguments: Callable[..., None]) -> Non
     _add_context_cli(sub, add_common_arguments=add_common_arguments)
     _add_task_evidence_cli(sub, add_common_arguments=add_common_arguments)
     _add_change_cli(sub, add_common_arguments=add_common_arguments)
+    _add_source_observation_cli(sub, add_common_arguments=add_common_arguments)

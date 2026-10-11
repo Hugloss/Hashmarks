@@ -298,6 +298,18 @@ invocation does not establish repository-negative evidence. Stack-to-source,
 symbol and transport qualification remain separate checks, and the debugging
 corpus still requires broader genuine problems and repositories.
 
+The existing canonical source member observer is now available through the CLI:
+
+```sh
+hashmarks source-observation lib/sqlalchemy/engine/characteristics.py \
+  --line 145 --presentation compact
+```
+
+This command refreshes the selected member through CodeMap and exposes the same
+revision-bound line anchors and context as the API/MCP observer. It does not
+execute repository code, interpret a traceback, establish runtime frame identity
+or choose a repair. Invalid source lines fail before index state is created.
+
 ## Measured implementation checkpoint
 
 The twelve-workflow API/CLI/MCP rerun under protocol

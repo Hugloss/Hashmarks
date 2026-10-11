@@ -8,6 +8,7 @@ Captured outcomes belong to this external producer, not repository authority.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib
 import json
 import os
@@ -100,6 +101,11 @@ def capture_scenario(root: Path, scenario: str) -> dict[str, Any]:
         "scenario": scenario,
         "source_identity": repository_content_identity(root),
         "python_version": sys.version,
+        "python_executable_sha256": hashlib.sha256(
+            Path(sys.executable).read_bytes()
+        ).hexdigest(),
+        "producer_implementation_identity": "sha256:"
+        + hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         "source_package_version": sqlalchemy.__version__,
         "scope": "one invocation; captured repository frames only",
         "authority": "external-runtime-producer-claim",

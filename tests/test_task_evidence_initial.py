@@ -15,6 +15,16 @@ from hashmarks.mcp_contract import tool_contract
 from hashmarks.mcp_surface import HashmarksMcpSurface, McpSurfaceError
 
 
+def _decoded_task_matches(matches: dict[str, Any]) -> dict[str, Any]:
+    matches = deepcopy(matches)
+    encoding = matches.pop("matches_encoding")
+    assert encoding["kind"] == "columns-rows.v1"
+    matches["matches"] = [
+        dict(zip(encoding["columns"], row, strict=True)) for row in matches["matches"]
+    ]
+    return matches
+
+
 @pytest.mark.parametrize("ambiguous", [False, True])
 def test_initial_profile_preserves_authority_and_source_identity(
     tmp_path: Path, ambiguous: bool
@@ -50,8 +60,8 @@ def test_initial_profile_preserves_authority_and_source_identity(
     assert initial["provenance"] == native["provenance"]
     assert initial["verification"]["plan"] == native["verification"]["plan"]
     assert (
-        initial["verification"]["relevance"]["task_matches"]
-        == (native["verification"]["relevance"]["task_matches"])
+        _decoded_task_matches(initial["verification"]["relevance"]["task_matches"])
+        == native["verification"]["relevance"]["task_matches"]
     )
     if native["ownership"]["owner"] is None:
         assert initial["ownership"]["owner"] is None
