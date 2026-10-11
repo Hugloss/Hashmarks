@@ -296,6 +296,56 @@ def _verify_identity(value: Mapping[str, Any], identity_field: str) -> None:
         )
 
 
+def _validate_call_site_source(claim: Mapping[str, Any]) -> None:
+    """Reject stronger call-site claims even when packet digests were recomputed."""
+    basis = claim.get("basis")
+    if not isinstance(basis, Mapping):
+        raise ValueError("direct relationship basis must be an object")
+    site = basis.get("call_site_source")
+    if site is None:  # Existing v1 packets before call-site qualification.
+        return
+    if not isinstance(site, Mapping) or set(site) != {
+        "path",
+        "ranges",
+        "position_encoding",
+        "source_binding",
+        "state",
+        "authority",
+        "negative_evidence_admissible",
+    }:
+        raise ValueError("invalid call-site source qualification")
+    if (
+        site["authority"] != "caller-supplied-call-site-source-correspondence-only"
+        or site["negative_evidence_admissible"] is not False
+        or site["ranges"] != basis.get("fromRanges")
+    ):
+        raise ValueError("call-site qualification cannot strengthen producer authority")
+    allowed = (
+        "source-range-matching",
+        "revision-different",
+        "unknown",
+        "outside-caller-item",
+        "invalid-position",
+        "outside-repository",
+        "unadmitted",
+        "snapshot-unavailable",
+        "empty-call-sites",
+    )
+    if site["state"] not in allowed:
+        raise ValueError("unsupported call-site qualification state")
+    binding = site["source_binding"]
+    if binding is not None:
+        _validate_binding(binding)
+    if site["state"] == "source-range-matching" and (
+        not isinstance(binding, Mapping)
+        or binding.get("state") != "matching"
+        or binding.get("path") != site["path"]
+    ):
+        raise ValueError(
+            "call-site source match requires exact revision correspondence"
+        )
+
+
 def _validate_claim(claim: object, producer: str) -> None:
     if not isinstance(claim, Mapping) or claim.get("kind") not in RELATIONSHIP_KINDS:
         raise ValueError("invalid direct relationship claim")
@@ -308,6 +358,8 @@ def _validate_claim(claim: object, producer: str) -> None:
         if not isinstance(value, Mapping) or not isinstance(value.get("key"), Mapping):
             raise ValueError("relationship claim must preserve endpoint identity")
         _validate_endpoint(value)
+    if claim["kind"] == "call":
+        _validate_call_site_source(claim)
     if claim.get("identity") != claim_identity(claim):
         raise ValueError("relationship fact identity does not match retained claim")
 

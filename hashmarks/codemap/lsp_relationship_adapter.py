@@ -10,6 +10,7 @@ from hashmarks.digest import FILE_DOMAIN, hash_bytes
 from hashmarks.paths import normalize_relative_path
 
 from .diagnostic_provenance import COLLECTION_STATES, diagnostic_member_claims
+from .lsp_call_site_source import qualify_call_site_source
 from .lsp_hover_capture import normalize_hover_observation
 from .semantic_relationship_model import (
     CLAIM_LIMIT,
@@ -499,6 +500,32 @@ def _result_endpoint(
     }
 
 
+def _direct_lsp_basis(
+    capture: Mapping[str, Any],
+    kind: str,
+    method: str,
+    result_to_query: bool,
+    location: Mapping[str, Any],
+    resolver: RelationshipSourceResolver,
+) -> dict[str, Any]:
+    basis: dict[str, Any] = {
+        "format": "lsp",
+        "method": method,
+        "request_id": capture["request"]["id"],
+        "direction": "result-to-query" if result_to_query else "query-to-result",
+        "captured_location": location,
+        "fromRanges": location.get("fromRanges", []) if kind == "call" else [],
+        "fromRanges_authority": (
+            "caller-supplied-call-site-ranges" if kind == "call" else None
+        ),
+    }
+    if kind == "call":
+        basis["call_site_source"] = qualify_call_site_source(
+            capture, location, resolver
+        )
+    return basis
+
+
 def lsp_relationship_observation(
     capture: Mapping[str, Any],
     target: Mapping[str, Any],
@@ -585,21 +612,9 @@ def lsp_relationship_observation(
                 kind,
                 source,
                 destination,
-                {
-                    "format": "lsp",
-                    "method": method,
-                    "request_id": capture["request"]["id"],
-                    "direction": "result-to-query"
-                    if result_to_query
-                    else "query-to-result",
-                    "captured_location": location,
-                    "fromRanges": location.get("fromRanges", [])
-                    if kind == "call"
-                    else [],
-                    "fromRanges_authority": "caller-supplied-call-site-ranges"
-                    if kind == "call"
-                    else None,
-                },
+                _direct_lsp_basis(
+                    capture, kind, method, result_to_query, location, resolver
+                ),
             )
         )
     # Preserve every supplied snapshot.  An unadmitted path remains an
