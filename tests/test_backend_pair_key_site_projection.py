@@ -112,9 +112,10 @@ def test_c05_literal_match_is_only_per_return_site_syntax(tmp_path: Path) -> Non
     assert group["absence"]["state"] == "unknown"
     projected = present_repository_evidence(packet["declarations"], format="compact")
     assert projected["supported"] is True
-    assert validate_evidence_presentation(
-        packet["declarations"], projected
-    )["valid"] is True
+    assert (
+        validate_evidence_presentation(packet["declarations"], projected)["valid"]
+        is True
+    )
 
 
 def test_c06_unresolved_returns_do_not_make_absence_claims(tmp_path: Path) -> None:
@@ -248,15 +249,19 @@ def test_c08_mutation_rebinds_literal_sites_on_new_revision(tmp_path: Path) -> N
             previous_observation=original,
         )
     assert original["observation_identity"] != changed["observation_identity"]
-    assert _key_site_projection(changed)["observations"][0]["consumer_literal_key"] == "id"
-    assert _key_site_projection(original)["observations"][0]["consumer_literal_key"] == "name"
+    assert (
+        _key_site_projection(changed)["observations"][0]["consumer_literal_key"] == "id"
+    )
+    assert (
+        _key_site_projection(original)["observations"][0]["consumer_literal_key"]
+        == "name"
+    )
 
 
 def test_c08_denied_consumer_never_leaks_keys(tmp_path: Path) -> None:
     _repo(tmp_path)
     (tmp_path / "client.py").write_text(
-        "def render(response):\n"
-        '    return response["CONFIDENTIAL_FIELD"]\n',
+        'def render(response):\n    return response["CONFIDENTIAL_FIELD"]\n',
         encoding="utf-8",
     )
     (tmp_path / ".hashmarks-context.toml").write_text(
