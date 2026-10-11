@@ -201,3 +201,16 @@ Current `production-response` arms retain the full native result. In contrast
 control for testing text/JSON encoding preference. Host-specific truncation,
 elision, spill files, deferred tools and session compaction are not Hashmarks
 repository evidence authorities.
+
+## Source-bound call site and descriptor regression ring
+
+The backend evidence integrity ring uses deterministic caller-supplied LSP
+captures with exact source revisions and no language-server runtime. Positive
+cases distinguish declaration identity, captured call-site range and actual
+member correspondence; negatives cover changed revisions, out-of-scope caller
+ranges, invalid encoded positions and digest-recomputed authority upgrades.
+
+The portable evidence-reference ring checks source selector identity,
+tampering, and unchanged/changed reobservation **claims** independently of
+agent-session memory. These do not measure model request inclusion or
+establish causal agent use, which remain external host/evaluator concerns.
