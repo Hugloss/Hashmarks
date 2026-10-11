@@ -182,3 +182,145 @@ def test_transport_source_mutation_invalidates_the_observation(
             transports=("cli",),
         )
     assert not (tmp_path / "output/summary.json").exists()
+
+
+def _add_boundary_observations(suite_path: Path, sources: dict[str, Path]) -> None:
+    suite = json.loads(suite_path.read_text())
+    grader_path = suite_path.parent / "grader.json"
+    grader = json.loads(grader_path.read_text())
+    workflow = suite["workflows"][0]
+    rule = grader["cases"]["handler"]
+    span = {"path": "backend.py", "start_line": 2, "end_line": 2}
+    workflow["boundary_observations"] = {}
+    rule["function_boundary_oracles"] = {}
+    for stage in ("before", "after"):
+        workflow["boundary_observations"][stage] = {
+            "task": "Inspect caller-reported source lines",
+            "changed_paths": ["backend.py"],
+            "changed_line_spans": [span],
+            "max_depth": 1,
+        }
+        rule["function_boundary_oracles"][stage] = {
+            "source": stage,
+            "source_label": rule["source_labels"][stage][0],
+            "reported_span": span,
+            "literal_source_line_sha256": hashlib.sha256(
+                (sources[stage] / "backend.py")
+                .read_bytes()
+                .splitlines(keepends=True)[1]
+            ).hexdigest(),
+            "checks": [
+                {
+                    "id": "direct-authority",
+                    "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+                    "predicate": "equals",
+                    "value": "direct-static-syntax-only",
+                    "authority_check": True,
+                },
+                {
+                    "id": "declaration",
+                    "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+                    "predicate": "includes_record",
+                    "value": {
+                        "subject": "backend.py::handler",
+                        "declaration_syntax": "sync",
+                    },
+                },
+            ],
+        }
+    write_json(suite_path, suite)
+    write_json(grader_path, grader)
+
+
+def test_boundary_revision_observations_preserve_actual_cli_facts_and_missing_mcp(
+    corpus, tmp_path: Path
+) -> None:
+    suite_path, sources = corpus
+    _add_boundary_observations(suite_path, sources)
+    report = run_backend(
+        sources=sources,
+        suite_path=suite_path,
+        output_dir=tmp_path / "output",
+        transports=("cli",),
+    )
+    outcome = report["outcomes"][0]
+    assert outcome["gates"]["facts"] is True
+    assert outcome["gates"]["freshness"] is True
+    assert outcome["gates"]["mcp"] is None
+    for stage in ("before", "after"):
+        boundary = outcome["boundary_observations"][stage]
+        assert boundary["gates"] == {
+            "facts": True,
+            "authority": True,
+            "revision": True,
+            "cli": True,
+            "mcp": None,
+        }
+        assert len(boundary["cli"]["grades"]) == 4
+    assert outcome["gates"]["initial_evidence"] is False
+    assert report["status"] == "FAIL"
+    assert all(row["local_e2e_rating"] is None for row in report["capabilities"])
+
+
+def test_boundary_failed_fact_cannot_be_compensated_by_task_or_revision_success(
+    corpus, tmp_path: Path
+) -> None:
+    suite_path, sources = corpus
+    _add_boundary_observations(suite_path, sources)
+    grader_path = suite_path.parent / "grader.json"
+    grader = json.loads(grader_path.read_text())
+    grader["cases"]["handler"]["function_boundary_oracles"]["after"]["checks"][1][
+        "value"
+    ]["declaration_syntax"] = "async"
+    write_json(grader_path, grader)
+    report = run_backend(
+        sources=sources,
+        suite_path=suite_path,
+        output_dir=tmp_path / "output",
+        transports=(),
+    )
+    outcome = report["outcomes"][0]
+    assert outcome["before"]["classification"] == "PASS"
+    assert outcome["after"]["classification"] == "PASS"
+    assert outcome["gates"]["revision"] is True
+    assert outcome["gates"]["facts"] is False
+    assert report["status"] == "FAIL"
+
+
+@pytest.mark.parametrize("mutation", ["missing-stage", "line-hash", "scope"])
+def test_boundary_source_admission_rejects_incomplete_or_unbound_oracles(
+    corpus, mutation: str
+) -> None:
+    suite_path, sources = corpus
+    _add_boundary_observations(suite_path, sources)
+    grader_path = suite_path.parent / "grader.json"
+    grader = json.loads(grader_path.read_text())
+    oracles = grader["cases"]["handler"]["function_boundary_oracles"]
+    if mutation == "missing-stage":
+        del oracles["after"]
+    elif mutation == "line-hash":
+        oracles["after"]["literal_source_line_sha256"] = "0" * 64
+    else:
+        oracles["after"]["source"] = "before"
+    write_json(grader_path, grader)
+    with pytest.raises(ValueError, match="backend boundary"):
+        load_corpus(suite_path, sources)
+
+
+def test_existing_verifier_oracle_cannot_name_a_test_absent_at_that_revision(
+    corpus,
+) -> None:
+    suite_path, sources = corpus
+    grader_path = suite_path.parent / "grader.json"
+    grader = json.loads(grader_path.read_text())
+    grader["cases"]["handler"]["checks"].append(
+        {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/not_yet_introduced.py",
+        }
+    )
+    write_json(grader_path, grader)
+    with pytest.raises(ValueError, match="not a repository file"):
+        load_corpus(suite_path, sources)

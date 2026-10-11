@@ -70,13 +70,7 @@ def _check_workflow(
     _check_workflow_metadata(workflow)
     for stage in ("before", "after"):
         root = sources[workflow[stage]]
-        labels = rule["source_labels"][stage]
-        if not labels:
-            raise ValueError(
-                "backend workflow requires source labels for both revisions"
-            )
-        for label in labels:
-            _check_label(root, label)
+        _check_revision_labels(root, rule, stage)
     if not workflow["changed_paths"]:
         raise ValueError("backend workflow requires a genuine source change")
     for relative in workflow["changed_paths"]:
@@ -84,6 +78,79 @@ def _check_workflow(
         after = confined_file(sources[workflow["after"]], relative)
         if before.read_bytes() == after.read_bytes():
             raise ValueError(f"backend changed path is unchanged: {relative}")
+    _check_boundary_inputs(workflow, rule, sources)
+
+
+def _check_revision_labels(root: Path, rule: dict[str, Any], stage: str) -> None:
+    labels = rule["source_labels"][stage]
+    if not labels:
+        raise ValueError(
+            "backend workflow requires source labels for both revisions"
+        )
+    for label in labels:
+        _check_label(root, label)
+    for check in rule.get(stage, rule).get("checks", []):
+        if check.get("id") == "existing-verifier-visible":
+            confined_file(root, check["value"])
+
+
+def _check_boundary_inputs(
+    workflow: dict[str, Any], rule: dict[str, Any], sources: dict[str, Path]
+) -> None:
+    inputs = workflow.get("boundary_observations")
+    oracles = rule.get("function_boundary_oracles")
+    if inputs is None and oracles is None:
+        return
+    if (
+        not isinstance(inputs, dict)
+        or not isinstance(oracles, dict)
+        or set(inputs) != {"before", "after"}
+        or set(oracles) != set(inputs)
+    ):
+        raise ValueError(
+            "backend boundary observations require both revision inputs and oracles"
+        )
+    for stage in ("before", "after"):
+        request, oracle = inputs[stage], oracles[stage]
+        root = sources[workflow[stage]]
+        span = oracle["reported_span"]
+        if (
+            request
+            != {
+                "task": "Inspect caller-reported source lines",
+                "changed_paths": [span["path"]],
+                "changed_line_spans": [span],
+                "max_depth": 1,
+            }
+            or oracle["source"] != workflow[stage]
+            or span["path"] not in workflow["changed_paths"]
+        ):
+            raise ValueError(
+                "backend boundary inputs differ from the admitted source scope"
+            )
+        _check_boundary_oracle(root, oracle)
+
+
+def _check_boundary_oracle(root: Path, oracle: dict[str, Any]) -> None:
+    span = oracle["reported_span"]
+    for key in ("source_label", "site_source_label"):
+        if key in oracle:
+            _check_label(root, oracle[key])
+    lines = confined_file(root, span["path"]).read_bytes().splitlines(keepends=True)
+    start, end = span["start_line"], span["end_line"]
+    if (
+        type(start) is not int
+        or type(end) is not int
+        or not 1 <= start <= end <= len(lines)
+    ):
+        raise ValueError("backend boundary source span is invalid")
+    if (
+        hashlib.sha256(lines[start - 1]).hexdigest()
+        != oracle["literal_source_line_sha256"]
+    ):
+        raise ValueError("backend boundary literal source line changed")
+    if not oracle.get("checks"):
+        raise ValueError("backend boundary oracle checks must be nonempty")
 
 
 def load_corpus(

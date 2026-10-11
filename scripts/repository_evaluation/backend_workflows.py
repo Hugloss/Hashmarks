@@ -13,6 +13,7 @@ from hashmarks.evidence_presentation import FORMATS
 from hashmarks.evidence_presentation_conformance import validate_evidence_presentation
 from hashmarks.test_shards import repository_content_identity
 
+from .backend_boundary import observe_boundary
 from .backend_matrix import INITIAL_TOKEN_CEILING
 from .backend_transport import capture_cli, capture_mcp
 from .common import canonical_sha256, write_json
@@ -100,6 +101,20 @@ def _observe_stage(
     write_json(output / "api.json", packet)
     cli = capture_cli(workspace, state, case) if "cli" in transports else []
     mcp = capture_mcp(workspace, state, case) if "mcp" in transports else []
+    boundary_inputs = workflow.get("boundary_observations", {}).get(rule["_stage"])
+    boundary_rule = rule.get("function_boundary_oracles", {}).get(rule["_stage"])
+    boundary = (
+        observe_boundary(
+            workspace,
+            state,
+            boundary_inputs,
+            boundary_rule,
+            output / "boundary",
+            transports,
+        )
+        if boundary_inputs is not None and boundary_rule is not None
+        else None
+    )
     # A sequence of public observations must belong to one stable repository
     # snapshot, including producer and transport reads after the writer closes.
     _check_snapshot(workspace, snapshot)
@@ -111,6 +126,7 @@ def _observe_stage(
         "revision_bound": _revision_bound(workspace, packet),
         "cli": _transport_grade(cli, rule, workspace) if cli else _missing_transport(),
         "mcp": _transport_grade(mcp, rule, workspace) if mcp else _missing_transport(),
+        "boundary": boundary,
     }
 
 
@@ -214,7 +230,7 @@ def execute_workflow(
             workspace,
             state,
             workflow,
-            {**rule, **rule.get("before", {})},
+            {**rule, **rule.get("before", {}), "_stage": "before"},
             output / "before",
             transports,
         )
@@ -237,17 +253,32 @@ def execute_workflow(
             workspace,
             state,
             workflow,
-            {**rule, **rule.get("after", {})},
+            {**rule, **rule.get("after", {}), "_stage": "after"},
             output / "after",
             transports,
         )
     gates = _gates(before, after, stale, rule, delta_grade)
+    for stage in (before, after):
+        if stage["boundary"] is not None:
+            for key, value in stage["boundary"]["gates"].items():
+                gates[key] = (
+                    False
+                    if gates[key] is False or value is False
+                    else None
+                    if gates[key] is None or value is None
+                    else True
+                )
+            gates["presentation"] = gates["cli"] and gates["mcp"]
     return {
         "id": workflow["id"],
         "gates": gates,
         "before": before["grade"],
         "after": after["grade"],
         "delta": delta_grade,
+        "boundary_observations": {
+            "before": before["boundary"],
+            "after": after["boundary"],
+        },
         "transport_grades": {
             "before": {key: before[key] for key in ("cli", "mcp")},
             "after": {key: after[key] for key in ("cli", "mcp")},
@@ -259,6 +290,7 @@ def execute_workflow(
                 "after": after["packet"],
                 "stale": stale,
                 "delta": delta,
+                "boundary": [before["boundary"], after["boundary"]],
             }
         ),
     }

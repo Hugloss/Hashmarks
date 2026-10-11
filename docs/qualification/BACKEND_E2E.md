@@ -139,6 +139,12 @@ The full packet and projection have distinct identities. Re-observing the full
 mode may observe changed source, so consumers must compare the supplied full
 packet identity before treating an expansion as the same observation.
 
+In initial mode, weak matches use lossless `columns-rows.v1` encoding: the
+`matches_encoding.columns` names each value in a `matches` row. Counts,
+visibility, ordering and all match-scope/authority qualifiers are retained.
+Unexpected row fields retain the original object encoding. The full mode
+continues to return object rows.
+
 For this new mode, presentation metadata accounts for undisplayed sections
 without duplicating the bounded native facts as display findings. Public
 envelopes retain those facts in `result`; a standalone presentation projection is
@@ -257,6 +263,26 @@ source. They do not establish the receiver's API identity, actual execution,
 message acknowledgement, transaction effects or task ownership. Call syntax is
 not an exact caller-to-callee edge.
 
+Task retrieval also discloses at most sixteen directly declared methods of the
+first class within its canonical first three locators. Exact indexed class and
+member ranges qualify lexical containment; nested classes, inherited methods
+and similarly named classes do not expand that scope. The member list carries
+its current source revision, index generation, bounds and omission counts.
+Retrieval order, ownership and verification selection remain unchanged.
+Runtime membership and negative evidence remain unestablished.
+
+```text
+Observed repository fact/evidence: Bounded direct indexed method declarations
+  within an already retrieved class's exact source range.
+Authority source: Existing CodeMap symbol/file index and current member digest.
+Completeness/freshness behavior: Index-scoped counts and explicit omissions;
+  force-checked source binding before and after disclosure, no runtime absence.
+Existing Hashmarks owner extended: Task-local repository retrieval disclosure.
+Consumer/execution responsibility explicitly not acquired: Choosing a method
+  to edit, establishing runtime membership or reranking ownership/verification.
+Decision: OBSERVER
+```
+
 ```text
 Observed repository fact/evidence: Direct function-body syntax and source sites.
 Authority source: Canonical current member bytes, shared Python AST parser and
@@ -278,6 +304,39 @@ The explicit source specimen pass retained twenty-four before/after observations
 and 192 CLI/MCP format captures across the twelve pinned problems. This proves
 that source syntax contract only. It does not add runtime semantics, invalidate
 the separate revision/native gates or qualify twelve async problems.
+
+The additional `backend-async-v1` corpus contains twelve distinct upstream
+async-resource problems across aiokafka, SQLAlchemy, FastStream and Litestar.
+It includes listener lifecycle and subscription-lock changes, with pinned
+before/after archives and independently hashed declarations and literal sites.
+Some problems change synchronous methods that manage async resources; the
+corpus does not claim twelve async function declarations or runtime task proof.
+
+Its `boundary_observations` inputs nominate source spans separately from the
+`function_boundary_oracles` grader. The existing backend workflow observes
+those spans before and after the genuine source transition, checks current
+member revisions, rejects stale members on reopening, and grades all four
+actual CLI/MCP formats. A failed syntax check also fails the common facts gate;
+successful owner/revision measurements cannot compensate for it. Admission
+rejects nonexistent paths named as existing verification files.
+
+```sh
+uv run --frozen --no-sync python -m scripts.repository_evaluation.run_backend \
+  --suite benchmarks/repository_evaluation/manifests/backend-async-v1/suite.json \
+  --sources-file /path/to/async-sources.json \
+  --output-dir .hashmarks/backend-e2e/async-revision
+
+uv run --frozen --no-sync python -m scripts.repository_evaluation.run_backend_native \
+  --suite benchmarks/repository_evaluation/manifests/backend-async-v1/suite.json \
+  --sources-file /path/to/async-sources.json --regenerate \
+  --capture-root .hashmarks/backend-e2e/async-native/captures \
+  --output-dir .hashmarks/backend-e2e/async-native/qualification
+```
+
+The native ring still qualifies explicitly nominated source specimens only.
+Neither source nomination nor a passing native specimen report proves that an
+initial task response found the needed declaration or test. Those facts,
+response economics and unknown runtime boundaries retain separate qualification.
 
 Real debugging acquisitions are also available without a database service:
 

@@ -186,7 +186,37 @@
       "problem_id": "79c9bf5fe557cd2a70451a1a8709ca64c2b28500",
       "problem_source": "https://github.com/aio-libs/aiokafka/commit/79c9bf5fe557cd2a70451a1a8709ca64c2b28500",
       "repository": "aiokafka",
-      "task": "Fix cancellation escaping Fetcher._fetch_requests_routine while draining finished fetch tasks."
+      "task": "Fix cancellation escaping Fetcher._fetch_requests_routine while draining finished fetch tasks.",
+      "boundary_observations": {
+        "before": {
+          "task": "Inspect caller-reported source lines",
+          "changed_paths": [
+            "aiokafka/consumer/fetcher.py"
+          ],
+          "changed_line_spans": [
+            {
+              "path": "aiokafka/consumer/fetcher.py",
+              "start_line": 514,
+              "end_line": 514
+            }
+          ],
+          "max_depth": 1
+        },
+        "after": {
+          "task": "Inspect caller-reported source lines",
+          "changed_paths": [
+            "aiokafka/consumer/fetcher.py"
+          ],
+          "changed_line_spans": [
+            {
+              "path": "aiokafka/consumer/fetcher.py",
+              "start_line": 514,
+              "end_line": 514
+            }
+          ],
+          "max_depth": 1
+        }
+      }
     },
     {
       "after": "aiokafka-sender-node-failure-after",
@@ -202,7 +232,37 @@
       "problem_id": "9f9161eb78785683edc7a8821983491221ccd9c6",
       "problem_source": "https://github.com/aio-libs/aiokafka/commit/9f9161eb78785683edc7a8821983491221ccd9c6",
       "repository": "aiokafka",
-      "task": "Fix Sender._find_coordinator after node failure so the coordinator can be rediscovered."
+      "task": "Fix Sender._find_coordinator after node failure so the coordinator can be rediscovered.",
+      "boundary_observations": {
+        "before": {
+          "task": "Inspect caller-reported source lines",
+          "changed_paths": [
+            "aiokafka/producer/sender.py"
+          ],
+          "changed_line_spans": [
+            {
+              "path": "aiokafka/producer/sender.py",
+              "start_line": 235,
+              "end_line": 235
+            }
+          ],
+          "max_depth": 1
+        },
+        "after": {
+          "task": "Inspect caller-reported source lines",
+          "changed_paths": [
+            "aiokafka/producer/sender.py"
+          ],
+          "changed_line_spans": [
+            {
+              "path": "aiokafka/producer/sender.py",
+              "start_line": 239,
+              "end_line": 239
+            }
+          ],
+          "max_depth": 1
+        }
+      }
     },
     {
       "after": "aiokafka-metadata-future-after",
@@ -218,7 +278,37 @@
       "problem_id": "608ab2443510c92226de0eb3fc2065f5d1307e12",
       "problem_source": "https://github.com/aio-libs/aiokafka/commit/608ab2443510c92226de0eb3fc2065f5d1307e12",
       "repository": "aiokafka",
-      "task": "Fix ClusterMetadata.failed_update completing a request_update future through unsupported methods."
+      "task": "Fix ClusterMetadata.failed_update completing a request_update future through unsupported methods.",
+      "boundary_observations": {
+        "before": {
+          "task": "Inspect caller-reported source lines",
+          "changed_paths": [
+            "aiokafka/cluster.py"
+          ],
+          "changed_line_spans": [
+            {
+              "path": "aiokafka/cluster.py",
+              "start_line": 204,
+              "end_line": 204
+            }
+          ],
+          "max_depth": 1
+        },
+        "after": {
+          "task": "Inspect caller-reported source lines",
+          "changed_paths": [
+            "aiokafka/cluster.py"
+          ],
+          "changed_line_spans": [
+            {
+              "path": "aiokafka/cluster.py",
+              "start_line": 212,
+              "end_line": 212
+            }
+          ],
+          "max_depth": 1
+        }
+      }
     },
     {
       "after": "aiokafka-stable-offset-after",
@@ -234,7 +324,37 @@
       "problem_id": "7d331e0fe948a022cddeb6f1ea2da94fbeaa39a2",
       "problem_source": "https://github.com/aio-libs/aiokafka/commit/7d331e0fe948a022cddeb6f1ea2da94fbeaa39a2",
       "repository": "aiokafka",
-      "task": "Fix Fetcher._proc_fetch_request parsing last_stable_offset for fetch response versions five through ten."
+      "task": "Fix Fetcher._proc_fetch_request parsing last_stable_offset for fetch response versions five through ten.",
+      "boundary_observations": {
+        "before": {
+          "task": "Inspect caller-reported source lines",
+          "changed_paths": [
+            "aiokafka/consumer/fetcher.py"
+          ],
+          "changed_line_spans": [
+            {
+              "path": "aiokafka/consumer/fetcher.py",
+              "start_line": 747,
+              "end_line": 747
+            }
+          ],
+          "max_depth": 1
+        },
+        "after": {
+          "task": "Inspect caller-reported source lines",
+          "changed_paths": [
+            "aiokafka/consumer/fetcher.py"
+          ],
+          "changed_line_spans": [
+            {
+              "path": "aiokafka/consumer/fetcher.py",
+              "start_line": 747,
+              "end_line": 747
+            }
+          ],
+          "max_depth": 1
+        }
+      }
     },
     {
       "after": "sqlalchemy-failed-begin-after",
@@ -250,7 +370,37 @@
       "problem_id": "d29277af2b8046e9ac98ea0ddcf254fe2abc758e",
       "problem_source": "https://github.com/sqlalchemy/sqlalchemy/commit/d29277af2b8046e9ac98ea0ddcf254fe2abc758e",
       "repository": "sqlalchemy",
-      "task": "Fix AsyncAdapt_asyncpg_connection._start_transaction retaining a failed BEGIN transaction and masking the original exception during cleanup."
+      "task": "Fix AsyncAdapt_asyncpg_connection._start_transaction retaining a failed BEGIN transaction and masking the original exception during cleanup.",
+      "boundary_observations": {
+        "before": {
+          "task": "Inspect caller-reported source lines",
+          "changed_paths": [
+            "lib/sqlalchemy/dialects/postgresql/asyncpg.py"
+          ],
+          "changed_line_spans": [
+            {
+              "path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+              "start_line": 894,
+              "end_line": 894
+            }
+          ],
+          "max_depth": 1
+        },
+        "after": {
+          "task": "Inspect caller-reported source lines",
+          "changed_paths": [
+            "lib/sqlalchemy/dialects/postgresql/asyncpg.py"
+          ],
+          "changed_line_spans": [
+            {
+              "path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+              "start_line": 894,
+              "end_line": 894
+            }
+          ],
+          "max_depth": 1
+        }
+      }
     },
     {
       "after": "faststream-middleware-enter-error-after",
@@ -266,7 +416,37 @@
       "problem_id": "71bd3234fcd8799f2405c2a23badf6dfd8eb2e32",
       "problem_source": "https://github.com/ag2ai/faststream/commit/71bd3234fcd8799f2405c2a23badf6dfd8eb2e32",
       "repository": "faststream",
-      "task": "Fix SubscriberUsecase.process_message failing to exit already entered middleware when later middleware entry raises."
+      "task": "Fix SubscriberUsecase.process_message failing to exit already entered middleware when later middleware entry raises.",
+      "boundary_observations": {
+        "before": {
+          "task": "Inspect caller-reported source lines",
+          "changed_paths": [
+            "faststream/_internal/endpoint/subscriber/usecase.py"
+          ],
+          "changed_line_spans": [
+            {
+              "path": "faststream/_internal/endpoint/subscriber/usecase.py",
+              "start_line": 378,
+              "end_line": 378
+            }
+          ],
+          "max_depth": 1
+        },
+        "after": {
+          "task": "Inspect caller-reported source lines",
+          "changed_paths": [
+            "faststream/_internal/endpoint/subscriber/usecase.py"
+          ],
+          "changed_line_spans": [
+            {
+              "path": "faststream/_internal/endpoint/subscriber/usecase.py",
+              "start_line": 382,
+              "end_line": 382
+            }
+          ],
+          "max_depth": 1
+        }
+      }
     },
     {
       "after": "faststream-subscriber-stop-after",
@@ -282,7 +462,37 @@
       "problem_id": "31df8dac071bb47d05537afdf8fa50b36eda6354",
       "problem_source": "https://github.com/ag2ai/faststream/commit/31df8dac071bb47d05537afdf8fa50b36eda6354",
       "repository": "faststream",
-      "task": "Fix BrokerUsecase.stop blocking other subscribers from shutting down when one subscriber stops slowly or raises."
+      "task": "Fix BrokerUsecase.stop blocking other subscribers from shutting down when one subscriber stops slowly or raises.",
+      "boundary_observations": {
+        "before": {
+          "task": "Inspect caller-reported source lines",
+          "changed_paths": [
+            "faststream/_internal/broker/broker.py"
+          ],
+          "changed_line_spans": [
+            {
+              "path": "faststream/_internal/broker/broker.py",
+              "start_line": 131,
+              "end_line": 131
+            }
+          ],
+          "max_depth": 1
+        },
+        "after": {
+          "task": "Inspect caller-reported source lines",
+          "changed_paths": [
+            "faststream/_internal/broker/broker.py"
+          ],
+          "changed_line_spans": [
+            {
+              "path": "faststream/_internal/broker/broker.py",
+              "start_line": 137,
+              "end_line": 137
+            }
+          ],
+          "max_depth": 1
+        }
+      }
     },
     {
       "after": "faststream-concurrent-queue-lifetime-after",
@@ -298,7 +508,37 @@
       "problem_id": "af579438de685e7aeed97d02e422b363f983b721",
       "problem_source": "https://github.com/ag2ai/faststream/commit/af579438de685e7aeed97d02e422b363f983b721",
       "repository": "faststream",
-      "task": "Fix ConcurrentMixin.__init__ opening a concurrent subscriber queue before start and leaking it after stop."
+      "task": "Fix ConcurrentMixin.__init__ opening a concurrent subscriber queue before start and leaking it after stop.",
+      "boundary_observations": {
+        "before": {
+          "task": "Inspect caller-reported source lines",
+          "changed_paths": [
+            "faststream/_internal/endpoint/subscriber/mixins.py"
+          ],
+          "changed_line_spans": [
+            {
+              "path": "faststream/_internal/endpoint/subscriber/mixins.py",
+              "start_line": 65,
+              "end_line": 65
+            }
+          ],
+          "max_depth": 1
+        },
+        "after": {
+          "task": "Inspect caller-reported source lines",
+          "changed_paths": [
+            "faststream/_internal/endpoint/subscriber/mixins.py"
+          ],
+          "changed_line_spans": [
+            {
+              "path": "faststream/_internal/endpoint/subscriber/mixins.py",
+              "start_line": 67,
+              "end_line": 67
+            }
+          ],
+          "max_depth": 1
+        }
+      }
     },
     {
       "after": "faststream-partial-pull-batch-after",
@@ -314,7 +554,37 @@
       "problem_id": "3509bd2b16a57918dfe2f4b8f44ae1912a866332",
       "problem_source": "https://github.com/ag2ai/faststream/commit/3509bd2b16a57918dfe2f4b8f44ae1912a866332",
       "repository": "faststream",
-      "task": "Fix BatchPullStreamSubscriber._consume_pull discarding partially collected messages while waiting for a full batch."
+      "task": "Fix BatchPullStreamSubscriber._consume_pull discarding partially collected messages while waiting for a full batch.",
+      "boundary_observations": {
+        "before": {
+          "task": "Inspect caller-reported source lines",
+          "changed_paths": [
+            "faststream/nats/subscriber/usecases/stream_pull_subscriber.py"
+          ],
+          "changed_line_spans": [
+            {
+              "path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+              "start_line": 235,
+              "end_line": 235
+            }
+          ],
+          "max_depth": 1
+        },
+        "after": {
+          "task": "Inspect caller-reported source lines",
+          "changed_paths": [
+            "faststream/nats/subscriber/usecases/stream_pull_subscriber.py"
+          ],
+          "changed_line_spans": [
+            {
+              "path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+              "start_line": 250,
+              "end_line": 250
+            }
+          ],
+          "max_depth": 1
+        }
+      }
     },
     {
       "id": "litestar-redis-close",
@@ -330,7 +600,37 @@
       "capabilities": [
         12
       ],
-      "native_required": true
+      "native_required": true,
+      "boundary_observations": {
+        "before": {
+          "task": "Inspect caller-reported source lines",
+          "changed_paths": [
+            "litestar/channels/backends/redis.py"
+          ],
+          "changed_line_spans": [
+            {
+              "path": "litestar/channels/backends/redis.py",
+              "start_line": 102,
+              "end_line": 102
+            }
+          ],
+          "max_depth": 1
+        },
+        "after": {
+          "task": "Inspect caller-reported source lines",
+          "changed_paths": [
+            "litestar/channels/backends/redis.py"
+          ],
+          "changed_line_spans": [
+            {
+              "path": "litestar/channels/backends/redis.py",
+              "start_line": 106,
+              "end_line": 106
+            }
+          ],
+          "max_depth": 1
+        }
+      }
     },
     {
       "id": "litestar-psycopg-listener-stop",
@@ -346,7 +646,37 @@
       "capabilities": [
         12
       ],
-      "native_required": true
+      "native_required": true,
+      "boundary_observations": {
+        "before": {
+          "task": "Inspect caller-reported source lines",
+          "changed_paths": [
+            "litestar/channels/backends/psycopg.py"
+          ],
+          "changed_line_spans": [
+            {
+              "path": "litestar/channels/backends/psycopg.py",
+              "start_line": 98,
+              "end_line": 98
+            }
+          ],
+          "max_depth": 1
+        },
+        "after": {
+          "task": "Inspect caller-reported source lines",
+          "changed_paths": [
+            "litestar/channels/backends/psycopg.py"
+          ],
+          "changed_line_spans": [
+            {
+              "path": "litestar/channels/backends/psycopg.py",
+              "start_line": 107,
+              "end_line": 107
+            }
+          ],
+          "max_depth": 1
+        }
+      }
     },
     {
       "id": "litestar-asyncpg-listener-lock",
@@ -362,7 +692,37 @@
       "capabilities": [
         12
       ],
-      "native_required": true
+      "native_required": true,
+      "boundary_observations": {
+        "before": {
+          "task": "Inspect caller-reported source lines",
+          "changed_paths": [
+            "litestar/channels/backends/asyncpg.py"
+          ],
+          "changed_line_spans": [
+            {
+              "path": "litestar/channels/backends/asyncpg.py",
+              "start_line": 67,
+              "end_line": 67
+            }
+          ],
+          "max_depth": 1
+        },
+        "after": {
+          "task": "Inspect caller-reported source lines",
+          "changed_paths": [
+            "litestar/channels/backends/asyncpg.py"
+          ],
+          "changed_line_spans": [
+            {
+              "path": "litestar/channels/backends/asyncpg.py",
+              "start_line": 73,
+              "end_line": 73
+            }
+          ],
+          "max_depth": 1
+        }
+      }
     }
   ],
   "grader_file": "grader.json",

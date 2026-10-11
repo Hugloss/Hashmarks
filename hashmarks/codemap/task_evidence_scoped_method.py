@@ -13,6 +13,92 @@ if TYPE_CHECKING:
 
 
 class TaskEvidenceScopedMethodMixin:
+    def _task_evidence_class_declarations(
+        self, path: str, parent: Mapping[str, object]
+    ) -> dict[str, object]:
+        """Disclose indexed lexical members; inherited/runtime members are unknown."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        qualname = str(parent["qualname"])
+        members = sorted(
+            (
+                row
+                for row in self._session_symbols_for_path(path)
+                if row.get("parent") == qualname
+                and row.get("kind") == "method"
+                and isinstance(row.get("start_line"), int)
+                and isinstance(row.get("end_line"), int)
+                and cast("int", parent["start_line"])
+                <= cast("int", row["start_line"])
+                <= cast("int", row["end_line"])
+                <= cast("int", parent["end_line"])
+            ),
+            key=lambda row: (
+                cast("int", row["start_line"]),
+                str(row.get("qualname") or ""),
+            ),
+        )
+        member = self._session_file_row(path)
+        assert member is not None
+        return {
+            "authority": "indexed-lexical-declarations-only",
+            "scope": "direct-declared-methods-of-retrieved-class",
+            "ownership_authority": False,
+            "runtime_members": "not-established",
+            "negative_evidence_admissible": False,
+            "source_revision": member["file_digest"],
+            "index_generation": self.store.generation(),
+            "observed": len(members),
+            "returned": min(len(members), 16),
+            "omitted": max(0, len(members) - 16),
+            "bound": 16,
+            "declarations": [
+                {
+                    "path": path,
+                    "symbol": row["qualname"],
+                    "start_line": row["start_line"],
+                    "end_line": row["end_line"],
+                }
+                for row in members[:16]
+            ],
+        }
+
+    def _task_evidence_attach_class_declarations(
+        self, packet: dict[str, object]
+    ) -> None:
+        """Keep the first retrieved class's members visible without reranking it."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        retrieval = packet.get("retrieval")
+        if not isinstance(retrieval, dict):
+            return
+        for row in retrieval.get("results", [])[:3]:
+            path, symbol = row.get("path"), row.get("symbol")
+            if not path or not symbol or not self._indexed_path_current(path):
+                continue
+            visibility = self._task_evidence_visibility(path)
+            if (
+                visibility
+                not in {EvidenceVisibility.SOURCE, EvidenceVisibility.OUTLINE}
+                or self.policy.decide(path).evidence_visibility
+                is EvidenceVisibility.DENY
+            ):
+                continue
+            declaration = self.store.symbol_at(path, symbol)
+            if (
+                declaration is None
+                or declaration.get("kind") != "class"
+                or not isinstance(declaration.get("start_line"), int)
+                or not isinstance(declaration.get("end_line"), int)
+                or (declaration.get("start_line"), declaration.get("end_line"))
+                != (row.get("start_line"), row.get("end_line"))
+            ):
+                continue
+            context = self._task_evidence_class_declarations(path, declaration)
+            if self._indexed_path_current(path):
+                row["class_declarations"] = context
+            return
+
     def _task_evidence_named_class_scope(
         self, task: str
     ) -> tuple[str, str, EvidenceVisibility] | None:
@@ -113,6 +199,8 @@ class TaskEvidenceScopedMethodMixin:
         self, owner: Mapping[str, object]
     ) -> Mapping[str, object] | None:
         """Rebind the admitted locator to an exact, visible current symbol."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         path = str(owner.get("path") or "")
         qualname = str(owner.get("qualname") or "")
         if not path or not qualname:

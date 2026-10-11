@@ -3189,6 +3189,43 @@
       "before": {
         "checks": [
           {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "litestar/channels/backends/redis.py"
+          },
+          {
+            "id": "changed-declaration-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "litestar/channels/backends/redis.py",
+              "start_line": 101,
+              "end_line": 107,
+              "symbol": "RedisChannelsPubSubBackend.on_shutdown"
+            },
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "path": "litestar/channels/backends/redis.py",
+                  "start_line": 101,
+                  "end_line": 107,
+                  "qualname": "RedisChannelsPubSubBackend.on_shutdown"
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "path": "litestar/channels/backends/redis.py",
+                  "start_line": 101,
+                  "end_line": 107,
+                  "qualname": "RedisChannelsPubSubBackend.on_shutdown"
+                }
+              }
+            ]
+          },
+          {
             "id": "existing-verifier-visible",
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
@@ -3199,13 +3236,65 @@
       "after": {
         "checks": [
           {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "litestar/channels/backends/redis.py"
+          },
+          {
+            "id": "changed-declaration-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "litestar/channels/backends/redis.py",
+              "start_line": 101,
+              "end_line": 113,
+              "symbol": "RedisChannelsPubSubBackend.on_shutdown"
+            },
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "path": "litestar/channels/backends/redis.py",
+                  "start_line": 101,
+                  "end_line": 113,
+                  "qualname": "RedisChannelsPubSubBackend.on_shutdown"
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "path": "litestar/channels/backends/redis.py",
+                  "start_line": 101,
+                  "end_line": 113,
+                  "qualname": "RedisChannelsPubSubBackend.on_shutdown"
+                }
+              }
+            ]
+          },
+          {
             "id": "existing-verifier-visible",
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
             "value": "tests/unit/test_channels/test_backends.py"
           }
         ]
-      }
+      },
+      "delta_checks": [
+        {
+          "id": "changed-path",
+          "pointer": "/path_changes/0/path",
+          "predicate": "equals",
+          "value": "litestar/channels/backends/redis.py"
+        },
+        {
+          "id": "current-changed-revision",
+          "pointer": "/path_changes/0/revision",
+          "predicate": "equals",
+          "value": "b335768dc0f274af310fca96f23304d715887eacd797bb142ad9fa69eaaf40b1",
+          "authority_check": true
+        }
+      ]
     },
     "litestar-psycopg-listener-stop": {
       "expected_owner_path": "litestar/channels/backends/psycopg.py",
@@ -3426,6 +3515,43 @@
       "before": {
         "checks": [
           {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "litestar/channels/backends/psycopg.py"
+          },
+          {
+            "id": "changed-declaration-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "litestar/channels/backends/psycopg.py",
+              "start_line": 93,
+              "end_line": 99,
+              "symbol": "PsycoPgChannelsBackend._stop_listener"
+            },
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "path": "litestar/channels/backends/psycopg.py",
+                  "start_line": 93,
+                  "end_line": 99,
+                  "qualname": "PsycoPgChannelsBackend._stop_listener"
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "path": "litestar/channels/backends/psycopg.py",
+                  "start_line": 93,
+                  "end_line": 99,
+                  "qualname": "PsycoPgChannelsBackend._stop_listener"
+                }
+              }
+            ]
+          },
+          {
             "id": "existing-verifier-visible",
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
@@ -3436,13 +3562,65 @@
       "after": {
         "checks": [
           {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "litestar/channels/backends/psycopg.py"
+          },
+          {
+            "id": "changed-declaration-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "litestar/channels/backends/psycopg.py",
+              "start_line": 101,
+              "end_line": 113,
+              "symbol": "PsycoPgChannelsBackend._stop_listener"
+            },
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "path": "litestar/channels/backends/psycopg.py",
+                  "start_line": 101,
+                  "end_line": 113,
+                  "qualname": "PsycoPgChannelsBackend._stop_listener"
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "path": "litestar/channels/backends/psycopg.py",
+                  "start_line": 101,
+                  "end_line": 113,
+                  "qualname": "PsycoPgChannelsBackend._stop_listener"
+                }
+              }
+            ]
+          },
+          {
             "id": "existing-verifier-visible",
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
             "value": "tests/unit/test_channels/test_psycopg_backend.py"
           }
         ]
-      }
+      },
+      "delta_checks": [
+        {
+          "id": "changed-path",
+          "pointer": "/path_changes/0/path",
+          "predicate": "equals",
+          "value": "litestar/channels/backends/psycopg.py"
+        },
+        {
+          "id": "current-changed-revision",
+          "pointer": "/path_changes/0/revision",
+          "predicate": "equals",
+          "value": "68b28a1d7e3bddb43e33d771575ac1fae52fe645a7ee76dc59273e2db58e1336",
+          "authority_check": true
+        }
+      ]
     },
     "litestar-asyncpg-listener-lock": {
       "expected_owner_path": "litestar/channels/backends/asyncpg.py",
@@ -3455,6 +3633,14 @@
             "end_line": 68,
             "declaration_line": 65,
             "sha256": "7b62fc7c7d2564651cadee2f3484f40875ac727948fe600a252452ac59d78498"
+          },
+          {
+            "path": "tests/unit/test_channels/test_backends.py",
+            "symbol": "test_pub_sub",
+            "declaration_line": 63,
+            "start_line": 63,
+            "end_line": 71,
+            "sha256": "39f5b840b8cc388221e1ce79d6d721622d456c0c61861592ab4e6cdfffa886ba"
           }
         ],
         "after": [
@@ -3684,15 +3870,89 @@
       "before": {
         "checks": [
           {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "litestar/channels/backends/asyncpg.py"
+          },
+          {
+            "id": "changed-declaration-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "litestar/channels/backends/asyncpg.py",
+              "start_line": 65,
+              "end_line": 68,
+              "symbol": "AsyncPgChannelsBackend.subscribe"
+            },
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "path": "litestar/channels/backends/asyncpg.py",
+                  "start_line": 65,
+                  "end_line": 68,
+                  "qualname": "AsyncPgChannelsBackend.subscribe"
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "path": "litestar/channels/backends/asyncpg.py",
+                  "start_line": 65,
+                  "end_line": 68,
+                  "qualname": "AsyncPgChannelsBackend.subscribe"
+                }
+              }
+            ]
+          },
+          {
             "id": "existing-verifier-visible",
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
-            "value": "tests/unit/test_channels/test_asyncpg_backend.py"
+            "value": "tests/unit/test_channels/test_backends.py"
           }
         ]
       },
       "after": {
         "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "litestar/channels/backends/asyncpg.py"
+          },
+          {
+            "id": "changed-declaration-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "litestar/channels/backends/asyncpg.py",
+              "start_line": 69,
+              "end_line": 74,
+              "symbol": "AsyncPgChannelsBackend.subscribe"
+            },
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "path": "litestar/channels/backends/asyncpg.py",
+                  "start_line": 69,
+                  "end_line": 74,
+                  "qualname": "AsyncPgChannelsBackend.subscribe"
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "path": "litestar/channels/backends/asyncpg.py",
+                  "start_line": 69,
+                  "end_line": 74,
+                  "qualname": "AsyncPgChannelsBackend.subscribe"
+                }
+              }
+            ]
+          },
           {
             "id": "existing-verifier-visible",
             "pointer": "/verification/relevance/candidates/*/path",
@@ -3700,7 +3960,22 @@
             "value": "tests/unit/test_channels/test_asyncpg_backend.py"
           }
         ]
-      }
+      },
+      "delta_checks": [
+        {
+          "id": "changed-path",
+          "pointer": "/path_changes/0/path",
+          "predicate": "equals",
+          "value": "litestar/channels/backends/asyncpg.py"
+        },
+        {
+          "id": "current-changed-revision",
+          "pointer": "/path_changes/0/revision",
+          "predicate": "equals",
+          "value": "a18ed6cf0e386f2a00f700c371f39e59334c3f9c9f9776c38d6c6c3d7a4d8b4b",
+          "authority_check": true
+        }
+      ]
     }
   }
 }
