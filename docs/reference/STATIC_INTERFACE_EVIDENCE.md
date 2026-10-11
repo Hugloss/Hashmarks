@@ -66,7 +66,7 @@ The core does not need to understand API routing or MCP tools; `concept` and
 an ambiently loaded plugin, a second parser/index generation, or an MCP
 execution surface.
 
-## Opt-in caller-nominated producer/consumer syntax pairs (B15–B18)
+## Opt-in caller-nominated producer/consumer syntax pairs (C01–C04)
 
 The existing trusted `StaticPythonInterfaceDeclarations` provider can also
 observe narrowly selected **potential** source pairs:
