@@ -243,6 +243,29 @@ It does not inspect files, discover dependencies, choose edits/tests, execute
 tools or prove runtime API compatibility. The producer/consumer work merged in
 #424 remains under its separate source-declaration authority.
 
+## Backend B35–B39: frozen external evaluation of navigation
+
+After merged #428, first prove a controlled evidence presentation
+intervention before claiming an agent uplift. The Hashmarks evaluation-only
+exporter `scripts.agent_evaluation.backend_navigation_ablation` freezes
+two explicitly selected backend observations per case under one source
+snapshot and the same semantic owner.
+
+| Checkpoint | Evidence | Non-claim |
+| --- | --- | --- |
+| B35 | Bounded caller-selected task and path manifest | No automatic task/oracle generation |
+| B36 | Same CodeMap and matching provider input revisions for paired arms | No externally attested host workspace |
+| B37 | Exact source-fact equivalence after removing only opt-in navigation | Not Hashmarks versus bare |
+| B38 | Canonical size, SHA-256 observation and export identities with self-consistency validation | Not signed provenance, host capture or cryptographic anti-forgery |
+| B39 | Explicit exposure, visibility, usage and outcome unknowns; adversarial regressions and handoff docs | No agent benefit before agentsCookbook host trials |
+
+Next independent agentsCookbook work: run paired native coding-agent
+tasks with host-attested delivery, correct source-version binding, controlled
+arm order, identical tool catalog, actual model-visible evidence identity,
+independent task success, first-choice/late-rescue attribution, native
+reads and verified patch outcomes. **Do not** infer agent understanding
+or a PASS from export sizes or a navigation recommendation alone.
+
 ## Open conditional checkpoints
 
 - **H04:** changed-line → symbol/relationship claims require a direct
