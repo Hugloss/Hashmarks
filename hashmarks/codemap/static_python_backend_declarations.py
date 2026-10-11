@@ -59,7 +59,6 @@ def _class_field(node: ast.AnnAssign) -> dict[str, object] | None:
 
 
 def _group(
-    path: str,
     group_id: str,
     concept: dict[str, object],
     scope: dict[str, object],
@@ -134,7 +133,6 @@ def _model_group(
         "class_line": node.lineno,
     }
     return _group(
-        path,
         f"{path}:model:{node.lineno}:{node.name}",
         {"kind": "python-model-class-syntax", "syntax": "python-ast"},
         scope,
@@ -166,15 +164,15 @@ def _env_callee(node: ast.expr) -> str | None:
         and node.attr == "getenv"
     ):
         return "os.getenv"
-    if (
-        isinstance(node, ast.Attribute)
-        and node.attr == "get"
-        and isinstance(node.value, ast.Attribute)
-        and isinstance(node.value.value, ast.Name)
-        and node.value.value.id == "os"
-        and node.value.attr == "environ"
-    ):
-        return "os.environ.get"
+    if isinstance(node, ast.Attribute) and node.attr == "get":
+        receiver = node.value
+        if (
+            isinstance(receiver, ast.Attribute)
+            and isinstance(receiver.value, ast.Name)
+            and receiver.value.id == "os"
+            and receiver.attr == "environ"
+        ):
+            return "os.environ.get"
     return None
 
 
@@ -260,7 +258,6 @@ def _config_groups(
         scope = {"path": path, "line": line, "column": column}
         rows.append(
             _group(
-                path,
                 f"{path}:env:{line}:{column}",
                 {"kind": "python-env-access-syntax", "syntax": "python-ast"},
                 scope,
@@ -310,6 +307,23 @@ class StaticPythonBackendDeclarations:
     def detect(self, context: RepositoryDeclarationProviderContext) -> bool:
         return any(context.exists(path) for path in self.paths)
 
+    def _source_groups(self, path: str, source: str) -> list[dict[str, object]]:
+        if len(source.encode("utf-8")) > MAX_BACKEND_SOURCE_BYTES:
+            raise ValueError("backend source exceeds bounded syntax input")
+        tree = ast.parse(source, filename=path)
+        groups: list[dict[str, object]] = []
+        if self.include_model_fields:
+            for node in tree.body:
+                if isinstance(node, ast.ClassDef):
+                    group = _model_group(path, node, name=self.name)
+                    if group is not None:
+                        groups.append(group)
+                        if len(groups) > MAX_BACKEND_GROUPS:
+                            raise ValueError("backend declarations exceed group bound")
+        if self.include_environment_reads:
+            groups.extend(_config_groups(path, tree, name=self.name))
+        return groups
+
     def discover(
         self, context: RepositoryDeclarationProviderContext
     ) -> RepositoryDeclarationProviderResult:
@@ -319,20 +333,7 @@ class StaticPythonBackendDeclarations:
             if not context.exists(path):
                 missing.append(path)
                 continue
-            source = context.read_text(path)
-            if len(source.encode("utf-8")) > MAX_BACKEND_SOURCE_BYTES:
-                raise ValueError("backend source exceeds bounded syntax input")
-            tree = ast.parse(source, filename=path)
-            if self.include_model_fields:
-                for node in tree.body:
-                    if isinstance(node, ast.ClassDef):
-                        group = _model_group(path, node, name=self.name)
-                        if group is not None:
-                            groups.append(group)
-                            if len(groups) > MAX_BACKEND_GROUPS:
-                                raise ValueError("backend declarations exceed group bound")
-            if self.include_environment_reads:
-                groups.extend(_config_groups(path, tree, name=self.name))
+            groups.extend(self._source_groups(path, context.read_text(path)))
             if len(groups) > MAX_BACKEND_GROUPS:
                 raise ValueError("backend declarations exceed group bound")
         return RepositoryDeclarationProviderResult(
