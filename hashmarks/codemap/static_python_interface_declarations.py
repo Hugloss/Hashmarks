@@ -274,9 +274,11 @@ def _source_groups(
     tool_objects: frozenset[str],
     provider: str,
     include_literal_shape_syntax: bool = False,
+    parsed: ast.Module | None = None,
 ) -> list[dict[str, object]]:
     groups: list[dict[str, object]] = []
-    for declaration in ast.parse(source, filename=path).body:
+    tree = parsed if parsed is not None else ast.parse(source, filename=path)
+    for declaration in tree.body:
         if not isinstance(declaration, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
         body_syntax: dict[str, object] | None = None
@@ -320,19 +322,24 @@ def _validate_consumer_pairs(
     """Admit only explicit same-scope source/function/receiver nominations."""
     if not isinstance(pairs, tuple) or len(pairs) > _MAX_CONSUMER_PAIRS:
         raise ValueError("consumer_pairs must be a tuple of at most 16 pairs")
-    if len(set(pairs)) != len(pairs):
-        raise ValueError("consumer_pairs must be unique")
     for pair in pairs:
         if not isinstance(pair, tuple) or len(pair) != 5:
             raise ValueError("consumer_pairs must contain five-field tuples")
         producer_path, producer_name, consumer_path, consumer_name, receiver = pair
-        if producer_path not in paths or consumer_path not in paths:
+        if (
+            not isinstance(producer_path, str)
+            or not isinstance(consumer_path, str)
+            or producer_path not in paths
+            or consumer_path not in paths
+        ):
             raise ValueError("consumer_pairs paths must be explicitly selected")
         if any(
             not isinstance(value, str) or not value.isidentifier()
             for value in (producer_name, consumer_name, receiver)
         ):
             raise ValueError("consumer_pairs require exact Python identifiers")
+    if len(set(pairs)) != len(pairs):
+        raise ValueError("consumer_pairs must be unique")
 
 
 def _unique_top_level(
@@ -573,6 +580,7 @@ class StaticPythonInterfaceDeclarations:
                     tool_objects=frozenset(self.tool_objects),
                     provider=self.name,
                     include_literal_shape_syntax=self.include_literal_shape_syntax,
+                    parsed=trees.get(path),
                 )
             )
             if len(groups) > _MAX_GROUPS:
