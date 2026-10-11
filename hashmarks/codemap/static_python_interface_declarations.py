@@ -448,18 +448,6 @@ def _pair_group(
         "group_id": f"caller-nominated-consumer-pair:{index}",
         "concept": {"kind": "nominated-python-interface-syntax-pair"},
         "scope": scope,
-        **(
-            {
-                "literal_key_site_projection": project_pair_key_sites(
-                    returns,
-                    reads,
-                    producer_path=producer_path,
-                    consumer_path=consumer_path,
-                )
-            }
-            if include_pair_key_site_projection
-            else {}
-        ),
         "correspondence": {
             "state": "unresolved",
             "basis": {
@@ -490,6 +478,18 @@ def _pair_group(
                     "literal_subscript_reads": reads,
                     "coverage": "incomplete",
                     "runtime_consumer_binding": "unknown",
+                    **(
+                        {
+                            "literal_key_site_projection": project_pair_key_sites(
+                                returns,
+                                reads,
+                                producer_path=producer_path,
+                                consumer_path=consumer_path,
+                            )
+                        }
+                        if include_pair_key_site_projection
+                        else {}
+                    ),
                 },
                 provider=provider_name,
                 sites=reads,
