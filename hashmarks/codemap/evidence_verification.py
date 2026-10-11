@@ -503,14 +503,15 @@ class VerificationMixin:
                 if short_match
                 else None
             )
-            if path in state.unresolved_import_identity_paths:
-                exact_reference = False
-            elif alias_owner_match is not None:
+            if alias_owner_match is not None:
                 exact_reference = alias_owner_match
             else:
                 exact_reference = (
                     path in exact_import_paths if resolution_available else short_match
                 )
+            exact_reference = exact_reference and (
+                path not in state.unresolved_import_identity_paths
+            )
             if not short_match or not exact_reference:
                 if RepositoryDomain.TEST in set(classify_repository_path(path)):
                     state.candidate_paths.add(path)
@@ -834,6 +835,29 @@ class VerificationMixin:
         result.sort(key=self._verification_candidate_score, reverse=True)
         return result
 
+    def _verification_lexical_candidates(
+        self, state: _VerificationRelevanceState
+    ) -> list[dict[str, object]]:
+        """Expose bounded test scouts without granting reference/selection authority."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        rows = self._session_lexical_file_candidates(sorted(state.task_terms), limit=65)
+        if len(rows) > 64:
+            state.search_bound_reasons.add("lexical-verification-candidate-limit")
+        paths = {
+            str(row["path"])
+            for row in rows[:64]
+            if self._verification_ref_visible(row)
+            and RepositoryDomain.TEST in classify_repository_path(str(row["path"]))
+        } - state.candidate_paths
+        # Only newly exposed paths need symbol/runner reads. Existing candidate
+        # observations and qualified references stay owned by the original state.
+        scouts = replace(state, candidate_paths=paths)
+        return [
+            {**row, "candidate_origin": "bounded-task-lexical-only"}
+            for row in self._verification_candidates(scouts)
+        ]
+
     @staticmethod
     def _verification_candidate_score(
         row: Mapping[str, object],
@@ -1093,6 +1117,10 @@ class VerificationMixin:
             uniqueness_admissible=not state.search_bound_reasons
             and not identity_ambiguous,
         )
+        # Projection can reveal useful weak candidates without changing the
+        # already selected verification surface or any exact reference claim.
+        candidates.extend(self._verification_lexical_candidates(state))
+        candidates.sort(key=self._verification_candidate_score, reverse=True)
         return self._verification_relevance_result(
             state, candidates, selected, reason, limit
         )

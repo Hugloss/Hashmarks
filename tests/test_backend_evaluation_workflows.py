@@ -174,7 +174,7 @@ def test_transport_source_mutation_invalidates_the_observation(
         return []
 
     monkeypatch.setattr(backend_workflows, "capture_cli", changing_transport)
-    with pytest.raises(ValueError, match="snapshot identity"):
+    with pytest.raises(ValueError, match="source changed.*snapshot"):
         run_backend(
             sources=sources,
             suite_path=suite_path,

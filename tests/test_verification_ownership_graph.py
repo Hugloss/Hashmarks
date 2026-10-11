@@ -6,6 +6,43 @@ import pytest
 from hashmarks.codemap import CodeMap
 
 
+def test_lexical_verification_scouts_do_not_claim_references_or_replace_verifier(
+    tmp_path: Path,
+) -> None:
+    files = {
+        "src/internals/pipeline.py": "def transform(value):\n    return value\n",
+        "src/test_redelivery.py": "def redelivery_ordering(value):\n    return value\n",
+        "tests/test_pipeline.py": "from src.internals.pipeline import transform\ndef test_pipeline():\n    assert transform(1) == 1\n",
+        "tests/internals/test_a_redelivery.py": "def test_redelivery_ordering():\n    assert True\n",
+        "tests/internals/test_b_redelivery.py": "def test_redelivery_ordering():\n    assert True\n",
+        "pyproject.toml": "[tool.pytest.ini_options]\ntestpaths=['tests']\n",
+    }
+    for name, source in files.items():
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(source)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = cast(
+            "dict[str, Any]",
+            codemap.task_evidence(
+                "Change transform in src/internals/pipeline.py for redelivery ordering",
+                limit=3,
+                per_role=1,
+            ),
+        )
+    relevance = packet["verification"]["relevance"]
+    assert relevance["selected"]["path"] == "tests/test_pipeline.py"
+    rows = {row["path"]: row for row in relevance["candidates"]}
+    scouts = [rows[f"tests/internals/test_{name}_redelivery.py"] for name in ("a", "b")]
+    assert all(
+        row["direct_reference"] is False and row["indirect_reference"] is False
+        for row in scouts
+    )
+    assert "src/test_redelivery.py" not in rows
+    assert packet["ownership"]["owner"]["path"] == "src/internals/pipeline.py"
+
+
 @pytest.mark.parametrize(
     ("exports", "expected_direct", "expected_ambiguous"),
     [

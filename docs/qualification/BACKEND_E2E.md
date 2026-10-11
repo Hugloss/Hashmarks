@@ -84,6 +84,28 @@ make semantic-evidence-live
 A passing existing live producer ring is useful evidence. It does not
 automatically qualify every newly composed backend packet.
 
+The backend corpus also has a separate explicit-target native specimen ring:
+
+```sh
+make backend-native-live
+make backend-native-dogfood BACKEND_NATIVE_CAPTURES=.hashmarks/backend-e2e/native-live/captures
+```
+
+Install `scip-python` and the official `scip` decoder before running the live
+command. Each live acquisition requires a new capture directory; set
+`BACKEND_NATIVE_LIVE_CAPTURES` and `BACKEND_NATIVE_LIVE_OUTPUT` for another run.
+The replay target accepts `BACKEND_NATIVE_CAPTURES` and `BACKEND_NATIVE_OUTPUT`.
+Both commands use the exact source mapping in `BACKEND_SOURCES`.
+
+This ring deliberately selects the changed declaration and independently
+identified verifier file as explicit specimens. It checks capture bytes,
+configuration identity, exact source revisions, current native definition
+binding, stale evidence after reopening on changed source, and real CLI/MCP
+projection conformance. Unobserved relationship kinds remain unknown. Its report
+does not qualify owner recall, verifier recall, initial sufficiency or complete
+repository coverage, and cannot grant a capability 5/5. Initial task queries
+remain independent of these oracle-selected capture inputs.
+
 ## What a workflow records
 
 Each workflow copies caller-supplied sources into a disposable workspace. It
@@ -140,11 +162,11 @@ release gates.
 | --- | --- | --- |
 | R01 | Frozen genuine problems, source oracles, public-surface revision runner, all-twenty report | Initial twelve-workflow corpus and runner implemented; full qualification pending |
 | R02 | Exact owner/direct path observations with unresolved missing edges | Repaired arbitrary first-symbol projection, incomplete-graph candidate displacement and hidden explicitly named method locators; broader direct-path corpus pending |
-| R03 | Genuine failure frames, changed symbols and independently known verifier correspondence | Exact revision/range grading implemented; failure corpus and remaining relevance repairs pending |
+| R03 | Genuine failure frames, changed symbols and independently known verifier correspondence | Exact revision/range grading, qualified indirect/alias references and weak lexical test scouts implemented; failure corpus and further relevance proof pending |
 | R04 | Genuine handler/model/config/data/service declaration cases | Pending; no runtime compatibility inference is admitted |
 | R05 | Async/message/transaction syntax and source ownership observations | Genuine problems identified; capability-specific observations and adversarial proof pending |
 | R06 | Required facts visible within the initial response ceiling | Whole-response size measured; compact/text CLI whitespace removed without changing facts; duplicated payloads still exceed the ceiling |
-| R07 | Dependency/native/language qualification and comparable indexing economics | Existing fresh native ring reused; new packet and real-source economics qualification pending |
+| R07 | Dependency/native/language qualification and comparable indexing economics | Explicit backend SCIP capture/source/reopen/transport runner implemented; composed packet, language and economics qualification pending |
 | R08 | Complete reviewed matrix and final bounded regression qualification | Pending; no 5/5 completion claim |
 
 The next repairs must follow observed gaps in these genuine workflows. Exact
@@ -159,6 +181,15 @@ unobserved. Incomplete candidate evidence is retained for discrimination.
 Explicit qualified declaration locators compose the existing symbol/import
 identity resolver into bounded retrieval supplements. These supplements cannot
 change edit or verification selection, prove uniqueness, or grant ownership.
+
+Verification output can additionally expose bounded task-lexical test scouts
+from the existing repository index. New scouts carry
+`candidate_origin=bounded-task-lexical-only`, retain false direct/indirect
+reference claims, and cannot change the previously selected verification
+surface. The search uses repository test-domain and visibility qualification;
+test-shaped production filenames do not become test surfaces. Reaching the
+lexical bound remains explicit incomplete evidence. A matching word never proves
+that a test exercises the changed symbol or is sufficient verification.
 
 ## Measured implementation checkpoint
 
@@ -175,3 +206,18 @@ These measurements bind the implementation captured by that protocol. Later
 source changes require fresh measurement; this checkpoint is not current
 release authority and does not promote any capability to 5/5. The initial
 corpus still leaves fourteen capability families without dedicated workflows.
+
+The explicit-target native specimen ring subsequently passed all twelve genuine
+workflows across the same three repositories. It regenerated twenty-four SCIP
+captures and checked exact declaration tokens, before/after member revisions,
+stale evidence after reopening, API output, and all four CLI/MCP formats.
+An incoming subclass implementation claim remains a separate producer record;
+the number of related records is never used as a declaration-uniqueness oracle.
+This checkpoint proves the named specimen contract only. It does not change the
+initial task-query scores or qualify any missing backend capability.
+Its observer identity is
+`sha256:2857d4b8b70fe4f76b19a221a1cf2d4b41ce619eb85c006d05d7df7b97a2bc33`;
+its evaluator identity is
+`sha256:abd8c5d6c1ebaee896b631156c31d39047783ae71acbe2600d86a0799c6b597e`.
+Subsequent product changes require remeasurement before using this history as
+current qualification.
