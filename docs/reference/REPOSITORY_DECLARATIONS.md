@@ -10,6 +10,22 @@ The governing boundary is:
 
 This capability is intentionally not a universal service/configuration ontology. Hashmarks core does not define concepts such as \`service.owner\`, \`service.lifecycle\`, \`runtime.python\`, or organization-specific source-of-truth precedence.
 
+## Selected backend schema and environment syntax
+
+An explicitly nominated `StaticPythonBackendDeclarations` provider can now
+supply bounded AST observations of simple `BaseModel` / `BaseSettings`
+declarations and `os.getenv` / `os.environ` access expressions. They
+are ordinary provider-owned `concept` and `scope` values under this
+existing repository-declaration contract, with canonical admitted revision
+and physical source evidence. A syntactic key/field/variable name is not
+a provider-normalized semantic equivalence, resolved Python import, runtime
+configuration value or source-of-truth precedence rule. Consequently such
+groups remain unresolved and incomplete until an independent qualified
+provider directly attests a correspondence.
+
+See [Explicit Python interface syntax evidence](STATIC_INTERFACE_EVIDENCE.md)
+for the selected-file API and B20–B24 boundaries.
+
 ## Why this exists
 
 Repositories frequently express one conceptual fact on several surfaces:
