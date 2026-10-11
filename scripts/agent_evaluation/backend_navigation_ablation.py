@@ -46,14 +46,8 @@ def _valid_case_header(case: dict[str, Any], seen: set[str]) -> bool:
         and len(case_id) <= 128
         and case_id not in seen
     )
-    prompt_ok = (
-        isinstance(prompt, str)
-        and bool(prompt.strip())
-        and len(prompt) <= 2048
-    )
-    paths_ok = isinstance(paths, list) and all(
-        isinstance(path, str) for path in paths
-    )
+    prompt_ok = isinstance(prompt, str) and bool(prompt.strip()) and len(prompt) <= 2048
+    paths_ok = isinstance(paths, list) and all(isinstance(path, str) for path in paths)
     return identity_ok and prompt_ok and paths_ok
 
 
@@ -79,7 +73,10 @@ def _cases(manifest: object) -> list[dict[str, Any]]:
         case_id, prompt, paths = case["id"], case["prompt"], case["paths"]
         if not _valid_case_header(case, seen):
             raise ValueError("invalid backend case id, prompt or path selection")
-        if type(case["model_fields"]) is not bool or type(case["environment_reads"]) is not bool:
+        if (
+            type(case["model_fields"]) is not bool
+            or type(case["environment_reads"]) is not bool
+        ):
             raise ValueError("backend mode fields must be booleans")
         # Reuse product provider's exact source-path validation, not another parser.
         StaticPythonBackendDeclarations(
@@ -265,7 +262,9 @@ def _validate_navigation_arms(
     right = after["declarations"]["groups"]
     if any("evidence_navigation" in row["declarations"][0]["value"] for row in left):
         raise ValueError("syntax-only arm contains navigation")
-    if any("evidence_navigation" not in row["declarations"][0]["value"] for row in right):
+    if any(
+        "evidence_navigation" not in row["declarations"][0]["value"] for row in right
+    ):
         raise ValueError("navigation arm has no navigation evidence")
     if _provider_sources(before) != _provider_sources(after):
         raise ValueError("backend pair source binding differs")
@@ -285,11 +284,13 @@ def _validate_pair(case: dict[str, Any]) -> None:
     before, after = arms[0]["provider_packet"], arms[1]["provider_packet"]
     facts = _validate_navigation_arms(before, after)
     sources = _provider_sources(before)
-    identity = _digest({
-        "repository": before["repository"],
-        "sources": sources,
-        "facts": facts,
-    })
+    identity = _digest(
+        {
+            "repository": before["repository"],
+            "sources": sources,
+            "facts": facts,
+        }
+    )
     if identity != case["source_facts_identity"] or any(
         arm["fact_identity"] != identity for arm in arms
     ):
