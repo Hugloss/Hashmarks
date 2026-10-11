@@ -600,16 +600,16 @@ class StaticPythonInterfaceDeclarations:
             if len(source) > _MAX_SOURCE_CHARS:
                 raise ValueError("interface provider source exceeds bounded AST input")
             observed, parsed = _source_groups(
-                    path,
-                    source,
-                    route_objects=frozenset(self.route_objects),
-                    tool_objects=frozenset(self.tool_objects),
-                    provider=self.name,
-                    syntax_options=_SourceSyntaxOptions(
-                        include_body=self.include_literal_shape_syntax,
-                        include_inputs=self.include_input_contract_syntax,
-                    ),
-                )
+                path,
+                source,
+                route_objects=frozenset(self.route_objects),
+                tool_objects=frozenset(self.tool_objects),
+                provider=self.name,
+                syntax_options=_SourceSyntaxOptions(
+                    include_body=self.include_literal_shape_syntax,
+                    include_inputs=self.include_input_contract_syntax,
+                ),
+            )
             groups.extend(observed)
             if self.consumer_pairs:
                 trees[path] = parsed
