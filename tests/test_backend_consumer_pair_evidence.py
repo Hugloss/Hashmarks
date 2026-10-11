@@ -257,3 +257,41 @@ def test_bounded_consumer_syntax_fails_closed_instead_of_false_empty(
         cm.sync()
         with pytest.raises(RepositoryDeclarationProviderError, match="bound"):
             cm.discover_repository_declarations([_provider()])
+
+
+def test_consumer_source_visibility_denial_never_leaks_literal_keys(
+    tmp_path: Path,
+) -> None:
+    _repo(tmp_path)
+    (tmp_path / "client.py").write_text(
+        "def render(response):\n"
+        '    return response["CONFIDENTIAL_FIELD"]\n',
+        encoding="utf-8",
+    )
+    (tmp_path / ".hashmarks-context.toml").write_text(
+        '[[rule]]\npattern = "client.py"\nvisibility = "deny"\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(RepositoryDeclarationProviderError) as exc:
+        _observe(tmp_path, _provider())
+    assert "CONFIDENTIAL_FIELD" not in str(exc.value)
+
+
+def test_mutated_consumer_without_resync_refuses_old_repository_evidence(
+    tmp_path: Path,
+) -> None:
+    _repo(tmp_path)
+    with CodeMap(tmp_path) as cm:
+        cm.sync()
+        provider = _provider()
+        original = cm.discover_repository_declarations([provider])
+        (tmp_path / "client.py").write_text(
+            'def render(response):\n    return response["changed"]\n',
+            encoding="utf-8",
+        )
+        with pytest.raises(
+            RepositoryDeclarationProviderError, match="input changed while reading"
+        ):
+            cm.discover_repository_declarations(
+                [provider], previous_observation=original
+            )
