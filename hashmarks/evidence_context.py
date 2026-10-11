@@ -213,7 +213,9 @@ def describe_evidence_binding_reacquisition(
     if not isinstance(repository, dict):
         raise ValueError("invalid repository binding")
     require_generation(repository.get("codemap_generation"), field="codemap_generation")
-    return {
+    from .evidence_reacquisition_integrity import descriptor_identity
+
+    description = {
         "schema": "hashmarks.evidence-binding-reacquisition.v1",
         "source_packet_identity": source_identity,
         "binding_definition_identity": binding.get("binding_definition_identity"),
@@ -229,4 +231,8 @@ def describe_evidence_binding_reacquisition(
         "authority": "consumer-reacquisition-description-only",
         "current_freshness_proven": False,
         "execution_effect": "none",
+    }
+    return {
+        **description,
+        "descriptor_identity": descriptor_identity(description),
     }
