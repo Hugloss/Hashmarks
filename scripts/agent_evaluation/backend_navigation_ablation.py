@@ -26,7 +26,11 @@ MAX_EXPORT_BYTES = 4_194_304
 
 def _encode(value: object) -> bytes:
     return json.dumps(
-        value, sort_keys=True, ensure_ascii=False, separators=(",", ":"), allow_nan=False
+        value,
+        sort_keys=True,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        allow_nan=False,
     ).encode("utf-8")
 
 
@@ -65,7 +69,11 @@ def _cases(manifest: object) -> list[dict[str, Any]]:
     seen: set[str] = set()
     for case in cases:
         if not isinstance(case, dict) or set(case) != {
-            "id", "prompt", "paths", "model_fields", "environment_reads"
+            "id",
+            "prompt",
+            "paths",
+            "model_fields",
+            "environment_reads",
         }:
             raise ValueError("backend cases require five exact fields")
         case_id, prompt, paths = case["id"], case["prompt"], case["paths"]
@@ -90,22 +98,26 @@ def _source_facts(packet: dict[str, Any]) -> list[dict[str, object]]:
     facts: list[dict[str, object]] = []
     for group in groups:
         if len(group["declarations"]) != 1:
-            raise ValueError("backend ablation expected one direct declaration per group")
+            raise ValueError(
+                "backend ablation expected one direct declaration per group"
+            )
         declaration = group["declarations"][0]
         value = deepcopy(declaration["value"])
         value.pop("evidence_navigation", None)
-        facts.append({
-            "group_id": group["group_id"],
-            "concept": group["concept"],
-            "scope": group["scope"],
-            "correspondence": group["correspondence"],
-            "coverage": group["coverage"],
-            "semantic_role": declaration["semantic_role"],
-            "value_state": declaration["value_state"],
-            "value": value,
-            "producer": declaration["producer"],
-            "evidence": declaration["evidence"],
-        })
+        facts.append(
+            {
+                "group_id": group["group_id"],
+                "concept": group["concept"],
+                "scope": group["scope"],
+                "correspondence": group["correspondence"],
+                "coverage": group["coverage"],
+                "semantic_role": declaration["semantic_role"],
+                "value_state": declaration["value_state"],
+                "value": value,
+                "producer": declaration["producer"],
+                "evidence": declaration["evidence"],
+            }
+        )
     return sorted(facts, key=lambda fact: str(fact["group_id"]))
 
 
@@ -118,8 +130,11 @@ def _provider_sources(packet: dict[str, Any]) -> dict[str, object]:
 
 
 def _arm(
-    case: dict[str, Any], packet: dict[str, Any], *,
-    navigation: bool, fact_identity: str
+    case: dict[str, Any],
+    packet: dict[str, Any],
+    *,
+    navigation: bool,
+    fact_identity: str,
 ) -> dict[str, object]:
     arm = "navigation" if navigation else "syntax-only"
     observation = {
@@ -153,44 +168,54 @@ def export_cases(repo: Path, manifest: dict[str, object]) -> dict[str, object]:
                 "include_model_fields": case["model_fields"],
                 "include_environment_reads": case["environment_reads"],
             }
-            baseline = codemap.discover_repository_declarations([
-                StaticPythonBackendDeclarations(**settings)
-            ])
-            treatment = codemap.discover_repository_declarations([
-                StaticPythonBackendDeclarations(**settings, include_evidence_navigation=True)
-            ])
+            baseline = codemap.discover_repository_declarations(
+                [StaticPythonBackendDeclarations(**settings)]
+            )
+            treatment = codemap.discover_repository_declarations(
+                [
+                    StaticPythonBackendDeclarations(
+                        **settings, include_evidence_navigation=True
+                    )
+                ]
+            )
             before, after = _source_facts(baseline), _source_facts(treatment)
             if not before:
-                raise ValueError("backend ablation case has no selected syntax evidence")
+                raise ValueError(
+                    "backend ablation case has no selected syntax evidence"
+                )
             if before != after:
                 raise ValueError("navigation changed the observed backend source facts")
             if _provider_sources(baseline) != _provider_sources(treatment):
-                raise ValueError("navigation arms have divergent source revision binding")
+                raise ValueError(
+                    "navigation arms have divergent source revision binding"
+                )
             if baseline["repository"] != treatment["repository"]:
                 raise ValueError("navigation arms have divergent repository authority")
-            if any(
-                "evidence_navigation" in row["value"] for row in before
-            ) or any(
+            if any("evidence_navigation" in row["value"] for row in before) or any(
                 "evidence_navigation" not in row["declarations"][0]["value"]
                 for row in treatment["declarations"]["groups"]
             ):
                 raise ValueError("ablation arms are not exact navigation off/on")
-            identity = _digest({
-                "repository": baseline["repository"],
-                "sources": _provider_sources(baseline),
-                "facts": before,
-            })
-            result.append({
-                "case_id": case["id"],
-                "source_facts_identity": identity,
-                "source_group_count": len(before),
-                "source_revision_binding": _provider_sources(baseline),
-                "arms": [
-                    _arm(case, baseline, navigation=False, fact_identity=identity),
-                    _arm(case, treatment, navigation=True, fact_identity=identity),
-                ],
-                "inference": "no-agent-outcome-measured",
-            })
+            identity = _digest(
+                {
+                    "repository": baseline["repository"],
+                    "sources": _provider_sources(baseline),
+                    "facts": before,
+                }
+            )
+            result.append(
+                {
+                    "case_id": case["id"],
+                    "source_facts_identity": identity,
+                    "source_group_count": len(before),
+                    "source_revision_binding": _provider_sources(baseline),
+                    "arms": [
+                        _arm(case, baseline, navigation=False, fact_identity=identity),
+                        _arm(case, treatment, navigation=True, fact_identity=identity),
+                    ],
+                    "inference": "no-agent-outcome-measured",
+                }
+            )
     export: dict[str, object] = {
         "schema": SCHEMA,
         "cases": result,
@@ -209,7 +234,8 @@ def export_cases(repo: Path, manifest: dict[str, object]) -> dict[str, object]:
 
 def _validate_arm(arm: dict[str, Any], *, case_id: str) -> None:
     observation = {
-        key: item for key, item in arm.items()
+        key: item
+        for key, item in arm.items()
         if key not in {"observation_identity", "utf8_bytes"}
     }
     if arm["case_id"] != case_id or arm["fact_identity"] == "":
@@ -280,13 +306,14 @@ def validate_export(value: object) -> None:
         raise ValueError("unsupported backend ablation export schema")
     if len(_encode(value)) > MAX_EXPORT_BYTES:
         raise ValueError("backend ablation validation bound exceeded")
-    if value.get("export_identity") != _digest({
-        key: item for key, item in value.items() if key != "export_identity"
-    }):
+    if value.get("export_identity") != _digest(
+        {key: item for key, item in value.items() if key != "export_identity"}
+    ):
         raise ValueError("backend export identity mismatch")
-    if value.get("model_delivery") != "not-observed" or value.get(
-        "paired_correctness"
-    ) != "not-measured":
+    if (
+        value.get("model_delivery") != "not-observed"
+        or value.get("paired_correctness") != "not-measured"
+    ):
         raise ValueError("backend export cannot assert measured agent outcomes")
     cases = value["cases"]
     if not isinstance(cases, list) or not 1 <= len(cases) <= MAX_CASES:
