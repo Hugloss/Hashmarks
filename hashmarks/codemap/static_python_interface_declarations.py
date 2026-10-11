@@ -275,6 +275,12 @@ def _declaration_group(
     }
 
 
+@dataclass(frozen=True, slots=True)
+class _SourceSyntaxOptions:
+    include_body: bool = False
+    include_inputs: bool = False
+
+
 def _source_groups(
     path: str,
     source: str,
@@ -282,8 +288,7 @@ def _source_groups(
     route_objects: frozenset[str],
     tool_objects: frozenset[str],
     provider: str,
-    include_literal_shape_syntax: bool = False,
-    include_input_contract_syntax: bool = False,
+    syntax_options: _SourceSyntaxOptions = _SourceSyntaxOptions(),
 ) -> list[dict[str, object]]:
     groups: list[dict[str, object]] = []
     for declaration in ast.parse(source, filename=path).body:
@@ -297,9 +302,9 @@ def _source_groups(
             )
             if observed is None:
                 continue
-            if include_literal_shape_syntax and body_syntax is None:
+            if syntax_options.include_body and body_syntax is None:
                 body_syntax = _handler_body_syntax(declaration)
-            if include_input_contract_syntax and input_syntax is None:
+            if syntax_options.include_inputs and input_syntax is None:
                 input_syntax = handler_input_syntax(declaration)
             groups.append(
                 _declaration_group(
@@ -391,8 +396,10 @@ class StaticPythonInterfaceDeclarations:
                     route_objects=frozenset(self.route_objects),
                     tool_objects=frozenset(self.tool_objects),
                     provider=self.name,
-                    include_literal_shape_syntax=self.include_literal_shape_syntax,
-                    include_input_contract_syntax=self.include_input_contract_syntax,
+                    syntax_options=_SourceSyntaxOptions(
+                        include_body=self.include_literal_shape_syntax,
+                        include_inputs=self.include_input_contract_syntax,
+                    ),
                 )
             )
             if len(groups) > _MAX_GROUPS:
