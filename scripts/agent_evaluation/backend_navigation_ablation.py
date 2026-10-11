@@ -151,6 +151,8 @@ def export_cases(repo: Path, manifest: dict[str, object]) -> dict[str, object]:
                 StaticPythonBackendDeclarations(**settings, include_evidence_navigation=True)
             ])
             before, after = _source_facts(baseline), _source_facts(treatment)
+            if not before:
+                raise ValueError("backend ablation case has no selected syntax evidence")
             if before != after:
                 raise ValueError("navigation changed the observed backend source facts")
             if _provider_sources(baseline) != _provider_sources(treatment):
@@ -196,41 +198,88 @@ def export_cases(repo: Path, manifest: dict[str, object]) -> dict[str, object]:
     return export
 
 
+def _validate_arm(arm: dict[str, Any], *, case_id: str) -> None:
+    observation = {
+        key: item for key, item in arm.items()
+        if key not in {"observation_identity", "utf8_bytes"}
+    }
+    if arm["case_id"] != case_id or arm["fact_identity"] == "":
+        raise ValueError("backend arm case or fact identity mismatch")
+    if _digest(observation) != arm["observation_identity"]:
+        raise ValueError("backend arm observation identity mismatch")
+    if len(_encode(observation)) != arm["utf8_bytes"]:
+        raise ValueError("backend arm size mismatch")
+    for key, expected in (
+        ("exposure", "exported-not-host-attested"),
+        ("host_visible", "not-established"),
+        ("agent_invoked", "not-established"),
+        ("agent_used", "not-established"),
+        ("agent_result", "not-measured"),
+    ):
+        if arm[key] != expected:
+            raise ValueError("backend export cannot assert an agent or host outcome")
+
+
+def _validate_pair(case: dict[str, Any]) -> None:
+    arms = case["arms"]
+    if [arm["arm"] for arm in arms] != ["syntax-only", "navigation"]:
+        raise ValueError("backend ablation requires exact paired arms")
+    for arm in arms:
+        _validate_arm(arm, case_id=case["case_id"])
+    if arms[0]["prompt"] != arms[1]["prompt"]:
+        raise ValueError("backend pair has divergent prompts")
+    before, after = arms[0]["provider_packet"], arms[1]["provider_packet"]
+    before_facts, after_facts = _source_facts(before), _source_facts(after)
+    if not before_facts or before_facts != after_facts:
+        raise ValueError("backend pair differs beyond navigation")
+    left = before["declarations"]["groups"]
+    right = after["declarations"]["groups"]
+    if any("evidence_navigation" in row["declarations"][0]["value"] for row in left):
+        raise ValueError("syntax-only arm contains navigation")
+    if any("evidence_navigation" not in row["declarations"][0]["value"] for row in right):
+        raise ValueError("navigation arm has no navigation evidence")
+    if _provider_sources(before) != _provider_sources(after):
+        raise ValueError("backend pair source binding differs")
+    if before["repository"] != after["repository"]:
+        raise ValueError("backend pair repository binding differs")
+    identity = _digest({
+        "repository": before["repository"],
+        "sources": _provider_sources(before),
+        "facts": before_facts,
+    })
+    if identity != case["source_facts_identity"] or any(
+        arm["fact_identity"] != identity for arm in arms
+    ):
+        raise ValueError("backend source facts identity mismatch")
+    if case["source_group_count"] != len(before_facts):
+        raise ValueError("backend group count mismatch")
+    if case["source_revision_binding"] != _provider_sources(before):
+        raise ValueError("backend source revision receipt mismatch")
+
+
 def validate_export(value: object) -> None:
-    """Reject forged pairs, mismatched sources, and changed export identities."""
+    """Check frozen export's *internal consistency*, not host attestation."""
     if not isinstance(value, dict) or value.get("schema") != SCHEMA:
         raise ValueError("unsupported backend ablation export schema")
+    if len(_encode(value)) > MAX_EXPORT_BYTES:
+        raise ValueError("backend ablation validation bound exceeded")
     if value.get("export_identity") != _digest({
         key: item for key, item in value.items() if key != "export_identity"
     }):
         raise ValueError("backend export identity mismatch")
-    for case in value["cases"]:
-        arms = case["arms"]
-        if [arm["arm"] for arm in arms] != ["syntax-only", "navigation"]:
-            raise ValueError("backend ablation requires exact paired arms")
-        for arm in arms:
-            observation = {
-                key: item for key, item in arm.items()
-                if key not in {"observation_identity", "utf8_bytes"}
-            }
-            if _digest(observation) != arm["observation_identity"]:
-                raise ValueError("backend arm observation identity mismatch")
-            if len(_encode(observation)) != arm["utf8_bytes"]:
-                raise ValueError("backend arm size mismatch")
-        before, after = arms[0]["provider_packet"], arms[1]["provider_packet"]
-        if _source_facts(before) != _source_facts(after):
-            raise ValueError("backend pair differs beyond navigation")
-        if _provider_sources(before) != _provider_sources(after):
-            raise ValueError("backend pair source binding differs")
-        identity = _digest({
-            "repository": before["repository"],
-            "sources": _provider_sources(before),
-            "facts": _source_facts(before),
-        })
-        if identity != case["source_facts_identity"] or any(
-            arm["fact_identity"] != identity for arm in arms
-        ):
-            raise ValueError("backend source facts identity mismatch")
+    if value.get("model_delivery") != "not-observed" or value.get(
+        "paired_correctness"
+    ) != "not-measured":
+        raise ValueError("backend export cannot assert measured agent outcomes")
+    cases = value["cases"]
+    if not isinstance(cases, list) or not 1 <= len(cases) <= MAX_CASES:
+        raise ValueError("backend export case count invalid")
+    seen: set[str] = set()
+    for case in cases:
+        if case["case_id"] in seen:
+            raise ValueError("backend export duplicate case")
+        seen.add(case["case_id"])
+        _validate_pair(case)
 
 
 def main(argv: list[str] | None = None) -> int:
