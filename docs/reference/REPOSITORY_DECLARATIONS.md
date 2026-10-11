@@ -36,6 +36,16 @@ read or set at runtime. Ambiguous keyword/positional forms are not
 silently reduced to one selected value. See
 [Explicit Python interface syntax evidence](STATIC_INTERFACE_EVIDENCE.md).
 
+The explicit backend source provider can additionally return bounded
+`evidence_navigation` only when
+`include_evidence_navigation=True`. Its exact per-declaration source-read
+suggestions come from already bound syntax facts, preserve source-policy
+authority, and report omission counts. An empty suggestion list means the
+selected observed syntax does not require another syntax read; it **never**
+proves a complete repository scan, valid runtime model, resolved environment
+value or producer-consumer compatibility. See
+[Explicit Python interface syntax evidence](STATIC_INTERFACE_EVIDENCE.md).
+
 ## Why this exists
 
 Repositories frequently express one conceptual fact on several surfaces:
