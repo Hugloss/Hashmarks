@@ -380,7 +380,8 @@ source snapshot binding, and a qualified range state.
 an exact captured source revision, positions at valid encoded character
 boundaries, and ranges inside the caller's declared `CallHierarchyItem.range`.
 `revision-different`, `snapshot-unavailable`, `outside-repository`,
-`unadmitted`, `outside-caller-item`, `invalid-position` and `unknown`
+`unadmitted`, `outside-caller-item`, `invalid-position`, `empty-call-sites`
+and `unknown`
 remain descriptive, non-authoritative evidence. A matching call-site *range*
 does not prove that a semantic call exists or that the LSP server was correct.
 
