@@ -156,6 +156,25 @@ contracts or tests executed. Producer-consumer correspondence, config binding
 and dependency transition facts continue with their *existing separate*
 declaration/dependency authorities; names alone are never joined.
 
+## Backend B20–B24: selected schema and configuration syntax
+
+Build upon merged #425 without repeating the B06–B19 observations.
+The new `StaticPythonBackendDeclarations` is caller-selected and routes
+through the existing qualified `RepositoryDeclarationProviderContext`:
+
+| Checkpoint | Direct fact | Explicit non-claim |
+| --- | --- | --- |
+| B20 | Selected-file top-level `BaseModel` / `BaseSettings` class-base syntax | Resolved class/framework identity |
+| B21 | Class-local field annotation and `Field(...)` call syntax | Pydantic validation, requiredness, default values |
+| B22 | Exact `os.getenv` / `os.environ` key and direct assignment syntax | Runtime `os` binding, precedence or actual config values |
+| B23 | Bounded sources, fields, groups, paths and provider revision checks | Exhaustive absence or scanned repository universe |
+| B24 | Independent provider switches, adversarial tests, documentation and original declaration owner | Producer/consumer compatibility or inferred cross-file edges |
+
+This is one PR and one explicit provider. C01–C04 producer/consumer syntax
+work in the separate, unmerged #424 is not incorporated or duplicated.
+No call graph, new MCP method, runtime framework analyzer, Pydantic loader,
+configuration evaluator or semantic inference is introduced.
+
 ## Open conditional checkpoints
 
 - **H04:** changed-line → symbol/relationship claims require a direct
