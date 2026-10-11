@@ -294,6 +294,24 @@ its coverage incomplete, and negative evidence unavailable. A consumer can
 use each exact declaration binding for investigation; choosing a repair and
 authenticating the pair are external responsibilities.
 
+### Caller-nominated literal key-site projection (C05–C08)
+
+The explicit Python interface declaration provider can opt in to
+`include_pair_key_site_projection=True` for a previously caller-nominated
+producer/consumer pair. In the existing bound consumer declaration value,
+`literal_key_site_projection` presents up to eight consumer literal
+read sites against eight producer literal return sites, preserving exact
+source ranges and three independently qualified relations:
+`same-literal-key-at-site`, `different-literal-key-at-site`,
+`producer-return-syntax-unresolved`. Both dimensions carry observed,
+retained and omitted counts. All observations stay
+`coverage=incomplete` with `runtime_compatibility=not-asserted`,
+`missing_field_conclusion=not-admissible`, and
+`negative_evidence_admissible=false`. Source binding, privacy,
+freshness and previous-observation replay remain owned by the existing
+repository declaration operation, with no runtime route correspondence
+or API compatibility verdict.
+
 ## Backend changed-line evidence: direct correlation without impact inference
 
 The existing `change_impact` owner can optionally include
