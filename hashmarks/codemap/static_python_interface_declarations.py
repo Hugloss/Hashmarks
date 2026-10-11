@@ -217,11 +217,13 @@ def _declaration_group(
         ]
     if isinstance(input_syntax, dict):
         signature = input_syntax["signature_source_range"]
-        extra_evidence.append({
-            "path": path,
-            "start_line": signature["start_line"],
-            "end_line": signature["end_line"],
-        })
+        extra_evidence.append(
+            {
+                "path": path,
+                "start_line": signature["start_line"],
+                "end_line": signature["end_line"],
+            }
+        )
     return {
         "group_id": group_id,
         "concept": {"kind": observed["kind"], "syntax": "python-decorator"},
