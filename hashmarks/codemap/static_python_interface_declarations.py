@@ -291,9 +291,10 @@ def _source_groups(
     tool_objects: frozenset[str],
     provider: str,
     syntax_options: _SourceSyntaxOptions = _SourceSyntaxOptions(),
-) -> list[dict[str, object]]:
+) -> tuple[list[dict[str, object]], ast.Module]:
     groups: list[dict[str, object]] = []
-    for declaration in ast.parse(source, filename=path).body:
+    tree = ast.parse(source, filename=path)
+    for declaration in tree.body:
         if not isinstance(declaration, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
         body_syntax: dict[str, object] | None = None
@@ -332,7 +333,211 @@ def _source_groups(
             )
             if len(groups) > _MAX_GROUPS:
                 raise ValueError("interface provider group bound exceeded")
-    return groups
+    return groups, tree
+
+
+_MAX_CONSUMER_PAIRS = 16
+
+
+def _validate_consumer_pairs(
+    pairs: tuple[tuple[str, str, str, str, str], ...],
+    paths: tuple[str, ...],
+) -> None:
+    """Admit only explicit same-scope source/function/receiver nominations."""
+    if not isinstance(pairs, tuple) or len(pairs) > _MAX_CONSUMER_PAIRS:
+        raise ValueError("consumer_pairs must be a tuple of at most 16 pairs")
+    for pair in pairs:
+        if not isinstance(pair, tuple) or len(pair) != 5:
+            raise ValueError("consumer_pairs must contain five-field tuples")
+        producer_path, producer_name, consumer_path, consumer_name, receiver = pair
+        if (
+            not isinstance(producer_path, str)
+            or not isinstance(consumer_path, str)
+            or producer_path not in paths
+            or consumer_path not in paths
+        ):
+            raise ValueError("consumer_pairs paths must be explicitly selected")
+        if any(
+            not isinstance(value, str) or not value.isidentifier()
+            for value in (producer_name, consumer_name, receiver)
+        ):
+            raise ValueError("consumer_pairs require exact Python identifiers")
+    if len(set(pairs)) != len(pairs):
+        raise ValueError("consumer_pairs must be unique")
+
+
+def _unique_top_level(
+    tree: ast.Module, name: str
+) -> ast.FunctionDef | ast.AsyncFunctionDef | None:
+    matches = [
+        row
+        for row in tree.body
+        if isinstance(row, (ast.FunctionDef, ast.AsyncFunctionDef)) and row.name == name
+    ]
+    return matches[0] if len(matches) == 1 else None
+
+
+def _direct_interface_decorator(
+    declaration: ast.FunctionDef | ast.AsyncFunctionDef,
+    *,
+    route_objects: frozenset[str],
+    tool_objects: frozenset[str],
+) -> bool:
+    return any(
+        _observed_decorator(row, route_objects=route_objects, tool_objects=tool_objects)
+        is not None
+        for row in declaration.decorator_list
+    )
+
+
+def _pair_declaration(
+    path: str,
+    declaration: ast.FunctionDef | ast.AsyncFunctionDef,
+    *,
+    role: str,
+    value: dict[str, object],
+    provider: str,
+    sites: list[dict[str, object]],
+) -> dict[str, object]:
+    spans = {
+        (declaration.lineno, declaration.lineno),
+        *((site["line"], site["end_line"]) for site in sites),
+    }
+    return {
+        "declaration_id": role,
+        "semantic_role": {"kind": role},
+        "value_state": "resolved",
+        "value": value,
+        "producer": {
+            "provider": provider,
+            "parser": "python-ast",
+            "authority": "direct-static-syntax-only",
+        },
+        "evidence": [
+            {"path": path, "start_line": start, "end_line": end}
+            for start, end in sorted(spans)
+        ],
+    }
+
+
+def _pair_group(
+    index: int,
+    pair: tuple[str, str, str, str, str],
+    producer: ast.FunctionDef | ast.AsyncFunctionDef,
+    consumer: ast.FunctionDef | ast.AsyncFunctionDef,
+    *,
+    provider_name: str,
+) -> dict[str, object]:
+    producer_path, producer_name, consumer_path, consumer_name, receiver = pair
+    returns = _handler_body_syntax(producer)["literal_dictionary_returns"]
+    reads = [
+        site
+        for site in _handler_body_syntax(consumer)["literal_subscript_accesses"]
+        if site["receiver_syntax"] == receiver
+    ]
+    scope = {
+        "producer_path": producer_path,
+        "producer_function": producer_name,
+        "consumer_path": consumer_path,
+        "consumer_function": consumer_name,
+        "consumer_receiver_syntax": receiver,
+    }
+    return {
+        "group_id": f"caller-nominated-consumer-pair:{index}",
+        "concept": {"kind": "nominated-python-interface-syntax-pair"},
+        "scope": scope,
+        "correspondence": {
+            "state": "unresolved",
+            "basis": {
+                "provider": provider_name,
+                "pair_authority": "explicit-caller-nomination-only",
+                "runtime_correspondence": "unproven",
+            },
+        },
+        "declarations": [
+            _pair_declaration(
+                producer_path,
+                producer,
+                role="producer-return-syntax",
+                value={
+                    "literal_dictionary_returns": returns,
+                    "coverage": "incomplete",
+                    "runtime_response_shape": "unknown",
+                },
+                provider=provider_name,
+                sites=returns,
+            ),
+            _pair_declaration(
+                consumer_path,
+                consumer,
+                role="consumer-subscript-read-syntax",
+                value={
+                    "receiver_syntax": receiver,
+                    "literal_subscript_reads": reads,
+                    "coverage": "incomplete",
+                    "runtime_consumer_binding": "unknown",
+                },
+                provider=provider_name,
+                sites=reads,
+            ),
+        ],
+        "coverage": {
+            "state": "incomplete",
+            "truncation": "complete",
+            "expected_declaration_ids": [],
+            "scope": scope,
+            "provenance": {
+                "provider": provider_name,
+                "reason": "explicit-pair-does-not-prove-runtime-correspondence",
+            },
+        },
+    }
+
+
+def _paired_groups(
+    pairs: tuple[tuple[str, str, str, str, str], ...],
+    trees: dict[str, ast.Module],
+    *,
+    provider: str,
+    route_objects: frozenset[str],
+    tool_objects: frozenset[str],
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    """Retain only directly located nominees; everything else stays unresolved."""
+    groups: list[dict[str, object]] = []
+    unresolved: list[dict[str, object]] = []
+    for index, pair in enumerate(sorted(pairs)):
+        producer_path, producer_name, consumer_path, consumer_name, _ = pair
+        producer_tree = trees.get(producer_path)
+        consumer_tree = trees.get(consumer_path)
+        producer_row = (
+            _unique_top_level(producer_tree, producer_name)
+            if producer_tree is not None
+            else None
+        )
+        consumer_row = (
+            _unique_top_level(consumer_tree, consumer_name)
+            if consumer_tree is not None
+            else None
+        )
+        if producer_row is None or consumer_row is None:
+            unresolved.append(
+                {"pair": list(pair), "reason": "source-or-subject-unresolved"}
+            )
+        elif not _direct_interface_decorator(
+            producer_row,
+            route_objects=route_objects,
+            tool_objects=tool_objects,
+        ):
+            unresolved.append(
+                {"pair": list(pair), "reason": "producer-decorator-unresolved"}
+            )
+        else:
+            groups.append(
+                _pair_group(
+                    index, pair, producer_row, consumer_row, provider_name=provider
+                )
+            )
+    return groups, unresolved
 
 
 @dataclass(frozen=True, slots=True)
@@ -350,12 +555,14 @@ class StaticPythonInterfaceDeclarations:
     tool_objects: tuple[str, ...] = ("mcp", "server")
     include_literal_shape_syntax: bool = False
     include_input_contract_syntax: bool = False
+    consumer_pairs: tuple[tuple[str, str, str, str, str], ...] = ()
 
     def __post_init__(self) -> None:
         if type(self.include_literal_shape_syntax) is not bool:
             raise ValueError("include_literal_shape_syntax must be boolean")
         if type(self.include_input_contract_syntax) is not bool:
             raise ValueError("include_input_contract_syntax must be boolean")
+        _validate_consumer_pairs(self.consumer_pairs, self.paths)
         if not 1 <= len(self.paths) <= _MAX_PATHS:
             raise ValueError("interface provider requires 1..32 exact paths")
         if any(
@@ -384,6 +591,7 @@ class StaticPythonInterfaceDeclarations:
     ) -> RepositoryDeclarationProviderResult:
         groups: list[dict[str, object]] = []
         unavailable: list[str] = []
+        trees: dict[str, ast.Module] = {}
         for path in sorted(self.paths):
             if not context.exists(path):
                 unavailable.append(path)
@@ -391,8 +599,7 @@ class StaticPythonInterfaceDeclarations:
             source = context.read_text(path)
             if len(source) > _MAX_SOURCE_CHARS:
                 raise ValueError("interface provider source exceeds bounded AST input")
-            groups.extend(
-                _source_groups(
+            observed, parsed = _source_groups(
                     path,
                     source,
                     route_objects=frozenset(self.route_objects),
@@ -403,7 +610,21 @@ class StaticPythonInterfaceDeclarations:
                         include_inputs=self.include_input_contract_syntax,
                     ),
                 )
+            groups.extend(observed)
+            if self.consumer_pairs:
+                trees[path] = parsed
+            if len(groups) > _MAX_GROUPS:
+                raise ValueError("interface provider group bound exceeded")
+        unresolved_pairs: list[dict[str, object]] = []
+        if self.consumer_pairs:
+            paired, unresolved_pairs = _paired_groups(
+                self.consumer_pairs,
+                trees,
+                provider=self.name,
+                route_objects=frozenset(self.route_objects),
+                tool_objects=frozenset(self.tool_objects),
             )
+            groups.extend(paired)
             if len(groups) > _MAX_GROUPS:
                 raise ValueError("interface provider group bound exceeded")
         return RepositoryDeclarationProviderResult(
@@ -424,5 +645,13 @@ class StaticPythonInterfaceDeclarations:
                     else {}
                 ),
                 "missing_selected_paths": sorted(unavailable),
+                **(
+                    {
+                        "consumer_pairs": "explicit-caller-nominations-only",
+                        "unresolved_consumer_pairs": unresolved_pairs,
+                    }
+                    if self.consumer_pairs
+                    else {}
+                ),
             },
         )
