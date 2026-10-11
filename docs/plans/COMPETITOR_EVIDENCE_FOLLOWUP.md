@@ -137,9 +137,9 @@ No route runtime, typed API compatibility, consumer schema matching,
 verification selection, new public tool, durable state or semantic graph is
 introduced. No `changed_line_spans` means the old result is unchanged.
 
-## Backend B15–B18: caller-nominated producer/consumer syntax pairs (after #422)
+## Cross-artifact C01–C04: caller-nominated producer/consumer syntax pairs (after #422)
 
-- **B15 — explicit pairing only:** one caller-selected provider accepts at most
+- **C01 — explicit pairing only:** one caller-selected provider accepts at most
   16 five-field nominations
   `(producer_path, producer_function, consumer_path, consumer_function, receiver)`.
   Both paths must already be in its explicit, bounded source path selection;
@@ -147,18 +147,18 @@ introduced. No `changed_line_spans` means the old result is unchanged.
   must have a directly observed supported route/MCP tool decorator. Duplicates,
   missing/renamed paths or functions, and unsupported decorator syntax are
   labelled unresolved in provider provenance, not claimed absent.
-- **B16 — existing body syntax owner:** producer returns and consumer literal
+- **C02 — existing body syntax owner:** producer returns and consumer literal
   `receiver["key"]` read sites come from the existing source-bound
   `_handler_body_syntax` extractor; nested functions and aliases are excluded.
   A single captured module AST is reused for both producer discovery and
   pair extraction when opted in. No second source scan, parser or graph owner.
-- **B17 — independent authority:** one repository-declaration group contains
+- **C03 — independent authority:** one repository-declaration group contains
   separately bound producer and consumer syntax observations with explicit
   provenance. `correspondence=unresolved`, `coverage=incomplete`,
   `comparison=ambiguous`, runtime binding/shape unknown and absence unknown
   even when observed keys differ. Pair nomination does not prove a call chain,
   API compatibility, missing field, runtime response or downstream impact.
-- **B18 — compatibility/qualification:** the empty default remains identical;
+- **C04 — compatibility/qualification:** the empty default remains identical;
   invalid nomination fails before repository reads, 16-site syntax overflow
   fails closed, exact source bindings and revision changes use the existing
   declaration observer, and projection must preserve the same facts.
