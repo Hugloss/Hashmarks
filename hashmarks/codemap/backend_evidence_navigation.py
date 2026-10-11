@@ -49,9 +49,7 @@ def _model_read_candidates(
         if "direct_environment_initializer" in field:
             reasons.append("environment-initializer-runtime-meaning-unresolved")
         if reasons:
-            rows.append(
-                _source_read(path, field["line"], field["end_line"], reasons)
-            )
+            rows.append(_source_read(path, field["line"], field["end_line"], reasons))
     return rows
 
 
@@ -78,9 +76,7 @@ def _environment_read_candidates(
     if not reasons:
         return []
     evidence = group["declarations"][0]["evidence"][0]
-    return [
-        _source_read(path, evidence["start_line"], evidence["end_line"], reasons)
-    ]
+    return [_source_read(path, evidence["start_line"], evidence["end_line"], reasons)]
 
 
 def backend_evidence_navigation(group: dict[str, object]) -> None:
