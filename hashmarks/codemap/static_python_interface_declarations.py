@@ -346,8 +346,7 @@ def _unique_top_level(
     matches = [
         row
         for row in tree.body
-        if isinstance(row, (ast.FunctionDef, ast.AsyncFunctionDef))
-        and row.name == name
+        if isinstance(row, (ast.FunctionDef, ast.AsyncFunctionDef)) and row.name == name
     ]
     return matches[0] if len(matches) == 1 else None
 
@@ -359,9 +358,8 @@ def _direct_interface_decorator(
     tool_objects: frozenset[str],
 ) -> bool:
     return any(
-        _observed_decorator(
-            row, route_objects=route_objects, tool_objects=tool_objects
-        ) is not None
+        _observed_decorator(row, route_objects=route_objects, tool_objects=tool_objects)
+        is not None
         for row in declaration.decorator_list
     )
 
@@ -496,13 +494,17 @@ def _paired_groups(
             else None
         )
         if producer_row is None or consumer_row is None:
-            unresolved.append({"pair": list(pair), "reason": "source-or-subject-unresolved"})
+            unresolved.append(
+                {"pair": list(pair), "reason": "source-or-subject-unresolved"}
+            )
         elif not _direct_interface_decorator(
             producer_row,
             route_objects=route_objects,
             tool_objects=tool_objects,
         ):
-            unresolved.append({"pair": list(pair), "reason": "producer-decorator-unresolved"})
+            unresolved.append(
+                {"pair": list(pair), "reason": "producer-decorator-unresolved"}
+            )
         else:
             groups.append(
                 _pair_group(
