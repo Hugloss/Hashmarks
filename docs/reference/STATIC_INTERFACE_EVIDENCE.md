@@ -256,6 +256,61 @@ stable file reads, previous-endpoint deltas and provider trust limitations
 remain unchanged. Default calls without `consumer_pairs` preserve their
 existing packets and identities.
 
+## Opt-in backend evidence navigation (B30–B34)
+
+For selected backend syntax, the existing
+`StaticPythonBackendDeclarations` accepts
+`include_evidence_navigation=True` independently of its model-field and
+environment-access switches. **The default remains false**, preserving
+the default declaration payload and observation identity.
+
+```python
+provider = StaticPythonBackendDeclarations(
+    paths=("src/models.py", "src/settings.py"),
+    include_evidence_navigation=True,
+)
+```
+
+Each returned model or environment declaration now optionally includes
+`value.evidence_navigation`, composed **only from facts already bound to
+the existing selected-source provider**. This is a navigation projection,
+not a repository-wide scan, compatibility oracle or automatic tool call.
+
+- **B30 — direct fact vs open question:** `syntactic_evidence=already-observed`
+  means the bounded selected-file AST observation exists. Runtime binding
+  remains `not-established`, runtime contract `unknown`, and cross-artifact
+  correspondence `unresolved`. Nothing is made complete by an empty
+  next-read list.
+- **B31 — exact next reads:** model declarations may suggest inspecting
+  their nearby base/import syntax, nontrivial initializer, or directly
+  observed environment initializer. Environment expressions suggest their
+  exact physical source range when the key, default, argument binding or
+  write/delete target needs source inspection. Existing group evidence
+  owns the source paths and lines; no read is performed by Hashmarks.
+- **B32 — meaningful no-read state:** straightforward literal-key lookup
+  syntax needs no *additional syntax* read, though actual environment
+  values and runtime effects remain unproven. This avoids redundant
+  exploratory reads without classifying runtime behavior as safe.
+- **B33 — deterministic bounds:** at most eight source-read suggestions per
+  group, with `read_candidates_observed`, `read_candidates_retained`,
+  `read_candidates_omitted`, and `read_limit`. Omitted sites are **not**
+  evidence that any relevant source or behavior is absent. Every request
+  retains `purpose=inspect-source-syntax` and
+  `runtime_proof=not-established`.
+- **B34 — authority and compatibility:** opt-in flag validation happens
+  before repository reads; the owner remains the existing
+  `RepositoryDeclarationProviderContext` with its admission, revision,
+  visibility, tamper and replay checks. Native and compact presentation
+  preserve the same packet; source edits revise the observation and
+  suggestions. The default provider identity is unchanged.
+
+An agent is responsible for deciding whether and how to perform a
+`read_requests[]` read. A source read may clarify syntax but cannot
+establish an actual framework binding, Pydantic validation, config
+precedence, downstream compatibility or test coverage. No new MCP tool,
+resolver, ranking algorithm, cache, process graph or runtime contract is
+introduced.
+
 ## Native SCIP symbol metadata
 
 SCIP `SymbolInformation.documentation` and occurrence `symbolRoles` are
