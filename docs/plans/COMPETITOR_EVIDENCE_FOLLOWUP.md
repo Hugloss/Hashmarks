@@ -137,6 +137,25 @@ No route runtime, typed API compatibility, consumer schema matching,
 verification selection, new public tool, durable state or semantic graph is
 introduced. No `changed_line_spans` means the old result is unchanged.
 
+## Backend B15–B19: qualified handler input boundary (after merged #422)
+
+| Checkpoint | Admitted change | Authority and unknowns |
+| --- | --- | --- |
+| B15 | Positional/keyword parameter declarations with exact indexed handler and signature site | Shared Python AST, <=16 per selected handler; no runtime signature binding |
+| B16 | Bounded direct annotations and declared return annotation | Current admitted source only; no inferred Pydantic schema or API response |
+| B17 | Constant default *kinds* and direct default-call/keyword syntax | No literal default values, evaluation or dependency resolution |
+| B18 | Bounded `Annotated` metadata call sites with omissions | No framework-specific DI engine, validation or transitive provider graph |
+| B19 | Shared provider/change-impact extractor, source privacy, adversarial regressions | Default provider unchanged, no added MCP tool, no consumer compatibility claim |
+
+The implementation has one bounded `handler_input_syntax` AST owner. The
+existing explicit `StaticPythonInterfaceDeclarations` path opts in
+independently of body syntax. A current, uniquely indexed changed-decorator
+association exposes that exact same syntax via the existing
+`change_impact` source-bound packet. Both remain observations, not runtime
+contracts or tests executed. Producer-consumer correspondence, config binding
+and dependency transition facts continue with their *existing separate*
+declaration/dependency authorities; names alone are never joined.
+
 ## Open conditional checkpoints
 
 - **H04:** changed-line → symbol/relationship claims require a direct
