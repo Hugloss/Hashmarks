@@ -109,6 +109,66 @@ annotation, or default-call text. The selected provider is still only a
 request-local source observer: no framework plugin, source scanner, global
 type graph, dependency-injection engine, new MCP tool or durable state.
 
+## Explicit selected-file Python model and environment syntax (B20–B24)
+
+`StaticPythonBackendDeclarations(paths=("src/models.py", "src/settings.py"))`
+is a separate **explicitly selected** provider for the existing
+`CodeMap.discover_repository_declarations([provider])` authority. It does
+not run automatically or add an MCP tool, framework integration, state
+store, config interpreter, or global schema index.
+
+- **B20 — Model class declarations.** Direct, top-level
+  `class Payload(BaseModel)`, `class Settings(BaseSettings)` and
+  simple `receiver.BaseModel` / `receiver.BaseSettings` base *syntax*
+  can nominate a bounded model class. This never establishes the runtime
+  identity of `BaseModel` or `BaseSettings`; imported and aliased bases
+  beyond the supported literal shapes are not inferred.
+- **B21 — Field syntax.** Within an observed class, at most 24 directly
+  annotated fields retain source lines, identifier, a bounded direct
+  annotation, and defaults using the existing shared
+  `handler_input_syntax` owner. `Field(default=..., min_length=...)`
+  yields direct call/keyword *names*, not a validated Pydantic field or
+  a revealed default value. A missing default does **not** prove required.
+- **B22 — Environment key reads.** Direct `os.getenv("KEY")`,
+  `os.environ.get("KEY")`, and `os.environ["KEY"]` AST forms retain
+  exact source sites and literal or dynamic key syntax, plus a directly
+  assigned variable name only when the entire right-hand side is the
+  expression. Simple lexical spelling does **not** prove `os` resolves
+  to Python's standard library or that a particular runtime value is used.
+- **B23 — Boundary and bounds.** At most 16 exact selected `.py` paths,
+  256 KiB UTF-8 per member, 64 combined declaration groups, and 128
+  characters per environment-key literal. Invalid syntax, excessive
+  field count or group count, and forbidden source fail closed, without
+  a partial authoritative result. Source policy, revisions, and evidence
+  binding are owned by the existing provider context.
+- **B24 — No invented correspondence.** The two kinds of observations
+  can be independently selected with `include_model_fields` and
+  `include_environment_reads`. All groups retain
+  `correspondence.state=unresolved`, incomplete coverage, unknown
+  runtime schema/field requiredness, and negative-evidence inadmissibility.
+  Equal spelling across files does not prove that a handler's annotation
+  refers to a particular model, nor that configuration sources agree.
+
+Example:
+
+```python
+from hashmarks import CodeMap
+from hashmarks.codemap.static_python_backend_declarations import (
+    StaticPythonBackendDeclarations,
+)
+
+with CodeMap(".") as codemap:
+    codemap.sync()
+    observation = codemap.discover_repository_declarations([
+        StaticPythonBackendDeclarations(paths=("src/models.py", "src/settings.py"))
+    ])
+```
+
+This is a *descriptive source observation*. It does not replace the
+configuration-evidence path selector, dependency CodeMap, or the existing
+repository-declaration correspondence authority. Neither Pydantic validation
+nor configuration precedence is inferred or executed.
+
 ## Native SCIP symbol metadata
 
 SCIP `SymbolInformation.documentation` and occurrence `symbolRoles` are
