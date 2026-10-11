@@ -265,7 +265,9 @@ its source-observed sites:
 ```python
 StaticPythonInterfaceDeclarations(
     paths=("src/api.py", "src/client.py"),
-    consumer_pairs=(("src/api.py", "get_user", "src/client.py", "show_user", "response"),),
+    consumer_pairs=(
+        ("src/api.py", "get_user", "src/client.py", "show_user", "response"),
+    ),
     include_pair_key_site_projection=True,
 )
 ```
