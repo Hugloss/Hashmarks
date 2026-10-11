@@ -236,7 +236,7 @@ def test_modified_reacquisition_selector_is_rejected(repo: Path) -> None:
         _source_binding(repo), binding_id="source:entry"
     )
     forged = deepcopy(desc)
-    forged["requery"]["evidence"][0]["start_line"] = 2
+    forged["requery"]["evidence"][0]["end_line"] = 2
     with pytest.raises(ValueError, match="identity"):
         validate_reacquisition_descriptor(forged)
 
