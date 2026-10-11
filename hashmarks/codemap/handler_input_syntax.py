@@ -13,6 +13,7 @@ MAX_HANDLER_PARAMETERS = 16
 MAX_ANNOTATION_CHARS = 192
 MAX_DEFAULT_KEYWORDS = 8
 MAX_ANNOTATED_METADATA = 4
+MAX_DIRECT_NAME_CHARS = 128
 
 
 def _annotation(node: ast.expr | None) -> dict[str, object]:
@@ -34,8 +35,12 @@ def _annotation(node: ast.expr | None) -> dict[str, object]:
 
 def _callee(node: ast.expr) -> dict[str, object]:
     if isinstance(node, ast.Name):
+        if len(node.id) > MAX_DIRECT_NAME_CHARS:
+            return {"state": "over-bound"}
         return {"state": "name-syntax", "name": node.id}
     if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
+        if len(node.value.id) > MAX_DIRECT_NAME_CHARS or len(node.attr) > MAX_DIRECT_NAME_CHARS:
+            return {"state": "over-bound"}
         return {
             "state": "member-syntax",
             "receiver": node.value.id,
@@ -71,7 +76,11 @@ def _default(node: ast.expr | None) -> dict[str, object]:
         }
     if not isinstance(node, ast.Call):
         return {"state": "dynamic-or-unsupported"}
-    keywords = [kw.arg for kw in node.keywords if kw.arg is not None]
+    keywords = [
+        kw.arg if len(kw.arg) <= MAX_DIRECT_NAME_CHARS else "<over-bound>"
+        for kw in node.keywords
+        if kw.arg is not None
+    ]
     return {
         "state": "direct-call-syntax",
         "callee": _callee(node.func),
@@ -120,11 +129,16 @@ def _metadata(annotation: ast.expr | None) -> dict[str, object]:
 def _parameter(
     node: ast.arg, kind: str, default: ast.expr | None
 ) -> dict[str, object]:
+    if len(node.arg) > MAX_DIRECT_NAME_CHARS:
+        raise ValueError("handler parameter name exceeds identifier bound")
     return {
         "name": node.arg,
         "kind": kind,
         "start_line": node.lineno,
-        "end_line": node.end_lineno or node.lineno,
+        "end_line": max(
+            node.end_lineno or node.lineno,
+            default.end_lineno or default.lineno if default is not None else node.lineno,
+        ),
         "annotation": _annotation(node.annotation),
         "annotated_metadata": _metadata(node.annotation),
         "default": _default(default),
@@ -135,6 +149,15 @@ def _all_parameters(
     declaration: ast.FunctionDef | ast.AsyncFunctionDef,
 ) -> list[dict[str, object]]:
     args = declaration.args
+    count = (
+        len(args.posonlyargs)
+        + len(args.args)
+        + len(args.kwonlyargs)
+        + int(args.vararg is not None)
+        + int(args.kwarg is not None)
+    )
+    if count > MAX_HANDLER_PARAMETERS:
+        raise ValueError("handler parameter syntax exceeds site bound")
     positional = [*args.posonlyargs, *args.args]
     padding = len(positional) - len(args.defaults)
     defaults: list[ast.expr | None] = [None] * padding + list(args.defaults)
@@ -158,8 +181,6 @@ def handler_input_syntax(
 ) -> dict[str, object]:
     """Observe explicit signature and direct DI-call syntax, not API contracts."""
     parameters = _all_parameters(declaration)
-    if len(parameters) > MAX_HANDLER_PARAMETERS:
-        raise ValueError("handler parameter syntax exceeds site bound")
     source_end = max(
         (
             item["end_line"]
