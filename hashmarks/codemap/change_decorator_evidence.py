@@ -12,6 +12,7 @@ import ast
 from collections.abc import Mapping
 from typing import Protocol
 
+from .handler_input_syntax import handler_input_syntax
 from .static_python_interface_declarations import _handler_body_syntax
 
 MAX_DECORATOR_SOURCE_BYTES = 262_144
@@ -187,6 +188,35 @@ def _handler_body_context(
     }
 
 
+def _handler_input_context(
+    node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef,
+    *,
+    allow_source_syntax: bool,
+) -> dict[str, object]:
+    """Reuse the explicit declaration provider's input syntax oracle."""
+    if not allow_source_syntax:
+        return {
+            "state": "source-visibility-required",
+            "coverage": "unknown",
+            "negative_evidence_admissible": False,
+        }
+    if isinstance(node, ast.ClassDef):
+        return {
+            "state": "not-a-function-declaration",
+            "coverage": "unknown",
+            "negative_evidence_admissible": False,
+        }
+    try:
+        return handler_input_syntax(node)
+    except (ValueError, RecursionError):
+        return {
+            "state": "unresolved",
+            "reason": "handler-input-syntax-over-bound-or-unavailable",
+            "coverage": "unknown",
+            "negative_evidence_admissible": False,
+        }
+
+
 def _indexed_signature(
     row: Mapping[str, object], *, allow_source_syntax: bool
 ) -> dict[str, object]:
@@ -312,6 +342,9 @@ def observe_python_decorator_associations(
                     row, allow_source_syntax=allow_source_syntax
                 ),
                 "handler_body_context": _handler_body_context(
+                    declaration, allow_source_syntax=allow_source_syntax
+                ),
+                "handler_input_context": _handler_input_context(
                     declaration, allow_source_syntax=allow_source_syntax
                 ),
                 "relationship_detail": {

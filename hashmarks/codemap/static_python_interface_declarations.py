@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 from hashmarks.paths import normalize_relative_path
 
+from .handler_input_syntax import handler_input_syntax
 from .repository_declaration_provider import (
     RepositoryDeclarationProviderContext,
     RepositoryDeclarationProviderResult,
@@ -203,6 +204,7 @@ def _declaration_group(
         "decorator_line": decorator.lineno,
     }
     body_syntax = observed.get("static_body_syntax")
+    input_syntax = observed.get("static_input_syntax")
     extra_evidence: list[dict[str, object]] = []
     if body_syntax is not None:
         sites = [
@@ -213,6 +215,15 @@ def _declaration_group(
         extra_evidence = [
             {"path": path, "start_line": start, "end_line": end} for start, end in spans
         ]
+    if isinstance(input_syntax, dict):
+        signature = input_syntax["signature_source_range"]
+        extra_evidence.append(
+            {
+                "path": path,
+                "start_line": signature["start_line"],
+                "end_line": signature["end_line"],
+            }
+        )
     return {
         "group_id": group_id,
         "concept": {"kind": observed["kind"], "syntax": "python-decorator"},
@@ -266,6 +277,12 @@ def _declaration_group(
     }
 
 
+@dataclass(frozen=True, slots=True)
+class _SourceSyntaxOptions:
+    include_body: bool = False
+    include_inputs: bool = False
+
+
 def _source_groups(
     path: str,
     source: str,
@@ -273,21 +290,24 @@ def _source_groups(
     route_objects: frozenset[str],
     tool_objects: frozenset[str],
     provider: str,
-    include_literal_shape_syntax: bool = False,
+    syntax_options: _SourceSyntaxOptions = _SourceSyntaxOptions(),
 ) -> list[dict[str, object]]:
     groups: list[dict[str, object]] = []
     for declaration in ast.parse(source, filename=path).body:
         if not isinstance(declaration, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
         body_syntax: dict[str, object] | None = None
+        input_syntax: dict[str, object] | None = None
         for ordinal, decorator in enumerate(declaration.decorator_list):
             observed = _observed_decorator(
                 decorator, route_objects=route_objects, tool_objects=tool_objects
             )
             if observed is None:
                 continue
-            if include_literal_shape_syntax and body_syntax is None:
+            if syntax_options.include_body and body_syntax is None:
                 body_syntax = _handler_body_syntax(declaration)
+            if syntax_options.include_inputs and input_syntax is None:
+                input_syntax = handler_input_syntax(declaration)
             groups.append(
                 _declaration_group(
                     path,
@@ -299,6 +319,11 @@ def _source_groups(
                         **(
                             {"static_body_syntax": body_syntax}
                             if body_syntax is not None
+                            else {}
+                        ),
+                        **(
+                            {"static_input_syntax": input_syntax}
+                            if input_syntax is not None
                             else {}
                         ),
                     },
@@ -324,10 +349,13 @@ class StaticPythonInterfaceDeclarations:
     route_objects: tuple[str, ...] = ("app", "router")
     tool_objects: tuple[str, ...] = ("mcp", "server")
     include_literal_shape_syntax: bool = False
+    include_input_contract_syntax: bool = False
 
     def __post_init__(self) -> None:
         if type(self.include_literal_shape_syntax) is not bool:
             raise ValueError("include_literal_shape_syntax must be boolean")
+        if type(self.include_input_contract_syntax) is not bool:
+            raise ValueError("include_input_contract_syntax must be boolean")
         if not 1 <= len(self.paths) <= _MAX_PATHS:
             raise ValueError("interface provider requires 1..32 exact paths")
         if any(
@@ -370,7 +398,10 @@ class StaticPythonInterfaceDeclarations:
                     route_objects=frozenset(self.route_objects),
                     tool_objects=frozenset(self.tool_objects),
                     provider=self.name,
-                    include_literal_shape_syntax=self.include_literal_shape_syntax,
+                    syntax_options=_SourceSyntaxOptions(
+                        include_body=self.include_literal_shape_syntax,
+                        include_inputs=self.include_input_contract_syntax,
+                    ),
                 )
             )
             if len(groups) > _MAX_GROUPS:
@@ -385,6 +416,11 @@ class StaticPythonInterfaceDeclarations:
                 **(
                     {"handler_body": "bounded-literal-syntax-not-response-contract"}
                     if self.include_literal_shape_syntax
+                    else {}
+                ),
+                **(
+                    {"handler_input": "bounded-static-syntax-not-runtime-binding"}
+                    if self.include_input_contract_syntax
                     else {}
                 ),
                 "missing_selected_paths": sorted(unavailable),

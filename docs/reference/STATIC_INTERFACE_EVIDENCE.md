@@ -66,6 +66,49 @@ The core does not need to understand API routing or MCP tools; `concept` and
 an ambiently loaded plugin, a second parser/index generation, or an MCP
 execution surface.
 
+## Opt-in backend handler inputs (B15–B19)
+
+`StaticPythonInterfaceDeclarations(paths=(...), include_input_contract_syntax=True)`
+now attaches `static_input_syntax` to the same selected, directly observed
+top-level decorated functions. This opt-in is independent of
+`include_literal_shape_syntax`; the default packet is unchanged.
+The same **one** `handler_input_syntax` AST owner is used by
+`change_impact(changed_line_spans=...)` in its already revision-bound,
+uniquely indexed Python decorator associations as `handler_input_context`.
+
+- **B15:** record up to 16 parameters in signature order with explicit
+  positional-only, positional-or-keyword, variadic-positional, keyword-only
+  and variadic-keyword kinds, individual source coordinates and a qualified
+  signature source range. Additional parameters fail the selected provider
+  before publication; a changed-line request locally reports unresolved
+  rather than a fabricated empty signature.
+- **B16:** retain bounded `ast.unparse` annotation *syntax* (maximum 192
+  characters), an independently bounded return annotation, and explicit
+  `not-supplied`, `over-bound` or `dynamic-or-unsupported` states.
+  Neither a `Payload` annotation nor a `dict[str, int]` return annotation
+  proves Pydantic validation or the actual runtime response shape.
+- **B17:** distinguish absent defaults, literal **types without literal
+  values**, and direct call syntax such as `Depends(auth)`,
+  `Query(1, ge=0)`, `Header(default=None)`, or `Field(...)`.
+  The call's direct callee/first argument name, counts, up to eight keyword
+  *names* and expansion uncertainty remain syntax facts only. No default
+  expression is executed, and literal default values are not transmitted.
+- **B18:** `Annotated[Type, Depends(...)]` metadata captures at most four
+  direct source expressions and explicit omission counts. Calling a
+  function `Depends` is not proof that the framework bound it to a
+  dependency, nor that the dependency is registered, reachable or invoked.
+- **B19:** declaration provider and changed-line transport are parity-tested
+  against the same syntax owner. Cross-file producer/consumer schema matching,
+  runtime request validation, dependency resolution and **negative
+  evidence** remain respectively `unresolved`, `unknown`,
+  `not-established` and `false`.
+
+Source admission, source visibility and the existing second stable revision
+read remain mandatory. An outline/denied file never discloses argument,
+annotation, or default-call text. The selected provider is still only a
+request-local source observer: no framework plugin, source scanner, global
+type graph, dependency-injection engine, new MCP tool or durable state.
+
 ## Native SCIP symbol metadata
 
 SCIP `SymbolInformation.documentation` and occurrence `symbolRoles` are
