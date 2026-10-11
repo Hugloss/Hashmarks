@@ -202,7 +202,9 @@ def _env_site(node: ast.AST) -> dict[str, object] | None:
         if callee is None:
             return None
         key_kw = next((kw.value for kw in node.keywords if kw.arg == "key"), None)
-        default_kw = next((kw.value for kw in node.keywords if kw.arg == "default"), None)
+        default_kw = next(
+            (kw.value for kw in node.keywords if kw.arg == "default"), None
+        )
         key = node.args[0] if node.args else key_kw
         default = node.args[1] if len(node.args) > 1 else default_kw
         return {
@@ -231,7 +233,9 @@ def _direct_assignment_targets(tree: ast.Module) -> dict[int, list[str]]:
     targets: dict[int, list[str]] = {}
     for node in ast.walk(tree):
         if isinstance(node, ast.Assign):
-            names = [target.id for target in node.targets if isinstance(target, ast.Name)]
+            names = [
+                target.id for target in node.targets if isinstance(target, ast.Name)
+            ]
             if names:
                 targets[id(node.value)] = names[:8]
         elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
