@@ -39,7 +39,10 @@ def _callee(node: ast.expr) -> dict[str, object]:
             return {"state": "over-bound"}
         return {"state": "name-syntax", "name": node.id}
     if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
-        if len(node.value.id) > MAX_DIRECT_NAME_CHARS or len(node.attr) > MAX_DIRECT_NAME_CHARS:
+        if (
+            len(node.value.id) > MAX_DIRECT_NAME_CHARS
+            or len(node.attr) > MAX_DIRECT_NAME_CHARS
+        ):
             return {"state": "over-bound"}
         return {
             "state": "member-syntax",
@@ -90,9 +93,7 @@ def _default(node: ast.expr | None) -> dict[str, object]:
         ),
         "keyword_names": keywords[:MAX_DEFAULT_KEYWORDS],
         "keyword_names_omitted": max(0, len(keywords) - MAX_DEFAULT_KEYWORDS),
-        "has_argument_expansion": any(
-            isinstance(arg, ast.Starred) for arg in node.args
-        )
+        "has_argument_expansion": any(isinstance(arg, ast.Starred) for arg in node.args)
         or any(kw.arg is None for kw in node.keywords),
         "runtime_binding": "not-established",
     }
@@ -102,11 +103,9 @@ def _metadata(annotation: ast.expr | None) -> dict[str, object]:
     if not isinstance(annotation, ast.Subscript):
         return {"state": "not-observed"}
     root = _callee(annotation.value)
-    if (
-        root not in (
-            {"state": "name-syntax", "name": "Annotated"},
-            {"state": "member-syntax", "receiver": "typing", "name": "Annotated"},
-        )
+    if root not in (
+        {"state": "name-syntax", "name": "Annotated"},
+        {"state": "member-syntax", "receiver": "typing", "name": "Annotated"},
     ):
         return {"state": "not-observed"}
     parts: Sequence[ast.expr] = (
@@ -126,9 +125,7 @@ def _metadata(annotation: ast.expr | None) -> dict[str, object]:
     }
 
 
-def _parameter(
-    node: ast.arg, kind: str, default: ast.expr | None
-) -> dict[str, object]:
+def _parameter(node: ast.arg, kind: str, default: ast.expr | None) -> dict[str, object]:
     if len(node.arg) > MAX_DIRECT_NAME_CHARS:
         raise ValueError("handler parameter name exceeds identifier bound")
     return {
@@ -137,7 +134,9 @@ def _parameter(
         "start_line": node.lineno,
         "end_line": max(
             node.end_lineno or node.lineno,
-            default.end_lineno or default.lineno if default is not None else node.lineno,
+            default.end_lineno or default.lineno
+            if default is not None
+            else node.lineno,
         ),
         "annotation": _annotation(node.annotation),
         "annotated_metadata": _metadata(node.annotation),
@@ -163,7 +162,11 @@ def _all_parameters(
     defaults: list[ast.expr | None] = [None] * padding + list(args.defaults)
     records: list[dict[str, object]] = []
     for index, (arg, default) in enumerate(zip(positional, defaults, strict=True)):
-        kind = "positional-only" if index < len(args.posonlyargs) else "positional-or-keyword"
+        kind = (
+            "positional-only"
+            if index < len(args.posonlyargs)
+            else "positional-or-keyword"
+        )
         records.append(_parameter(arg, kind, default))
     if args.vararg is not None:
         records.append(_parameter(args.vararg, "variadic-positional", None))
@@ -182,10 +185,7 @@ def handler_input_syntax(
     """Observe explicit signature and direct DI-call syntax, not API contracts."""
     parameters = _all_parameters(declaration)
     source_end = max(
-        (
-            item["end_line"]
-            for item in parameters
-        ),
+        (item["end_line"] for item in parameters),
         default=declaration.lineno,
     )
     return {
