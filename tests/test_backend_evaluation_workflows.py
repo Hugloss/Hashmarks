@@ -160,3 +160,25 @@ def test_invalid_workflow_selection_is_not_an_empty_success(corpus, tmp_path: Pa
                 workflow_ids=selected,
                 transports=(),
             )
+
+
+def test_transport_source_mutation_invalidates_the_observation(
+    corpus, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from scripts.repository_evaluation import backend_workflows
+
+    suite_path, sources = corpus
+
+    def changing_transport(workspace: Path, *_args):
+        (workspace / "backend.py").write_text("def handler():\n    return 999\n")
+        return []
+
+    monkeypatch.setattr(backend_workflows, "capture_cli", changing_transport)
+    with pytest.raises(ValueError, match="snapshot identity"):
+        run_backend(
+            sources=sources,
+            suite_path=suite_path,
+            output_dir=tmp_path / "output",
+            transports=("cli",),
+        )
+    assert not (tmp_path / "output/summary.json").exists()

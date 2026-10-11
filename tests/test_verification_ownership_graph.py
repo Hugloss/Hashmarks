@@ -1,7 +1,52 @@
 from pathlib import Path
 from typing import Any, cast
 
+import pytest
+
 from hashmarks.codemap import CodeMap
+
+
+@pytest.mark.parametrize(
+    ("exports", "expected_direct", "expected_ambiguous"),
+    [
+        ("from .a import *\n", True, False),
+        ("from .b import *\n", False, False),
+        ("from .a import *\nfrom .b import *\n", False, True),
+        ("from .a import handle\nfrom .b import handle\n", False, True),
+    ],
+)
+@pytest.mark.parametrize("binding", ["import src.pkg as target", "import src.pkg"])
+def test_module_alias_verifier_preserves_export_owner_identity(
+    tmp_path: Path,
+    exports: str,
+    expected_direct: bool,
+    expected_ambiguous: bool,
+    binding: str,
+) -> None:
+    receiver = "target" if " as " in binding else "src.pkg"
+    files = {
+        "src/__init__.py": "",
+        "src/pkg/__init__.py": exports,
+        "src/pkg/a.py": "def handle(value):\n    return value\n",
+        "src/pkg/b.py": "def handle(value):\n    return value + 1\n",
+        "tests/test_facade.py": f"{binding}\ndef test_handle():\n    assert {receiver}.handle(1) == 1\n",
+    }
+    for name, source in files.items():
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(source)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = cast(
+            "dict[str, Any]", codemap.task_evidence("Change handle in src/pkg/a.py")
+        )
+    relevance = packet["verification"]["relevance"]
+    verifier = next(
+        row for row in relevance["candidates"] if row["path"] == "tests/test_facade.py"
+    )
+    assert verifier["direct_reference"] is expected_direct
+    assert relevance["qualified_identity_ambiguous"] is expected_ambiguous
+    assert packet["ownership"]["candidate"]["path"] == "src/pkg/a.py"
 
 
 def test_indirect_verification_reference_requires_the_correct_import_owner(
@@ -403,8 +448,9 @@ def test_direct_or_unique_indirect_evidence_can_still_improve_weak_canonical_ver
     assert reason == "unique-bounded-indirect-reference-plus-namespace-locality"
 
 
-def test_module_alias_call_through_exact_reexport_binds_original_owner(
-    tmp_path: Path,
+@pytest.mark.parametrize("conditional", [False, True])
+def test_module_alias_call_uses_the_existing_reexport_authority(
+    tmp_path: Path, conditional: bool
 ) -> None:
     (tmp_path / "pyproject.toml").write_text(
         "[tool.pytest.ini_options]\ntestpaths=['tests']\n", encoding="utf-8"
@@ -417,10 +463,14 @@ def test_module_alias_call_through_exact_reexport_binds_original_owner(
         encoding="utf-8",
     )
     (tmp_path / "src/facade.py").write_text(
-        "try:\n"
-        "    from src.owner import target\n"
-        "except ModuleNotFoundError:\n"
-        "    from owner import target\n",
+        (
+            "try:\n"
+            "    from src.owner import target\n"
+            "except ModuleNotFoundError:\n"
+            "    from owner import target\n"
+            if conditional
+            else "from src.owner import target\n"
+        ),
         encoding="utf-8",
     )
     (tmp_path / "tests/test_owner.py").write_text(
@@ -439,13 +489,17 @@ def test_module_alias_call_through_exact_reexport_binds_original_owner(
 
     selected = relevance["selected"]
     assert selected["path"] == "tests/test_owner.py"
-    assert selected["direct_reference"] is True
-    assert selected["reference_symbols"] == ["target"]
-    assert relevance["qualified_identity_ambiguous"] is False
-    assert relevance["unresolved_import_identity_paths"] == []
+    # The import resolver admits the unconditional export. Its unsupported
+    # conditional binding remains unknown; verification must not reinterpret it.
+    assert selected["direct_reference"] is not conditional
+    assert selected["reference_symbols"] == ([] if conditional else ["target"])
+    assert relevance["qualified_identity_ambiguous"] is conditional
+    assert relevance["unresolved_import_identity_paths"] == (
+        ["tests/test_owner.py"] if conditional else []
+    )
     assert action["edit"]["path"] == "src/owner.py"
     assert action["edit"]["name"] == "target"
-    assert action["ambiguity"]["ambiguous"] is False
+    assert action["ambiguity"]["ambiguous"] is conditional
 
 
 def test_module_alias_local_override_cannot_claim_reexported_owner(

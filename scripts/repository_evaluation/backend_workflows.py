@@ -89,6 +89,7 @@ def _observe_stage(
     output: Path,
     transports: tuple[str, ...],
 ) -> dict[str, Any]:
+    snapshot = repository_content_identity(workspace)
     with CodeMap(workspace, state_dir=state) as codemap:
         codemap.sync()
         packet = codemap.task_evidence(workflow["task"])
@@ -99,6 +100,9 @@ def _observe_stage(
     write_json(output / "api.json", packet)
     cli = capture_cli(workspace, state, case) if "cli" in transports else []
     mcp = capture_mcp(workspace, state, case) if "mcp" in transports else []
+    # A sequence of public observations must belong to one stable repository
+    # snapshot, including producer and transport reads after the writer closes.
+    _check_snapshot(workspace, snapshot)
     write_json(output / "cli.json", cli)
     write_json(output / "mcp.json", mcp)
     return {

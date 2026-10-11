@@ -382,6 +382,10 @@ class VerificationMixin:
             classify_repository_path(ref_path)
         ):
             state.unresolved_import_identity_paths.add(ref_path)
+        if unresolved_identity:
+            # The resolver's facade path is an observed import location, not
+            # proof of the underlying exported symbol's owner.
+            return set()
         if not resolved_paths:
             resolved_paths = self._verification_relative_import_paths(ref_path, target)
         return set(resolved_paths)
@@ -405,7 +409,7 @@ class VerificationMixin:
             resolved_paths = self._verification_resolved_import_paths(
                 state, ref_path, target
             )
-            if resolved_paths:
+            if resolved_paths or ref_path in state.unresolved_import_identity_paths:
                 import_resolution_available = True
             if state.edit_path in resolved_paths:
                 exact_import_paths.add(ref_path)
@@ -432,52 +436,6 @@ class VerificationMixin:
         if state is not None:
             state.reference_indexes[path] = index
         return index
-
-    def _verification_facade_reexport_owner_match(
-        self,
-        state: _VerificationRelevanceState,
-        facade_path: str,
-        exported_name: str,
-    ) -> bool | None:
-        self = cast("CodeMap", self)
-        if not facade_path.endswith(".py") or not exported_name:
-            return None
-        binding_kind, _binding_targets = self._python_export_binding(
-            facade_path, exported_name
-        )
-        if binding_kind == "local":
-            return False
-
-        matching_edges = [
-            edge
-            for edge in self.store.edges_from(facade_path)
-            if str(edge.get("kind") or "") == "import"
-            and edge.get("source") is None
-            and str(edge.get("target_short") or "") == exported_name
-            and str(edge.get("target") or "")
-        ][:16]
-        if not matching_edges:
-            return None
-
-        owners: set[str] = set()
-        unresolved = False
-        for edge in matching_edges:
-            import_target = str(edge.get("target") or "")
-            resolved, ambiguous = self._resolve_import_owner_evidence(
-                facade_path, import_target
-            )
-            if not resolved and not import_target.startswith("."):
-                resolved, fallback_ambiguous = self._resolve_import_owner_evidence(
-                    facade_path, f".{import_target}"
-                )
-                ambiguous = ambiguous or fallback_ambiguous
-            if ambiguous or not resolved:
-                unresolved = True
-                continue
-            owners.update(map(str, resolved))
-        if unresolved or not owners:
-            return None
-        return owners == {state.edit_path}
 
     def _verification_module_alias_reference_owner_match(
         self,
@@ -507,16 +465,20 @@ class VerificationMixin:
             resolved_alias = True
             if state.edit_path in resolved_paths:
                 return True
-            if "." in attribute_chain:
-                continue
-            reexport_matches = [
-                self._verification_facade_reexport_owner_match(
-                    state, facade_path, attribute_chain
-                )
-                for facade_path in sorted(resolved_paths)[:8]
-            ]
-            if True in reexport_matches or None in reexport_matches:
-                return True if True in reexport_matches else None
+            # Resolve the exported name with the same bounded import identity
+            # owner used for direct imports, including star exports and cycles.
+            # An unaliased dotted import binds its first package segment.
+            suffix = attribute_chain
+            package_tail = module_target.removeprefix(f"{bound_name}.")
+            if module_target.startswith(f"{bound_name}.") and suffix.startswith(
+                f"{package_tail}."
+            ):
+                suffix = suffix.removeprefix(f"{package_tail}.")
+            exported_paths = self._verification_resolved_import_paths(
+                state, ref_path, f"{module_target}.{suffix}"
+            )
+            if state.edit_path in exported_paths:
+                return True
         return False if resolved_alias else None
 
     def _verification_collect_direct_symbol_refs(
@@ -541,7 +503,9 @@ class VerificationMixin:
                 if short_match
                 else None
             )
-            if alias_owner_match is not None:
+            if path in state.unresolved_import_identity_paths:
+                exact_reference = False
+            elif alias_owner_match is not None:
                 exact_reference = alias_owner_match
             else:
                 exact_reference = (
