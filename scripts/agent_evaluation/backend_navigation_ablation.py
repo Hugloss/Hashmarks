@@ -91,7 +91,12 @@ def _cases(manifest: object) -> list[dict[str, Any]]:
 
 def _source_facts(packet: dict[str, Any]) -> list[dict[str, object]]:
     """Compare source syntax independently of navigation and generated digests."""
-    groups = packet["declarations"]["groups"]
+    declared = packet["declarations"]
+    groups = declared["groups"]
+    bindings = {
+        row["binding_id"]: row["evidence"]
+        for row in declared["repository_evidence"]["bindings"]
+    }
     facts: list[dict[str, object]] = []
     for group in groups:
         if len(group["declarations"]) != 1:
@@ -112,7 +117,8 @@ def _source_facts(packet: dict[str, Any]) -> list[dict[str, object]]:
                 "value_state": declaration["value_state"],
                 "value": value,
                 "producer": declaration["producer"],
-                "evidence": declaration["evidence"],
+                "evidence_state": declaration["evidence_state"],
+                "evidence": bindings[declaration["binding_id"]],
             }
         )
     return sorted(facts, key=lambda fact: str(fact["group_id"]))
