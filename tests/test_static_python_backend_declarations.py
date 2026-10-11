@@ -54,9 +54,7 @@ def test_bounded_model_field_syntax_reuses_canonical_declaration_authority(
         "class Service:\n"
         "    accidental: str = 'not-a-model'\n",
     )
-    packet = _observe(
-        tmp_path, StaticPythonBackendDeclarations(paths=(PATH,))
-    )
+    packet = _observe(tmp_path, StaticPythonBackendDeclarations(paths=(PATH,)))
     groups = _groups(packet)
     assert set(groups) == {"python-model-class-syntax"}
     group = groups["python-model-class-syntax"][0]
@@ -68,26 +66,22 @@ def test_bounded_model_field_syntax_reuses_canonical_declaration_authority(
     assert value["field_requiredness"] == "unknown"
     assert value["schema_compatibility"] == "not-established"
     assert value["negative_evidence_admissible"] is False
-    assert [row["name"] for row in value["fields"]] == [
-        "id", "display_name", "enabled"
-    ]
+    assert [row["name"] for row in value["fields"]] == ["id", "display_name", "enabled"]
     assert value["fields"][0]["annotation"]["text"] == "int"
     assert value["fields"][0]["default"]["state"] == "not-supplied"
     assert value["fields"][1]["default"]["state"] == "direct-call-syntax"
     assert value["fields"][1]["default"]["callee"] == {
-        "state": "name-syntax", "name": "Field"
+        "state": "name-syntax",
+        "name": "Field",
     }
-    assert value["fields"][1]["default"]["keyword_names"] == [
-        "default", "min_length"
-    ]
+    assert value["fields"][1]["default"]["keyword_names"] == ["default", "min_length"]
     assert value["fields"][2]["default"] == {
-        "state": "literal-kind-only", "kind": "bool"
+        "state": "literal-kind-only",
+        "kind": "bool",
     }
     assert "private" not in str(value)
     assert group["declarations"][0]["evidence_state"] == "known-present"
-    assert group["declarations"][0]["semantic_value_authority"] == (
-        "provider-claimed"
-    )
+    assert group["declarations"][0]["semantic_value_authority"] == ("provider-claimed")
 
 
 def test_environment_key_reads_not_runtime_resolution_and_no_secret_defaults(
@@ -105,28 +99,23 @@ def test_environment_key_reads_not_runtime_resolution_and_no_secret_defaults(
     )
     packet = _observe(
         tmp_path,
-        StaticPythonBackendDeclarations(
-            paths=(PATH,), include_model_fields=False
-        ),
+        StaticPythonBackendDeclarations(paths=(PATH,), include_model_fields=False),
     )
     values = [_value(group) for group in _groups(packet)["python-env-access-syntax"]]
     assert len(values) == 5
     assert [row["callee_syntax"] for row in values] == [
-        "os.getenv", "os.environ.get", "os.environ[...]",
-        "os.getenv", "os.getenv"
+        "os.getenv",
+        "os.environ.get",
+        "os.environ[...]",
+        "os.getenv",
+        "os.getenv",
     ]
     assert values[0]["direct_assignment_names"] == ["ENV"]
     assert values[1]["direct_assignment_names"] == ["timeout"]
     assert values[4]["runtime_assignment_binding"] == "not-established"
-    assert values[0]["key"] == {
-        "state": "literal-key-syntax", "value": "API_TOKEN"
-    }
-    assert values[0]["default"] == {
-        "state": "literal-kind-only", "kind": "string"
-    }
-    assert values[1]["default"] == {
-        "state": "literal-kind-only", "kind": "integer"
-    }
+    assert values[0]["key"] == {"state": "literal-key-syntax", "value": "API_TOKEN"}
+    assert values[0]["default"] == {"state": "literal-kind-only", "kind": "string"}
+    assert values[1]["default"] == {"state": "literal-kind-only", "kind": "integer"}
     assert values[2]["default"]["state"] == "not-supplied"
     assert values[3]["key"]["state"] == "dynamic-or-unsupported"
     assert values[3]["has_argument_expansion"] is True
@@ -186,11 +175,14 @@ def test_path_admission_fails_before_provider_work(paths: tuple[str, ...]) -> No
         StaticPythonBackendDeclarations(paths=paths)
 
 
-@pytest.mark.parametrize("settings", [
-    {"include_model_fields": 1},
-    {"include_environment_reads": "yes"},
-    {"include_model_fields": False, "include_environment_reads": False},
-])
+@pytest.mark.parametrize(
+    "settings",
+    [
+        {"include_model_fields": 1},
+        {"include_environment_reads": "yes"},
+        {"include_model_fields": False, "include_environment_reads": False},
+    ],
+)
 def test_strict_provider_modes_fail_on_construction(settings: dict) -> None:
     with pytest.raises(ValueError):
         StaticPythonBackendDeclarations(paths=(PATH,), **settings)
@@ -201,7 +193,9 @@ def test_invalid_ast_and_bound_excess_fail_closed(tmp_path: Path) -> None:
     _write(tmp_path, "class Payload(BaseModel):\n    unfinished =\n")
     with CodeMap(tmp_path) as cm:
         cm.sync()
-        with pytest.raises((ValueError, SyntaxError, RepositoryDeclarationProviderError)):
+        with pytest.raises(
+            (ValueError, SyntaxError, RepositoryDeclarationProviderError)
+        ):
             cm.discover_repository_declarations([provider])
     fields = "\n".join(f"    field_{n}: int" for n in range(MAX_MODEL_FIELDS + 1))
     _write(tmp_path, f"class Payload(BaseModel):\n{fields}\n")
@@ -244,24 +238,23 @@ def test_model_and_environment_modes_remain_independently_selectable(
     )
     model = _observe(
         tmp_path,
-        StaticPythonBackendDeclarations(
-            paths=(PATH,), include_environment_reads=False
-        ),
+        StaticPythonBackendDeclarations(paths=(PATH,), include_environment_reads=False),
     )
     env = _observe(
         tmp_path,
-        StaticPythonBackendDeclarations(
-            paths=(PATH,), include_model_fields=False
-        ),
+        StaticPythonBackendDeclarations(paths=(PATH,), include_model_fields=False),
     )
     assert set(_groups(model)) == {"python-model-class-syntax"}
     assert set(_groups(env)) == {"python-env-access-syntax"}
-    assert _value(_groups(model)["python-model-class-syntax"][0])[
-        "model_identity"
-    ] == "not-established"
-    assert _value(_groups(env)["python-env-access-syntax"][0])[
-        "runtime_binding"
-    ] == "not-established"
+    assert (
+        _value(_groups(model)["python-model-class-syntax"][0])["model_identity"]
+        == "not-established"
+    )
+    assert (
+        _value(_groups(env)["python-env-access-syntax"][0])["runtime_binding"]
+        == "not-established"
+    )
+
 
 def test_environment_keyword_default_is_syntax_not_missing_or_resolved(
     tmp_path: Path,
@@ -270,9 +263,7 @@ def test_environment_keyword_default_is_syntax_not_missing_or_resolved(
     rows = _groups(
         _observe(
             tmp_path,
-            StaticPythonBackendDeclarations(
-                paths=(PATH,), include_model_fields=False
-            ),
+            StaticPythonBackendDeclarations(paths=(PATH,), include_model_fields=False),
         )
     )["python-env-access-syntax"]
     value = _value(rows[0])
