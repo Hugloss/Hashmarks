@@ -366,3 +366,27 @@ As with prepared call hierarchy, the hover observation is carried on an
 existing read-only evidence surface rather than emitted as an edge. Consumer
 routing, tool selection, model visibility, LSP lifecycle and verification
 remain external responsibilities.
+
+## Call-site source correspondence
+
+A caller-supplied LSP `incomingCalls` or `outgoingCalls` result carries
+`fromRanges` in the **caller document**, which is distinct from the
+declaration/selection range of either endpoint. The direct claim's existing
+`basis.fromRanges` remains verbatim producer data. New packets add
+`basis.call_site_source`: explicit caller path, UTF-8/16/32 position encoding,
+source snapshot binding, and a qualified range state.
+
+`source-range-matching` requires the caller's admitted repository member,
+an exact captured source revision, positions at valid encoded character
+boundaries, and ranges inside the caller's declared `CallHierarchyItem.range`.
+`revision-different`, `snapshot-unavailable`, `outside-repository`,
+`unadmitted`, `outside-caller-item`, `invalid-position` and `unknown`
+remain descriptive, non-authoritative evidence. A matching call-site *range*
+does not prove that a semantic call exists or that the LSP server was correct.
+
+The source observation is request-local, uses the existing bounded/stable
+source-read owner, and does not start an LSP server, execute code, interpret
+a call expression or infer any missing calls. Legacy relationship packets
+without the optional `call_site_source` remain valid, while claims that
+present it must pass the native non-strengthening validator, even if packet
+hashes have been recomputed.
