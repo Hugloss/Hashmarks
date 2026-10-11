@@ -11,6 +11,7 @@ from hashmarks.paths import normalize_relative_path
 
 from .diagnostic_provenance import COLLECTION_STATES, diagnostic_member_claims
 from .lsp_hover_capture import normalize_hover_observation
+from .lsp_call_site_source import qualify_call_site_source
 from .semantic_relationship_model import (
     CLAIM_LIMIT,
     OBSERVATION_LIMIT,
@@ -579,27 +580,28 @@ def lsp_relationship_observation(
         source, destination = (
             (endpoint, query) if result_to_query else (query, endpoint)
         )
+        basis = {
+            "format": "lsp",
+            "method": method,
+            "request_id": capture["request"]["id"],
+            "direction": "result-to-query"
+            if result_to_query
+            else "query-to-result",
+            "captured_location": location,
+            "fromRanges": location.get("fromRanges", [])
+            if kind == "call"
+            else [],
+            "fromRanges_authority": "caller-supplied-call-site-ranges"
+            if kind == "call"
+            else None,
+        }
+        if kind == "call":
+            basis["call_site_source"] = qualify_call_site_source(
+                capture, location, resolver
+            )
         observation.claims.append(
             direct_claim(
-                capture["producer"],
-                kind,
-                source,
-                destination,
-                {
-                    "format": "lsp",
-                    "method": method,
-                    "request_id": capture["request"]["id"],
-                    "direction": "result-to-query"
-                    if result_to_query
-                    else "query-to-result",
-                    "captured_location": location,
-                    "fromRanges": location.get("fromRanges", [])
-                    if kind == "call"
-                    else [],
-                    "fromRanges_authority": "caller-supplied-call-site-ranges"
-                    if kind == "call"
-                    else None,
-                },
+                capture["producer"], kind, source, destination, basis,
             )
         )
     # Preserve every supplied snapshot.  An unadmitted path remains an
