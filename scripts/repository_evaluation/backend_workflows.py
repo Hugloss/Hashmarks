@@ -5,12 +5,13 @@ from __future__ import annotations
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
-from hashmarks import CodeMap
+from hashmarks.codemap import CodeMap
 from hashmarks.digest import FILE_DOMAIN, hash_file
 from hashmarks.evidence_presentation import FORMATS
 from hashmarks.evidence_presentation_conformance import validate_evidence_presentation
+from hashmarks.test_shards import repository_content_identity
 
 from .backend_matrix import INITIAL_TOKEN_CEILING
 from .backend_transport import capture_cli, capture_mcp
@@ -23,9 +24,9 @@ def _packet(response: dict[str, Any]) -> dict[str, Any]:
 
 
 def _transport_grade(
-    captures: list[dict[str, Any]], rule: dict[str, Any]
+    captures: list[dict[str, Any]], rule: dict[str, Any], workspace: Path
 ) -> dict[str, Any]:
-    grades = []
+    grades: list[dict[str, Any]] = []
     for capture in captures:
         response = capture["response"]
         packet = _packet(response)
@@ -44,6 +45,9 @@ def _transport_grade(
                 "parity": parity,
                 "estimated_tokens": capture["estimated_tokens"],
                 "checks": graded["checks"],
+                "authority": _authority_safe(packet, rule)
+                and graded["authority_violations"] == 0,
+                "revision": _revision_bound(workspace, packet),
             }
         )
     complete = sorted(row["format"] for row in grades) == sorted(FORMATS)
@@ -57,6 +61,23 @@ def _transport_grade(
             for row in initial
         ),
         "grades": grades,
+        "authority": complete and all(row["authority"] for row in grades),
+        "revision": complete and all(row["revision"] for row in grades),
+    }
+
+
+def _authority_safe(packet: dict[str, Any], rule: dict[str, Any]) -> bool:
+    owner = packet["ownership"]["owner"]
+    return owner is None or owner["path"] == rule["expected_owner_path"]
+
+
+def _missing_transport() -> dict[str, Any]:
+    return {
+        "parity": None,
+        "initial_budget": None,
+        "grades": [],
+        "authority": None,
+        "revision": None,
     }
 
 
@@ -84,12 +105,8 @@ def _observe_stage(
         "packet": packet,
         "grade": grade,
         "revision_bound": _revision_bound(workspace, packet),
-        "cli": _transport_grade(cli, rule)
-        if cli
-        else {"parity": None, "initial_budget": None, "grades": []},
-        "mcp": _transport_grade(mcp, rule)
-        if mcp
-        else {"parity": None, "initial_budget": None, "grades": []},
+        "cli": _transport_grade(cli, rule, workspace) if cli else _missing_transport(),
+        "mcp": _transport_grade(mcp, rule, workspace) if mcp else _missing_transport(),
     }
 
 
@@ -105,11 +122,19 @@ def _revision_bound(workspace: Path, packet: dict[str, Any]) -> bool:
     )
 
 
-def _freshness(codemap: CodeMap, paths: list[str]) -> dict[str, Any]:
-    observations = [codemap.source_observation(path) for path in paths]
+def _freshness(
+    codemap: CodeMap, paths: list[str], before_revisions: dict[str, str]
+) -> dict[str, Any]:
+    observations = [
+        cast("dict[str, Any]", codemap.source_observation(path)) for path in paths
+    ]
     passed = bool(observations) and all(
-        row["freshness"] != "current" and row["negative_evidence"] == "not-admissible"
-        for row in observations
+        row["freshness"] != "current"
+        and row["negative_evidence"] == "not-admissible"
+        and row["member"]["state"] == "unknown"
+        and row["member"]["reason"] == "member-revision-mismatch"
+        and row["member"]["member_revision"] == before_revisions[path]
+        for path, row in zip(paths, observations, strict=True)
     )
     return {"passed": passed, "observations": observations}
 
@@ -119,20 +144,28 @@ def _gates(
     after: dict[str, Any],
     stale: dict[str, Any],
     rule: dict[str, Any],
+    delta_grade: dict[str, Any],
 ) -> dict[str, bool | None]:
     packets = [before["packet"], after["packet"]]
     owner_path = rule["expected_owner_path"]
-    authority = all(
-        packet["ownership"]["owner"] is None
-        or packet["ownership"]["owner"]["path"] == owner_path
-        for packet in packets
+    authority = all(_authority_safe(packet, rule) for packet in packets)
+    authority &= (
+        all(stage["grade"]["authority_violations"] == 0 for stage in (before, after))
+        and delta_grade["authority_violations"] == 0
     )
+    transport_rows = [
+        stage[name] for stage in (before, after) for name in ("cli", "mcp")
+    ]
+    authority &= all(row["authority"] is not False for row in transport_rows)
     return {
         "facts": all(
             stage["grade"]["classification"] == "PASS" for stage in (before, after)
-        ),
+        )
+        and delta_grade["classification"] == "PASS",
         "authority": authority,
-        "revision": before["revision_bound"] and after["revision_bound"],
+        "revision": before["revision_bound"]
+        and after["revision_bound"]
+        and all(row["revision"] is not False for row in transport_rows),
         "freshness": stale["passed"],
         "cli": before["cli"]["parity"] and after["cli"]["parity"],
         "mcp": before["mcp"]["parity"] and after["mcp"]["parity"],
@@ -154,11 +187,25 @@ def execute_workflow(
     output: Path,
     *,
     transports: tuple[str, ...] = ("cli", "mcp"),
+    source_identities: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Run one known source transition; no edits to the supplied source trees."""
+    identities = (
+        source_identities
+        if source_identities is not None
+        else {
+            workflow[stage]: repository_content_identity(sources[workflow[stage]])
+            for stage in ("before", "after")
+        }
+    )
     with tempfile.TemporaryDirectory(prefix="hashmarks-backend-") as scratch:
         workspace, state = Path(scratch) / "repo", Path(scratch) / "state"
         shutil.copytree(sources[workflow["before"]], workspace, symlinks=True)
+        _check_snapshot(workspace, identities[workflow["before"]])
+        before_revisions = {
+            path: hash_file(workspace / path, domain=FILE_DOMAIN).hash
+            for path in workflow["changed_paths"]
+        }
         before = _observe_stage(
             workspace,
             state,
@@ -169,8 +216,9 @@ def execute_workflow(
         )
         shutil.rmtree(workspace)
         shutil.copytree(sources[workflow["after"]], workspace, symlinks=True)
+        _check_snapshot(workspace, identities[workflow["after"]])
         with CodeMap(workspace, state_dir=state) as codemap:
-            stale = _freshness(codemap, workflow["changed_paths"])
+            stale = _freshness(codemap, workflow["changed_paths"], before_revisions)
             write_json(output / "stale.json", stale)
             delta = codemap.task_post_change_delta(
                 workflow["task"],
@@ -178,6 +226,9 @@ def execute_workflow(
                 previous_evidence=before["packet"],
             )
             write_json(output / "delta.json", delta)
+            delta_grade = grade_facts(
+                workflow["id"], {"packet": delta}, {"checks": rule["delta_checks"]}
+            )
         after = _observe_stage(
             workspace,
             state,
@@ -186,12 +237,13 @@ def execute_workflow(
             output / "after",
             transports,
         )
-    gates = _gates(before, after, stale, rule)
+    gates = _gates(before, after, stale, rule, delta_grade)
     return {
         "id": workflow["id"],
         "gates": gates,
         "before": before["grade"],
         "after": after["grade"],
+        "delta": delta_grade,
         "transport_grades": {
             "before": {key: before[key] for key in ("cli", "mcp")},
             "after": {key: after[key] for key in ("cli", "mcp")},
@@ -206,3 +258,10 @@ def execute_workflow(
             }
         ),
     }
+
+
+def _check_snapshot(workspace: Path, expected_identity: str) -> None:
+    if repository_content_identity(workspace) != expected_identity:
+        raise ValueError(
+            "backend source changed while materializing the observation snapshot"
+        )

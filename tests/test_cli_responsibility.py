@@ -75,7 +75,9 @@ def test_repository_cli_operation_projection_validates_before_print(
     import hashmarks.repository_cli as repository_cli
 
     printed: list[object] = []
-    monkeypatch.setattr(repository_cli, "_print", printed.append)
+    monkeypatch.setattr(
+        repository_cli, "_print", lambda value, **_encoding: printed.append(value)
+    )
 
     packet = {"schema": "hashmarks.find.v2", "results": []}
     repository_cli._print_operation("find", packet)
@@ -131,7 +133,9 @@ def test_repository_cli_projects_all_canonical_cli_operations_through_one_guard(
     packet = {"schema": operation_schema(operation)}
     printed: list[object] = []
     monkeypatch.setattr(repository_cli, "_call_codemap", lambda *_args: packet)
-    monkeypatch.setattr(repository_cli, "_print", printed.append)
+    monkeypatch.setattr(
+        repository_cli, "_print", lambda value, **_encoding: printed.append(value)
+    )
     assert parsed.func(parsed) == 0
     assert printed == [packet]
 

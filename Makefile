@@ -38,6 +38,7 @@ help:
 	  '  make dependency-dogfood  Check genuine uv/Maven dependency add, change, and removal evidence' \
 	  '  make semantic-evidence-dogfood  Check offline native dependency/SCIP/LSP changes and CLI/MCP evidence' \
 	  '  make semantic-evidence-live  Regenerate the bounded corpus with installed Maven, uv and SCIP producers' \
+	  '  make backend-evidence-dogfood  Measure pinned genuine backend revision workflows through CLI/MCP' \
 	  '  make check          Junior-friendly local check: setup + compile + CodeMap + tests' \
 	  '  make bootstrap      Offline runtime-only bootstrap (CI/prepared environments)' \
 	  '  make start          Bootstrap and start the identity daemon' \
@@ -211,6 +212,12 @@ ruff: ruff-check ruff-format-check
 lint: ruff lint-debt
 
 .PHONY: dependency-dogfood semantic-evidence-dogfood semantic-evidence-live
+.PHONY: backend-evidence-dogfood
+BACKEND_SOURCES ?= .hashmarks/backend-e2e/sources/sources.json
+BACKEND_OUTPUT ?= .hashmarks/backend-e2e/qualification
+backend-evidence-dogfood:
+	@$(UV_RUN) --offline --no-sync --group test python -m scripts.repository_evaluation.run_backend --sources-file "$(BACKEND_SOURCES)" --output-dir "$(BACKEND_OUTPUT)"
+
 dependency-dogfood:
 	@$(UV_RUN) --offline --no-sync --group test python -m pytest -v tests/test_dependency_dogfood.py
 

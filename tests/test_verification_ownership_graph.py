@@ -1,6 +1,41 @@
 from pathlib import Path
+from typing import Any, cast
 
 from hashmarks.codemap import CodeMap
+
+
+def test_indirect_verification_reference_requires_the_correct_import_owner(
+    tmp_path: Path,
+) -> None:
+    files = {
+        "src/__init__.py": "",
+        "src/owner.py": "def normalize_widget(value):\n    return value.strip()\n",
+        "src/route.py": "from .owner import normalize_widget\ndef handle_widget(value):\n    return normalize_widget(value)\n",
+        "src/unrelated.py": "def handle_widget(value):\n    return value.upper()\n",
+        "tests/test_route.py": "from src.route import handle_widget\ndef test_widget():\n    assert handle_widget(' x ') == 'x'\n",
+        "tests/test_unrelated.py": "from src.unrelated import handle_widget\ndef test_widget():\n    assert handle_widget('x') == 'X'\n",
+        "pyproject.toml": "[tool.pytest.ini_options]\ntestpaths=['tests']\n",
+    }
+    for name, content in files.items():
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = cast(
+            "dict[str, Any]",
+            codemap.task_evidence("Change normalize_widget in src/owner.py"),
+        )
+    assert packet["ownership"]["owner"]["path"] == "src/owner.py"
+    rows = {
+        row["path"]: row for row in packet["verification"]["relevance"]["candidates"]
+    }
+    assert rows["tests/test_route.py"]["indirect_reference"] is True
+    assert rows["tests/test_route.py"]["indirect_reference_symbols"] == [
+        "handle_widget"
+    ]
+    assert rows["tests/test_unrelated.py"]["indirect_reference"] is False
+    assert rows["tests/test_unrelated.py"]["indirect_via_paths"] == []
 
 
 def test_verification_ownership_is_evidence_only_and_bounded(tmp_path):

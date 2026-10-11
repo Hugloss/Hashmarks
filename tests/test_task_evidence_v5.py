@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
@@ -718,6 +718,48 @@ def _dense_prefix_repository(root: Path) -> tuple[Path, str]:
         "indexed repository paths underneath a requested prefix."
     )
     return owner, task
+
+
+def test_named_method_remains_visible_when_retrieval_prefers_its_class(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "backend.py",
+        "class Subscriber:\n    def process_message(self):\n        return 1\n    def start(self):\n        return 0\n",
+    )
+    _write(
+        tmp_path,
+        "route.py",
+        "from backend import Subscriber\ndef handle():\n    return Subscriber().process_message()\n",
+    )
+    _write(
+        tmp_path,
+        "tests/test_route.py",
+        "from route import handle\ndef test_message():\n    assert handle() == 1\n",
+    )
+    task = "Fix Subscriber.start blocking other subscribers from shutting down when one stops slowly."
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = cast("dict[str, Any]", codemap.task_evidence(task))
+        candidate = packet["ownership"]["candidate"]
+        rows = packet["retrieval"]["results"]
+        assert any(row.get("symbol") == "Subscriber" for row in rows)
+        assert any(
+            row.get("symbol") == "Subscriber.start"
+            and row.get("path") == "backend.py"
+            and row.get("start_line") == 4
+            and row.get("end_line") == 5
+            for row in rows
+        )
+        assert packet["retrieval"]["ownership_authority"] is False
+        assert candidate["path"] == "backend.py"
+        (tmp_path / "backend.py").write_text("class Subscriber:\n    pass\n")
+        stale = cast("dict[str, Any]", codemap.task_evidence(task))
+        assert not any(
+            row.get("symbol") == "Subscriber.start"
+            for row in stale["retrieval"]["results"]
+        )
 
 
 def test_task_evidence_v5_compact_retrieval_is_materially_smaller_than_internal_rows(

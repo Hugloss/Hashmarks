@@ -162,3 +162,68 @@ def test_matrix_rejects_duplicate_or_unexpected_outcomes() -> None:
         capability_matrix(workflows, [*outcomes, outcomes[0]])
     with pytest.raises(ValueError, match="unexpected"):
         capability_matrix(workflows, [{"id": "not-selected", "gates": {}}])
+
+
+def test_known_authority_failure_is_not_hidden_by_missing_outcomes() -> None:
+    workflows = _workflows()
+    outcome = _outcomes(workflows)[0]
+    outcome["gates"]["authority"] = False
+    report = capability_matrix(workflows, [outcome])
+    assert report["status"] == "FAIL"
+    assert report["capabilities"][0]["gates"]["authority"]["state"] == "FAIL"
+    assert report["missing_outcomes"]
+
+
+def test_exact_record_checks_bind_symbol_to_its_own_source_range() -> None:
+    from scripts.repository_evaluation.fact_grading import grade_facts
+
+    check = {
+        "id": "changed-declaration",
+        "pointer": "/symbols/*",
+        "predicate": "includes_record",
+        "value": {"path": "backend.py", "symbol": "handler", "start_line": 10},
+    }
+    packet = {
+        "symbols": [
+            {"path": "backend.py", "symbol": "handler", "start_line": 5},
+            {"path": "other.py", "symbol": "handler", "start_line": 10},
+        ]
+    }
+    report = grade_facts("range", {"packet": packet}, {"checks": [check]})
+    assert report["classification"] == "OTHER_FAILURE"
+    packet["symbols"][0]["start_line"] = 10
+    assert (
+        grade_facts("range", {"packet": packet}, {"checks": [check]})["classification"]
+        == "PASS"
+    )
+
+
+def test_exact_source_facts_can_appear_in_different_public_records() -> None:
+    from scripts.repository_evaluation.fact_grading import grade_facts
+
+    expected = {"path": "backend.py", "start_line": 5, "end_line": 8}
+    check = {
+        "id": "changed-declaration",
+        "pointer": "/retrieval/results/*",
+        "predicate": "includes_record",
+        "value": {**expected, "symbol": "Backend.handler"},
+        "alternative_records": [
+            {
+                "pointer": "/ownership/candidate",
+                "value": {**expected, "qualname": "Backend.handler"},
+            },
+        ],
+    }
+    packet = {"ownership": {"candidate": {**expected, "qualname": "Backend.handler"}}}
+    assert (
+        grade_facts("range", {"packet": packet}, {"checks": [check]})["classification"]
+        == "PASS"
+    )
+    packet["ownership"]["candidate"]["start_line"] = 4
+    assert (
+        grade_facts("range", {"packet": packet}, {"checks": [check]})["classification"]
+        == "OTHER_FAILURE"
+    )
+    check["authority_check"] = True
+    with pytest.raises(ValueError, match="positive source-fact"):
+        grade_facts("range", {"packet": packet}, {"checks": [check]})

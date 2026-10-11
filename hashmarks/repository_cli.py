@@ -30,8 +30,16 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 
-def _print(value) -> None:
-    log_command_output(logger, json.dumps(value, indent=2, sort_keys=True))
+def _print(value, *, compact: bool = False) -> None:
+    log_command_output(
+        logger,
+        json.dumps(
+            value,
+            indent=None if compact else 2,
+            separators=(",", ":") if compact else None,
+            sort_keys=True,
+        ),
+    )
 
 
 def _print_operation(
@@ -43,7 +51,8 @@ def _print_operation(
 ) -> None:
     native = validate_operation_response(operation, value, mode=mode)
     _print(
-        presentation_response(operation, native, format=presentation, result_mode=mode)
+        presentation_response(operation, native, format=presentation, result_mode=mode),
+        compact=presentation in {"compact", "text"},
     )
 
 

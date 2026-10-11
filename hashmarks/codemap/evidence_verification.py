@@ -5,7 +5,7 @@ import hashlib
 import json
 import os
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
@@ -675,6 +675,7 @@ class VerificationMixin:
             [symbol for _via_path, symbol, _short in via_symbol_sources],
             limit_per_target=257,
         )
+        self._verification_preload_import_resolution(indirect_ref_sets)
         for via_path, symbol, short in via_symbol_sources:
             refs = list(indirect_ref_sets.get(symbol, ()))
             if len(refs) > 256:
@@ -690,18 +691,23 @@ class VerificationMixin:
         short: str,
         refs: Sequence[Mapping[str, object]],
     ) -> None:
-        for ref in refs:
-            path = str(ref.get("path") or "")
-            if not path or RepositoryDomain.TEST not in set(
-                classify_repository_path(path)
-            ):
-                continue
-            if not self._verification_ref_visible(ref):
-                continue
-            state.candidate_paths.add(path)
-            if str(ref.get("target_short") or "") == short:
-                state.indirect_refs_by_path.setdefault(path, set()).add(short)
-                state.indirect_via_paths.setdefault(path, set()).add(via_path)
+        # The second reference has the same import/alias identity obligations
+        # as the first. A same-named definition in another module is a scout
+        # candidate, not evidence of a relationship through this source file.
+        # Share this observation's identity/cache bookkeeping, while keeping
+        # the temporary endpoint's collected links separate from the edit owner.
+        endpoint = replace(
+            state,
+            edit_path=via_path,
+            candidate_paths=set(),
+            refs_by_path={},
+            source_ref_paths=set(),
+        )
+        self._verification_collect_direct_symbol_refs(endpoint, short, refs)
+        state.candidate_paths.update(endpoint.candidate_paths)
+        for path, symbols in endpoint.refs_by_path.items():
+            state.indirect_refs_by_path.setdefault(path, set()).update(symbols)
+            state.indirect_via_paths.setdefault(path, set()).add(via_path)
 
     @staticmethod
     def _verification_relevance_test_symbol(

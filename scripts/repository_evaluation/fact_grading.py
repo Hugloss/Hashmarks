@@ -39,9 +39,35 @@ def _check(packet: object, rule: Mapping[str, Any]) -> dict[str, object]:
     pointer, predicate = str(rule["pointer"]), str(rule["predicate"])
     values = pointer_values(packet, pointer)
     expected = rule["value"]
+    alternatives = rule.get("alternative_records", [])
+    if alternatives and (predicate != "includes_record" or rule.get("authority_check")):
+        raise ValueError("alternative records are only positive source-fact checks")
+    records = [(pointer, expected, values)]
+    for alternative in alternatives:
+        alternative_pointer = alternative["pointer"]
+        records.append(
+            (
+                alternative_pointer,
+                alternative["value"],
+                pointer_values(packet, alternative_pointer),
+            )
+        )
     predicates = {
         "equals": lambda: len(values) == 1 and values[0] == expected,
         "includes": lambda: any(value == expected for value in values),
+        "includes_record": lambda: any(
+            isinstance(record_expected, dict)
+            and bool(record_expected)
+            and any(
+                isinstance(value, Mapping)
+                and all(
+                    key in value and value[key] == item
+                    for key, item in record_expected.items()
+                )
+                for value in record_values
+            )
+            for _, record_expected, record_values in records
+        ),
         "all_equal": lambda: (
             bool(values) and all(value == expected for value in values)
         ),
@@ -55,10 +81,18 @@ def _check(packet: object, rule: Mapping[str, Any]) -> dict[str, object]:
         "predicate": predicate,
         "expected": expected,
         "observed": values,
+        "alternative_records": [
+            {
+                "pointer": record_pointer,
+                "expected": record_expected,
+                "observed": record_values,
+            }
+            for record_pointer, record_expected, record_values in records[1:]
+        ],
         "classification": "PASS"
         if predicates[predicate]()
         else "FAIL"
-        if values
+        if any(record_values for _, _, record_values in records)
         else "INCOMPLETE",
         "authority_check": rule.get("authority_check") is True,
     }
@@ -93,6 +127,7 @@ def grade_facts(
         else "SOURCE_FACT_MISMATCH",
         "checks": rows,
         "authority_violations": sum(
-            row["authority_check"] and row["classification"] == "FAIL" for row in rows
+            row["authority_check"] is True and row["classification"] == "FAIL"
+            for row in rows
         ),
     }

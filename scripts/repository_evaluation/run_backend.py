@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -29,7 +30,14 @@ def _measure(
     identity: dict[str, Any],
 ) -> dict[str, Any]:
     _check_implementation(identity)
-    result = execute_workflow(workflow, rule, sources, output, transports=transports)
+    result = execute_workflow(
+        workflow,
+        rule,
+        sources,
+        output,
+        transports=transports,
+        source_identities=identity["source_identities"],
+    )
     _check_implementation(identity)
     result["artifacts"] = {
         path.relative_to(output).as_posix(): hashlib.sha256(
@@ -91,9 +99,13 @@ def run_backend(
         "observer": _observer_identity(),
         "evaluator": evaluator_implementation_identity(),
         "transports": transports,
+        "source_identities": {
+            name: definition["content_identity"]
+            for name, definition in suite["sources"].items()
+        },
     }
     protocol = "sha256:" + canonical_sha256(identity)
-    outcomes = []
+    outcomes: list[Mapping[str, Any]] = []
     for workflow in suite["workflows"]:
         if workflow["id"] not in selected:
             continue

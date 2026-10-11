@@ -1189,6 +1189,8 @@ class TaskEvidencePacketMixin(
         *,
         limit: int,
     ) -> None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         retrieval = result.get("retrieval")
         if not isinstance(retrieval, dict):
             return
@@ -1196,11 +1198,48 @@ class TaskEvidencePacketMixin(
         if not isinstance(current, list):
             return
         rows = [row for row in current if isinstance(row, Mapping)]
-        supplements = self._task_evidence_natural_retrieval_supplements(
+        # A structural file/class owner is not a reason to hide an explicitly
+        # named declaration. Reuse exact identity resolution for locators only;
+        # these rows never change the independently selected edit/test owner.
+        exact_terms = tuple(
+            term
+            for term in self._task_action_exact_identifier_terms(task)
+            if "." in term
+        )
+        exact, exact_complete = self._task_action_qualified_identifier_index_evidence(
+            exact_terms, set(), canonical_rank=len(current) + 1
+        )
+        existing_keys = {
+            (str(row.get("path") or ""), str(row.get("symbol") or "")) for row in rows
+        }
+        exact = [
+            row
+            for row in exact
+            if (
+                str(row.get("path") or ""),
+                str(row.get("qualname") or row.get("name") or ""),
+            )
+            not in existing_keys
+        ]
+        exact_bound = min(2, max(0, limit - 3))
+        supplements = [
+            {**row, "retrieval_supplement": "exact-qualified-identifier"}
+            for row in exact[:exact_bound]
+        ]
+        natural = self._task_evidence_natural_retrieval_supplements(
             task,
-            rows,
+            [*rows, *supplements],
             limit=limit,
         )
+        supplements.extend(natural[: 2 - len(supplements)])
+        if exact_terms:
+            retrieval["exact_identifier_supplements"] = {
+                "observed": len(exact),
+                "returned": min(len(exact), exact_bound),
+                "search_complete": exact_complete,
+                "omitted": max(0, len(exact) - exact_bound),
+                "ownership_authority": False,
+            }
         if not supplements:
             return
         keep = max(0, limit - len(supplements))
@@ -1211,7 +1250,14 @@ class TaskEvidencePacketMixin(
         retrieval["canonical_omitted_results"] = max(0, len(current) - keep)
         retrieval["supplemental_results"] = len(supplements)
         retrieval["supplemental_authority"] = False
-        retrieval["ordering"] = "canonical-then-bounded-natural-language"
+        retrieval["ordering"] = (
+            "canonical-then-bounded-supplements"
+            if any(
+                row.get("retrieval_supplement") == "exact-qualified-identifier"
+                for row in supplements
+            )
+            else "canonical-then-bounded-natural-language"
+        )
 
     @staticmethod
     def _task_evidence_compact_evidence(

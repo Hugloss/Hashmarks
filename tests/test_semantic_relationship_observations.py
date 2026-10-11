@@ -257,7 +257,10 @@ def test_cli_relationship_capture_and_comparison_use_the_same_authority(
     captures = tmp_path.parent / f"{tmp_path.name}-captures.json"
     captures.write_text(json.dumps({"observations": [_capture(tmp_path)]}))
     printed = []
-    monkeypatch.setattr("hashmarks.repository_cli._print", printed.append)
+    monkeypatch.setattr(
+        "hashmarks.repository_cli._print",
+        lambda value, **_encoding: printed.append(value),
+    )
     monkeypatch.setenv("HASHMARKS_NO_UPDATE_CHECK", "1")
     assert (
         main(
@@ -325,7 +328,10 @@ def test_cli_task_and_post_change_present_request_local_evidence_without_replay(
     captures = tmp_path.parent / f"{tmp_path.name}-captures.json"
     captures.write_text(json.dumps({"observations": [_capture(tmp_path)]}))
     printed: list[Any] = []
-    monkeypatch.setattr("hashmarks.repository_cli._print", printed.append)
+    monkeypatch.setattr(
+        "hashmarks.repository_cli._print",
+        lambda value, **_encoding: printed.append(value),
+    )
     monkeypatch.setenv("HASHMARKS_NO_UPDATE_CHECK", "1")
     task = "Change Interface in contract.py to document its behavior."
     assert (

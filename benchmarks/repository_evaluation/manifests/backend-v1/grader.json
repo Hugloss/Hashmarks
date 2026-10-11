@@ -1,31 +1,127 @@
 {
   "cases": {
     "aiokafka-fetch-cancellation": {
-      "checks": [
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "aiokafka/consumer/fetcher.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 582,
+                  "path": "aiokafka/consumer/fetcher.py",
+                  "qualname": "Fetcher._fetch_requests_routine",
+                  "start_line": 476
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 582,
+                  "path": "aiokafka/consumer/fetcher.py",
+                  "qualname": "Fetcher._fetch_requests_routine",
+                  "start_line": 476
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 582,
+              "path": "aiokafka/consumer/fetcher.py",
+              "start_line": 476,
+              "symbol": "Fetcher._fetch_requests_routine"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_fetcher.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "aiokafka/consumer/fetcher.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 581,
+                  "path": "aiokafka/consumer/fetcher.py",
+                  "qualname": "Fetcher._fetch_requests_routine",
+                  "start_line": 476
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 581,
+                  "path": "aiokafka/consumer/fetcher.py",
+                  "qualname": "Fetcher._fetch_requests_routine",
+                  "start_line": 476
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 581,
+              "path": "aiokafka/consumer/fetcher.py",
+              "start_line": 476,
+              "symbol": "Fetcher._fetch_requests_routine"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_fetcher.py"
+          }
+        ]
+      },
+      "delta_checks": [
         {
-          "id": "source-owner-visible",
-          "pointer": "/retrieval/results/*/path",
-          "predicate": "includes",
+          "id": "changed-path-bound",
+          "pointer": "/path_changes/0/path",
+          "predicate": "equals",
           "value": "aiokafka/consumer/fetcher.py"
         },
         {
-          "id": "changed-symbol-visible",
-          "pointer": "/retrieval/results/*/symbol",
-          "predicate": "includes",
-          "value": "Fetcher._fetch_requests_routine"
+          "id": "changed-state",
+          "pointer": "/path_changes/0/state",
+          "predicate": "equals",
+          "value": "changed"
         },
         {
-          "id": "existing-verifier-visible",
-          "pointer": "/verification/relevance/candidates/*/path",
-          "predicate": "includes",
-          "value": "tests/test_fetcher.py"
+          "authority_check": true,
+          "id": "changed-revision",
+          "pointer": "/path_changes/0/revision",
+          "predicate": "equals",
+          "value": "50b12dbcebf127dc9a1d1e35680d89efa7729bcc405e56c8cea188b2d50ea231"
         }
       ],
       "expected_owner_path": "aiokafka/consumer/fetcher.py",
-      "review_basis": "Exact upstream source transition and changed declaration; existing verification path independently inspected. This does not prove runtime behavior, execution paths, or test sufficiency.",
+      "review_basis": "Exact upstream source transition and changed declaration range. Before/after verifier expectations are distinct when the repair adds a more relevant regression. This oracle asserts repository correspondence only; it does not certify runtime behavior or test sufficiency.",
       "source_labels": {
         "after": [
           {
+            "declaration_line": 476,
             "end_line": 582,
             "path": "aiokafka/consumer/fetcher.py",
             "sha256": "2a8ec5932644c9b04ff222ee7f27c9b0d6a0a7e89ce5a158ed340ceedc2ec7a9",
@@ -35,6 +131,7 @@
         ],
         "before": [
           {
+            "declaration_line": 476,
             "end_line": 581,
             "path": "aiokafka/consumer/fetcher.py",
             "sha256": "0d055beebcc194c74ba0dc8254f200f9f61d91939f076c983f2f7dc1fdda19b5",
@@ -45,31 +142,127 @@
       }
     },
     "aiokafka-metadata-future": {
-      "checks": [
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "aiokafka/cluster.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 213,
+                  "path": "aiokafka/cluster.py",
+                  "qualname": "ClusterMetadata.failed_update",
+                  "start_line": 204
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 213,
+                  "path": "aiokafka/cluster.py",
+                  "qualname": "ClusterMetadata.failed_update",
+                  "start_line": 204
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 213,
+              "path": "aiokafka/cluster.py",
+              "start_line": 204,
+              "symbol": "ClusterMetadata.failed_update"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_cluster.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "aiokafka/cluster.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 213,
+                  "path": "aiokafka/cluster.py",
+                  "qualname": "ClusterMetadata.failed_update",
+                  "start_line": 204
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 213,
+                  "path": "aiokafka/cluster.py",
+                  "qualname": "ClusterMetadata.failed_update",
+                  "start_line": 204
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 213,
+              "path": "aiokafka/cluster.py",
+              "start_line": 204,
+              "symbol": "ClusterMetadata.failed_update"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_client.py"
+          }
+        ]
+      },
+      "delta_checks": [
         {
-          "id": "source-owner-visible",
-          "pointer": "/retrieval/results/*/path",
-          "predicate": "includes",
+          "id": "changed-path-bound",
+          "pointer": "/path_changes/0/path",
+          "predicate": "equals",
           "value": "aiokafka/cluster.py"
         },
         {
-          "id": "changed-symbol-visible",
-          "pointer": "/retrieval/results/*/symbol",
-          "predicate": "includes",
-          "value": "ClusterMetadata.failed_update"
+          "id": "changed-state",
+          "pointer": "/path_changes/0/state",
+          "predicate": "equals",
+          "value": "changed"
         },
         {
-          "id": "existing-verifier-visible",
-          "pointer": "/verification/relevance/candidates/*/path",
-          "predicate": "includes",
-          "value": "tests/test_cluster.py"
+          "authority_check": true,
+          "id": "changed-revision",
+          "pointer": "/path_changes/0/revision",
+          "predicate": "equals",
+          "value": "04d25de7aadff509a7b803fb43e13550f6f73e1a57ea94a9044019e7a5b81656"
         }
       ],
       "expected_owner_path": "aiokafka/cluster.py",
-      "review_basis": "Exact upstream source transition and changed declaration; existing verification path independently inspected. This does not prove runtime behavior, execution paths, or test sufficiency.",
+      "review_basis": "Exact upstream source transition and changed declaration range. Before/after verifier expectations are distinct when the repair adds a more relevant regression. This oracle asserts repository correspondence only; it does not certify runtime behavior or test sufficiency.",
       "source_labels": {
         "after": [
           {
+            "declaration_line": 204,
             "end_line": 213,
             "path": "aiokafka/cluster.py",
             "sha256": "7eb3371ae526b1275ff9210acb4066e558cead1c7b2b5618dfad781a8ae7ceaa",
@@ -79,6 +272,7 @@
         ],
         "before": [
           {
+            "declaration_line": 204,
             "end_line": 213,
             "path": "aiokafka/cluster.py",
             "sha256": "e392c1d1d0f3615b92830b114dbd7388fd15efe8e52a553c8d9a08737e6e98c9",
@@ -89,31 +283,127 @@
       }
     },
     "aiokafka-sender-node-failure": {
-      "checks": [
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "aiokafka/producer/sender.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 269,
+                  "path": "aiokafka/producer/sender.py",
+                  "qualname": "Sender._find_coordinator",
+                  "start_line": 217
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 269,
+                  "path": "aiokafka/producer/sender.py",
+                  "qualname": "Sender._find_coordinator",
+                  "start_line": 217
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 269,
+              "path": "aiokafka/producer/sender.py",
+              "start_line": 217,
+              "symbol": "Sender._find_coordinator"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_sender.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "aiokafka/producer/sender.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 265,
+                  "path": "aiokafka/producer/sender.py",
+                  "qualname": "Sender._find_coordinator",
+                  "start_line": 217
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 265,
+                  "path": "aiokafka/producer/sender.py",
+                  "qualname": "Sender._find_coordinator",
+                  "start_line": 217
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 265,
+              "path": "aiokafka/producer/sender.py",
+              "start_line": 217,
+              "symbol": "Sender._find_coordinator"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_sender.py"
+          }
+        ]
+      },
+      "delta_checks": [
         {
-          "id": "source-owner-visible",
-          "pointer": "/retrieval/results/*/path",
-          "predicate": "includes",
+          "id": "changed-path-bound",
+          "pointer": "/path_changes/0/path",
+          "predicate": "equals",
           "value": "aiokafka/producer/sender.py"
         },
         {
-          "id": "changed-symbol-visible",
-          "pointer": "/retrieval/results/*/symbol",
-          "predicate": "includes",
-          "value": "Sender._find_coordinator"
+          "id": "changed-state",
+          "pointer": "/path_changes/0/state",
+          "predicate": "equals",
+          "value": "changed"
         },
         {
-          "id": "existing-verifier-visible",
-          "pointer": "/verification/relevance/candidates/*/path",
-          "predicate": "includes",
-          "value": "tests/test_sender.py"
+          "authority_check": true,
+          "id": "changed-revision",
+          "pointer": "/path_changes/0/revision",
+          "predicate": "equals",
+          "value": "59345da12744cc3a0004041b4b7a8be95f85517c19476931823a142029b23dd0"
         }
       ],
       "expected_owner_path": "aiokafka/producer/sender.py",
-      "review_basis": "Exact upstream source transition and changed declaration; existing verification path independently inspected. This does not prove runtime behavior, execution paths, or test sufficiency.",
+      "review_basis": "Exact upstream source transition and changed declaration range. Before/after verifier expectations are distinct when the repair adds a more relevant regression. This oracle asserts repository correspondence only; it does not certify runtime behavior or test sufficiency.",
       "source_labels": {
         "after": [
           {
+            "declaration_line": 217,
             "end_line": 269,
             "path": "aiokafka/producer/sender.py",
             "sha256": "33001a36bf6a0ae06058568aada62aa046fce14e4897466e72faf87bf42aa368",
@@ -123,6 +413,7 @@
         ],
         "before": [
           {
+            "declaration_line": 217,
             "end_line": 265,
             "path": "aiokafka/producer/sender.py",
             "sha256": "2c1e273c8cd3707675b5faac49bdc6cd407dbf9f65f9635328ff3417bbb6721d",
@@ -133,31 +424,127 @@
       }
     },
     "aiokafka-stable-offset": {
-      "checks": [
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "aiokafka/consumer/fetcher.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 914,
+                  "path": "aiokafka/consumer/fetcher.py",
+                  "qualname": "Fetcher._proc_fetch_request",
+                  "start_line": 744
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 914,
+                  "path": "aiokafka/consumer/fetcher.py",
+                  "qualname": "Fetcher._proc_fetch_request",
+                  "start_line": 744
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 914,
+              "path": "aiokafka/consumer/fetcher.py",
+              "start_line": 744,
+              "symbol": "Fetcher._proc_fetch_request"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_transactional_consumer.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "aiokafka/consumer/fetcher.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 908,
+                  "path": "aiokafka/consumer/fetcher.py",
+                  "qualname": "Fetcher._proc_fetch_request",
+                  "start_line": 744
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 908,
+                  "path": "aiokafka/consumer/fetcher.py",
+                  "qualname": "Fetcher._proc_fetch_request",
+                  "start_line": 744
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 908,
+              "path": "aiokafka/consumer/fetcher.py",
+              "start_line": 744,
+              "symbol": "Fetcher._proc_fetch_request"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_fetcher.py"
+          }
+        ]
+      },
+      "delta_checks": [
         {
-          "id": "source-owner-visible",
-          "pointer": "/retrieval/results/*/path",
-          "predicate": "includes",
+          "id": "changed-path-bound",
+          "pointer": "/path_changes/0/path",
+          "predicate": "equals",
           "value": "aiokafka/consumer/fetcher.py"
         },
         {
-          "id": "changed-symbol-visible",
-          "pointer": "/retrieval/results/*/symbol",
-          "predicate": "includes",
-          "value": "Fetcher._proc_fetch_request"
+          "id": "changed-state",
+          "pointer": "/path_changes/0/state",
+          "predicate": "equals",
+          "value": "changed"
         },
         {
-          "id": "existing-verifier-visible",
-          "pointer": "/verification/relevance/candidates/*/path",
-          "predicate": "includes",
-          "value": "tests/test_transactional_consumer.py"
+          "authority_check": true,
+          "id": "changed-revision",
+          "pointer": "/path_changes/0/revision",
+          "predicate": "equals",
+          "value": "a5e0cada3c6edd8cc5dab91279440a6721cb8f5971e2db6e2fd37f6df5137089"
         }
       ],
       "expected_owner_path": "aiokafka/consumer/fetcher.py",
-      "review_basis": "Exact upstream source transition and changed declaration; existing verification path independently inspected. This does not prove runtime behavior, execution paths, or test sufficiency.",
+      "review_basis": "Exact upstream source transition and changed declaration range. Before/after verifier expectations are distinct when the repair adds a more relevant regression. This oracle asserts repository correspondence only; it does not certify runtime behavior or test sufficiency.",
       "source_labels": {
         "after": [
           {
+            "declaration_line": 744,
             "end_line": 914,
             "path": "aiokafka/consumer/fetcher.py",
             "sha256": "59bf948fff47eed580671971252454daa614df479733f3bedfefe95bc4d8ad30",
@@ -167,6 +554,7 @@
         ],
         "before": [
           {
+            "declaration_line": 744,
             "end_line": 908,
             "path": "aiokafka/consumer/fetcher.py",
             "sha256": "a70e682fa558181aaa81e30aa0dfe6298ee0c5d63f8cfec87b7c3613966699eb",
@@ -177,31 +565,127 @@
       }
     },
     "faststream-concurrent-queue-lifetime": {
-      "checks": [
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "faststream/_internal/endpoint/subscriber/mixins.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 69,
+                  "path": "faststream/_internal/endpoint/subscriber/mixins.py",
+                  "qualname": "ConcurrentMixin.__init__",
+                  "start_line": 58
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 69,
+                  "path": "faststream/_internal/endpoint/subscriber/mixins.py",
+                  "qualname": "ConcurrentMixin.__init__",
+                  "start_line": 58
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 69,
+              "path": "faststream/_internal/endpoint/subscriber/mixins.py",
+              "start_line": 58,
+              "symbol": "ConcurrentMixin.__init__"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/brokers/nats/test_consume.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "faststream/_internal/endpoint/subscriber/mixins.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 70,
+                  "path": "faststream/_internal/endpoint/subscriber/mixins.py",
+                  "qualname": "ConcurrentMixin.__init__",
+                  "start_line": 57
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 70,
+                  "path": "faststream/_internal/endpoint/subscriber/mixins.py",
+                  "qualname": "ConcurrentMixin.__init__",
+                  "start_line": 57
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 70,
+              "path": "faststream/_internal/endpoint/subscriber/mixins.py",
+              "start_line": 57,
+              "symbol": "ConcurrentMixin.__init__"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/brokers/nats/test_consume.py"
+          }
+        ]
+      },
+      "delta_checks": [
         {
-          "id": "source-owner-visible",
-          "pointer": "/retrieval/results/*/path",
-          "predicate": "includes",
+          "id": "changed-path-bound",
+          "pointer": "/path_changes/0/path",
+          "predicate": "equals",
           "value": "faststream/_internal/endpoint/subscriber/mixins.py"
         },
         {
-          "id": "changed-symbol-visible",
-          "pointer": "/retrieval/results/*/symbol",
-          "predicate": "includes",
-          "value": "ConcurrentMixin.__init__"
+          "id": "changed-state",
+          "pointer": "/path_changes/0/state",
+          "predicate": "equals",
+          "value": "changed"
         },
         {
-          "id": "existing-verifier-visible",
-          "pointer": "/verification/relevance/candidates/*/path",
-          "predicate": "includes",
-          "value": "tests/brokers/nats/test_consume.py"
+          "authority_check": true,
+          "id": "changed-revision",
+          "pointer": "/path_changes/0/revision",
+          "predicate": "equals",
+          "value": "7e342f72d545b0eabfab13d00a39c4c8ce8d4d992b798047be6fe0344f25f4b6"
         }
       ],
       "expected_owner_path": "faststream/_internal/endpoint/subscriber/mixins.py",
-      "review_basis": "Exact upstream source transition and changed declaration; existing verification path independently inspected. This does not prove runtime behavior, execution paths, or test sufficiency.",
+      "review_basis": "Exact upstream source transition and changed declaration range. Before/after verifier expectations are distinct when the repair adds a more relevant regression. This oracle asserts repository correspondence only; it does not certify runtime behavior or test sufficiency.",
       "source_labels": {
         "after": [
           {
+            "declaration_line": 58,
             "end_line": 69,
             "path": "faststream/_internal/endpoint/subscriber/mixins.py",
             "sha256": "f8a94c6ddacbc352749f2c33cc07c1cdb67456574cc388110153023f33356077",
@@ -211,6 +695,7 @@
         ],
         "before": [
           {
+            "declaration_line": 57,
             "end_line": 70,
             "path": "faststream/_internal/endpoint/subscriber/mixins.py",
             "sha256": "57888f8b6a2003e99d83a6c338a1e1dc828515d35981acb6ef5d680b8f62d220",
@@ -221,31 +706,127 @@
       }
     },
     "faststream-middleware-enter-error": {
-      "checks": [
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "faststream/_internal/endpoint/subscriber/usecase.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 440,
+                  "path": "faststream/_internal/endpoint/subscriber/usecase.py",
+                  "qualname": "SubscriberUsecase.process_message",
+                  "start_line": 354
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 440,
+                  "path": "faststream/_internal/endpoint/subscriber/usecase.py",
+                  "qualname": "SubscriberUsecase.process_message",
+                  "start_line": 354
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 440,
+              "path": "faststream/_internal/endpoint/subscriber/usecase.py",
+              "start_line": 354,
+              "symbol": "SubscriberUsecase.process_message"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/brokers/base/middlewares.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "faststream/_internal/endpoint/subscriber/usecase.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 443,
+                  "path": "faststream/_internal/endpoint/subscriber/usecase.py",
+                  "qualname": "SubscriberUsecase.process_message",
+                  "start_line": 354
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 443,
+                  "path": "faststream/_internal/endpoint/subscriber/usecase.py",
+                  "qualname": "SubscriberUsecase.process_message",
+                  "start_line": 354
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 443,
+              "path": "faststream/_internal/endpoint/subscriber/usecase.py",
+              "start_line": 354,
+              "symbol": "SubscriberUsecase.process_message"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/brokers/base/middlewares.py"
+          }
+        ]
+      },
+      "delta_checks": [
         {
-          "id": "source-owner-visible",
-          "pointer": "/retrieval/results/*/path",
-          "predicate": "includes",
+          "id": "changed-path-bound",
+          "pointer": "/path_changes/0/path",
+          "predicate": "equals",
           "value": "faststream/_internal/endpoint/subscriber/usecase.py"
         },
         {
-          "id": "changed-symbol-visible",
-          "pointer": "/retrieval/results/*/symbol",
-          "predicate": "includes",
-          "value": "SubscriberUsecase.process_message"
+          "id": "changed-state",
+          "pointer": "/path_changes/0/state",
+          "predicate": "equals",
+          "value": "changed"
         },
         {
-          "id": "existing-verifier-visible",
-          "pointer": "/verification/relevance/candidates/*/path",
-          "predicate": "includes",
-          "value": "tests/brokers/base/middlewares.py"
+          "authority_check": true,
+          "id": "changed-revision",
+          "pointer": "/path_changes/0/revision",
+          "predicate": "equals",
+          "value": "b95491daeef8a2af3090bbbefe691a60c927994a5bf2e89de9406089d4fe6d0f"
         }
       ],
       "expected_owner_path": "faststream/_internal/endpoint/subscriber/usecase.py",
-      "review_basis": "Exact upstream source transition and changed declaration; existing verification path independently inspected. This does not prove runtime behavior, execution paths, or test sufficiency.",
+      "review_basis": "Exact upstream source transition and changed declaration range. Before/after verifier expectations are distinct when the repair adds a more relevant regression. This oracle asserts repository correspondence only; it does not certify runtime behavior or test sufficiency.",
       "source_labels": {
         "after": [
           {
+            "declaration_line": 354,
             "end_line": 440,
             "path": "faststream/_internal/endpoint/subscriber/usecase.py",
             "sha256": "aa3ed06c328d92abd126e0362beabee5b63400468cc02914f46992752d103350",
@@ -255,6 +836,7 @@
         ],
         "before": [
           {
+            "declaration_line": 354,
             "end_line": 443,
             "path": "faststream/_internal/endpoint/subscriber/usecase.py",
             "sha256": "52ebf78e8615ada8ac52a51044d9363f8bfd96417d4906ae451005e4e97ed4b0",
@@ -265,31 +847,127 @@
       }
     },
     "faststream-partial-pull-batch": {
-      "checks": [
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 264,
+                  "path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+                  "qualname": "BatchPullStreamSubscriber._consume_pull",
+                  "start_line": 230
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 264,
+                  "path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+                  "qualname": "BatchPullStreamSubscriber._consume_pull",
+                  "start_line": 230
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 264,
+              "path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+              "start_line": 230,
+              "symbol": "BatchPullStreamSubscriber._consume_pull"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/brokers/nats/test_pull_batch.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 241,
+                  "path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+                  "qualname": "BatchPullStreamSubscriber._consume_pull",
+                  "start_line": 229
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 241,
+                  "path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+                  "qualname": "BatchPullStreamSubscriber._consume_pull",
+                  "start_line": 229
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 241,
+              "path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+              "start_line": 229,
+              "symbol": "BatchPullStreamSubscriber._consume_pull"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/brokers/nats/test_consume.py"
+          }
+        ]
+      },
+      "delta_checks": [
         {
-          "id": "source-owner-visible",
-          "pointer": "/retrieval/results/*/path",
-          "predicate": "includes",
+          "id": "changed-path-bound",
+          "pointer": "/path_changes/0/path",
+          "predicate": "equals",
           "value": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py"
         },
         {
-          "id": "changed-symbol-visible",
-          "pointer": "/retrieval/results/*/symbol",
-          "predicate": "includes",
-          "value": "BatchPullStreamSubscriber._consume_pull"
+          "id": "changed-state",
+          "pointer": "/path_changes/0/state",
+          "predicate": "equals",
+          "value": "changed"
         },
         {
-          "id": "existing-verifier-visible",
-          "pointer": "/verification/relevance/candidates/*/path",
-          "predicate": "includes",
-          "value": "tests/brokers/nats/test_consume.py"
+          "authority_check": true,
+          "id": "changed-revision",
+          "pointer": "/path_changes/0/revision",
+          "predicate": "equals",
+          "value": "685232069e2388eccd124ae295b46d0b1901fe52dae38d2fcdeb29871837fa3b"
         }
       ],
       "expected_owner_path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
-      "review_basis": "Exact upstream source transition and changed declaration; existing verification path independently inspected. This does not prove runtime behavior, execution paths, or test sufficiency.",
+      "review_basis": "Exact upstream source transition and changed declaration range. Before/after verifier expectations are distinct when the repair adds a more relevant regression. This oracle asserts repository correspondence only; it does not certify runtime behavior or test sufficiency.",
       "source_labels": {
         "after": [
           {
+            "declaration_line": 230,
             "end_line": 264,
             "path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
             "sha256": "0495395a1f6d736ff9262faf4a85779a7f70d24a419688587eefeabbcc4c866b",
@@ -299,6 +977,7 @@
         ],
         "before": [
           {
+            "declaration_line": 229,
             "end_line": 241,
             "path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
             "sha256": "e2b6dcacf877d2e799ff93c1c88ec0f81887fcad3b2aea046cbd079cb438d5d2",
@@ -309,31 +988,127 @@
       }
     },
     "faststream-subscriber-stop": {
-      "checks": [
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "faststream/_internal/broker/broker.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 149,
+                  "path": "faststream/_internal/broker/broker.py",
+                  "qualname": "BrokerUsecase.stop",
+                  "start_line": 126
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 149,
+                  "path": "faststream/_internal/broker/broker.py",
+                  "qualname": "BrokerUsecase.stop",
+                  "start_line": 126
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 149,
+              "path": "faststream/_internal/broker/broker.py",
+              "start_line": 126,
+              "symbol": "BrokerUsecase.stop"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/brokers/test_stop.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "faststream/_internal/broker/broker.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 133,
+                  "path": "faststream/_internal/broker/broker.py",
+                  "qualname": "BrokerUsecase.stop",
+                  "start_line": 123
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 133,
+                  "path": "faststream/_internal/broker/broker.py",
+                  "qualname": "BrokerUsecase.stop",
+                  "start_line": 123
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 133,
+              "path": "faststream/_internal/broker/broker.py",
+              "start_line": 123,
+              "symbol": "BrokerUsecase.stop"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/brokers/base/connection.py"
+          }
+        ]
+      },
+      "delta_checks": [
         {
-          "id": "source-owner-visible",
-          "pointer": "/retrieval/results/*/path",
-          "predicate": "includes",
+          "id": "changed-path-bound",
+          "pointer": "/path_changes/0/path",
+          "predicate": "equals",
           "value": "faststream/_internal/broker/broker.py"
         },
         {
-          "id": "changed-symbol-visible",
-          "pointer": "/retrieval/results/*/symbol",
-          "predicate": "includes",
-          "value": "BrokerUsecase.stop"
+          "id": "changed-state",
+          "pointer": "/path_changes/0/state",
+          "predicate": "equals",
+          "value": "changed"
         },
         {
-          "id": "existing-verifier-visible",
-          "pointer": "/verification/relevance/candidates/*/path",
-          "predicate": "includes",
-          "value": "tests/brokers/base/connection.py"
+          "authority_check": true,
+          "id": "changed-revision",
+          "pointer": "/path_changes/0/revision",
+          "predicate": "equals",
+          "value": "08986062c5945caf644cb5b14e716b1b1bd1a43b4885d419a707e974d9bd8a7f"
         }
       ],
       "expected_owner_path": "faststream/_internal/broker/broker.py",
-      "review_basis": "Exact upstream source transition and changed declaration; existing verification path independently inspected. This does not prove runtime behavior, execution paths, or test sufficiency.",
+      "review_basis": "Exact upstream source transition and changed declaration range. Before/after verifier expectations are distinct when the repair adds a more relevant regression. This oracle asserts repository correspondence only; it does not certify runtime behavior or test sufficiency.",
       "source_labels": {
         "after": [
           {
+            "declaration_line": 126,
             "end_line": 149,
             "path": "faststream/_internal/broker/broker.py",
             "sha256": "dfab2da33ed7e26c910782b608c80f94bd8e497bcfe39f5f07e9bcfe4230eb3d",
@@ -343,6 +1118,7 @@
         ],
         "before": [
           {
+            "declaration_line": 123,
             "end_line": 133,
             "path": "faststream/_internal/broker/broker.py",
             "sha256": "6663830e7a1b1f3ecf831cd66614b6f7f7f3fc31a167583e2e91db303dc6896f",
@@ -353,31 +1129,127 @@
       }
     },
     "sqlalchemy-aggregate-strings": {
-      "checks": [
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "lib/sqlalchemy/sql/compiler.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 3174,
+                  "path": "lib/sqlalchemy/sql/compiler.py",
+                  "qualname": "SQLCompiler.visit_aggregate_strings_func",
+                  "start_line": 3139
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 3174,
+                  "path": "lib/sqlalchemy/sql/compiler.py",
+                  "qualname": "SQLCompiler.visit_aggregate_strings_func",
+                  "start_line": 3139
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 3174,
+              "path": "lib/sqlalchemy/sql/compiler.py",
+              "start_line": 3139,
+              "symbol": "SQLCompiler.visit_aggregate_strings_func"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "test/sql/test_functions.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "lib/sqlalchemy/sql/compiler.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 3166,
+                  "path": "lib/sqlalchemy/sql/compiler.py",
+                  "qualname": "SQLCompiler.visit_aggregate_strings_func",
+                  "start_line": 3139
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 3166,
+                  "path": "lib/sqlalchemy/sql/compiler.py",
+                  "qualname": "SQLCompiler.visit_aggregate_strings_func",
+                  "start_line": 3139
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 3166,
+              "path": "lib/sqlalchemy/sql/compiler.py",
+              "start_line": 3139,
+              "symbol": "SQLCompiler.visit_aggregate_strings_func"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "test/sql/test_functions.py"
+          }
+        ]
+      },
+      "delta_checks": [
         {
-          "id": "source-owner-visible",
-          "pointer": "/retrieval/results/*/path",
-          "predicate": "includes",
+          "id": "changed-path-bound",
+          "pointer": "/path_changes/0/path",
+          "predicate": "equals",
           "value": "lib/sqlalchemy/sql/compiler.py"
         },
         {
-          "id": "changed-symbol-visible",
-          "pointer": "/retrieval/results/*/symbol",
-          "predicate": "includes",
-          "value": "SQLCompiler.visit_aggregate_strings_func"
+          "id": "changed-state",
+          "pointer": "/path_changes/0/state",
+          "predicate": "equals",
+          "value": "changed"
         },
         {
-          "id": "existing-verifier-visible",
-          "pointer": "/verification/relevance/candidates/*/path",
-          "predicate": "includes",
-          "value": "test/sql/test_functions.py"
+          "authority_check": true,
+          "id": "changed-revision",
+          "pointer": "/path_changes/0/revision",
+          "predicate": "equals",
+          "value": "1d54cc1313339c7908b28c280377df9c17826f9a2e53f9fe90049287438a30cf"
         }
       ],
       "expected_owner_path": "lib/sqlalchemy/sql/compiler.py",
-      "review_basis": "Exact upstream source transition and changed declaration; existing verification path independently inspected. This does not prove runtime behavior, execution paths, or test sufficiency.",
+      "review_basis": "Exact upstream source transition and changed declaration range. Before/after verifier expectations are distinct when the repair adds a more relevant regression. This oracle asserts repository correspondence only; it does not certify runtime behavior or test sufficiency.",
       "source_labels": {
         "after": [
           {
+            "declaration_line": 3139,
             "end_line": 3174,
             "path": "lib/sqlalchemy/sql/compiler.py",
             "sha256": "644092820439ff821e884f9848b69da59805f280946122d2cef928500677bcb6",
@@ -387,6 +1259,7 @@
         ],
         "before": [
           {
+            "declaration_line": 3139,
             "end_line": 3166,
             "path": "lib/sqlalchemy/sql/compiler.py",
             "sha256": "50ddb98d3e3aed4a0c55c738050e8e0755c936de698ab481a0c57fdb31df649e",
@@ -397,31 +1270,127 @@
       }
     },
     "sqlalchemy-failed-begin": {
-      "checks": [
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "lib/sqlalchemy/dialects/postgresql/asyncpg.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 900,
+                  "path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+                  "qualname": "AsyncAdapt_asyncpg_connection._start_transaction",
+                  "start_line": 883
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 900,
+                  "path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+                  "qualname": "AsyncAdapt_asyncpg_connection._start_transaction",
+                  "start_line": 883
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 900,
+              "path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+              "start_line": 883,
+              "symbol": "AsyncAdapt_asyncpg_connection._start_transaction"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "test/dialect/postgresql/test_async_pg.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "lib/sqlalchemy/dialects/postgresql/asyncpg.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 896,
+                  "path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+                  "qualname": "AsyncAdapt_asyncpg_connection._start_transaction",
+                  "start_line": 883
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 896,
+                  "path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+                  "qualname": "AsyncAdapt_asyncpg_connection._start_transaction",
+                  "start_line": 883
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 896,
+              "path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+              "start_line": 883,
+              "symbol": "AsyncAdapt_asyncpg_connection._start_transaction"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "test/dialect/postgresql/test_async_pg.py"
+          }
+        ]
+      },
+      "delta_checks": [
         {
-          "id": "source-owner-visible",
-          "pointer": "/retrieval/results/*/path",
-          "predicate": "includes",
+          "id": "changed-path-bound",
+          "pointer": "/path_changes/0/path",
+          "predicate": "equals",
           "value": "lib/sqlalchemy/dialects/postgresql/asyncpg.py"
         },
         {
-          "id": "changed-symbol-visible",
-          "pointer": "/retrieval/results/*/symbol",
-          "predicate": "includes",
-          "value": "AsyncAdapt_asyncpg_connection._start_transaction"
+          "id": "changed-state",
+          "pointer": "/path_changes/0/state",
+          "predicate": "equals",
+          "value": "changed"
         },
         {
-          "id": "existing-verifier-visible",
-          "pointer": "/verification/relevance/candidates/*/path",
-          "predicate": "includes",
-          "value": "test/dialect/postgresql/test_async_pg.py"
+          "authority_check": true,
+          "id": "changed-revision",
+          "pointer": "/path_changes/0/revision",
+          "predicate": "equals",
+          "value": "9fb92f4ccb74b1990370b570ec2dfb8dcbc24974029542cf8bc6296e81844325"
         }
       ],
       "expected_owner_path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
-      "review_basis": "Exact upstream source transition and changed declaration; existing verification path independently inspected. This does not prove runtime behavior, execution paths, or test sufficiency.",
+      "review_basis": "Exact upstream source transition and changed declaration range. Before/after verifier expectations are distinct when the repair adds a more relevant regression. This oracle asserts repository correspondence only; it does not certify runtime behavior or test sufficiency.",
       "source_labels": {
         "after": [
           {
+            "declaration_line": 883,
             "end_line": 900,
             "path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
             "sha256": "9d879eca5f9578a6a79f7231fc3082c3750538de47ccce60e3dd20b112165426",
@@ -431,6 +1400,7 @@
         ],
         "before": [
           {
+            "declaration_line": 883,
             "end_line": 896,
             "path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
             "sha256": "3f0ed2fed9d4c330936df231595003a442f6cb05c646e5bb512e35d244ccc9f1",
@@ -441,31 +1411,127 @@
       }
     },
     "sqlalchemy-logging-token-reset": {
-      "checks": [
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "lib/sqlalchemy/engine/characteristics.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 145,
+                  "path": "lib/sqlalchemy/engine/characteristics.py",
+                  "qualname": "LoggingTokenCharacteristic.set_connection_characteristic",
+                  "start_line": 135
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 145,
+                  "path": "lib/sqlalchemy/engine/characteristics.py",
+                  "qualname": "LoggingTokenCharacteristic.set_connection_characteristic",
+                  "start_line": 135
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 145,
+              "path": "lib/sqlalchemy/engine/characteristics.py",
+              "start_line": 135,
+              "symbol": "LoggingTokenCharacteristic.set_connection_characteristic"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "test/engine/test_logging.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "lib/sqlalchemy/engine/characteristics.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 145,
+                  "path": "lib/sqlalchemy/engine/characteristics.py",
+                  "qualname": "LoggingTokenCharacteristic.set_connection_characteristic",
+                  "start_line": 135
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 145,
+                  "path": "lib/sqlalchemy/engine/characteristics.py",
+                  "qualname": "LoggingTokenCharacteristic.set_connection_characteristic",
+                  "start_line": 135
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 145,
+              "path": "lib/sqlalchemy/engine/characteristics.py",
+              "start_line": 135,
+              "symbol": "LoggingTokenCharacteristic.set_connection_characteristic"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "test/engine/test_logging.py"
+          }
+        ]
+      },
+      "delta_checks": [
         {
-          "id": "source-owner-visible",
-          "pointer": "/retrieval/results/*/path",
-          "predicate": "includes",
+          "id": "changed-path-bound",
+          "pointer": "/path_changes/0/path",
+          "predicate": "equals",
           "value": "lib/sqlalchemy/engine/characteristics.py"
         },
         {
-          "id": "changed-symbol-visible",
-          "pointer": "/retrieval/results/*/symbol",
-          "predicate": "includes",
-          "value": "LoggingTokenCharacteristic.set_connection_characteristic"
+          "id": "changed-state",
+          "pointer": "/path_changes/0/state",
+          "predicate": "equals",
+          "value": "changed"
         },
         {
-          "id": "existing-verifier-visible",
-          "pointer": "/verification/relevance/candidates/*/path",
-          "predicate": "includes",
-          "value": "test/engine/test_logging.py"
+          "authority_check": true,
+          "id": "changed-revision",
+          "pointer": "/path_changes/0/revision",
+          "predicate": "equals",
+          "value": "0d12825ad53deb0d1276ad5f7b4640502e830b657ae5c6acb6a3f472e471fee8"
         }
       ],
       "expected_owner_path": "lib/sqlalchemy/engine/characteristics.py",
-      "review_basis": "Exact upstream source transition and changed declaration; existing verification path independently inspected. This does not prove runtime behavior, execution paths, or test sufficiency.",
+      "review_basis": "Exact upstream source transition and changed declaration range. Before/after verifier expectations are distinct when the repair adds a more relevant regression. This oracle asserts repository correspondence only; it does not certify runtime behavior or test sufficiency.",
       "source_labels": {
         "after": [
           {
+            "declaration_line": 135,
             "end_line": 145,
             "path": "lib/sqlalchemy/engine/characteristics.py",
             "sha256": "bfc5332ec1b9c0bc3fc20113ea197c226feeffc465ce7aedaf1a6da35a132a90",
@@ -475,6 +1541,7 @@
         ],
         "before": [
           {
+            "declaration_line": 135,
             "end_line": 145,
             "path": "lib/sqlalchemy/engine/characteristics.py",
             "sha256": "f23c689b9ea0ca125387df581f7b40bb3092b6c84462c64b1133e16a12ec2a70",
@@ -485,31 +1552,127 @@
       }
     },
     "sqlalchemy-pickle-extra-criteria": {
-      "checks": [
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "lib/sqlalchemy/orm/strategies.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 1263,
+                  "path": "lib/sqlalchemy/orm/strategies.py",
+                  "qualname": "_LazyLoader.create_row_processor",
+                  "start_line": 1194
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 1263,
+                  "path": "lib/sqlalchemy/orm/strategies.py",
+                  "qualname": "_LazyLoader.create_row_processor",
+                  "start_line": 1194
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 1263,
+              "path": "lib/sqlalchemy/orm/strategies.py",
+              "start_line": 1194,
+              "symbol": "_LazyLoader.create_row_processor"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "test/orm/test_pickled.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "lib/sqlalchemy/orm/strategies.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 1256,
+                  "path": "lib/sqlalchemy/orm/strategies.py",
+                  "qualname": "_LazyLoader.create_row_processor",
+                  "start_line": 1187
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 1256,
+                  "path": "lib/sqlalchemy/orm/strategies.py",
+                  "qualname": "_LazyLoader.create_row_processor",
+                  "start_line": 1187
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 1256,
+              "path": "lib/sqlalchemy/orm/strategies.py",
+              "start_line": 1187,
+              "symbol": "_LazyLoader.create_row_processor"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "test/orm/test_pickled.py"
+          }
+        ]
+      },
+      "delta_checks": [
         {
-          "id": "source-owner-visible",
-          "pointer": "/retrieval/results/*/path",
-          "predicate": "includes",
+          "id": "changed-path-bound",
+          "pointer": "/path_changes/0/path",
+          "predicate": "equals",
           "value": "lib/sqlalchemy/orm/strategies.py"
         },
         {
-          "id": "changed-symbol-visible",
-          "pointer": "/retrieval/results/*/symbol",
-          "predicate": "includes",
-          "value": "_LazyLoader.create_row_processor"
+          "id": "changed-state",
+          "pointer": "/path_changes/0/state",
+          "predicate": "equals",
+          "value": "changed"
         },
         {
-          "id": "existing-verifier-visible",
-          "pointer": "/verification/relevance/candidates/*/path",
-          "predicate": "includes",
-          "value": "test/orm/test_pickled.py"
+          "authority_check": true,
+          "id": "changed-revision",
+          "pointer": "/path_changes/0/revision",
+          "predicate": "equals",
+          "value": "a231abb0fa5a679f517d6358e0f8bfe990827467c440ddfe8255c92404edabe7"
         }
       ],
       "expected_owner_path": "lib/sqlalchemy/orm/strategies.py",
-      "review_basis": "Exact upstream source transition and changed declaration; existing verification path independently inspected. This does not prove runtime behavior, execution paths, or test sufficiency.",
+      "review_basis": "Exact upstream source transition and changed declaration range. Before/after verifier expectations are distinct when the repair adds a more relevant regression. This oracle asserts repository correspondence only; it does not certify runtime behavior or test sufficiency.",
       "source_labels": {
         "after": [
           {
+            "declaration_line": 1194,
             "end_line": 1263,
             "path": "lib/sqlalchemy/orm/strategies.py",
             "sha256": "c688fbfa864b040018ae3df3a70d0517a68884625584535f7affc5d38caa15f8",
@@ -519,6 +1682,7 @@
         ],
         "before": [
           {
+            "declaration_line": 1187,
             "end_line": 1256,
             "path": "lib/sqlalchemy/orm/strategies.py",
             "sha256": "38e9b96ca348ff6cc3d455d5b113108a016fe4ebb1d96945b7f9378e1e8369ab",

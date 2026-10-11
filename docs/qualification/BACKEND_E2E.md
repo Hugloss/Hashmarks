@@ -1,0 +1,177 @@
+# Backend E2E qualification
+
+The target is defensible **5/5 Local E2E evidence for all twenty backend
+capabilities**. Expected value is a separate audit judgment. A coverage rating
+is never inferred from an average score or from the size of the test suite.
+
+This work extends `scripts.repository_evaluation` with revision workflows,
+separate source-fact oracles, retained public responses and coverage accounting.
+It is development measurement only. Hashmarks product APIs do not import this
+evaluator, judge task sufficiency, execute verification, choose patches, manage
+Git state, or certify results.
+
+## Frozen source corpus
+
+The initial `benchmarks/repository_evaluation/manifests/backend-v1/suite.json`
+contains twelve genuine upstream source transitions across aiokafka, SQLAlchemy
+and FastStream. Each before/after tree has an exact Git commit and a frozen
+repository content identity. The
+separate `backend-v1/grader.json`
+contains independently source-grounded declaration ranges, raw range hashes,
+expected verification paths and exact post-change revision checks. Oracles are
+never supplied to product observation calls.
+
+The corpus deliberately admits these projects as qualification targets. It does
+not authorize following their imports into dependency implementations or adding
+package-specific analysis rules.
+
+| Repository | Genuine source transitions |
+| --- | --- |
+| aiokafka | Fetch cancellation, sender node failure, metadata futures, stable-offset parsing |
+| SQLAlchemy | Failed async transaction start, logging-token reset, repeated pickle criteria, aggregate string compilation |
+| FastStream | Middleware entry failure, concurrent subscriber shutdown, queue lifetime, partial pull batches |
+
+The first twelve workflows address owner localization, changed declaration and
+test correspondence, verification relevance, freshness, initial evidence and
+presentation. They **do not qualify** runtime debugging, handler/model/config
+contracts, concurrency semantics, message delivery, transaction outcomes,
+dependency changes, service compatibility or performance. Real task context
+does not establish those additional capabilities by itself.
+
+## Local entrypoints
+
+Obtain read-only local checkouts containing the exact commits named by the suite.
+Extract the selected trees without checking out or modifying those repositories:
+
+```sh
+uv run --frozen --no-sync python -m scripts.repository_evaluation.materialize_backend \
+  --repository aiokafka=/path/to/aiokafka \
+  --repository sqlalchemy=/path/to/sqlalchemy \
+  --repository faststream=/path/to/faststream \
+  --output-dir .hashmarks/backend-e2e/sources
+
+make backend-evidence-dogfood
+```
+
+`BACKEND_SOURCES` overrides the source-directory mapping file;
+`BACKEND_OUTPUT` overrides the report directory. The ordinary initialization and
+test environment still consume the committed uv lock. The official MCP SDK and
+installed Hashmarks console script are required for MCP capture.
+
+For a bounded investigation, select a named workflow:
+
+```sh
+uv run --frozen --no-sync python -m scripts.repository_evaluation.run_backend \
+  --sources-file .hashmarks/backend-e2e/sources/sources.json \
+  --workflow aiokafka-metadata-future \
+  --output-dir .hashmarks/backend-e2e/investigation
+```
+
+`--transport cli` or `--transport mcp` permits a partial measurement. Omitted
+transport proof remains unknown and cannot produce a passing full qualification.
+Use a new output directory after changing the observer, evaluator, corpus or
+grader. Existing receipts fail closed on identity drift instead of silently
+reinterpreting old results.
+
+The existing producer rings remain separate, executable evidence:
+
+```sh
+make dependency-dogfood
+make semantic-evidence-dogfood
+make semantic-evidence-live
+```
+
+A passing existing live producer ring is useful evidence. It does not
+automatically qualify every newly composed backend packet.
+
+## What a workflow records
+
+Each workflow copies caller-supplied sources into a disposable workspace. It
+observes the before revision through the API, real CLI and official MCP client,
+replaces the copy with the genuine after revision, observes invalidated source
+bindings before rebuilding, captures the post-change delta, and re-observes the
+after revision. Original source trees remain untouched.
+
+All four presentation formats are captured. The evaluator checks oracle facts
+on the actual returned packets and checks presentation conformance against each
+transport's own native packet. It retains the exact consumer-visible response,
+UTF-8 byte count and the existing byte-based token estimate. Compact/text must
+fit within 4,000 estimated tokens; the MCP measurement includes both text and
+structured content when both are delivered.
+
+Source ranges and revisions are checked against the admitted source trees.
+Changed symbols are checked as exact path/symbol/range records, so independent
+matches from different declarations cannot manufacture a correspondence.
+An oracle may name alternative public record locations for the same positive
+source fact, such as a retrieval symbol or an ownership candidate's qualified
+name. Every alternative retains the complete expected path and source range;
+alternatives are forbidden for authority checks.
+Bounded or missing observations cannot satisfy an exclusion check. Source
+invalidation must preserve unknown/not-admissible negative evidence.
+
+Receipts bind corpus, oracle, observer, evaluator and transport selection.
+Receipt result bytes and retained observation files are revalidated before
+reuse. Implementation drift during observation invalidates the measurement.
+Receipt reuse preserves evidence only; it does not establish clean-run timing,
+execution progress, retry policy or certification.
+
+## Coverage accounting
+
+Every completed report contains all twenty capability rows. A 5/5 row requires at
+least twelve distinct upstream problems across at least three repositories,
+complete required evidence and passing capability-specific checks. Rewordings,
+formats and adversarial variants of the same problem do not increase breadth.
+Missing workflows, transport captures or required native proof remain
+`INCOMPLETE`. A known hard violation remains `FAIL` even if other work is missing.
+
+Owner top-three recall must reach 95%; supported debugging correspondence and
+initial evidence targets must reach 90%. Authority, source binding, freshness
+and required transport facts have zero tolerance for violations. A missing fact
+cannot be compensated by a better result on another capability.
+
+The report is reproducible repository-intelligence measurement, not an automatic
+release promotion or certification decision. Representative coverage and
+independent oracle review remain necessary before promoting these targets to
+release gates.
+
+## Implementation sequence and current boundaries
+
+| Bundle | Required outcome | Current state |
+| --- | --- | --- |
+| R01 | Frozen genuine problems, source oracles, public-surface revision runner, all-twenty report | Initial twelve-workflow corpus and runner implemented; full qualification pending |
+| R02 | Exact owner/direct path observations with unresolved missing edges | Repaired arbitrary first-symbol projection, incomplete-graph candidate displacement and hidden explicitly named method locators; broader direct-path corpus pending |
+| R03 | Genuine failure frames, changed symbols and independently known verifier correspondence | Exact revision/range grading implemented; failure corpus and remaining relevance repairs pending |
+| R04 | Genuine handler/model/config/data/service declaration cases | Pending; no runtime compatibility inference is admitted |
+| R05 | Async/message/transaction syntax and source ownership observations | Genuine problems identified; capability-specific observations and adversarial proof pending |
+| R06 | Required facts visible within the initial response ceiling | Whole-response size measured; compact/text CLI whitespace removed without changing facts; duplicated payloads still exceed the ceiling |
+| R07 | Dependency/native/language qualification and comparable indexing economics | Existing fresh native ring reused; new packet and real-source economics qualification pending |
+| R08 | Complete reviewed matrix and final bounded regression qualification | Pending; no 5/5 completion claim |
+
+The next repairs must follow observed gaps in these genuine workflows. Exact
+relationship segments remain bounded claims under their existing producers;
+there is no inferred path completion or global semantic graph. Test relevance
+remains repository evidence and never becomes coverage or sufficiency authority.
+
+The structural repairs are existing observer defect repairs: a file relationship
+does not prove its first declaration, and an incomplete graph cannot displace a
+source candidate or redirect verification while competing relationships remain
+unobserved. Incomplete candidate evidence is retained for discrimination.
+Explicit qualified declaration locators compose the existing symbol/import
+identity resolver into bounded retrieval supplements. These supplements cannot
+change edit or verification selection, prove uniqueness, or grant ownership.
+
+## Measured implementation checkpoint
+
+The twelve-workflow API/CLI/MCP rerun under protocol
+`sha256:77cab0911ec2a53211eb2557bf442b22e9f8c596d11daa4074f106abb082966b`
+exposed the exact changed declaration in all twenty-four before/after
+observations. All twelve workflows passed owner-path top-three recall, owner
+authority, candidate revision binding and deliberately invalidated source
+binding checks. Three workflows exposed every required declaration/test fact;
+nine still missed an independently identified verification path in at least one
+revision. None met the whole-response compact/text ceiling.
+
+These measurements bind the implementation captured by that protocol. Later
+source changes require fresh measurement; this checkpoint is not current
+release authority and does not promote any capability to 5/5. The initial
+corpus still leaves fourteen capability families without dedicated workflows.

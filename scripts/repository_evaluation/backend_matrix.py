@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 SCHEMA = "hashmarks.backend-evidence-matrix.v1"
@@ -49,7 +49,7 @@ THRESHOLDS = {
 }
 
 
-def _records(workflows: list[Mapping[str, Any]]) -> dict[str, Mapping[str, Any]]:
+def _records(workflows: Sequence[Mapping[str, Any]]) -> dict[str, Mapping[str, Any]]:
     result: dict[str, Mapping[str, Any]] = {}
     for workflow in workflows:
         key = str(workflow["id"])
@@ -108,8 +108,8 @@ def _problem_gate(values: list[object]) -> bool | None:
 
 
 def _capability(
-    capability: int, workflows: list[Mapping[str, Any]], outcomes: Mapping[str, Any]
-) -> dict[str, object]:
+    capability: int, workflows: Sequence[Mapping[str, Any]], outcomes: Mapping[str, Any]
+) -> dict[str, Any]:
     selected = [
         workflow for workflow in workflows if capability in workflow["capabilities"]
     ]
@@ -146,8 +146,8 @@ def _capability(
 
 
 def capability_matrix(
-    workflows: list[Mapping[str, Any]], outcomes: list[Mapping[str, Any]]
-) -> dict[str, object]:
+    workflows: Sequence[Mapping[str, Any]], outcomes: Sequence[Mapping[str, Any]]
+) -> dict[str, Any]:
     expected, observed = _records(workflows), _records(outcomes)
     unexpected = sorted(set(observed) - set(expected))
     if unexpected:

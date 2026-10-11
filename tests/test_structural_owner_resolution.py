@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any, cast
 
 from hashmarks.codemap import CodeMap
 
@@ -61,8 +62,11 @@ def test_projected_file_owner_does_not_claim_an_unrelated_first_symbol(tmp_path:
     engine.write_text("def unrelated_helper():\n    return 0\n\n" + engine.read_text())
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        action = codemap.task_action_map(
-            "Fix ember accepted response behavior owner", limit=3
+        action = cast(
+            "dict[str, Any]",
+            codemap.task_action_map(
+                "Fix ember accepted response behavior owner", limit=3
+            ),
         )
     assert action["edit"]["path"] == "src/case/engine.py"
     assert action["edit"]["structural_projection"] is True
@@ -89,8 +93,11 @@ def test_incomplete_structural_candidate_does_not_displace_named_source(tmp_path
     )
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        packet = codemap.task_evidence(
-            "Fix Metadata.failed_update completing a request_update future through unsupported methods."
+        packet = cast(
+            "dict[str, Any]",
+            codemap.task_evidence(
+                "Fix Metadata.failed_update completing a request_update future through unsupported methods."
+            ),
         )
     assert packet["ownership"]["candidate"]["path"] == "src/owner.py"
     assert packet["ownership"]["candidate"]["qualname"] == "Metadata.failed_update"
