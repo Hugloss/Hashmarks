@@ -256,6 +256,39 @@ stable file reads, previous-endpoint deltas and provider trust limitations
 remain unchanged. Default calls without `consumer_pairs` preserve their
 existing packets and identities.
 
+## Opt-in caller-nominated key-site projection (C05–C08)
+
+When a caller has already nominated a specific C01–C04 pair, the provider
+can additionally project the **direct literal spelling comparison** of
+its source-observed sites:
+
+```python
+StaticPythonInterfaceDeclarations(
+    paths=("src/api.py", "src/client.py"),
+    consumer_pairs=(("src/api.py", "get_user", "src/client.py", "show_user", "response"),),
+    include_pair_key_site_projection=True,
+)
+```
+
+The existing `consumer-subscript-read-syntax` declaration's `value` gains
+`literal_key_site_projection`. Each retained direct read of
+`response["key"]` is shown with its exact source range alongside at most
+eight observed producer return ranges. `same-literal-key-at-site` means
+that a **literal dictionary on that one return site** spells that exact key;
+`different-literal-key-at-site` means only the two direct literal syntax
+observations differ. A dynamic or unrecognized return is
+`producer-return-syntax-unresolved`.
+
+All return paths are **not** proven exhaustive, executable or connected to
+the named consumer; equal spellings are not compatibility, and different
+spellings are not a missing-field finding. The projection includes observed,
+retained and omitted site counts in both dimensions (limit eight each),
+plus explicit unknown runtime binding/shape, unresolved correspondence,
+incomplete coverage and negative-evidence denial. No producer/consumer edge,
+framework resolver or execution is inferred. A caller must explicitly supply
+a nonempty `consumer_pairs` selection to opt in; absent the option,
+existing packet identity and default behavior are byte-for-byte unchanged.
+
 ## Opt-in backend evidence navigation (B30–B34)
 
 For selected backend syntax, the existing
