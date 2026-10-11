@@ -237,12 +237,12 @@ def test_export_cli_writes_only_validated_complete_pair(tmp_path: Path) -> None:
     manifest_path = tmp_path / "cases.json"
     output = tmp_path / "frozen.json"
     manifest_path.write_text(json.dumps(_manifest()), encoding="utf-8")
+    expected = export_cases(tmp_path, _manifest())
     assert main([
         "--repo", str(tmp_path),
         "--manifest", str(manifest_path),
         "--output", str(output),
     ]) == 0
-    expected = export_cases(tmp_path, _manifest())
     assert json.loads(output.read_text(encoding="utf-8")) == expected
     assert output.read_bytes().endswith(b"\n")
 
