@@ -25,8 +25,11 @@ def descriptor_identity(value: Mapping[str, Any]) -> str:
     """Identity of the transport description, not proof of producer signature."""
     try:
         raw = json.dumps(
-            value, ensure_ascii=False, sort_keys=True,
-            separators=(",", ":"), allow_nan=False,
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
         ).encode("utf-8")
     except (ValueError, TypeError) as exc:
         raise ValueError("reacquisition descriptor must be portable JSON") from exc
@@ -41,22 +44,29 @@ def _qualified_requery(value: object) -> None:
     )
 
     if not isinstance(value, Mapping) or set(value) != {
-        "binding_id", "evidence", "dependency_paths",
-        "include_relationships", "relationship_limit_per_path",
+        "binding_id",
+        "evidence",
+        "dependency_paths",
+        "include_relationships",
+        "relationship_limit_per_path",
     }:
         raise ValueError("malformed reacquisition requery contract")
     binding_id = value["binding_id"]
     if not isinstance(binding_id, str) or not binding_id.strip():
         raise ValueError("reacquisition binding id must not be blank")
     scopes = _reacquisition_scopes(value["evidence"])
-    dependencies = _reacquisition_dependencies(
-        [{"path": p} for p in value["dependency_paths"]]
-    ) if isinstance(value["dependency_paths"], list) else None
+    dependencies = (
+        _reacquisition_dependencies([{"path": p} for p in value["dependency_paths"]])
+        if isinstance(value["dependency_paths"], list)
+        else None
+    )
     if dependencies != value["dependency_paths"] or scopes != value["evidence"]:
         raise ValueError("reacquisition selectors must be canonical")
     rel = {
-        "state": "observed" if value["include_relationships"] is True
-        else "not-requested" if value["include_relationships"] is False
+        "state": "observed"
+        if value["include_relationships"] is True
+        else "not-requested"
+        if value["include_relationships"] is False
         else "invalid",
         "bounds": {"limit_per_path": value["relationship_limit_per_path"]},
     }
@@ -65,15 +75,29 @@ def _qualified_requery(value: object) -> None:
 
 def validate_reacquisition_descriptor(value: Mapping[str, Any]) -> dict[str, Any]:
     """Fail closed on altered scope/provenance and noncanonical selectors."""
-    if not isinstance(value, Mapping) or set(value) != {
-        "schema", "source_packet_identity", "binding_definition_identity",
-        "binding_observation_identity", "repository", "requery", "authority",
-        "current_freshness_proven", "execution_effect", "descriptor_identity",
-    } or value.get("schema") != SCHEMA:
+    if (
+        not isinstance(value, Mapping)
+        or set(value)
+        != {
+            "schema",
+            "source_packet_identity",
+            "binding_definition_identity",
+            "binding_observation_identity",
+            "repository",
+            "requery",
+            "authority",
+            "current_freshness_proven",
+            "execution_effect",
+            "descriptor_identity",
+        }
+        or value.get("schema") != SCHEMA
+    ):
         raise ValueError("unsupported reacquisition descriptor schema/fields")
     for key in (
-        "source_packet_identity", "binding_definition_identity",
-        "binding_observation_identity", "descriptor_identity",
+        "source_packet_identity",
+        "binding_definition_identity",
+        "binding_observation_identity",
+        "descriptor_identity",
     ):
         if not isinstance(value.get(key), str) or not _SHA.fullmatch(value[key]):
             raise ValueError("reacquisition descriptor has invalid identities")
@@ -105,9 +129,9 @@ def compare_reacquisition_observation(
     authoritative producer. Stable scope identity is never proof of freshness.
     """
     old = validate_reacquisition_descriptor(descriptor)
-    if not isinstance(reobserved, Mapping) or reobserved.get("schema") != operation_schema(
-        "repository_evidence", "observation"
-    ):
+    if not isinstance(reobserved, Mapping) or reobserved.get(
+        "schema"
+    ) != operation_schema("repository_evidence", "observation"):
         raise ValueError("reobservation must be a native evidence binding packet")
     if (
         reobserved.get("authority") != "repository-intelligence-only"
@@ -118,7 +142,8 @@ def compare_reacquisition_observation(
     if not isinstance(rows, list):
         raise ValueError("reobserved bindings must be a list")
     candidates = [
-        row for row in rows
+        row
+        for row in rows
         if isinstance(row, Mapping)
         and row.get("binding_id") == old["requery"]["binding_id"]
     ]
@@ -128,9 +153,8 @@ def compare_reacquisition_observation(
     repository = reobserved.get("repository")
     if not isinstance(repository, Mapping):
         raise ValueError("missing reobserved repository")
-    same_repository = (
-        repository.get("repository_identity")
-        == old["repository"].get("repository_identity")
+    same_repository = repository.get("repository_identity") == old["repository"].get(
+        "repository_identity"
     )
     same_definition = (
         candidate.get("binding_definition_identity")
