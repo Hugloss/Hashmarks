@@ -62,14 +62,13 @@ def test_same_bound_source_facts_in_both_arms_and_only_navigation_added(
     assert len(result["cases"]) == 1
     pair = result["cases"][0]
     before, after = pair["arms"]
-    assert [row["arm"] for row in pair["arms"]] == [
-        "syntax-only", "navigation"
-    ]
+    assert [row["arm"] for row in pair["arms"]] == ["syntax-only", "navigation"]
     assert before["prompt"] == after["prompt"]
     assert before["fact_identity"] == after["fact_identity"]
     assert before["fact_identity"] == pair["source_facts_identity"]
-    assert before["provider_packet"]["repository"] == (
-        after["provider_packet"]["repository"]
+    assert (
+        before["provider_packet"]["repository"]
+        == (after["provider_packet"]["repository"])
     )
     assert before["host_visible"] == after["host_visible"] == "not-established"
     assert before["agent_used"] == after["agent_used"] == "not-established"
@@ -77,12 +76,10 @@ def test_same_bound_source_facts_in_both_arms_and_only_navigation_added(
     right = after["provider_packet"]["declarations"]["groups"]
     assert len(left) == len(right) == 2
     assert all(
-        "evidence_navigation" not in group["declarations"][0]["value"]
-        for group in left
+        "evidence_navigation" not in group["declarations"][0]["value"] for group in left
     )
     assert all(
-        "evidence_navigation" in group["declarations"][0]["value"]
-        for group in right
+        "evidence_navigation" in group["declarations"][0]["value"] for group in right
     )
     assert "DONT_COPY_THIS_VALUE" not in json.dumps(result)
     assert export_cases(tmp_path, _manifest()) == result
@@ -96,12 +93,19 @@ def test_modes_are_real_independent_source_experiments(tmp_path: Path) -> None:
     ):
         result = export_cases(tmp_path, _manifest(mode=mode))
         validate_export(result)
-        assert len(
-            result["cases"][0]["arms"][0]["provider_packet"]["declarations"]["groups"]
-        ) == 1
         assert (
-            result["cases"][0]["arms"][0]["provider_packet"]["declarations"]["groups"]
-            [0]["concept"]["kind"] == kind
+            len(
+                result["cases"][0]["arms"][0]["provider_packet"]["declarations"][
+                    "groups"
+                ]
+            )
+            == 1
+        )
+        assert (
+            result["cases"][0]["arms"][0]["provider_packet"]["declarations"]["groups"][
+                0
+            ]["concept"]["kind"]
+            == kind
         )
 
 
@@ -123,9 +127,9 @@ def test_source_edit_changes_snapshot_identity_and_exposed_navigation(
         first["cases"][0]["source_facts_identity"]
         != next_snapshot["cases"][0]["source_facts_identity"]
     )
-    env = next_snapshot["cases"][0]["arms"][1]["provider_packet"][
-        "declarations"
-    ]["groups"]
+    env = next_snapshot["cases"][0]["arms"][1]["provider_packet"]["declarations"][
+        "groups"
+    ]
     reads = [
         group["declarations"][0]["value"]["evidence_navigation"]["read_requests"]
         for group in env
@@ -179,9 +183,9 @@ def test_manipulated_arm_identity_fails_validation(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="export identity"):
         validate_export(tampered)
     # Even after self-consistent outer re-digestion, an unchanged inner receipt fails.
-    tampered["export_identity"] = _digest({
-        k: v for k, v in tampered.items() if k != "export_identity"
-    })
+    tampered["export_identity"] = _digest(
+        {k: v for k, v in tampered.items() if k != "export_identity"}
+    )
     with pytest.raises(ValueError, match="observation identity"):
         validate_export(tampered)
 
@@ -195,14 +199,15 @@ def test_navigation_not_forgeable_by_relabeling_an_arm(tmp_path: Path) -> None:
     )
     for arm in case["arms"]:
         observation = {
-            k: v for k, v in arm.items()
+            k: v
+            for k, v in arm.items()
             if k not in {"observation_identity", "utf8_bytes"}
         }
         arm["observation_identity"] = _digest(observation)
         arm["utf8_bytes"] = len(_encode(observation))
-    tampered["export_identity"] = _digest({
-        k: v for k, v in tampered.items() if k != "export_identity"
-    })
+    tampered["export_identity"] = _digest(
+        {k: v for k, v in tampered.items() if k != "export_identity"}
+    )
     with pytest.raises(ValueError, match="navigation"):
         validate_export(tampered)
 
@@ -214,20 +219,21 @@ def test_source_divergence_fails_even_if_both_arm_checksums_recomputed(
     tampered = copy.deepcopy(export_cases(tmp_path, _manifest()))
     case = tampered["cases"][0]
     after = case["arms"][1]
-    value = after["provider_packet"]["declarations"]["groups"][0][
-        "declarations"
-    ][0]["value"]
+    value = after["provider_packet"]["declarations"]["groups"][0]["declarations"][0][
+        "value"
+    ]
     value["class_name_syntax"] = "OtherSettings"
     for arm in case["arms"]:
         observation = {
-            k: v for k, v in arm.items()
+            k: v
+            for k, v in arm.items()
             if k not in {"observation_identity", "utf8_bytes"}
         }
         arm["observation_identity"] = _digest(observation)
         arm["utf8_bytes"] = len(_encode(observation))
-    tampered["export_identity"] = _digest({
-        k: v for k, v in tampered.items() if k != "export_identity"
-    })
+    tampered["export_identity"] = _digest(
+        {k: v for k, v in tampered.items() if k != "export_identity"}
+    )
     with pytest.raises(ValueError, match="differs beyond navigation"):
         validate_export(tampered)
 
@@ -238,11 +244,19 @@ def test_export_cli_writes_only_validated_complete_pair(tmp_path: Path) -> None:
     output = tmp_path / "frozen.json"
     manifest_path.write_text(json.dumps(_manifest()), encoding="utf-8")
     expected = export_cases(tmp_path, _manifest())
-    assert main([
-        "--repo", str(tmp_path),
-        "--manifest", str(manifest_path),
-        "--output", str(output),
-    ]) == 0
+    assert (
+        main(
+            [
+                "--repo",
+                str(tmp_path),
+                "--manifest",
+                str(manifest_path),
+                "--output",
+                str(output),
+            ]
+        )
+        == 0
+    )
     assert json.loads(output.read_text(encoding="utf-8")) == expected
     assert output.read_bytes().endswith(b"\n")
 
