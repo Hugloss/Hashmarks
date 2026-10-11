@@ -225,6 +225,24 @@ to be the repository-declaration provider context. No Python code execution.
 No new MCP tool, ambient provider, executable parser, global graph, ranker,
 test runner or source-of-truth precedence is admitted.
 
+## Backend B30–B34: source-bound evidence readiness and next-read guidance
+
+Continue from merged #427 and #424, **without duplicating** the
+C01–C04 producer/consumer pair provider or guessing runtime behavior.
+
+| Checkpoint | Implementation | Hard constraint |
+| --- | --- | --- |
+| B30 | Opt-in direct-syntax vs runtime-unresolved status | Empty read list never proves complete runtime scope |
+| B31 | Existing observed source ranges mapped to exact read requests | No new filesystem scanning, graph, owner or tool |
+| B32 | Suppress redundant source reads when literal lookup syntax is already known | Literal syntax does not prove actual env binding |
+| B33 | Max eight bounded reads with observed/retained/omitted counts | Truncation can never admit negative evidence |
+| B34 | Strict boolean opt-in, revision/privacy/default parity regressions, docs | Source binding remains provider-owned |
+
+Read guidance is a **pure projection from existing declaration observations**.
+It does not inspect files, discover dependencies, choose edits/tests, execute
+tools or prove runtime API compatibility. The producer/consumer work merged in
+#424 remains under its separate source-declaration authority.
+
 ## Open conditional checkpoints
 
 - **H04:** changed-line → symbol/relationship claims require a direct
