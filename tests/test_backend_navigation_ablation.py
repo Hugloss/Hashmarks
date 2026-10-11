@@ -11,8 +11,8 @@ import pytest
 from scripts.agent_evaluation.backend_navigation_ablation import (
     MANIFEST_SCHEMA,
     SCHEMA,
-    _encode,
     _digest,
+    _encode,
     export_cases,
     main,
     validate_export,
