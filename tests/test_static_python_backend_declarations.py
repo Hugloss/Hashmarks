@@ -115,6 +115,9 @@ def test_environment_key_reads_not_runtime_resolution_and_no_secret_defaults(
         "os.getenv", "os.environ.get", "os.environ[...]",
         "os.getenv", "os.getenv"
     ]
+    assert values[0]["direct_assignment_names"] == ["ENV"]
+    assert values[1]["direct_assignment_names"] == ["timeout"]
+    assert values[4]["runtime_assignment_binding"] == "not-established"
     assert values[0]["key"] == {
         "state": "literal-key-syntax", "value": "API_TOKEN"
     }
@@ -259,3 +262,22 @@ def test_model_and_environment_modes_remain_independently_selectable(
     assert _value(_groups(env)["python-env-access-syntax"][0])[
         "runtime_binding"
     ] == "not-established"
+
+def test_environment_keyword_default_is_syntax_not_missing_or_resolved(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "import os\nsetting = os.getenv(key='REGION', default='hidden')\n")
+    rows = _groups(
+        _observe(
+            tmp_path,
+            StaticPythonBackendDeclarations(
+                paths=(PATH,), include_model_fields=False
+            ),
+        )
+    )["python-env-access-syntax"]
+    value = _value(rows[0])
+    assert value["key"] == {"state": "literal-key-syntax", "value": "REGION"}
+    assert value["default"] == {"state": "literal-kind-only", "kind": "string"}
+    assert value["direct_assignment_names"] == ["setting"]
+    assert "hidden" not in str(value)
+    assert value["runtime_env_read"] == "not-established"
