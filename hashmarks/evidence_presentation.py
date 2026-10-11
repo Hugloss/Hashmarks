@@ -317,8 +317,20 @@ class _Projection:
         ref: tuple[object, ...] = (),
         inherited: Mapping[str, object] | None = None,
     ) -> bool:
-        context = {**(inherited or {}), **_context(packet)}
         schema = packet.get("schema")
+        if schema == operation_schema("task_evidence", "initial"):
+            _require_fields(packet, str(schema))
+            # This profile admits no display findings. Account for the entire
+            # native packet, including all qualifiers, without cloning them.
+            self.unprojected.append(
+                {
+                    "source_ref": _pointer(ref),
+                    "reason": "native-packet-not-displayed",
+                    "native_item_count": len(packet),
+                }
+            )
+            return True
+        context = {**(inherited or {}), **_context(packet)}
         projector = _projectors().get(str(schema))
         self.contexts.append(
             {
@@ -1209,20 +1221,6 @@ def _task(
     )
 
 
-def _task_initial(
-    p: _Projection,
-    packet: Mapping[str, object],
-    ref: tuple[object, ...],
-    ctx: Mapping[str, object],
-) -> None:
-    """Account for display omission; the envelope retains the initial facts once.
-
-    This profile does not duplicate already bounded native records as findings.
-    The ordinary projection accounting retains pointers to every undisplayed
-    section. A standalone projection is metadata only, not a substitute packet.
-    """
-
-
 def _impact(
     p: _Projection,
     packet: Mapping[str, object],
@@ -1467,7 +1465,6 @@ def _projectors() -> dict[str, Any]:
         operation_schema("repository_context"): _context_packet,
         operation_schema("find"): _find,
         operation_schema("task_evidence"): _task,
-        operation_schema("task_evidence", "initial"): _task_initial,
         operation_schema("change_impact"): _impact,
         operation_schema("post_change"): _impact,
         operation_schema("structural_locality"): _locality,

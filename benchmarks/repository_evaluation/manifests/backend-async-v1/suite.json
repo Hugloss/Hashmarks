@@ -1,0 +1,370 @@
+{
+  "schema": "hashmarks.backend-evidence-workflows.v1",
+  "suite": "backend-async-v1",
+  "sources": {
+    "aiokafka-fetch-cancellation-before": {
+      "commit": "c75966458b590c20f00845a77981661e57a53666",
+      "content_identity": "sha256:713aa2d0f888fb081d8978e13b839ec877fc12612685b7b0908bcadaa424aa3c:201",
+      "repository": "aiokafka",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/aio-libs/aiokafka"
+    },
+    "aiokafka-fetch-cancellation-after": {
+      "commit": "79c9bf5fe557cd2a70451a1a8709ca64c2b28500",
+      "content_identity": "sha256:78023f358d474d0e3a4a4e470bb3ce8a60bc525b0bfd6fc17289b649498f2886:201",
+      "repository": "aiokafka",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/aio-libs/aiokafka"
+    },
+    "aiokafka-sender-node-failure-before": {
+      "commit": "7d0bd255f40d156f7016f70d744738321ba65ebe",
+      "content_identity": "sha256:d5b9a6797f820a6d22b83a598050878fee997144f3ee58a442bce0b196af813e:176",
+      "repository": "aiokafka",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/aio-libs/aiokafka"
+    },
+    "aiokafka-sender-node-failure-after": {
+      "commit": "9f9161eb78785683edc7a8821983491221ccd9c6",
+      "content_identity": "sha256:174728c969f32db6f24486c28129cfc16c490f268eb5b9fb2ed45b4fd20d251f:176",
+      "repository": "aiokafka",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/aio-libs/aiokafka"
+    },
+    "aiokafka-metadata-future-before": {
+      "commit": "4cff9d77014e922c6e458224ed6abbae4fa07c4d",
+      "content_identity": "sha256:0423336a5e22ff9de03c3f366ee05944a6efdeb7f381f5c7bdeaf636a15ffd31:202",
+      "repository": "aiokafka",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/aio-libs/aiokafka"
+    },
+    "aiokafka-metadata-future-after": {
+      "commit": "608ab2443510c92226de0eb3fc2065f5d1307e12",
+      "content_identity": "sha256:3d302cc98ad33cfe589fa6540f88f790a284772c26acb5357e39b543f82f2521:202",
+      "repository": "aiokafka",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/aio-libs/aiokafka"
+    },
+    "aiokafka-stable-offset-before": {
+      "commit": "00b099f0caa9009f9774c1c1869bbdf38de6d4bd",
+      "content_identity": "sha256:5dde498649d6cf598a90b0f3bbcab9d5316ded4fc66c1d95b3ecaa1a110d3a0d:178",
+      "repository": "aiokafka",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/aio-libs/aiokafka"
+    },
+    "aiokafka-stable-offset-after": {
+      "commit": "7d331e0fe948a022cddeb6f1ea2da94fbeaa39a2",
+      "content_identity": "sha256:199a72d9fb55386b506885c14bebfafde69a43d832b9aa240d46c5f599b24465:179",
+      "repository": "aiokafka",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/aio-libs/aiokafka"
+    },
+    "sqlalchemy-failed-begin-before": {
+      "commit": "baff8f671c241ef947324d1d1305e6404b7c50af",
+      "content_identity": "sha256:9da100a37b69c3def100f396589a0a996de3574fdd5ea431ad5547d8ba2377cc:928",
+      "repository": "sqlalchemy",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/sqlalchemy/sqlalchemy"
+    },
+    "sqlalchemy-failed-begin-after": {
+      "commit": "d29277af2b8046e9ac98ea0ddcf254fe2abc758e",
+      "content_identity": "sha256:dbe3e36fcd75721616a05afb9eb79e29cf8da22cd2c9f7ef1c0f80746620eb78:929",
+      "repository": "sqlalchemy",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/sqlalchemy/sqlalchemy"
+    },
+    "faststream-middleware-enter-error-before": {
+      "commit": "627c9ce753f9bd4b32056343d00750347ee5c515",
+      "content_identity": "sha256:1d7e334299ff3bb2e4666cf7b0de23ee2533b0e525afc52d5835228abf7175f2:2320",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/ag2ai/faststream"
+    },
+    "faststream-middleware-enter-error-after": {
+      "commit": "71bd3234fcd8799f2405c2a23badf6dfd8eb2e32",
+      "content_identity": "sha256:1d1c191c8b9e3265a54c35936345c6b26ecdaa0358fd6213121bf5ce64700a71:2320",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/ag2ai/faststream"
+    },
+    "faststream-subscriber-stop-before": {
+      "commit": "2fa58356ad3dde68b667f8496f3cf04afc8ed83b",
+      "content_identity": "sha256:bb538a28cb806cc2e35bc2d4a94eb88e28a5c445ad01bab6a6228b7bca2476bd:2284",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/ag2ai/faststream"
+    },
+    "faststream-subscriber-stop-after": {
+      "commit": "31df8dac071bb47d05537afdf8fa50b36eda6354",
+      "content_identity": "sha256:fbb4698f06e9a43b109b40eccda48982e914194fb5d1e996cdf210bd7b4b7b47:2285",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/ag2ai/faststream"
+    },
+    "faststream-concurrent-queue-lifetime-before": {
+      "commit": "e5ddad47bd5f6794bf8be1243a84074a131be534",
+      "content_identity": "sha256:97dea8d5d3e9441d9cfb49107d9fa19abbcf004ffaed21f13cf65fcdd0a934d0:2231",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/ag2ai/faststream"
+    },
+    "faststream-concurrent-queue-lifetime-after": {
+      "commit": "af579438de685e7aeed97d02e422b363f983b721",
+      "content_identity": "sha256:a9c686f88787cdeb57d98e33c851eb63fcfb876681751a1d0cdd42664f0d8e80:2231",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/ag2ai/faststream"
+    },
+    "faststream-partial-pull-batch-before": {
+      "commit": "31df8dac071bb47d05537afdf8fa50b36eda6354",
+      "content_identity": "sha256:fbb4698f06e9a43b109b40eccda48982e914194fb5d1e996cdf210bd7b4b7b47:2285",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/ag2ai/faststream"
+    },
+    "faststream-partial-pull-batch-after": {
+      "commit": "3509bd2b16a57918dfe2f4b8f44ae1912a866332",
+      "content_identity": "sha256:084013a1f4addbd8e8ea6a7dbc3bb07ae4be73dcf72ed3087aabe8b65c75a5f8:2286",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/ag2ai/faststream"
+    },
+    "litestar-redis-close-before": {
+      "repository": "litestar",
+      "commit": "7cccc5e52ce92683a13436a4be8ac77c1ccd1c12",
+      "content_identity": "sha256:405875933ae0c888ae67e40260ae755d3a251c13522d579a74a67023f6475ec2:1440",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar"
+    },
+    "litestar-redis-close-after": {
+      "repository": "litestar",
+      "commit": "4cf3dafab7c15b8aa84b7b93a0dac7faec118f71",
+      "content_identity": "sha256:cde3ddd24ed3c7a03a38057a349ab4bbb74b5b44170550be232920875c8ffa5d:1440",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar"
+    },
+    "litestar-psycopg-listener-stop-before": {
+      "repository": "litestar",
+      "commit": "333e5f14032adab50dbdfb3ed0f238ca87a2a2a0",
+      "content_identity": "sha256:a93ca98d7cd8ca6369ecede37f9b8d21284af393f18274e58f1725501d6d1008:1441",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar"
+    },
+    "litestar-psycopg-listener-stop-after": {
+      "repository": "litestar",
+      "commit": "826122894f1df8abbb9eff09a57b950fe09f9641",
+      "content_identity": "sha256:8267677fde843a1e6cae58e52a0fba4bdba0350f1a8e978b75ae8f7ffea84635:1441",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar"
+    },
+    "litestar-asyncpg-listener-lock-before": {
+      "repository": "litestar",
+      "commit": "2967787c55056aab13e1290410b61360b3b36ed0",
+      "content_identity": "sha256:3b391774e4003c340daf6ca71c7346902848a28179ef1e4ced93a011dc73bdef:1439",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar"
+    },
+    "litestar-asyncpg-listener-lock-after": {
+      "repository": "litestar",
+      "commit": "733d72cf9d3c8a63ec54490d4352b267590c2e9f",
+      "content_identity": "sha256:dfeb21a561047ac80c938883f63e674319aec5c56a71b79971144fabbb47dcde:1440",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar"
+    }
+  },
+  "workflows": [
+    {
+      "after": "aiokafka-fetch-cancellation-after",
+      "before": "aiokafka-fetch-cancellation-before",
+      "capabilities": [
+        12
+      ],
+      "changed_paths": [
+        "aiokafka/consumer/fetcher.py"
+      ],
+      "id": "aiokafka-fetch-cancellation",
+      "native_required": true,
+      "problem_id": "79c9bf5fe557cd2a70451a1a8709ca64c2b28500",
+      "problem_source": "https://github.com/aio-libs/aiokafka/commit/79c9bf5fe557cd2a70451a1a8709ca64c2b28500",
+      "repository": "aiokafka",
+      "task": "Fix cancellation escaping Fetcher._fetch_requests_routine while draining finished fetch tasks."
+    },
+    {
+      "after": "aiokafka-sender-node-failure-after",
+      "before": "aiokafka-sender-node-failure-before",
+      "capabilities": [
+        12
+      ],
+      "changed_paths": [
+        "aiokafka/producer/sender.py"
+      ],
+      "id": "aiokafka-sender-node-failure",
+      "native_required": true,
+      "problem_id": "9f9161eb78785683edc7a8821983491221ccd9c6",
+      "problem_source": "https://github.com/aio-libs/aiokafka/commit/9f9161eb78785683edc7a8821983491221ccd9c6",
+      "repository": "aiokafka",
+      "task": "Fix Sender._find_coordinator after node failure so the coordinator can be rediscovered."
+    },
+    {
+      "after": "aiokafka-metadata-future-after",
+      "before": "aiokafka-metadata-future-before",
+      "capabilities": [
+        12
+      ],
+      "changed_paths": [
+        "aiokafka/cluster.py"
+      ],
+      "id": "aiokafka-metadata-future",
+      "native_required": true,
+      "problem_id": "608ab2443510c92226de0eb3fc2065f5d1307e12",
+      "problem_source": "https://github.com/aio-libs/aiokafka/commit/608ab2443510c92226de0eb3fc2065f5d1307e12",
+      "repository": "aiokafka",
+      "task": "Fix ClusterMetadata.failed_update completing a request_update future through unsupported methods."
+    },
+    {
+      "after": "aiokafka-stable-offset-after",
+      "before": "aiokafka-stable-offset-before",
+      "capabilities": [
+        12
+      ],
+      "changed_paths": [
+        "aiokafka/consumer/fetcher.py"
+      ],
+      "id": "aiokafka-stable-offset",
+      "native_required": true,
+      "problem_id": "7d331e0fe948a022cddeb6f1ea2da94fbeaa39a2",
+      "problem_source": "https://github.com/aio-libs/aiokafka/commit/7d331e0fe948a022cddeb6f1ea2da94fbeaa39a2",
+      "repository": "aiokafka",
+      "task": "Fix Fetcher._proc_fetch_request parsing last_stable_offset for fetch response versions five through ten."
+    },
+    {
+      "after": "sqlalchemy-failed-begin-after",
+      "before": "sqlalchemy-failed-begin-before",
+      "capabilities": [
+        12
+      ],
+      "changed_paths": [
+        "lib/sqlalchemy/dialects/postgresql/asyncpg.py"
+      ],
+      "id": "sqlalchemy-failed-begin",
+      "native_required": true,
+      "problem_id": "d29277af2b8046e9ac98ea0ddcf254fe2abc758e",
+      "problem_source": "https://github.com/sqlalchemy/sqlalchemy/commit/d29277af2b8046e9ac98ea0ddcf254fe2abc758e",
+      "repository": "sqlalchemy",
+      "task": "Fix AsyncAdapt_asyncpg_connection._start_transaction retaining a failed BEGIN transaction and masking the original exception during cleanup."
+    },
+    {
+      "after": "faststream-middleware-enter-error-after",
+      "before": "faststream-middleware-enter-error-before",
+      "capabilities": [
+        12
+      ],
+      "changed_paths": [
+        "faststream/_internal/endpoint/subscriber/usecase.py"
+      ],
+      "id": "faststream-middleware-enter-error",
+      "native_required": true,
+      "problem_id": "71bd3234fcd8799f2405c2a23badf6dfd8eb2e32",
+      "problem_source": "https://github.com/ag2ai/faststream/commit/71bd3234fcd8799f2405c2a23badf6dfd8eb2e32",
+      "repository": "faststream",
+      "task": "Fix SubscriberUsecase.process_message failing to exit already entered middleware when later middleware entry raises."
+    },
+    {
+      "after": "faststream-subscriber-stop-after",
+      "before": "faststream-subscriber-stop-before",
+      "capabilities": [
+        12
+      ],
+      "changed_paths": [
+        "faststream/_internal/broker/broker.py"
+      ],
+      "id": "faststream-subscriber-stop",
+      "native_required": true,
+      "problem_id": "31df8dac071bb47d05537afdf8fa50b36eda6354",
+      "problem_source": "https://github.com/ag2ai/faststream/commit/31df8dac071bb47d05537afdf8fa50b36eda6354",
+      "repository": "faststream",
+      "task": "Fix BrokerUsecase.stop blocking other subscribers from shutting down when one subscriber stops slowly or raises."
+    },
+    {
+      "after": "faststream-concurrent-queue-lifetime-after",
+      "before": "faststream-concurrent-queue-lifetime-before",
+      "capabilities": [
+        12
+      ],
+      "changed_paths": [
+        "faststream/_internal/endpoint/subscriber/mixins.py"
+      ],
+      "id": "faststream-concurrent-queue-lifetime",
+      "native_required": true,
+      "problem_id": "af579438de685e7aeed97d02e422b363f983b721",
+      "problem_source": "https://github.com/ag2ai/faststream/commit/af579438de685e7aeed97d02e422b363f983b721",
+      "repository": "faststream",
+      "task": "Fix ConcurrentMixin.__init__ opening a concurrent subscriber queue before start and leaking it after stop."
+    },
+    {
+      "after": "faststream-partial-pull-batch-after",
+      "before": "faststream-partial-pull-batch-before",
+      "capabilities": [
+        12
+      ],
+      "changed_paths": [
+        "faststream/nats/subscriber/usecases/stream_pull_subscriber.py"
+      ],
+      "id": "faststream-partial-pull-batch",
+      "native_required": true,
+      "problem_id": "3509bd2b16a57918dfe2f4b8f44ae1912a866332",
+      "problem_source": "https://github.com/ag2ai/faststream/commit/3509bd2b16a57918dfe2f4b8f44ae1912a866332",
+      "repository": "faststream",
+      "task": "Fix BatchPullStreamSubscriber._consume_pull discarding partially collected messages while waiting for a full batch."
+    },
+    {
+      "id": "litestar-redis-close",
+      "repository": "litestar",
+      "problem_id": "4cf3dafab7c15b8aa84b7b93a0dac7faec118f71",
+      "problem_source": "https://github.com/litestar-org/litestar/commit/4cf3dafab7c15b8aa84b7b93a0dac7faec118f71",
+      "task": "Use the supported Redis pubsub close operation while retaining older-backend fallback",
+      "before": "litestar-redis-close-before",
+      "after": "litestar-redis-close-after",
+      "changed_paths": [
+        "litestar/channels/backends/redis.py"
+      ],
+      "capabilities": [
+        12
+      ],
+      "native_required": true
+    },
+    {
+      "id": "litestar-psycopg-listener-stop",
+      "repository": "litestar",
+      "problem_id": "826122894f1df8abbb9eff09a57b950fe09f9641",
+      "problem_source": "https://github.com/litestar-org/litestar/commit/826122894f1df8abbb9eff09a57b950fe09f9641",
+      "task": "Observe the listener stop change that waits for completion and retains bounded cancellation fallback",
+      "before": "litestar-psycopg-listener-stop-before",
+      "after": "litestar-psycopg-listener-stop-after",
+      "changed_paths": [
+        "litestar/channels/backends/psycopg.py"
+      ],
+      "capabilities": [
+        12
+      ],
+      "native_required": true
+    },
+    {
+      "id": "litestar-asyncpg-listener-lock",
+      "repository": "litestar",
+      "problem_id": "733d72cf9d3c8a63ec54490d4352b267590c2e9f",
+      "problem_source": "https://github.com/litestar-org/litestar/commit/733d72cf9d3c8a63ec54490d4352b267590c2e9f",
+      "task": "Observe the async listener subscription change that declares a backend lock around mutations",
+      "before": "litestar-asyncpg-listener-lock-before",
+      "after": "litestar-asyncpg-listener-lock-after",
+      "changed_paths": [
+        "litestar/channels/backends/asyncpg.py"
+      ],
+      "capabilities": [
+        12
+      ],
+      "native_required": true
+    }
+  ],
+  "grader_file": "grader.json",
+  "scope": "Twelve distinct upstream async-resource/cancellation/subscription problems across four repositories; source syntax only, runtime task ownership remains unknown. Qualification is incomplete until the dedicated revision, transport and native checks run."
+}

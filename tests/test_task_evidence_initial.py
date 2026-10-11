@@ -25,6 +25,21 @@ def _decoded_task_matches(matches: dict[str, Any]) -> dict[str, Any]:
     return matches
 
 
+def _assert_metadata_only_display(
+    response: dict[str, Any], packet: dict[str, Any]
+) -> None:
+    assert response["result"] == packet
+    assert response["presentation"]["groups"] == []
+    assert response["presentation"]["source_context"] == []
+    assert response["presentation"]["unprojected_sections"] == [
+        {
+            "source_ref": "",
+            "reason": "native-packet-not-displayed",
+            "native_item_count": len(packet),
+        }
+    ]
+
+
 @pytest.mark.parametrize("ambiguous", [False, True])
 def test_initial_profile_preserves_authority_and_source_identity(
     tmp_path: Path, ambiguous: bool
@@ -81,6 +96,8 @@ def test_initial_profile_preserves_authority_and_source_identity(
         tool_contract("task_evidence").validate_response(
             response, result_mode="initial", presentation=mode
         )
+        if mode != "none":
+            _assert_metadata_only_display(response, api)
     surface = HashmarksMcpSurface(str(tmp_path))
     try:
         observed = cast(
