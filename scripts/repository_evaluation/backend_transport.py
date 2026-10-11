@@ -37,10 +37,11 @@ def _cli_arguments(operation: str, inputs: dict[str, Any]) -> list[str]:
             ("limit", "--limit"),
             ("per_role", "--per-role"),
             ("token_budget", "--budget"),
+            ("result_mode", "--result-mode"),
         ):
             if key in inputs:
                 args.extend((flag, str(inputs[key])))
-        if set(inputs) - {"task", "limit", "per_role", "token_budget"}:
+        if set(inputs) - {"task", "limit", "per_role", "token_budget", "result_mode"}:
             raise ValueError("backend CLI capture requires source-only task inputs")
         return args
     if operation == "structural_locality":
@@ -54,6 +55,23 @@ def _cli_arguments(operation: str, inputs: dict[str, Any]) -> list[str]:
             "--result-mode",
             inputs.get("result_mode", "default"),
         ]
+    if operation == "change_impact":
+        allowed = {"task", "changed_paths", "changed_line_spans", "max_depth"}
+        if set(inputs) - allowed:
+            raise ValueError("backend CLI change capture requires matching public inputs")
+        args = ["change-impact", inputs["task"]]
+        for path in inputs["changed_paths"]:
+            args.extend(("--changed", path))
+        for span in inputs.get("changed_line_spans", []):
+            args.extend(
+                (
+                    "--changed-line-span",
+                    f"{span['path']}:{span['start_line']}:{span['end_line']}",
+                )
+            )
+        if "max_depth" in inputs:
+            args.extend(("--max-depth", str(inputs["max_depth"])))
+        return args
     raise ValueError(f"backend CLI transport is not available for {operation}")
 
 

@@ -231,7 +231,12 @@ def _indexed_signature(
 
 
 def _decorator_hits(
-    source: str, path: str, start_line: int, end_line: int
+    source: str,
+    path: str,
+    start_line: int,
+    end_line: int,
+    *,
+    tree: ast.Module | None = None,
 ) -> list[
     tuple[
         int,
@@ -240,7 +245,8 @@ def _decorator_hits(
         ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef,
     ]
 ]:
-    tree = ast.parse(source, filename=path)
+    if tree is None:
+        tree = ast.parse(source, filename=path)
     hits: list[
         tuple[
             int,
@@ -293,6 +299,7 @@ def observe_python_decorator_associations(
     span: Mapping[str, int],
     *,
     allow_source_syntax: bool = True,
+    tree: ast.Module | None = None,
 ) -> dict[str, object] | None:
     """Associate edited decorators with *current* indexed declarations only.
 
@@ -305,7 +312,11 @@ def observe_python_decorator_associations(
         return _unresolved("python-decorator-source-over-bound")
     try:
         hits = _decorator_hits(
-            raw.decode("utf-8"), path, span["start_line"], span["end_line"]
+            raw.decode("utf-8"),
+            path,
+            span["start_line"],
+            span["end_line"],
+            tree=tree,
         )
     except (SyntaxError, UnicodeDecodeError, ValueError, RecursionError):
         return _unresolved("python-decorator-syntax-unavailable")

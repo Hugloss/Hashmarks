@@ -373,9 +373,12 @@ def _task_evidence_code(args) -> int:
             limit=args.limit,
             per_role=args.per_role,
             supplied_observations=supplied,
+            result_mode=args.result_mode,
         ),
     )
-    _print_operation("task_evidence", value, presentation=args.presentation)
+    _print_operation(
+        "task_evidence", value, presentation=args.presentation, mode=args.result_mode
+    )
     return 0
 
 
@@ -435,7 +438,7 @@ def _change_impact_code(args) -> int:
             ),
         ),
     )
-    _print_operation("change_impact", value)
+    _print_operation("change_impact", value, presentation=args.presentation)
     return 0
 
 
@@ -782,6 +785,9 @@ def _add_task_evidence_cli(sub, *, add_common_arguments: Callable[..., None]) ->
     _add_evidence_presentation_cli(task_evidence)
     task_evidence.add_argument("task")
     task_evidence.add_argument(
+        "--result-mode", choices=("default", "initial"), default="default"
+    )
+    task_evidence.add_argument(
         "--supplied-observations", help="JSON file containing captured LSP observations"
     )
     task_evidence.add_argument(
@@ -823,6 +829,7 @@ def _add_change_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
         help="expose bounded changed-code impact and verification relevance",
     )
     add_common_arguments(change_impact, inherited=True)
+    _add_evidence_presentation_cli(change_impact)
     change_impact.add_argument("task")
     change_impact.add_argument(
         "--changed",

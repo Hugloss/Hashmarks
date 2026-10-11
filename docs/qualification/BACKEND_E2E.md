@@ -121,6 +121,32 @@ UTF-8 byte count and the existing byte-based token estimate. Compact/text must
 fit within 4,000 estimated tokens; the MCP measurement includes both text and
 structured content when both are delivered.
 
+Task evidence now supports an explicit `initial` result mode:
+
+```sh
+hashmarks task-evidence 'Describe the repository question' --result-mode initial
+```
+
+The API and MCP accept `result_mode="initial"` as well. The default remains the
+full `hashmarks.task-evidence.v5` packet. The initial mode returns
+`hashmarks.task-evidence-initial.v1`: the same admitted owner, selected verifier,
+provenance, freshness and uncertainty, canonical first-three locators and bounded
+declaration supplements, one selected/canonical relevance record, and the
+separate weak task matches. It retains exact source locations while omitting the
+source body, ancillary locator/ranking detail and related sections. Every
+collection reduction and omitted section is recorded in `initial_projection`.
+The full packet and projection have distinct identities. Re-observing the full
+mode may observe changed source, so consumers must compare the supplied full
+packet identity before treating an expansion as the same observation.
+
+For this new mode, presentation metadata accounts for undisplayed sections
+without duplicating the bounded native facts as display findings. Public
+envelopes retain those facts in `result`; a standalone presentation projection is
+metadata only. This does not change the existing full-mode rendering contract.
+The new mode is a candidate for the initial-response target, not proof that the
+4,000-token target has been achieved. Transport measurements and source-fact
+qualification still determine that result; existing gates have not been weakened.
+
 Source ranges and revisions are checked against the admitted source trees.
 Changed symbols are checked as exact path/symbol/range records, so independent
 matches from different declarations cannot manufacture a correspondence.
@@ -164,7 +190,7 @@ release gates.
 | R02 | Exact owner/direct path observations with unresolved missing edges | Repaired arbitrary first-symbol projection, incomplete-graph candidate displacement and hidden explicitly named method locators; broader direct-path corpus pending |
 | R03 | Genuine failure frames, changed symbols and independently known verifier correspondence | Exact revision/range grading, qualified indirect/alias references and weak lexical test scouts implemented; failure corpus and further relevance proof pending |
 | R04 | Genuine handler/model/config/data/service declaration cases | Pending; no runtime compatibility inference is admitted |
-| R05 | Async/message/transaction syntax and source ownership observations | Genuine problems identified; capability-specific observations and adversarial proof pending |
+| R05 | Async/message/transaction syntax and source ownership observations | Current-source/index-bound function syntax implemented for caller-reported changed spans; genuine transport qualification and broader cases pending |
 | R06 | Required facts visible within the initial response ceiling | Whole-response size measured; compact/text CLI whitespace removed without changing facts; duplicated payloads still exceed the ceiling |
 | R07 | Dependency/native/language qualification and comparable indexing economics | Explicit backend SCIP capture/source/reopen/transport runner implemented; composed packet, language and economics qualification pending |
 | R08 | Complete reviewed matrix and final bounded regression qualification | Pending; no 5/5 completion claim |
@@ -190,6 +216,55 @@ surface. The search uses repository test-domain and visibility qualification;
 test-shaped production filenames do not become test surfaces. Reaching the
 lexical bound remains explicit incomplete evidence. A matching word never proves
 that a test exercises the changed symbol or is sufficient verification.
+
+Task packets also retain a separate `verification.relevance.task_matches`
+observation, including when owner discrimination suppresses owner-bound reference
+relevance. It records up to sixteen visible test paths from the first sixty-four
+indexed lexical matches, their matched-term counts, index generation and explicit
+search/projection bounds. Source binding is indexed and not revalidated by this
+projection. It never establishes an edit-to-test relationship, changes the
+selected verifier, or admits negative evidence. The qualification oracle and
+release gates are unchanged; finding a known verifier in these weak observations
+is additional retrieval evidence, not a passing correspondence claim.
+
+```text
+Observed repository fact/evidence: Bounded indexed task-term matches in test files.
+Authority source: Existing CodeMap lexical index; no exact test relationship.
+Completeness/freshness behavior: Explicit bounds and index generation; source
+  binding is not revalidated; negative evidence is never admitted.
+Existing Hashmarks owner extended: Task evidence and its presentation projection.
+Consumer/execution responsibility explicitly not acquired: Choosing/running
+  verification, recommendations, ownership and test-sufficiency decisions.
+Decision: OBSERVER
+```
+
+Caller-reported changed-line evidence now includes bounded
+`function_boundary_syntax` for Python functions whose exact declaration ranges
+match the current canonical symbol index. It exposes await/call/with/async-with
+and exception-handler syntax, with exact UTF-8 source columns. The shared Python
+AST cache supplies one qualified tree to body and decorator observers; canonical
+member bytes and the existing read-after-observation revision check remain the
+authority. Oversized, unstable or unavailable parses stay unresolved. Nested
+def/class/lambda subtrees are outside the declared body scope. Site truncation,
+omitted functions and unsupported callee expressions remain explicit.
+
+These observations can show `cancel`, `ack`, `commit` or `rollback` spelling in
+source. They do not establish the receiver's API identity, actual execution,
+message acknowledgement, transaction effects or task ownership. Call syntax is
+not an exact caller-to-callee edge.
+
+```text
+Observed repository fact/evidence: Direct function-body syntax and source sites.
+Authority source: Canonical current member bytes, shared Python AST parser and
+  exact indexed declaration-range/name correspondence.
+Completeness/freshness behavior: Explicit lexical scope, byte/function/site
+  bounds, omission counts, unresolved reads and existing revision closure;
+  negative evidence is not admitted.
+Existing Hashmarks owner extended: Caller-reported changed-line evidence.
+Consumer/execution responsibility explicitly not acquired: Runtime API/task/
+  message/transaction ownership, execution order, diagnosis and verification.
+Decision: OBSERVER
+```
 
 ## Measured implementation checkpoint
 

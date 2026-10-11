@@ -1131,6 +1131,28 @@ def _task_verification(
                     shape="record",
                     assertion="producer_claim",
                 )
+        relevance = verification.get("relevance")
+        task_matches = (
+            relevance.get("task_matches") if isinstance(relevance, Mapping) else None
+        )
+        if isinstance(task_matches, Mapping):
+            match_context = {
+                **verification_context,
+                "task_match_qualification": {
+                    key: deepcopy(value)
+                    for key, value in task_matches.items()
+                    if key != "matches"
+                },
+            }
+            p.field(
+                task_matches,
+                "matches",
+                "verification",
+                (*ref, "verification", "relevance", "task_matches"),
+                match_context,
+                kind="lexical_test_term_match",
+                assertion="producer_claim",
+            )
 
 
 def _task(
@@ -1185,6 +1207,20 @@ def _task(
             ("related", "relationship", "record"),
         ),
     )
+
+
+def _task_initial(
+    p: _Projection,
+    packet: Mapping[str, object],
+    ref: tuple[object, ...],
+    ctx: Mapping[str, object],
+) -> None:
+    """Account for display omission; the envelope retains the initial facts once.
+
+    This profile does not duplicate already bounded native records as findings.
+    The ordinary projection accounting retains pointers to every undisplayed
+    section. A standalone projection is metadata only, not a substitute packet.
+    """
 
 
 def _impact(
@@ -1431,6 +1467,7 @@ def _projectors() -> dict[str, Any]:
         operation_schema("repository_context"): _context_packet,
         operation_schema("find"): _find,
         operation_schema("task_evidence"): _task,
+        operation_schema("task_evidence", "initial"): _task_initial,
         operation_schema("change_impact"): _impact,
         operation_schema("post_change"): _impact,
         operation_schema("structural_locality"): _locality,
@@ -1454,6 +1491,12 @@ def _require_fields(packet: Mapping[str, object], schema: str) -> None:
         operation_schema("find"): ("results",),
         operation_schema("repository_context"): ("areas",),
         operation_schema("task_evidence"): ("retrieval", "ownership", "verification"),
+        operation_schema("task_evidence", "initial"): (
+            "retrieval",
+            "ownership",
+            "verification",
+            "initial_projection",
+        ),
         operation_schema("source_observation", "member"): ("member", "occurrences"),
         operation_schema("source_observation", "scope"): (
             "member_observations",
@@ -1562,7 +1605,14 @@ def present_repository_evidence(
         "execution_effect": "none",
     }
     if format == "text":
-        result["text"] = evidence_projection_text(result)
+        if packet.get("schema") == operation_schema("task_evidence", "initial"):
+            result["text"] = (
+                "Initial facts and qualifications are in the native packet. "
+                "This display projection contains metadata only. "
+                "Omitted display detail does not establish repository absence."
+            )
+        else:
+            result["text"] = evidence_projection_text(result)
     return result
 
 

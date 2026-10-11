@@ -1,0 +1,2113 @@
+{
+  "schema": "hashmarks.backend-function-syntax-oracles.v1",
+  "source_suite": "suite.json",
+  "scope": "Explicit independently labeled source syntax specimens. Does not qualify answer-blind retrieval or runtime effects; capabilities retain separate breadth and adversarial gates.",
+  "cases": {
+    "aiokafka-fetch-cancellation": {
+      "before": {
+        "source": "aiokafka-fetch-cancellation-before",
+        "source_label": {
+          "declaration_line": 476,
+          "end_line": 581,
+          "path": "aiokafka/consumer/fetcher.py",
+          "sha256": "0d055beebcc194c74ba0dc8254f200f9f61d91939f076c983f2f7dc1fdda19b5",
+          "start_line": 476,
+          "symbol": "Fetcher._fetch_requests_routine"
+        },
+        "reported_span": {
+          "path": "aiokafka/consumer/fetcher.py",
+          "start_line": 514,
+          "end_line": 514
+        },
+        "literal_source_line_sha256": "ea57344b75f3a3818685cfd16fd916d8324ad07913b61cef3d431dafa6d10e91",
+        "checks": [
+          {
+            "id": "current-member",
+            "pointer": "/changed_line_evidence/observations/0/member_revision",
+            "predicate": "equals",
+            "value": "4dd31fe8f199c13a651906e6b323a7432ce905663056ee308d7454864a2ad8b9",
+            "authority_check": true
+          },
+          {
+            "id": "exact-declaration",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_record",
+            "value": {
+              "subject": "aiokafka/consumer/fetcher.py::Fetcher._fetch_requests_routine",
+              "state": "source-index-bound",
+              "declaration_syntax": "async"
+            }
+          },
+          {
+            "id": "authority",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+            "predicate": "equals",
+            "value": "direct-static-syntax-only",
+            "authority_check": true
+          },
+          {
+            "id": "runtime_boundary_kind",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "task_ownership",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "execution_order",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "callee_resolution",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "negative_evidence_admissible",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+            "predicate": "equals",
+            "value": false,
+            "authority_check": true
+          },
+          {
+            "id": "literal-site",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
+            "predicate": "includes_record",
+            "value": {
+              "line": 514,
+              "syntax_kind": "call",
+              "callee_identifier_syntax": "task.cancel"
+            }
+          }
+        ]
+      },
+      "after": {
+        "source": "aiokafka-fetch-cancellation-after",
+        "source_label": {
+          "declaration_line": 476,
+          "end_line": 582,
+          "path": "aiokafka/consumer/fetcher.py",
+          "sha256": "2a8ec5932644c9b04ff222ee7f27c9b0d6a0a7e89ce5a158ed340ceedc2ec7a9",
+          "start_line": 476,
+          "symbol": "Fetcher._fetch_requests_routine"
+        },
+        "reported_span": {
+          "path": "aiokafka/consumer/fetcher.py",
+          "start_line": 514,
+          "end_line": 514
+        },
+        "literal_source_line_sha256": "ea57344b75f3a3818685cfd16fd916d8324ad07913b61cef3d431dafa6d10e91",
+        "checks": [
+          {
+            "id": "current-member",
+            "pointer": "/changed_line_evidence/observations/0/member_revision",
+            "predicate": "equals",
+            "value": "50b12dbcebf127dc9a1d1e35680d89efa7729bcc405e56c8cea188b2d50ea231",
+            "authority_check": true
+          },
+          {
+            "id": "exact-declaration",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_record",
+            "value": {
+              "subject": "aiokafka/consumer/fetcher.py::Fetcher._fetch_requests_routine",
+              "state": "source-index-bound",
+              "declaration_syntax": "async"
+            }
+          },
+          {
+            "id": "authority",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+            "predicate": "equals",
+            "value": "direct-static-syntax-only",
+            "authority_check": true
+          },
+          {
+            "id": "runtime_boundary_kind",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "task_ownership",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "execution_order",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "callee_resolution",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "negative_evidence_admissible",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+            "predicate": "equals",
+            "value": false,
+            "authority_check": true
+          },
+          {
+            "id": "literal-site",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
+            "predicate": "includes_record",
+            "value": {
+              "line": 514,
+              "syntax_kind": "call",
+              "callee_identifier_syntax": "task.cancel"
+            }
+          }
+        ]
+      }
+    },
+    "aiokafka-sender-node-failure": {
+      "before": {
+        "source": "aiokafka-sender-node-failure-before",
+        "source_label": {
+          "declaration_line": 217,
+          "end_line": 265,
+          "path": "aiokafka/producer/sender.py",
+          "sha256": "2c1e273c8cd3707675b5faac49bdc6cd407dbf9f65f9635328ff3417bbb6721d",
+          "start_line": 217,
+          "symbol": "Sender._find_coordinator"
+        },
+        "reported_span": {
+          "path": "aiokafka/producer/sender.py",
+          "start_line": 235,
+          "end_line": 235
+        },
+        "literal_source_line_sha256": "0c2bc746bcf58539be0d9486cbc4f29a7298cd926fa381e0e269a61f3a581d3c",
+        "checks": [
+          {
+            "id": "current-member",
+            "pointer": "/changed_line_evidence/observations/0/member_revision",
+            "predicate": "equals",
+            "value": "b0f4725927411e509bd5545fdc966abdeb3e24ffca48ff55df06f5e7c0109b11",
+            "authority_check": true
+          },
+          {
+            "id": "exact-declaration",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_record",
+            "value": {
+              "subject": "aiokafka/producer/sender.py::Sender._find_coordinator",
+              "state": "source-index-bound",
+              "declaration_syntax": "async"
+            }
+          },
+          {
+            "id": "authority",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+            "predicate": "equals",
+            "value": "direct-static-syntax-only",
+            "authority_check": true
+          },
+          {
+            "id": "runtime_boundary_kind",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "task_ownership",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "execution_order",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "callee_resolution",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "negative_evidence_admissible",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+            "predicate": "equals",
+            "value": false,
+            "authority_check": true
+          },
+          {
+            "id": "literal-site",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
+            "predicate": "includes_record",
+            "value": {
+              "line": 235,
+              "syntax_kind": "await",
+              "callee_identifier_syntax": "self.client.force_metadata_update"
+            }
+          }
+        ]
+      },
+      "after": {
+        "source": "aiokafka-sender-node-failure-after",
+        "source_label": {
+          "declaration_line": 217,
+          "end_line": 269,
+          "path": "aiokafka/producer/sender.py",
+          "sha256": "33001a36bf6a0ae06058568aada62aa046fce14e4897466e72faf87bf42aa368",
+          "start_line": 217,
+          "symbol": "Sender._find_coordinator"
+        },
+        "reported_span": {
+          "path": "aiokafka/producer/sender.py",
+          "start_line": 239,
+          "end_line": 239
+        },
+        "literal_source_line_sha256": "0c2bc746bcf58539be0d9486cbc4f29a7298cd926fa381e0e269a61f3a581d3c",
+        "checks": [
+          {
+            "id": "current-member",
+            "pointer": "/changed_line_evidence/observations/0/member_revision",
+            "predicate": "equals",
+            "value": "59345da12744cc3a0004041b4b7a8be95f85517c19476931823a142029b23dd0",
+            "authority_check": true
+          },
+          {
+            "id": "exact-declaration",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_record",
+            "value": {
+              "subject": "aiokafka/producer/sender.py::Sender._find_coordinator",
+              "state": "source-index-bound",
+              "declaration_syntax": "async"
+            }
+          },
+          {
+            "id": "authority",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+            "predicate": "equals",
+            "value": "direct-static-syntax-only",
+            "authority_check": true
+          },
+          {
+            "id": "runtime_boundary_kind",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "task_ownership",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "execution_order",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "callee_resolution",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "negative_evidence_admissible",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+            "predicate": "equals",
+            "value": false,
+            "authority_check": true
+          },
+          {
+            "id": "literal-site",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
+            "predicate": "includes_record",
+            "value": {
+              "line": 239,
+              "syntax_kind": "await",
+              "callee_identifier_syntax": "self.client.force_metadata_update"
+            }
+          }
+        ]
+      }
+    },
+    "aiokafka-metadata-future": {
+      "before": {
+        "source": "aiokafka-metadata-future-before",
+        "source_label": {
+          "declaration_line": 204,
+          "end_line": 213,
+          "path": "aiokafka/cluster.py",
+          "sha256": "e392c1d1d0f3615b92830b114dbd7388fd15efe8e52a553c8d9a08737e6e98c9",
+          "start_line": 204,
+          "symbol": "ClusterMetadata.failed_update"
+        },
+        "reported_span": {
+          "path": "aiokafka/cluster.py",
+          "start_line": 204,
+          "end_line": 204
+        },
+        "literal_source_line_sha256": "d6ffd83c899921c45a460ac891ba1dc032227a2f088b6047528df8231fd171d7",
+        "checks": [
+          {
+            "id": "current-member",
+            "pointer": "/changed_line_evidence/observations/0/member_revision",
+            "predicate": "equals",
+            "value": "5b35147961e532a33aa6671bf88bbdbfba8cb95cfdf92b00ed1a2fb7267b9484",
+            "authority_check": true
+          },
+          {
+            "id": "exact-declaration",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_record",
+            "value": {
+              "subject": "aiokafka/cluster.py::ClusterMetadata.failed_update",
+              "state": "source-index-bound",
+              "declaration_syntax": "sync"
+            }
+          },
+          {
+            "id": "authority",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+            "predicate": "equals",
+            "value": "direct-static-syntax-only",
+            "authority_check": true
+          },
+          {
+            "id": "runtime_boundary_kind",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "task_ownership",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "execution_order",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "callee_resolution",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "negative_evidence_admissible",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+            "predicate": "equals",
+            "value": false,
+            "authority_check": true
+          }
+        ]
+      },
+      "after": {
+        "source": "aiokafka-metadata-future-after",
+        "source_label": {
+          "declaration_line": 204,
+          "end_line": 213,
+          "path": "aiokafka/cluster.py",
+          "sha256": "7eb3371ae526b1275ff9210acb4066e558cead1c7b2b5618dfad781a8ae7ceaa",
+          "start_line": 204,
+          "symbol": "ClusterMetadata.failed_update"
+        },
+        "reported_span": {
+          "path": "aiokafka/cluster.py",
+          "start_line": 212,
+          "end_line": 212
+        },
+        "literal_source_line_sha256": "9ed57d4af73208162c4846a22de5920e58faa9bfc5f985483c682ccc90178f03",
+        "checks": [
+          {
+            "id": "current-member",
+            "pointer": "/changed_line_evidence/observations/0/member_revision",
+            "predicate": "equals",
+            "value": "04d25de7aadff509a7b803fb43e13550f6f73e1a57ea94a9044019e7a5b81656",
+            "authority_check": true
+          },
+          {
+            "id": "exact-declaration",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_record",
+            "value": {
+              "subject": "aiokafka/cluster.py::ClusterMetadata.failed_update",
+              "state": "source-index-bound",
+              "declaration_syntax": "sync"
+            }
+          },
+          {
+            "id": "authority",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+            "predicate": "equals",
+            "value": "direct-static-syntax-only",
+            "authority_check": true
+          },
+          {
+            "id": "runtime_boundary_kind",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "task_ownership",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "execution_order",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "callee_resolution",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "negative_evidence_admissible",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+            "predicate": "equals",
+            "value": false,
+            "authority_check": true
+          },
+          {
+            "id": "literal-site",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
+            "predicate": "includes_record",
+            "value": {
+              "line": 212,
+              "syntax_kind": "call",
+              "callee_identifier_syntax": "f.set_exception"
+            }
+          }
+        ]
+      }
+    },
+    "aiokafka-stable-offset": {
+      "before": {
+        "source": "aiokafka-stable-offset-before",
+        "source_label": {
+          "declaration_line": 744,
+          "end_line": 908,
+          "path": "aiokafka/consumer/fetcher.py",
+          "sha256": "a70e682fa558181aaa81e30aa0dfe6298ee0c5d63f8cfec87b7c3613966699eb",
+          "start_line": 744,
+          "symbol": "Fetcher._proc_fetch_request"
+        },
+        "reported_span": {
+          "path": "aiokafka/consumer/fetcher.py",
+          "start_line": 747,
+          "end_line": 747
+        },
+        "literal_source_line_sha256": "84828763e13efe32432a220b5b99371713c167cca07310c88f74bba9530eea54",
+        "checks": [
+          {
+            "id": "current-member",
+            "pointer": "/changed_line_evidence/observations/0/member_revision",
+            "predicate": "equals",
+            "value": "056d07d868c886616c2b524d78e146f0c2a2c9b3ff1166287c26693e8092600a",
+            "authority_check": true
+          },
+          {
+            "id": "exact-declaration",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_record",
+            "value": {
+              "subject": "aiokafka/consumer/fetcher.py::Fetcher._proc_fetch_request",
+              "state": "source-index-bound",
+              "declaration_syntax": "async"
+            }
+          },
+          {
+            "id": "authority",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+            "predicate": "equals",
+            "value": "direct-static-syntax-only",
+            "authority_check": true
+          },
+          {
+            "id": "runtime_boundary_kind",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "task_ownership",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "execution_order",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "callee_resolution",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "negative_evidence_admissible",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+            "predicate": "equals",
+            "value": false,
+            "authority_check": true
+          },
+          {
+            "id": "literal-site",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
+            "predicate": "includes_record",
+            "value": {
+              "line": 747,
+              "syntax_kind": "await",
+              "callee_identifier_syntax": "self._client.send"
+            }
+          }
+        ]
+      },
+      "after": {
+        "source": "aiokafka-stable-offset-after",
+        "source_label": {
+          "declaration_line": 744,
+          "end_line": 914,
+          "path": "aiokafka/consumer/fetcher.py",
+          "sha256": "59bf948fff47eed580671971252454daa614df479733f3bedfefe95bc4d8ad30",
+          "start_line": 744,
+          "symbol": "Fetcher._proc_fetch_request"
+        },
+        "reported_span": {
+          "path": "aiokafka/consumer/fetcher.py",
+          "start_line": 747,
+          "end_line": 747
+        },
+        "literal_source_line_sha256": "84828763e13efe32432a220b5b99371713c167cca07310c88f74bba9530eea54",
+        "checks": [
+          {
+            "id": "current-member",
+            "pointer": "/changed_line_evidence/observations/0/member_revision",
+            "predicate": "equals",
+            "value": "a5e0cada3c6edd8cc5dab91279440a6721cb8f5971e2db6e2fd37f6df5137089",
+            "authority_check": true
+          },
+          {
+            "id": "exact-declaration",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_record",
+            "value": {
+              "subject": "aiokafka/consumer/fetcher.py::Fetcher._proc_fetch_request",
+              "state": "source-index-bound",
+              "declaration_syntax": "async"
+            }
+          },
+          {
+            "id": "authority",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+            "predicate": "equals",
+            "value": "direct-static-syntax-only",
+            "authority_check": true
+          },
+          {
+            "id": "runtime_boundary_kind",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "task_ownership",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "execution_order",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "callee_resolution",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "negative_evidence_admissible",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+            "predicate": "equals",
+            "value": false,
+            "authority_check": true
+          },
+          {
+            "id": "literal-site",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
+            "predicate": "includes_record",
+            "value": {
+              "line": 747,
+              "syntax_kind": "await",
+              "callee_identifier_syntax": "self._client.send"
+            }
+          }
+        ]
+      }
+    },
+    "sqlalchemy-failed-begin": {
+      "before": {
+        "source": "sqlalchemy-failed-begin-before",
+        "source_label": {
+          "declaration_line": 883,
+          "end_line": 896,
+          "path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+          "sha256": "3f0ed2fed9d4c330936df231595003a442f6cb05c646e5bb512e35d244ccc9f1",
+          "start_line": 883,
+          "symbol": "AsyncAdapt_asyncpg_connection._start_transaction"
+        },
+        "reported_span": {
+          "path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+          "start_line": 894,
+          "end_line": 894
+        },
+        "literal_source_line_sha256": "98f1acb1c424bfa84ee92bee0762a9186b814734732c5fe437f48deb374cd642",
+        "checks": [
+          {
+            "id": "current-member",
+            "pointer": "/changed_line_evidence/observations/0/member_revision",
+            "predicate": "equals",
+            "value": "a0eb9afd22ed058e72b60e22e5fbb5a13c66246656fbe2f69095a7b2e4855ea1",
+            "authority_check": true
+          },
+          {
+            "id": "exact-declaration",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_record",
+            "value": {
+              "subject": "lib/sqlalchemy/dialects/postgresql/asyncpg.py::AsyncAdapt_asyncpg_connection._start_transaction",
+              "state": "source-index-bound",
+              "declaration_syntax": "async"
+            }
+          },
+          {
+            "id": "authority",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+            "predicate": "equals",
+            "value": "direct-static-syntax-only",
+            "authority_check": true
+          },
+          {
+            "id": "runtime_boundary_kind",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "task_ownership",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "execution_order",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "callee_resolution",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "negative_evidence_admissible",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+            "predicate": "equals",
+            "value": false,
+            "authority_check": true
+          },
+          {
+            "id": "literal-site",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
+            "predicate": "includes_record",
+            "value": {
+              "line": 894,
+              "syntax_kind": "await",
+              "callee_identifier_syntax": "self._transaction.start"
+            }
+          }
+        ]
+      },
+      "after": {
+        "source": "sqlalchemy-failed-begin-after",
+        "source_label": {
+          "declaration_line": 883,
+          "end_line": 900,
+          "path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+          "sha256": "9d879eca5f9578a6a79f7231fc3082c3750538de47ccce60e3dd20b112165426",
+          "start_line": 883,
+          "symbol": "AsyncAdapt_asyncpg_connection._start_transaction"
+        },
+        "reported_span": {
+          "path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+          "start_line": 894,
+          "end_line": 894
+        },
+        "literal_source_line_sha256": "02358ead4672c8f40b343eeb98e855125504d1d317fcd58e5fc7379b833df108",
+        "checks": [
+          {
+            "id": "current-member",
+            "pointer": "/changed_line_evidence/observations/0/member_revision",
+            "predicate": "equals",
+            "value": "9fb92f4ccb74b1990370b570ec2dfb8dcbc24974029542cf8bc6296e81844325",
+            "authority_check": true
+          },
+          {
+            "id": "exact-declaration",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_record",
+            "value": {
+              "subject": "lib/sqlalchemy/dialects/postgresql/asyncpg.py::AsyncAdapt_asyncpg_connection._start_transaction",
+              "state": "source-index-bound",
+              "declaration_syntax": "async"
+            }
+          },
+          {
+            "id": "authority",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+            "predicate": "equals",
+            "value": "direct-static-syntax-only",
+            "authority_check": true
+          },
+          {
+            "id": "runtime_boundary_kind",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "task_ownership",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "execution_order",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "callee_resolution",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "negative_evidence_admissible",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+            "predicate": "equals",
+            "value": false,
+            "authority_check": true
+          },
+          {
+            "id": "literal-site",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
+            "predicate": "includes_record",
+            "value": {
+              "line": 894,
+              "syntax_kind": "await",
+              "callee_identifier_syntax": "transaction.start"
+            }
+          }
+        ]
+      }
+    },
+    "sqlalchemy-logging-token-reset": {
+      "before": {
+        "source": "sqlalchemy-logging-token-reset-before",
+        "source_label": {
+          "declaration_line": 135,
+          "end_line": 145,
+          "path": "lib/sqlalchemy/engine/characteristics.py",
+          "sha256": "f23c689b9ea0ca125387df581f7b40bb3092b6c84462c64b1133e16a12ec2a70",
+          "start_line": 135,
+          "symbol": "LoggingTokenCharacteristic.set_connection_characteristic"
+        },
+        "reported_span": {
+          "path": "lib/sqlalchemy/engine/characteristics.py",
+          "start_line": 135,
+          "end_line": 135
+        },
+        "literal_source_line_sha256": "4d07c44f3352f3a6345538fbba46fe5a9825e273c94f47e36e2fece0fd74ff93",
+        "checks": [
+          {
+            "id": "current-member",
+            "pointer": "/changed_line_evidence/observations/0/member_revision",
+            "predicate": "equals",
+            "value": "2b72f554f02dd0bc647674dfcc096844ec517427a7c428e7c66470505c9db606",
+            "authority_check": true
+          },
+          {
+            "id": "exact-declaration",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_record",
+            "value": {
+              "subject": "lib/sqlalchemy/engine/characteristics.py::LoggingTokenCharacteristic.set_connection_characteristic",
+              "state": "source-index-bound",
+              "declaration_syntax": "sync"
+            }
+          },
+          {
+            "id": "authority",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+            "predicate": "equals",
+            "value": "direct-static-syntax-only",
+            "authority_check": true
+          },
+          {
+            "id": "runtime_boundary_kind",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "task_ownership",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "execution_order",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "callee_resolution",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "negative_evidence_admissible",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+            "predicate": "equals",
+            "value": false,
+            "authority_check": true
+          }
+        ]
+      },
+      "after": {
+        "source": "sqlalchemy-logging-token-reset-after",
+        "source_label": {
+          "declaration_line": 135,
+          "end_line": 145,
+          "path": "lib/sqlalchemy/engine/characteristics.py",
+          "sha256": "bfc5332ec1b9c0bc3fc20113ea197c226feeffc465ce7aedaf1a6da35a132a90",
+          "start_line": 135,
+          "symbol": "LoggingTokenCharacteristic.set_connection_characteristic"
+        },
+        "reported_span": {
+          "path": "lib/sqlalchemy/engine/characteristics.py",
+          "start_line": 135,
+          "end_line": 135
+        },
+        "literal_source_line_sha256": "4d07c44f3352f3a6345538fbba46fe5a9825e273c94f47e36e2fece0fd74ff93",
+        "checks": [
+          {
+            "id": "current-member",
+            "pointer": "/changed_line_evidence/observations/0/member_revision",
+            "predicate": "equals",
+            "value": "0d12825ad53deb0d1276ad5f7b4640502e830b657ae5c6acb6a3f472e471fee8",
+            "authority_check": true
+          },
+          {
+            "id": "exact-declaration",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_record",
+            "value": {
+              "subject": "lib/sqlalchemy/engine/characteristics.py::LoggingTokenCharacteristic.set_connection_characteristic",
+              "state": "source-index-bound",
+              "declaration_syntax": "sync"
+            }
+          },
+          {
+            "id": "authority",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+            "predicate": "equals",
+            "value": "direct-static-syntax-only",
+            "authority_check": true
+          },
+          {
+            "id": "runtime_boundary_kind",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "task_ownership",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "execution_order",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "callee_resolution",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "negative_evidence_admissible",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+            "predicate": "equals",
+            "value": false,
+            "authority_check": true
+          }
+        ]
+      }
+    },
+    "sqlalchemy-pickle-extra-criteria": {
+      "before": {
+        "source": "sqlalchemy-pickle-extra-criteria-before",
+        "source_label": {
+          "declaration_line": 1187,
+          "end_line": 1256,
+          "path": "lib/sqlalchemy/orm/strategies.py",
+          "sha256": "38e9b96ca348ff6cc3d455d5b113108a016fe4ebb1d96945b7f9378e1e8369ab",
+          "start_line": 1187,
+          "symbol": "_LazyLoader.create_row_processor"
+        },
+        "reported_span": {
+          "path": "lib/sqlalchemy/orm/strategies.py",
+          "start_line": 1234,
+          "end_line": 1234
+        },
+        "literal_source_line_sha256": "46129db7d377f1c9aec3473dfc5e62981609a2d1ce51a6f969de0d03144ff1eb",
+        "checks": [
+          {
+            "id": "current-member",
+            "pointer": "/changed_line_evidence/observations/0/member_revision",
+            "predicate": "equals",
+            "value": "7c25f78adb82e6ec3be7c6c6910d5529c9592fcdad192fbf9ed1b358e25331d4",
+            "authority_check": true
+          },
+          {
+            "id": "exact-declaration",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_record",
+            "value": {
+              "subject": "lib/sqlalchemy/orm/strategies.py::_LazyLoader.create_row_processor",
+              "state": "source-index-bound",
+              "declaration_syntax": "sync"
+            }
+          },
+          {
+            "id": "authority",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+            "predicate": "equals",
+            "value": "direct-static-syntax-only",
+            "authority_check": true
+          },
+          {
+            "id": "runtime_boundary_kind",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "task_ownership",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "execution_order",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "callee_resolution",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "negative_evidence_admissible",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+            "predicate": "equals",
+            "value": false,
+            "authority_check": true
+          },
+          {
+            "id": "literal-site",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
+            "predicate": "includes_record",
+            "value": {
+              "line": 1234,
+              "syntax_kind": "call",
+              "callee_identifier_syntax": "loadopt._generate_extra_criteria"
+            }
+          }
+        ]
+      },
+      "after": {
+        "source": "sqlalchemy-pickle-extra-criteria-after",
+        "source_label": {
+          "declaration_line": 1194,
+          "end_line": 1263,
+          "path": "lib/sqlalchemy/orm/strategies.py",
+          "sha256": "c688fbfa864b040018ae3df3a70d0517a68884625584535f7affc5d38caa15f8",
+          "start_line": 1194,
+          "symbol": "_LazyLoader.create_row_processor"
+        },
+        "reported_span": {
+          "path": "lib/sqlalchemy/orm/strategies.py",
+          "start_line": 1241,
+          "end_line": 1241
+        },
+        "literal_source_line_sha256": "46129db7d377f1c9aec3473dfc5e62981609a2d1ce51a6f969de0d03144ff1eb",
+        "checks": [
+          {
+            "id": "current-member",
+            "pointer": "/changed_line_evidence/observations/0/member_revision",
+            "predicate": "equals",
+            "value": "a231abb0fa5a679f517d6358e0f8bfe990827467c440ddfe8255c92404edabe7",
+            "authority_check": true
+          },
+          {
+            "id": "exact-declaration",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_record",
+            "value": {
+              "subject": "lib/sqlalchemy/orm/strategies.py::_LazyLoader.create_row_processor",
+              "state": "source-index-bound",
+              "declaration_syntax": "sync"
+            }
+          },
+          {
+            "id": "authority",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+            "predicate": "equals",
+            "value": "direct-static-syntax-only",
+            "authority_check": true
+          },
+          {
+            "id": "runtime_boundary_kind",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "task_ownership",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "execution_order",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "callee_resolution",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "negative_evidence_admissible",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+            "predicate": "equals",
+            "value": false,
+            "authority_check": true
+          },
+          {
+            "id": "literal-site",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
+            "predicate": "includes_record",
+            "value": {
+              "line": 1241,
+              "syntax_kind": "call",
+              "callee_identifier_syntax": "loadopt._generate_extra_criteria"
+            }
+          }
+        ]
+      }
+    },
+    "sqlalchemy-aggregate-strings": {
+      "before": {
+        "source": "sqlalchemy-aggregate-strings-before",
+        "source_label": {
+          "declaration_line": 3139,
+          "end_line": 3166,
+          "path": "lib/sqlalchemy/sql/compiler.py",
+          "sha256": "50ddb98d3e3aed4a0c55c738050e8e0755c936de698ab481a0c57fdb31df649e",
+          "start_line": 3139,
+          "symbol": "SQLCompiler.visit_aggregate_strings_func"
+        },
+        "reported_span": {
+          "path": "lib/sqlalchemy/sql/compiler.py",
+          "start_line": 3143,
+          "end_line": 3143
+        },
+        "literal_source_line_sha256": "8387718391de4257be8bfd19839692d8e17cc64767b6b1b63e73ad1cee188f47",
+        "checks": [
+          {
+            "id": "current-member",
+            "pointer": "/changed_line_evidence/observations/0/member_revision",
+            "predicate": "equals",
+            "value": "d314c252d3a2bbe4db74ed247cc625bf4f6f78cb422ceb1aa52b781c7baccfcd",
+            "authority_check": true
+          },
+          {
+            "id": "exact-declaration",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_record",
+            "value": {
+              "subject": "lib/sqlalchemy/sql/compiler.py::SQLCompiler.visit_aggregate_strings_func",
+              "state": "source-index-bound",
+              "declaration_syntax": "sync"
+            }
+          },
+          {
+            "id": "authority",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+            "predicate": "equals",
+            "value": "direct-static-syntax-only",
+            "authority_check": true
+          },
+          {
+            "id": "runtime_boundary_kind",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "task_ownership",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "execution_order",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "callee_resolution",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "negative_evidence_admissible",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+            "predicate": "equals",
+            "value": false,
+            "authority_check": true
+          },
+          {
+            "id": "literal-site",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
+            "predicate": "includes_record",
+            "value": {
+              "line": 3143,
+              "syntax_kind": "call",
+              "callee_identifier_syntax": "getattr"
+            }
+          }
+        ]
+      },
+      "after": {
+        "source": "sqlalchemy-aggregate-strings-after",
+        "source_label": {
+          "declaration_line": 3139,
+          "end_line": 3174,
+          "path": "lib/sqlalchemy/sql/compiler.py",
+          "sha256": "644092820439ff821e884f9848b69da59805f280946122d2cef928500677bcb6",
+          "start_line": 3139,
+          "symbol": "SQLCompiler.visit_aggregate_strings_func"
+        },
+        "reported_span": {
+          "path": "lib/sqlalchemy/sql/compiler.py",
+          "start_line": 3148,
+          "end_line": 3148
+        },
+        "literal_source_line_sha256": "20b50886e7168ea9df4a9a1a61be641f4eae4698835f0b1ea392c6ceb3cac318",
+        "checks": [
+          {
+            "id": "current-member",
+            "pointer": "/changed_line_evidence/observations/0/member_revision",
+            "predicate": "equals",
+            "value": "1d54cc1313339c7908b28c280377df9c17826f9a2e53f9fe90049287438a30cf",
+            "authority_check": true
+          },
+          {
+            "id": "exact-declaration",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_record",
+            "value": {
+              "subject": "lib/sqlalchemy/sql/compiler.py::SQLCompiler.visit_aggregate_strings_func",
+              "state": "source-index-bound",
+              "declaration_syntax": "sync"
+            }
+          },
+          {
+            "id": "authority",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+            "predicate": "equals",
+            "value": "direct-static-syntax-only",
+            "authority_check": true
+          },
+          {
+            "id": "runtime_boundary_kind",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "task_ownership",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "execution_order",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "callee_resolution",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "negative_evidence_admissible",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+            "predicate": "equals",
+            "value": false,
+            "authority_check": true
+          },
+          {
+            "id": "literal-site",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
+            "predicate": "includes_record",
+            "value": {
+              "line": 3148,
+              "syntax_kind": "call",
+              "callee_identifier_syntax": "exc.CompileError"
+            }
+          }
+        ]
+      }
+    },
+    "faststream-middleware-enter-error": {
+      "before": {
+        "source": "faststream-middleware-enter-error-before",
+        "source_label": {
+          "declaration_line": 354,
+          "end_line": 443,
+          "path": "faststream/_internal/endpoint/subscriber/usecase.py",
+          "sha256": "52ebf78e8615ada8ac52a51044d9363f8bfd96417d4906ae451005e4e97ed4b0",
+          "start_line": 354,
+          "symbol": "SubscriberUsecase.process_message"
+        },
+        "reported_span": {
+          "path": "faststream/_internal/endpoint/subscriber/usecase.py",
+          "start_line": 378,
+          "end_line": 378
+        },
+        "literal_source_line_sha256": "5cc1ee0f0ad59921a6b1d10cd4b7eb170beb43cb222c074487918668d90affbe",
+        "checks": [
+          {
+            "id": "current-member",
+            "pointer": "/changed_line_evidence/observations/0/member_revision",
+            "predicate": "equals",
+            "value": "9b08b8c39e350c6655c973ebe857531c71f98fe79b481dcf4f757a165f5e24ff",
+            "authority_check": true
+          },
+          {
+            "id": "exact-declaration",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_record",
+            "value": {
+              "subject": "faststream/_internal/endpoint/subscriber/usecase.py::SubscriberUsecase.process_message",
+              "state": "source-index-bound",
+              "declaration_syntax": "async"
+            }
+          },
+          {
+            "id": "authority",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+            "predicate": "equals",
+            "value": "direct-static-syntax-only",
+            "authority_check": true
+          },
+          {
+            "id": "runtime_boundary_kind",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "task_ownership",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "execution_order",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "callee_resolution",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "negative_evidence_admissible",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+            "predicate": "equals",
+            "value": false,
+            "authority_check": true
+          },
+          {
+            "id": "literal-site",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
+            "predicate": "includes_record",
+            "value": {
+              "line": 378,
+              "syntax_kind": "await",
+              "callee_identifier_syntax": "middleware.__aenter__"
+            }
+          }
+        ]
+      },
+      "after": {
+        "source": "faststream-middleware-enter-error-after",
+        "source_label": {
+          "declaration_line": 354,
+          "end_line": 440,
+          "path": "faststream/_internal/endpoint/subscriber/usecase.py",
+          "sha256": "aa3ed06c328d92abd126e0362beabee5b63400468cc02914f46992752d103350",
+          "start_line": 354,
+          "symbol": "SubscriberUsecase.process_message"
+        },
+        "reported_span": {
+          "path": "faststream/_internal/endpoint/subscriber/usecase.py",
+          "start_line": 382,
+          "end_line": 382
+        },
+        "literal_source_line_sha256": "734e859eb9e0ff2c6d9021ade705a1fb7abf26badedbeb97049a815cf5140647",
+        "checks": [
+          {
+            "id": "current-member",
+            "pointer": "/changed_line_evidence/observations/0/member_revision",
+            "predicate": "equals",
+            "value": "b95491daeef8a2af3090bbbefe691a60c927994a5bf2e89de9406089d4fe6d0f",
+            "authority_check": true
+          },
+          {
+            "id": "exact-declaration",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_record",
+            "value": {
+              "subject": "faststream/_internal/endpoint/subscriber/usecase.py::SubscriberUsecase.process_message",
+              "state": "source-index-bound",
+              "declaration_syntax": "async"
+            }
+          },
+          {
+            "id": "authority",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+            "predicate": "equals",
+            "value": "direct-static-syntax-only",
+            "authority_check": true
+          },
+          {
+            "id": "runtime_boundary_kind",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "task_ownership",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "execution_order",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "callee_resolution",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "negative_evidence_admissible",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+            "predicate": "equals",
+            "value": false,
+            "authority_check": true
+          },
+          {
+            "id": "literal-site",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
+            "predicate": "includes_record",
+            "value": {
+              "line": 382,
+              "syntax_kind": "await",
+              "callee_identifier_syntax": "stack.enter_async_context"
+            }
+          }
+        ]
+      }
+    },
+    "faststream-subscriber-stop": {
+      "before": {
+        "source": "faststream-subscriber-stop-before",
+        "source_label": {
+          "declaration_line": 123,
+          "end_line": 133,
+          "path": "faststream/_internal/broker/broker.py",
+          "sha256": "6663830e7a1b1f3ecf831cd66614b6f7f7f3fc31a167583e2e91db303dc6896f",
+          "start_line": 123,
+          "symbol": "BrokerUsecase.stop"
+        },
+        "reported_span": {
+          "path": "faststream/_internal/broker/broker.py",
+          "start_line": 131,
+          "end_line": 131
+        },
+        "literal_source_line_sha256": "bc7ac045181d276c2ed650b76f235f5777df6f933d7ad24a0a4c4ffec2aafbc6",
+        "checks": [
+          {
+            "id": "current-member",
+            "pointer": "/changed_line_evidence/observations/0/member_revision",
+            "predicate": "equals",
+            "value": "bb5f929de52f3fa91dbda438f1d8a4ffdc51b31418dc8ac175445d10ece9ae5f",
+            "authority_check": true
+          },
+          {
+            "id": "exact-declaration",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_record",
+            "value": {
+              "subject": "faststream/_internal/broker/broker.py::BrokerUsecase.stop",
+              "state": "source-index-bound",
+              "declaration_syntax": "async"
+            }
+          },
+          {
+            "id": "authority",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+            "predicate": "equals",
+            "value": "direct-static-syntax-only",
+            "authority_check": true
+          },
+          {
+            "id": "runtime_boundary_kind",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "task_ownership",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "execution_order",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "callee_resolution",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "negative_evidence_admissible",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+            "predicate": "equals",
+            "value": false,
+            "authority_check": true
+          },
+          {
+            "id": "literal-site",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
+            "predicate": "includes_record",
+            "value": {
+              "line": 131,
+              "syntax_kind": "await",
+              "callee_identifier_syntax": "sub.stop"
+            }
+          }
+        ]
+      },
+      "after": {
+        "source": "faststream-subscriber-stop-after",
+        "source_label": {
+          "declaration_line": 126,
+          "end_line": 149,
+          "path": "faststream/_internal/broker/broker.py",
+          "sha256": "dfab2da33ed7e26c910782b608c80f94bd8e497bcfe39f5f07e9bcfe4230eb3d",
+          "start_line": 126,
+          "symbol": "BrokerUsecase.stop"
+        },
+        "reported_span": {
+          "path": "faststream/_internal/broker/broker.py",
+          "start_line": 137,
+          "end_line": 137
+        },
+        "literal_source_line_sha256": "a2aa5eb2719858d10f4abcbdf5e56ce87b6ef1b57a4a61410120f24e90ab38a4",
+        "checks": [
+          {
+            "id": "current-member",
+            "pointer": "/changed_line_evidence/observations/0/member_revision",
+            "predicate": "equals",
+            "value": "08986062c5945caf644cb5b14e716b1b1bd1a43b4885d419a707e974d9bd8a7f",
+            "authority_check": true
+          },
+          {
+            "id": "exact-declaration",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_record",
+            "value": {
+              "subject": "faststream/_internal/broker/broker.py::BrokerUsecase.stop",
+              "state": "source-index-bound",
+              "declaration_syntax": "async"
+            }
+          },
+          {
+            "id": "authority",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+            "predicate": "equals",
+            "value": "direct-static-syntax-only",
+            "authority_check": true
+          },
+          {
+            "id": "runtime_boundary_kind",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "task_ownership",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "execution_order",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "callee_resolution",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "negative_evidence_admissible",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+            "predicate": "equals",
+            "value": false,
+            "authority_check": true
+          },
+          {
+            "id": "literal-site",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
+            "predicate": "includes_record",
+            "value": {
+              "line": 137,
+              "syntax_kind": "await",
+              "callee_identifier_syntax": "sub.stop"
+            }
+          }
+        ]
+      }
+    },
+    "faststream-concurrent-queue-lifetime": {
+      "before": {
+        "source": "faststream-concurrent-queue-lifetime-before",
+        "source_label": {
+          "declaration_line": 57,
+          "end_line": 70,
+          "path": "faststream/_internal/endpoint/subscriber/mixins.py",
+          "sha256": "57888f8b6a2003e99d83a6c338a1e1dc828515d35981acb6ef5d680b8f62d220",
+          "start_line": 57,
+          "symbol": "ConcurrentMixin.__init__"
+        },
+        "reported_span": {
+          "path": "faststream/_internal/endpoint/subscriber/mixins.py",
+          "start_line": 65,
+          "end_line": 65
+        },
+        "literal_source_line_sha256": "3bb911be00effbf80cdc72978c24e26beaa62b446ea745d5d881d27548393787",
+        "checks": [
+          {
+            "id": "current-member",
+            "pointer": "/changed_line_evidence/observations/0/member_revision",
+            "predicate": "equals",
+            "value": "c66d54ade60f4dccf8972f38ef944aadb5c00a62280636bdf87f8d8f9e75665c",
+            "authority_check": true
+          },
+          {
+            "id": "exact-declaration",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_record",
+            "value": {
+              "subject": "faststream/_internal/endpoint/subscriber/mixins.py::ConcurrentMixin.__init__",
+              "state": "source-index-bound",
+              "declaration_syntax": "sync"
+            }
+          },
+          {
+            "id": "authority",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+            "predicate": "equals",
+            "value": "direct-static-syntax-only",
+            "authority_check": true
+          },
+          {
+            "id": "runtime_boundary_kind",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "task_ownership",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "execution_order",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "callee_resolution",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "negative_evidence_admissible",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+            "predicate": "equals",
+            "value": false,
+            "authority_check": true
+          },
+          {
+            "id": "literal-site",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
+            "predicate": "includes_record",
+            "value": {
+              "line": 65,
+              "syntax_kind": "call",
+              "callee_identifier_syntax": "anyio.create_memory_object_stream"
+            }
+          }
+        ]
+      },
+      "after": {
+        "source": "faststream-concurrent-queue-lifetime-after",
+        "source_label": {
+          "declaration_line": 58,
+          "end_line": 69,
+          "path": "faststream/_internal/endpoint/subscriber/mixins.py",
+          "sha256": "f8a94c6ddacbc352749f2c33cc07c1cdb67456574cc388110153023f33356077",
+          "start_line": 58,
+          "symbol": "ConcurrentMixin.__init__"
+        },
+        "reported_span": {
+          "path": "faststream/_internal/endpoint/subscriber/mixins.py",
+          "start_line": 67,
+          "end_line": 67
+        },
+        "literal_source_line_sha256": "391f76ab253f51067634f5bc7d8a74f6b2ec06b1bfe368bc0598d6ee5879a07a",
+        "checks": [
+          {
+            "id": "current-member",
+            "pointer": "/changed_line_evidence/observations/0/member_revision",
+            "predicate": "equals",
+            "value": "7e342f72d545b0eabfab13d00a39c4c8ce8d4d992b798047be6fe0344f25f4b6",
+            "authority_check": true
+          },
+          {
+            "id": "exact-declaration",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_record",
+            "value": {
+              "subject": "faststream/_internal/endpoint/subscriber/mixins.py::ConcurrentMixin.__init__",
+              "state": "source-index-bound",
+              "declaration_syntax": "sync"
+            }
+          },
+          {
+            "id": "authority",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+            "predicate": "equals",
+            "value": "direct-static-syntax-only",
+            "authority_check": true
+          },
+          {
+            "id": "runtime_boundary_kind",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "task_ownership",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "execution_order",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "callee_resolution",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "negative_evidence_admissible",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+            "predicate": "equals",
+            "value": false,
+            "authority_check": true
+          },
+          {
+            "id": "literal-site",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
+            "predicate": "includes_record",
+            "value": {
+              "line": 67,
+              "syntax_kind": "call",
+              "callee_identifier_syntax": "_closed_queue"
+            }
+          }
+        ]
+      }
+    },
+    "faststream-partial-pull-batch": {
+      "before": {
+        "source": "faststream-partial-pull-batch-before",
+        "source_label": {
+          "declaration_line": 229,
+          "end_line": 241,
+          "path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+          "sha256": "e2b6dcacf877d2e799ff93c1c88ec0f81887fcad3b2aea046cbd079cb438d5d2",
+          "start_line": 229,
+          "symbol": "BatchPullStreamSubscriber._consume_pull"
+        },
+        "reported_span": {
+          "path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+          "start_line": 235,
+          "end_line": 235
+        },
+        "literal_source_line_sha256": "4adbdf6bca4cecd5dfc3202dab0e35fd46e13265b2c660fa1a13180eb6fd634e",
+        "checks": [
+          {
+            "id": "current-member",
+            "pointer": "/changed_line_evidence/observations/0/member_revision",
+            "predicate": "equals",
+            "value": "b947d36ce3bae2feb0077da193f00fd89328b28ca4f11eb51f92c94b33e3072e",
+            "authority_check": true
+          },
+          {
+            "id": "exact-declaration",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_record",
+            "value": {
+              "subject": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py::BatchPullStreamSubscriber._consume_pull",
+              "state": "source-index-bound",
+              "declaration_syntax": "async"
+            }
+          },
+          {
+            "id": "authority",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+            "predicate": "equals",
+            "value": "direct-static-syntax-only",
+            "authority_check": true
+          },
+          {
+            "id": "runtime_boundary_kind",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "task_ownership",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "execution_order",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "callee_resolution",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "negative_evidence_admissible",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+            "predicate": "equals",
+            "value": false,
+            "authority_check": true
+          },
+          {
+            "id": "literal-site",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
+            "predicate": "includes_record",
+            "value": {
+              "line": 235,
+              "syntax_kind": "await",
+              "callee_identifier_syntax": "self.subscription.fetch"
+            }
+          }
+        ]
+      },
+      "after": {
+        "source": "faststream-partial-pull-batch-after",
+        "source_label": {
+          "declaration_line": 230,
+          "end_line": 264,
+          "path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+          "sha256": "0495395a1f6d736ff9262faf4a85779a7f70d24a419688587eefeabbcc4c866b",
+          "start_line": 230,
+          "symbol": "BatchPullStreamSubscriber._consume_pull"
+        },
+        "reported_span": {
+          "path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+          "start_line": 250,
+          "end_line": 250
+        },
+        "literal_source_line_sha256": "d6bd7eae6bfe1554b206ac8827b8806187a78b1c7d312211f44bb5d996bbf9f6",
+        "checks": [
+          {
+            "id": "current-member",
+            "pointer": "/changed_line_evidence/observations/0/member_revision",
+            "predicate": "equals",
+            "value": "685232069e2388eccd124ae295b46d0b1901fe52dae38d2fcdeb29871837fa3b",
+            "authority_check": true
+          },
+          {
+            "id": "exact-declaration",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_record",
+            "value": {
+              "subject": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py::BatchPullStreamSubscriber._consume_pull",
+              "state": "source-index-bound",
+              "declaration_syntax": "async"
+            }
+          },
+          {
+            "id": "authority",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+            "predicate": "equals",
+            "value": "direct-static-syntax-only",
+            "authority_check": true
+          },
+          {
+            "id": "runtime_boundary_kind",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "task_ownership",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "execution_order",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "callee_resolution",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "negative_evidence_admissible",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+            "predicate": "equals",
+            "value": false,
+            "authority_check": true
+          },
+          {
+            "id": "literal-site",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
+            "predicate": "includes_record",
+            "value": {
+              "line": 250,
+              "syntax_kind": "await",
+              "callee_identifier_syntax": "self.subscription.fetch"
+            }
+          }
+        ]
+      }
+    }
+  }
+}

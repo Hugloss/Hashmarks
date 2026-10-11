@@ -12,6 +12,7 @@ from hashmarks.evidence_context import evidence_context_identity
 from hashmarks.operation_contract import (
     operation_response,
     operation_schema,
+    require_operation_mode,
     validate_operation_response,
 )
 
@@ -1430,6 +1431,24 @@ class TaskEvidencePacketMixin(
         ownership["next_read"] = compact_pending
         ownership["source_budget"] = source_budget
 
+    def _task_evidence_attach_test_matches(
+        self, result: dict[str, object], task: str
+    ) -> None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        verification = result["verification"]
+        assert isinstance(verification, dict)
+        relevance = verification.get("relevance")
+        if isinstance(relevance, dict) and "task_matches" not in relevance:
+            # Owner discrimination can intentionally replace reference relevance
+            # with a no-owner result. Term matches have no such authority.
+            verification["relevance"] = {
+                **relevance,
+                "task_matches": self._verification_task_matches(
+                    self._verification_state(task, "", "", ())
+                ),
+            }
+
     def task_evidence(
         self,
         task: str,
@@ -1438,12 +1457,14 @@ class TaskEvidencePacketMixin(
         per_role: int = TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
         token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
         supplied_observations: Sequence[Mapping[str, object]] | None = None,
+        result_mode: str = "default",
     ) -> dict[str, object]:
         """Return role-separated repository evidence for an external consumer."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         from .lsp_relationship_adapter import normalize_lsp_captures
 
+        require_operation_mode("task_evidence", result_mode)
         captures = normalize_lsp_captures(supplied_observations)
         if token_budget < 1:
             raise ValueError("token_budget must be >= 1")
@@ -1470,6 +1491,7 @@ class TaskEvidencePacketMixin(
                 evidence_receipt,
                 verification_plan,
             )
+            self._task_evidence_attach_test_matches(result, task)
             canonical = self._find_task_evidence_impl(task, limit=limit)
             retrieval = result["retrieval"]
             assert isinstance(retrieval, dict)
@@ -1521,7 +1543,15 @@ class TaskEvidencePacketMixin(
             operation_schema("task_evidence"),
             result,
         )
-        return validate_operation_response("task_evidence", result)
+        validate_operation_response("task_evidence", result)
+        if result_mode == "initial":
+            from .task_evidence_initial import initial_task_evidence
+
+            result = initial_task_evidence(result)
+            result["evidence_packet_identity"] = "sha256:" + self._packet_digest(
+                operation_schema("task_evidence", "initial"), result
+            )
+        return validate_operation_response("task_evidence", result, mode=result_mode)
 
     @operation_response("task_action_brief")
     @decision_scoped

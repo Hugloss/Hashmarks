@@ -1,9 +1,75 @@
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, cast
 
 import pytest
 
 from hashmarks.codemap import CodeMap
+from hashmarks.evidence_presentation import present_repository_evidence
+
+
+def test_task_test_match_bounds_do_not_establish_absence(tmp_path: Path) -> None:
+    tests = tmp_path / "tests"
+    tests.mkdir()
+    for index in range(70):
+        (tests / f"test_token_{index:02d}.py").write_text(
+            "def test_reset_token():\n    assert True\n"
+        )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map("Fix reset_token")
+        relevance_before = deepcopy(action["verification_relevance"])
+        packet = cast("dict[str, Any]", codemap.task_evidence("Fix reset_token"))
+        assert action["verification_relevance"] == relevance_before
+    matches = packet["verification"]["relevance"]["task_matches"]
+    assert len(matches["matches"]) == 16
+    assert matches["observed_in_search"] == 64
+    assert matches["omitted_from_projection"] == 48
+    assert matches["search_truncated"] is True
+    assert matches["negative_evidence_admissible"] is False
+    assert matches["source_binding"] == "indexed-not-source-revalidated"
+    assert packet["ownership"]["owner"] is None
+
+
+def test_task_test_matches_preserve_unresolved_ownership_and_selection(
+    tmp_path: Path,
+) -> None:
+    files = {
+        "src/alpha.py": "def reset_token(value):\n    return value\n",
+        "src/beta.py": "def reset_token(value):\n    return value\n",
+        "src/test_reset_token.py": "def reset_token(value):\n    return value\n",
+        "tests/test_token.py": "def test_reset_token():\n    assert True\n",
+        "tests/test_other.py": "def test_other():\n    assert True\n",
+    }
+    for name, source in files.items():
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(source)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = cast("dict[str, Any]", codemap.task_evidence("Fix reset_token"))
+    assert packet["ownership"]["owner"] is None
+    relevance = packet["verification"]["relevance"]
+    assert relevance["selection_changed"] is False
+    matches = relevance["task_matches"]
+    assert matches["edit_relationship"] == "unestablished"
+    assert matches["verification_selection_authority"] is False
+    assert matches["negative_evidence_admissible"] is False
+    assert [row["path"] for row in matches["matches"]] == ["tests/test_token.py"]
+    projection = cast(
+        "dict[str, Any]", present_repository_evidence(packet, format="structured")
+    )
+    finding = next(
+        row
+        for group in projection["groups"]
+        for row in group["findings"]
+        if row["kind"] == "lexical_test_term_match"
+    )
+    assert finding["details"]["path"] == "tests/test_token.py"
+    assert finding["assertion"] == "producer_claim"
+    assert finding["source_context"]["task_match_qualification"] == {
+        key: value for key, value in matches.items() if key != "matches"
+    }
 
 
 def test_lexical_verification_scouts_do_not_claim_references_or_replace_verifier(
@@ -41,6 +107,10 @@ def test_lexical_verification_scouts_do_not_claim_references_or_replace_verifier
     )
     assert "src/test_redelivery.py" not in rows
     assert packet["ownership"]["owner"]["path"] == "src/internals/pipeline.py"
+    assert relevance["task_matches"]["verification_selection_authority"] is False
+    assert "tests/internals/test_a_redelivery.py" in {
+        row["path"] for row in relevance["task_matches"]["matches"]
+    }
 
 
 @pytest.mark.parametrize(

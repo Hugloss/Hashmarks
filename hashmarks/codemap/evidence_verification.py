@@ -858,6 +858,41 @@ class VerificationMixin:
             for row in self._verification_candidates(scouts)
         ]
 
+    def _verification_task_matches(
+        self, state: _VerificationRelevanceState
+    ) -> dict[str, object]:
+        """Keep lexical test observations separate from owner-bound references.
+
+        These are indexed term matches, including when there is no admitted edit
+        owner. They cannot choose verification or establish a test relationship.
+        """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        rows = self._session_lexical_file_candidates(sorted(state.task_terms), limit=65)
+        matches = [
+            {
+                "path": str(row["path"]),
+                "matched_term_count": int(row.get("matches") or 0),
+                "evidence_visibility": row.get("evidence_visibility"),
+            }
+            for row in rows[:64]
+            if self._verification_ref_visible(row)
+            and RepositoryDomain.TEST in classify_repository_path(str(row["path"]))
+        ]
+        return {
+            "basis": "indexed-task-term-matches",
+            "index_generation": self.store.generation(),
+            "source_binding": "indexed-not-source-revalidated",
+            "matches": matches[:16],
+            "observed_in_search": len(matches),
+            "omitted_from_projection": max(0, len(matches) - 16),
+            "search_truncated": len(rows) > 64,
+            "bounds": {"lexical_files": 64, "returned_test_paths": 16},
+            "edit_relationship": "unestablished",
+            "verification_selection_authority": False,
+            "negative_evidence_admissible": False,
+        }
+
     @staticmethod
     def _verification_candidate_score(
         row: Mapping[str, object],
@@ -1096,10 +1131,14 @@ class VerificationMixin:
             else ""
         )
         edit_path = str(edit.get("path") or "") if isinstance(edit, Mapping) else ""
-        if not edit_path:
-            return self._verification_without_edit_owner(current_path)
-
         state = self._verification_state(task, edit_path, current_path, rows)
+        task_matches = self._verification_task_matches(state)
+        if not edit_path:
+            return {
+                **self._verification_without_edit_owner(current_path),
+                "task_matches": task_matches,
+            }
+
         symbol_names, symbol_scope_complete = self._verification_edit_symbols(
             edit_path, edit
         )
@@ -1121,9 +1160,12 @@ class VerificationMixin:
         # already selected verification surface or any exact reference claim.
         candidates.extend(self._verification_lexical_candidates(state))
         candidates.sort(key=self._verification_candidate_score, reverse=True)
-        return self._verification_relevance_result(
-            state, candidates, selected, reason, limit
-        )
+        return {
+            **self._verification_relevance_result(
+                state, candidates, selected, reason, limit
+            ),
+            "task_matches": task_matches,
+        }
 
     @operation_response("verification_relevance")
     def verification_relevance(

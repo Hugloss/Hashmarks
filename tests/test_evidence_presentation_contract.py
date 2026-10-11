@@ -153,6 +153,11 @@ def native_packets(
             ("repository_context", "default", codemap.orient()),
             ("find", "default", codemap.find_packet("widget")),
             ("task_evidence", "default", previous),
+            (
+                "task_evidence",
+                "initial",
+                codemap.task_evidence(task, result_mode="initial"),
+            ),
             ("change_impact", "default", codemap.task_change_impact(task, paths)),
             ("correlate_evidence", "default", codemap.correlate_evidence([bundle])),
             (

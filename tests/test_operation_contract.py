@@ -47,7 +47,10 @@ _EXPECTED = {
     },
     "repository_context": {"default": "hashmarks.repository-capsule.v1"},
     "find": {"default": "hashmarks.find.v2"},
-    "task_evidence": {"default": "hashmarks.task-evidence.v5"},
+    "task_evidence": {
+        "default": "hashmarks.task-evidence.v5",
+        "initial": "hashmarks.task-evidence-initial.v1",
+    },
     "change_impact": {"default": "hashmarks.task-change-impact.v1"},
     "correlate_evidence": {"default": "hashmarks.evidence-correlation.v2"},
     "dependency_codemap": {
@@ -356,7 +359,6 @@ def test_operation_modes_fail_closed() -> None:
 _FIXED_MODE_CORE_BOUNDARIES = {
     "repository_context": ("hashmarks/codemap/repository_context.py", "orient"),
     "find": ("hashmarks/codemap/find_engine.py", "find_packet"),
-    "task_evidence": ("hashmarks/codemap/evidence_packet.py", "task_evidence"),
     "change_impact": ("hashmarks/codemap/change_impact.py", "task_change_impact"),
     "correlate_evidence": (
         "hashmarks/codemap/evidence_correlation.py",

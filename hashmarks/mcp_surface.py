@@ -24,7 +24,7 @@ from .mcp_contract import (
     MCP_ERROR_RECOVERY_AUTHORITY,
     MCP_ERROR_SCHEMA,
 )
-from .operation_contract import operation_default_mode
+from .operation_contract import operation_default_mode, operation_modes
 from .repository_retry import retry_transient_repository_race
 
 if TYPE_CHECKING:
@@ -272,7 +272,12 @@ class HashmarksMcpSurface:
         per_role: int = TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
         token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
         supplied_observations: list[dict[str, Any]] | None = None,
+        result_mode: str = "default",
     ) -> dict[str, object]:
+        if not isinstance(result_mode, str) or result_mode not in operation_modes(
+            "task_evidence"
+        ):
+            raise McpSurfaceError("unsupported task evidence result_mode")
         task = _bounded_text(task, name="task", maximum=_MAX_TASK_CHARS)
         limit = _bounded_int(limit, name="limit", minimum=1, maximum=_MAX_LIMIT)
         per_role = _bounded_int(per_role, name="per_role", minimum=1, maximum=8)
@@ -286,6 +291,7 @@ class HashmarksMcpSurface:
                 per_role=per_role,
                 token_budget=token_budget,
                 supplied_observations=supplied_observations,
+                result_mode=result_mode,
             )
         )
 

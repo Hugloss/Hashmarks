@@ -53,6 +53,7 @@ _RepositoryDeclarationsResultMode = Literal[
 _SourceObservationResultMode = Literal[*tuple(operation_modes("source_observation"))]
 _RepositoryEvidenceResultMode = Literal[*tuple(operation_modes("repository_evidence"))]
 _EvidenceComparisonResultMode = Literal[*tuple(operation_modes("evidence_comparison"))]
+_TaskEvidenceResultMode = Literal[*tuple(operation_modes("task_evidence"))]
 
 
 def _sdk():
@@ -430,13 +431,15 @@ def build_server(
         description=task_evidence_contract.description,
         annotations=annotations,
     )
-    def task_evidence(
+    def task_evidence(  # noqa: PLR0913 - preserve explicit MCP inputs with disclosure mode
         task: str,
+        *,
         limit: int = TASK_EVIDENCE_DEFAULT_OPTIONS.limit,
         per_role: int = TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
         token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
         presentation: _Presentation = "none",
         supplied_observations: list[dict[str, Any]] | None = None,
+        result_mode: _TaskEvidenceResultMode = "default",
     ) -> dict[str, object]:
         return _call_surface(
             task_evidence_contract,
@@ -447,6 +450,8 @@ def build_server(
             per_role=per_role,
             token_budget=token_budget,
             supplied_observations=supplied_observations,
+            result_mode=result_mode,
+            response_mode=result_mode,
             presentation=presentation,
         )
 
