@@ -169,6 +169,55 @@ configuration-evidence path selector, dependency CodeMap, or the existing
 repository-declaration correspondence authority. Neither Pydantic validation
 nor configuration precedence is inferred or executed.
 
+## Source-local environment expression roles and model initializers (B25–B29)
+
+The explicit `StaticPythonBackendDeclarations` producer also qualifies two
+small source-local facts that were previously easy to misread:
+
+- **B25 — Access direction, not a runtime value.** Direct
+  `os.environ["KEY"]` subscripts now distinguish
+  `load-expression-syntax`, `store-target-syntax`, and
+  `delete-target-syntax`. An augmented assignment remains a
+  `store-target-syntax` observation; it is not a measured read, atomic
+  operation, or runtime side-effect report. Direct `os.getenv` and
+  `os.environ.get` calls retain `lookup-call-syntax`. A syntactic
+  `os` name is not proof of a standard-library object binding.
+- **B26 — One exact AST expression.** A directly annotated class field
+  whose entire initializer is one supported environment expression
+  carries `direct_environment_initializer`. Its
+  `state=same-direct-ast-expression` connects the field declaration and
+  the *same* observed expression by physical line and column, not by a
+  guessed config-key name. The expression is projected through the
+  existing `_env_site` syntax owner; no separate parser or index exists.
+  `Field(default_factory=lambda: os.getenv("KEY"))`, nested calls,
+  aliases and computed expressions do **not** become direct initializers.
+- **B27 — Ambiguous arguments stay ambiguous.** If a lookup call
+  supplies both positional and named forms of the same argument, that
+  argument is `ambiguous-explicit-syntax`, not the first value found.
+  Star-argument and double-star expansion keep
+  `argument_binding=unresolved-ambiguous-or-expanded` even if a literal
+  is visible beside them. Keyword-only `key=` and `default=` forms
+  retain their distinct syntactic candidates.
+- **B28 — Revision/visibility/privacy.** All expressions inherit the
+  exact selected-file source revision and privacy policy from the
+  existing declaration provider context. Call default **values** are
+  never copied; only existing default kind/callee/keyword-name facts
+  remain. Member edit, missing input, denied source, malformed syntax
+  and observation replay use existing fail-closed contracts.
+- **B29 — No inferred connection.** Identical environment-key literals
+  across unrelated sites remain separate facts. These additions do not
+  prove runtime `os` binding, assignment execution, Pydantic model
+  identity, environment precedence, a default factory's effects,
+  consumer compatibility, or an absent dependency. Provider-level
+  correspondence stays `unresolved`, coverage `incomplete`, and
+  negative evidence inadmissible. The existing model-only/environment-
+  only provider switches remain independently usable.
+
+This bundle extends the **same** `StaticPythonBackendDeclarations`
+provider; it introduces no new MCP tool, project-wide search, durable
+representation, execution runner, graph or automatic linkage. The open
+C01–C04 producer/consumer work is separate and not implicitly absorbed.
+
 ## Native SCIP symbol metadata
 
 SCIP `SymbolInformation.documentation` and occurrence `symbolRoles` are

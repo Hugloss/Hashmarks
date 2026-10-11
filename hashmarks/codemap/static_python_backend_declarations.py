@@ -47,12 +47,26 @@ def _class_field(node: ast.AnnAssign) -> dict[str, object] | None:
         return None
     if len(node.target.id) > 128:
         raise ValueError("model field identifier exceeds direct syntax bound")
+    direct_environment = _env_site(node.value) if node.value is not None else None
     return {
         "name": node.target.id,
         "line": node.lineno,
         "end_line": node.end_lineno or node.lineno,
         "annotation": _annotation(node.annotation),
         "default": _default(node.value),
+        **(
+            {
+                "direct_environment_initializer": {
+                    "state": "same-direct-ast-expression",
+                    "source_site": _source_site(node.value),
+                    "expression": direct_environment,
+                    "runtime_binding": "not-established",
+                    "configuration_precedence": "unknown",
+                }
+            }
+            if direct_environment is not None
+            else {}
+        ),
         "runtime_requiredness": "unknown",
         "runtime_validation": "not-established",
     }
@@ -196,33 +210,81 @@ def _env_key(node: ast.expr | None) -> dict[str, object]:
     return {"state": "literal-key-syntax", "value": node.value}
 
 
+def _source_site(node: ast.AST) -> dict[str, int]:
+    return {
+        "start_line": node.lineno,
+        "end_line": node.end_lineno or node.lineno,
+        "start_column": node.col_offset,
+        "end_column": node.end_col_offset or node.col_offset,
+    }
+
+
+def _direct_argument(
+    call: ast.Call, index: int, keyword: str
+) -> tuple[ast.expr | None, str]:
+    positional = [call.args[index]] if len(call.args) > index else []
+    named = [kw.value for kw in call.keywords if kw.arg == keyword]
+    candidates = [*positional, *named]
+    if len(candidates) > 1:
+        return None, "ambiguous-explicit-syntax"
+    if not candidates:
+        return None, "not-supplied"
+    return candidates[0], "single-explicit-syntax"
+
+
+def _subscript_context(node: ast.Subscript) -> str:
+    if isinstance(node.ctx, ast.Load):
+        return "load-expression-syntax"
+    if isinstance(node.ctx, ast.Store):
+        return "store-target-syntax"
+    if isinstance(node.ctx, ast.Del):
+        return "delete-target-syntax"
+    return "unknown-context"
+
+
 def _env_site(node: ast.AST) -> dict[str, object] | None:
     if isinstance(node, ast.Call):
         callee = _env_callee(node.func)
         if callee is None:
             return None
-        key_kw = next((kw.value for kw in node.keywords if kw.arg == "key"), None)
-        default_kw = next(
-            (kw.value for kw in node.keywords if kw.arg == "default"), None
+        key, key_state = _direct_argument(node, 0, "key")
+        default, default_state = _direct_argument(node, 1, "default")
+        expanded = any(isinstance(arg, ast.Starred) for arg in node.args) or any(
+            kw.arg is None for kw in node.keywords
         )
-        key = node.args[0] if node.args else key_kw
-        default = node.args[1] if len(node.args) > 1 else default_kw
         return {
             "callee_syntax": callee,
-            "key": _env_key(key),
-            "default": _default(default),
+            "source_site": _source_site(node),
+            "access_role": "lookup-call-syntax",
+            "key": (
+                {"state": key_state}
+                if key_state == "ambiguous-explicit-syntax"
+                else _env_key(key)
+            ),
+            "default": (
+                {"state": default_state}
+                if default_state == "ambiguous-explicit-syntax"
+                else _default(default)
+            ),
+            "key_argument_state": key_state,
+            "default_argument_state": default_state,
+            "argument_binding": (
+                "unresolved-ambiguous-or-expanded"
+                if expanded or "ambiguous-explicit-syntax" in (key_state, default_state)
+                else "direct-lexical-syntax-only"
+            ),
             "positional_count": len(node.args),
-            "has_argument_expansion": any(
-                isinstance(arg, ast.Starred) for arg in node.args
-            )
-            or any(kw.arg is None for kw in node.keywords),
+            "has_argument_expansion": expanded,
             "runtime_env_read": "not-established",
         }
     if isinstance(node, ast.Subscript) and _environ_subscript(node):
         return {
             "callee_syntax": "os.environ[...]",
+            "source_site": _source_site(node),
+            "access_role": _subscript_context(node),
             "key": _env_key(node.slice),
             "default": {"state": "not-supplied"},
+            "argument_binding": "not-applicable-to-subscript",
             "runtime_env_read": "not-established",
         }
     return None

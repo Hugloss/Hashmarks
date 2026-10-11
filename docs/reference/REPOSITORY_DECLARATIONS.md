@@ -26,6 +26,16 @@ provider directly attests a correspondence.
 See [Explicit Python interface syntax evidence](STATIC_INTERFACE_EVIDENCE.md)
 for the selected-file API and B20–B24 boundaries.
 
+Direct `os.environ[...]` expressions in the explicit Python backend
+provider now distinguish load, store-target, and delete-target syntax. Its
+observed annotated model fields can also reference an environmental
+expression only when it is literally their entire initializer, bound to
+the same current Python AST site. This is a **source-local syntax identity**,
+not cross-provider contract equivalence or proof that configuration is
+read or set at runtime. Ambiguous keyword/positional forms are not
+silently reduced to one selected value. See
+[Explicit Python interface syntax evidence](STATIC_INTERFACE_EVIDENCE.md).
+
 ## Why this exists
 
 Repositories frequently express one conceptual fact on several surfaces:
