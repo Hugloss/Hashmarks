@@ -264,8 +264,7 @@ def test_consumer_source_visibility_denial_never_leaks_literal_keys(
 ) -> None:
     _repo(tmp_path)
     (tmp_path / "client.py").write_text(
-        "def render(response):\n"
-        '    return response["CONFIDENTIAL_FIELD"]\n',
+        'def render(response):\n    return response["CONFIDENTIAL_FIELD"]\n',
         encoding="utf-8",
     )
     (tmp_path / ".hashmarks-context.toml").write_text(
