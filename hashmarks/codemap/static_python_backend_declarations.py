@@ -203,8 +203,10 @@ def _env_site(node: ast.AST) -> dict[str, object] | None:
         callee = _env_callee(node.func)
         if callee is None:
             return None
-        key = node.args[0] if node.args else None
-        default = node.args[1] if len(node.args) > 1 else None
+        key_kw = next((kw.value for kw in node.keywords if kw.arg == "key"), None)
+        default_kw = next((kw.value for kw in node.keywords if kw.arg == "default"), None)
+        key = node.args[0] if node.args else key_kw
+        default = node.args[1] if len(node.args) > 1 else default_kw
         return {
             "callee_syntax": callee,
             "key": _env_key(key),
@@ -226,13 +228,30 @@ def _env_site(node: ast.AST) -> dict[str, object] | None:
     return None
 
 
+def _direct_assignment_targets(tree: ast.Module) -> dict[int, list[str]]:
+    """Capture only a direct RHS name assignment, not runtime dataflow."""
+    targets: dict[int, list[str]] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            names = [target.id for target in node.targets if isinstance(target, ast.Name)]
+            if names:
+                targets[id(node.value)] = names[:8]
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            if node.value is not None:
+                targets[id(node.value)] = [node.target.id]
+    return targets
+
+
 def _config_groups(
     path: str, tree: ast.Module, *, name: str
 ) -> list[dict[str, object]]:
     sites: list[tuple[int, int, ast.AST, dict[str, object]]] = []
+    direct_targets = _direct_assignment_targets(tree)
     for node in ast.walk(tree):
         observation = _env_site(node)
         if observation is not None:
+            observation["direct_assignment_names"] = direct_targets.get(id(node), [])
+            observation["runtime_assignment_binding"] = "not-established"
             sites.append((node.lineno, node.col_offset, node, observation))
             if len(sites) > MAX_BACKEND_GROUPS:
                 raise ValueError("backend environment syntax exceeds group bound")
