@@ -159,9 +159,9 @@ from hashmarks.codemap.static_python_backend_declarations import (
 
 with CodeMap(".") as codemap:
     codemap.sync()
-    observation = codemap.discover_repository_declarations([
-        StaticPythonBackendDeclarations(paths=("src/models.py", "src/settings.py"))
-    ])
+    observation = codemap.discover_repository_declarations(
+        [StaticPythonBackendDeclarations(paths=("src/models.py", "src/settings.py"))]
+    )
 ```
 
 This is a *descriptive source observation*. It does not replace the
