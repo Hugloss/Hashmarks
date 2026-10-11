@@ -268,14 +268,16 @@ def _declaration_group(
 
 def _source_groups(
     path: str,
-    tree: ast.Module,
+    source: str,
     *,
     route_objects: frozenset[str],
     tool_objects: frozenset[str],
     provider: str,
     include_literal_shape_syntax: bool = False,
-) -> list[dict[str, object]]:
+) -> tuple[list[dict[str, object]], ast.Module]:
+    """Parse admitted source once in the existing provider syntax owner."""
     groups: list[dict[str, object]] = []
+    tree = ast.parse(source, filename=path)
     for declaration in tree.body:
         if not isinstance(declaration, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
@@ -307,7 +309,7 @@ def _source_groups(
             )
             if len(groups) > _MAX_GROUPS:
                 raise ValueError("interface provider group bound exceeded")
-    return groups
+    return groups, tree
 
 
 _MAX_CONSUMER_PAIRS = 16
@@ -570,19 +572,17 @@ class StaticPythonInterfaceDeclarations:
             source = context.read_text(path)
             if len(source) > _MAX_SOURCE_CHARS:
                 raise ValueError("interface provider source exceeds bounded AST input")
-            parsed = ast.parse(source, filename=path)
-            if self.consumer_pairs:
-                trees[path] = parsed
-            groups.extend(
-                _source_groups(
+            observed, parsed = _source_groups(
                     path,
-                    parsed,
+                    source,
                     route_objects=frozenset(self.route_objects),
                     tool_objects=frozenset(self.tool_objects),
                     provider=self.name,
                     include_literal_shape_syntax=self.include_literal_shape_syntax,
                 )
-            )
+            groups.extend(observed)
+            if self.consumer_pairs:
+                trees[path] = parsed
             if len(groups) > _MAX_GROUPS:
                 raise ValueError("interface provider group bound exceeded")
         unresolved_pairs: list[dict[str, object]] = []
