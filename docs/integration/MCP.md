@@ -192,6 +192,20 @@ CLI equivalent: `hashmarks change-impact "task" --changed src/backend.py
 --changed-line-span src/backend.py:20:24`. This reads evidence only; edit
 and test execution remain the agent's responsibility.
 
+### Backend handler input evidence (B15–B19)
+
+When the caller reports a changed Python decorator line through the existing
+`change_impact(changed_line_spans=...)` call, an exact current indexed
+handler association can now include `handler_input_context`. It transports
+bounded positional/keyword parameter declarations, direct annotations,
+non-secret literal default *types*, simple `Depends` / `Query` / `Header`
+call syntax and `Annotated` metadata. This is the same AST observation
+available from the explicitly selected `StaticPythonInterfaceDeclarations`
+provider with `include_input_contract_syntax=True`. It never executes
+dependency injection, chooses a schema owner, asserts framework behavior, or
+claims a producer/consumer match; unavailable/oversized evidence is unresolved.
+No new MCP tool, argument or route index is added.
+
 ### Replacing exploratory native search with repository evidence
 
 A typical coding-agent trace runs `rg` across implementation and test folders,
