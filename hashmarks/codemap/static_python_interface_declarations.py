@@ -268,16 +268,14 @@ def _declaration_group(
 
 def _source_groups(
     path: str,
-    source: str,
+    tree: ast.Module,
     *,
     route_objects: frozenset[str],
     tool_objects: frozenset[str],
     provider: str,
     include_literal_shape_syntax: bool = False,
-    parsed: ast.Module | None = None,
 ) -> list[dict[str, object]]:
     groups: list[dict[str, object]] = []
-    tree = parsed if parsed is not None else ast.parse(source, filename=path)
     for declaration in tree.body:
         if not isinstance(declaration, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
@@ -570,17 +568,17 @@ class StaticPythonInterfaceDeclarations:
             source = context.read_text(path)
             if len(source) > _MAX_SOURCE_CHARS:
                 raise ValueError("interface provider source exceeds bounded AST input")
+            parsed = ast.parse(source, filename=path)
             if self.consumer_pairs:
-                trees[path] = ast.parse(source, filename=path)
+                trees[path] = parsed
             groups.extend(
                 _source_groups(
                     path,
-                    source,
+                    parsed,
                     route_objects=frozenset(self.route_objects),
                     tool_objects=frozenset(self.tool_objects),
                     provider=self.name,
                     include_literal_shape_syntax=self.include_literal_shape_syntax,
-                    parsed=trees.get(path),
                 )
             )
             if len(groups) > _MAX_GROUPS:
