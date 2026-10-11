@@ -281,7 +281,7 @@ they are never replayed into the current task observation or durable state.
 Use the exact relationship detail mode and its endpoint comparison for claim
 additions/removals.
 
-### Caller-nominated producer/consumer syntax (B15–B18)
+### Caller-nominated producer/consumer syntax (C01–C04)
 
 The opt-in `StaticPythonInterfaceDeclarations.consumer_pairs` provider adds
 one neutral `repository_declarations` group for two independently source-bound
