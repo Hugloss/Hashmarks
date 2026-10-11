@@ -66,6 +66,44 @@ The core does not need to understand API routing or MCP tools; `concept` and
 an ambiently loaded plugin, a second parser/index generation, or an MCP
 execution surface.
 
+## Opt-in caller-nominated producer/consumer syntax pairs (B15–B18)
+
+The existing trusted `StaticPythonInterfaceDeclarations` provider can also
+observe narrowly selected **potential** source pairs:
+
+```python
+provider = StaticPythonInterfaceDeclarations(
+    paths=("src/api.py", "src/client.py"),
+    consumer_pairs=(
+        ("src/api.py", "get_user", "src/client.py", "show_user", "response"),
+    ),
+)
+```
+
+Each nominated pair requires one unique top-level producer function with a
+supported syntactic route/tool decorator, one unique top-level consumer
+function, and a caller-specified direct receiver identifier. It retains
+independently source-bound literal dictionary-return sites and literal
+`receiver["field"]` load sites from the existing handler-body AST observer.
+Assignment targets, other receivers, nested functions and alias deductions
+cannot turn into reads for that nominated receiver.
+
+The nomination is **not** a proof that the client invokes the route, sees that
+response, or runs. The pair is intentionally
+`correspondence.state=unresolved`, `comparison.state=ambiguous`,
+`coverage.state=incomplete`, and `absence.state=unknown`. A consumer
+reading `status` when a provider's known return site contains only `name`
+is a *difference in directly observed syntax*, not a breaking-API finding.
+Dynamic/unobserved branches and external shapes remain unknown.
+
+All input paths must be in the original explicit path set (maximum 32);
+there are at most 16 distinct nominations. Missing/duplicated handler
+identities are reported as unresolved nominations in provider provenance,
+never as absence. Site bounds, visibility admission, index source revisions,
+stable file reads, previous-endpoint deltas and provider trust limitations
+remain unchanged. Default calls without `consumer_pairs` preserve their
+existing packets and identities.
+
 ## Native SCIP symbol metadata
 
 SCIP `SymbolInformation.documentation` and occurrence `symbolRoles` are
