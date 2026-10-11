@@ -305,8 +305,13 @@ def _validate_call_site_source(claim: Mapping[str, Any]) -> None:
     if site is None:  # Existing v1 packets before call-site qualification.
         return
     if not isinstance(site, Mapping) or set(site) != {
-        "path", "ranges", "position_encoding", "source_binding",
-        "state", "authority", "negative_evidence_admissible",
+        "path",
+        "ranges",
+        "position_encoding",
+        "source_binding",
+        "state",
+        "authority",
+        "negative_evidence_admissible",
     }:
         raise ValueError("invalid call-site source qualification")
     if (
@@ -316,9 +321,14 @@ def _validate_call_site_source(claim: Mapping[str, Any]) -> None:
     ):
         raise ValueError("call-site qualification cannot strengthen producer authority")
     allowed = (
-        "source-range-matching", "revision-different", "unknown",
-        "outside-caller-item", "invalid-position", "outside-repository",
-        "unadmitted", "snapshot-unavailable",
+        "source-range-matching",
+        "revision-different",
+        "unknown",
+        "outside-caller-item",
+        "invalid-position",
+        "outside-repository",
+        "unadmitted",
+        "snapshot-unavailable",
     )
     if site["state"] not in allowed:
         raise ValueError("unsupported call-site qualification state")
@@ -330,7 +340,9 @@ def _validate_call_site_source(claim: Mapping[str, Any]) -> None:
         or binding.get("state") != "matching"
         or binding.get("path") != site["path"]
     ):
-        raise ValueError("call-site source match requires exact revision correspondence")
+        raise ValueError(
+            "call-site source match requires exact revision correspondence"
+        )
 
 
 def _validate_claim(claim: object, producer: str) -> None:
