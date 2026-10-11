@@ -175,6 +175,26 @@ work in the separate, unmerged #424 is not incorporated or duplicated.
 No call graph, new MCP method, runtime framework analyzer, Pydantic loader,
 configuration evaluator or semantic inference is introduced.
 
+## Backend B25–B29: exact source-local schema/config correspondence
+
+Based on merged #426 and #423. Do not overlap the still-open,
+separately qualified #424 C01–C04 producer/consumer provider.
+
+| Checkpoint | Admitted observation | Explicit boundary |
+| --- | --- | --- |
+| B25 | Separate load/store/delete target syntax of `os.environ[...]` | Does not execute or claim actual reads/writes |
+| B26 | An annotated model field's exact RHS is a directly observed env expression, with the same line/column site | No inferred default-factory, config binding or cross-file match |
+| B27 | Competing positional and keyword arguments are ambiguous, expansions unresolved | No first-value-wins argument binding |
+| B28 | Source visibility, revision replay, omitted/default value privacy and tests | No stale or denied evidence promotion |
+| B29 | Existing explicit provider, independent modes and presentation parity | No new MCP tools, backend resolver or runtime schema contract |
+
+Reuse the existing `_env_site` observation owner for both environmental
+site declarations and field-local initializer evidence. Match on **AST node
+identity in the same admitted parse**, never lexical name similarity. Remain
+`correspondence=unresolved`, `coverage=incomplete`,
+`negative_evidence_admissible=false`. Exact owner/policy contract continues
+to be the repository-declaration provider context. No Python code execution.
+
 ## Open conditional checkpoints
 
 - **H04:** changed-line → symbol/relationship claims require a direct
