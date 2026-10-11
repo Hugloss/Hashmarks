@@ -55,6 +55,50 @@ def test_structural_owner_does_not_choose_unreachable_duplicate_legacy_symbol(
     assert action["edit"]["path"] != "src/case/legacy.py"
 
 
+def test_projected_file_owner_does_not_claim_an_unrelated_first_symbol(tmp_path: Path):
+    _repo(tmp_path)
+    engine = tmp_path / "src/case/engine.py"
+    engine.write_text("def unrelated_helper():\n    return 0\n\n" + engine.read_text())
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(
+            "Fix ember accepted response behavior owner", limit=3
+        )
+    assert action["edit"]["path"] == "src/case/engine.py"
+    assert action["edit"]["structural_projection"] is True
+    assert action["edit"]["qualname"] is None
+    assert action["edit"]["start_line"] is None
+    assert action["ownership_resolution"]["authority_admissible"] is False
+
+
+def test_incomplete_structural_candidate_does_not_displace_named_source(tmp_path: Path):
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "src/__init__.py").write_text("")
+    (tmp_path / "src/owner.py").write_text(
+        "from .helper import work\n\nclass Metadata:\n"
+        "    def failed_update(self, exception):\n        work(exception)\n"
+        "    def request_update(self):\n        return work(None)\n"
+    )
+    (tmp_path / "src/helper.py").write_text(
+        "def work(exception):\n    return exception\n\n"
+        + "\n".join(f"def helper_{n}():\n    return {n}\n" for n in range(150))
+    )
+    (tmp_path / "tests/test_owner.py").write_text(
+        "from src.owner import Metadata\n\ndef test_update():\n    Metadata().request_update()\n"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.task_evidence(
+            "Fix Metadata.failed_update completing a request_update future through unsupported methods."
+        )
+    assert packet["ownership"]["candidate"]["path"] == "src/owner.py"
+    assert packet["ownership"]["candidate"]["qualname"] == "Metadata.failed_update"
+    assert packet["ownership"]["owner"] is None
+    assert packet["ownership"]["ambiguity"]["ambiguous"] is True
+    assert packet["verification"]["selected"]["path"] == "tests/test_owner.py"
+
+
 def test_explicit_policy_task_keeps_configuration_authority(tmp_path: Path):
     _repo(tmp_path)
     (tmp_path / "src/case/policy.toml").write_text("mode='active'\nfeature='ember'\n")

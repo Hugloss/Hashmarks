@@ -391,7 +391,10 @@ class TaskActionOwnerResolutionMixin:
                 if graph["completeness"] == "complete"
                 else "graph-incomplete"
             )
-            return entry, resolved
+            # Retain this observation as scout evidence. A truncated graph
+            # cannot displace the existing edit candidate or route verification
+            # to a different file while competing relationships are unobserved.
+            return entry, resolved if graph["completeness"] == "complete" else None
         entry["status"] = (
             "stale"
             if owner and not current

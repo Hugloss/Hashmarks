@@ -247,9 +247,10 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         )
         if existing is not None:
             return existing
-        symbols = self._session_symbols_for_path(owner_path)
-        symbol = symbols[0] if symbols else {}
         file_row = self._session_file_row(owner_path)
+        # A bounded file relationship nominates a path, not a declaration.
+        # Selecting the file's first symbol would manufacture symbol authority
+        # unrelated to the relationship that produced this candidate.
         projected = {
             "path": owner_path,
             "canonical_rank": limit + int(resolved["depth"]),
@@ -258,11 +259,11 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
                 domain.value for domain in classify_repository_path(owner_path)
             ],
             "roles": ["edit", "related"],
-            "name": symbol.get("name"),
-            "qualname": symbol.get("qualname"),
-            "signature": symbol.get("signature"),
-            "start_line": symbol.get("start_line"),
-            "end_line": symbol.get("end_line"),
+            "name": None,
+            "qualname": None,
+            "signature": None,
+            "start_line": None,
+            "end_line": None,
             "evidence_visibility": (
                 str(file_row["evidence_visibility"])
                 if file_row is not None

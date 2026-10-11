@@ -70,6 +70,8 @@ def evaluate_with_receipt(
         result = payload.get("result")
         if not isinstance(result, dict):
             raise ValueError("research work receipt result is malformed")
+        if payload.get("result_sha256") != canonical_sha256(result):
+            raise ValueError("research work receipt result integrity mismatch")
         return result, True
     result = evaluate()
     atomic_write_json(
@@ -79,6 +81,7 @@ def evaluate_with_receipt(
             "identity": identity,
             "complete": True,
             "result": result,
+            "result_sha256": canonical_sha256(result),
         },
     )
     return result, False
