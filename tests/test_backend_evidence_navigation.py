@@ -102,9 +102,12 @@ def test_model_read_guidance_is_source_bound_and_does_not_claim_runtime(
     assert guide["cross_artifact_correspondence"] == "unresolved"
     assert guide["negative_evidence_admissible"] is False
     assert guide["read_may_not_resolve_runtime"] is True
-    assert validate_evidence_presentation(
-        packet, present_repository_evidence(packet, format="compact")
-    )["valid"] is True
+    assert (
+        validate_evidence_presentation(
+            packet, present_repository_evidence(packet, format="compact")
+        )["valid"]
+        is True
+    )
 
 
 def test_literal_env_syntax_needs_no_extra_syntax_read_but_runtime_is_unknown(
@@ -152,8 +155,7 @@ def test_read_budget_reports_omission_without_claiming_negative_coverage(
     tmp_path: Path,
 ) -> None:
     fields = "\n".join(
-        f"    field_{i}: str = Field(default_factory=build_{i})"
-        for i in range(20)
+        f"    field_{i}: str = Field(default_factory=build_{i})" for i in range(20)
     )
     _write(tmp_path, f"class Settings(BaseSettings):\n{fields}\n")
     packet = _observe(tmp_path, guidance=True)
