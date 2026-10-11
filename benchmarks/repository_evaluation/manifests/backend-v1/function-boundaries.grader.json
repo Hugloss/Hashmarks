@@ -82,12 +82,18 @@
           },
           {
             "id": "literal-site",
-            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
-            "predicate": "includes_record",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_scoped_record",
             "value": {
-              "line": 514,
-              "syntax_kind": "call",
-              "callee_identifier_syntax": "task.cancel"
+              "scope": {
+                "subject": "aiokafka/consumer/fetcher.py::Fetcher._fetch_requests_routine"
+              },
+              "pointer": "/sites/*",
+              "record": {
+                "line": 514,
+                "syntax_kind": "call",
+                "callee_identifier_syntax": "task.cancel"
+              }
             }
           }
         ]
@@ -170,12 +176,18 @@
           },
           {
             "id": "literal-site",
-            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
-            "predicate": "includes_record",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_scoped_record",
             "value": {
-              "line": 514,
-              "syntax_kind": "call",
-              "callee_identifier_syntax": "task.cancel"
+              "scope": {
+                "subject": "aiokafka/consumer/fetcher.py::Fetcher._fetch_requests_routine"
+              },
+              "pointer": "/sites/*",
+              "record": {
+                "line": 514,
+                "syntax_kind": "call",
+                "callee_identifier_syntax": "task.cancel"
+              }
             }
           }
         ]
@@ -260,12 +272,18 @@
           },
           {
             "id": "literal-site",
-            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
-            "predicate": "includes_record",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_scoped_record",
             "value": {
-              "line": 235,
-              "syntax_kind": "await",
-              "callee_identifier_syntax": "self.client.force_metadata_update"
+              "scope": {
+                "subject": "aiokafka/producer/sender.py::Sender._find_coordinator"
+              },
+              "pointer": "/sites/*",
+              "record": {
+                "line": 235,
+                "syntax_kind": "await",
+                "callee_identifier_syntax": "self.client.force_metadata_update"
+              }
             }
           }
         ]
@@ -348,12 +366,18 @@
           },
           {
             "id": "literal-site",
-            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
-            "predicate": "includes_record",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_scoped_record",
             "value": {
-              "line": 239,
-              "syntax_kind": "await",
-              "callee_identifier_syntax": "self.client.force_metadata_update"
+              "scope": {
+                "subject": "aiokafka/producer/sender.py::Sender._find_coordinator"
+              },
+              "pointer": "/sites/*",
+              "record": {
+                "line": 239,
+                "syntax_kind": "await",
+                "callee_identifier_syntax": "self.client.force_metadata_update"
+              }
             }
           }
         ]
@@ -516,12 +540,18 @@
           },
           {
             "id": "literal-site",
-            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
-            "predicate": "includes_record",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_scoped_record",
             "value": {
-              "line": 212,
-              "syntax_kind": "call",
-              "callee_identifier_syntax": "f.set_exception"
+              "scope": {
+                "subject": "aiokafka/cluster.py::ClusterMetadata.failed_update"
+              },
+              "pointer": "/sites/*",
+              "record": {
+                "line": 212,
+                "syntax_kind": "call",
+                "callee_identifier_syntax": "f.set_exception"
+              }
             }
           }
         ]
@@ -606,12 +636,18 @@
           },
           {
             "id": "literal-site",
-            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
-            "predicate": "includes_record",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_scoped_record",
             "value": {
-              "line": 747,
-              "syntax_kind": "await",
-              "callee_identifier_syntax": "self._client.send"
+              "scope": {
+                "subject": "aiokafka/consumer/fetcher.py::Fetcher._proc_fetch_request"
+              },
+              "pointer": "/sites/*",
+              "record": {
+                "line": 747,
+                "syntax_kind": "await",
+                "callee_identifier_syntax": "self._client.send"
+              }
             }
           }
         ]
@@ -694,12 +730,18 @@
           },
           {
             "id": "literal-site",
-            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
-            "predicate": "includes_record",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_scoped_record",
             "value": {
-              "line": 747,
-              "syntax_kind": "await",
-              "callee_identifier_syntax": "self._client.send"
+              "scope": {
+                "subject": "aiokafka/consumer/fetcher.py::Fetcher._proc_fetch_request"
+              },
+              "pointer": "/sites/*",
+              "record": {
+                "line": 747,
+                "syntax_kind": "await",
+                "callee_identifier_syntax": "self._client.send"
+              }
             }
           }
         ]
@@ -784,12 +826,18 @@
           },
           {
             "id": "literal-site",
-            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
-            "predicate": "includes_record",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_scoped_record",
             "value": {
-              "line": 894,
-              "syntax_kind": "await",
-              "callee_identifier_syntax": "self._transaction.start"
+              "scope": {
+                "subject": "lib/sqlalchemy/dialects/postgresql/asyncpg.py::AsyncAdapt_asyncpg_connection._start_transaction"
+              },
+              "pointer": "/sites/*",
+              "record": {
+                "line": 894,
+                "syntax_kind": "await",
+                "callee_identifier_syntax": "self._transaction.start"
+              }
             }
           }
         ]
@@ -872,12 +920,18 @@
           },
           {
             "id": "literal-site",
-            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
-            "predicate": "includes_record",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_scoped_record",
             "value": {
-              "line": 894,
-              "syntax_kind": "await",
-              "callee_identifier_syntax": "transaction.start"
+              "scope": {
+                "subject": "lib/sqlalchemy/dialects/postgresql/asyncpg.py::AsyncAdapt_asyncpg_connection._start_transaction"
+              },
+              "pointer": "/sites/*",
+              "record": {
+                "line": 894,
+                "syntax_kind": "await",
+                "callee_identifier_syntax": "transaction.start"
+              }
             }
           }
         ]
@@ -1120,12 +1174,18 @@
           },
           {
             "id": "literal-site",
-            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
-            "predicate": "includes_record",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_scoped_record",
             "value": {
-              "line": 1234,
-              "syntax_kind": "call",
-              "callee_identifier_syntax": "loadopt._generate_extra_criteria"
+              "scope": {
+                "subject": "lib/sqlalchemy/orm/strategies.py::_LazyLoader.create_row_processor"
+              },
+              "pointer": "/sites/*",
+              "record": {
+                "line": 1234,
+                "syntax_kind": "call",
+                "callee_identifier_syntax": "loadopt._generate_extra_criteria"
+              }
             }
           }
         ]
@@ -1208,12 +1268,18 @@
           },
           {
             "id": "literal-site",
-            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
-            "predicate": "includes_record",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_scoped_record",
             "value": {
-              "line": 1241,
-              "syntax_kind": "call",
-              "callee_identifier_syntax": "loadopt._generate_extra_criteria"
+              "scope": {
+                "subject": "lib/sqlalchemy/orm/strategies.py::_LazyLoader.create_row_processor"
+              },
+              "pointer": "/sites/*",
+              "record": {
+                "line": 1241,
+                "syntax_kind": "call",
+                "callee_identifier_syntax": "loadopt._generate_extra_criteria"
+              }
             }
           }
         ]
@@ -1298,12 +1364,18 @@
           },
           {
             "id": "literal-site",
-            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
-            "predicate": "includes_record",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_scoped_record",
             "value": {
-              "line": 3143,
-              "syntax_kind": "call",
-              "callee_identifier_syntax": "getattr"
+              "scope": {
+                "subject": "lib/sqlalchemy/sql/compiler.py::SQLCompiler.visit_aggregate_strings_func"
+              },
+              "pointer": "/sites/*",
+              "record": {
+                "line": 3143,
+                "syntax_kind": "call",
+                "callee_identifier_syntax": "getattr"
+              }
             }
           }
         ]
@@ -1386,12 +1458,18 @@
           },
           {
             "id": "literal-site",
-            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
-            "predicate": "includes_record",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_scoped_record",
             "value": {
-              "line": 3148,
-              "syntax_kind": "call",
-              "callee_identifier_syntax": "exc.CompileError"
+              "scope": {
+                "subject": "lib/sqlalchemy/sql/compiler.py::SQLCompiler.visit_aggregate_strings_func"
+              },
+              "pointer": "/sites/*",
+              "record": {
+                "line": 3148,
+                "syntax_kind": "call",
+                "callee_identifier_syntax": "exc.CompileError"
+              }
             }
           }
         ]
@@ -1476,12 +1554,18 @@
           },
           {
             "id": "literal-site",
-            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
-            "predicate": "includes_record",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_scoped_record",
             "value": {
-              "line": 378,
-              "syntax_kind": "await",
-              "callee_identifier_syntax": "middleware.__aenter__"
+              "scope": {
+                "subject": "faststream/_internal/endpoint/subscriber/usecase.py::SubscriberUsecase.process_message"
+              },
+              "pointer": "/sites/*",
+              "record": {
+                "line": 378,
+                "syntax_kind": "await",
+                "callee_identifier_syntax": "middleware.__aenter__"
+              }
             }
           }
         ]
@@ -1564,12 +1648,18 @@
           },
           {
             "id": "literal-site",
-            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
-            "predicate": "includes_record",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_scoped_record",
             "value": {
-              "line": 382,
-              "syntax_kind": "await",
-              "callee_identifier_syntax": "stack.enter_async_context"
+              "scope": {
+                "subject": "faststream/_internal/endpoint/subscriber/usecase.py::SubscriberUsecase.process_message"
+              },
+              "pointer": "/sites/*",
+              "record": {
+                "line": 382,
+                "syntax_kind": "await",
+                "callee_identifier_syntax": "stack.enter_async_context"
+              }
             }
           }
         ]
@@ -1654,12 +1744,18 @@
           },
           {
             "id": "literal-site",
-            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
-            "predicate": "includes_record",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_scoped_record",
             "value": {
-              "line": 131,
-              "syntax_kind": "await",
-              "callee_identifier_syntax": "sub.stop"
+              "scope": {
+                "subject": "faststream/_internal/broker/broker.py::BrokerUsecase.stop"
+              },
+              "pointer": "/sites/*",
+              "record": {
+                "line": 131,
+                "syntax_kind": "await",
+                "callee_identifier_syntax": "sub.stop"
+              }
             }
           }
         ]
@@ -1742,15 +1838,29 @@
           },
           {
             "id": "literal-site",
-            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
-            "predicate": "includes_record",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_scoped_record",
             "value": {
-              "line": 137,
-              "syntax_kind": "await",
-              "callee_identifier_syntax": "sub.stop"
+              "scope": {
+                "subject": "faststream/_internal/broker/broker.py::BrokerUsecase.stop.stop_subscriber"
+              },
+              "pointer": "/sites/*",
+              "record": {
+                "line": 137,
+                "syntax_kind": "await",
+                "callee_identifier_syntax": "sub.stop"
+              }
             }
           }
-        ]
+        ],
+        "site_source_label": {
+          "path": "faststream/_internal/broker/broker.py",
+          "symbol": "BrokerUsecase.stop.stop_subscriber",
+          "start_line": 135,
+          "end_line": 139,
+          "declaration_line": 135,
+          "sha256": "97e5eaed650473c9100fc8af18dd7b885ab9d31f682cbf6ea7b44cadb9610d24"
+        }
       }
     },
     "faststream-concurrent-queue-lifetime": {
@@ -1832,12 +1942,18 @@
           },
           {
             "id": "literal-site",
-            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
-            "predicate": "includes_record",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_scoped_record",
             "value": {
-              "line": 65,
-              "syntax_kind": "call",
-              "callee_identifier_syntax": "anyio.create_memory_object_stream"
+              "scope": {
+                "subject": "faststream/_internal/endpoint/subscriber/mixins.py::ConcurrentMixin.__init__"
+              },
+              "pointer": "/sites/*",
+              "record": {
+                "line": 65,
+                "syntax_kind": "call",
+                "callee_identifier_syntax": "anyio.create_memory_object_stream"
+              }
             }
           }
         ]
@@ -1920,12 +2036,18 @@
           },
           {
             "id": "literal-site",
-            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
-            "predicate": "includes_record",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_scoped_record",
             "value": {
-              "line": 67,
-              "syntax_kind": "call",
-              "callee_identifier_syntax": "_closed_queue"
+              "scope": {
+                "subject": "faststream/_internal/endpoint/subscriber/mixins.py::ConcurrentMixin.__init__"
+              },
+              "pointer": "/sites/*",
+              "record": {
+                "line": 67,
+                "syntax_kind": "call",
+                "callee_identifier_syntax": "_closed_queue"
+              }
             }
           }
         ]
@@ -2010,12 +2132,18 @@
           },
           {
             "id": "literal-site",
-            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
-            "predicate": "includes_record",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_scoped_record",
             "value": {
-              "line": 235,
-              "syntax_kind": "await",
-              "callee_identifier_syntax": "self.subscription.fetch"
+              "scope": {
+                "subject": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py::BatchPullStreamSubscriber._consume_pull"
+              },
+              "pointer": "/sites/*",
+              "record": {
+                "line": 235,
+                "syntax_kind": "await",
+                "callee_identifier_syntax": "self.subscription.fetch"
+              }
             }
           }
         ]
@@ -2098,12 +2226,18 @@
           },
           {
             "id": "literal-site",
-            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*/sites/*",
-            "predicate": "includes_record",
+            "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+            "predicate": "includes_scoped_record",
             "value": {
-              "line": 250,
-              "syntax_kind": "await",
-              "callee_identifier_syntax": "self.subscription.fetch"
+              "scope": {
+                "subject": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py::BatchPullStreamSubscriber._consume_pull"
+              },
+              "pointer": "/sites/*",
+              "record": {
+                "line": 250,
+                "syntax_kind": "await",
+                "callee_identifier_syntax": "self.subscription.fetch"
+              }
             }
           }
         ]

@@ -633,7 +633,10 @@ def test_mcp_server_registers_exact_small_read_only_tool_catalog(
     types_module = types.ModuleType("mcp.types")
     server_module.MCPServer = FakeMCPServer
     exceptions_module.ToolError = FakeToolError
-    types_module.ToolAnnotations = FakeToolAnnotations
+    types_module.ToolAnnotations, types_module.CallToolResult = (
+        FakeToolAnnotations,
+        object,
+    )
     monkeypatch.setitem(sys.modules, "mcp", mcp_module)
     monkeypatch.setitem(sys.modules, "mcp.server", server_module)
     monkeypatch.setitem(sys.modules, "mcp.server.mcpserver", mcpserver_module)
@@ -736,7 +739,10 @@ def test_mcp_server_rejects_mode_specific_response_schema_drift(
     types_module = types.ModuleType("mcp.types")
     server_module.MCPServer = FakeMCPServer
     exceptions_module.ToolError = FakeToolError
-    types_module.ToolAnnotations = FakeToolAnnotations
+    types_module.ToolAnnotations, types_module.CallToolResult = (
+        FakeToolAnnotations,
+        object,
+    )
     monkeypatch.setitem(sys.modules, "mcp", mcp_module)
     monkeypatch.setitem(sys.modules, "mcp.server", server_module)
     monkeypatch.setitem(sys.modules, "mcp.server.mcpserver", mcpserver_module)
@@ -798,7 +804,10 @@ def test_mcp_server_construction_does_not_scan_or_build_repository(
     types_module = types.ModuleType("mcp.types")
     server_module.MCPServer = FakeMCPServer
     exceptions_module.ToolError = FakeToolError
-    types_module.ToolAnnotations = FakeToolAnnotations
+    types_module.ToolAnnotations, types_module.CallToolResult = (
+        FakeToolAnnotations,
+        object,
+    )
     monkeypatch.setitem(sys.modules, "mcp", mcp_module)
     monkeypatch.setitem(sys.modules, "mcp.server", server_module)
     monkeypatch.setitem(sys.modules, "mcp.server.mcpserver", mcpserver_module)

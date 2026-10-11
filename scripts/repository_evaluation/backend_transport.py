@@ -30,6 +30,25 @@ def _capture(response: dict[str, Any], text: str, *, transport: str) -> dict[str
     }
 
 
+def _change_cli_arguments(inputs: dict[str, Any]) -> list[str]:
+    allowed = {"task", "changed_paths", "changed_line_spans", "max_depth"}
+    if set(inputs) - allowed:
+        raise ValueError("backend CLI change capture requires matching public inputs")
+    args = ["change-impact", inputs["task"]]
+    for path in inputs["changed_paths"]:
+        args.extend(("--changed", path))
+    for span in inputs.get("changed_line_spans", []):
+        args.extend(
+            (
+                "--changed-line-span",
+                f"{span['path']}:{span['start_line']}:{span['end_line']}",
+            )
+        )
+    if "max_depth" in inputs:
+        args.extend(("--max-depth", str(inputs["max_depth"])))
+    return args
+
+
 def _cli_arguments(operation: str, inputs: dict[str, Any]) -> list[str]:
     if operation == "task_evidence":
         args = ["task-evidence", inputs["task"]]
@@ -56,22 +75,7 @@ def _cli_arguments(operation: str, inputs: dict[str, Any]) -> list[str]:
             inputs.get("result_mode", "default"),
         ]
     if operation == "change_impact":
-        allowed = {"task", "changed_paths", "changed_line_spans", "max_depth"}
-        if set(inputs) - allowed:
-            raise ValueError("backend CLI change capture requires matching public inputs")
-        args = ["change-impact", inputs["task"]]
-        for path in inputs["changed_paths"]:
-            args.extend(("--changed", path))
-        for span in inputs.get("changed_line_spans", []):
-            args.extend(
-                (
-                    "--changed-line-span",
-                    f"{span['path']}:{span['start_line']}:{span['end_line']}",
-                )
-            )
-        if "max_depth" in inputs:
-            args.extend(("--max-depth", str(inputs["max_depth"])))
-        return args
+        return _change_cli_arguments(inputs)
     raise ValueError(f"backend CLI transport is not available for {operation}")
 
 

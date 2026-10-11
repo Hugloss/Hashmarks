@@ -622,11 +622,26 @@ def test_sdk_calls_all_tools_with_native_defaults_and_optional_formats(
                     format=format,
                     result_mode=mode,
                 )
+                _assert_task_json_mirror(contract.operation, called)
 
     try:
         asyncio.run(exercise())
     finally:
         server._hashmarks_surface.close()
+
+
+def _assert_task_json_mirror(operation: str, reply: Any) -> None:
+    if operation != "task_evidence":
+        return
+    texts = [part.text for part in reply.content if part.type == "text"]
+    assert texts == [
+        json.dumps(
+            reply.structured_content,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        )
+    ]
 
 
 def test_diagnostic_detail_and_json_pointer_escaping_preserve_native_values() -> None:

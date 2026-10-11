@@ -67,6 +67,7 @@ class _BoundarySites(ast.NodeVisitor):
             "await",
             expression_kind=type(node.value).__name__,
             callee_identifier_syntax=_callee(node.value),
+            awaited_identifier_syntax=_identifier(node.value),
         )
         self.generic_visit(node)
 
@@ -104,6 +105,7 @@ class _BoundarySites(ast.NodeVisitor):
                 {
                     "expression_kind": type(item.context_expr).__name__,
                     "callee_identifier_syntax": _callee(item.context_expr),
+                    "context_identifier_syntax": _identifier(item.context_expr),
                     "binding_identifier_syntax": (
                         item.optional_vars.id
                         if isinstance(item.optional_vars, ast.Name)
@@ -121,6 +123,18 @@ class _BoundarySites(ast.NodeVisitor):
 
     def visit_AsyncWith(self, node: ast.AsyncWith) -> None:
         self._context(node, "async-with")
+
+    def visit_AsyncFor(self, node: ast.AsyncFor) -> None:
+        self._add(
+            node,
+            "async-for",
+            iterator_expression_kind=type(node.iter).__name__,
+            callee_identifier_syntax=_callee(node.iter),
+            iterator_identifier_syntax=_identifier(node.iter),
+            target_expression_kind=type(node.target).__name__,
+            target_identifier_syntax=_identifier(node.target),
+        )
+        self.generic_visit(node)
 
     def visit_ExceptHandler(self, node: ast.ExceptHandler) -> None:
         self._add(

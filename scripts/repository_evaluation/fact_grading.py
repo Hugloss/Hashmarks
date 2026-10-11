@@ -35,6 +35,38 @@ def pointer_values(packet: object, pointer: str) -> list[object]:
     return _values(packet, components)
 
 
+def _matches_record(value: object, expected: object) -> bool:
+    return (
+        isinstance(value, Mapping)
+        and isinstance(expected, dict)
+        and bool(expected)
+        and all(key in value and value[key] == item for key, item in expected.items())
+    )
+
+
+def _includes_scoped_record(values: list[object], expected: object) -> bool:
+    if (
+        not isinstance(expected, dict)
+        or set(expected) != {"scope", "pointer", "record"}
+        or not isinstance(expected["pointer"], str)
+        or not all(
+            isinstance(expected[key], dict) and expected[key]
+            for key in ("scope", "record")
+        )
+    ):
+        raise ValueError(
+            "scoped source fact requires a scope, child pointer and record"
+        )
+    return any(
+        _matches_record(scope, expected["scope"])
+        and any(
+            _matches_record(child, expected["record"])
+            for child in pointer_values(scope, expected["pointer"])
+        )
+        for scope in values
+    )
+
+
 def _check(packet: object, rule: Mapping[str, Any]) -> dict[str, object]:
     pointer, predicate = str(rule["pointer"]), str(rule["predicate"])
     values = pointer_values(packet, pointer)
@@ -56,18 +88,10 @@ def _check(packet: object, rule: Mapping[str, Any]) -> dict[str, object]:
         "equals": lambda: len(values) == 1 and values[0] == expected,
         "includes": lambda: any(value == expected for value in values),
         "includes_record": lambda: any(
-            isinstance(record_expected, dict)
-            and bool(record_expected)
-            and any(
-                isinstance(value, Mapping)
-                and all(
-                    key in value and value[key] == item
-                    for key, item in record_expected.items()
-                )
-                for value in record_values
-            )
+            any(_matches_record(value, record_expected) for value in record_values)
             for _, record_expected, record_values in records
         ),
+        "includes_scoped_record": lambda: _includes_scoped_record(values, expected),
         "all_equal": lambda: (
             bool(values) and all(value == expected for value in values)
         ),

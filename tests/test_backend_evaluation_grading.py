@@ -227,3 +227,39 @@ def test_exact_source_facts_can_appear_in_different_public_records() -> None:
     check["authority_check"] = True
     with pytest.raises(ValueError, match="positive source-fact"):
         grade_facts("range", {"packet": packet}, {"checks": [check]})
+
+
+def test_scoped_sites_cannot_mix_declarations_or_pass_empty_oracles() -> None:
+    from scripts.repository_evaluation.fact_grading import grade_facts
+
+    check = {
+        "id": "awaited-stop",
+        "pointer": "/functions/*",
+        "predicate": "includes_scoped_record",
+        "value": {
+            "scope": {"subject": "service.py::stop.worker"},
+            "pointer": "/sites/*",
+            "record": {"line": 8, "callee_identifier_syntax": "sub.stop"},
+        },
+    }
+    packet = {
+        "functions": [
+            {"subject": "service.py::stop.worker", "sites": []},
+            {
+                "subject": "service.py::stop",
+                "sites": [{"line": 8, "callee_identifier_syntax": "sub.stop"}],
+            },
+        ]
+    }
+    assert (
+        grade_facts("scopes", {"packet": packet}, {"checks": [check]})["classification"]
+        == "OTHER_FAILURE"
+    )
+    packet["functions"][0]["sites"] = packet["functions"][1]["sites"]
+    assert (
+        grade_facts("scopes", {"packet": packet}, {"checks": [check]})["classification"]
+        == "PASS"
+    )
+    check["value"]["record"] = {}
+    with pytest.raises(ValueError, match="scoped source fact"):
+        grade_facts("scopes", {"packet": packet}, {"checks": [check]})

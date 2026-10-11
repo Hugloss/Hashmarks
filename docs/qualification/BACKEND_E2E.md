@@ -241,12 +241,16 @@ Decision: OBSERVER
 Caller-reported changed-line evidence now includes bounded
 `function_boundary_syntax` for Python functions whose exact declaration ranges
 match the current canonical symbol index. It exposes await/call/with/async-with
-and exception-handler syntax, with exact UTF-8 source columns. The shared Python
+and exception-handler/async-for syntax, with exact UTF-8 source columns. Bare
+awaited identifiers and context identifiers remain visible independently of
+callee syntax. The shared Python
 AST cache supplies one qualified tree to body and decorator observers; canonical
 member bytes and the existing read-after-observation revision check remain the
 authority. Oversized, unstable or unavailable parses stay unresolved. Nested
 def/class/lambda subtrees are outside the declared body scope. Site truncation,
 omitted functions and unsupported callee expressions remain explicit.
+Nested functions selected by the reported line are observed as separate indexed
+declarations; their sites never become sites of the enclosing function.
 
 These observations can show `cancel`, `ack`, `commit` or `rollback` spelling in
 source. They do not establish the receiver's API identity, actual execution,
@@ -265,6 +269,34 @@ Consumer/execution responsibility explicitly not acquired: Runtime API/task/
   message/transaction ownership, execution order, diagnosis and verification.
 Decision: OBSERVER
 ```
+
+The separate `backend-v1/function-boundaries.grader.json` records reviewed source
+sites, exact declaration ranges, literal-line hashes and required uncertainty.
+Its scoped-record checks require a site within the same named declaration;
+matching a declaration in one record and a call in another cannot satisfy them.
+The explicit source specimen pass retained twenty-four before/after observations
+and 192 CLI/MCP format captures across the twelve pinned problems. This proves
+that source syntax contract only. It does not add runtime semantics, invalidate
+the separate revision/native gates or qualify twelve async problems.
+
+Real debugging acquisitions are also available without a database service:
+
+```sh
+uv run --frozen --no-sync python -m scripts.repository_evaluation.capture_backend_failure \
+  --sources-file .hashmarks/backend-e2e/sources/sources.json \
+  --workflow sqlalchemy-logging-token-reset \
+  --output-dir .hashmarks/backend-e2e/runtime-failures/logging-token-reset
+```
+
+The second supported specimen is `sqlalchemy-aggregate-strings`. Each runs in a
+fresh interpreter against the explicitly selected source package, records actual
+exceptions and repository stack frames, and checks source identity before and
+after acquisition. Bytecode writes are disabled. Non-repository frames are
+counted separately; the full traceback is retained. These are external QA
+producer captures, never Hashmarks execution or diagnosis authority. A successful
+invocation does not establish repository-negative evidence. Stack-to-source,
+symbol and transport qualification remain separate checks, and the debugging
+corpus still requires broader genuine problems and repositories.
 
 ## Measured implementation checkpoint
 

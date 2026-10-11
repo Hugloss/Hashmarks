@@ -60,6 +60,10 @@ def test_async_context_calls_and_exception_syntax_are_source_facts(
         for site in sites
         if site["syntax_kind"] == "await"
     ] == [(4, None), (5, "message.ack")]
+    assert (
+        next(site for site in sites if site["line"] == 4)["awaited_identifier_syntax"]
+        == "task"
+    )
     assert {
         site["callee_identifier_syntax"]
         for site in sites
@@ -74,6 +78,49 @@ def test_async_context_calls_and_exception_syntax_are_source_facts(
     handler = next(site for site in sites if site["syntax_kind"] == "exception-handler")
     assert handler["exception_identifier_syntax"] == "arbitrary.CancelledError"
     assert row["member_revision"]
+
+
+def test_context_identifier_and_async_iterator_remain_literal_syntax(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "service.py").write_text(
+        "async def process(self):\n"
+        "    async with self.listener_lock:\n"
+        "        async for message in self.connection.notifies():\n"
+        "            self.queue.put_nowait(message)\n"
+    )
+    boundary = _observe(tmp_path)["function_boundary_syntax"]
+    sites = boundary["observations"][0]["sites"]
+    context = next(site for site in sites if site["syntax_kind"] == "async-with")
+    assert context["context_expressions"][0]["context_identifier_syntax"] == (
+        "self.listener_lock"
+    )
+    assert context["context_expressions"][0]["callee_identifier_syntax"] is None
+    iterator = next(site for site in sites if site["syntax_kind"] == "async-for")
+    assert iterator["callee_identifier_syntax"] == "self.connection.notifies"
+    assert iterator["target_identifier_syntax"] == "message"
+    assert boundary["runtime_boundary_kind"] == "not-established"
+    assert boundary["task_ownership"] == "not-established"
+
+
+def test_nested_changed_function_owns_its_sites_independently(tmp_path: Path) -> None:
+    (tmp_path / "service.py").write_text(
+        "async def stop():\n"
+        "    async def stop_subscriber(sub):\n"
+        "        await sub.stop()\n"
+        "    async with create_task_group() as group:\n"
+        "        group.start_soon(stop_subscriber)\n"
+    )
+    boundary = _observe(tmp_path, start=3, end=3)["function_boundary_syntax"]
+    observed = {row["subject"]: row for row in boundary["observations"]}
+    assert any(
+        site.get("callee_identifier_syntax") == "sub.stop"
+        for site in observed["service.py::stop.stop_subscriber"]["sites"]
+    )
+    assert all(
+        site.get("callee_identifier_syntax") != "sub.stop"
+        for site in observed["service.py::stop"]["sites"]
+    )
 
 
 def test_nested_scopes_and_complex_receivers_do_not_gain_resolution(

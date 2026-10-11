@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import argparse
-from typing import TYPE_CHECKING, Any, Literal
+import json
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from ._version import __version__
 from .codemap.change_impact import CHANGE_IMPACT_DEFAULT_REQUEST
@@ -36,6 +37,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
+    from mcp.types import CallToolResult
+
 _INSTALL_HINT = (
     'Hashmarks MCP support requires the optional extra: pip install "hashmarks[mcp]"'
 )
@@ -53,7 +56,10 @@ _RepositoryDeclarationsResultMode = Literal[
 _SourceObservationResultMode = Literal[*tuple(operation_modes("source_observation"))]
 _RepositoryEvidenceResultMode = Literal[*tuple(operation_modes("repository_evidence"))]
 _EvidenceComparisonResultMode = Literal[*tuple(operation_modes("evidence_comparison"))]
-_TaskEvidenceResultMode = Literal[*tuple(operation_modes("task_evidence"))]
+if TYPE_CHECKING:
+    _TaskEvidenceResultMode = str
+else:
+    _TaskEvidenceResultMode = Literal[*tuple(operation_modes("task_evidence"))]
 
 
 def _sdk():
@@ -64,6 +70,41 @@ def _sdk():
     except ImportError as exc:  # pragma: no cover - exercised through CLI boundary
         raise OptionalFeatureError(_INSTALL_HINT) from exc
     return MCPServer, ToolAnnotations, ToolError
+
+
+def _compact_json_tool_result(result: dict[str, object]) -> CallToolResult:
+    """Mirror the validated native JSON without pretty-print amplification."""
+    from mcp.types import CallToolResult, TextContent
+
+    return CallToolResult(
+        content=[
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    result, separators=(",", ":"), ensure_ascii=False, allow_nan=False
+                ),
+            )
+        ],
+        structured_content=result,
+    )
+
+
+def _register_json_mirror_tool(
+    server: Any,
+    contract: McpToolContract,
+    annotations: Any,
+    handler: Callable[..., Any],
+) -> None:
+    from mcp.types import CallToolResult
+
+    # Preserve structured-output validation and the object output schema while
+    # accepting an explicit compact JSON mirror through the supported SDK API.
+    handler.__annotations__["return"] = Annotated[CallToolResult, dict[str, object]]
+    server.tool(
+        name=contract.name,
+        description=contract.description,
+        annotations=annotations,
+    )(handler)
 
 
 def _call_surface(
@@ -426,11 +467,6 @@ def build_server(
 
     task_evidence_contract = tool_contract("task_evidence")
 
-    @server.tool(
-        name=task_evidence_contract.name,
-        description=task_evidence_contract.description,
-        annotations=annotations,
-    )
     def task_evidence(  # noqa: PLR0913 - preserve explicit MCP inputs with disclosure mode
         task: str,
         *,
@@ -440,8 +476,8 @@ def build_server(
         presentation: _Presentation = "none",
         supplied_observations: list[dict[str, Any]] | None = None,
         result_mode: _TaskEvidenceResultMode = "default",
-    ) -> dict[str, object]:
-        return _call_surface(
+    ) -> CallToolResult:
+        result = _call_surface(
             task_evidence_contract,
             ToolError,
             surface.task_evidence,
@@ -454,6 +490,11 @@ def build_server(
             response_mode=result_mode,
             presentation=presentation,
         )
+        return _compact_json_tool_result(result)
+
+    _register_json_mirror_tool(
+        server, task_evidence_contract, annotations, task_evidence
+    )
 
     change_impact_contract = tool_contract("change_impact")
 
