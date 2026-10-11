@@ -21,15 +21,12 @@ def _inside(item_range: Mapping[str, Any], call_range: Mapping[str, Any]) -> boo
     def key(position: Mapping[str, int]) -> tuple[int, int]:
         return position["line"], position["character"]
 
-    return (
-        key(item_range["start"]) <= key(call_range["start"])
-        and key(call_range["end"]) <= key(item_range["end"])
-    )
+    return key(item_range["start"]) <= key(call_range["start"]) and key(
+        call_range["end"]
+    ) <= key(item_range["end"])
 
 
-def _range_exists(
-    source: str, row: Mapping[str, Any], *, encoding: str
-) -> bool:
+def _range_exists(source: str, row: Mapping[str, Any], *, encoding: str) -> bool:
     lines = re.split(r"\r\n|\r|\n", source)
     codec = "utf-16-le" if encoding == "utf-16" else encoding
     for key in ("start", "end"):
