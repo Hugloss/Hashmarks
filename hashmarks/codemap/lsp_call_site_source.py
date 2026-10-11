@@ -70,7 +70,9 @@ def _source_state(
         source = None
     if source is None:
         return
-    if not all(_inside(caller["range"], site) for site in site_ranges):
+    if not site_ranges:
+        basis["state"] = "empty-call-sites"
+    elif not all(_inside(caller["range"], site) for site in site_ranges):
         basis["state"] = "outside-caller-item"
     elif not all(
         _range_exists(source, site, encoding=capture["position_encoding"])
