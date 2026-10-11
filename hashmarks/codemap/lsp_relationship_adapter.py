@@ -612,7 +612,9 @@ def lsp_relationship_observation(
                 kind,
                 source,
                 destination,
-                _direct_lsp_basis(capture, kind, method, result_to_query, location, resolver),
+                _direct_lsp_basis(
+                    capture, kind, method, result_to_query, location, resolver
+                ),
             )
         )
     # Preserve every supplied snapshot.  An unadmitted path remains an
