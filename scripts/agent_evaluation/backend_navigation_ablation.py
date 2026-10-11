@@ -34,6 +34,25 @@ def _digest(value: object) -> str:
     return "sha256:" + hashlib.sha256(_encode(value)).hexdigest()
 
 
+def _valid_case_header(case: dict[str, Any], seen: set[str]) -> bool:
+    case_id, prompt, paths = case["id"], case["prompt"], case["paths"]
+    identity_ok = (
+        isinstance(case_id, str)
+        and bool(case_id.strip())
+        and len(case_id) <= 128
+        and case_id not in seen
+    )
+    prompt_ok = (
+        isinstance(prompt, str)
+        and bool(prompt.strip())
+        and len(prompt) <= 2048
+    )
+    paths_ok = isinstance(paths, list) and all(
+        isinstance(path, str) for path in paths
+    )
+    return identity_ok and prompt_ok and paths_ok
+
+
 def _cases(manifest: object) -> list[dict[str, Any]]:
     if not isinstance(manifest, dict) or set(manifest) != {"schema", "cases"}:
         raise ValueError("backend case manifest must have exactly schema and cases")
@@ -50,17 +69,7 @@ def _cases(manifest: object) -> list[dict[str, Any]]:
         }:
             raise ValueError("backend cases require five exact fields")
         case_id, prompt, paths = case["id"], case["prompt"], case["paths"]
-        if (
-            not isinstance(case_id, str)
-            or not case_id.strip()
-            or len(case_id) > 128
-            or case_id in seen
-            or not isinstance(prompt, str)
-            or not prompt.strip()
-            or len(prompt) > 2048
-            or not isinstance(paths, list)
-            or any(not isinstance(path, str) for path in paths)
-        ):
+        if not _valid_case_header(case, seen):
             raise ValueError("invalid backend case id, prompt or path selection")
         if type(case["model_fields"]) is not bool or type(case["environment_reads"]) is not bool:
             raise ValueError("backend mode fields must be booleans")
@@ -220,17 +229,11 @@ def _validate_arm(arm: dict[str, Any], *, case_id: str) -> None:
             raise ValueError("backend export cannot assert an agent or host outcome")
 
 
-def _validate_pair(case: dict[str, Any]) -> None:
-    arms = case["arms"]
-    if [arm["arm"] for arm in arms] != ["syntax-only", "navigation"]:
-        raise ValueError("backend ablation requires exact paired arms")
-    for arm in arms:
-        _validate_arm(arm, case_id=case["case_id"])
-    if arms[0]["prompt"] != arms[1]["prompt"]:
-        raise ValueError("backend pair has divergent prompts")
-    before, after = arms[0]["provider_packet"], arms[1]["provider_packet"]
-    before_facts, after_facts = _source_facts(before), _source_facts(after)
-    if not before_facts or before_facts != after_facts:
+def _validate_navigation_arms(
+    before: dict[str, Any], after: dict[str, Any]
+) -> list[dict[str, object]]:
+    before_facts = _source_facts(before)
+    if not before_facts or before_facts != _source_facts(after):
         raise ValueError("backend pair differs beyond navigation")
     left = before["declarations"]["groups"]
     right = after["declarations"]["groups"]
@@ -242,18 +245,32 @@ def _validate_pair(case: dict[str, Any]) -> None:
         raise ValueError("backend pair source binding differs")
     if before["repository"] != after["repository"]:
         raise ValueError("backend pair repository binding differs")
+    return before_facts
+
+
+def _validate_pair(case: dict[str, Any]) -> None:
+    arms = case["arms"]
+    if [arm["arm"] for arm in arms] != ["syntax-only", "navigation"]:
+        raise ValueError("backend ablation requires exact paired arms")
+    for arm in arms:
+        _validate_arm(arm, case_id=case["case_id"])
+    if arms[0]["prompt"] != arms[1]["prompt"]:
+        raise ValueError("backend pair has divergent prompts")
+    before, after = arms[0]["provider_packet"], arms[1]["provider_packet"]
+    facts = _validate_navigation_arms(before, after)
+    sources = _provider_sources(before)
     identity = _digest({
         "repository": before["repository"],
-        "sources": _provider_sources(before),
-        "facts": before_facts,
+        "sources": sources,
+        "facts": facts,
     })
     if identity != case["source_facts_identity"] or any(
         arm["fact_identity"] != identity for arm in arms
     ):
         raise ValueError("backend source facts identity mismatch")
-    if case["source_group_count"] != len(before_facts):
+    if case["source_group_count"] != len(facts):
         raise ValueError("backend group count mismatch")
-    if case["source_revision_binding"] != _provider_sources(before):
+    if case["source_revision_binding"] != sources:
         raise ValueError("backend source revision receipt mismatch")
 
 
