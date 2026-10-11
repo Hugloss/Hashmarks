@@ -195,6 +195,36 @@ identity in the same admitted parse**, never lexical name similarity. Remain
 `negative_evidence_admissible=false`. Exact owner/policy contract continues
 to be the repository-declaration provider context. No Python code execution.
 
+## Cross-artifact C01–C04: caller-nominated producer/consumer syntax pairs (after #422)
+
+- **C01 — explicit pairing only:** one caller-selected provider accepts at most
+  16 five-field nominations
+  `(producer_path, producer_function, consumer_path, consumer_function, receiver)`.
+  Both paths must already be in its explicit, bounded source path selection;
+  both functions must be unique top-level Python declarations. The producer
+  must have a directly observed supported route/MCP tool decorator. Duplicates,
+  missing/renamed paths or functions, and unsupported decorator syntax are
+  labelled unresolved in provider provenance, not claimed absent.
+- **C02 — existing body syntax owner:** producer returns and consumer literal
+  `receiver["key"]` read sites come from the existing source-bound
+  `_handler_body_syntax` extractor; nested functions and aliases are excluded.
+  A single captured module AST is reused for both producer discovery and
+  pair extraction when opted in. No second source scan, parser or graph owner.
+- **C03 — independent authority:** one repository-declaration group contains
+  separately bound producer and consumer syntax observations with explicit
+  provenance. `correspondence=unresolved`, `coverage=incomplete`,
+  `comparison=ambiguous`, runtime binding/shape unknown and absence unknown
+  even when observed keys differ. Pair nomination does not prove a call chain,
+  API compatibility, missing field, runtime response or downstream impact.
+- **C04 — compatibility/qualification:** the empty default remains identical;
+  invalid nomination fails before repository reads, 16-site syntax overflow
+  fails closed, exact source bindings and revision changes use the existing
+  declaration observer, and projection must preserve the same facts.
+  Focused negative/changed-source/ordering/duplicate tests are required.
+
+No new MCP tool, ambient provider, executable parser, global graph, ranker,
+test runner or source-of-truth precedence is admitted.
+
 ## Open conditional checkpoints
 
 - **H04:** changed-line → symbol/relationship claims require a direct
