@@ -34,8 +34,7 @@ def _item(path: Path, name: str) -> dict:
         "kind": 12,
         "uri": path.as_uri(),
         "range": _range(0, 0, 1, 12) if target else _range(3, 0, 4, 20),
-        "selectionRange": _range(0, 4, 0, 10)
-        if target else _range(3, 4, 3, 10),
+        "selectionRange": _range(0, 4, 0, 10) if target else _range(3, 4, 3, 10),
     }
 
 
@@ -57,9 +56,7 @@ def _capture(path: Path, *, method: str, revision: str | None = None) -> dict:
         },
         "response": {
             "id": 7,
-            "result": [
-                {key: result_item, "fromRanges": [_range(4, 11, 4, 17)]}
-            ],
+            "result": [{key: result_item, "fromRanges": [_range(4, 11, 4, 17)]}],
         },
         "capabilities": {"callHierarchyProvider": True},
         "position_encoding": "utf-16",
@@ -114,9 +111,13 @@ def repo(tmp_path: Path) -> Path:
     ],
 )
 def test_call_site_range_matches_exact_caller_snapshot(
-    repo: Path, method: str, subject: str,
+    repo: Path,
+    method: str,
+    subject: str,
 ) -> None:
-    _packet, claim = _claim(repo, _capture(repo / "src.py", method=method), subject=subject)
+    _packet, claim = _claim(
+        repo, _capture(repo / "src.py", method=method), subject=subject
+    )
     site = claim["basis"]["call_site_source"]
     assert site["path"] == "src.py"
     assert site["source_binding"]["state"] == "matching"
@@ -126,7 +127,9 @@ def test_call_site_range_matches_exact_caller_snapshot(
 
 
 def test_stale_source_does_not_become_qualified_call_site(repo: Path) -> None:
-    capture = _capture(repo / "src.py", method="callHierarchy/incomingCalls", revision="0" * 64)
+    capture = _capture(
+        repo / "src.py", method="callHierarchy/incomingCalls", revision="0" * 64
+    )
     _packet, claim = _claim(repo, capture, subject="target")
     site = claim["basis"]["call_site_source"]
     assert site["state"] == "revision-different"
@@ -143,7 +146,8 @@ def test_range_outside_caller_is_not_a_current_call_site(repo: Path) -> None:
 def test_out_of_bounds_position_is_not_qualified(repo: Path) -> None:
     capture = _capture(repo / "src.py", method="callHierarchy/incomingCalls")
     capture["response"]["result"][0]["from"]["range"]["end"] = {
-        "line": 90, "character": 1,
+        "line": 90,
+        "character": 1,
     }
     capture["response"]["result"][0]["fromRanges"] = [_range(4, 11, 4, 900)]
     _packet, claim = _claim(repo, capture, subject="target")
@@ -154,28 +158,30 @@ def test_source_site_authority_cannot_be_forged_with_recomputed_digests(
     repo: Path,
 ) -> None:
     packet, _claim_row = _claim(
-        repo, _capture(repo / "src.py", method="callHierarchy/incomingCalls"),
+        repo,
+        _capture(repo / "src.py", method="callHierarchy/incomingCalls"),
         subject="target",
     )
     forged = deepcopy(packet)
     observation = next(
-        row for row in forged["observations"]
-        if row["producer"] == "fixture-lsp"
+        row for row in forged["observations"] if row["producer"] == "fixture-lsp"
     )
     claim = observation["claims"][0]
     claim["basis"]["call_site_source"]["negative_evidence_admissible"] = True
-    claim["identity"] = content_identity({
-        "producer": claim["producer"],
-        "kind": claim["kind"],
-        "source": claim["source"]["key"],
-        "target": claim["target"]["key"],
-    })
-    observation["observation_identity"] = content_identity({
-        k: v for k, v in observation.items() if k != "observation_identity"
-    })
-    forged["evidence_identity"] = content_identity({
-        k: v for k, v in forged.items() if k != "evidence_identity"
-    })
+    claim["identity"] = content_identity(
+        {
+            "producer": claim["producer"],
+            "kind": claim["kind"],
+            "source": claim["source"]["key"],
+            "target": claim["target"]["key"],
+        }
+    )
+    observation["observation_identity"] = content_identity(
+        {k: v for k, v in observation.items() if k != "observation_identity"}
+    )
+    forged["evidence_identity"] = content_identity(
+        {k: v for k, v in forged.items() if k != "evidence_identity"}
+    )
     with pytest.raises(ValueError, match="call-site"):
         validate_relationship_observation(forged)
 
@@ -184,17 +190,26 @@ def _source_binding(root: Path, *, include_relationships: bool = False) -> dict:
     with CodeMap(root) as codemap:
         codemap.sync()
         return codemap.repository_evidence_bindings(
-            [{
-                "binding_id": "source:entry",
-                "evidence": [
-                    {"scope": "lines", "path": "src.py", "start_line": 1, "end_line": 1}
-                ],
-            }],
+            [
+                {
+                    "binding_id": "source:entry",
+                    "evidence": [
+                        {
+                            "scope": "lines",
+                            "path": "src.py",
+                            "start_line": 1,
+                            "end_line": 1,
+                        }
+                    ],
+                }
+            ],
             include_relationships=include_relationships,
         )
 
 
-def test_reacquisition_descriptor_preserves_exact_scope_and_identity(repo: Path) -> None:
+def test_reacquisition_descriptor_preserves_exact_scope_and_identity(
+    repo: Path,
+) -> None:
     packet = _source_binding(repo)
     desc = describe_evidence_binding_reacquisition(packet, binding_id="source:entry")
     assert validate_reacquisition_descriptor(desc) == desc
