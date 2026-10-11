@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 from hashmarks.paths import normalize_relative_path
 
+from .backend_evidence_navigation import backend_evidence_navigation
 from .handler_input_syntax import _annotation, _default
 from .repository_declaration_provider import (
     RepositoryDeclarationProviderContext,
@@ -349,6 +350,7 @@ class StaticPythonBackendDeclarations:
     name: str = "static-python-backend"
     include_model_fields: bool = True
     include_environment_reads: bool = True
+    include_evidence_navigation: bool = False
 
     def __post_init__(self) -> None:
         if not 1 <= len(self.paths) <= MAX_BACKEND_PATHS:
@@ -369,9 +371,16 @@ class StaticPythonBackendDeclarations:
             raise ValueError("backend provider switches must be boolean")
         if not self.include_model_fields and not self.include_environment_reads:
             raise ValueError("backend provider requires an enabled observation")
+        if type(self.include_evidence_navigation) is not bool:
+            raise ValueError("include_evidence_navigation must be boolean")
 
     def detect(self, context: RepositoryDeclarationProviderContext) -> bool:
         return any(context.exists(path) for path in self.paths)
+
+    def _attach_navigation(self, groups: list[dict[str, object]]) -> None:
+        if self.include_evidence_navigation:
+            for group in groups:
+                backend_evidence_navigation(group)
 
     def _source_groups(self, path: str, source: str) -> list[dict[str, object]]:
         if len(source.encode("utf-8")) > MAX_BACKEND_SOURCE_BYTES:
@@ -388,6 +397,7 @@ class StaticPythonBackendDeclarations:
                             raise ValueError("backend declarations exceed group bound")
         if self.include_environment_reads:
             groups.extend(_config_groups(path, tree, name=self.name))
+        self._attach_navigation(groups)
         return groups
 
     def discover(
@@ -411,6 +421,11 @@ class StaticPythonBackendDeclarations:
                 "missing_selected_paths": missing,
                 "model_fields": self.include_model_fields,
                 "environment_reads": self.include_environment_reads,
+                **(
+                    {"evidence_navigation": "bounded-source-syntax-read-guidance"}
+                    if self.include_evidence_navigation
+                    else {}
+                ),
                 "semantics": "direct-selected-source-syntax-not-runtime-binding",
             },
         )
