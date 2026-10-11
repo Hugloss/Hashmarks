@@ -377,6 +377,11 @@ class StaticPythonBackendDeclarations:
     def detect(self, context: RepositoryDeclarationProviderContext) -> bool:
         return any(context.exists(path) for path in self.paths)
 
+    def _attach_navigation(self, groups: list[dict[str, object]]) -> None:
+        if self.include_evidence_navigation:
+            for group in groups:
+                backend_evidence_navigation(group)
+
     def _source_groups(self, path: str, source: str) -> list[dict[str, object]]:
         if len(source.encode("utf-8")) > MAX_BACKEND_SOURCE_BYTES:
             raise ValueError("backend source exceeds bounded syntax input")
@@ -392,9 +397,7 @@ class StaticPythonBackendDeclarations:
                             raise ValueError("backend declarations exceed group bound")
         if self.include_environment_reads:
             groups.extend(_config_groups(path, tree, name=self.name))
-        if self.include_evidence_navigation:
-            for group in groups:
-                backend_evidence_navigation(group)
+        self._attach_navigation(groups)
         return groups
 
     def discover(
