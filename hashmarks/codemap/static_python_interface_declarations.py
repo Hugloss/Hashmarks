@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from hashmarks.paths import normalize_relative_path
 
 from .handler_input_syntax import handler_input_syntax
+from .pair_key_site_projection import project_pair_key_sites
 from .repository_declaration_provider import (
     RepositoryDeclarationProviderContext,
     RepositoryDeclarationProviderResult,
@@ -366,6 +367,17 @@ def _validate_consumer_pairs(
         raise ValueError("consumer_pairs must be unique")
 
 
+def _validate_pair_site_projection(
+    enabled: object,
+    pairs: tuple[tuple[str, str, str, str, str], ...],
+) -> None:
+    """Fail invalid source-pair opt-in before repository reads."""
+    if type(enabled) is not bool:
+        raise ValueError("include_pair_key_site_projection must be boolean")
+    if enabled and not pairs:
+        raise ValueError("pair key site projection requires consumer_pairs")
+
+
 def _unique_top_level(
     tree: ast.Module, name: str
 ) -> ast.FunctionDef | ast.AsyncFunctionDef | None:
@@ -427,6 +439,7 @@ def _pair_group(
     consumer: ast.FunctionDef | ast.AsyncFunctionDef,
     *,
     provider_name: str,
+    include_pair_key_site_projection: bool = False,
 ) -> dict[str, object]:
     producer_path, producer_name, consumer_path, consumer_name, receiver = pair
     returns = _handler_body_syntax(producer)["literal_dictionary_returns"]
@@ -476,6 +489,18 @@ def _pair_group(
                     "literal_subscript_reads": reads,
                     "coverage": "incomplete",
                     "runtime_consumer_binding": "unknown",
+                    **(
+                        {
+                            "literal_key_site_projection": project_pair_key_sites(
+                                returns,
+                                reads,
+                                producer_path=producer_path,
+                                consumer_path=consumer_path,
+                            )
+                        }
+                        if include_pair_key_site_projection
+                        else {}
+                    ),
                 },
                 provider=provider_name,
                 sites=reads,
@@ -501,6 +526,7 @@ def _paired_groups(
     provider: str,
     route_objects: frozenset[str],
     tool_objects: frozenset[str],
+    include_pair_key_site_projection: bool = False,
 ) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     """Retain only directly located nominees; everything else stays unresolved."""
     groups: list[dict[str, object]] = []
@@ -534,7 +560,12 @@ def _paired_groups(
         else:
             groups.append(
                 _pair_group(
-                    index, pair, producer_row, consumer_row, provider_name=provider
+                    index,
+                    pair,
+                    producer_row,
+                    consumer_row,
+                    provider_name=provider,
+                    include_pair_key_site_projection=include_pair_key_site_projection,
                 )
             )
     return groups, unresolved
@@ -556,6 +587,7 @@ class StaticPythonInterfaceDeclarations:
     include_literal_shape_syntax: bool = False
     include_input_contract_syntax: bool = False
     consumer_pairs: tuple[tuple[str, str, str, str, str], ...] = ()
+    include_pair_key_site_projection: bool = False
 
     def __post_init__(self) -> None:
         if type(self.include_literal_shape_syntax) is not bool:
@@ -563,6 +595,9 @@ class StaticPythonInterfaceDeclarations:
         if type(self.include_input_contract_syntax) is not bool:
             raise ValueError("include_input_contract_syntax must be boolean")
         _validate_consumer_pairs(self.consumer_pairs, self.paths)
+        _validate_pair_site_projection(
+            self.include_pair_key_site_projection, self.consumer_pairs
+        )
         if not 1 <= len(self.paths) <= _MAX_PATHS:
             raise ValueError("interface provider requires 1..32 exact paths")
         if any(
@@ -623,6 +658,7 @@ class StaticPythonInterfaceDeclarations:
                 provider=self.name,
                 route_objects=frozenset(self.route_objects),
                 tool_objects=frozenset(self.tool_objects),
+                include_pair_key_site_projection=self.include_pair_key_site_projection,
             )
             groups.extend(paired)
             if len(groups) > _MAX_GROUPS:
@@ -649,6 +685,15 @@ class StaticPythonInterfaceDeclarations:
                     {
                         "consumer_pairs": "explicit-caller-nominations-only",
                         "unresolved_consumer_pairs": unresolved_pairs,
+                        **(
+                            {
+                                "pair_key_site_projection": (
+                                    "bounded-direct-literal-site-syntax-only"
+                                )
+                            }
+                            if self.include_pair_key_site_projection
+                            else {}
+                        ),
                     }
                     if self.consumer_pairs
                     else {}
