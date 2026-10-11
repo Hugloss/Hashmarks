@@ -347,6 +347,31 @@ binding and read-after-query race qualification remain with the existing
 changed-line observation; the presentation is a projection, not a separate
 freshness authority.
 
+### Source-bound handler body context (B11–B14)
+
+An exact indexed `changed_line_evidence.observations[].decorator_associations.
+associations[]` from an explicitly reported Python decorator span can now
+include an `indexed_declaration_signature` (bounded to 1,024 characters) and
+`handler_body_context`. The latter **reuses**
+`StaticPythonInterfaceDeclarations`'s handler-body AST visitor, preserving
+its `literal-dict-return` versus `unresolved-return` distinction, exact
+site lines, literal keys in source order, and `name["key"]` subscript syntax.
+Nested functions and classes are excluded from the parent body visitor.
+
+The context carries `coverage: incomplete`,
+`runtime_response_shape: unknown`,
+`cross_artifact_correspondence: unresolved` and
+`negative_evidence_admissible: false`. Eight sites per kind can be
+retained; observed/omitted counts prevent accidental absence claims, and
+producer-side overflow returns a local unresolved state. A decorated class
+is not a function body. The enclosing member revision and read-after-observe
+qualification are exactly those of the original B03/B06 packet.
+
+Only canonical source-admitted, exactly indexed members disclose syntax.
+No declaration body fields appear for `outline` or `deny` policy. These
+direct facts do **not** prove Python runtime values, registered endpoints,
+actual edits, effective response types, error compatibility, or test coverage.
+
 ## Qualified endpoint comparisons
 
 The read-only `evidence_comparison` MCP tool transports two explicit,
