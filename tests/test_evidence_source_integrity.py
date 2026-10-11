@@ -126,6 +126,16 @@ def test_call_site_range_matches_exact_caller_snapshot(
     assert site["ranges"] == claim["basis"]["fromRanges"]
 
 
+def test_empty_call_site_result_cannot_claim_range_correspondence(
+    repo: Path,
+) -> None:
+    capture = _capture(repo / "src.py", method="callHierarchy/incomingCalls")
+    capture["response"]["result"][0]["fromRanges"] = []
+    _packet, claim = _claim(repo, capture, subject="target")
+    assert claim["basis"]["call_site_source"]["state"] == "empty-call-sites"
+    assert claim["basis"]["call_site_source"]["negative_evidence_admissible"] is False
+
+
 def test_stale_source_does_not_become_qualified_call_site(repo: Path) -> None:
     capture = _capture(
         repo / "src.py", method="callHierarchy/incomingCalls", revision="0" * 64
