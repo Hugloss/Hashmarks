@@ -23,7 +23,7 @@ def _repo(root: Path) -> None:
     (root / "api.py").write_text(
         '@app.get("/users")\n'
         "def serve():\n"
-        '    if flag:\n'
+        "    if flag:\n"
         '        return {"id": 1}\n'
         '    return {"name": "Sam", "age": 2}\n',
         encoding="utf-8",
@@ -33,9 +33,9 @@ def _repo(root: Path) -> None:
         '    a = response["name"]\n'
         '    response["id"] = 7\n'
         '    other = payload["other"]\n'
-        '    def nested():\n'
+        "    def nested():\n"
         '        return response["nested"]\n'
-        '    return a\n',
+        "    return a\n",
         encoding="utf-8",
     )
 
@@ -56,7 +56,8 @@ def _observe(root: Path, provider: StaticPythonInterfaceDeclarations) -> dict:
 
 def _pair(packet: dict) -> dict:
     (group,) = [
-        row for row in packet["declarations"]["groups"]
+        row
+        for row in packet["declarations"]["groups"]
         if row["concept"]["kind"] == "nominated-python-interface-syntax-pair"
     ]
     return group
@@ -79,14 +80,13 @@ def test_b15_b18_pair_has_two_exact_bindings_but_no_compatibility_claim(
         "consumer_function": "render",
         "consumer_receiver_syntax": "response",
     }
-    roles = {
-        row["semantic_role"]["kind"]: row for row in group["declarations"]
-    }
+    roles = {row["semantic_role"]["kind"]: row for row in group["declarations"]}
     producer = roles["producer-return-syntax"]
     consumer = roles["consumer-subscript-read-syntax"]
     returns = producer["value"]["literal_dictionary_returns"]
     assert [row["literal_keys_in_source_order"] for row in returns] == [
-        ["id"], ["name", "age"]
+        ["id"],
+        ["name", "age"],
     ]
     reads = consumer["value"]["literal_subscript_reads"]
     assert [(row["receiver_syntax"], row["literal_key"]) for row in reads] == [
@@ -96,13 +96,10 @@ def test_b15_b18_pair_has_two_exact_bindings_but_no_compatibility_claim(
     assert producer["value"]["runtime_response_shape"] == "unknown"
     assert all(row["evidence_state"] == "known-present" for row in roles.values())
     assert all(
-        row["semantic_value_authority"] == "provider-claimed"
-        for row in roles.values()
+        row["semantic_value_authority"] == "provider-claimed" for row in roles.values()
     )
     assert packet["execution_effect"]["hashmarks"] == "none"
-    projected = present_repository_evidence(
-        packet["declarations"], format="compact"
-    )
+    projected = present_repository_evidence(packet["declarations"], format="compact")
     assert projected["supported"] is True
 
 
@@ -114,7 +111,8 @@ def test_consumer_alias_is_not_inferred_from_other_receiver(tmp_path: Path) -> N
     )
     group = _pair(packet)
     consumer = next(
-        row for row in group["declarations"]
+        row
+        for row in group["declarations"]
         if row["declaration_id"] == "consumer-subscript-read-syntax"
     )
     assert consumer["value"]["literal_subscript_reads"] == []
@@ -131,7 +129,8 @@ def test_missing_consumer_never_creates_a_pair_or_negative_claim(
         _provider((("api.py", "serve", "client.py", "missing", "response"),)),
     )
     assert not [
-        group for group in packet["declarations"]["groups"]
+        group
+        for group in packet["declarations"]["groups"]
         if group["concept"]["kind"] == "nominated-python-interface-syntax-pair"
     ]
     unresolved = packet["providers"][0]["provenance"]["unresolved_consumer_pairs"]
@@ -152,7 +151,8 @@ def test_duplicate_consumer_function_is_ambiguous_not_first_match(
     packet = _observe(tmp_path, _provider())
     assert packet["providers"][0]["provenance"]["unresolved_consumer_pairs"]
     assert not [
-        g for g in packet["declarations"]["groups"]
+        g
+        for g in packet["declarations"]["groups"]
         if g["concept"]["kind"] == "nominated-python-interface-syntax-pair"
     ]
 
@@ -165,9 +165,10 @@ def test_undecorated_producer_does_not_masquerade_as_route(
         'def serve():\n    return {"name": "Sam"}\n', encoding="utf-8"
     )
     packet = _observe(tmp_path, _provider())
-    assert packet["providers"][0]["provenance"]["unresolved_consumer_pairs"][
-        0
-    ]["reason"] == "producer-decorator-unresolved"
+    assert (
+        packet["providers"][0]["provenance"]["unresolved_consumer_pairs"][0]["reason"]
+        == "producer-decorator-unresolved"
+    )
 
 
 def test_opt_out_preserves_existing_declaration_evidence(
@@ -179,9 +180,7 @@ def test_opt_out_preserves_existing_declaration_evidence(
         default = cm.discover_repository_declarations(
             [StaticPythonInterfaceDeclarations(paths=("api.py", "client.py"))]
         )
-        explicitly_empty = cm.discover_repository_declarations(
-            [_provider(())]
-        )
+        explicitly_empty = cm.discover_repository_declarations([_provider(())])
     assert default == explicitly_empty
     assert "consumer_pairs" not in default["providers"][0]["provenance"]
 
@@ -197,21 +196,27 @@ def test_order_does_not_change_pair_identity_and_mutation_changes_observation(
     with CodeMap(tmp_path) as cm:
         cm.sync()
         first = cm.discover_repository_declarations([_provider(pairs)])
-        second = cm.discover_repository_declarations([_provider(tuple(reversed(pairs)))])
+        second = cm.discover_repository_declarations(
+            [_provider(tuple(reversed(pairs)))]
+        )
         assert first["observation_identity"] == second["observation_identity"]
         source = tmp_path / "client.py"
-        source.write_text(source.read_text().replace('response["name"]', 'response["age"]'))
+        source.write_text(
+            source.read_text().replace('response["name"]', 'response["age"]')
+        )
         cm.sync(["client.py"])
         changed = cm.discover_repository_declarations(
             [_provider(pairs)], previous_observation=first
         )
     assert changed["observation_identity"] != first["observation_identity"]
     groups = [
-        row for row in changed["declarations"]["groups"]
+        row
+        for row in changed["declarations"]["groups"]
         if row["concept"]["kind"] == "nominated-python-interface-syntax-pair"
     ]
     consumer = next(
-        row for row in groups[1]["declarations"]
+        row
+        for row in groups[1]["declarations"]
         if row["declaration_id"] == "consumer-subscript-read-syntax"
     )
     assert consumer["value"]["literal_subscript_reads"][0]["literal_key"] == "age"
