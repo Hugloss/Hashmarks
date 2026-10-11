@@ -281,6 +281,19 @@ they are never replayed into the current task observation or durable state.
 Use the exact relationship detail mode and its endpoint comparison for claim
 additions/removals.
 
+### Caller-nominated producer/consumer syntax (B15–B18)
+
+The opt-in `StaticPythonInterfaceDeclarations.consumer_pairs` provider adds
+one neutral `repository_declarations` group for two independently source-bound
+function-body observations. It reuses existing literal dict-return and subscript
+load syntax and emits no inferred runtime compatibility, route registration,
+consumer reachability, missing-field conclusion, or relationship graph edge.
+Exact paths/functions and receiver are explicitly nominated by the caller.
+The pair's `correspondence` and `comparison` remain unresolved/ambiguous,
+its coverage incomplete, and negative evidence unavailable. A consumer can
+use each exact declaration binding for investigation; choosing a repair and
+authenticating the pair are external responsibilities.
+
 ## Backend changed-line evidence: direct correlation without impact inference
 
 The existing `change_impact` owner can optionally include
