@@ -119,3 +119,33 @@ def test_initial_mode_rejects_unknown_mode_before_observation(tmp_path: Path) ->
         assert caught.value.reason == "invalid-request"
     finally:
         surface.close()
+
+
+def test_initial_class_table_keeps_future_fields_and_preserves_source_packet(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "backend.py").write_text(
+        "class ChannelBackend:\n    def subscribe(self): pass\n"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = cast("dict[str, Any]", codemap.task_evidence("Inspect ChannelBackend"))
+    context = next(
+        row["class_declarations"]
+        for row in packet["retrieval"]["results"]
+        if "class_declarations" in row
+    )
+    context["declarations"][0]["future_source_fact"] = {
+        "state": "unknown",
+        "source": "producer-owned",
+    }
+    original = deepcopy(packet)
+    projected = initial_task_evidence(packet)
+    returned = next(
+        row["class_declarations"]
+        for row in projected["retrieval"]["results"]
+        if "class_declarations" in row
+    )
+    assert "declarations_encoding" not in returned
+    assert returned == context
+    assert packet == original

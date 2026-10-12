@@ -34,16 +34,33 @@ def _locator(value: Any) -> Any:
     return {key: item for key, item in value.items() if key not in omitted}
 
 
-def _encode_task_matches(relevance: dict[str, Any]) -> None:
-    matches = relevance.get("task_matches")
-    if not isinstance(matches, dict) or not isinstance(matches.get("matches"), list):
+def _encode_rows(container: dict[str, Any], key: str, columns: list[str]) -> None:
+    rows = container.get(key)
+    if not isinstance(rows, list):
         return
-    columns = ["path", "matched_term_count", "evidence_visibility"]
-    rows = matches["matches"]
     if not all(isinstance(row, dict) and set(row) == set(columns) for row in rows):
         return
-    matches["matches_encoding"] = {"kind": "columns-rows.v1", "columns": columns}
-    matches["matches"] = [[row[key] for key in columns] for row in rows]
+    container[key + "_encoding"] = {"kind": "columns-rows.v1", "columns": columns}
+    container[key] = [[row[column] for column in columns] for row in rows]
+
+
+def _encode_task_matches(relevance: dict[str, Any]) -> None:
+    matches = relevance.get("task_matches")
+    if isinstance(matches, dict):
+        _encode_rows(
+            matches, "matches", ["path", "matched_term_count", "evidence_visibility"]
+        )
+
+
+def _encode_class_declarations(rows: list[dict[str, Any]]) -> None:
+    for row in rows:
+        declarations = row.get("class_declarations")
+        if isinstance(declarations, dict):
+            _encode_rows(
+                declarations,
+                "declarations",
+                ["path", "symbol", "start_line", "end_line"],
+            )
 
 
 def initial_task_evidence(packet: dict[str, Any]) -> dict[str, Any]:
@@ -81,6 +98,7 @@ def initial_task_evidence(packet: dict[str, Any]) -> dict[str, Any]:
     # supplements. No authority or retrieval decision is made by this profile.
     retained = rows[:3] + [row for row in rows[3:] if row.get("supplement")][:2]
     retrieval["results"] = retained
+    _encode_class_declarations(retained)
     omissions["collections"]["/retrieval/results"] = {
         "observed_in_source_packet": len(rows),
         "returned": len(retained),

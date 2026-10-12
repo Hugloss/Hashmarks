@@ -70,6 +70,26 @@ def _source_cli_arguments(inputs: dict[str, Any]) -> list[str]:
     return args
 
 
+def _declaration_cli_arguments(inputs: dict[str, Any]) -> list[str]:
+    if (
+        set(inputs)
+        - {"groups", "result_mode", "python_backend_paths", "include_class_fields"}
+        or inputs.get("groups") != []
+        or inputs.get("result_mode") != "discovery"
+        or not inputs.get("python_backend_paths")
+        or type(inputs.get("include_class_fields", False)) is not bool
+    ):
+        raise ValueError(
+            "backend CLI declaration capture requires selected source discovery"
+        )
+    args = ["repository-declarations"]
+    for path in inputs["python_backend_paths"]:
+        args.extend(("--python-backend-path", path))
+    if inputs.get("include_class_fields"):
+        args.append("--include-class-fields")
+    return args
+
+
 def _cli_arguments(operation: str, inputs: dict[str, Any]) -> list[str]:
     if operation == "task_evidence":
         args = ["task-evidence", inputs["task"]]
@@ -98,6 +118,7 @@ def _cli_arguments(operation: str, inputs: dict[str, Any]) -> list[str]:
     source_captures = {
         "change_impact": _change_cli_arguments,
         "source_observation": _source_cli_arguments,
+        "repository_declarations": _declaration_cli_arguments,
     }
     if operation in source_captures:
         return source_captures[operation](inputs)
@@ -184,4 +205,12 @@ async def _mcp_captures(
 def capture_mcp(
     workspace: Path, state: Path, case: dict[str, Any]
 ) -> list[dict[str, Any]]:
-    return asyncio.run(_mcp_captures(workspace, state, case))
+    try:
+        return asyncio.run(_mcp_captures(workspace, state, case))
+    except ExceptionGroup as error:
+        leaf: BaseException = error
+        while isinstance(leaf, BaseExceptionGroup) and len(leaf.exceptions) == 1:
+            leaf = leaf.exceptions[0]
+        if isinstance(leaf, ValueError):
+            raise ValueError(str(leaf)) from error
+        raise

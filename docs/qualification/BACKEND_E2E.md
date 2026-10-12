@@ -145,6 +145,47 @@ visibility, ordering and all match-scope/authority qualifiers are retained.
 Unexpected row fields retain the original object encoding. The full mode
 continues to return object rows.
 
+Initial class declaration lists use the same lossless encoding, with
+`declarations_encoding.columns` naming `path`, `symbol`, `start_line`, and
+`end_line`. The class scope, revision, generation, bounds, omission counts and
+authority qualifiers are retained as object fields. Future declaration fields
+keep object rows so encoding cannot discard newly admitted source facts.
+
+The `backend-model-v1/source-oracles.json` source baseline reviews three genuine
+FastAPI, Litestar and SQLModel problems. Both revisions bind exact upstream
+commits, full repository-content identities and independently reviewed source
+range hashes. Its expectations distinguish direct annotations, initializer
+syntax and base expressions from runtime validation and inherited fields.
+The remaining acquired model problems are not admitted by this baseline.
+
+It exposed a generic observer defect: model declarations nested inside a
+function or conditional were skipped. The selected-source observer now retains
+those declarations by their exact class line. `include_class_fields=True`
+additionally exposes ordinary annotated classes as
+`python-annotated-class-syntax`, with direct field origins and base-expression
+syntax. It does not infer a model role or resolve inherited/runtime fields.
+The default continues to omit ordinary classes without recognized model-base
+syntax. These source observations still require full revision, native and
+actual CLI/MCP workflow qualification before capability promotion.
+
+The public `repository_declarations` discovery mode now exposes this same
+selected-source provider through CLI and official MCP, including its tracked
+inputs and nested declaration bindings. Observation/explain remain caller-claim
+projections. Discovery uses the existing current-source validation and rejects
+mixed raw/source inputs; comparison packets cannot restore unselected providers.
+
+```text
+Observed repository fact/evidence: Direct class annotations and base expressions,
+  including declarations nested in caller-selected source members.
+Authority source: Existing declaration provider and canonical member bindings.
+Completeness/freshness behavior: Existing file/group/field bounds, exact source
+  revisions, incomplete semantic coverage and no negative-evidence authority.
+Existing Hashmarks owner extended: Static Python backend declaration observer.
+Consumer/execution responsibility explicitly not acquired: Model inference,
+  runtime inheritance/validation, compatibility judgments or test execution.
+Decision: OBSERVER
+```
+
 For this new mode, presentation metadata accounts for undisplayed sections
 without duplicating the bounded native facts as display findings. Public
 envelopes retain those facts in `result`; a standalone presentation projection is

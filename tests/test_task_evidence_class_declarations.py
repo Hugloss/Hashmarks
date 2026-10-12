@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from pathlib import Path
 from typing import cast
 
@@ -57,7 +58,17 @@ def test_retrieved_class_exposes_exact_direct_members_in_every_format(
     assert context["ownership_authority"] is False
     assert context["negative_evidence_admissible"] is False
     assert context["runtime_members"] == "not-established"
-    assert _context(initial) == context
+    decoded = deepcopy(_context(initial))
+    encoding = decoded.pop("declarations_encoding")
+    assert encoding == {
+        "kind": "columns-rows.v1",
+        "columns": ["path", "symbol", "start_line", "end_line"],
+    }
+    decoded["declarations"] = [
+        dict(zip(encoding["columns"], row, strict=True))
+        for row in decoded["declarations"]
+    ]
+    assert decoded == context
     for mode in FORMATS:
         response = presentation_response("task_evidence", packet, format=mode)
         native = response.get("result", response)

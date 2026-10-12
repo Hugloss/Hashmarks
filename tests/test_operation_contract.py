@@ -61,6 +61,7 @@ _EXPECTED = {
     "repository_declarations": {
         "observation": "hashmarks.repository-declarations.v1",
         "explain": "hashmarks.repository-declaration-explain.v1",
+        "discovery": "hashmarks.repository-declaration-discovery.v1",
     },
     "post_change": {"default": "hashmarks.task-post-change-delta.v2"},
     "source_observation": {

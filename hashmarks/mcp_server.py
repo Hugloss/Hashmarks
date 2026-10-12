@@ -49,16 +49,23 @@ _Presentation = PresentationFormat
 _QuerySurface = QuerySurface
 _Profile = ProfileName
 
-_DependencyCodemapResultMode = Literal[*tuple(operation_modes("dependency_codemap"))]
-_RepositoryDeclarationsResultMode = Literal[
-    *tuple(operation_modes("repository_declarations"))
-]
-_SourceObservationResultMode = Literal[*tuple(operation_modes("source_observation"))]
-_RepositoryEvidenceResultMode = Literal[*tuple(operation_modes("repository_evidence"))]
-_EvidenceComparisonResultMode = Literal[*tuple(operation_modes("evidence_comparison"))]
 if TYPE_CHECKING:
+    # Static checkers cannot evaluate computed Literal arguments. Runtime tool
+    # schemas still derive their exact selectors from the operation owner.
+    _DependencyCodemapResultMode = str
+    _RepositoryDeclarationsResultMode = str
+    _SourceObservationResultMode = str
+    _RepositoryEvidenceResultMode = str
+    _EvidenceComparisonResultMode = str
     _TaskEvidenceResultMode = str
 else:
+    _DependencyCodemapResultMode = Literal[*tuple(operation_modes("dependency_codemap"))]
+    _RepositoryDeclarationsResultMode = Literal[
+        *tuple(operation_modes("repository_declarations"))
+    ]
+    _SourceObservationResultMode = Literal[*tuple(operation_modes("source_observation"))]
+    _RepositoryEvidenceResultMode = Literal[*tuple(operation_modes("repository_evidence"))]
+    _EvidenceComparisonResultMode = Literal[*tuple(operation_modes("evidence_comparison"))]
     _TaskEvidenceResultMode = Literal[*tuple(operation_modes("task_evidence"))]
 
 
@@ -165,6 +172,8 @@ def _register_repository_declarations_tool(
         previous_observation: dict[str, Any] | None = None,
         result_mode: _RepositoryDeclarationsResultMode = contract.default_response_mode,
         presentation: _Presentation = "none",
+        python_backend_paths: list[str] | None = None,
+        include_class_fields: bool = False,
     ) -> dict[str, object]:
         return _call_surface(
             contract,
@@ -175,6 +184,14 @@ def _register_repository_declarations_tool(
             result_mode=result_mode,
             response_mode=result_mode,
             presentation=presentation,
+            **(
+                {
+                    "python_backend_paths": python_backend_paths,
+                    "include_class_fields": include_class_fields,
+                }
+                if python_backend_paths is not None or include_class_fields
+                else {}
+            ),
         )
 
 

@@ -20,6 +20,9 @@ from hashmarks.codemap.repository_intelligence_query import (
     RepositoryIntelligenceQueryOptions,
 )
 from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
+from hashmarks.codemap.static_python_backend_declarations import (
+    StaticPythonBackendDeclarations,
+)
 from hashmarks.codemap.structural_locality import structural_locality_delta
 from hashmarks.evidence_presentation import (
     FORMATS,
@@ -176,6 +179,15 @@ def native_packets(
                 codemap.dependency_resolution_delta(observation, observation),
             ),
             ("repository_declarations", "observation", declarations),
+            (
+                "repository_declarations",
+                "discovery",
+                codemap.repository_declarations_operation(
+                    [],
+                    result_mode="discovery",
+                    providers=(StaticPythonBackendDeclarations(paths=(paths[0],)),),
+                ),
+            ),
             (
                 "repository_declarations",
                 "explain",

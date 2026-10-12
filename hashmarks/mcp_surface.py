@@ -17,7 +17,9 @@ from .codemap.repository_declaration_contract import (
     MAX_PACKET_BYTES,
     MAX_REQUEST_BYTES,
 )
+from .codemap.repository_declaration_provider import MAX_DISCOVERY_PACKET_BYTES
 from .codemap.repository_intelligence_query import RepositoryIntelligenceQueryOptions
+from .codemap.static_python_backend_declarations import StaticPythonBackendDeclarations
 from .file_store import UnstableFileError
 from .mcp_contract import (
     MCP_ERROR_REASONS,
@@ -88,6 +90,35 @@ def _value_error_reason(message: str) -> str:
 def _surface_value_error(exc: ValueError) -> McpSurfaceError:
     message = str(exc)
     return McpSurfaceError(message, reason=_value_error_reason(message))
+
+
+def _source_declaration_providers(
+    mode: str, paths: list[str] | None, include_class_fields: bool
+) -> list[StaticPythonBackendDeclarations] | None:
+    if type(include_class_fields) is not bool:
+        raise McpSurfaceError("include_class_fields must be boolean")
+    if mode != "discovery":
+        if paths is not None or include_class_fields:
+            raise McpSurfaceError("source selection requires result_mode=discovery")
+        return None
+    if paths is None:
+        if include_class_fields:
+            raise McpSurfaceError("include_class_fields requires selected paths")
+        return []
+    bounded_paths = _bounded_json(
+        paths,
+        name="python_backend_paths",
+        maximum=MAX_REQUEST_BYTES,
+        expected_type=list,
+    )
+    try:
+        return [
+            StaticPythonBackendDeclarations(
+                paths=tuple(bounded_paths), include_class_fields=include_class_fields
+            )
+        ]
+    except ValueError as exc:
+        raise _surface_value_error(exc) from exc
 
 
 def _bounded_text(
@@ -417,6 +448,8 @@ class HashmarksMcpSurface:
         *,
         previous_observation: dict[str, Any] | None = None,
         result_mode: str = operation_default_mode("repository_declarations"),
+        python_backend_paths: list[str] | None = None,
+        include_class_fields: bool = False,
     ) -> dict[str, object]:
         """Project one core-owned declaration operation without changing semantics."""
         bounded_groups = _bounded_json(
@@ -425,17 +458,24 @@ class HashmarksMcpSurface:
             maximum=MAX_REQUEST_BYTES,
             expected_type=list,
         )
+        mode = _bounded_text(result_mode, name="result_mode", maximum=32)
+        providers = _source_declaration_providers(
+            mode, python_backend_paths, include_class_fields
+        )
         previous = (
             None
             if previous_observation is None
             else _bounded_json(
                 previous_observation,
                 name="previous_observation",
-                maximum=MAX_PACKET_BYTES,
+                maximum=(
+                    MAX_DISCOVERY_PACKET_BYTES
+                    if mode == "discovery"
+                    else MAX_PACKET_BYTES
+                ),
                 expected_type=dict,
             )
         )
-        mode = _bounded_text(result_mode, name="result_mode", maximum=32)
 
         def project() -> dict[str, object]:
             try:
@@ -443,6 +483,7 @@ class HashmarksMcpSurface:
                     bounded_groups,
                     previous_observation=previous,
                     result_mode=mode,
+                    **({"providers": providers} if mode == "discovery" else {}),
                 )
             except ValueError as exc:
                 raise _surface_value_error(exc) from exc

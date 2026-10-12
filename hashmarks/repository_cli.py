@@ -30,6 +30,8 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from .codemap import CodeMap
+
 
 def _print(value, *, compact: bool = False) -> None:
     log_command_output(
@@ -63,7 +65,7 @@ _REPOSITORY_USER_ERRORS = (KeyError, PermissionError, ValueError, FileNotFoundEr
 
 def _call_codemap(
     args,
-    operation: Callable[[object], _T],
+    operation: Callable[[CodeMap], _T],
     *,
     extra_errors: tuple[type[BaseException], ...] = (),
 ) -> _T:
@@ -96,6 +98,39 @@ def _codemap(args):
     from .codemap import CodeMap
 
     return CodeMap(args.workspace, state_dir=args.state_dir)
+
+
+def _repository_declarations_code(args) -> int:
+    from .codemap.static_python_backend_declarations import (
+        StaticPythonBackendDeclarations,
+    )
+
+    previous = (
+        _read_json_object(args.previous_observation, option="--previous-observation")
+        if args.previous_observation
+        else None
+    )
+    value = _call_codemap(
+        args,
+        lambda codemap: codemap.repository_declarations_operation(
+            [],
+            providers=(
+                StaticPythonBackendDeclarations(
+                    paths=tuple(args.python_backend_path),
+                    include_class_fields=args.include_class_fields,
+                ),
+            ),
+            previous_observation=previous,
+            result_mode="discovery",
+        ),
+    )
+    _print_operation(
+        "repository_declarations",
+        value,
+        mode="discovery",
+        presentation=args.presentation,
+    )
+    return 0
 
 
 def _map_sync(args) -> int:
@@ -947,3 +982,19 @@ def add_repository_cli(sub, *, add_common_arguments: Callable[..., None]) -> Non
     _add_task_evidence_cli(sub, add_common_arguments=add_common_arguments)
     _add_change_cli(sub, add_common_arguments=add_common_arguments)
     _add_source_observation_cli(sub, add_common_arguments=add_common_arguments)
+    declarations = sub.add_parser(
+        "repository-declarations",
+        help="observe source declarations in explicitly selected Python backend files",
+    )
+    add_common_arguments(declarations, inherited=True)
+    _add_evidence_presentation_cli(declarations)
+    declarations.add_argument(
+        "--python-backend-path", action="append", required=True, metavar="PATH"
+    )
+    declarations.add_argument("--include-class-fields", action="store_true")
+    declarations.add_argument(
+        "--previous-observation", help="JSON file containing the prior discovery packet"
+    )
+    declarations.set_defaults(
+        func=_repository_declarations_code, automatic_update_check=True
+    )

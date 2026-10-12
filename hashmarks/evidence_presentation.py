@@ -1008,6 +1008,17 @@ def _declarations(
     p.nested(packet, "repository_evidence", ref, ctx)
 
 
+def _declaration_discovery(
+    p: _Projection,
+    packet: Mapping[str, object],
+    ref: tuple[object, ...],
+    ctx: Mapping[str, object],
+) -> None:
+    p.field(packet, "providers", "repository_structure", ref, ctx)
+    p.field(packet, "delta_from_previous", "correspondence", ref, ctx)
+    p.nested(packet, "declarations", ref, ctx)
+
+
 def _context_packet(
     p: _Projection,
     packet: Mapping[str, object],
@@ -1480,6 +1491,9 @@ def _projectors() -> dict[str, Any]:
         operation_schema("correlate_evidence"): _correlation,
         operation_schema("repository_declarations", "observation"): _declarations,
         operation_schema("repository_declarations", "explain"): _declarations,
+        operation_schema(
+            "repository_declarations", "discovery"
+        ): _declaration_discovery,
     }
 
 
@@ -1518,6 +1532,10 @@ def _require_fields(packet: Mapping[str, object], schema: str) -> None:
         ),
         operation_schema("dependency_codemap", "compare"): ("comparability",),
         operation_schema("repository_declarations", "observation"): ("groups",),
+        operation_schema("repository_declarations", "discovery"): (
+            "providers",
+            "declarations",
+        ),
         operation_schema("repository_declarations", "explain"): (
             "semantic_result",
             "derivation",

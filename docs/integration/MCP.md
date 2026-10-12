@@ -142,7 +142,7 @@ Hashmarks intentionally exposes a small read-only repository-intelligence tool c
 | `change_impact` | bounded structural impact for caller-reported changed paths |
 | `correlate_evidence` | correlate bounded external/derived observations to canonical repository evidence without inferring causation |
 | `dependency_codemap` | qualify dependency observations, explain their authority, compare explicit endpoints, or run bounded factual queries |
-| `repository_declarations` | bind declarations to exact repository evidence and return the qualified observation or typed explanation |
+| `repository_declarations` | bind declaration claims to exact evidence, or discover syntax from selected backend source with tracked input revisions |
 | `post_change` | refresh changed paths against a previous `task_evidence` packet and return evidence deltas |
 | `repository_intelligence_query` | expose existing bounded profiles, snapshots, deltas, freshness, verification explanations, and cross-repository evidence |
 | `source_observation` | exact revision-bound source occurrences for one member or an explicit bounded member set |
@@ -344,7 +344,14 @@ The catalog stays small: explainability and endpoint comparison are modes on exi
 - `explain` returns the existing typed `hashmarks.dependency-resolution-explain.v1` projection;
 - `compare` requires a bounded caller-supplied qualified `previous_observation` and returns `hashmarks.dependency-resolution-delta.v3`.
 
-`repository_declarations` accepts `result_mode="observation" | "explain"`. Observation is the unchanged default response; explain returns `hashmarks.repository-declaration-explain.v1`. Existing `previous_observation` declaration delta behavior remains observation-mode only.
+`repository_declarations` accepts `result_mode="observation" | "explain" | "discovery"`.
+Observation remains the default; explain returns `hashmarks.repository-declaration-explain.v1`.
+Discovery takes `groups=[]` and optional explicit `python_backend_paths`, with
+`include_class_fields=True` enabling ordinary class annotations. It returns
+`hashmarks.repository-declaration-discovery.v1`, retaining tracked source inputs
+and nested declarations. `previous_observation` compares a prior packet of the
+same observation/discovery kind. Source selection cannot be mixed with raw
+caller-supplied declaration claims. See [Repository declarations](../reference/REPOSITORY_DECLARATIONS.md).
 
 The MCP server never stores a "previous" dependency or declaration observation on behalf of the caller. Compare/explain modes are request-scoped projections over explicit authority supplied or produced in that request. They do not scan Git history, add a session-history cache, or create a new freshness owner.
 

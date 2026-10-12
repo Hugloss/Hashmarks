@@ -4,6 +4,8 @@ from collections.abc import Mapping, Sequence
 from itertools import islice
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.operation_contract import operation_schema
+
 from .decision_session import decision_scoped
 from .repository_declaration_contract import encoded_json_bytes
 from .repository_declaration_provider import (
@@ -20,7 +22,7 @@ from .repository_declaration_provider import (
 if TYPE_CHECKING:
     from .engine import CodeMap
 
-_SCHEMA = "hashmarks.repository-declaration-discovery.v1"
+_SCHEMA = operation_schema("repository_declarations", "discovery")
 _DELTA_SCHEMA = "hashmarks.repository-declaration-discovery-delta.v1"
 
 
@@ -238,6 +240,8 @@ class RepositoryDeclarationDiscoveryMixin:
         self,
         previous: Mapping[str, object],
     ) -> None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if previous.get("schema") != _SCHEMA:
             raise ValueError(f"previous discovery must use schema {_SCHEMA}")
         identity = previous.get("observation_identity")

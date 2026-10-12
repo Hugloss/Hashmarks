@@ -242,8 +242,9 @@ MCP_TOOL_CONTRACTS = (
     McpToolContract(
         "repository_declarations",
         (
-            "Project correlated repository declarations as observation or explanation "
-            "while preserving provenance, ambiguity, coverage, and freshness."
+            "Project repository declarations as observation or explanation, or discover "
+            "source syntax from explicitly selected Python backend paths. Preserve "
+            "provenance, ambiguity, coverage, and freshness."
         ),
         "repository_declarations",
     ),

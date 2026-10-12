@@ -93,6 +93,7 @@ OPERATION_CONTRACTS = (
         (
             ("observation", "hashmarks.repository-declarations.v1"),
             ("explain", "hashmarks.repository-declaration-explain.v1"),
+            ("discovery", "hashmarks.repository-declaration-discovery.v1"),
         ),
     ),
     OperationContract(

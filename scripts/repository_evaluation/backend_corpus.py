@@ -84,9 +84,7 @@ def _check_workflow(
 def _check_revision_labels(root: Path, rule: dict[str, Any], stage: str) -> None:
     labels = rule["source_labels"][stage]
     if not labels:
-        raise ValueError(
-            "backend workflow requires source labels for both revisions"
-        )
+        raise ValueError("backend workflow requires source labels for both revisions")
     for label in labels:
         _check_label(root, label)
     for check in rule.get(stage, rule).get("checks", []):
