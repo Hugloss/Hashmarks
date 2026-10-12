@@ -21,6 +21,41 @@ if TYPE_CHECKING:
 
 class TaskActionOwnerResolutionMixin:
     @staticmethod
+    def _task_action_symbol_is_explicit_in_file_task(
+        task: str, candidate: dict[str, object]
+    ) -> bool:
+        """Do not reinterpret an ordinary task word as a narrower file target."""
+        name = str(candidate.get("name") or "")
+        qualname = str(candidate.get("qualname") or "")
+        if not name:
+            return False
+        if "_" in name or any(character.isupper() for character in name):
+            return True
+        if "." in qualname and qualname in task:
+            return True
+        quoted_or_call = rf"(?:[`'\"]{re.escape(name)}[`'\"]|\b{re.escape(name)}\s*\()"
+        declaration = rf"\b(?:function|method|class|symbol)\s+{re.escape(name)}\b"
+        return bool(
+            re.search(quoted_or_call, task) or re.search(declaration, task, re.I)
+        )
+
+    def _task_action_literal_path_row(
+        self, token: str
+    ) -> tuple[str, dict[str, object] | None]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        path = normalize_relative_path(token, allow_root=False)
+        row = self._session_file_row(path)
+        # Missing index rows do not prove absence. Only the canonical member
+        # owner can admit punctuation fallback for an absent literal filename.
+        if row is None and token.endswith("."):
+            member = self._repository_member_source(path)
+            if isinstance(member, dict) and member.get("state") == "known-absent":
+                path = normalize_relative_path(token.rstrip("."), allow_root=False)
+                row = self._session_file_row(path)
+        return path, row
+
+    @staticmethod
     def _task_action_class_is_method_scope(
         task: str, candidate: dict[str, object] | None
     ) -> bool:
@@ -48,12 +83,11 @@ class TaskActionOwnerResolutionMixin:
             token = raw.strip("`'\"()[]{}<>,:;").replace("\\", "/")
             token = token.partition("::")[0]
             try:
-                path = normalize_relative_path(token, allow_root=False)
+                path, row = self._task_action_literal_path_row(token)
             except ValueError:
                 continue
             if path in failed:
                 continue
-            row = self._session_file_row(path)
             if row is None:
                 continue
             visibility = EvidenceVisibility(
@@ -120,6 +154,15 @@ class TaskActionOwnerResolutionMixin:
                 request.context.rows,
                 request.limit,
             )
+        # A literal file nominates the file. A retrieved declaration in that
+        # file does not establish which symbol the caller intended; the exact
+        # identifier resolver below may qualify that separately.
+        literal_row = {
+            **literal_row,
+            **dict.fromkeys(
+                ("name", "qualname", "signature", "start_line", "end_line")
+            ),
+        }
         return literal_row, literal_task_path
 
     def _task_action_exact_owner(
@@ -153,6 +196,9 @@ class TaskActionOwnerResolutionMixin:
                     row
                     for row in exact_identifier_edits
                     if str(row.get("path") or "") == literal_task_path
+                    and self._task_action_symbol_is_explicit_in_file_task(
+                        request.task, row
+                    )
                 ]
             evidence = _TaskActionExactIdentifierEvidence(
                 exact_identifier_edits,

@@ -389,3 +389,62 @@ def test_generic_class_reopen_rejects_stale_source_and_does_not_replay(
     value = _value(_groups(current)["python-annotated-class-syntax"][0])
     assert [field["name"] for field in value["fields"]] == ["current"]
     assert value["inherited_fields"] == "not-established"
+
+
+def test_decorated_method_annotation_is_direct_syntax_not_a_runtime_field(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "class Result(BaseModel):\n"
+        "    @arbitrary.computed\n"
+        "    @configure(secret='DO_NOT_COPY')\n"
+        "    def status(self) -> Optional[Status]:\n"
+        "        @nested\n"
+        "        def hidden() -> int: return 1\n"
+        "        return None\n"
+        "    class Nested:\n"
+        "        @property\n"
+        "        def nested_status(self) -> str: return 'x'\n",
+    )
+    value = _value(
+        _groups(_observe(tmp_path, StaticPythonBackendDeclarations(paths=(PATH,))))[
+            "python-model-class-syntax"
+        ][0]
+    )
+    assert value["fields"] == []
+    methods = value["annotated_decorated_methods"]
+    assert [method["name"] for method in methods] == ["status"]
+    assert methods[0]["return_annotation"] == {
+        "state": "direct-annotation-syntax",
+        "text": "Optional[Status]",
+        "start_line": 4,
+        "end_line": 4,
+    }
+    assert methods[0]["decorators"][0]["callee"] == {
+        "state": "member-syntax",
+        "receiver": "arbitrary",
+        "name": "computed",
+    }
+    assert methods[0]["decorators"][1]["call_arguments"]["keyword_names"] == ["secret"]
+    assert methods[0]["runtime_field_role"] == "unknown"
+    assert methods[0]["runtime_binding"] == "not-established"
+    assert "DO_NOT_COPY" not in str(value)
+    assert value["negative_evidence_admissible"] is False
+
+
+def test_decorated_method_syntax_bounds_fail_closed(tmp_path: Path) -> None:
+    from hashmarks.codemap.static_python_backend_declarations import (
+        MAX_ANNOTATED_DECORATED_METHODS,
+    )
+
+    _write(
+        tmp_path,
+        "class Result(BaseModel):\n"
+        + "".join(
+            f"    @property\n    def field_{i}(self) -> int: return {i}\n"
+            for i in range(MAX_ANNOTATED_DECORATED_METHODS + 1)
+        ),
+    )
+    with pytest.raises(RepositoryDeclarationProviderError):
+        _observe(tmp_path, StaticPythonBackendDeclarations(paths=(PATH,)))

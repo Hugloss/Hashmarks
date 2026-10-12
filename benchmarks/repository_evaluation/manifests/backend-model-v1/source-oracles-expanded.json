@@ -1,0 +1,954 @@
+{
+  "schema": "hashmarks.backend-model-source-oracles.v1",
+  "qualification_scope": "Seven manually reviewed genuine model source problems across three repositories. Source expectations only; no transport, breadth, recall or runtime validation qualification is implied.",
+  "sources": {
+    "fastapi-dict-exclude-defaults-before": {
+      "repository": "fastapi",
+      "commit": "4ffd45172059cb32c3326cedde2c7ecf579c5db8",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/fastapi",
+      "content_identity": "sha256:2ce7cfa1a7a0340ea62a8a38237ef804b5092124e9fd3b0f9bff4f3272683ca9:3134"
+    },
+    "fastapi-dict-exclude-defaults-after": {
+      "repository": "fastapi",
+      "commit": "aadfcce76380ab169fe172d5cda21722e53c4924",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/fastapi",
+      "content_identity": "sha256:2f615ba2fb85aaf8b0b9ff1b3577150ebbf786798df49be2cb6481eb9c65dce5:3134"
+    },
+    "litestar-notrequired-field-schema-before": {
+      "repository": "litestar",
+      "commit": "7c9d0e0dd8c68c92d162ad65f39f44f3b75cbcd4",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar",
+      "content_identity": "sha256:e610dde327395441f4825327418c68a8b9010ccc5fd47b5ce7cbc2fa8c683e82:1445"
+    },
+    "litestar-notrequired-field-schema-after": {
+      "repository": "litestar",
+      "commit": "ce3ff9e6de8a3f69b45e8ab2c716908cb7c9b749",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar",
+      "content_identity": "sha256:ce20973c71352bb8bdae5bd6cf1f625629f34c0ba6a62c456d16941d11c1cb93:1445"
+    },
+    "sqlmodel-field-discriminator-before": {
+      "repository": "sqlmodel",
+      "commit": "43353a45817b30a51b7904d0b30e500bbbcef7ca",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/sqlmodel",
+      "content_identity": "sha256:aac1ee4905b23bbef428faf1cb80d87561a10fd0e02bff8534f929e054151cc2:508"
+    },
+    "sqlmodel-field-discriminator-after": {
+      "repository": "sqlmodel",
+      "commit": "073023d84546490bd5dce86ce94fe6e8914db7c2",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/sqlmodel",
+      "content_identity": "sha256:52c47becdd7c2af0a5795317b693725fa5a1b8005eeae2b48c00affe87ce7c79:508"
+    },
+    "fastapi-iterable-response-options-before": {
+      "repository": "fastapi",
+      "commit": "0f3d3b2f9f09f04fe612d4b7db32485170c9f1dd",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/fastapi",
+      "content_identity": "sha256:ccf6682ec80563d9b74bfd2cc89c8a31afda4a96c35f00d7340a037661fda23a:3135"
+    },
+    "fastapi-iterable-response-options-after": {
+      "repository": "fastapi",
+      "commit": "d6537f774b0e80e376e2cf4e0fa998a38c6d0c09",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/fastapi",
+      "content_identity": "sha256:df4f016032a76da5d2cf29af9f1495356b42c1c79b493145b23db0ad61d03e32:3135"
+    },
+    "litestar-nullable-required-fields-before": {
+      "repository": "litestar",
+      "commit": "e0204f0db1aeff58b17ccc7d6daa168588a16799",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar",
+      "content_identity": "sha256:fb4689d651cbd2e777b069ac67b7d9ef8d76acce168cb076f7f61bc0771006bb:1387"
+    },
+    "litestar-nullable-required-fields-after": {
+      "repository": "litestar",
+      "commit": "0377e285cb3c1f0d3e17876fcdc0b6be443d0a58",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar",
+      "content_identity": "sha256:4509516280bf7369d16784c0794320c504ef2c53e3be37b2efb29ce82f732363:1387"
+    },
+    "sqlmodel-utc-timedelta-before": {
+      "repository": "sqlmodel",
+      "commit": "dcaf3296ae0b79d802ce69c18eced6b590e499b7",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/sqlmodel",
+      "content_identity": "sha256:7d3fd4319c2b562e4fb7168e99a1a9a8a18fbe4495931b6a44400c60cb7dbd12:525"
+    },
+    "sqlmodel-utc-timedelta-after": {
+      "repository": "sqlmodel",
+      "commit": "bc809ca3f54cafb9eb93b826e00507cf8582e55a",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/sqlmodel",
+      "content_identity": "sha256:97ee5e4af7ce01062c07ac6fc3d20325c27d88f150e69ce074df2d026bfadf4b:525"
+    },
+    "sqlmodel-relationship-declaration-type-before": {
+      "repository": "sqlmodel",
+      "commit": "46abf3fb662909c5d1f2a157f04091126304026c",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/sqlmodel",
+      "content_identity": "sha256:3d5986753171bf04cf1c02559e31a6c6d868663c413812ce104ef399f214d708:506"
+    },
+    "sqlmodel-relationship-declaration-type-after": {
+      "repository": "sqlmodel",
+      "commit": "fcb2da310d5906c878f90dac2121d194388c39f3",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/sqlmodel",
+      "content_identity": "sha256:22094ae8546a5d60bc9a63bc1f9effd548b3a28e2e38cb03dacfac450e5f37b1:506"
+    }
+  },
+  "cases": [
+    {
+      "id": "fastapi-dict-exclude-defaults",
+      "repository": "fastapi",
+      "problem_id": "aadfcce76380ab169fe172d5cda21722e53c4924",
+      "problem_source": "https://github.com/fastapi/fastapi/commit/aadfcce76380ab169fe172d5cda21722e53c4924",
+      "before": "fastapi-dict-exclude-defaults-before",
+      "after": "fastapi-dict-exclude-defaults-after",
+      "question": "Which directly declared defaults are involved when encoding models nested in dicts and lists?",
+      "path": "tests/test_jsonable_encoder.py",
+      "source_oracles": {
+        "before": [
+          {
+            "class_name_syntax": "ModelWithDefault",
+            "class_line": 69,
+            "fields": [
+              {
+                "name": "foo",
+                "line": 70,
+                "annotation_text": "str",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "other-literal"
+              },
+              {
+                "name": "bar",
+                "line": 71,
+                "annotation_text": "str",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "string"
+              },
+              {
+                "name": "bla",
+                "line": 72,
+                "annotation_text": "str",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "string"
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "tests/test_jsonable_encoder.py",
+                "start_line": 69,
+                "end_line": 72,
+                "sha256": "93ca3fefc43f16425e44e6c5b130e69c583b5aeba884ae9e284a4c92b42b8b12"
+              }
+            ]
+          }
+        ],
+        "after": [
+          {
+            "class_name_syntax": "ModelWithDefault",
+            "class_line": 69,
+            "fields": [
+              {
+                "name": "foo",
+                "line": 70,
+                "annotation_text": "str",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "other-literal"
+              },
+              {
+                "name": "bar",
+                "line": 71,
+                "annotation_text": "str",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "string"
+              },
+              {
+                "name": "bla",
+                "line": 72,
+                "annotation_text": "str",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "string"
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "tests/test_jsonable_encoder.py",
+                "start_line": 69,
+                "end_line": 72,
+                "sha256": "93ca3fefc43f16425e44e6c5b130e69c583b5aeba884ae9e284a4c92b42b8b12"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "litestar-notrequired-field-schema",
+      "repository": "litestar",
+      "problem_id": "ce3ff9e6de8a3f69b45e8ab2c716908cb7c9b749",
+      "problem_source": "https://github.com/litestar-org/litestar/commit/ce3ff9e6de8a3f69b45e8ab2c716908cb7c9b749",
+      "before": "litestar-notrequired-field-schema-before",
+      "after": "litestar-notrequired-field-schema-after",
+      "question": "Where is the factory initializer on the constrained string model declared? Does syntax establish requiredness?",
+      "path": "tests/unit/test_plugins/test_pydantic/test_schema_plugin.py",
+      "source_oracles": {
+        "before": [
+          {
+            "class_name_syntax": "Model",
+            "class_line": 137,
+            "fields": [
+              {
+                "name": "test_str",
+                "line": 138,
+                "annotation_text": "str",
+                "default_state": "direct-call-syntax",
+                "default_keyword_names": [
+                  "default_factory",
+                  "max_length"
+                ]
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "tests/unit/test_plugins/test_pydantic/test_schema_plugin.py",
+                "start_line": 137,
+                "end_line": 138,
+                "sha256": "44f1c77f96cba95da3d75485dfb9ea7ba722a8c9f88d540614c740157635ce80"
+              }
+            ],
+            "class_qualname": "test_v1_constrained_str_with_default_factory_does_not_generate_title.Model"
+          }
+        ],
+        "after": [
+          {
+            "class_name_syntax": "Model",
+            "class_line": 137,
+            "fields": [
+              {
+                "name": "test_str",
+                "line": 138,
+                "annotation_text": "str",
+                "default_state": "direct-call-syntax",
+                "default_keyword_names": [
+                  "default_factory",
+                  "max_length"
+                ]
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "tests/unit/test_plugins/test_pydantic/test_schema_plugin.py",
+                "start_line": 137,
+                "end_line": 138,
+                "sha256": "44f1c77f96cba95da3d75485dfb9ea7ba722a8c9f88d540614c740157635ce80"
+              }
+            ],
+            "class_qualname": "test_v1_constrained_str_with_default_factory_does_not_generate_title.Model"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sqlmodel-field-discriminator",
+      "repository": "sqlmodel",
+      "problem_id": "073023d84546490bd5dce86ce94fe6e8914db7c2",
+      "problem_source": "https://github.com/fastapi/sqlmodel/commit/073023d84546490bd5dce86ce94fe6e8914db7c2",
+      "before": "sqlmodel-field-discriminator-before",
+      "after": "sqlmodel-field-discriminator-after",
+      "question": "Which direct declarations and initializer syntax accompany the new callable discriminator? Do not infer inherited fields or runtime validation.",
+      "path": "tests/test_pydantic/test_field.py",
+      "source_oracles": {
+        "before": [
+          {
+            "class_name_syntax": "Model",
+            "class_line": 40,
+            "fields": [
+              {
+                "name": "pet",
+                "line": 41,
+                "annotation_text": "Cat | Dog | Lizard",
+                "default_state": "direct-call-syntax",
+                "default_keyword_names": [
+                  "discriminator"
+                ]
+              },
+              {
+                "name": "n",
+                "line": 42,
+                "annotation_text": "int",
+                "default_state": "not-supplied"
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "tests/test_pydantic/test_field.py",
+                "start_line": 40,
+                "end_line": 42,
+                "sha256": "7656aae5a392b08fe3153613d30206c596e13e0513b75548c48f81cd6eb5afa4"
+              }
+            ],
+            "base_expression_texts": [
+              "SQLModel"
+            ],
+            "class_qualname": "test_discriminator.Model"
+          }
+        ],
+        "after": [
+          {
+            "class_name_syntax": "ApplePie",
+            "class_line": 57,
+            "fields": [
+              {
+                "name": "fruit",
+                "line": 58,
+                "annotation_text": "Literal['apple']",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "string"
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "tests/test_pydantic/test_field.py",
+                "start_line": 57,
+                "end_line": 58,
+                "sha256": "115df9108ec154121881fe20902d6f190b1b21fa93bc09d840af3a4098e2f840"
+              }
+            ],
+            "base_expression_texts": [
+              "Pie"
+            ],
+            "class_qualname": "test_discriminator_callable.ApplePie"
+          },
+          {
+            "class_name_syntax": "PumpkinPie",
+            "class_line": 60,
+            "fields": [
+              {
+                "name": "filling",
+                "line": 61,
+                "annotation_text": "Literal['pumpkin']",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "string"
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "tests/test_pydantic/test_field.py",
+                "start_line": 60,
+                "end_line": 61,
+                "sha256": "e1f32eefa3746ac2c88fe4e31e33e43a3052fd8c93976a51c6a34ba4318adcb3"
+              }
+            ],
+            "base_expression_texts": [
+              "Pie"
+            ],
+            "class_qualname": "test_discriminator_callable.PumpkinPie"
+          },
+          {
+            "class_name_syntax": "ThanksgivingDinner",
+            "class_line": 68,
+            "fields": [
+              {
+                "name": "dessert",
+                "line": 69,
+                "annotation_text": "Annotated[ApplePie, Tag('apple')] | Annotated[PumpkinPie, Tag('pumpkin')]",
+                "default_state": "direct-call-syntax",
+                "default_keyword_names": [
+                  "discriminator"
+                ]
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "tests/test_pydantic/test_field.py",
+                "start_line": 68,
+                "end_line": 73,
+                "sha256": "41bc67ce9b75852a44a892baea5f3e5aa7ff78ff56dd1cda5e6d832fdac69f12"
+              }
+            ],
+            "base_expression_texts": [
+              "SQLModel"
+            ],
+            "class_qualname": "test_discriminator_callable.ThanksgivingDinner"
+          }
+        ]
+      }
+    },
+    {
+      "id": "fastapi-iterable-response-options",
+      "repository": "fastapi",
+      "problem_id": "d6537f774b0e80e376e2cf4e0fa998a38c6d0c09",
+      "problem_source": "https://github.com/fastapi/fastapi/commit/d6537f774b0e80e376e2cf4e0fa998a38c6d0c09",
+      "before": "fastapi-iterable-response-options-before",
+      "after": "fastapi-iterable-response-options-after",
+      "question": "Locate declared defaults and direct subclass fields involved in Iterable response options; inherited runtime fields remain unknown.",
+      "path": "tests/test_skip_defaults.py",
+      "source_oracles": {
+        "before": [
+          {
+            "class_name_syntax": "Model",
+            "class_line": 12,
+            "fields": [
+              {
+                "name": "x",
+                "line": 13,
+                "annotation_text": "int | None",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "none"
+              },
+              {
+                "name": "sub",
+                "line": 14,
+                "annotation_text": "SubModel",
+                "default_state": "not-supplied"
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "tests/test_skip_defaults.py",
+                "start_line": 12,
+                "end_line": 14,
+                "sha256": "2279686e81ba4b3e6d35cde86922d85c7180dee12e21217881d7316a2cdbaecf"
+              }
+            ]
+          },
+          {
+            "class_name_syntax": "ModelSubclass",
+            "class_line": 17,
+            "fields": [
+              {
+                "name": "y",
+                "line": 18,
+                "annotation_text": "int",
+                "default_state": "not-supplied"
+              },
+              {
+                "name": "z",
+                "line": 19,
+                "annotation_text": "int",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "integer"
+              },
+              {
+                "name": "w",
+                "line": 20,
+                "annotation_text": "int | None",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "none"
+              }
+            ],
+            "base_expression_texts": [
+              "Model"
+            ],
+            "source_labels": [
+              {
+                "path": "tests/test_skip_defaults.py",
+                "start_line": 17,
+                "end_line": 20,
+                "sha256": "c1ac2cfc7e77640e3fcb08cc9b4f8f701cafd9dbead1884c26c0fff5c24e5d7f"
+              }
+            ]
+          },
+          {
+            "class_name_syntax": "ModelDefaults",
+            "class_line": 23,
+            "fields": [
+              {
+                "name": "w",
+                "line": 24,
+                "annotation_text": "str | None",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "none"
+              },
+              {
+                "name": "x",
+                "line": 25,
+                "annotation_text": "str | None",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "none"
+              },
+              {
+                "name": "y",
+                "line": 26,
+                "annotation_text": "str",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "string"
+              },
+              {
+                "name": "z",
+                "line": 27,
+                "annotation_text": "str",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "string"
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "tests/test_skip_defaults.py",
+                "start_line": 23,
+                "end_line": 27,
+                "sha256": "1d2fb4b8e66af9c135f4966447dc7742c4cfbd3f77b853d5ba0535e2958c46b7"
+              }
+            ]
+          }
+        ],
+        "after": [
+          {
+            "class_name_syntax": "Model",
+            "class_line": 14,
+            "fields": [
+              {
+                "name": "x",
+                "line": 15,
+                "annotation_text": "int | None",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "none"
+              },
+              {
+                "name": "sub",
+                "line": 16,
+                "annotation_text": "SubModel",
+                "default_state": "not-supplied"
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "tests/test_skip_defaults.py",
+                "start_line": 14,
+                "end_line": 16,
+                "sha256": "2279686e81ba4b3e6d35cde86922d85c7180dee12e21217881d7316a2cdbaecf"
+              }
+            ]
+          },
+          {
+            "class_name_syntax": "ModelSubclass",
+            "class_line": 19,
+            "fields": [
+              {
+                "name": "y",
+                "line": 20,
+                "annotation_text": "int",
+                "default_state": "not-supplied"
+              },
+              {
+                "name": "z",
+                "line": 21,
+                "annotation_text": "int",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "integer"
+              },
+              {
+                "name": "w",
+                "line": 22,
+                "annotation_text": "int | None",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "none"
+              }
+            ],
+            "base_expression_texts": [
+              "Model"
+            ],
+            "source_labels": [
+              {
+                "path": "tests/test_skip_defaults.py",
+                "start_line": 19,
+                "end_line": 22,
+                "sha256": "c1ac2cfc7e77640e3fcb08cc9b4f8f701cafd9dbead1884c26c0fff5c24e5d7f"
+              }
+            ]
+          },
+          {
+            "class_name_syntax": "ModelDefaults",
+            "class_line": 25,
+            "fields": [
+              {
+                "name": "w",
+                "line": 26,
+                "annotation_text": "str | None",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "none"
+              },
+              {
+                "name": "x",
+                "line": 27,
+                "annotation_text": "str | None",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "none"
+              },
+              {
+                "name": "y",
+                "line": 28,
+                "annotation_text": "str",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "string"
+              },
+              {
+                "name": "z",
+                "line": 29,
+                "annotation_text": "str",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "string"
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "tests/test_skip_defaults.py",
+                "start_line": 25,
+                "end_line": 29,
+                "sha256": "1d2fb4b8e66af9c135f4966447dc7742c4cfbd3f77b853d5ba0535e2958c46b7"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "litestar-nullable-required-fields",
+      "repository": "litestar",
+      "problem_id": "0377e285cb3c1f0d3e17876fcdc0b6be443d0a58",
+      "problem_source": "https://github.com/litestar-org/litestar/commit/0377e285cb3c1f0d3e17876fcdc0b6be443d0a58",
+      "before": "litestar-nullable-required-fields-before",
+      "after": "litestar-nullable-required-fields-after",
+      "question": "Locate nullable annotations with and without direct defaults; runtime schema requiredness is unknown.",
+      "path": "tests/unit/test_plugins/test_pydantic/models.py",
+      "source_oracles": {
+        "before": [
+          {
+            "class_name_syntax": "PydanticPerson",
+            "class_line": 20,
+            "fields": [
+              {
+                "name": "first_name",
+                "line": 21,
+                "annotation_text": "str",
+                "default_state": "not-supplied"
+              },
+              {
+                "name": "last_name",
+                "line": 22,
+                "annotation_text": "str",
+                "default_state": "not-supplied"
+              },
+              {
+                "name": "id",
+                "line": 23,
+                "annotation_text": "str",
+                "default_state": "not-supplied"
+              },
+              {
+                "name": "optional",
+                "line": 24,
+                "annotation_text": "Optional[str]",
+                "default_state": "not-supplied"
+              },
+              {
+                "name": "complex",
+                "line": 25,
+                "annotation_text": "dict[str, list[dict[str, str]]]",
+                "default_state": "not-supplied"
+              },
+              {
+                "name": "union",
+                "line": 26,
+                "annotation_text": "Union[int, list[str]]",
+                "default_state": "not-supplied"
+              },
+              {
+                "name": "pets",
+                "line": 27,
+                "annotation_text": "Optional[list[DataclassPet]]",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "none"
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "tests/unit/test_plugins/test_pydantic/models.py",
+                "start_line": 20,
+                "end_line": 27,
+                "sha256": "ea0c71f2ef8c2a80af72dbc12d9e65cdcb52ac15714a8ffa5a7a01fc4c6719e4"
+              }
+            ]
+          }
+        ],
+        "after": [
+          {
+            "class_name_syntax": "PydanticPerson",
+            "class_line": 20,
+            "fields": [
+              {
+                "name": "first_name",
+                "line": 21,
+                "annotation_text": "str",
+                "default_state": "not-supplied"
+              },
+              {
+                "name": "last_name",
+                "line": 22,
+                "annotation_text": "str",
+                "default_state": "not-supplied"
+              },
+              {
+                "name": "id",
+                "line": 23,
+                "annotation_text": "str",
+                "default_state": "not-supplied"
+              },
+              {
+                "name": "optional",
+                "line": 24,
+                "annotation_text": "Optional[str]",
+                "default_state": "not-supplied"
+              },
+              {
+                "name": "complex",
+                "line": 25,
+                "annotation_text": "dict[str, list[dict[str, str]]]",
+                "default_state": "not-supplied"
+              },
+              {
+                "name": "union",
+                "line": 26,
+                "annotation_text": "Union[int, list[str]]",
+                "default_state": "not-supplied"
+              },
+              {
+                "name": "pets",
+                "line": 27,
+                "annotation_text": "Optional[list[DataclassPet]]",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "none"
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "tests/unit/test_plugins/test_pydantic/models.py",
+                "start_line": 20,
+                "end_line": 27,
+                "sha256": "ea0c71f2ef8c2a80af72dbc12d9e65cdcb52ac15714a8ffa5a7a01fc4c6719e4"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "sqlmodel-utc-timedelta",
+      "repository": "sqlmodel",
+      "problem_id": "bc809ca3f54cafb9eb93b826e00507cf8582e55a",
+      "problem_source": "https://github.com/fastapi/sqlmodel/commit/bc809ca3f54cafb9eb93b826e00507cf8582e55a",
+      "before": "sqlmodel-utc-timedelta-before",
+      "after": "sqlmodel-utc-timedelta-after",
+      "question": "Locate separate base and derived datetime declarations and direct initializers without inferring inherited fields.",
+      "path": "tests/test_datetime.py",
+      "source_oracles": {
+        "before": [
+          {
+            "class_name_syntax": "EventBase",
+            "class_line": 74,
+            "fields": [
+              {
+                "name": "occurred_at",
+                "line": 75,
+                "annotation_text": "Annotated[datetime, NaiveDatetime, Field(index=True)]",
+                "default_state": "not-supplied"
+              }
+            ],
+            "base_expression_texts": [
+              "SQLModel"
+            ],
+            "source_labels": [
+              {
+                "path": "tests/test_datetime.py",
+                "start_line": 74,
+                "end_line": 75,
+                "sha256": "feb8a5feb53ca652e4a5de60cba1b1eb2383e369d21c0664d8b4c7146bf73ed2"
+              }
+            ],
+            "class_qualname": "test_inherited_annotated_datetime.EventBase"
+          },
+          {
+            "class_name_syntax": "Event",
+            "class_line": 77,
+            "fields": [
+              {
+                "name": "id",
+                "line": 78,
+                "annotation_text": "int | None",
+                "default_state": "direct-call-syntax",
+                "default_keyword_names": [
+                  "default",
+                  "primary_key"
+                ]
+              }
+            ],
+            "base_expression_texts": [
+              "EventBase"
+            ],
+            "source_labels": [
+              {
+                "path": "tests/test_datetime.py",
+                "start_line": 77,
+                "end_line": 78,
+                "sha256": "685fd203ecbd4eff82b71fd2d875684f8dbab534d9d6aa931aefbad5cb832ffc"
+              }
+            ],
+            "class_qualname": "test_inherited_annotated_datetime.Event"
+          }
+        ],
+        "after": [
+          {
+            "class_name_syntax": "EventBase",
+            "class_line": 76,
+            "fields": [
+              {
+                "name": "occurred_at",
+                "line": 77,
+                "annotation_text": "Annotated[datetime, NaiveDatetime, Field(index=True)]",
+                "default_state": "not-supplied"
+              }
+            ],
+            "base_expression_texts": [
+              "SQLModel"
+            ],
+            "source_labels": [
+              {
+                "path": "tests/test_datetime.py",
+                "start_line": 76,
+                "end_line": 77,
+                "sha256": "feb8a5feb53ca652e4a5de60cba1b1eb2383e369d21c0664d8b4c7146bf73ed2"
+              }
+            ],
+            "class_qualname": "test_inherited_annotated_datetime.EventBase"
+          },
+          {
+            "class_name_syntax": "Event",
+            "class_line": 79,
+            "fields": [
+              {
+                "name": "id",
+                "line": 80,
+                "annotation_text": "int | None",
+                "default_state": "direct-call-syntax",
+                "default_keyword_names": [
+                  "default",
+                  "primary_key"
+                ]
+              }
+            ],
+            "base_expression_texts": [
+              "EventBase"
+            ],
+            "source_labels": [
+              {
+                "path": "tests/test_datetime.py",
+                "start_line": 79,
+                "end_line": 80,
+                "sha256": "685fd203ecbd4eff82b71fd2d875684f8dbab534d9d6aa931aefbad5cb832ffc"
+              }
+            ],
+            "class_qualname": "test_inherited_annotated_datetime.Event"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sqlmodel-relationship-declaration-type",
+      "repository": "sqlmodel",
+      "problem_id": "fcb2da310d5906c878f90dac2121d194388c39f3",
+      "problem_source": "https://github.com/fastapi/sqlmodel/commit/fcb2da310d5906c878f90dac2121d194388c39f3",
+      "before": "sqlmodel-relationship-declaration-type-before",
+      "after": "sqlmodel-relationship-declaration-type-after",
+      "question": "Locate the changed class-variable relationship annotation; syntax does not establish runtime schema field roles.",
+      "path": "sqlmodel/main.py",
+      "source_oracles": {
+        "before": [
+          {
+            "class_name_syntax": "SQLModel",
+            "class_line": 804,
+            "fields": [
+              {
+                "name": "__tablename__",
+                "line": 807,
+                "annotation_text": "ClassVar[str | Callable[..., str]]",
+                "default_state": "not-supplied"
+              },
+              {
+                "name": "__sqlmodel_relationships__",
+                "line": 808,
+                "annotation_text": "ClassVar[builtins.dict[str, RelationshipProperty[Any]]]",
+                "default_state": "not-supplied"
+              },
+              {
+                "name": "__name__",
+                "line": 809,
+                "annotation_text": "ClassVar[str]",
+                "default_state": "not-supplied"
+              },
+              {
+                "name": "metadata",
+                "line": 810,
+                "annotation_text": "ClassVar[MetaData]",
+                "default_state": "not-supplied"
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "sqlmodel/main.py",
+                "start_line": 804,
+                "end_line": 810,
+                "sha256": "d7f1547dc6c4721ae24999cb7da569f173583e4d3d770b934bb1cf061d5a01de"
+              }
+            ]
+          }
+        ],
+        "after": [
+          {
+            "class_name_syntax": "SQLModel",
+            "class_line": 804,
+            "fields": [
+              {
+                "name": "__tablename__",
+                "line": 807,
+                "annotation_text": "ClassVar[str | Callable[..., str]]",
+                "default_state": "not-supplied"
+              },
+              {
+                "name": "__sqlmodel_relationships__",
+                "line": 808,
+                "annotation_text": "ClassVar[builtins.dict[str, RelationshipInfo]]",
+                "default_state": "not-supplied"
+              },
+              {
+                "name": "__name__",
+                "line": 809,
+                "annotation_text": "ClassVar[str]",
+                "default_state": "not-supplied"
+              },
+              {
+                "name": "metadata",
+                "line": 810,
+                "annotation_text": "ClassVar[MetaData]",
+                "default_state": "not-supplied"
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "sqlmodel/main.py",
+                "start_line": 804,
+                "end_line": 810,
+                "sha256": "bacbf150b130f5c1089f596b05e4acc4f05ad90ae52545af94fbef20ac42f7df"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

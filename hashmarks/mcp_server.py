@@ -59,13 +59,21 @@ if TYPE_CHECKING:
     _EvidenceComparisonResultMode = str
     _TaskEvidenceResultMode = str
 else:
-    _DependencyCodemapResultMode = Literal[*tuple(operation_modes("dependency_codemap"))]
+    _DependencyCodemapResultMode = Literal[
+        *tuple(operation_modes("dependency_codemap"))
+    ]
     _RepositoryDeclarationsResultMode = Literal[
         *tuple(operation_modes("repository_declarations"))
     ]
-    _SourceObservationResultMode = Literal[*tuple(operation_modes("source_observation"))]
-    _RepositoryEvidenceResultMode = Literal[*tuple(operation_modes("repository_evidence"))]
-    _EvidenceComparisonResultMode = Literal[*tuple(operation_modes("evidence_comparison"))]
+    _SourceObservationResultMode = Literal[
+        *tuple(operation_modes("source_observation"))
+    ]
+    _RepositoryEvidenceResultMode = Literal[
+        *tuple(operation_modes("repository_evidence"))
+    ]
+    _EvidenceComparisonResultMode = Literal[
+        *tuple(operation_modes("evidence_comparison"))
+    ]
     _TaskEvidenceResultMode = Literal[*tuple(operation_modes("task_evidence"))]
 
 

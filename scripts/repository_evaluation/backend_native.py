@@ -222,6 +222,35 @@ def _transport(
     return True
 
 
+def _stale_native_observation(
+    codemap: CodeMap, prior: dict[str, Any]
+) -> tuple[dict[str, Any], bool]:
+    target = prior["path"] + "::" + prior["symbol"]
+    try:
+        packet = cast(
+            "dict[str, Any]",
+            codemap.structural_locality(target, result_mode="relationships"),
+        )
+    except (KeyError, PermissionError) as error:
+        # The after specimen may deliberately replace an entire source file.
+        # Rejection then proves invalidation, not semantic absence. Failures for
+        # a still-present member retain their normal error contract.
+        if (codemap.workspace / prior["path"]).is_file():
+            raise
+        return {
+            "target": target,
+            "status": "rejected",
+            "reason": "selected-source-not-present",
+            "error_type": type(error).__name__,
+            "negative_evidence_admissible": False,
+        }, True
+    rows = packet["observations"]
+    return packet, bool(rows) and all(
+        row["freshness"] != "current" and row["negative_evidence_admissible"] is False
+        for row in rows
+    )
+
+
 def qualify_native_workflow(
     workflow: dict[str, Any],
     rule: dict[str, Any],
@@ -255,20 +284,10 @@ def qualify_native_workflow(
             if stage == "after":
                 prior = rule["source_labels"]["before"][0]
                 with CodeMap(workspace, state_dir=state) as codemap:
-                    stale = cast(
-                        "dict[str, Any]",
-                        codemap.structural_locality(
-                            prior["path"] + "::" + prior["symbol"],
-                            result_mode="relationships",
-                        ),
+                    stale, gates["stale_reopened"] = _stale_native_observation(
+                        codemap, prior
                     )
                 write_json(output / "stale-reopened.json", stale)
-                rows = stale["observations"]
-                gates["stale_reopened"] = bool(rows) and all(
-                    row["freshness"] != "current"
-                    and row["negative_evidence_admissible"] is False
-                    for row in rows
-                )
             with CodeMap(workspace, state_dir=state) as codemap:
                 codemap.sync()
                 write_json(

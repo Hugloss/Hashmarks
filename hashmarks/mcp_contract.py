@@ -6,7 +6,7 @@ import hashlib
 import json
 import sys
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from .evidence_presentation import (
     FORMATS,
@@ -729,6 +729,10 @@ def contract_summary(manifest: dict[str, object]) -> dict[str, object]:
     }
     if identity != _contract_identity(identity_payload):
         raise ValueError("Hashmarks MCP contract identity mismatch")
+    server = cast("dict[str, object]", server)
+    tools = cast("list[object]", tools)
+    operation_contract = cast("dict[str, object]", operation_contract)
+    errors = cast("dict[str, object]", errors)
     return {
         "schema": MCP_CONTRACT_SCHEMA,
         "contract_identity": identity,

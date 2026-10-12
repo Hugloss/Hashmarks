@@ -324,3 +324,161 @@ def test_existing_verifier_oracle_cannot_name_a_test_absent_at_that_revision(
     write_json(grader_path, grader)
     with pytest.raises(ValueError, match="not a repository file"):
         load_corpus(suite_path, sources)
+
+
+def _add_declaration_observations(suite_path: Path, sources: dict[str, Path]) -> None:
+    suite = json.loads(suite_path.read_text())
+    grader_path = suite_path.parent / "grader.json"
+    grader = json.loads(grader_path.read_text())
+    workflow = suite["workflows"][0]
+    rule = grader["cases"]["handler"]
+    workflow["declaration_observations"] = {}
+    rule["declaration_oracles"] = {}
+    for stage in ("before", "after"):
+        path = sources[stage] / "backend.py"
+        source = path.read_bytes() + b"class Payload(BaseModel):\n    value: int\n"
+        path.write_bytes(source)
+        suite["sources"][stage]["content_identity"] = repository_content_identity(
+            sources[stage]
+        )
+        workflow["declaration_observations"][stage] = {
+            "groups": [],
+            "result_mode": "discovery",
+            "python_backend_paths": ["backend.py"],
+            "include_class_fields": False,
+        }
+        rule["declaration_oracles"][stage] = {
+            "source": stage,
+            "source_labels": [
+                {
+                    "path": "backend.py",
+                    "start_line": 3,
+                    "end_line": 4,
+                    "sha256": hashlib.sha256(
+                        b"".join(source.splitlines(keepends=True)[2:4])
+                    ).hexdigest(),
+                }
+            ],
+            "checks": [
+                {
+                    "id": "direct-field",
+                    "pointer": "/declarations/groups/*",
+                    "predicate": "includes_scoped_record",
+                    "value": {
+                        "scope": {
+                            "scope": {
+                                "path": "backend.py",
+                                "class_name_syntax": "Payload",
+                                "class_line": 3,
+                            }
+                        },
+                        "pointer": "/declarations/0/value/fields/*",
+                        "record": {
+                            "name": "value",
+                            "line": 4,
+                            "runtime_validation": "not-established",
+                        },
+                    },
+                },
+                {
+                    "id": "runtime-unknown",
+                    "pointer": "/declarations/groups/*/declarations/*/value/runtime_binding",
+                    "predicate": "all_equal",
+                    "value": "not-established",
+                    "authority_check": True,
+                },
+            ],
+        }
+    rule["delta_checks"][0]["value"] = hash_file(
+        sources["after"] / "backend.py", domain=FILE_DOMAIN
+    ).hash
+    write_json(suite_path, suite)
+    write_json(grader_path, grader)
+
+
+def test_declaration_workflow_preserves_real_cli_facts_and_missing_mcp(
+    corpus, tmp_path: Path
+) -> None:
+    suite_path, sources = corpus
+    _add_declaration_observations(suite_path, sources)
+    report = run_backend(
+        sources=sources,
+        suite_path=suite_path,
+        output_dir=tmp_path / "result",
+        transports=("cli",),
+    )
+    outcome = report["outcomes"][0]
+    for stage in ("before", "after"):
+        observation = outcome["declaration_observations"][stage]
+        assert observation["gates"] == {
+            "facts": True,
+            "authority": True,
+            "revision": True,
+            "cli": True,
+            "mcp": None,
+        }
+        assert len(observation["cli"]["grades"]) == 4
+    assert outcome["gates"]["mcp"] is None
+    assert outcome["gates"]["freshness"] is True
+    assert outcome["gates"]["facts"] is True
+
+
+def test_failed_declaration_fact_cannot_be_masked_by_successful_task(
+    corpus, tmp_path: Path
+) -> None:
+    suite_path, sources = corpus
+    _add_declaration_observations(suite_path, sources)
+    path = suite_path.parent / "grader.json"
+    grader = json.loads(path.read_text())
+    grader["cases"]["handler"]["declaration_oracles"]["after"]["checks"][0]["value"][
+        "record"
+    ]["name"] = "unrelated"
+    write_json(path, grader)
+    report = run_backend(
+        sources=sources,
+        suite_path=suite_path,
+        output_dir=tmp_path / "result",
+        transports=(),
+    )
+    outcome = report["outcomes"][0]
+    assert outcome["gates"]["freshness"] is True
+    assert outcome["gates"]["revision"] is True
+    assert outcome["gates"]["facts"] is False
+    assert outcome["declaration_observations"]["after"]["gates"]["facts"] is False
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "missing-stage",
+        "empty-checks",
+        "duplicate-checks",
+        "unlabeled-path",
+        "wrong-source",
+    ],
+)
+def test_declaration_admission_requires_complete_source_oracles(
+    corpus, mutation: str
+) -> None:
+    suite_path, sources = corpus
+    _add_declaration_observations(suite_path, sources)
+    suite = json.loads(suite_path.read_text())
+    path = suite_path.parent / "grader.json"
+    grader = json.loads(path.read_text())
+    oracle = grader["cases"]["handler"]["declaration_oracles"]
+    if mutation == "missing-stage":
+        del oracle["after"]
+    elif mutation == "empty-checks":
+        oracle["after"]["checks"] = []
+    elif mutation == "duplicate-checks":
+        oracle["after"]["checks"].append(oracle["after"]["checks"][0].copy())
+    elif mutation == "unlabeled-path":
+        suite["workflows"][0]["declaration_observations"]["after"][
+            "python_backend_paths"
+        ].append("unlabeled.py")
+    else:
+        oracle["after"]["source"] = "before"
+    write_json(suite_path, suite)
+    write_json(path, grader)
+    with pytest.raises(ValueError, match="backend declaration"):
+        load_corpus(suite_path, sources)

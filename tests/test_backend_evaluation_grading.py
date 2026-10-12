@@ -263,3 +263,57 @@ def test_scoped_sites_cannot_mix_declarations_or_pass_empty_oracles() -> None:
     check["value"]["record"] = {}
     with pytest.raises(ValueError, match="scoped source fact"):
         grade_facts("scopes", {"packet": packet}, {"checks": [check]})
+
+
+def test_initial_source_oracle_reads_lossless_tables_without_hydrating_missing_facts() -> (
+    None
+):
+    from hashmarks.operation_contract import operation_schema
+    from scripts.repository_evaluation.fact_grading import grade_facts
+
+    packet = {
+        "schema": operation_schema("task_evidence", "initial"),
+        "verification": {
+            "candidates_encoding": {
+                "kind": "columns-rows-with-extras.v1",
+                "columns": ["path", "current"],
+            },
+            "candidates": [["tests/test_backend.py", False, {}]],
+        },
+    }
+    check = {
+        "id": "existing-test",
+        "pointer": "/verification/candidates/*",
+        "predicate": "includes_record",
+        "value": {"path": "tests/test_backend.py", "current": False},
+    }
+    assert (
+        grade_facts("initial", {"packet": packet}, {"checks": [check]})[
+            "classification"
+        ]
+        == "PASS"
+    )
+    check["value"]["current"] = True
+    assert (
+        grade_facts("initial", {"packet": packet}, {"checks": [check]})[
+            "classification"
+        ]
+        == "OTHER_FAILURE"
+    )
+    packet["verification"]["candidates"][0][-1] = {"current": True}
+    with pytest.raises(ValueError, match="overwrite"):
+        grade_facts("initial", {"packet": packet}, {"checks": [check]})
+
+
+def test_non_initial_provider_data_does_not_acquire_table_semantics() -> None:
+    from scripts.repository_evaluation.fact_grading import pointer_values
+
+    raw = [["literal", False, {}]]
+    packet = {
+        "records": raw,
+        "records_encoding": {
+            "kind": "columns-rows-with-extras.v1",
+            "columns": ["name", "present"],
+        },
+    }
+    assert pointer_values(packet, "/records") == [raw]

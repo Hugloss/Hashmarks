@@ -6,6 +6,9 @@ import hashlib
 from pathlib import Path
 from typing import Any
 
+from hashmarks.codemap.static_python_backend_declarations import (
+    StaticPythonBackendDeclarations,
+)
 from hashmarks.test_shards import repository_content_identity
 
 from .common import GRADER_SCHEMA, load_json
@@ -79,6 +82,70 @@ def _check_workflow(
         if before.read_bytes() == after.read_bytes():
             raise ValueError(f"backend changed path is unchanged: {relative}")
     _check_boundary_inputs(workflow, rule, sources)
+    _check_declaration_inputs(workflow, rule, sources)
+
+
+def _check_declaration_inputs(
+    workflow: dict[str, Any], rule: dict[str, Any], sources: dict[str, Path]
+) -> None:
+    inputs = workflow.get("declaration_observations")
+    oracles = rule.get("declaration_oracles")
+    if inputs is None and oracles is None:
+        return
+    if (
+        not isinstance(inputs, dict)
+        or not isinstance(oracles, dict)
+        or set(inputs) != {"before", "after"}
+        or set(oracles) != set(inputs)
+    ):
+        raise ValueError(
+            "backend declarations require both revision inputs and oracles"
+        )
+    for stage in ("before", "after"):
+        _check_declaration_revision(
+            inputs[stage], oracles[stage], workflow[stage], sources[workflow[stage]]
+        )
+
+
+def _check_declaration_revision(
+    request: object, oracle: object, source: str, root: Path
+) -> None:
+    if not isinstance(request, dict) or not isinstance(oracle, dict):
+        raise ValueError("backend declaration inputs and oracles must be objects")
+    paths = request.get("python_backend_paths")
+    if (
+        set(request)
+        != {"groups", "result_mode", "python_backend_paths", "include_class_fields"}
+        or request["groups"] != []
+        or request["result_mode"] != "discovery"
+        or not isinstance(paths, list)
+    ):
+        raise ValueError("backend declaration inputs differ from admitted source scope")
+    StaticPythonBackendDeclarations(
+        paths=tuple(paths), include_class_fields=request["include_class_fields"]
+    )
+    if (
+        oracle.get("source") != source
+        or not oracle.get("checks")
+        or not oracle.get("source_labels")
+    ):
+        raise ValueError("backend declarations require source-bound oracle checks")
+    checks = oracle["checks"]
+    if (
+        not isinstance(checks, list)
+        or any(
+            not isinstance(check, dict)
+            or not isinstance(check.get("id"), str)
+            or not check["id"]
+            for check in checks
+        )
+        or len({check["id"] for check in checks}) != len(checks)
+    ):
+        raise ValueError("backend declaration checks require distinct nonempty IDs")
+    if set(paths) != {label["path"] for label in oracle["source_labels"]}:
+        raise ValueError("backend declaration paths require independent source labels")
+    for label in oracle["source_labels"]:
+        _check_label(root, label)
 
 
 def _check_revision_labels(root: Path, rule: dict[str, Any], stage: str) -> None:

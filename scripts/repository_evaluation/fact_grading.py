@@ -5,8 +5,13 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from hashmarks.codemap.task_evidence_initial import decode_initial_collection
+from hashmarks.operation_contract import operation_schema
 
-def _values(value: object, components: list[str]) -> list[object]:
+
+def _values(
+    value: object, components: list[str], *, initial_tables: bool = False
+) -> list[object]:
     if not components:
         return [value]
     component, *remaining = components
@@ -14,12 +19,24 @@ def _values(value: object, components: list[str]) -> list[object]:
         if not isinstance(value, (list, dict)):
             return []
         children = value.values() if isinstance(value, dict) else value
-        return [item for child in children for item in _values(child, remaining)]
+        return [
+            item
+            for child in children
+            for item in _values(child, remaining, initial_tables=initial_tables)
+        ]
     if isinstance(value, Mapping) and component in value:
-        return _values(value[component], remaining)
+        child = value[component]
+        encoding = value.get(component + "_encoding")
+        if initial_tables and isinstance(encoding, dict):
+            child = decode_initial_collection(child, encoding)
+        return _values(child, remaining, initial_tables=initial_tables)
     if isinstance(value, list) and component.isdecimal():
         index = int(component)
-        return _values(value[index], remaining) if index < len(value) else []
+        return (
+            _values(value[index], remaining, initial_tables=initial_tables)
+            if index < len(value)
+            else []
+        )
     return []
 
 
@@ -32,7 +49,12 @@ def pointer_values(packet: object, pointer: str) -> list[object]:
     components = [
         part.replace("~1", "/").replace("~0", "~") for part in pointer[1:].split("/")
     ]
-    return _values(packet, components)
+    return _values(
+        packet,
+        components,
+        initial_tables=isinstance(packet, Mapping)
+        and packet.get("schema") == operation_schema("task_evidence", "initial"),
+    )
 
 
 def _matches_record(value: object, expected: object) -> bool:

@@ -9,7 +9,10 @@ from typing import Any, cast
 import pytest
 
 from hashmarks.codemap import CodeMap
-from hashmarks.codemap.task_evidence_initial import initial_task_evidence
+from hashmarks.codemap.task_evidence_initial import (
+    decode_initial_collection,
+    initial_task_evidence,
+)
 from hashmarks.evidence_presentation import FORMATS, presentation_response
 from hashmarks.mcp_contract import tool_contract
 from hashmarks.mcp_surface import HashmarksMcpSurface, McpSurfaceError
@@ -149,3 +152,71 @@ def test_initial_class_table_keeps_future_fields_and_preserves_source_packet(
     assert "declarations_encoding" not in returned
     assert returned == context
     assert packet == original
+
+
+def test_initial_disclosure_keeps_admitted_owner_and_verification_alternatives(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "owner.py").write_text("def widget(): return 1\n")
+    (tmp_path / "tests").mkdir()
+    for index in range(3):
+        (tmp_path / "tests" / f"test_widget_{index}.py").write_text(
+            "from owner import widget\n"
+            f"def test_widget_{index}(): assert widget() == 1\n"
+        )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = cast("dict[str, Any]", codemap.task_evidence("Inspect owner.py."))
+    assert packet["ownership"]["owner"]["path"] == "owner.py"
+    rows = packet["retrieval"]["results"]
+    owner_row = next(row for row in rows if row["path"] == "owner.py")
+    # Simulate a full producer packet where the admitted owner follows the
+    # canonical display prefix. Projection must conserve its source locator.
+    packet["retrieval"]["results"] = [
+        {"path": f"other_{i}.py", "symbol": "other"} for i in range(3)
+    ] + [owner_row]
+    original = deepcopy(packet)
+    initial = initial_task_evidence(packet)
+    assert packet == original
+    assert owner_row in initial["retrieval"]["results"]
+    relevance = packet["verification"]["relevance"]
+    projected = deepcopy(initial["verification"]["relevance"])
+    projected["candidates"] = decode_initial_collection(
+        projected["candidates"], projected["candidates_encoding"]
+    )
+    assert [row["path"] for row in projected["candidates"]] == [
+        row["path"] for row in relevance["candidates"]
+    ]
+    for source, returned in zip(
+        relevance["candidates"], projected["candidates"], strict=True
+    ):
+        for key in (
+            "direct_reference",
+            "indirect_reference",
+            "reference_symbols",
+            "indirect_reference_symbols",
+            "source_revision",
+        ):
+            if key in source:
+                assert returned[key] == source[key]
+    ledger = initial["initial_projection"]["omissions"]["collections"]
+    assert ledger["/verification/relevance/candidates"]["omitted"] == 0
+    assert initial["ownership"]["authority"] == packet["ownership"]["authority"]
+
+
+def test_initial_tables_preserve_missing_extra_fields_and_reject_corruption() -> None:
+    encoding = {"kind": "columns-rows-with-extras.v1", "columns": ["path", "current"]}
+    rows = [["a.py", False, {"uncertainty": None}], ["b.py", True, {}]]
+    assert decode_initial_collection(rows, encoding) == [
+        {"path": "a.py", "current": False, "uncertainty": None},
+        {"path": "b.py", "current": True},
+    ]
+    for invalid in (
+        [["a.py", False]],
+        [["a.py", False, {"current": True}]],
+        [["a.py", False, None]],
+    ):
+        with pytest.raises(ValueError, match="initial collection"):
+            decode_initial_collection(invalid, encoding)
+    with pytest.raises(ValueError, match="encoding"):
+        decode_initial_collection(rows, {**encoding, "columns": ["path", "path"]})

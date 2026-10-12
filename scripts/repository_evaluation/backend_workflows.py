@@ -14,6 +14,7 @@ from hashmarks.evidence_presentation_conformance import validate_evidence_presen
 from hashmarks.test_shards import repository_content_identity
 
 from .backend_boundary import observe_boundary
+from .backend_declarations import observe_declarations
 from .backend_matrix import INITIAL_TOKEN_CEILING
 from .backend_transport import capture_cli, capture_mcp
 from .common import canonical_sha256, write_json
@@ -115,6 +116,22 @@ def _observe_stage(
         if boundary_inputs is not None and boundary_rule is not None
         else None
     )
+    declaration_inputs = workflow.get("declaration_observations", {}).get(
+        rule["_stage"]
+    )
+    declaration_rule = rule.get("declaration_oracles", {}).get(rule["_stage"])
+    declarations = (
+        observe_declarations(
+            workspace,
+            state,
+            declaration_inputs,
+            declaration_rule,
+            output / "declarations",
+            transports,
+        )
+        if declaration_inputs is not None and declaration_rule is not None
+        else None
+    )
     # A sequence of public observations must belong to one stable repository
     # snapshot, including producer and transport reads after the writer closes.
     _check_snapshot(workspace, snapshot)
@@ -127,6 +144,7 @@ def _observe_stage(
         "cli": _transport_grade(cli, rule, workspace) if cli else _missing_transport(),
         "mcp": _transport_grade(mcp, rule, workspace) if mcp else _missing_transport(),
         "boundary": boundary,
+        "declarations": declarations,
     }
 
 
@@ -259,8 +277,10 @@ def execute_workflow(
         )
     gates = _gates(before, after, stale, rule, delta_grade)
     for stage in (before, after):
-        if stage["boundary"] is not None:
-            for key, value in stage["boundary"]["gates"].items():
+        for component in (stage["boundary"], stage["declarations"]):
+            if component is None:
+                continue
+            for key, value in component["gates"].items():
                 gates[key] = (
                     False
                     if gates[key] is False or value is False
@@ -279,6 +299,10 @@ def execute_workflow(
             "before": before["boundary"],
             "after": after["boundary"],
         },
+        "declaration_observations": {
+            "before": before["declarations"],
+            "after": after["declarations"],
+        },
         "transport_grades": {
             "before": {key: before[key] for key in ("cli", "mcp")},
             "after": {key: after[key] for key in ("cli", "mcp")},
@@ -291,6 +315,7 @@ def execute_workflow(
                 "stale": stale,
                 "delta": delta,
                 "boundary": [before["boundary"], after["boundary"]],
+                "declarations": [before["declarations"], after["declarations"]],
             }
         ),
     }

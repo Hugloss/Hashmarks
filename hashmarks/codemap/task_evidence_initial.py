@@ -52,6 +52,58 @@ def _encode_task_matches(relevance: dict[str, Any]) -> None:
         )
 
 
+def _encode_candidate_rows(relevance: dict[str, Any]) -> None:
+    rows = relevance.get("candidates")
+    if (
+        not isinstance(rows, list)
+        or not rows
+        or not all(isinstance(row, dict) for row in rows)
+    ):
+        return
+    columns = sorted(set.intersection(*(set(row) for row in rows)))
+    if not columns:
+        return
+    relevance["candidates_encoding"] = {
+        "kind": "columns-rows-with-extras.v1",
+        "columns": columns,
+    }
+    relevance["candidates"] = [
+        [
+            *[row[column] for column in columns],
+            {key: value for key, value in row.items() if key not in columns},
+        ]
+        for row in rows
+    ]
+
+
+def decode_initial_collection(
+    rows: Any, encoding: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """Read the explicit lossless table contract without guessing missing fields."""
+    columns = encoding.get("columns")
+    kind = encoding.get("kind")
+    if (
+        kind not in {"columns-rows.v1", "columns-rows-with-extras.v1"}
+        or not isinstance(columns, list)
+        or not all(isinstance(column, str) for column in columns)
+        or len(set(columns)) != len(columns)
+        or not isinstance(rows, list)
+    ):
+        raise ValueError("invalid initial collection encoding")
+    decoded = []
+    extras = kind == "columns-rows-with-extras.v1"
+    for row in rows:
+        if not isinstance(row, list) or len(row) != len(columns) + int(extras):
+            raise ValueError("initial collection row differs from declared columns")
+        record = dict(zip(columns, row[: len(columns)], strict=True))
+        if extras:
+            if not isinstance(row[-1], dict) or set(row[-1]) & set(columns):
+                raise ValueError("initial collection extras overwrite declared fields")
+            record.update(row[-1])
+        decoded.append(record)
+    return decoded
+
+
 def _encode_class_declarations(rows: list[dict[str, Any]]) -> None:
     for row in rows:
         declarations = row.get("class_declarations")
@@ -61,6 +113,29 @@ def _encode_class_declarations(rows: list[dict[str, Any]]) -> None:
                 "declarations",
                 ["path", "symbol", "start_line", "end_line"],
             )
+
+
+def _project_verification(
+    verification: dict[str, Any], omissions: dict[str, Any]
+) -> None:
+    verification["selected"] = _locator(verification.get("selected"))
+    relevance = verification.get("relevance")
+    if isinstance(relevance, dict):
+        _encode_task_matches(relevance)
+        relevance["selected"] = _locator(relevance.get("selected"))
+        candidates = relevance.get("candidates", [])
+        # A selected verifier is not a completeness claim. Preserve every
+        # already-bounded alternative rather than silently dropping the test
+        # that answers the caller's question. Locators retain relationship and
+        # freshness qualifiers; only declared display fields are omitted.
+        projected = candidates
+        relevance["candidates"] = [_locator(row) for row in projected]
+        _encode_candidate_rows(relevance)
+        omissions["collections"]["/verification/relevance/candidates"] = {
+            "observed_in_source_packet": len(candidates),
+            "returned": len(projected),
+            "omitted": len(candidates) - len(projected),
+        }
 
 
 def initial_task_evidence(packet: dict[str, Any]) -> dict[str, Any]:
@@ -97,6 +172,13 @@ def initial_task_evidence(packet: dict[str, Any]) -> dict[str, Any]:
     # Preserve the canonical first three and already admitted declaration
     # supplements. No authority or retrieval decision is made by this profile.
     retained = rows[:3] + [row for row in rows[3:] if row.get("supplement")][:2]
+    owner = ownership.get("owner")
+    if isinstance(owner, dict):
+        owner_row = next(
+            (row for row in rows if row.get("path") == owner.get("path")), None
+        )
+        if owner_row is not None and owner_row not in retained:
+            retained.append(owner_row)
     retrieval["results"] = retained
     _encode_class_declarations(retained)
     omissions["collections"]["/retrieval/results"] = {
@@ -104,25 +186,7 @@ def initial_task_evidence(packet: dict[str, Any]) -> dict[str, Any]:
         "returned": len(retained),
         "omitted": len(rows) - len(retained),
     }
-    verification = result["verification"]
-    verification["selected"] = _locator(verification.get("selected"))
-    relevance = verification.get("relevance")
-    if isinstance(relevance, dict):
-        _encode_task_matches(relevance)
-        relevance["selected"] = _locator(relevance.get("selected"))
-        candidates = relevance.get("candidates", [])
-        selected = relevance.get("selected")
-        projected = candidates[:1]
-        if isinstance(selected, dict) and not any(
-            row.get("path") == selected.get("path") for row in projected
-        ):
-            projected = [selected]
-        relevance["candidates"] = [_locator(row) for row in projected]
-        omissions["collections"]["/verification/relevance/candidates"] = {
-            "observed_in_source_packet": len(candidates),
-            "returned": len(projected),
-            "omitted": len(candidates) - sum(row in candidates for row in projected),
-        }
+    _project_verification(result["verification"], omissions)
     if "related" in result:
         result.pop("related")
         omissions["sections"].append("/related")

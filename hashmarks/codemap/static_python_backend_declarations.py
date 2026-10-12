@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from hashmarks.paths import normalize_relative_path
 
 from .backend_evidence_navigation import backend_evidence_navigation
-from .handler_input_syntax import _annotation, _default
+from .handler_input_syntax import _annotation, _callee, _default
 from .repository_declaration_provider import (
     RepositoryDeclarationProviderContext,
     RepositoryDeclarationProviderResult,
@@ -22,6 +22,8 @@ MAX_BACKEND_SOURCE_BYTES = 262_144
 MAX_BACKEND_PATHS = 16
 MAX_BACKEND_GROUPS = 64
 MAX_MODEL_FIELDS = 24
+MAX_ANNOTATED_DECORATED_METHODS = 24
+MAX_METHOD_DECORATORS = 8
 MAX_ENV_KEY_CHARS = 128
 
 _MODEL_BASE_NAMES = frozenset({"BaseModel", "BaseSettings"})
@@ -127,6 +129,60 @@ def _group(
     }
 
 
+def _annotated_decorated_methods(
+    node: ast.ClassDef,
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    methods: list[dict[str, object]] = []
+    evidence: list[dict[str, object]] = []
+    for statement in node.body:
+        if (
+            isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and statement.returns is not None
+            and statement.decorator_list
+        ):
+            if len(statement.name) > 128:
+                raise ValueError("annotated decorated method name exceeds syntax bound")
+            if len(statement.decorator_list) > MAX_METHOD_DECORATORS:
+                raise ValueError("annotated method exceeds eight decorator sites")
+            methods.append(
+                {
+                    "name": statement.name,
+                    "line": statement.lineno,
+                    "end_line": statement.end_lineno or statement.lineno,
+                    "async_syntax": isinstance(statement, ast.AsyncFunctionDef),
+                    "return_annotation": _annotation(statement.returns),
+                    "decorators": [
+                        {
+                            "line": decorator.lineno,
+                            "end_line": decorator.end_lineno or decorator.lineno,
+                            "callee": _callee(
+                                decorator.func
+                                if isinstance(decorator, ast.Call)
+                                else decorator
+                            ),
+                            "call_arguments": (
+                                _default(decorator)
+                                if isinstance(decorator, ast.Call)
+                                else {"state": "not-supplied"}
+                            ),
+                        }
+                        for decorator in statement.decorator_list
+                    ],
+                    "runtime_field_role": "unknown",
+                    "runtime_binding": "not-established",
+                }
+            )
+            if len(methods) > MAX_ANNOTATED_DECORATED_METHODS:
+                raise ValueError("class exceeds 24 annotated decorated methods")
+            evidence.append(
+                {
+                    "start_line": min(d.lineno for d in statement.decorator_list),
+                    "end_line": statement.end_lineno or statement.lineno,
+                }
+            )
+    return methods, evidence
+
+
 def _model_group(
     path: str, node: ast.ClassDef, *, name: str, generic: bool = False
 ) -> dict[str, object] | None:
@@ -135,6 +191,7 @@ def _model_group(
     if not nominated and not generic:
         return None
     fields: list[dict[str, object]] = []
+    methods, method_evidence = _annotated_decorated_methods(node)
     for statement in node.body:
         if isinstance(statement, ast.AnnAssign):
             field = _class_field(statement)
@@ -175,6 +232,7 @@ def _model_group(
             ),
             "field_count": len(fields),
             "fields": fields,
+            **({"annotated_decorated_methods": methods} if methods else {}),
             "field_requiredness": "unknown",
             "schema_compatibility": "not-established",
         },
@@ -184,6 +242,7 @@ def _model_group(
                 {"path": path, "start_line": f["line"], "end_line": f["end_line"]}
                 for f in fields
             ],
+            *[{"path": path, **site} for site in method_evidence],
         ],
         name=name,
     )

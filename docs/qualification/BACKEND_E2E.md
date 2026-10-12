@@ -158,6 +158,16 @@ range hashes. Its expectations distinguish direct annotations, initializer
 syntax and base expressions from runtime validation and inherited fields.
 The remaining acquired model problems are not admitted by this baseline.
 
+`source-oracles-expanded.json` separately reviews seven genuine problems across
+the same three repositories, including inherited datetime declarations,
+nullable/default distinctions and a changed class-variable annotation. The
+shared `backend-model-v1/suite.json` and `grader.json` admit those seven source
+transitions, with task and declaration observations graded together. Their
+production paths are explicit caller input; these cases do not measure
+answer-blind owner recall. The annotation-only case records verification
+correspondence as unknown rather than manufacturing an existing test oracle.
+Seven cases remain below the required twelve-problem capability breadth.
+
 It exposed a generic observer defect: model declarations nested inside a
 function or conditional were skipped. The selected-source observer now retains
 those declarations by their exact class line. `include_class_fields=True`
@@ -173,6 +183,17 @@ selected-source provider through CLI and official MCP, including its tracked
 inputs and nested declaration bindings. Observation/explain remain caller-claim
 projections. Discovery uses the existing current-source validation and rejects
 mixed raw/source inputs; comparison packets cannot restore unselected providers.
+
+The existing backend workflow runner also accepts optional
+`declaration_observations` for both revisions. These contain only public
+discovery inputs, separate from the grader's `declaration_oracles` source IDs,
+range hashes and fact checks. Admission requires independently labeled source
+for every nominated path. API and actual CLI/MCP declaration observations are
+retained under the same stable repository snapshot and receipt identity as the
+task packet. Their facts, authority, revision and transport results compose into
+the common gates: any failure remains a failure, and omitted transport proof
+remains incomplete. Nominated source disclosure does not establish answer-blind
+owner recall or verification sufficiency.
 
 ```text
 Observed repository fact/evidence: Direct class annotations and base expressions,
@@ -440,3 +461,60 @@ its evaluator identity is
 `sha256:abd8c5d6c1ebaee896b631156c31d39047783ae71acbe2600d86a0799c6b597e`.
 Subsequent product changes require remeasurement before using this history as
 current qualification.
+
+## Annotated decorated methods
+
+The optional computed-field source oracle records a genuine Litestar change
+whose new model fixture declares a decorated `status()` method returning
+`Optional[Status]`. The earlier fixture does not contain this new declaration;
+its existing model field syntax is baseline evidence only. The oracle does not
+claim a pre-change computed-field declaration or runtime validation outcome.
+
+Observed repository fact/evidence: direct annotated, decorated methods inside a
+selected Python class, their decorator syntax and return annotations.
+Authority source: the selected current source member's Python AST and exact
+source ranges.
+Completeness/freshness behavior: selected-file, incomplete semantic coverage;
+24 method and eight decorator bounds fail closed; canonical declaration source
+bindings govern freshness. Nested methods and inherited declarations are not
+folded into the enclosing class.
+Existing Hashmarks owner extended: `StaticPythonBackendDeclarations` and the
+canonical repository-declaration provider/binding/presentation surfaces.
+Consumer/execution responsibility explicitly not acquired: interpreting a
+method as a runtime field, evaluating decorators, validation or serialization.
+Decision: OBSERVER.
+
+Method observations retain `runtime_field_role=unknown` and
+`runtime_binding=not-established`. Decorator argument values are not copied;
+only the existing bounded call syntax is exposed. This source primitive does
+not establish method execution, framework identity, or a complete model schema.
+
+## Model declaration corpus checkpoint
+
+`backend-model-v1` now admits twelve genuine changes across FastAPI, Litestar
+and SQLModel, with twenty-four exact source trees. The separately reviewed
+source oracles cover direct and nested declarations, base expressions,
+annotations, direct initializer syntax, nullable defaults, class-variable
+annotations, SQL field keyword names and an annotated decorated method.
+New after-only fixtures are distinguished from existing before baselines;
+those baselines do not establish pre-change declarations of the new models.
+An annotation-only change with no reviewed direct test retains an explicitly
+unknown verification oracle. Exact qualified names distinguish same-named
+classes for native targeting.
+
+The selected-source API ring `model-twelve-source-v2` passed all twenty-four
+source observations. The `model-computed-native-v3` specimen regenerated both
+native captures and passed exact definition-token, source-binding, stale
+reopening, and all four CLI/MCP format checks. Its after specimen targets the
+essential `Result.status` method at line 18, rather than another class in the
+same file. Removed specimen source is rejected with negative-evidence authority
+remaining false; ambiguity in a still-present source remains an error.
+
+The genuine computed-field and item-bound revision workflows passed required
+facts, authority, revisions, freshness and CLI/MCP presentation. Initial
+response size still fails. The `sa_type` workflow still misses a required
+verification path, and the Iterable workflow still misses its required test in
+the bounded returned candidates despite recovering more qualified references.
+The initial compact/text measurements currently use the default full packet;
+they do not certify the separate initial projection. None of these measurements
+promotes a capability to 5/5. The wider twenty-capability goal remains incomplete.

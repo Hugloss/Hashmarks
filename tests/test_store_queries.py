@@ -91,3 +91,28 @@ def test_search_candidates_match_repository_fields_in_stable_order(tmp_path):
 
     files = [row for row in first if row["row_type"] == "file"]
     assert [row["path"] for row in files] == ["z_path_needle.py"]
+
+
+def test_scoped_references_filter_paths_before_row_bound(tmp_path):
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "src" / "noise.py").write_text(
+        "from owner import Thing\n" + "Thing()\n" * 12
+    )
+    target = "tests/test_thing.py"
+    (tmp_path / target).write_text(
+        "from owner import Thing\ndef test_thing(): Thing()\n"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        raw = codemap.store.refs_many(["Thing"], limit_per_target=2)["Thing"]
+        assert all(row["path"] != target for row in raw)
+        scoped = codemap.store.refs_many_for_paths(
+            ["owner.Thing", "other.Thing"], [target], limit_per_target=2
+        )
+        assert len(scoped["owner.Thing"]) == 2
+        assert scoped["owner.Thing"] == scoped["other.Thing"]
+        assert all(row["path"] == target for row in scoped["owner.Thing"])
+        assert codemap.store.refs_many_for_paths(["Thing"], [], limit_per_target=2) == {
+            "Thing": []
+        }

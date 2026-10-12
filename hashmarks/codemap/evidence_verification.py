@@ -294,6 +294,19 @@ class VerificationMixin:
             return selected_symbols, True
 
         symbol_rows = self._session_symbols_for_path(edit_path)
+        # A file-level target has no selected declaration. Seed its bounded
+        # reference search from module-level, ordinary identifiers before
+        # private/nested implementation helpers. This is candidate ordering,
+        # never proof of exports, call reachability or test sufficiency.
+        symbol_rows = sorted(
+            symbol_rows,
+            key=lambda row: (
+                "." in str(row.get("qualname") or ""),
+                str(row.get("name") or "").startswith("_"),
+                int(cast("int", row.get("start_line") or 0)),
+                str(row.get("qualname") or ""),
+            ),
+        )
         file_symbols: list[str] = []
         for symbol in symbol_rows[:32]:
             self._append_verification_symbol_names(file_symbols, symbol)
@@ -640,7 +653,11 @@ class VerificationMixin:
             [symbol for _via_path, symbol, _short in via_symbol_sources],
             limit_per_target=257,
         )
+        test_ref_sets = self._verification_test_ref_supplements(
+            state, indirect_ref_sets
+        )
         self._verification_preload_import_resolution(indirect_ref_sets)
+        self._verification_preload_import_resolution(test_ref_sets)
         for via_path, symbol, short in via_symbol_sources:
             refs = list(indirect_ref_sets.get(symbol, ()))
             if len(refs) > 256:
@@ -648,6 +665,36 @@ class VerificationMixin:
             self._verification_collect_indirect_symbol_refs(
                 state, via_path, short, refs[:256]
             )
+            if symbol in test_ref_sets:
+                self._verification_collect_indirect_symbol_refs(
+                    state, via_path, short, test_ref_sets[symbol]
+                )
+
+    def _verification_test_ref_supplements(
+        self,
+        state: _VerificationRelevanceState,
+        refs: Mapping[str, Sequence[Mapping[str, object]]],
+    ) -> dict[str, list[dict[str, object]]]:
+        """Nominate bounded test-scope candidates without bypassing import proof."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        bounded_symbols = [symbol for symbol, rows in refs.items() if len(rows) > 256]
+        if not bounded_symbols:
+            return {}
+        test_paths = sorted(
+            path
+            for path in self.store.paths()
+            if RepositoryDomain.TEST in classify_repository_path(path)
+        )
+        if len(test_paths) > 4096:
+            state.search_bound_reasons.add("indirect-test-path-limit")
+        results = self.store.refs_many_for_paths(
+            bounded_symbols, test_paths[:4096], limit_per_target=1024
+        )
+        # A saturated scoped read cannot prove that every row was observed.
+        if any(len(rows) >= 1024 for rows in results.values()):
+            state.search_bound_reasons.add("indirect-test-reverse-ref-limit")
+        return results
 
     def _verification_collect_indirect_symbol_refs(
         self,
@@ -1107,6 +1154,8 @@ class VerificationMixin:
                 "indirect_source_paths": 64,
                 "indirect_symbols_per_source": 16,
                 "indirect_reverse_refs_per_symbol": 256,
+                "indirect_test_paths": 4096,
+                "indirect_test_reverse_refs_per_symbol": 1024,
             },
             "authority": "bounded-index-evidence-not-verification-execution",
             "secret_knowledge_used": False,

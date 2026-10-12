@@ -157,3 +157,36 @@ def test_native_definition_token_preserves_location_and_identity_ambiguity(
         capture, {"path": "backend.py", "symbol": "handle", "start_line": 1}
     )
     assert observed["unique_definition_token"] is unique
+
+
+def test_deleted_native_subject_is_rejected_without_semantic_absence(
+    tmp_path: Path,
+) -> None:
+    from hashmarks.codemap import CodeMap
+    from scripts.repository_evaluation.backend_native import _stale_native_observation
+
+    root = tmp_path / "repo"
+    root.mkdir()
+    with CodeMap(root, state_dir=tmp_path / "state") as codemap:
+        packet, invalidated = _stale_native_observation(
+            codemap, {"path": "removed.py", "symbol": "Model"}
+        )
+    assert invalidated is True
+    assert packet["status"] == "rejected"
+    assert packet["target"] == "removed.py::Model"
+    assert packet["negative_evidence_admissible"] is False
+
+
+def test_present_ambiguous_native_subject_does_not_pass_invalidation(
+    tmp_path: Path,
+) -> None:
+    from hashmarks.codemap import CodeMap
+    from scripts.repository_evaluation.backend_native import _stale_native_observation
+
+    (tmp_path / "models.py").write_text(
+        "def first():\n    class Model: pass\ndef second():\n    class Model: pass\n"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(KeyError):
+            _stale_native_observation(codemap, {"path": "models.py", "symbol": "Model"})

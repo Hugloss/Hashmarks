@@ -305,6 +305,49 @@ class WorkspaceMapQueryMixin:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def refs_many_for_paths(
+        self,
+        targets: Iterable[str],
+        paths: Iterable[str],
+        *,
+        limit_per_target: int = 100,
+    ) -> dict[str, list[dict]]:
+        """Read candidate references inside explicit paths before bounding rows.
+
+        Path membership is caller input, not repository-negative or relationship
+        authority. Returned same-name rows still require semantic qualification.
+        """
+        if TYPE_CHECKING:
+            self = cast("WorkspaceMapStore", self)
+        unique_targets = list(
+            dict.fromkeys(str(target) for target in targets if target)
+        )
+        selected_paths = sorted(set(str(path) for path in paths if path))
+        if limit_per_target < 1 or len(selected_paths) > 4096:
+            raise ValueError(
+                "scoped references require a positive bound and at most 4096 paths"
+            )
+        if not unique_targets or not selected_paths:
+            return {target: [] for target in unique_targets}
+        limit = min(int(limit_per_target), 1024)
+        shorts = {target: target.rsplit(".", 1)[-1] for target in unique_targets}
+        by_short: dict[str, list[dict]] = {}
+        self._count_read("refs_many_for_paths")
+        with self._lock:
+            for short in dict.fromkeys(shorts.values()):
+                rows = self._db.execute(
+                    """SELECT e.*,f.evidence_visibility
+                    FROM edge e JOIN file_map f ON f.path=e.path
+                    WHERE e.target_short=? AND e.path IN (SELECT value FROM json_each(?))
+                    ORDER BY e.path,e.line LIMIT ?""",
+                    (short, json.dumps(selected_paths), limit),
+                ).fetchall()
+                by_short[short] = [dict(row) for row in rows]
+        return {
+            target: [dict(row) for row in by_short[shorts[target]]]
+            for target in unique_targets
+        }
+
     def edges_from_many(
         self, seeds: Iterable[tuple[str, str]], *, limit_per_seed: int = 100
     ) -> dict[tuple[str, str], list[dict]]:

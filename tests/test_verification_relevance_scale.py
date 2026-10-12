@@ -587,3 +587,67 @@ def test_verification_reference_projection_reads_each_candidate_snapshot_once(
     candidate_count = action["verification_relevance"]["candidate_count"]
     assert candidate_count == 81
     assert calls == candidate_count
+
+
+def test_file_target_keeps_module_declarations_visible_after_many_nested_helpers(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "src" / "owner.py").write_text(
+        "def container():\n"
+        + "".join(f"    def nested_{i}(): return {i}\n" for i in range(40))
+        + "class ApiModel:\n    pass\n"
+    )
+    expected = "tests/test_model.py"
+    (tmp_path / expected).write_text(
+        "from src.owner import ApiModel\ndef test_model():\n    assert ApiModel()\n"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.task_evidence("Inspect src/owner.py.")
+    relevance = packet["verification"]["relevance"]
+    candidate = next(row for row in relevance["candidates"] if row["path"] == expected)
+    assert candidate["direct_reference"] is True
+    assert "ApiModel" in candidate["reference_symbols"]
+    assert relevance["completeness"] == "incomplete"
+    assert relevance["negative_evidence_admissible"] is False
+    assert packet["explicit_target"]["symbol"] is None
+
+
+def test_indirect_test_scope_keeps_import_identity_and_incomplete_bounds(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "examples").mkdir()
+    (tmp_path / "src/owner.py").write_text("def calculate(): return 1\n")
+    (tmp_path / "src/api.py").write_text(
+        "from src.owner import calculate\ndef endpoint(): return calculate()\n"
+    )
+    (tmp_path / "src/foreign.py").write_text("def endpoint(): return 2\n")
+    (tmp_path / "examples/noise.py").write_text(
+        "from src.api import endpoint\n" + "endpoint()\n" * 300
+    )
+    (tmp_path / "tests/test_actual.py").write_text(
+        "from src.api import endpoint\ndef test_actual(): assert endpoint() == 1\n"
+    )
+    (tmp_path / "tests/test_foreign.py").write_text(
+        "from src.foreign import endpoint\ndef test_foreign(): assert endpoint() == 2\n"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.task_evidence("Inspect src/owner.py.")
+    relevance = packet["verification"]["relevance"]
+    actual = next(
+        row for row in relevance["candidates"] if row["path"] == "tests/test_actual.py"
+    )
+    assert actual["indirect_reference"] is True
+    assert actual["indirect_reference_symbols"] == ["endpoint"]
+    assert all(
+        not row["indirect_reference"]
+        for row in relevance["candidates"]
+        if row["path"] == "tests/test_foreign.py"
+    )
+    assert relevance["completeness"] == "incomplete"
+    assert relevance["negative_evidence_admissible"] is False

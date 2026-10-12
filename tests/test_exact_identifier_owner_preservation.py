@@ -400,3 +400,86 @@ def test_plain_identifier_index_preserves_duplicate_owner_ambiguity(
     assert action["ambiguity"]["ambiguous"] is True
     assert action["ambiguity"]["reason"] == "multiple-exact-identifier-edit-owners"
     assert action["ownership_authority"]["owner_resolved"] is False
+
+
+def test_sentence_ending_period_preserves_explicit_path_target(tmp_path: Path) -> None:
+    _write(tmp_path, "src/worker.py", "def transform_schema(): return 1\n")
+    _write(tmp_path, "src/decoy.py", "def default_factory(): return 2\n")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.task_evidence("Fix default_factory schema in src/worker.py.")
+    assert packet["explicit_target"]["status"] == "resolved"
+    assert packet["explicit_target"]["path"] == "src/worker.py"
+    assert packet["explicit_target"]["basis"] == "literal-path"
+    assert packet["ownership"]["candidate"]["path"] == "src/worker.py"
+
+
+def test_exact_filename_with_period_is_not_rebound_to_prefix(tmp_path: Path) -> None:
+    _write(tmp_path, "src/worker.py", "def prefix(): return 1\n")
+    _write(tmp_path, "src/worker.py.", "exact filename content\n")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.task_evidence("Inspect src/worker.py.")
+    assert packet["explicit_target"]["path"] != "src/worker.py"
+
+
+def test_denied_literal_filename_does_not_admit_punctuation_fallback(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "src/worker.py", "def prefix(): return 1\n")
+    (tmp_path / ".hashmarks-context.toml").write_text(
+        '[[rule]]\npattern = "src/worker.py."\nvisibility = "deny"\n'
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.task_evidence("Inspect src/worker.py.")
+    assert packet["explicit_target"]["path"] != "src/worker.py"
+
+
+def test_literal_file_does_not_promote_retrieved_helper_to_symbol_owner(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "src/worker.py",
+        "def schema_metadata(): return 1\ndef encode_payload(): return 2\n",
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.task_evidence("Fix schema metadata in src/worker.py")
+    assert packet["ownership"]["candidate"]["path"] == "src/worker.py"
+    assert packet["explicit_target"]["basis"] == "literal-path"
+    assert packet["explicit_target"]["symbol"] is None
+    assert packet["ownership"]["candidate"]["qualname"] is None
+    assert packet["ownership"]["candidate"]["start_line"] is None
+
+
+def test_file_task_generic_options_does_not_establish_options_method(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "src/routes.py",
+        "class Router:\n    def options(self): pass\n    def response(self): pass\n",
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.task_evidence("Fix response model options in src/routes.py.")
+    assert packet["explicit_target"]["path"] == "src/routes.py"
+    assert packet["explicit_target"]["symbol"] is None
+    assert packet["ownership"]["candidate"]["qualname"] is None
+
+
+def test_qualified_lowercase_method_can_refine_literal_file_target(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "src/routes.py",
+        "class Router:\n    def options(self): pass\n    def response(self): pass\n",
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.task_evidence("Fix Router.options in src/routes.py.")
+    assert packet["explicit_target"]["path"] == "src/routes.py"
+    assert packet["explicit_target"]["symbol"] == "Router.options"

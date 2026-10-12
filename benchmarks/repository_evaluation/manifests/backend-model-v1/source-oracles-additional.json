@@ -1,0 +1,536 @@
+{
+  "schema": "hashmarks.backend-model-source-oracles.v1",
+  "qualification_scope": "Four independently source-reviewed genuine declaration changes. New after-only fixtures have existing model baselines; no pre-change declaration identity, runtime contract, breadth, transport or native qualification is implied.",
+  "sources": {
+    "litestar-optional-nested-dto-before": {
+      "repository": "litestar",
+      "commit": "2613a77c4f5dc37741bdbffaec223817f24f06e1",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar",
+      "content_identity": "sha256:1c8514d0c8f722e5fa133b16be24e2e84c6a1fb17d66472dbd8f834656e7d128:1404"
+    },
+    "litestar-optional-nested-dto-after": {
+      "repository": "litestar",
+      "commit": "4e6c3f24bac978ea3e38a034e65a933b1b3a2f3f",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar",
+      "content_identity": "sha256:0bdf61a0ac7611a52fbd447efe6bd10f182e8d8728b1616af51a67b090bcea55:1404"
+    },
+    "litestar-root-schema-name-before": {
+      "repository": "litestar",
+      "commit": "30ae1fa5ef197e816bd89968625ad395e367ba0b",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar",
+      "content_identity": "sha256:5d7ad0a4eb50701d99b805d81ac593b321f14e13ca1b6ec66be988ef6364acc4:1404"
+    },
+    "litestar-root-schema-name-after": {
+      "repository": "litestar",
+      "commit": "e68dd0b58b078fa83d5ad23a542ce4d7116a83ed",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar",
+      "content_identity": "sha256:2a2e5f8d4b47f2bb006578aa1edc9b4e65fcd3732923cb71f85a39c30c4bad7e:1404"
+    },
+    "sqlmodel-field-sa-type-before": {
+      "repository": "sqlmodel",
+      "commit": "7fec3bcbdbca5b29b21ac4777e3fb341d8a7e4e1",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/sqlmodel",
+      "content_identity": "sha256:596145813826677d63fd6beac23cee6a3cd4292a7388c17f990c2cd95d9ec2d1:508"
+    },
+    "sqlmodel-field-sa-type-after": {
+      "repository": "sqlmodel",
+      "commit": "01960be28ed852c5c118c5be163c91bb72f3cd91",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/sqlmodel",
+      "content_identity": "sha256:b1149d32dd24c30fce2347797b563e04fcaa9d6a85bcb44bb92f5c4cf5d36593:509"
+    },
+    "sqlmodel-field-item-bounds-before": {
+      "repository": "sqlmodel",
+      "commit": "83db52b0556e9437d5b0b229abdda5938eb09a9f",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/sqlmodel",
+      "content_identity": "sha256:c9e55030c465f08970aa117b911cb1f1d25dd22a737a20ef9d6ed79137510fe9:508"
+    },
+    "sqlmodel-field-item-bounds-after": {
+      "repository": "sqlmodel",
+      "commit": "2d02c4cd6fe861fca9ffd1a487eb32202f85c8df",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/sqlmodel",
+      "content_identity": "sha256:73d2fbe3ae72a1896d9c99b53d323ad4a16fd97f39edab4abbf45636cec6e2c4:508"
+    }
+  },
+  "cases": [
+    {
+      "id": "litestar-optional-nested-dto",
+      "repository": "litestar",
+      "problem_id": "4e6c3f24bac978ea3e38a034e65a933b1b3a2f3f",
+      "problem_source": "https://github.com/litestar-org/litestar/commit/4e6c3f24bac978ea3e38a034e65a933b1b3a2f3f",
+      "before": "litestar-optional-nested-dto-before",
+      "after": "litestar-optional-nested-dto-after",
+      "paths": {
+        "before": "tests/unit/test_dto/test_factory/test_backends/test_backends.py",
+        "after": "tests/unit/test_dto/test_factory/test_backends/test_backends.py"
+      },
+      "question": "Expose the optional nested DTO declarations and literal None initializer without inferring runtime transfer compatibility.",
+      "source_oracles": {
+        "before": [
+          {
+            "class_name_syntax": "NestedDC",
+            "class_line": 36,
+            "fields": [
+              {
+                "name": "a",
+                "line": 37,
+                "annotation_text": "int",
+                "default_state": "not-supplied"
+              },
+              {
+                "name": "b",
+                "line": 38,
+                "annotation_text": "str",
+                "default_state": "not-supplied"
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "tests/unit/test_dto/test_factory/test_backends/test_backends.py",
+                "start_line": 36,
+                "end_line": 38,
+                "sha256": "d3267f2c1d2fb2219536ce3c8e5e0a969893bd280bd783803b506e4a42d95a05"
+              }
+            ]
+          }
+        ],
+        "after": [
+          {
+            "class_name_syntax": "OptionalNestedInner",
+            "class_line": 42,
+            "fields": [
+              {
+                "name": "value",
+                "line": 43,
+                "annotation_text": "str",
+                "default_state": "not-supplied"
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "tests/unit/test_dto/test_factory/test_backends/test_backends.py",
+                "start_line": 42,
+                "end_line": 43,
+                "sha256": "11d0e3d81b1fb23ac78a0de00381a0b81f970ac69a6187ef6b0553a2866c27dd"
+              }
+            ]
+          },
+          {
+            "class_name_syntax": "OptionalNestedOuter",
+            "class_line": 47,
+            "fields": [
+              {
+                "name": "name",
+                "line": 48,
+                "annotation_text": "str",
+                "default_state": "not-supplied"
+              },
+              {
+                "name": "inner",
+                "line": 49,
+                "annotation_text": "Optional[OptionalNestedInner]",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "none"
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "tests/unit/test_dto/test_factory/test_backends/test_backends.py",
+                "start_line": 47,
+                "end_line": 49,
+                "sha256": "ef1a5eda9aef5d301adc72fb4132d4f61c190ff160e08e5351c74328f92f073d"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "litestar-root-schema-name",
+      "repository": "litestar",
+      "problem_id": "e68dd0b58b078fa83d5ad23a542ce4d7116a83ed",
+      "problem_source": "https://github.com/litestar-org/litestar/commit/e68dd0b58b078fa83d5ad23a542ce4d7116a83ed",
+      "before": "litestar-root-schema-name-before",
+      "after": "litestar-root-schema-name-after",
+      "paths": {
+        "before": "tests/unit/test_dto/test_factory/test_backends/test_base_dto.py",
+        "after": "tests/unit/test_openapi/test_integration.py"
+      },
+      "question": "Expose separate root and child declarations; source syntax does not establish runtime schema naming. Existing nested-transfer fixtures provide the before baseline; the named root/child fixture is introduced after the change.",
+      "source_oracles": {
+        "before": [
+          {
+            "class_name_syntax": "Model",
+            "class_line": 32,
+            "fields": [
+              {
+                "name": "a",
+                "line": 33,
+                "annotation_text": "int",
+                "default_state": "not-supplied"
+              },
+              {
+                "name": "b",
+                "line": 34,
+                "annotation_text": "str",
+                "default_state": "not-supplied"
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "tests/unit/test_dto/test_factory/test_backends/test_base_dto.py",
+                "start_line": 32,
+                "end_line": 34,
+                "sha256": "bc7ebda7e9cd25651950972bdeb2cffc48e73e3ea3e39a3044dfd57da29d9c47"
+              }
+            ]
+          },
+          {
+            "class_name_syntax": "Model2",
+            "class_line": 38,
+            "fields": [
+              {
+                "name": "c",
+                "line": 39,
+                "annotation_text": "int",
+                "default_state": "not-supplied"
+              },
+              {
+                "name": "d",
+                "line": 40,
+                "annotation_text": "str",
+                "default_state": "not-supplied"
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "tests/unit/test_dto/test_factory/test_backends/test_base_dto.py",
+                "start_line": 38,
+                "end_line": 40,
+                "sha256": "b8e34454b1f1270b2a8609a7d03c8077a1aed93ce2ba9c4e031c033cb31d357a"
+              }
+            ]
+          }
+        ],
+        "after": [
+          {
+            "class_name_syntax": "_SchemaNameChild",
+            "class_line": 366,
+            "fields": [
+              {
+                "name": "name",
+                "line": 367,
+                "annotation_text": "str",
+                "default_state": "not-supplied"
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "tests/unit/test_openapi/test_integration.py",
+                "start_line": 366,
+                "end_line": 367,
+                "sha256": "75854013f7ef3e8547e75c965fc9ea1956720b0dc3b61c938fcbee168909c438"
+              }
+            ]
+          },
+          {
+            "class_name_syntax": "_SchemaNamePerson",
+            "class_line": 371,
+            "fields": [
+              {
+                "name": "name",
+                "line": 372,
+                "annotation_text": "str",
+                "default_state": "not-supplied"
+              },
+              {
+                "name": "age",
+                "line": 373,
+                "annotation_text": "int",
+                "default_state": "not-supplied"
+              },
+              {
+                "name": "child",
+                "line": 374,
+                "annotation_text": "_SchemaNameChild",
+                "default_state": "not-supplied"
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "tests/unit/test_openapi/test_integration.py",
+                "start_line": 371,
+                "end_line": 374,
+                "sha256": "6e0d0bc0a7e67f1082518cb68e53e042502fec5d331eff98e967eda3be2658a7"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "sqlmodel-field-sa-type",
+      "repository": "sqlmodel",
+      "problem_id": "01960be28ed852c5c118c5be163c91bb72f3cd91",
+      "problem_source": "https://github.com/fastapi/sqlmodel/commit/01960be28ed852c5c118c5be163c91bb72f3cd91",
+      "before": "sqlmodel-field-sa-type-before",
+      "after": "sqlmodel-field-sa-type-after",
+      "paths": {
+        "before": "tests/test_field_sa_args_kwargs.py",
+        "after": "tests/test_field_sa_type.py"
+      },
+      "question": "Expose direct SQL field declaration keyword names in existing and newly introduced fixtures; runtime SQL types remain unestablished.",
+      "source_oracles": {
+        "before": [
+          {
+            "class_name_syntax": "Team",
+            "class_line": 6,
+            "fields": [
+              {
+                "name": "id",
+                "line": 7,
+                "annotation_text": "int | None",
+                "default_state": "direct-call-syntax",
+                "default_keyword_names": [
+                  "default",
+                  "primary_key"
+                ]
+              },
+              {
+                "name": "name",
+                "line": 8,
+                "annotation_text": "str",
+                "default_state": "not-supplied"
+              }
+            ],
+            "base_expression_texts": [
+              "SQLModel"
+            ],
+            "source_labels": [
+              {
+                "path": "tests/test_field_sa_args_kwargs.py",
+                "start_line": 6,
+                "end_line": 8,
+                "sha256": "3d0ce2ebaca0ebb2f380776f8f33a9e6e9a4e76ffeaa1dc576a1569ecb35c245"
+              }
+            ],
+            "class_qualname": "test_sa_column_args.Team"
+          },
+          {
+            "class_name_syntax": "Hero",
+            "class_line": 10,
+            "fields": [
+              {
+                "name": "id",
+                "line": 11,
+                "annotation_text": "int | None",
+                "default_state": "direct-call-syntax",
+                "default_keyword_names": [
+                  "default",
+                  "primary_key"
+                ]
+              },
+              {
+                "name": "team_id",
+                "line": 12,
+                "annotation_text": "int | None",
+                "default_state": "direct-call-syntax",
+                "default_keyword_names": [
+                  "default",
+                  "sa_column_args"
+                ],
+                "source_end_line": 15
+              }
+            ],
+            "base_expression_texts": [
+              "SQLModel"
+            ],
+            "source_labels": [
+              {
+                "path": "tests/test_field_sa_args_kwargs.py",
+                "start_line": 10,
+                "end_line": 15,
+                "sha256": "d77ce0bbe9fd604076f5e75fbedd69693ddd6d91cc0a746d222dcaf787163710"
+              }
+            ],
+            "class_qualname": "test_sa_column_args.Hero"
+          }
+        ],
+        "after": [
+          {
+            "class_name_syntax": "Item",
+            "class_line": 8,
+            "fields": [
+              {
+                "name": "id",
+                "line": 9,
+                "annotation_text": "int",
+                "default_state": "direct-call-syntax",
+                "default_keyword_names": [
+                  "primary_key",
+                  "sa_type"
+                ]
+              }
+            ],
+            "base_expression_texts": [
+              "SQLModel"
+            ],
+            "source_labels": [
+              {
+                "path": "tests/test_field_sa_type.py",
+                "start_line": 8,
+                "end_line": 9,
+                "sha256": "c0dd5422b570b6f53943722986d561178a19e0a4b34cee9a3db42642539bb3ae"
+              }
+            ],
+            "class_qualname": "test_sa_type_class.Item"
+          },
+          {
+            "class_name_syntax": "Item",
+            "class_line": 16,
+            "fields": [
+              {
+                "name": "id",
+                "line": 17,
+                "annotation_text": "int",
+                "default_state": "direct-call-syntax",
+                "default_keyword_names": [
+                  "primary_key"
+                ]
+              },
+              {
+                "name": "name",
+                "line": 18,
+                "annotation_text": "str",
+                "default_state": "direct-call-syntax",
+                "default_keyword_names": [
+                  "sa_type"
+                ]
+              }
+            ],
+            "base_expression_texts": [
+              "SQLModel"
+            ],
+            "source_labels": [
+              {
+                "path": "tests/test_field_sa_type.py",
+                "start_line": 16,
+                "end_line": 18,
+                "sha256": "a3c50c3326c73f38a81634d7da458c5769a363d86e3057de51dff0d039bdf7a9"
+              }
+            ],
+            "class_qualname": "test_sa_type_instance.Item"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sqlmodel-field-item-bounds",
+      "repository": "sqlmodel",
+      "problem_id": "2d02c4cd6fe861fca9ffd1a487eb32202f85c8df",
+      "problem_source": "https://github.com/fastapi/sqlmodel/commit/2d02c4cd6fe861fca9ffd1a487eb32202f85c8df",
+      "before": "sqlmodel-field-item-bounds-before",
+      "after": "sqlmodel-field-item-bounds-after",
+      "paths": {
+        "before": "tests/test_pydantic/test_field.py",
+        "after": "tests/test_pydantic/test_field.py"
+      },
+      "question": "Expose literal declaration constraint keyword names; runtime validation and translation to length constraints remain unknown.",
+      "source_oracles": {
+        "before": [
+          {
+            "class_name_syntax": "Model",
+            "class_line": 10,
+            "fields": [
+              {
+                "name": "dec",
+                "line": 11,
+                "annotation_text": "Decimal",
+                "default_state": "direct-call-syntax",
+                "default_keyword_names": [
+                  "max_digits",
+                  "decimal_places"
+                ]
+              }
+            ],
+            "base_expression_texts": [
+              "SQLModel"
+            ],
+            "source_labels": [
+              {
+                "path": "tests/test_pydantic/test_field.py",
+                "start_line": 10,
+                "end_line": 11,
+                "sha256": "726060dc3f7326d2205fd6ee95821e81949631d12ed5ed6916a5c9f25a311189"
+              }
+            ],
+            "class_qualname": "test_decimal.Model"
+          }
+        ],
+        "after": [
+          {
+            "class_name_syntax": "Model",
+            "class_line": 65,
+            "fields": [
+              {
+                "name": "items",
+                "line": 66,
+                "annotation_text": "list[int]",
+                "default_state": "direct-call-syntax",
+                "default_keyword_names": [
+                  "min_items"
+                ]
+              }
+            ],
+            "base_expression_texts": [
+              "SQLModel"
+            ],
+            "source_labels": [
+              {
+                "path": "tests/test_pydantic/test_field.py",
+                "start_line": 65,
+                "end_line": 66,
+                "sha256": "95822d3d3b2901506372532f531f1f99640a22de51c46d13e33c70e137faf1dd"
+              }
+            ],
+            "class_qualname": "test_min_items.Model"
+          },
+          {
+            "class_name_syntax": "Model",
+            "class_line": 82,
+            "fields": [
+              {
+                "name": "items",
+                "line": 83,
+                "annotation_text": "list[int]",
+                "default_state": "direct-call-syntax",
+                "default_keyword_names": [
+                  "max_items"
+                ]
+              }
+            ],
+            "base_expression_texts": [
+              "SQLModel"
+            ],
+            "source_labels": [
+              {
+                "path": "tests/test_pydantic/test_field.py",
+                "start_line": 82,
+                "end_line": 83,
+                "sha256": "cae441cffbeb19933039a18fb8d413ad7d7ff674c6b5a59d2755304eda246005"
+              }
+            ],
+            "class_qualname": "test_max_items.Model"
+          }
+        ]
+      }
+    }
+  ]
+}
