@@ -20,7 +20,7 @@ from .backend_gates import combine_required, fact_state, presentation_conformanc
 from .backend_grading import _authority_safe, _gates, _packet
 from .backend_matrix import INITIAL_TOKEN_CEILING
 from .backend_transport import capture_cli, capture_mcp
-from .backend_witnesses import api_fact_witnesses
+from .backend_witnesses import task_fact_witnesses
 from .common import canonical_sha256, write_json
 from .fact_grading import grade_facts
 
@@ -212,7 +212,7 @@ def _observe_stage(
     _check_snapshot(workspace, snapshot)
     return {
         **profiles["full"],
-        "fact_witnesses": api_fact_witnesses(workspace, output, workflow, rule, packet),
+        "fact_witnesses": task_fact_witnesses(workspace, output, workflow, rule),
         "grade": grade_facts(workflow["id"], {"packet": packet}, rule),
         "revision_bound": _revision_bound(workspace, packet),
         "initial": profiles["initial"],

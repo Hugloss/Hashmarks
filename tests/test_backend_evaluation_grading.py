@@ -123,6 +123,18 @@ def test_duplicate_results_cannot_hide_missing_case() -> None:
         grade_run(run={"cases": [result, result]}, grader={"cases": {"a": {}, "b": {}}})
 
 
+def _witness_context(unit: str, check: str, stage: str) -> dict:
+    return {
+        "gate": "facts",
+        "unit_id": unit,
+        "stage": stage,
+        "profile": "default",
+        "surface": "api",
+        "format": "none",
+        "check_id": check,
+    }
+
+
 def _workflows() -> list[dict]:
     return [
         {
@@ -134,13 +146,22 @@ def _workflows() -> list[dict]:
             "debug_frame_units": ["frame-0"],
             "metric_eligibility": {
                 name: {"eligible": True, "reason": "controlled metric population"}
-                for name in ("owner_top_three", "initial_evidence")
+                for name in (
+                    "owner_top_three",
+                    "initial_evidence",
+                    "debug_correspondence",
+                )
             },
             "capability_proofs": {
                 str(capability): {
                     "reviewed": True,
                     "positive_check_ids": ["positive"],
                     "adversarial_check_ids": ["adversarial"],
+                    "required_witnesses": [
+                        {**_witness_context(str(index), check, stage), "role": check}
+                        for stage in ("before", "after")
+                        for check in ("positive", "adversarial")
+                    ],
                 }
                 for capability in range(1, 21)
             },
@@ -164,7 +185,8 @@ def _outcomes(workflows: list[dict]) -> list[dict]:
             "initial_evidence",
             "initial_size",
             "presentation",
-            "live",
+            "native_binding",
+            "fresh_acquisition",
             "language_parity",
             "performance",
         )
@@ -174,8 +196,22 @@ def _outcomes(workflows: list[dict]) -> list[dict]:
             "id": workflow["id"],
             "gates": dict(gates),
             "gate_witnesses": [
-                {"check_id": "positive", "state": "PASS"},
-                {"check_id": "adversarial", "state": "PASS"},
+                {
+                    **_witness_context(workflow["id"], check, stage),
+                    "state": "PASS",
+                    "artifact": stage + "/api.json",
+                    "artifact_sha256": "0" * 64,
+                    "oracle_pointer": "/controlled/checks",
+                    "source_bindings": [
+                        {
+                            "repository": workflow["repository"],
+                            "path": "owner.py",
+                            "revision": "controlled",
+                        }
+                    ],
+                }
+                for stage in ("before", "after")
+                for check in ("positive", "adversarial")
             ],
             "debug_frame_observations": [
                 {"unit_id": "frame-0", "correspondence": True}
@@ -292,10 +328,10 @@ def test_native_requirement_is_scoped_to_eligible_workflows() -> None:
     workflows = _workflows()
     outcomes = _outcomes(workflows)
     workflows[0]["native_required"] = False
-    outcomes[0]["gates"]["live"] = None
+    outcomes[0]["gates"]["native_binding"] = None
     matrix = capability_matrix(workflows, outcomes)
     assert matrix["capabilities"][0]["status"] == "PASS"
-    assert matrix["capabilities"][0]["gates"]["live"]["expected"] == 19
+    assert matrix["capabilities"][0]["gates"]["native_binding"]["expected"] == 19
     assert matrix["capabilities"][17]["status"] == "INCOMPLETE"
 
 
@@ -483,3 +519,32 @@ def test_non_initial_provider_data_does_not_acquire_table_semantics() -> None:
         },
     }
     assert pointer_values(packet, "/records") == [raw]
+
+
+def test_capability_proof_requires_every_frozen_witness_context():
+    workflows = _workflows()
+    outcomes = _outcomes(workflows)
+    outcomes[0]["gate_witnesses"] = [
+        row for row in outcomes[0]["gate_witnesses"] if row["stage"] == "before"
+    ]
+    report = capability_matrix(workflows, outcomes)
+    assert report["status"] == "INCOMPLETE"
+    assert report["capabilities"][0]["gates"]["capability_proof"]["observed"] == 19
+
+
+def test_capability_proof_rejects_duplicate_contexts():
+    workflows = _workflows()
+    outcomes = _outcomes(workflows)
+    outcomes[0]["gate_witnesses"].append(dict(outcomes[0]["gate_witnesses"][0]))
+    with pytest.raises(ValueError, match="duplicate backend gate witness context"):
+        capability_matrix(workflows, outcomes)
+
+
+def test_unknown_eligibility_does_not_manufacture_a_metric_unit():
+    workflows = _workflows()
+    del workflows[0]["metric_eligibility"]["owner_top_three"]
+    report = capability_matrix(workflows, _outcomes(workflows))
+    gate = report["capabilities"][0]["gates"]["owner_top_three"]
+    assert gate["expected"] == 19
+    assert gate["eligibility_missing"] == ["0"]
+    assert gate["state"] == "INCOMPLETE"

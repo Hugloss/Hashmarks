@@ -17,7 +17,10 @@
             "id": "source-owner-visible",
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
-            "value": "aiokafka/consumer/fetcher.py"
+            "value": "aiokafka/consumer/fetcher.py",
+            "source_paths": [
+              "aiokafka/consumer/fetcher.py"
+            ]
           },
           {
             "alternative_records": [
@@ -66,13 +69,20 @@
               "path": "aiokafka/consumer/fetcher.py",
               "start_line": 476,
               "symbol": "Fetcher._fetch_requests_routine"
-            }
+            },
+            "source_paths": [
+              "aiokafka/consumer/fetcher.py"
+            ]
           },
           {
             "id": "existing-verifier-visible",
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
-            "value": "tests/test_fetcher.py"
+            "value": "tests/test_fetcher.py",
+            "source_paths": [
+              "tests/test_fetcher.py"
+            ],
+            "support": "supported"
           }
         ],
         "initial_checks": [
@@ -81,7 +91,10 @@
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
             "support": "supported",
-            "value": "aiokafka/consumer/fetcher.py"
+            "value": "aiokafka/consumer/fetcher.py",
+            "source_paths": [
+              "aiokafka/consumer/fetcher.py"
+            ]
           },
           {
             "alternative_records": [
@@ -131,7 +144,20 @@
               "path": "aiokafka/consumer/fetcher.py",
               "start_line": 476,
               "symbol": "Fetcher._fetch_requests_routine"
-            }
+            },
+            "source_paths": [
+              "aiokafka/consumer/fetcher.py"
+            ]
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_fetcher.py",
+            "source_paths": [
+              "tests/test_fetcher.py"
+            ],
+            "support": "supported"
           }
         ],
         "owner_oracle": {
@@ -160,7 +186,10 @@
             "id": "source-owner-visible",
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
-            "value": "aiokafka/consumer/fetcher.py"
+            "value": "aiokafka/consumer/fetcher.py",
+            "source_paths": [
+              "aiokafka/consumer/fetcher.py"
+            ]
           },
           {
             "alternative_records": [
@@ -209,13 +238,20 @@
               "path": "aiokafka/consumer/fetcher.py",
               "start_line": 476,
               "symbol": "Fetcher._fetch_requests_routine"
-            }
+            },
+            "source_paths": [
+              "aiokafka/consumer/fetcher.py"
+            ]
           },
           {
             "id": "existing-verifier-visible",
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
-            "value": "tests/test_fetcher.py"
+            "value": "tests/test_fetcher.py",
+            "source_paths": [
+              "tests/test_fetcher.py"
+            ],
+            "support": "supported"
           }
         ],
         "initial_checks": [
@@ -224,7 +260,10 @@
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
             "support": "supported",
-            "value": "aiokafka/consumer/fetcher.py"
+            "value": "aiokafka/consumer/fetcher.py",
+            "source_paths": [
+              "aiokafka/consumer/fetcher.py"
+            ]
           },
           {
             "alternative_records": [
@@ -274,7 +313,20 @@
               "path": "aiokafka/consumer/fetcher.py",
               "start_line": 476,
               "symbol": "Fetcher._fetch_requests_routine"
-            }
+            },
+            "source_paths": [
+              "aiokafka/consumer/fetcher.py"
+            ]
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_fetcher.py",
+            "source_paths": [
+              "tests/test_fetcher.py"
+            ],
+            "support": "supported"
           }
         ],
         "owner_oracle": {
@@ -310,10 +362,9 @@
       ],
       "expected_owner_path": "aiokafka/consumer/fetcher.py",
       "review": {
-        "basis": "inspected pinned upstream source diffs and existing exact range labels; not Hashmarks output",
-        "oracle_digest": "sha256:a833736abd7af55b1de7111995049d0a47035e451fd3a93a141d50828981ac41",
+        "basis": "inspected pinned upstream source diffs, exact declaration labels and selected test bodies; not Hashmarks output",
+        "oracle_digest": "sha256:a203ecb1f7c9fe68843064725c3838d22f3348440955c776aa6b3dc1847941dc",
         "pending": [
-          "independent test correspondence",
           "display facts",
           "capability-specific adversarial proof"
         ],
@@ -321,7 +372,8 @@
         "scope": [
           "file-owner",
           "changed-symbol",
-          "behavior-task"
+          "behavior-task",
+          "test-file-relevance"
         ],
         "source_identities": {
           "after": "sha256:78023f358d474d0e3a4a4e470bb3ce8a60bc525b0bfd6fc17289b649498f2886:201",
@@ -338,6 +390,14 @@
             "sha256": "2a8ec5932644c9b04ff222ee7f27c9b0d6a0a7e89ce5a158ed340ceedc2ec7a9",
             "start_line": 476,
             "symbol": "Fetcher._fetch_requests_routine"
+          },
+          {
+            "path": "tests/test_fetcher.py",
+            "symbol": "TestFetcher.test_fetcher__update_fetch_positions",
+            "start_line": 85,
+            "end_line": 208,
+            "declaration_line": 86,
+            "sha256": "d8397c309f3a255436e86c2873c19bc6dd332f8e3b28e4fbf0eecfb0da10ecd0"
           }
         ],
         "before": [
@@ -348,8 +408,46 @@
             "sha256": "0d055beebcc194c74ba0dc8254f200f9f61d91939f076c983f2f7dc1fdda19b5",
             "start_line": 476,
             "symbol": "Fetcher._fetch_requests_routine"
+          },
+          {
+            "path": "tests/test_fetcher.py",
+            "symbol": "TestFetcher.test_fetcher__update_fetch_positions",
+            "start_line": 85,
+            "end_line": 208,
+            "declaration_line": 86,
+            "sha256": "d8397c309f3a255436e86c2873c19bc6dd332f8e3b28e4fbf0eecfb0da10ecd0"
           }
         ]
+      },
+      "verification_oracles": {
+        "before": {
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "path": "tests/test_fetcher.py",
+            "symbol": "TestFetcher.test_fetcher__update_fetch_positions",
+            "start_line": 85,
+            "end_line": 208,
+            "declaration_line": 86,
+            "sha256": "d8397c309f3a255436e86c2873c19bc6dd332f8e3b28e4fbf0eecfb0da10ecd0"
+          },
+          "basis": "inspected pinned test declaration and source diff; relevance candidate, not a claim of sufficient regression coverage",
+          "runtime_coverage": "not-established",
+          "verification_execution": "not-observed"
+        },
+        "after": {
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "path": "tests/test_fetcher.py",
+            "symbol": "TestFetcher.test_fetcher__update_fetch_positions",
+            "start_line": 85,
+            "end_line": 208,
+            "declaration_line": 86,
+            "sha256": "d8397c309f3a255436e86c2873c19bc6dd332f8e3b28e4fbf0eecfb0da10ecd0"
+          },
+          "basis": "inspected pinned test declaration and source diff; relevance candidate, not a claim of sufficient regression coverage",
+          "runtime_coverage": "not-established",
+          "verification_execution": "not-observed"
+        }
       }
     },
     "aiokafka-metadata-future": {
@@ -369,7 +467,10 @@
             "id": "source-owner-visible",
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
-            "value": "aiokafka/cluster.py"
+            "value": "aiokafka/cluster.py",
+            "source_paths": [
+              "aiokafka/cluster.py"
+            ]
           },
           {
             "alternative_records": [
@@ -418,13 +519,20 @@
               "path": "aiokafka/cluster.py",
               "start_line": 204,
               "symbol": "ClusterMetadata.failed_update"
-            }
+            },
+            "source_paths": [
+              "aiokafka/cluster.py"
+            ]
           },
           {
             "id": "existing-verifier-visible",
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
-            "value": "tests/test_cluster.py"
+            "value": "tests/test_cluster.py",
+            "source_paths": [
+              "tests/test_cluster.py"
+            ],
+            "support": "supported"
           }
         ],
         "initial_checks": [
@@ -433,7 +541,10 @@
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
             "support": "supported",
-            "value": "aiokafka/cluster.py"
+            "value": "aiokafka/cluster.py",
+            "source_paths": [
+              "aiokafka/cluster.py"
+            ]
           },
           {
             "alternative_records": [
@@ -483,7 +594,20 @@
               "path": "aiokafka/cluster.py",
               "start_line": 204,
               "symbol": "ClusterMetadata.failed_update"
-            }
+            },
+            "source_paths": [
+              "aiokafka/cluster.py"
+            ]
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_cluster.py",
+            "source_paths": [
+              "tests/test_cluster.py"
+            ],
+            "support": "supported"
           }
         ],
         "owner_oracle": {
@@ -512,7 +636,10 @@
             "id": "source-owner-visible",
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
-            "value": "aiokafka/cluster.py"
+            "value": "aiokafka/cluster.py",
+            "source_paths": [
+              "aiokafka/cluster.py"
+            ]
           },
           {
             "alternative_records": [
@@ -561,13 +688,20 @@
               "path": "aiokafka/cluster.py",
               "start_line": 204,
               "symbol": "ClusterMetadata.failed_update"
-            }
+            },
+            "source_paths": [
+              "aiokafka/cluster.py"
+            ]
           },
           {
             "id": "existing-verifier-visible",
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
-            "value": "tests/test_client.py"
+            "value": "tests/test_client.py",
+            "source_paths": [
+              "tests/test_client.py"
+            ],
+            "support": "supported"
           }
         ],
         "initial_checks": [
@@ -576,7 +710,10 @@
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
             "support": "supported",
-            "value": "aiokafka/cluster.py"
+            "value": "aiokafka/cluster.py",
+            "source_paths": [
+              "aiokafka/cluster.py"
+            ]
           },
           {
             "alternative_records": [
@@ -626,7 +763,20 @@
               "path": "aiokafka/cluster.py",
               "start_line": 204,
               "symbol": "ClusterMetadata.failed_update"
-            }
+            },
+            "source_paths": [
+              "aiokafka/cluster.py"
+            ]
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_client.py",
+            "source_paths": [
+              "tests/test_client.py"
+            ],
+            "support": "supported"
           }
         ],
         "owner_oracle": {
@@ -662,10 +812,9 @@
       ],
       "expected_owner_path": "aiokafka/cluster.py",
       "review": {
-        "basis": "inspected pinned upstream source diffs and existing exact range labels; not Hashmarks output",
-        "oracle_digest": "sha256:e5b11a787fd843669b0a96530011de15b1a52bd35b1db7b7fbb015fb9ff45b6e",
+        "basis": "inspected pinned upstream source diffs, exact declaration labels and selected test bodies; not Hashmarks output",
+        "oracle_digest": "sha256:e7369dace17b11f6cf76d994708d55cbad9979e0f54ccca0793e0241e1244906",
         "pending": [
-          "independent test correspondence",
           "display facts",
           "capability-specific adversarial proof"
         ],
@@ -673,7 +822,8 @@
         "scope": [
           "file-owner",
           "changed-symbol",
-          "behavior-task"
+          "behavior-task",
+          "test-file-relevance"
         ],
         "source_identities": {
           "after": "sha256:3d302cc98ad33cfe589fa6540f88f790a284772c26acb5357e39b543f82f2521:202",
@@ -690,6 +840,14 @@
             "sha256": "7eb3371ae526b1275ff9210acb4066e558cead1c7b2b5618dfad781a8ae7ceaa",
             "start_line": 204,
             "symbol": "ClusterMetadata.failed_update"
+          },
+          {
+            "path": "tests/test_cluster.py",
+            "symbol": "test_request_update_expecting_failure",
+            "start_line": 33,
+            "end_line": 41,
+            "declaration_line": 33,
+            "sha256": "f6a2e921c7040dcd46fbf30efe60794fab2fddc715d6c9ef3facc8feb5ae5483"
           }
         ],
         "before": [
@@ -700,8 +858,46 @@
             "sha256": "e392c1d1d0f3615b92830b114dbd7388fd15efe8e52a553c8d9a08737e6e98c9",
             "start_line": 204,
             "symbol": "ClusterMetadata.failed_update"
+          },
+          {
+            "path": "tests/test_client.py",
+            "symbol": "TestKafkaClientIntegration.test_metadata_synchronizer",
+            "start_line": 327,
+            "end_line": 345,
+            "declaration_line": 328,
+            "sha256": "03134b64a178f3aa511d386f05c1204854119af8afc3d5ba05128956cacb2f49"
           }
         ]
+      },
+      "verification_oracles": {
+        "before": {
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "path": "tests/test_client.py",
+            "symbol": "TestKafkaClientIntegration.test_metadata_synchronizer",
+            "start_line": 327,
+            "end_line": 345,
+            "declaration_line": 328,
+            "sha256": "03134b64a178f3aa511d386f05c1204854119af8afc3d5ba05128956cacb2f49"
+          },
+          "basis": "inspected pinned test declaration and source diff; relevance candidate, not a claim of sufficient regression coverage",
+          "runtime_coverage": "not-established",
+          "verification_execution": "not-observed"
+        },
+        "after": {
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "path": "tests/test_cluster.py",
+            "symbol": "test_request_update_expecting_failure",
+            "start_line": 33,
+            "end_line": 41,
+            "declaration_line": 33,
+            "sha256": "f6a2e921c7040dcd46fbf30efe60794fab2fddc715d6c9ef3facc8feb5ae5483"
+          },
+          "basis": "inspected pinned test declaration and source diff; relevance candidate, not a claim of sufficient regression coverage",
+          "runtime_coverage": "not-established",
+          "verification_execution": "not-observed"
+        }
       }
     },
     "aiokafka-sender-node-failure": {
@@ -721,7 +917,10 @@
             "id": "source-owner-visible",
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
-            "value": "aiokafka/producer/sender.py"
+            "value": "aiokafka/producer/sender.py",
+            "source_paths": [
+              "aiokafka/producer/sender.py"
+            ]
           },
           {
             "alternative_records": [
@@ -770,13 +969,20 @@
               "path": "aiokafka/producer/sender.py",
               "start_line": 217,
               "symbol": "Sender._find_coordinator"
-            }
+            },
+            "source_paths": [
+              "aiokafka/producer/sender.py"
+            ]
           },
           {
             "id": "existing-verifier-visible",
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
-            "value": "tests/test_sender.py"
+            "value": "tests/test_sender.py",
+            "source_paths": [
+              "tests/test_sender.py"
+            ],
+            "support": "supported"
           }
         ],
         "initial_checks": [
@@ -785,7 +991,10 @@
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
             "support": "supported",
-            "value": "aiokafka/producer/sender.py"
+            "value": "aiokafka/producer/sender.py",
+            "source_paths": [
+              "aiokafka/producer/sender.py"
+            ]
           },
           {
             "alternative_records": [
@@ -835,7 +1044,20 @@
               "path": "aiokafka/producer/sender.py",
               "start_line": 217,
               "symbol": "Sender._find_coordinator"
-            }
+            },
+            "source_paths": [
+              "aiokafka/producer/sender.py"
+            ]
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_sender.py",
+            "source_paths": [
+              "tests/test_sender.py"
+            ],
+            "support": "supported"
           }
         ],
         "owner_oracle": {
@@ -864,7 +1086,10 @@
             "id": "source-owner-visible",
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
-            "value": "aiokafka/producer/sender.py"
+            "value": "aiokafka/producer/sender.py",
+            "source_paths": [
+              "aiokafka/producer/sender.py"
+            ]
           },
           {
             "alternative_records": [
@@ -913,13 +1138,20 @@
               "path": "aiokafka/producer/sender.py",
               "start_line": 217,
               "symbol": "Sender._find_coordinator"
-            }
+            },
+            "source_paths": [
+              "aiokafka/producer/sender.py"
+            ]
           },
           {
             "id": "existing-verifier-visible",
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
-            "value": "tests/test_sender.py"
+            "value": "tests/test_sender.py",
+            "source_paths": [
+              "tests/test_sender.py"
+            ],
+            "support": "supported"
           }
         ],
         "initial_checks": [
@@ -928,7 +1160,10 @@
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
             "support": "supported",
-            "value": "aiokafka/producer/sender.py"
+            "value": "aiokafka/producer/sender.py",
+            "source_paths": [
+              "aiokafka/producer/sender.py"
+            ]
           },
           {
             "alternative_records": [
@@ -978,7 +1213,20 @@
               "path": "aiokafka/producer/sender.py",
               "start_line": 217,
               "symbol": "Sender._find_coordinator"
-            }
+            },
+            "source_paths": [
+              "aiokafka/producer/sender.py"
+            ]
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_sender.py",
+            "source_paths": [
+              "tests/test_sender.py"
+            ],
+            "support": "supported"
           }
         ],
         "owner_oracle": {
@@ -1014,10 +1262,9 @@
       ],
       "expected_owner_path": "aiokafka/producer/sender.py",
       "review": {
-        "basis": "inspected pinned upstream source diffs and existing exact range labels; not Hashmarks output",
-        "oracle_digest": "sha256:e6cebaa1755afe1d0c2e590d8974a4e0c6192c0534801c65208f7fad36046669",
+        "basis": "inspected pinned upstream source diffs, exact declaration labels and selected test bodies; not Hashmarks output",
+        "oracle_digest": "sha256:c0fc4c968092ce6202deb39bfb1b425f2cc26c5b35257dff1e24c167d545986c",
         "pending": [
-          "independent test correspondence",
           "display facts",
           "capability-specific adversarial proof"
         ],
@@ -1025,7 +1272,8 @@
         "scope": [
           "file-owner",
           "changed-symbol",
-          "behavior-task"
+          "behavior-task",
+          "test-file-relevance"
         ],
         "source_identities": {
           "after": "sha256:174728c969f32db6f24486c28129cfc16c490f268eb5b9fb2ed45b4fd20d251f:176",
@@ -1042,6 +1290,14 @@
             "sha256": "33001a36bf6a0ae06058568aada62aa046fce14e4897466e72faf87bf42aa368",
             "start_line": 217,
             "symbol": "Sender._find_coordinator"
+          },
+          {
+            "path": "tests/test_sender.py",
+            "symbol": "TestSender.test_sender__find_coordinator",
+            "start_line": 127,
+            "end_line": 196,
+            "declaration_line": 129,
+            "sha256": "12672b4357fdcdd75afcdea2440286907f16dcf0a2e248a2262d2ea9c0fe9f44"
           }
         ],
         "before": [
@@ -1052,8 +1308,46 @@
             "sha256": "2c1e273c8cd3707675b5faac49bdc6cd407dbf9f65f9635328ff3417bbb6721d",
             "start_line": 217,
             "symbol": "Sender._find_coordinator"
+          },
+          {
+            "path": "tests/test_sender.py",
+            "symbol": "TestSender.test_sender__find_coordinator",
+            "start_line": 126,
+            "end_line": 195,
+            "declaration_line": 128,
+            "sha256": "12672b4357fdcdd75afcdea2440286907f16dcf0a2e248a2262d2ea9c0fe9f44"
           }
         ]
+      },
+      "verification_oracles": {
+        "before": {
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "path": "tests/test_sender.py",
+            "symbol": "TestSender.test_sender__find_coordinator",
+            "start_line": 126,
+            "end_line": 195,
+            "declaration_line": 128,
+            "sha256": "12672b4357fdcdd75afcdea2440286907f16dcf0a2e248a2262d2ea9c0fe9f44"
+          },
+          "basis": "inspected pinned test declaration and source diff; relevance candidate, not a claim of sufficient regression coverage",
+          "runtime_coverage": "not-established",
+          "verification_execution": "not-observed"
+        },
+        "after": {
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "path": "tests/test_sender.py",
+            "symbol": "TestSender.test_sender__find_coordinator",
+            "start_line": 127,
+            "end_line": 196,
+            "declaration_line": 129,
+            "sha256": "12672b4357fdcdd75afcdea2440286907f16dcf0a2e248a2262d2ea9c0fe9f44"
+          },
+          "basis": "inspected pinned test declaration and source diff; relevance candidate, not a claim of sufficient regression coverage",
+          "runtime_coverage": "not-established",
+          "verification_execution": "not-observed"
+        }
       }
     },
     "aiokafka-stable-offset": {
@@ -1073,7 +1367,10 @@
             "id": "source-owner-visible",
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
-            "value": "aiokafka/consumer/fetcher.py"
+            "value": "aiokafka/consumer/fetcher.py",
+            "source_paths": [
+              "aiokafka/consumer/fetcher.py"
+            ]
           },
           {
             "alternative_records": [
@@ -1122,13 +1419,20 @@
               "path": "aiokafka/consumer/fetcher.py",
               "start_line": 744,
               "symbol": "Fetcher._proc_fetch_request"
-            }
+            },
+            "source_paths": [
+              "aiokafka/consumer/fetcher.py"
+            ]
           },
           {
             "id": "existing-verifier-visible",
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
-            "value": "tests/test_transactional_consumer.py"
+            "value": "tests/test_transactional_consumer.py",
+            "source_paths": [
+              "tests/test_transactional_consumer.py"
+            ],
+            "support": "supported"
           }
         ],
         "initial_checks": [
@@ -1137,7 +1441,10 @@
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
             "support": "supported",
-            "value": "aiokafka/consumer/fetcher.py"
+            "value": "aiokafka/consumer/fetcher.py",
+            "source_paths": [
+              "aiokafka/consumer/fetcher.py"
+            ]
           },
           {
             "alternative_records": [
@@ -1187,7 +1494,20 @@
               "path": "aiokafka/consumer/fetcher.py",
               "start_line": 744,
               "symbol": "Fetcher._proc_fetch_request"
-            }
+            },
+            "source_paths": [
+              "aiokafka/consumer/fetcher.py"
+            ]
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_transactional_consumer.py",
+            "source_paths": [
+              "tests/test_transactional_consumer.py"
+            ],
+            "support": "supported"
           }
         ],
         "owner_oracle": {
@@ -1216,7 +1536,10 @@
             "id": "source-owner-visible",
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
-            "value": "aiokafka/consumer/fetcher.py"
+            "value": "aiokafka/consumer/fetcher.py",
+            "source_paths": [
+              "aiokafka/consumer/fetcher.py"
+            ]
           },
           {
             "alternative_records": [
@@ -1265,13 +1588,20 @@
               "path": "aiokafka/consumer/fetcher.py",
               "start_line": 744,
               "symbol": "Fetcher._proc_fetch_request"
-            }
+            },
+            "source_paths": [
+              "aiokafka/consumer/fetcher.py"
+            ]
           },
           {
             "id": "existing-verifier-visible",
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
-            "value": "tests/test_fetcher.py"
+            "value": "tests/test_fetcher.py",
+            "source_paths": [
+              "tests/test_fetcher.py"
+            ],
+            "support": "supported"
           }
         ],
         "initial_checks": [
@@ -1280,7 +1610,10 @@
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
             "support": "supported",
-            "value": "aiokafka/consumer/fetcher.py"
+            "value": "aiokafka/consumer/fetcher.py",
+            "source_paths": [
+              "aiokafka/consumer/fetcher.py"
+            ]
           },
           {
             "alternative_records": [
@@ -1330,7 +1663,20 @@
               "path": "aiokafka/consumer/fetcher.py",
               "start_line": 744,
               "symbol": "Fetcher._proc_fetch_request"
-            }
+            },
+            "source_paths": [
+              "aiokafka/consumer/fetcher.py"
+            ]
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_fetcher.py",
+            "source_paths": [
+              "tests/test_fetcher.py"
+            ],
+            "support": "supported"
           }
         ],
         "owner_oracle": {
@@ -1366,10 +1712,9 @@
       ],
       "expected_owner_path": "aiokafka/consumer/fetcher.py",
       "review": {
-        "basis": "inspected pinned upstream source diffs and existing exact range labels; not Hashmarks output",
-        "oracle_digest": "sha256:ecc2dc5ff3eb70131c339219c5040e44966360879c4d59fd86df04fca6f524ca",
+        "basis": "inspected pinned upstream source diffs, exact declaration labels and selected test bodies; not Hashmarks output",
+        "oracle_digest": "sha256:381b6bb234daed117c9d0cc109e50b74185311661eebbabbe311e034d48950e3",
         "pending": [
-          "independent test correspondence",
           "display facts",
           "capability-specific adversarial proof"
         ],
@@ -1377,7 +1722,8 @@
         "scope": [
           "file-owner",
           "changed-symbol",
-          "behavior-task"
+          "behavior-task",
+          "test-file-relevance"
         ],
         "source_identities": {
           "after": "sha256:199a72d9fb55386b506885c14bebfafde69a43d832b9aa240d46c5f599b24465:179",
@@ -1394,6 +1740,14 @@
             "sha256": "59bf948fff47eed580671971252454daa614df479733f3bedfefe95bc4d8ad30",
             "start_line": 744,
             "symbol": "Fetcher._proc_fetch_request"
+          },
+          {
+            "path": "tests/test_transactional_consumer.py",
+            "symbol": "TestKafkaConsumerIntegration.test_consumer_transactional_commit",
+            "start_line": 12,
+            "end_line": 79,
+            "declaration_line": 14,
+            "sha256": "e0b5fa8e320b12e820000f9fed7ead2c0b36c6f55a6ab755e9c861654c4dd46f"
           }
         ],
         "before": [
@@ -1404,8 +1758,46 @@
             "sha256": "a70e682fa558181aaa81e30aa0dfe6298ee0c5d63f8cfec87b7c3613966699eb",
             "start_line": 744,
             "symbol": "Fetcher._proc_fetch_request"
+          },
+          {
+            "path": "tests/test_fetcher.py",
+            "symbol": "TestFetcher.test_solitary_abort_marker",
+            "start_line": 562,
+            "end_line": 613,
+            "declaration_line": 563,
+            "sha256": "9695b9ece3dde7b04403ddffc90bba67a5e59cbaaa0faa44b09e6132ac3bb7ed"
           }
         ]
+      },
+      "verification_oracles": {
+        "before": {
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "path": "tests/test_fetcher.py",
+            "symbol": "TestFetcher.test_solitary_abort_marker",
+            "start_line": 562,
+            "end_line": 613,
+            "declaration_line": 563,
+            "sha256": "9695b9ece3dde7b04403ddffc90bba67a5e59cbaaa0faa44b09e6132ac3bb7ed"
+          },
+          "basis": "inspected pinned test declaration and source diff; relevance candidate, not a claim of sufficient regression coverage",
+          "runtime_coverage": "not-established",
+          "verification_execution": "not-observed"
+        },
+        "after": {
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "path": "tests/test_transactional_consumer.py",
+            "symbol": "TestKafkaConsumerIntegration.test_consumer_transactional_commit",
+            "start_line": 12,
+            "end_line": 79,
+            "declaration_line": 14,
+            "sha256": "e0b5fa8e320b12e820000f9fed7ead2c0b36c6f55a6ab755e9c861654c4dd46f"
+          },
+          "basis": "inspected pinned test declaration and source diff; relevance candidate, not a claim of sufficient regression coverage",
+          "runtime_coverage": "not-established",
+          "verification_execution": "not-observed"
+        }
       }
     },
     "faststream-concurrent-queue-lifetime": {
@@ -1425,7 +1817,10 @@
             "id": "source-owner-visible",
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
-            "value": "faststream/_internal/endpoint/subscriber/mixins.py"
+            "value": "faststream/_internal/endpoint/subscriber/mixins.py",
+            "source_paths": [
+              "faststream/_internal/endpoint/subscriber/mixins.py"
+            ]
           },
           {
             "alternative_records": [
@@ -1474,13 +1869,20 @@
               "path": "faststream/_internal/endpoint/subscriber/mixins.py",
               "start_line": 58,
               "symbol": "ConcurrentMixin.__init__"
-            }
+            },
+            "source_paths": [
+              "faststream/_internal/endpoint/subscriber/mixins.py"
+            ]
           },
           {
             "id": "existing-verifier-visible",
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
-            "value": "tests/brokers/nats/test_consume.py"
+            "value": "tests/brokers/nats/test_consume.py",
+            "source_paths": [
+              "tests/brokers/nats/test_consume.py"
+            ],
+            "support": "supported"
           }
         ],
         "initial_checks": [
@@ -1489,7 +1891,10 @@
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
             "support": "supported",
-            "value": "faststream/_internal/endpoint/subscriber/mixins.py"
+            "value": "faststream/_internal/endpoint/subscriber/mixins.py",
+            "source_paths": [
+              "faststream/_internal/endpoint/subscriber/mixins.py"
+            ]
           },
           {
             "alternative_records": [
@@ -1539,7 +1944,20 @@
               "path": "faststream/_internal/endpoint/subscriber/mixins.py",
               "start_line": 58,
               "symbol": "ConcurrentMixin.__init__"
-            }
+            },
+            "source_paths": [
+              "faststream/_internal/endpoint/subscriber/mixins.py"
+            ]
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/brokers/nats/test_consume.py",
+            "source_paths": [
+              "tests/brokers/nats/test_consume.py"
+            ],
+            "support": "supported"
           }
         ],
         "owner_oracle": {
@@ -1568,7 +1986,10 @@
             "id": "source-owner-visible",
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
-            "value": "faststream/_internal/endpoint/subscriber/mixins.py"
+            "value": "faststream/_internal/endpoint/subscriber/mixins.py",
+            "source_paths": [
+              "faststream/_internal/endpoint/subscriber/mixins.py"
+            ]
           },
           {
             "alternative_records": [
@@ -1617,13 +2038,20 @@
               "path": "faststream/_internal/endpoint/subscriber/mixins.py",
               "start_line": 57,
               "symbol": "ConcurrentMixin.__init__"
-            }
+            },
+            "source_paths": [
+              "faststream/_internal/endpoint/subscriber/mixins.py"
+            ]
           },
           {
             "id": "existing-verifier-visible",
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
-            "value": "tests/brokers/nats/test_consume.py"
+            "value": "tests/brokers/nats/test_consume.py",
+            "source_paths": [
+              "tests/brokers/nats/test_consume.py"
+            ],
+            "support": "supported"
           }
         ],
         "initial_checks": [
@@ -1632,7 +2060,10 @@
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
             "support": "supported",
-            "value": "faststream/_internal/endpoint/subscriber/mixins.py"
+            "value": "faststream/_internal/endpoint/subscriber/mixins.py",
+            "source_paths": [
+              "faststream/_internal/endpoint/subscriber/mixins.py"
+            ]
           },
           {
             "alternative_records": [
@@ -1682,7 +2113,20 @@
               "path": "faststream/_internal/endpoint/subscriber/mixins.py",
               "start_line": 57,
               "symbol": "ConcurrentMixin.__init__"
-            }
+            },
+            "source_paths": [
+              "faststream/_internal/endpoint/subscriber/mixins.py"
+            ]
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/brokers/nats/test_consume.py",
+            "source_paths": [
+              "tests/brokers/nats/test_consume.py"
+            ],
+            "support": "supported"
           }
         ],
         "owner_oracle": {
@@ -1718,10 +2162,9 @@
       ],
       "expected_owner_path": "faststream/_internal/endpoint/subscriber/mixins.py",
       "review": {
-        "basis": "inspected pinned upstream source diffs and existing exact range labels; not Hashmarks output",
-        "oracle_digest": "sha256:eb1de0dab42c040b2c2dee47f47c0dbb2189cd4db1dbf8ee3105e821b366003a",
+        "basis": "inspected pinned upstream source diffs, exact declaration labels and selected test bodies; not Hashmarks output",
+        "oracle_digest": "sha256:1a5e442f6955a25a60106f56283a9220e82865ce6b6ce7d821906ca6e086b5d6",
         "pending": [
-          "independent test correspondence",
           "display facts",
           "capability-specific adversarial proof"
         ],
@@ -1729,7 +2172,8 @@
         "scope": [
           "file-owner",
           "changed-symbol",
-          "behavior-task"
+          "behavior-task",
+          "test-file-relevance"
         ],
         "source_identities": {
           "after": "sha256:a9c686f88787cdeb57d98e33c851eb63fcfb876681751a1d0cdd42664f0d8e80:2231",
@@ -1746,6 +2190,14 @@
             "sha256": "f8a94c6ddacbc352749f2c33cc07c1cdb67456574cc388110153023f33356077",
             "start_line": 58,
             "symbol": "ConcurrentMixin.__init__"
+          },
+          {
+            "path": "tests/brokers/nats/test_consume.py",
+            "symbol": "TestConsume.test_concurrent_subscriber_closes_its_queue_on_stop",
+            "start_line": 38,
+            "end_line": 51,
+            "declaration_line": 38,
+            "sha256": "4fef67b575e228d0b43ffc675791ed49bff14c69f7226de151d8607f7c3c1a4b"
           }
         ],
         "before": [
@@ -1756,8 +2208,46 @@
             "sha256": "57888f8b6a2003e99d83a6c338a1e1dc828515d35981acb6ef5d680b8f62d220",
             "start_line": 57,
             "symbol": "ConcurrentMixin.__init__"
+          },
+          {
+            "path": "tests/brokers/nats/test_consume.py",
+            "symbol": "TestConsume.test_concurrent_subscriber",
+            "start_line": 22,
+            "end_line": 60,
+            "declaration_line": 22,
+            "sha256": "bb846e1d7e4f9173013dd31d0946a156c2a876afa9ed8d1eb94a4a5ccc47e601"
           }
         ]
+      },
+      "verification_oracles": {
+        "before": {
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "path": "tests/brokers/nats/test_consume.py",
+            "symbol": "TestConsume.test_concurrent_subscriber",
+            "start_line": 22,
+            "end_line": 60,
+            "declaration_line": 22,
+            "sha256": "bb846e1d7e4f9173013dd31d0946a156c2a876afa9ed8d1eb94a4a5ccc47e601"
+          },
+          "basis": "inspected pinned test declaration and source diff; relevance candidate, not a claim of sufficient regression coverage",
+          "runtime_coverage": "not-established",
+          "verification_execution": "not-observed"
+        },
+        "after": {
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "path": "tests/brokers/nats/test_consume.py",
+            "symbol": "TestConsume.test_concurrent_subscriber_closes_its_queue_on_stop",
+            "start_line": 38,
+            "end_line": 51,
+            "declaration_line": 38,
+            "sha256": "4fef67b575e228d0b43ffc675791ed49bff14c69f7226de151d8607f7c3c1a4b"
+          },
+          "basis": "inspected pinned test declaration and source diff; relevance candidate, not a claim of sufficient regression coverage",
+          "runtime_coverage": "not-established",
+          "verification_execution": "not-observed"
+        }
       }
     },
     "faststream-middleware-enter-error": {
@@ -1777,7 +2267,10 @@
             "id": "source-owner-visible",
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
-            "value": "faststream/_internal/endpoint/subscriber/usecase.py"
+            "value": "faststream/_internal/endpoint/subscriber/usecase.py",
+            "source_paths": [
+              "faststream/_internal/endpoint/subscriber/usecase.py"
+            ]
           },
           {
             "alternative_records": [
@@ -1826,13 +2319,20 @@
               "path": "faststream/_internal/endpoint/subscriber/usecase.py",
               "start_line": 354,
               "symbol": "SubscriberUsecase.process_message"
-            }
+            },
+            "source_paths": [
+              "faststream/_internal/endpoint/subscriber/usecase.py"
+            ]
           },
           {
             "id": "existing-verifier-visible",
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
-            "value": "tests/brokers/base/middlewares.py"
+            "value": "tests/brokers/base/middlewares.py",
+            "source_paths": [
+              "tests/brokers/base/middlewares.py"
+            ],
+            "support": "supported"
           }
         ],
         "initial_checks": [
@@ -1841,7 +2341,10 @@
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
             "support": "supported",
-            "value": "faststream/_internal/endpoint/subscriber/usecase.py"
+            "value": "faststream/_internal/endpoint/subscriber/usecase.py",
+            "source_paths": [
+              "faststream/_internal/endpoint/subscriber/usecase.py"
+            ]
           },
           {
             "alternative_records": [
@@ -1891,7 +2394,20 @@
               "path": "faststream/_internal/endpoint/subscriber/usecase.py",
               "start_line": 354,
               "symbol": "SubscriberUsecase.process_message"
-            }
+            },
+            "source_paths": [
+              "faststream/_internal/endpoint/subscriber/usecase.py"
+            ]
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/brokers/base/middlewares.py",
+            "source_paths": [
+              "tests/brokers/base/middlewares.py"
+            ],
+            "support": "supported"
           }
         ],
         "owner_oracle": {
@@ -1920,7 +2436,10 @@
             "id": "source-owner-visible",
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
-            "value": "faststream/_internal/endpoint/subscriber/usecase.py"
+            "value": "faststream/_internal/endpoint/subscriber/usecase.py",
+            "source_paths": [
+              "faststream/_internal/endpoint/subscriber/usecase.py"
+            ]
           },
           {
             "alternative_records": [
@@ -1969,13 +2488,20 @@
               "path": "faststream/_internal/endpoint/subscriber/usecase.py",
               "start_line": 354,
               "symbol": "SubscriberUsecase.process_message"
-            }
+            },
+            "source_paths": [
+              "faststream/_internal/endpoint/subscriber/usecase.py"
+            ]
           },
           {
             "id": "existing-verifier-visible",
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
-            "value": "tests/brokers/base/middlewares.py"
+            "value": "tests/brokers/base/middlewares.py",
+            "source_paths": [
+              "tests/brokers/base/middlewares.py"
+            ],
+            "support": "supported"
           }
         ],
         "initial_checks": [
@@ -1984,7 +2510,10 @@
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
             "support": "supported",
-            "value": "faststream/_internal/endpoint/subscriber/usecase.py"
+            "value": "faststream/_internal/endpoint/subscriber/usecase.py",
+            "source_paths": [
+              "faststream/_internal/endpoint/subscriber/usecase.py"
+            ]
           },
           {
             "alternative_records": [
@@ -2034,7 +2563,20 @@
               "path": "faststream/_internal/endpoint/subscriber/usecase.py",
               "start_line": 354,
               "symbol": "SubscriberUsecase.process_message"
-            }
+            },
+            "source_paths": [
+              "faststream/_internal/endpoint/subscriber/usecase.py"
+            ]
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/brokers/base/middlewares.py",
+            "source_paths": [
+              "tests/brokers/base/middlewares.py"
+            ],
+            "support": "supported"
           }
         ],
         "owner_oracle": {
@@ -2070,10 +2612,9 @@
       ],
       "expected_owner_path": "faststream/_internal/endpoint/subscriber/usecase.py",
       "review": {
-        "basis": "inspected pinned upstream source diffs and existing exact range labels; not Hashmarks output",
-        "oracle_digest": "sha256:f707563b8d9137d37d1757092e2433939d4715187a01477776aa6974a8dcc302",
+        "basis": "inspected pinned upstream source diffs, exact declaration labels and selected test bodies; not Hashmarks output",
+        "oracle_digest": "sha256:8102998de0824d6b88e048b9ea128511ef291f6a14f66f5d87255a9931e8fa1c",
         "pending": [
-          "independent test correspondence",
           "display facts",
           "capability-specific adversarial proof"
         ],
@@ -2081,7 +2622,8 @@
         "scope": [
           "file-owner",
           "changed-symbol",
-          "behavior-task"
+          "behavior-task",
+          "test-file-relevance"
         ],
         "source_identities": {
           "after": "sha256:1d1c191c8b9e3265a54c35936345c6b26ecdaa0358fd6213121bf5ce64700a71:2320",
@@ -2098,6 +2640,14 @@
             "sha256": "aa3ed06c328d92abd126e0362beabee5b63400468cc02914f46992752d103350",
             "start_line": 354,
             "symbol": "SubscriberUsecase.process_message"
+          },
+          {
+            "path": "tests/brokers/base/middlewares.py",
+            "symbol": "MiddlewaresOrderTestcase.test_broker_middleware_exit_on_enter_error",
+            "start_line": 94,
+            "end_line": 126,
+            "declaration_line": 94,
+            "sha256": "6d39acc3bf152fe4b33caf7740152089ce930ab9d974ff1271e1e5f9d15d933f"
           }
         ],
         "before": [
@@ -2108,8 +2658,46 @@
             "sha256": "52ebf78e8615ada8ac52a51044d9363f8bfd96417d4906ae451005e4e97ed4b0",
             "start_line": 354,
             "symbol": "SubscriberUsecase.process_message"
+          },
+          {
+            "path": "tests/brokers/base/middlewares.py",
+            "symbol": "MiddlewaresOrderTestcase.test_broker_middleware_order",
+            "start_line": 20,
+            "end_line": 92,
+            "declaration_line": 20,
+            "sha256": "0bd2999c847ceb8d17c69d5da0433fc61741af7f45422c13a5b059cdb3326d9d"
           }
         ]
+      },
+      "verification_oracles": {
+        "before": {
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "path": "tests/brokers/base/middlewares.py",
+            "symbol": "MiddlewaresOrderTestcase.test_broker_middleware_order",
+            "start_line": 20,
+            "end_line": 92,
+            "declaration_line": 20,
+            "sha256": "0bd2999c847ceb8d17c69d5da0433fc61741af7f45422c13a5b059cdb3326d9d"
+          },
+          "basis": "inspected pinned test declaration and source diff; relevance candidate, not a claim of sufficient regression coverage",
+          "runtime_coverage": "not-established",
+          "verification_execution": "not-observed"
+        },
+        "after": {
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "path": "tests/brokers/base/middlewares.py",
+            "symbol": "MiddlewaresOrderTestcase.test_broker_middleware_exit_on_enter_error",
+            "start_line": 94,
+            "end_line": 126,
+            "declaration_line": 94,
+            "sha256": "6d39acc3bf152fe4b33caf7740152089ce930ab9d974ff1271e1e5f9d15d933f"
+          },
+          "basis": "inspected pinned test declaration and source diff; relevance candidate, not a claim of sufficient regression coverage",
+          "runtime_coverage": "not-established",
+          "verification_execution": "not-observed"
+        }
       }
     },
     "faststream-partial-pull-batch": {
@@ -2129,7 +2717,10 @@
             "id": "source-owner-visible",
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
-            "value": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py"
+            "value": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+            "source_paths": [
+              "faststream/nats/subscriber/usecases/stream_pull_subscriber.py"
+            ]
           },
           {
             "alternative_records": [
@@ -2178,13 +2769,20 @@
               "path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
               "start_line": 230,
               "symbol": "BatchPullStreamSubscriber._consume_pull"
-            }
+            },
+            "source_paths": [
+              "faststream/nats/subscriber/usecases/stream_pull_subscriber.py"
+            ]
           },
           {
             "id": "existing-verifier-visible",
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
-            "value": "tests/brokers/nats/test_pull_batch.py"
+            "value": "tests/brokers/nats/test_pull_batch.py",
+            "source_paths": [
+              "tests/brokers/nats/test_pull_batch.py"
+            ],
+            "support": "supported"
           }
         ],
         "initial_checks": [
@@ -2193,7 +2791,10 @@
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
             "support": "supported",
-            "value": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py"
+            "value": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+            "source_paths": [
+              "faststream/nats/subscriber/usecases/stream_pull_subscriber.py"
+            ]
           },
           {
             "alternative_records": [
@@ -2243,7 +2844,20 @@
               "path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
               "start_line": 230,
               "symbol": "BatchPullStreamSubscriber._consume_pull"
-            }
+            },
+            "source_paths": [
+              "faststream/nats/subscriber/usecases/stream_pull_subscriber.py"
+            ]
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/brokers/nats/test_pull_batch.py",
+            "source_paths": [
+              "tests/brokers/nats/test_pull_batch.py"
+            ],
+            "support": "supported"
           }
         ],
         "owner_oracle": {
@@ -2272,7 +2886,10 @@
             "id": "source-owner-visible",
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
-            "value": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py"
+            "value": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+            "source_paths": [
+              "faststream/nats/subscriber/usecases/stream_pull_subscriber.py"
+            ]
           },
           {
             "alternative_records": [
@@ -2321,13 +2938,20 @@
               "path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
               "start_line": 229,
               "symbol": "BatchPullStreamSubscriber._consume_pull"
-            }
+            },
+            "source_paths": [
+              "faststream/nats/subscriber/usecases/stream_pull_subscriber.py"
+            ]
           },
           {
             "id": "existing-verifier-visible",
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
-            "value": "tests/brokers/nats/test_consume.py"
+            "value": "tests/brokers/nats/test_consume.py",
+            "source_paths": [
+              "tests/brokers/nats/test_consume.py"
+            ],
+            "support": "supported"
           }
         ],
         "initial_checks": [
@@ -2336,7 +2960,10 @@
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
             "support": "supported",
-            "value": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py"
+            "value": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+            "source_paths": [
+              "faststream/nats/subscriber/usecases/stream_pull_subscriber.py"
+            ]
           },
           {
             "alternative_records": [
@@ -2386,7 +3013,20 @@
               "path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
               "start_line": 229,
               "symbol": "BatchPullStreamSubscriber._consume_pull"
-            }
+            },
+            "source_paths": [
+              "faststream/nats/subscriber/usecases/stream_pull_subscriber.py"
+            ]
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/brokers/nats/test_consume.py",
+            "source_paths": [
+              "tests/brokers/nats/test_consume.py"
+            ],
+            "support": "supported"
           }
         ],
         "owner_oracle": {
@@ -2422,10 +3062,9 @@
       ],
       "expected_owner_path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
       "review": {
-        "basis": "inspected pinned upstream source diffs and existing exact range labels; not Hashmarks output",
-        "oracle_digest": "sha256:2a4241389c30d1f9bd0b2cab9e24d71845eaf15975a34535e874f22f3b857bbf",
+        "basis": "inspected pinned upstream source diffs, exact declaration labels and selected test bodies; not Hashmarks output",
+        "oracle_digest": "sha256:e830477ac7d88d98b713e90289f4e803bc416e722bc9da1b9f063fd196cfffdd",
         "pending": [
-          "independent test correspondence",
           "display facts",
           "capability-specific adversarial proof"
         ],
@@ -2433,7 +3072,8 @@
         "scope": [
           "file-owner",
           "changed-symbol",
-          "behavior-task"
+          "behavior-task",
+          "test-file-relevance"
         ],
         "source_identities": {
           "after": "sha256:084013a1f4addbd8e8ea6a7dbc3bb07ae4be73dcf72ed3087aabe8b65c75a5f8:2286",
@@ -2450,6 +3090,14 @@
             "sha256": "0495395a1f6d736ff9262faf4a85779a7f70d24a419688587eefeabbcc4c866b",
             "start_line": 230,
             "symbol": "BatchPullStreamSubscriber._consume_pull"
+          },
+          {
+            "path": "tests/brokers/nats/test_pull_batch.py",
+            "symbol": "TestPullBatch.test_collects_full_and_partial_batches",
+            "start_line": 15,
+            "end_line": 46,
+            "declaration_line": 15,
+            "sha256": "6cf4cb4999f936c71cb191dd4fb85b29a00e9dbcf982a618e1f05f90f11a0e67"
           }
         ],
         "before": [
@@ -2460,8 +3108,46 @@
             "sha256": "e2b6dcacf877d2e799ff93c1c88ec0f81887fcad3b2aea046cbd079cb438d5d2",
             "start_line": 229,
             "symbol": "BatchPullStreamSubscriber._consume_pull"
+          },
+          {
+            "path": "tests/brokers/nats/test_consume.py",
+            "symbol": "TestConsume.test_consume_batch",
+            "start_line": 171,
+            "end_line": 197,
+            "declaration_line": 171,
+            "sha256": "1c94c558d57f1e03ed693fa75ace11c2ce161fdc7da44ba0b7c54418365b9d45"
           }
         ]
+      },
+      "verification_oracles": {
+        "before": {
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "path": "tests/brokers/nats/test_consume.py",
+            "symbol": "TestConsume.test_consume_batch",
+            "start_line": 171,
+            "end_line": 197,
+            "declaration_line": 171,
+            "sha256": "1c94c558d57f1e03ed693fa75ace11c2ce161fdc7da44ba0b7c54418365b9d45"
+          },
+          "basis": "inspected pinned test declaration and source diff; relevance candidate, not a claim of sufficient regression coverage",
+          "runtime_coverage": "not-established",
+          "verification_execution": "not-observed"
+        },
+        "after": {
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "path": "tests/brokers/nats/test_pull_batch.py",
+            "symbol": "TestPullBatch.test_collects_full_and_partial_batches",
+            "start_line": 15,
+            "end_line": 46,
+            "declaration_line": 15,
+            "sha256": "6cf4cb4999f936c71cb191dd4fb85b29a00e9dbcf982a618e1f05f90f11a0e67"
+          },
+          "basis": "inspected pinned test declaration and source diff; relevance candidate, not a claim of sufficient regression coverage",
+          "runtime_coverage": "not-established",
+          "verification_execution": "not-observed"
+        }
       }
     },
     "faststream-subscriber-stop": {
@@ -2481,7 +3167,10 @@
             "id": "source-owner-visible",
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
-            "value": "faststream/_internal/broker/broker.py"
+            "value": "faststream/_internal/broker/broker.py",
+            "source_paths": [
+              "faststream/_internal/broker/broker.py"
+            ]
           },
           {
             "alternative_records": [
@@ -2530,13 +3219,20 @@
               "path": "faststream/_internal/broker/broker.py",
               "start_line": 126,
               "symbol": "BrokerUsecase.stop"
-            }
+            },
+            "source_paths": [
+              "faststream/_internal/broker/broker.py"
+            ]
           },
           {
             "id": "existing-verifier-visible",
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
-            "value": "tests/brokers/test_stop.py"
+            "value": "tests/brokers/test_stop.py",
+            "source_paths": [
+              "tests/brokers/test_stop.py"
+            ],
+            "support": "supported"
           }
         ],
         "initial_checks": [
@@ -2545,7 +3241,10 @@
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
             "support": "supported",
-            "value": "faststream/_internal/broker/broker.py"
+            "value": "faststream/_internal/broker/broker.py",
+            "source_paths": [
+              "faststream/_internal/broker/broker.py"
+            ]
           },
           {
             "alternative_records": [
@@ -2595,7 +3294,20 @@
               "path": "faststream/_internal/broker/broker.py",
               "start_line": 126,
               "symbol": "BrokerUsecase.stop"
-            }
+            },
+            "source_paths": [
+              "faststream/_internal/broker/broker.py"
+            ]
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/brokers/test_stop.py",
+            "source_paths": [
+              "tests/brokers/test_stop.py"
+            ],
+            "support": "supported"
           }
         ],
         "owner_oracle": {
@@ -2624,7 +3336,10 @@
             "id": "source-owner-visible",
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
-            "value": "faststream/_internal/broker/broker.py"
+            "value": "faststream/_internal/broker/broker.py",
+            "source_paths": [
+              "faststream/_internal/broker/broker.py"
+            ]
           },
           {
             "alternative_records": [
@@ -2673,13 +3388,20 @@
               "path": "faststream/_internal/broker/broker.py",
               "start_line": 123,
               "symbol": "BrokerUsecase.stop"
-            }
+            },
+            "source_paths": [
+              "faststream/_internal/broker/broker.py"
+            ]
           },
           {
             "id": "existing-verifier-visible",
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
-            "value": "tests/brokers/base/connection.py"
+            "value": "tests/brokers/base/connection.py",
+            "source_paths": [
+              "tests/brokers/base/connection.py"
+            ],
+            "support": "supported"
           }
         ],
         "initial_checks": [
@@ -2688,7 +3410,10 @@
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
             "support": "supported",
-            "value": "faststream/_internal/broker/broker.py"
+            "value": "faststream/_internal/broker/broker.py",
+            "source_paths": [
+              "faststream/_internal/broker/broker.py"
+            ]
           },
           {
             "alternative_records": [
@@ -2738,7 +3463,20 @@
               "path": "faststream/_internal/broker/broker.py",
               "start_line": 123,
               "symbol": "BrokerUsecase.stop"
-            }
+            },
+            "source_paths": [
+              "faststream/_internal/broker/broker.py"
+            ]
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/brokers/base/connection.py",
+            "source_paths": [
+              "tests/brokers/base/connection.py"
+            ],
+            "support": "supported"
           }
         ],
         "owner_oracle": {
@@ -2774,10 +3512,9 @@
       ],
       "expected_owner_path": "faststream/_internal/broker/broker.py",
       "review": {
-        "basis": "inspected pinned upstream source diffs and existing exact range labels; not Hashmarks output",
-        "oracle_digest": "sha256:4ae28e64403c593f928b8bc0dd7c066596a85f2a041df9ff37c655cc14f249eb",
+        "basis": "inspected pinned upstream source diffs, exact declaration labels and selected test bodies; not Hashmarks output",
+        "oracle_digest": "sha256:071e215405dde6ee63f8b99a6abe7c4d5507ceb058f00bd04fee8eb58b53ca65",
         "pending": [
-          "independent test correspondence",
           "display facts",
           "capability-specific adversarial proof"
         ],
@@ -2785,7 +3522,8 @@
         "scope": [
           "file-owner",
           "changed-symbol",
-          "behavior-task"
+          "behavior-task",
+          "test-file-relevance"
         ],
         "source_identities": {
           "after": "sha256:fbb4698f06e9a43b109b40eccda48982e914194fb5d1e996cdf210bd7b4b7b47:2285",
@@ -2802,6 +3540,14 @@
             "sha256": "dfab2da33ed7e26c910782b608c80f94bd8e497bcfe39f5f07e9bcfe4230eb3d",
             "start_line": 126,
             "symbol": "BrokerUsecase.stop"
+          },
+          {
+            "path": "tests/brokers/test_stop.py",
+            "symbol": "test_failing_subscriber_does_not_prevent_others_from_stopping",
+            "start_line": 79,
+            "end_line": 92,
+            "declaration_line": 80,
+            "sha256": "e0d8ee2f355a281e28c510182e4051f998fa57dab0fd8e5dc07c4efdf0c4fd64"
           }
         ],
         "before": [
@@ -2812,8 +3558,46 @@
             "sha256": "6663830e7a1b1f3ecf831cd66614b6f7f7f3fc31a167583e2e91db303dc6896f",
             "start_line": 123,
             "symbol": "BrokerUsecase.stop"
+          },
+          {
+            "path": "tests/brokers/base/connection.py",
+            "symbol": "BrokerConnectionTestcase.test_stop_before_start",
+            "start_line": 17,
+            "end_line": 22,
+            "declaration_line": 18,
+            "sha256": "bfb3ba2117d715ad1b36cec032e3346624429d2d980de6d248c1bdb02349f868"
           }
         ]
+      },
+      "verification_oracles": {
+        "before": {
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "path": "tests/brokers/base/connection.py",
+            "symbol": "BrokerConnectionTestcase.test_stop_before_start",
+            "start_line": 17,
+            "end_line": 22,
+            "declaration_line": 18,
+            "sha256": "bfb3ba2117d715ad1b36cec032e3346624429d2d980de6d248c1bdb02349f868"
+          },
+          "basis": "inspected pinned test declaration and source diff; relevance candidate, not a claim of sufficient regression coverage",
+          "runtime_coverage": "not-established",
+          "verification_execution": "not-observed"
+        },
+        "after": {
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "path": "tests/brokers/test_stop.py",
+            "symbol": "test_failing_subscriber_does_not_prevent_others_from_stopping",
+            "start_line": 79,
+            "end_line": 92,
+            "declaration_line": 80,
+            "sha256": "e0d8ee2f355a281e28c510182e4051f998fa57dab0fd8e5dc07c4efdf0c4fd64"
+          },
+          "basis": "inspected pinned test declaration and source diff; relevance candidate, not a claim of sufficient regression coverage",
+          "runtime_coverage": "not-established",
+          "verification_execution": "not-observed"
+        }
       }
     },
     "sqlalchemy-aggregate-strings": {
@@ -2833,7 +3617,10 @@
             "id": "source-owner-visible",
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
-            "value": "lib/sqlalchemy/sql/compiler.py"
+            "value": "lib/sqlalchemy/sql/compiler.py",
+            "source_paths": [
+              "lib/sqlalchemy/sql/compiler.py"
+            ]
           },
           {
             "alternative_records": [
@@ -2882,13 +3669,20 @@
               "path": "lib/sqlalchemy/sql/compiler.py",
               "start_line": 3139,
               "symbol": "SQLCompiler.visit_aggregate_strings_func"
-            }
+            },
+            "source_paths": [
+              "lib/sqlalchemy/sql/compiler.py"
+            ]
           },
           {
             "id": "existing-verifier-visible",
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
-            "value": "test/sql/test_functions.py"
+            "value": "test/sql/test_functions.py",
+            "source_paths": [
+              "test/sql/test_functions.py"
+            ],
+            "support": "supported"
           }
         ],
         "initial_checks": [
@@ -2897,7 +3691,10 @@
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
             "support": "supported",
-            "value": "lib/sqlalchemy/sql/compiler.py"
+            "value": "lib/sqlalchemy/sql/compiler.py",
+            "source_paths": [
+              "lib/sqlalchemy/sql/compiler.py"
+            ]
           },
           {
             "alternative_records": [
@@ -2947,7 +3744,20 @@
               "path": "lib/sqlalchemy/sql/compiler.py",
               "start_line": 3139,
               "symbol": "SQLCompiler.visit_aggregate_strings_func"
-            }
+            },
+            "source_paths": [
+              "lib/sqlalchemy/sql/compiler.py"
+            ]
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "test/sql/test_functions.py",
+            "source_paths": [
+              "test/sql/test_functions.py"
+            ],
+            "support": "supported"
           }
         ],
         "owner_oracle": {
@@ -2976,7 +3786,10 @@
             "id": "source-owner-visible",
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
-            "value": "lib/sqlalchemy/sql/compiler.py"
+            "value": "lib/sqlalchemy/sql/compiler.py",
+            "source_paths": [
+              "lib/sqlalchemy/sql/compiler.py"
+            ]
           },
           {
             "alternative_records": [
@@ -3025,13 +3838,20 @@
               "path": "lib/sqlalchemy/sql/compiler.py",
               "start_line": 3139,
               "symbol": "SQLCompiler.visit_aggregate_strings_func"
-            }
+            },
+            "source_paths": [
+              "lib/sqlalchemy/sql/compiler.py"
+            ]
           },
           {
             "id": "existing-verifier-visible",
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
-            "value": "test/sql/test_functions.py"
+            "value": "test/sql/test_functions.py",
+            "source_paths": [
+              "test/sql/test_functions.py"
+            ],
+            "support": "supported"
           }
         ],
         "initial_checks": [
@@ -3040,7 +3860,10 @@
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
             "support": "supported",
-            "value": "lib/sqlalchemy/sql/compiler.py"
+            "value": "lib/sqlalchemy/sql/compiler.py",
+            "source_paths": [
+              "lib/sqlalchemy/sql/compiler.py"
+            ]
           },
           {
             "alternative_records": [
@@ -3090,7 +3913,20 @@
               "path": "lib/sqlalchemy/sql/compiler.py",
               "start_line": 3139,
               "symbol": "SQLCompiler.visit_aggregate_strings_func"
-            }
+            },
+            "source_paths": [
+              "lib/sqlalchemy/sql/compiler.py"
+            ]
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "test/sql/test_functions.py",
+            "source_paths": [
+              "test/sql/test_functions.py"
+            ],
+            "support": "supported"
           }
         ],
         "owner_oracle": {
@@ -3126,10 +3962,9 @@
       ],
       "expected_owner_path": "lib/sqlalchemy/sql/compiler.py",
       "review": {
-        "basis": "inspected pinned upstream source diffs and existing exact range labels; not Hashmarks output",
-        "oracle_digest": "sha256:015d136aabf643bfa23588d344087824d219ec6471c377b127b2ce541306c982",
+        "basis": "inspected pinned upstream source diffs, exact declaration labels and selected test bodies; not Hashmarks output",
+        "oracle_digest": "sha256:d7a9021fd0990bf5f29fe046f729b3bc2fd6efdd7a879ebd0f23f20c32f2175f",
         "pending": [
-          "independent test correspondence",
           "display facts",
           "capability-specific adversarial proof"
         ],
@@ -3137,7 +3972,8 @@
         "scope": [
           "file-owner",
           "changed-symbol",
-          "behavior-task"
+          "behavior-task",
+          "test-file-relevance"
         ],
         "source_identities": {
           "after": "sha256:e0ec8b716941649c4379690070fc9de0b93841ac08aa48125f56b80ba49ac978:923",
@@ -3154,6 +3990,14 @@
             "sha256": "644092820439ff821e884f9848b69da59805f280946122d2cef928500677bcb6",
             "start_line": 3139,
             "symbol": "SQLCompiler.visit_aggregate_strings_func"
+          },
+          {
+            "path": "test/sql/test_functions.py",
+            "symbol": "CompileTest.test_aggregate_strings_default_dialect_raises",
+            "start_line": 344,
+            "end_line": 356,
+            "declaration_line": 345,
+            "sha256": "16bc6e50715965ecf64ce762e52ee031cfc26b014efa14476edc2c5dd452b7b3"
           }
         ],
         "before": [
@@ -3164,8 +4008,46 @@
             "sha256": "50ddb98d3e3aed4a0c55c738050e8e0755c936de698ab481a0c57fdb31df649e",
             "start_line": 3139,
             "symbol": "SQLCompiler.visit_aggregate_strings_func"
+          },
+          {
+            "path": "test/sql/test_functions.py",
+            "symbol": "CompileTest.test_aggregate_strings",
+            "start_line": 237,
+            "end_line": 268,
+            "declaration_line": 262,
+            "sha256": "e3b3ef80542b5d5ccae59d5bda0fabbf258862736bc38c7f7df239eaa3f82f26"
           }
         ]
+      },
+      "verification_oracles": {
+        "before": {
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "path": "test/sql/test_functions.py",
+            "symbol": "CompileTest.test_aggregate_strings",
+            "start_line": 237,
+            "end_line": 268,
+            "declaration_line": 262,
+            "sha256": "e3b3ef80542b5d5ccae59d5bda0fabbf258862736bc38c7f7df239eaa3f82f26"
+          },
+          "basis": "inspected pinned test declaration and source diff; relevance candidate, not a claim of sufficient regression coverage",
+          "runtime_coverage": "not-established",
+          "verification_execution": "not-observed"
+        },
+        "after": {
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "path": "test/sql/test_functions.py",
+            "symbol": "CompileTest.test_aggregate_strings_default_dialect_raises",
+            "start_line": 344,
+            "end_line": 356,
+            "declaration_line": 345,
+            "sha256": "16bc6e50715965ecf64ce762e52ee031cfc26b014efa14476edc2c5dd452b7b3"
+          },
+          "basis": "inspected pinned test declaration and source diff; relevance candidate, not a claim of sufficient regression coverage",
+          "runtime_coverage": "not-established",
+          "verification_execution": "not-observed"
+        }
       }
     },
     "sqlalchemy-failed-begin": {
@@ -3185,7 +4067,10 @@
             "id": "source-owner-visible",
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
-            "value": "lib/sqlalchemy/dialects/postgresql/asyncpg.py"
+            "value": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+            "source_paths": [
+              "lib/sqlalchemy/dialects/postgresql/asyncpg.py"
+            ]
           },
           {
             "alternative_records": [
@@ -3234,13 +4119,20 @@
               "path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
               "start_line": 883,
               "symbol": "AsyncAdapt_asyncpg_connection._start_transaction"
-            }
+            },
+            "source_paths": [
+              "lib/sqlalchemy/dialects/postgresql/asyncpg.py"
+            ]
           },
           {
             "id": "existing-verifier-visible",
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
-            "value": "test/dialect/postgresql/test_async_pg.py"
+            "value": "test/dialect/postgresql/test_async_pg.py",
+            "source_paths": [
+              "test/dialect/postgresql/test_async_pg.py"
+            ],
+            "support": "supported"
           }
         ],
         "initial_checks": [
@@ -3249,7 +4141,10 @@
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
             "support": "supported",
-            "value": "lib/sqlalchemy/dialects/postgresql/asyncpg.py"
+            "value": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+            "source_paths": [
+              "lib/sqlalchemy/dialects/postgresql/asyncpg.py"
+            ]
           },
           {
             "alternative_records": [
@@ -3299,7 +4194,20 @@
               "path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
               "start_line": 883,
               "symbol": "AsyncAdapt_asyncpg_connection._start_transaction"
-            }
+            },
+            "source_paths": [
+              "lib/sqlalchemy/dialects/postgresql/asyncpg.py"
+            ]
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "test/dialect/postgresql/test_async_pg.py",
+            "source_paths": [
+              "test/dialect/postgresql/test_async_pg.py"
+            ],
+            "support": "supported"
           }
         ],
         "owner_oracle": {
@@ -3328,7 +4236,10 @@
             "id": "source-owner-visible",
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
-            "value": "lib/sqlalchemy/dialects/postgresql/asyncpg.py"
+            "value": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+            "source_paths": [
+              "lib/sqlalchemy/dialects/postgresql/asyncpg.py"
+            ]
           },
           {
             "alternative_records": [
@@ -3377,13 +4288,20 @@
               "path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
               "start_line": 883,
               "symbol": "AsyncAdapt_asyncpg_connection._start_transaction"
-            }
+            },
+            "source_paths": [
+              "lib/sqlalchemy/dialects/postgresql/asyncpg.py"
+            ]
           },
           {
             "id": "existing-verifier-visible",
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
-            "value": "test/dialect/postgresql/test_async_pg.py"
+            "value": "test/dialect/postgresql/test_async_pg.py",
+            "source_paths": [
+              "test/dialect/postgresql/test_async_pg.py"
+            ],
+            "support": "supported"
           }
         ],
         "initial_checks": [
@@ -3392,7 +4310,10 @@
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
             "support": "supported",
-            "value": "lib/sqlalchemy/dialects/postgresql/asyncpg.py"
+            "value": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+            "source_paths": [
+              "lib/sqlalchemy/dialects/postgresql/asyncpg.py"
+            ]
           },
           {
             "alternative_records": [
@@ -3442,7 +4363,20 @@
               "path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
               "start_line": 883,
               "symbol": "AsyncAdapt_asyncpg_connection._start_transaction"
-            }
+            },
+            "source_paths": [
+              "lib/sqlalchemy/dialects/postgresql/asyncpg.py"
+            ]
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "test/dialect/postgresql/test_async_pg.py",
+            "source_paths": [
+              "test/dialect/postgresql/test_async_pg.py"
+            ],
+            "support": "supported"
           }
         ],
         "owner_oracle": {
@@ -3478,10 +4412,9 @@
       ],
       "expected_owner_path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
       "review": {
-        "basis": "inspected pinned upstream source diffs and existing exact range labels; not Hashmarks output",
-        "oracle_digest": "sha256:78c34f73b15fba7df6272df7d768fc3c0e34c1627110bec6f22bbc290e9c6e4e",
+        "basis": "inspected pinned upstream source diffs, exact declaration labels and selected test bodies; not Hashmarks output",
+        "oracle_digest": "sha256:8e0721f8d0988fb33ec9bb2c8ee7419557bd83ee2dd1ae15acc1ff886740489d",
         "pending": [
-          "independent test correspondence",
           "display facts",
           "capability-specific adversarial proof"
         ],
@@ -3489,7 +4422,8 @@
         "scope": [
           "file-owner",
           "changed-symbol",
-          "behavior-task"
+          "behavior-task",
+          "test-file-relevance"
         ],
         "source_identities": {
           "after": "sha256:dbe3e36fcd75721616a05afb9eb79e29cf8da22cd2c9f7ef1c0f80746620eb78:929",
@@ -3506,6 +4440,14 @@
             "sha256": "9d879eca5f9578a6a79f7231fc3082c3750538de47ccce60e3dd20b112165426",
             "start_line": 883,
             "symbol": "AsyncAdapt_asyncpg_connection._start_transaction"
+          },
+          {
+            "path": "test/dialect/postgresql/test_async_pg.py",
+            "symbol": "AsyncPgTest.test_failed_begin_recover",
+            "start_line": 360,
+            "end_line": 399,
+            "declaration_line": 361,
+            "sha256": "7e3e3b0267f2cedaa930ee14f7433c000edc4963ac998b8213a3cc4b87fc8b4c"
           }
         ],
         "before": [
@@ -3516,8 +4458,46 @@
             "sha256": "3f0ed2fed9d4c330936df231595003a442f6cb05c646e5bb512e35d244ccc9f1",
             "start_line": 883,
             "symbol": "AsyncAdapt_asyncpg_connection._start_transaction"
+          },
+          {
+            "path": "test/dialect/postgresql/test_async_pg.py",
+            "symbol": "AsyncPgTest.test_failed_rollback_recover",
+            "start_line": 334,
+            "end_line": 357,
+            "declaration_line": 335,
+            "sha256": "72f4a2177b1b776956867e97d44ce34c0d209ec2437262381fefddf06292987c"
           }
         ]
+      },
+      "verification_oracles": {
+        "before": {
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "path": "test/dialect/postgresql/test_async_pg.py",
+            "symbol": "AsyncPgTest.test_failed_rollback_recover",
+            "start_line": 334,
+            "end_line": 357,
+            "declaration_line": 335,
+            "sha256": "72f4a2177b1b776956867e97d44ce34c0d209ec2437262381fefddf06292987c"
+          },
+          "basis": "inspected pinned test declaration and source diff; relevance candidate, not a claim of sufficient regression coverage",
+          "runtime_coverage": "not-established",
+          "verification_execution": "not-observed"
+        },
+        "after": {
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "path": "test/dialect/postgresql/test_async_pg.py",
+            "symbol": "AsyncPgTest.test_failed_begin_recover",
+            "start_line": 360,
+            "end_line": 399,
+            "declaration_line": 361,
+            "sha256": "7e3e3b0267f2cedaa930ee14f7433c000edc4963ac998b8213a3cc4b87fc8b4c"
+          },
+          "basis": "inspected pinned test declaration and source diff; relevance candidate, not a claim of sufficient regression coverage",
+          "runtime_coverage": "not-established",
+          "verification_execution": "not-observed"
+        }
       }
     },
     "sqlalchemy-logging-token-reset": {
@@ -3537,7 +4517,10 @@
             "id": "source-owner-visible",
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
-            "value": "lib/sqlalchemy/engine/characteristics.py"
+            "value": "lib/sqlalchemy/engine/characteristics.py",
+            "source_paths": [
+              "lib/sqlalchemy/engine/characteristics.py"
+            ]
           },
           {
             "alternative_records": [
@@ -3586,13 +4569,20 @@
               "path": "lib/sqlalchemy/engine/characteristics.py",
               "start_line": 135,
               "symbol": "LoggingTokenCharacteristic.set_connection_characteristic"
-            }
+            },
+            "source_paths": [
+              "lib/sqlalchemy/engine/characteristics.py"
+            ]
           },
           {
             "id": "existing-verifier-visible",
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
-            "value": "test/engine/test_logging.py"
+            "value": "test/engine/test_logging.py",
+            "source_paths": [
+              "test/engine/test_logging.py"
+            ],
+            "support": "supported"
           }
         ],
         "initial_checks": [
@@ -3601,7 +4591,10 @@
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
             "support": "supported",
-            "value": "lib/sqlalchemy/engine/characteristics.py"
+            "value": "lib/sqlalchemy/engine/characteristics.py",
+            "source_paths": [
+              "lib/sqlalchemy/engine/characteristics.py"
+            ]
           },
           {
             "alternative_records": [
@@ -3651,7 +4644,20 @@
               "path": "lib/sqlalchemy/engine/characteristics.py",
               "start_line": 135,
               "symbol": "LoggingTokenCharacteristic.set_connection_characteristic"
-            }
+            },
+            "source_paths": [
+              "lib/sqlalchemy/engine/characteristics.py"
+            ]
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "test/engine/test_logging.py",
+            "source_paths": [
+              "test/engine/test_logging.py"
+            ],
+            "support": "supported"
           }
         ],
         "owner_oracle": {
@@ -3680,7 +4686,10 @@
             "id": "source-owner-visible",
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
-            "value": "lib/sqlalchemy/engine/characteristics.py"
+            "value": "lib/sqlalchemy/engine/characteristics.py",
+            "source_paths": [
+              "lib/sqlalchemy/engine/characteristics.py"
+            ]
           },
           {
             "alternative_records": [
@@ -3729,13 +4738,20 @@
               "path": "lib/sqlalchemy/engine/characteristics.py",
               "start_line": 135,
               "symbol": "LoggingTokenCharacteristic.set_connection_characteristic"
-            }
+            },
+            "source_paths": [
+              "lib/sqlalchemy/engine/characteristics.py"
+            ]
           },
           {
             "id": "existing-verifier-visible",
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
-            "value": "test/engine/test_logging.py"
+            "value": "test/engine/test_logging.py",
+            "source_paths": [
+              "test/engine/test_logging.py"
+            ],
+            "support": "supported"
           }
         ],
         "initial_checks": [
@@ -3744,7 +4760,10 @@
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
             "support": "supported",
-            "value": "lib/sqlalchemy/engine/characteristics.py"
+            "value": "lib/sqlalchemy/engine/characteristics.py",
+            "source_paths": [
+              "lib/sqlalchemy/engine/characteristics.py"
+            ]
           },
           {
             "alternative_records": [
@@ -3794,7 +4813,20 @@
               "path": "lib/sqlalchemy/engine/characteristics.py",
               "start_line": 135,
               "symbol": "LoggingTokenCharacteristic.set_connection_characteristic"
-            }
+            },
+            "source_paths": [
+              "lib/sqlalchemy/engine/characteristics.py"
+            ]
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "test/engine/test_logging.py",
+            "source_paths": [
+              "test/engine/test_logging.py"
+            ],
+            "support": "supported"
           }
         ],
         "owner_oracle": {
@@ -3830,10 +4862,9 @@
       ],
       "expected_owner_path": "lib/sqlalchemy/engine/characteristics.py",
       "review": {
-        "basis": "inspected pinned upstream source diffs and existing exact range labels; not Hashmarks output",
-        "oracle_digest": "sha256:339c18909a8ca436db6b88a31281c74dba46250b0bba6e509e5bdd33011290bb",
+        "basis": "inspected pinned upstream source diffs, exact declaration labels and selected test bodies; not Hashmarks output",
+        "oracle_digest": "sha256:2abc8b15f8a6fdf1302cc41fe00c5d772ea9ea9dda5032fb721f0d33d0a92dc8",
         "pending": [
-          "independent test correspondence",
           "display facts",
           "capability-specific adversarial proof"
         ],
@@ -3841,7 +4872,8 @@
         "scope": [
           "file-owner",
           "changed-symbol",
-          "behavior-task"
+          "behavior-task",
+          "test-file-relevance"
         ],
         "source_identities": {
           "after": "sha256:340c2f8a1c08796a6c52cdc243502a771c8a96043c2a0af2a57b97f7f8ab8e14:923",
@@ -3858,6 +4890,14 @@
             "sha256": "bfc5332ec1b9c0bc3fc20113ea197c226feeffc465ce7aedaf1a6da35a132a90",
             "start_line": 135,
             "symbol": "LoggingTokenCharacteristic.set_connection_characteristic"
+          },
+          {
+            "path": "test/engine/test_logging.py",
+            "symbol": "LoggingTokenTest.test_logging_token_reset_twice",
+            "start_line": 1046,
+            "end_line": 1060,
+            "declaration_line": 1046,
+            "sha256": "800e1d73da74505b8c0b534c66c21148555f7479d2f9c4564f1e1383f1336185"
           }
         ],
         "before": [
@@ -3868,8 +4908,46 @@
             "sha256": "f23c689b9ea0ca125387df581f7b40bb3092b6c84462c64b1133e16a12ec2a70",
             "start_line": 135,
             "symbol": "LoggingTokenCharacteristic.set_connection_characteristic"
+          },
+          {
+            "path": "test/engine/test_logging.py",
+            "symbol": "LoggingTokenTest.test_logging_token_option_connection_updates",
+            "start_line": 1006,
+            "end_line": 1023,
+            "declaration_line": 1006,
+            "sha256": "6899edc0779e0376de1bc1474254f139afd6029a10c9a6871367b97226fb3aac"
           }
         ]
+      },
+      "verification_oracles": {
+        "before": {
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "path": "test/engine/test_logging.py",
+            "symbol": "LoggingTokenTest.test_logging_token_option_connection_updates",
+            "start_line": 1006,
+            "end_line": 1023,
+            "declaration_line": 1006,
+            "sha256": "6899edc0779e0376de1bc1474254f139afd6029a10c9a6871367b97226fb3aac"
+          },
+          "basis": "inspected pinned test declaration and source diff; relevance candidate, not a claim of sufficient regression coverage",
+          "runtime_coverage": "not-established",
+          "verification_execution": "not-observed"
+        },
+        "after": {
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "path": "test/engine/test_logging.py",
+            "symbol": "LoggingTokenTest.test_logging_token_reset_twice",
+            "start_line": 1046,
+            "end_line": 1060,
+            "declaration_line": 1046,
+            "sha256": "800e1d73da74505b8c0b534c66c21148555f7479d2f9c4564f1e1383f1336185"
+          },
+          "basis": "inspected pinned test declaration and source diff; relevance candidate, not a claim of sufficient regression coverage",
+          "runtime_coverage": "not-established",
+          "verification_execution": "not-observed"
+        }
       }
     },
     "sqlalchemy-pickle-extra-criteria": {
@@ -3889,7 +4967,10 @@
             "id": "source-owner-visible",
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
-            "value": "lib/sqlalchemy/orm/strategies.py"
+            "value": "lib/sqlalchemy/orm/strategies.py",
+            "source_paths": [
+              "lib/sqlalchemy/orm/strategies.py"
+            ]
           },
           {
             "alternative_records": [
@@ -3938,13 +5019,20 @@
               "path": "lib/sqlalchemy/orm/strategies.py",
               "start_line": 1194,
               "symbol": "_LazyLoader.create_row_processor"
-            }
+            },
+            "source_paths": [
+              "lib/sqlalchemy/orm/strategies.py"
+            ]
           },
           {
             "id": "existing-verifier-visible",
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
-            "value": "test/orm/test_pickled.py"
+            "value": "test/orm/test_pickled.py",
+            "source_paths": [
+              "test/orm/test_pickled.py"
+            ],
+            "support": "supported"
           }
         ],
         "initial_checks": [
@@ -3953,7 +5041,10 @@
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
             "support": "supported",
-            "value": "lib/sqlalchemy/orm/strategies.py"
+            "value": "lib/sqlalchemy/orm/strategies.py",
+            "source_paths": [
+              "lib/sqlalchemy/orm/strategies.py"
+            ]
           },
           {
             "alternative_records": [
@@ -4003,7 +5094,20 @@
               "path": "lib/sqlalchemy/orm/strategies.py",
               "start_line": 1194,
               "symbol": "_LazyLoader.create_row_processor"
-            }
+            },
+            "source_paths": [
+              "lib/sqlalchemy/orm/strategies.py"
+            ]
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "test/orm/test_pickled.py",
+            "source_paths": [
+              "test/orm/test_pickled.py"
+            ],
+            "support": "supported"
           }
         ],
         "owner_oracle": {
@@ -4032,7 +5136,10 @@
             "id": "source-owner-visible",
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
-            "value": "lib/sqlalchemy/orm/strategies.py"
+            "value": "lib/sqlalchemy/orm/strategies.py",
+            "source_paths": [
+              "lib/sqlalchemy/orm/strategies.py"
+            ]
           },
           {
             "alternative_records": [
@@ -4081,13 +5188,20 @@
               "path": "lib/sqlalchemy/orm/strategies.py",
               "start_line": 1187,
               "symbol": "_LazyLoader.create_row_processor"
-            }
+            },
+            "source_paths": [
+              "lib/sqlalchemy/orm/strategies.py"
+            ]
           },
           {
             "id": "existing-verifier-visible",
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
-            "value": "test/orm/test_pickled.py"
+            "value": "test/orm/test_pickled.py",
+            "source_paths": [
+              "test/orm/test_pickled.py"
+            ],
+            "support": "supported"
           }
         ],
         "initial_checks": [
@@ -4096,7 +5210,10 @@
             "pointer": "/retrieval/results/*/path",
             "predicate": "includes",
             "support": "supported",
-            "value": "lib/sqlalchemy/orm/strategies.py"
+            "value": "lib/sqlalchemy/orm/strategies.py",
+            "source_paths": [
+              "lib/sqlalchemy/orm/strategies.py"
+            ]
           },
           {
             "alternative_records": [
@@ -4146,7 +5263,20 @@
               "path": "lib/sqlalchemy/orm/strategies.py",
               "start_line": 1187,
               "symbol": "_LazyLoader.create_row_processor"
-            }
+            },
+            "source_paths": [
+              "lib/sqlalchemy/orm/strategies.py"
+            ]
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "test/orm/test_pickled.py",
+            "source_paths": [
+              "test/orm/test_pickled.py"
+            ],
+            "support": "supported"
           }
         ],
         "owner_oracle": {
@@ -4182,10 +5312,9 @@
       ],
       "expected_owner_path": "lib/sqlalchemy/orm/strategies.py",
       "review": {
-        "basis": "inspected pinned upstream source diffs and existing exact range labels; not Hashmarks output",
-        "oracle_digest": "sha256:66f4655cff7478f27d7e65f9b3e165c3f5bdb68fe2fd167c690016495ba25b4f",
+        "basis": "inspected pinned upstream source diffs, exact declaration labels and selected test bodies; not Hashmarks output",
+        "oracle_digest": "sha256:e49ddd5079710facbe78e4451dc6c796be039d6a086032bb2e779740676473f6",
         "pending": [
-          "independent test correspondence",
           "display facts",
           "capability-specific adversarial proof"
         ],
@@ -4193,7 +5322,8 @@
         "scope": [
           "file-owner",
           "changed-symbol",
-          "behavior-task"
+          "behavior-task",
+          "test-file-relevance"
         ],
         "source_identities": {
           "after": "sha256:09f8d78aef036f22df52323dd004dd8a606853921385c5972dda43290f395cd3:923",
@@ -4210,6 +5340,14 @@
             "sha256": "c688fbfa864b040018ae3df3a70d0517a68884625584535f7affc5d38caa15f8",
             "start_line": 1194,
             "symbol": "_LazyLoader.create_row_processor"
+          },
+          {
+            "path": "test/orm/test_pickled.py",
+            "symbol": "PickleTest.test_instance_lazy_loader_repeated_pickle",
+            "start_line": 278,
+            "end_line": 390,
+            "declaration_line": 288,
+            "sha256": "e1ba63fcc5184f9816ead9434f861f8a75a983950c4509e440079808e41a36fc"
           }
         ],
         "before": [
@@ -4220,8 +5358,46 @@
             "sha256": "38e9b96ca348ff6cc3d455d5b113108a016fe4ebb1d96945b7f9378e1e8369ab",
             "start_line": 1187,
             "symbol": "_LazyLoader.create_row_processor"
+          },
+          {
+            "path": "test/orm/test_pickled.py",
+            "symbol": "PickleTest.test_instance_lazy_relation_loaders",
+            "start_line": 251,
+            "end_line": 273,
+            "declaration_line": 251,
+            "sha256": "95fd28008513b6d9a462b842ae07b5a06b36c3a50b18b2fc87aa9f6ebc670011"
           }
         ]
+      },
+      "verification_oracles": {
+        "before": {
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "path": "test/orm/test_pickled.py",
+            "symbol": "PickleTest.test_instance_lazy_relation_loaders",
+            "start_line": 251,
+            "end_line": 273,
+            "declaration_line": 251,
+            "sha256": "95fd28008513b6d9a462b842ae07b5a06b36c3a50b18b2fc87aa9f6ebc670011"
+          },
+          "basis": "inspected pinned test declaration and source diff; relevance candidate, not a claim of sufficient regression coverage",
+          "runtime_coverage": "not-established",
+          "verification_execution": "not-observed"
+        },
+        "after": {
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "path": "test/orm/test_pickled.py",
+            "symbol": "PickleTest.test_instance_lazy_loader_repeated_pickle",
+            "start_line": 278,
+            "end_line": 390,
+            "declaration_line": 288,
+            "sha256": "e1ba63fcc5184f9816ead9434f861f8a75a983950c4509e440079808e41a36fc"
+          },
+          "basis": "inspected pinned test declaration and source diff; relevance candidate, not a claim of sufficient regression coverage",
+          "runtime_coverage": "not-established",
+          "verification_execution": "not-observed"
+        }
       }
     }
   },

@@ -6,6 +6,8 @@ import argparse
 import hashlib
 import json
 import sys
+import uuid
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +17,7 @@ from .backend_native import (
     capture_artifact_digests,
     prepare_capture,
     qualify_native_workflow,
+    record_capture_acquisition,
 )
 from .common import canonical_sha256, evaluator_implementation_identity, write_json
 from .run_backend import _check_implementation, _observer_identity
@@ -68,6 +71,9 @@ def run_native(
         options.transports
     ) - {"cli", "mcp"}:
         raise ValueError("native transports must be distinct CLI/MCP selections")
+    options = replace(
+        options, acquisition_id=uuid.uuid4().hex if options.regenerated else None
+    )
     identity = {
         "suite": canonical_sha256(suite),
         "grader": canonical_sha256(grader),
@@ -75,6 +81,7 @@ def run_native(
         "evaluator": evaluator_implementation_identity(),
         "transports": options.transports,
         "regenerate": options.regenerated,
+        "acquisition_id": options.acquisition_id,
         "source_identities": {
             name: definition["content_identity"]
             for name, definition in suite["sources"].items()
@@ -102,6 +109,10 @@ def run_native(
                     sources[workflow[stage]],
                     suite["sources"][workflow[stage]],
                     destination,
+                )
+                assert options.acquisition_id is not None
+                record_capture_acquisition(
+                    destination, workflow["id"], stage, options.acquisition_id
                 )
         outcome = qualify_native_workflow(
             workflow,
@@ -135,7 +146,7 @@ def run_native(
         else "PASS"
     )
     report = {
-        "schema": "hashmarks.backend-native-specimen-measurement.v3",
+        "schema": "hashmarks.backend-native-specimen-measurement.v4",
         "status": status,
         "identity": identity,
         "outcomes": outcomes,

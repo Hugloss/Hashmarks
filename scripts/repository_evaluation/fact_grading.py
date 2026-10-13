@@ -176,6 +176,7 @@ def _check(packet: object, rule: Mapping[str, Any]) -> dict[str, object]:
         if predicates[predicate]()
         else "FAIL"
         if any(record_values for _, _, record_values in records)
+        or (rule.get("support") == "supported" and predicate != "excludes")
         else "INCOMPLETE",
         "authority_check": rule.get("authority_check") is True,
     }

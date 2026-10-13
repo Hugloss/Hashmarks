@@ -92,3 +92,39 @@ def test_capture_grade_cannot_disagree_with_actual_wire(mutation):
         capture["response"] = {"value": True}
     with pytest.raises(ValueError, match="differs from visible bytes"):
         validate_transport_capture(capture)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("stage", "unknown"),
+        ("surface", "summary"),
+        ("format", "html"),
+        ("oracle_pointer", "not-a-pointer"),
+        ("artifact", ("../escape.json", b"{}")),
+        (
+            "source_bindings",
+            ({"repository": "repo", "path": "../escape.py", "revision": "r"},),
+        ),
+    ],
+)
+def test_witness_context_and_references_fail_closed(observation, field, value):
+    with pytest.raises(ValueError, match="witness"):
+        replace(observation, **{field: value})
+
+
+def test_owner_binding_cannot_qualify_a_missing_test_source(observation):
+    rule = {
+        "checks": [
+            {
+                "id": "test",
+                "pointer": "/value",
+                "predicate": "equals",
+                "value": 1,
+                "source_paths": ["test_owner.py"],
+            }
+        ]
+    }
+    result = grade_fact_observation({"value": 1}, rule, observation)
+    assert result["gate"] is None
+    assert result["witnesses"][0]["source_bindings"] == []

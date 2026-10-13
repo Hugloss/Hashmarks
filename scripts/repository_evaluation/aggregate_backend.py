@@ -23,12 +23,13 @@ from .backend_native import (
     _transport,
     capture_artifact_digests,
     validate_capture,
+    validate_capture_acquisition,
 )
 from .common import canonical_sha256, load_json, write_json
 from .run_backend import _check_implementation, _verify_artifacts
 
-CAMPAIGN_SCHEMA = "hashmarks.backend-evidence-campaign.v2"
-NATIVE_SCHEMA = "hashmarks.backend-native-specimen-measurement.v3"
+CAMPAIGN_SCHEMA = "hashmarks.backend-evidence-campaign.v3"
+NATIVE_SCHEMA = "hashmarks.backend-native-specimen-measurement.v4"
 NATIVE_GATES = (
     "before_definition_token",
     "before_binding",
@@ -171,6 +172,9 @@ def _native_results(
             outcomes[workflow["id"]],
             (report_path.parent, Path(selection["capture_root"]).resolve()),
             (suite["sources"], sources),
+            acquisition_id=report["identity"].get("acquisition_id")
+            if report["identity"].get("regenerate") is True
+            else None,
         )
     return outcomes
 
@@ -181,6 +185,8 @@ def _verify_native_outcome(
     outcome: dict[str, Any],
     roots: tuple[Path, Path],
     inputs: tuple[dict[str, Any], dict[str, Path]],
+    *,
+    acquisition_id: str | None = None,
 ) -> None:
     report_root, capture_root = roots
     definitions, sources = inputs
@@ -235,6 +241,39 @@ def _verify_native_outcome(
     if outcome["capture_identity"] != "sha256:" + canonical_sha256(metadata):
         raise ValueError("backend native capture identity mismatch")
     _regrade_native_observations(workflow, rule, outcome, roots, inputs)
+    _verify_native_acquisition(outcome, capture_root / workflow["id"], acquisition_id)
+
+
+def _verify_native_acquisition(
+    outcome: dict[str, Any], capture: Path, acquisition_id: str | None
+) -> None:
+    fresh = (
+        combine_required(
+            validate_capture_acquisition(
+                capture / stage, outcome["id"], stage, acquisition_id
+            )
+            for stage in ("before", "after")
+        )
+        if acquisition_id is not None
+        else None
+    )
+    if outcome.get("fresh_acquisition") is not fresh:
+        raise ValueError(
+            "backend native fresh acquisition differs from invocation proof"
+        )
+    if outcome.get("acquisition_id") != acquisition_id:
+        raise ValueError("backend native acquisition identity differs from report")
+    expected_mode = (
+        "capture-replay"
+        if acquisition_id is None
+        else (
+            "fresh-this-invocation"
+            if fresh is True
+            else "fresh-acquisition-unqualified"
+        )
+    )
+    if outcome.get("capture_mode") != expected_mode:
+        raise ValueError("backend native capture mode differs from acquisition proof")
 
 
 def _regrade_native_observations(
@@ -405,15 +444,22 @@ def _merge_suite(
         if workflow["id"] not in observed:
             missing.append({"id": qualified_id, "proof": "workflow-report"})
         outcome = observed.get(workflow["id"], {"id": workflow["id"], "gates": {}})
-        gates = {**outcome["gates"], "live": None}
-        if workflow.get("native_required") is True or 18 in workflow["capabilities"]:
+        gates = {**outcome["gates"], "native_binding": None, "fresh_acquisition": None}
+        if (
+            any(
+                workflow.get(flag) is True
+                for flag in ("native_required", "native_fresh_required")
+            )
+            or 18 in workflow["capabilities"]
+        ):
             specimen = native.get(workflow["id"])
             if specimen is None:
                 missing.append(
                     {"id": qualified_id, "proof": "native-capture-and-binding"}
                 )
             else:
-                gates["live"] = combine_required(
+                gates["fresh_acquisition"] = specimen.get("fresh_acquisition")
+                gates["native_binding"] = combine_required(
                     [
                         *(specimen["gates"].get(name) for name in NATIVE_GATES),
                         *specimen["gates"].values(),

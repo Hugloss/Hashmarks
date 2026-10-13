@@ -21,11 +21,11 @@
     19,
     20
   ],
-  "matrix_schema": "hashmarks.backend-evidence-matrix.v3",
-  "schema": "hashmarks.backend-evidence-campaign.v2",
+  "matrix_schema": "hashmarks.backend-evidence-matrix.v4",
+  "schema": "hashmarks.backend-evidence-campaign.v3",
   "suites": [
     {
-      "grader_sha256": "2f7b64b0fd7d822413c05d98205feb07de9cd962d9e4d12d3d2477b18b07f4ea",
+      "grader_sha256": "7d73de59010dc5bd67b78cafa4861b996b152bce3a9fd71357eeb91b3af928c7",
       "id": "backend-v1",
       "suite_file": "../backend-v1/suite.json",
       "suite_sha256": "b67112bb47d6e355a91dddfeb8399dddf9af72ca5fba1e69c9fb88e0338d58f4",

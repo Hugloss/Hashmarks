@@ -743,3 +743,53 @@ def test_aggregate_rejects_unbound_or_modified_evidence(
             selections={"fixture": {"workflow_report": str(output / "summary.json")}},
             output_dir=tmp_path / "aggregate",
         )
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["before", "after", "delta", "transport_grades", "initial_transport_grades"],
+)
+def test_regrading_rejects_forged_retained_subgrades(corpus, tmp_path, field):
+    from scripts.repository_evaluation.backend_regrading import verify_task_summary
+
+    suite_path, sources = corpus
+    report = run_backend(
+        sources=sources,
+        suite_path=suite_path,
+        output_dir=tmp_path / "result",
+        transports=(),
+    )
+    suite, grader = load_corpus(suite_path, sources)
+    outcome = report["outcomes"][0]
+    outcome[field] = {"classification": "PASS"}
+    with pytest.raises(ValueError, match="summary differs from artifact proof"):
+        verify_task_summary(
+            tmp_path / "result/handler/observations",
+            suite["workflows"][0],
+            grader["cases"]["handler"],
+            sources,
+            outcome,
+        )
+
+
+def test_regrading_rejects_uncomputed_gate_claim(corpus, tmp_path):
+    from scripts.repository_evaluation.backend_regrading import verify_task_summary
+
+    suite_path, sources = corpus
+    report = run_backend(
+        sources=sources,
+        suite_path=suite_path,
+        output_dir=tmp_path / "result",
+        transports=(),
+    )
+    suite, grader = load_corpus(suite_path, sources)
+    outcome = report["outcomes"][0]
+    outcome["gates"]["runtime_verified"] = True
+    with pytest.raises(ValueError, match="unexpected or missing gate"):
+        verify_task_summary(
+            tmp_path / "result/handler/observations",
+            suite["workflows"][0],
+            grader["cases"]["handler"],
+            sources,
+            outcome,
+        )

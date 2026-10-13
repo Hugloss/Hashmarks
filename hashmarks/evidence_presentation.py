@@ -1783,6 +1783,9 @@ def _initial_declaration_text(row: dict[str, Any], index: int) -> list[str]:
             declared = decode_initial_collection(
                 declared, declarations["declarations_encoding"]
             )
+        lines.append(
+            f"Declaration qualification: authority: {declarations.get('authority', 'unknown')}; ownership: {declarations.get('ownership_authority', 'unknown')}; runtime: {declarations.get('runtime_members', 'unknown')}; negative evidence: {declarations.get('negative_evidence_admissible', 'unknown')}; revision: {declarations.get('source_revision', 'unknown')}; bound: {declarations.get('bound', 'unknown')}; omitted: {declarations.get('omitted', 'unknown')}; truncated: {declarations.get('truncated', 'unknown')} (@ /retrieval/results/{index}/{family})."
+        )
         for declaration in declared:
             lines.append(
                 f"Declaration: {declaration.get('path')}::{declaration.get('symbol')} ({declaration.get('start_line')}:{declaration.get('end_line')}; @ /retrieval/results/{index}/{family})."

@@ -14,10 +14,10 @@ from hashmarks.codemap.static_python_backend_declarations import (
     StaticPythonBackendDeclarations,
 )
 from hashmarks.digest import FILE_DOMAIN, hash_file
-from hashmarks.evidence_presentation import FORMATS
 
 from .backend_corpus import confined_file
-from .backend_gates import combine_required, fact_state, presentation_conformance
+from .backend_gates import fact_state, presentation_conformance
+from .backend_grading import component_summary, validate_transport_capture
 from .backend_transport import capture_cli, capture_mcp
 from .common import write_json
 from .fact_grading import grade_facts
@@ -98,13 +98,14 @@ def observe_declarations(
         )
     write_json(output / "api.json", packet)
     api = _grade(workspace, packet, rule, paths)
-    results: dict[str, Any] = {"api": api}
+    results: dict[str, list[dict[str, Any]]] = {}
     case = {"operation": "repository_declarations", "inputs": inputs}
     for transport, capture in (("cli", capture_cli), ("mcp", capture_mcp)):
         captures = capture(workspace, state, case) if transport in transports else []
         write_json(output / f"{transport}.json", captures)
         grades = []
         for row in captures:
+            validate_transport_capture(row)
             response = row["response"]
             native = response.get("result", response)
             graded = _grade(workspace, native, rule, paths)
@@ -114,33 +115,5 @@ def observe_declarations(
                 is True
             )
             grades.append({"format": row["format"], **graded})
-        complete = sorted(row["format"] for row in grades) == sorted(FORMATS)
-        results[transport] = {
-            "complete": complete if captures else None,
-            "grades": grades,
-        }
-    results["gates"] = {
-        name: combine_required(
-            [
-                api[name],
-                *(
-                    row[name]
-                    for transport in ("cli", "mcp")
-                    for row in results[transport]["grades"]
-                ),
-            ]
-        )
-        for name in ("facts", "authority", "revision")
-    }
-    for transport in ("cli", "mcp"):
-        result = results[transport]
-        results["gates"][transport] = combine_required(
-            [
-                True if result["complete"] is True else None,
-                *(
-                    combine_required([row["facts"], row["parity"]])
-                    for row in result["grades"]
-                ),
-            ]
-        )
-    return results
+        results[transport] = grades
+    return component_summary(api, results)

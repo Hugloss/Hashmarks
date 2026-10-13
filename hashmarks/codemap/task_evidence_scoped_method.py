@@ -90,6 +90,16 @@ class TaskEvidenceScopedMethodMixin:
             "declarations": declarations,
         }
 
+    def _task_evidence_declaration_visible(self, path: str) -> bool:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        return (
+            self._task_evidence_visibility(path)
+            in {EvidenceVisibility.SOURCE, EvidenceVisibility.OUTLINE}
+            and self.policy.decide(path).evidence_visibility
+            is not EvidenceVisibility.DENY
+        )
+
     def _task_evidence_attach_enclosing_functions(
         self, packet: dict[str, object]
     ) -> None:
@@ -102,19 +112,18 @@ class TaskEvidenceScopedMethodMixin:
             path, symbol = row.get("path"), row.get("symbol")
             if not path or not symbol or not self._indexed_path_current(path):
                 continue
-            if (
-                self._task_evidence_visibility(path)
-                not in {EvidenceVisibility.SOURCE, EvidenceVisibility.OUTLINE}
-                or self.policy.decide(path).evidence_visibility
-                is EvidenceVisibility.DENY
-            ):
+            if not self._task_evidence_declaration_visible(path):
                 continue
             context = self._task_evidence_enclosing_functions(path, symbol)
             if context is not None and self._indexed_path_current(path):
                 row["enclosing_declarations"] = context
 
     def _task_evidence_class_declarations(
-        self, path: str, parent: Mapping[str, object]
+        self,
+        path: str,
+        parent: Mapping[str, object],
+        *,
+        selected_symbol: str | None = None,
     ) -> dict[str, object]:
         """Disclose indexed lexical members; inherited/runtime members are unknown."""
         if TYPE_CHECKING:
@@ -140,7 +149,7 @@ class TaskEvidenceScopedMethodMixin:
         )
         member = self._session_file_row(path)
         assert member is not None
-        return {
+        context: dict[str, object] = {
             "authority": "indexed-lexical-declarations-only",
             "scope": "direct-declared-methods-of-retrieved-class",
             "ownership_authority": False,
@@ -162,42 +171,85 @@ class TaskEvidenceScopedMethodMixin:
                 for row in members[:16]
             ],
         }
+        if selected_symbol is not None and qualname != selected_symbol:
+            context["scope"] = "direct-declared-methods-of-indexed-parent-class"
+            context["class_scope"] = {
+                "path": path,
+                "symbol": qualname,
+                "start_line": parent["start_line"],
+                "end_line": parent["end_line"],
+            }
+        return context
+
+    def _task_evidence_retrieved_class_scope(
+        self, path: str, row: Mapping[str, object]
+    ) -> Mapping[str, object] | None:
+        """Resolve one indexed lexical class or direct method container."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        symbols = self._session_symbols_for_path(path)
+        selected = [
+            symbol for symbol in symbols if symbol.get("qualname") == row.get("symbol")
+        ]
+        if len(selected) != 1 or (
+            selected[0].get("start_line"),
+            selected[0].get("end_line"),
+        ) != (row.get("start_line"), row.get("end_line")):
+            return None
+        child = selected[0]
+        if child.get("kind") == "class":
+            return child
+        if child.get("kind") != "method":
+            return None
+        parents = [
+            symbol
+            for symbol in symbols
+            if symbol.get("qualname") == child.get("parent")
+        ]
+        if len(parents) != 1 or parents[0].get("kind") != "class":
+            return None
+        parent = parents[0]
+        bounds = [
+            parent.get("start_line"),
+            child.get("start_line"),
+            child.get("end_line"),
+            parent.get("end_line"),
+        ]
+        qualified = [
+            value
+            for value in bounds
+            if isinstance(value, int) and not isinstance(value, bool)
+        ]
+        if len(qualified) != 4 or qualified != sorted(qualified):
+            return None
+        return parent
 
     def _task_evidence_attach_class_declarations(
         self, packet: dict[str, object]
     ) -> None:
-        """Keep the first retrieved class's members visible without reranking it."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+        """Disclose bounded class scopes for the first three source locators."""
+        codemap = cast("CodeMap", self)
         retrieval = packet.get("retrieval")
         if not isinstance(retrieval, dict):
             return
+        observed = set()
         for row in retrieval.get("results", [])[:3]:
             path, symbol = row.get("path"), row.get("symbol")
-            if not path or not symbol or not self._indexed_path_current(path):
+            if not path or not symbol or not codemap._indexed_path_current(path):
                 continue
-            visibility = self._task_evidence_visibility(path)
-            if (
-                visibility
-                not in {EvidenceVisibility.SOURCE, EvidenceVisibility.OUTLINE}
-                or self.policy.decide(path).evidence_visibility
-                is EvidenceVisibility.DENY
-            ):
+            if "verify" in row.get("roles", []) and "edit" not in row.get("roles", []):
                 continue
-            declaration = self.store.symbol_at(path, symbol)
-            if (
-                declaration is None
-                or declaration.get("kind") != "class"
-                or not isinstance(declaration.get("start_line"), int)
-                or not isinstance(declaration.get("end_line"), int)
-                or (declaration.get("start_line"), declaration.get("end_line"))
-                != (row.get("start_line"), row.get("end_line"))
-            ):
+            if not codemap._task_evidence_declaration_visible(path):
                 continue
-            context = self._task_evidence_class_declarations(path, declaration)
-            if self._indexed_path_current(path):
+            declaration = codemap._task_evidence_retrieved_class_scope(path, row)
+            if declaration is None or (path, declaration["qualname"]) in observed:
+                continue
+            observed.add((path, declaration["qualname"]))
+            context = codemap._task_evidence_class_declarations(
+                path, declaration, selected_symbol=str(symbol)
+            )
+            if codemap._indexed_path_current(path):
                 row["class_declarations"] = context
-            return
 
     def _task_evidence_named_class_scope(
         self, task: str

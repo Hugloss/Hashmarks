@@ -7,14 +7,13 @@ from pathlib import Path
 from typing import Any
 
 from hashmarks.digest import FILE_DOMAIN, hash_file
-from hashmarks.evidence_presentation import FORMATS
 
 from .backend_boundary import _grade as _boundary_grade
 from .backend_corpus import confined_file, confined_path, workflow_changed_paths
 from .backend_declarations import _grade as _declaration_grade
 from .backend_gates import combine_required, presentation_conformance
-from .backend_grading import _gates, validate_transport_capture
-from .backend_witnesses import api_fact_witnesses
+from .backend_grading import _gates, component_summary, validate_transport_capture
+from .backend_witnesses import task_fact_witnesses
 from .backend_workflows import _invalidated_member, _revision_bound, _transport_grade
 from .fact_grading import _json_equal, grade_facts
 
@@ -82,7 +81,7 @@ def _freshness(
 
 def regrade_task_workflow(
     root: Path, workflow: dict[str, Any], rule: dict[str, Any], sources: dict[str, Path]
-) -> dict[str, bool | None]:
+) -> dict[str, Any]:
     """Recompute task and composed component gates from retained observations."""
     before = _stage(
         root / "before",
@@ -102,6 +101,10 @@ def regrade_task_workflow(
         {"checks": rule["delta_checks"]},
     )
     gates = _gates(before, after, _freshness(root, workflow, sources), rule, delta)
+    components = {
+        family: {stage: None for stage in ("before", "after")}
+        for family in ("boundary", "declarations")
+    }
     for stage in ("before", "after"):
         for family, input_key, oracle_key in (
             ("boundary", "boundary_observations", "function_boundary_oracles"),
@@ -116,10 +119,26 @@ def regrade_task_workflow(
                 rule[oracle_key][stage],
                 family,
             )
-            for name, value in component.items():
+            components[family][stage] = component
+            for name, value in component["gates"].items():
                 gates[name] = combine_required([gates[name], value])
             gates["presentation"] = combine_required([gates["cli"], gates["mcp"]])
-    return gates
+    return {
+        "gates": gates,
+        "before": before["grade"],
+        "after": after["grade"],
+        "delta": delta,
+        "boundary_observations": components["boundary"],
+        "declaration_observations": components["declarations"],
+        "transport_grades": {
+            stage: {key: observed[key] for key in ("cli", "mcp")}
+            for stage, observed in (("before", before), ("after", after))
+        },
+        "initial_transport_grades": {
+            stage: {key: observed["initial"][key] for key in ("cli", "mcp")}
+            for stage, observed in (("before", before), ("after", after))
+        },
+    }
 
 
 def verify_task_summary(
@@ -133,19 +152,19 @@ def verify_task_summary(
     witnesses = [
         witness
         for stage in ("before", "after")
-        for witness in api_fact_witnesses(
+        for witness in task_fact_witnesses(
             sources[workflow[stage]],
             root / stage,
             workflow,
             {**rule, **rule.get(stage, {}), "_stage": stage},
-            _read(root / stage, "api.json"),
         )
     ]
     if not _json_equal(outcome.get("gate_witnesses"), witnesses):
         raise ValueError("backend workflow witnesses differ from artifact proof")
+    if outcome.get("gates", {}).keys() != expected["gates"].keys():
+        raise ValueError("backend workflow has unexpected or missing gate claims")
     for name, value in expected.items():
-        actual = outcome["gates"].get(name)
-        if not _json_equal(actual, value):
+        if not _json_equal(outcome.get(name), value):
             raise ValueError(
                 f"backend workflow {name} summary differs from artifact proof"
             )
@@ -153,7 +172,7 @@ def verify_task_summary(
 
 def _component(
     root: Path, source: Path, inputs: dict[str, Any], rule: dict[str, Any], family: str
-) -> dict[str, bool | None]:
+) -> dict[str, Any]:
     grader = _boundary_grade if family == "boundary" else _declaration_grade
     paths = (
         inputs["changed_paths"]
@@ -161,8 +180,7 @@ def _component(
         else inputs["python_backend_paths"]
     )
     api = grader(source, _read(root, "api.json"), rule, paths)
-    observations = {"api": [api]}
-    gates = {}
+    observations = {}
     for transport in ("cli", "mcp"):
         captures = _read(root, transport + ".json")
         rows = []
@@ -176,16 +194,8 @@ def _component(
                 is True
             )
             rows.append(row)
-        complete = sorted(row["format"] for row in captures) == sorted(FORMATS)
-        gates[transport] = combine_required(
-            [
-                True if complete else None,
-                *(combine_required([row["facts"], row["parity"]]) for row in rows),
-            ]
-        )
-        observations[transport] = rows
-    for name in ("facts", "authority", "revision"):
-        gates[name] = combine_required(
-            row[name] for rows in observations.values() for row in rows
-        )
-    return gates
+        observations[transport] = [
+            {"format": capture["format"], **row}
+            for capture, row in zip(captures, rows, strict=True)
+        ]
+    return component_summary(api, observations)

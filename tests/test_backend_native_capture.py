@@ -308,3 +308,43 @@ def test_present_ambiguous_native_subject_does_not_pass_invalidation(
         codemap.sync()
         with pytest.raises(KeyError):
             _stale_native_observation(codemap, {"path": "models.py", "symbol": "Model"})
+
+
+@pytest.mark.parametrize("mutation", [None, "artifact", "invocation", "scope"])
+def test_fresh_acquisition_requires_current_invocation_and_untouched_output(
+    specimen, mutation
+):
+    from scripts.repository_evaluation.backend_native import (
+        record_capture_acquisition,
+        validate_capture_acquisition,
+    )
+
+    capture, _source, _definition = specimen
+    metadata = json.loads((capture / "capture.json").read_text())
+    metadata["configuration"].update(version="controlled-version", arguments=["index"])
+    write_json(capture / "capture.json", metadata)
+    record_capture_acquisition(capture, "handler", "before", "current-invocation")
+    assert validate_capture_acquisition(capture, "handler", "before", None) is None
+    if mutation == "artifact":
+        (capture / "index.scip").write_bytes(b"changed producer output")
+    elif mutation == "scope":
+        receipt = json.loads((capture / "backend-acquisition.json").read_text())
+        receipt["source_revisions"] = {}
+        write_json(capture / "backend-acquisition.json", receipt)
+    invocation = (
+        "another-invocation" if mutation == "invocation" else "current-invocation"
+    )
+    assert validate_capture_acquisition(capture, "handler", "before", invocation) is (
+        mutation is None
+    )
+
+
+def test_fresh_request_without_acquisition_receipt_is_incomplete(specimen):
+    from scripts.repository_evaluation.backend_native import (
+        validate_capture_acquisition,
+    )
+
+    capture, _source, _definition = specimen
+    assert (
+        validate_capture_acquisition(capture, "handler", "before", "requested") is None
+    )

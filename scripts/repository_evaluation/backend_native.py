@@ -35,6 +35,7 @@ class NativeSpecimenOptions:
     capture_root: Path
     transports: tuple[str, ...] = ("cli", "mcp")
     regenerated: bool = False
+    acquisition_id: str | None = None
 
 
 def prepare_capture(
@@ -75,6 +76,58 @@ def prepare_capture(
             "paths": paths,
             "scope": SCOPE,
         },
+    )
+
+
+def record_capture_acquisition(
+    capture: Path, workflow: str, stage: str, acquisition_id: str
+) -> None:
+    """Record successful QA producer output, never execution/certification state."""
+    metadata = json.loads(confined_file(capture, "capture.json").read_bytes())
+    products = capture_artifact_digests(capture)
+    products.pop("backend-acquisition.json", None)
+    write_json(
+        capture / "backend-acquisition.json",
+        {
+            "schema": "hashmarks.backend-native-acquisition.v1",
+            "acquisition_id": acquisition_id,
+            "workflow": workflow,
+            "stage": stage,
+            "source_revisions": metadata["source_revisions"],
+            "configuration": metadata["configuration"],
+            "artifacts": products,
+            "authority": "external-qa-capture-caller-claim",
+        },
+    )
+
+
+def validate_capture_acquisition(
+    capture: Path, workflow: str, stage: str, acquisition_id: str | None
+) -> bool | None:
+    """Re-prove output binding; a replay or request flag cannot prove acquisition."""
+    if acquisition_id is None or not (capture / "backend-acquisition.json").is_file():
+        return None
+    receipt = json.loads(
+        confined_file(capture, "backend-acquisition.json").read_bytes()
+    )
+    metadata = json.loads(confined_file(capture, "capture.json").read_bytes())
+    expected = {
+        "schema": "hashmarks.backend-native-acquisition.v1",
+        "acquisition_id": acquisition_id,
+        "workflow": workflow,
+        "stage": stage,
+        "source_revisions": metadata["source_revisions"],
+        "configuration": metadata["configuration"],
+        "authority": "external-qa-capture-caller-claim",
+    }
+    products = capture_artifact_digests(capture)
+    products.pop("backend-acquisition.json", None)
+    configuration = metadata["configuration"]
+    return (
+        all(receipt.get(key) == value for key, value in expected.items())
+        and receipt.get("artifacts") == products
+        and bool(configuration.get("version"))
+        and bool(configuration.get("arguments"))
     )
 
 
@@ -125,6 +178,8 @@ def capture_artifact_digests(root: Path) -> dict[str, str]:
         *metadata["source_revisions"],
         *metadata["configuration"]["configuration"],
     }
+    if (root / "backend-acquisition.json").is_file():
+        names.add("backend-acquisition.json")
     return {
         name: hashlib.sha256(confined_file(root, name).read_bytes()).hexdigest()
         for name in sorted(names)
@@ -538,18 +593,29 @@ def qualify_native_workflow(
                     raise ValueError(
                         "backend native specimen changed during observation"
                     )
+    fresh_acquisition = (
+        combine_required(
+            validate_capture_acquisition(
+                captures[stage], workflow["id"], stage, options.acquisition_id
+            )
+            for stage in ("before", "after")
+        )
+        if options.regenerated
+        else None
+    )
+    required = [*gates.values(), *([fresh_acquisition] if options.regenerated else [])]
     status = (
-        "FAIL"
-        if False in gates.values()
-        else "INCOMPLETE"
-        if None in gates.values()
-        else "PASS"
+        "FAIL" if False in required else "INCOMPLETE" if None in required else "PASS"
     )
     return {
         "id": workflow["id"],
         "status": status,
         "gates": gates,
+        "fresh_acquisition": fresh_acquisition,
+        "acquisition_id": options.acquisition_id,
         "capture_mode": "fresh-this-invocation"
+        if fresh_acquisition is True
+        else "fresh-acquisition-unqualified"
         if options.regenerated
         else "capture-replay",
         "capture_identity": "sha256:"

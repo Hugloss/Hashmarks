@@ -35,7 +35,16 @@ def native_runner(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     captures = tmp_path / "captures"
     calls = []
 
-    def acquire(workflow, _rule, stage, _source, _definition, destination):
+    def acquire(
+        workflow,
+        _rule,
+        stage,
+        _source,
+        _definition,
+        destination,
+        *,
+        acquisition_id=None,
+    ):
         calls.append((workflow["id"], stage))
         write_json(destination / "capture.json", {"id": workflow["id"], "stage": stage})
 
@@ -50,6 +59,7 @@ def native_runner(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         return {"id": workflow["id"], "status": "INCOMPLETE", "gates": {"mcp": None}}
 
     monkeypatch.setattr(runner, "prepare_capture", acquire)
+    monkeypatch.setattr(runner, "record_capture_acquisition", lambda *_: None)
     monkeypatch.setattr(runner, "qualify_native_workflow", qualify)
     monkeypatch.setattr(
         runner,

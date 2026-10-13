@@ -144,3 +144,58 @@ def test_class_disclosure_respects_source_visibility(
         assert (
             _context(packet)["declarations"][0]["symbol"] == "ChannelBackend.subscribe"
         )
+
+
+def test_retrieved_method_discloses_qualified_direct_class_scope(tmp_path):
+    from hashmarks.codemap.task_evidence_initial import (
+        decode_initial_collection,
+        decode_initial_packet,
+    )
+
+    path = tmp_path / "backend.py"
+    path.write_text(
+        "class Worker:\n    def metadata_update(self):\n        return self.failed_update()\n    def failed_update(self):\n        return False\n"
+    )
+    with CodeMap(tmp_path) as cm:
+        cm.sync()
+        full = cast("dict", cm.task_evidence("Inspect Worker.metadata_update in backend.py"))
+        initial = cast("dict", cm.task_evidence(
+            "Inspect Worker.metadata_update in backend.py", result_mode="initial"
+        ))
+    for packet in (full, decode_initial_packet(initial)):
+        row = next(
+            row
+            for row in packet["retrieval"]["results"][:3]
+            if row.get("symbol") == "Worker.metadata_update"
+        )
+        context = row["class_declarations"]
+        declarations = context["declarations"]
+        if "declarations_encoding" in context:
+            declarations = decode_initial_collection(
+                declarations, context["declarations_encoding"]
+            )
+        assert {
+            tuple(d[key] for key in ("path", "symbol", "start_line", "end_line"))
+            for d in declarations
+        } == {
+            ("backend.py", "Worker.metadata_update", 2, 3),
+            ("backend.py", "Worker.failed_update", 4, 5),
+        }
+        assert context["class_scope"] == {
+            "path": "backend.py",
+            "symbol": "Worker",
+            "start_line": 1,
+            "end_line": 5,
+        }
+        assert context["ownership_authority"] is False
+        assert context["runtime_members"] == "not-established"
+        assert context["negative_evidence_admissible"] is False
+        assert context["source_revision"] == hash_file(path, domain=FILE_DOMAIN).hash
+    response = cast("dict", presentation_response(
+        "task_evidence", initial, format="text", result_mode="initial"
+    ))
+    text = response["presentation"]["text"]
+    assert "Worker.failed_update (4:5" in text
+    assert (
+        "ownership: False; runtime: not-established; negative evidence: False" in text
+    )

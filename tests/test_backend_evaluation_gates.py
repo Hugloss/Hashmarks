@@ -63,7 +63,14 @@ def _evaluate(before, after):
         before,
         after,
         {"passed": True},
-        {"expected_owner_path": "backend.py"},
+        {
+            "expected_owner_path": "backend.py",
+            "owner_oracle": {
+                "scope": "file",
+                "resolution": "unique",
+                "candidates": [{"path": "backend.py"}],
+            },
+        },
         {"classification": "PASS", "authority_violations": 0},
     )
 
@@ -182,3 +189,81 @@ def test_rejected_presentation_is_retained_as_failure_evidence():
     error = result["error"]
     assert isinstance(error, str)
     assert "format" in error
+
+
+def test_symbol_recall_rejects_right_file_with_wrong_declaration():
+    from scripts.repository_evaluation.backend_grading import _owner_top_three
+
+    expected = {
+        "path": "backend.py",
+        "qualname": "Worker.run",
+        "start_line": 3,
+        "end_line": 5,
+    }
+    rule = {
+        "owner_oracle": {
+            "scope": "symbol",
+            "resolution": "unique",
+            "candidates": [expected],
+        }
+    }
+    packet = {
+        "retrieval": {
+            "results": [
+                {
+                    "path": "backend.py",
+                    "symbol": "Worker.other",
+                    "start_line": 3,
+                    "end_line": 5,
+                }
+            ]
+        }
+    }
+    assert _owner_top_three(packet, rule) is False
+    packet["retrieval"]["results"][0]["symbol"] = "Worker.run"
+    assert _owner_top_three(packet, rule) is True
+
+
+def test_symbol_recall_accepts_qualified_bounded_declaration_without_ownership():
+    from scripts.repository_evaluation.backend_grading import _owner_top_three
+
+    expected = {
+        "path": "backend.py",
+        "qualname": "Worker.run",
+        "start_line": 3,
+        "end_line": 5,
+    }
+    rule = {
+        "owner_oracle": {
+            "scope": "symbol",
+            "resolution": "unique",
+            "candidates": [expected],
+        }
+    }
+    declaration = {
+        "path": "backend.py",
+        "symbol": "Worker.run",
+        "start_line": 3,
+        "end_line": 5,
+    }
+    context = {
+        "authority": "indexed-lexical-declarations-only",
+        "ownership_authority": False,
+        "negative_evidence_admissible": False,
+        "source_revision": "bound-source",
+        "declarations": [declaration],
+    }
+    packet = {
+        "retrieval": {
+            "results": [
+                {
+                    "path": "backend.py",
+                    "symbol": "Worker",
+                    "class_declarations": context,
+                }
+            ]
+        }
+    }
+    assert _owner_top_three(packet, rule) is True
+    context["ownership_authority"] = True
+    assert _owner_top_three(packet, rule) is False
