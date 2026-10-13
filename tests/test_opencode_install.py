@@ -3,12 +3,15 @@ from __future__ import annotations
 import json
 import subprocess
 from pathlib import Path
+from typing import Callable
+
+import pytest
 
 import hashmarks.cli as cli
 import hashmarks.opencode_registration as opencode_registration
 
 
-def _which(hashmarks: Path, opencode: Path):
+def _which(hashmarks: Path, opencode: Path) -> Callable[[str], str | None]:
     def which(name: str) -> str | None:
         return {
             "hashmarks": str(hashmarks),
@@ -19,9 +22,9 @@ def _which(hashmarks: Path, opencode: Path):
 
 
 def test_install_opencode_registers_exact_hashmarks_executable(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-    capsys,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     hashmarks = tmp_path / "hashmarks"
     opencode = tmp_path / "opencode"
@@ -90,9 +93,9 @@ def test_install_opencode_registers_exact_hashmarks_executable(
 
 
 def test_install_opencode_reports_project_shadowing_without_rewriting(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-    capsys,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     hashmarks = tmp_path / "hashmarks"
     opencode = tmp_path / "opencode"
@@ -154,9 +157,9 @@ def test_install_opencode_reports_project_shadowing_without_rewriting(
 
 
 def test_install_opencode_keeps_registration_when_effective_config_unverifiable(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-    capsys,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     hashmarks = tmp_path / "hashmarks"
     opencode = tmp_path / "opencode"
@@ -196,7 +199,7 @@ def test_install_opencode_keeps_registration_when_effective_config_unverifiable(
 
 
 def test_install_opencode_reports_registration_failure(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     hashmarks = tmp_path / "hashmarks"

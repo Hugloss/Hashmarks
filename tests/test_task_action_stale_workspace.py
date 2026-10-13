@@ -174,7 +174,7 @@ def test_unsignaled_aba_owner_restoration_reconciles_from_recent_authority(
 
 
 def test_unsignaled_rename_reconciliation_retires_obsolete_history(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
     _write(tmp_path, "src/foo.py", "def calculate_total(): return 1\n")
     _write(
@@ -191,7 +191,7 @@ def test_unsignaled_rename_reconciliation_retires_obsolete_history(
         original_sync = codemap.sync
         sync_calls: list[tuple[str, ...]] = []
 
-        def counted_sync(paths=None):
+        def counted_sync(paths: list[str] | None = None) -> Any:
             sync_calls.append(tuple(paths or ()))
             return original_sync(paths)
 
@@ -313,7 +313,7 @@ def test_unsignaled_file_symlink_file_transition_recovers_without_following_syml
 
 
 def test_missing_resurrection_tombstone_does_not_poll_repository_and_recovers_path_scoped(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
     _write(tmp_path, "src/foo.py", "def calculate_total(): return 1\n")
     _write(
@@ -328,7 +328,7 @@ def test_missing_resurrection_tombstone_does_not_poll_repository_and_recovers_pa
         original_sync = codemap.sync
         sync_calls: list[tuple[str, ...]] = []
 
-        def counted_sync(paths=None):
+        def counted_sync(paths: list[str] | None = None) -> Any:
             sync_calls.append(tuple(paths or ()))
             return original_sync(paths)
 

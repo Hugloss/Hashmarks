@@ -6,13 +6,16 @@ import time
 from pathlib import Path
 
 import pytest
+from pytest import MonkeyPatch
 
 from hashmarks.client import IdentityClient, default_socket_path
 from hashmarks.daemon import IdentityDaemon
 
 
 @pytest.mark.skipif(os.name != "posix", reason="Unix runtime socket policy")
-def test_default_socket_is_separate_from_persistent_state(tmp_path: Path, monkeypatch):
+def test_default_socket_is_separate_from_persistent_state(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     state = workspace / ".hashmarks"
@@ -27,7 +30,9 @@ def test_default_socket_is_separate_from_persistent_state(tmp_path: Path, monkey
 
 
 @pytest.mark.skipif(os.name != "posix", reason="Unix runtime socket policy")
-def test_socket_path_stays_short_for_very_long_workspace(tmp_path: Path, monkeypatch):
+def test_socket_path_stays_short_for_very_long_workspace(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
     workspace = tmp_path
     for i in range(12):
         workspace = workspace / ("very-long-workspace-component-" + str(i).zfill(2))
@@ -41,7 +46,9 @@ def test_socket_path_stays_short_for_very_long_workspace(tmp_path: Path, monkeyp
 
 
 @pytest.mark.skipif(os.name != "posix", reason="Unix runtime socket policy")
-def test_state_dir_does_not_move_default_socket(tmp_path: Path, monkeypatch):
+def test_state_dir_does_not_move_default_socket(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     monkeypatch.delenv("XDG_RUNTIME_DIR", raising=False)
@@ -53,8 +60,8 @@ def test_state_dir_does_not_move_default_socket(tmp_path: Path, monkeypatch):
 
 @pytest.mark.skipif(os.name != "posix", reason="Unix runtime socket policy")
 def test_default_daemon_socket_round_trip_with_separate_state(
-    tmp_path: Path, monkeypatch
-):
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     (workspace / "a.txt").write_text("A")

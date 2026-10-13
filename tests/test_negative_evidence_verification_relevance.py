@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import pytest
+
 from hashmarks.codemap import CodeMap
 
 if TYPE_CHECKING:
@@ -31,15 +33,16 @@ def _ref(path: str) -> dict[str, object]:
 
 def test_bounded_reference_search_cannot_report_no_verification_candidate(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _write_owner(tmp_path)
     refs = [_ref(f"src/noise_{index}.py") for index in range(_DIRECT_REF_LIMIT + 1)]
-
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
 
-        def refs_many(targets, *, limit_per_target):
+        def refs_many(
+            targets: list[str], *, limit_per_target: int
+        ) -> dict[str, list[dict[str, object]]]:
             targets = list(targets)
             if limit_per_target == _DIRECT_REF_LIMIT + 1:
                 assert targets == ["target"]
@@ -76,7 +79,7 @@ def test_bounded_reference_search_cannot_report_no_verification_candidate(
 
 def test_bounded_reference_search_cannot_manufacture_unique_verifier(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _write_owner(tmp_path)
     (tmp_path / "tests").mkdir()
@@ -88,11 +91,12 @@ def test_bounded_reference_search_cannot_manufacture_unique_verifier(
     )
     refs = [_ref("tests/test_owner.py")]
     refs.extend(_ref(f"src/noise_{index}.py") for index in range(_DIRECT_REF_LIMIT))
-
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
 
-        def refs_many(targets, *, limit_per_target):
+        def refs_many(
+            targets: list[str], *, limit_per_target: int
+        ) -> dict[str, list[dict[str, object]]]:
             targets = list(targets)
             if limit_per_target == _DIRECT_REF_LIMIT + 1:
                 assert targets == ["target"]
@@ -124,14 +128,15 @@ def test_bounded_reference_search_cannot_manufacture_unique_verifier(
 
 def test_exhausted_verification_search_can_still_authorize_absence(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _write_owner(tmp_path)
-
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
 
-        def refs_many(targets, *, limit_per_target):
+        def refs_many(
+            targets: list[str], *, limit_per_target: int
+        ) -> dict[str, list[dict[str, object]]]:
             return {symbol: [] for symbol in targets}
 
         monkeypatch.setattr(codemap, "_session_refs_many", refs_many)

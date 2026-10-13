@@ -5,6 +5,7 @@ import json
 import sys
 import types
 from pathlib import Path
+from typing import Callable, Never
 
 import pytest
 
@@ -465,7 +466,7 @@ def test_mcp_surface_classifies_exhausted_transient_race(
         str(_repo(tmp_path)), state_dir=str(tmp_path / "state")
     )
 
-    def exhausted(_operation):
+    def exhausted(_operation: Callable[..., object]) -> Never:
         raise RuntimeError("CodeMap generation changed during decision session")
 
     monkeypatch.setattr(mcp_surface, "retry_transient_repository_race", exhausted)
@@ -523,7 +524,7 @@ def test_mcp_surface_read_centralizes_gate_and_retry(
     )
     calls: list[object] = []
 
-    def fake_retry(operation):
+    def fake_retry(operation: Callable[..., object]) -> str:
         calls.append(operation)
         return "fresh"
 
@@ -613,9 +614,11 @@ def test_mcp_server_registers_exact_small_read_only_tool_catalog(
             self.description = kwargs.get("description")
             self.instructions = kwargs.get("instructions")
 
-        def tool(self, **metadata):
-            def decorate(fn):
-                registered.append({"fn": fn, **metadata})
+        def tool(
+            self, **metadata: object
+        ) -> Callable[[Callable[..., object]], Callable[..., object]]:
+            def decorate(fn: Callable[..., object]) -> Callable[..., object]:
+                registered.append(str(metadata["name"]))
                 return fn
 
             return decorate
@@ -722,8 +725,10 @@ def test_mcp_server_rejects_mode_specific_response_schema_drift(
         def __init__(self, _name: str, **_kwargs):
             pass
 
-        def tool(self, **metadata):
-            def decorate(fn):
+        def tool(
+            self, **metadata: object
+        ) -> Callable[[Callable[..., object]], Callable[..., object]]:
+            def decorate(fn: Callable[..., object]) -> Callable[..., object]:
                 registered.append({"fn": fn, **metadata})
                 return fn
 
@@ -787,9 +792,11 @@ def test_mcp_server_construction_does_not_scan_or_build_repository(
             self.description = kwargs.get("description")
             self.instructions = kwargs.get("instructions")
 
-        def tool(self, **metadata):
-            def decorate(fn):
-                registered.append(str(metadata["name"]))
+        def tool(
+            self, **metadata: object
+        ) -> Callable[[Callable[..., object]], Callable[..., object]]:
+            def decorate(fn: Callable[..., object]) -> Callable[..., object]:
+                registered.append({"fn": fn, **metadata})
                 return fn
 
             return decorate

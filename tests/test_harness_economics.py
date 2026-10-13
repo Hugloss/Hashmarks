@@ -6,7 +6,7 @@ from scripts.agent_evaluation.economics import (
 )
 
 
-def _trace(task, events):
+def _trace(task: str, events: list[dict[str, object]]) -> dict[str, object]:
     return {
         "schema": "hashmarks.agent-event-trace.v1",
         "task_id": task,

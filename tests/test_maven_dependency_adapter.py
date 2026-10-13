@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+from typing import Never
 
 import pytest
 
@@ -14,7 +15,7 @@ def _complete_maven_observation(
     *,
     trees: dict[str, bytes],
     inventories: dict[str, bytes],
-    repository_inputs=(),
+    repository_inputs: tuple[str, ...] = (),
 ) -> dict[str, object]:
     return maven_dependency_observation(
         trees=trees,
@@ -281,10 +282,10 @@ def test_maven_adapter_preserves_classifier_as_selection_identity(
     }
 
 
-def test_maven_adapter_is_execution_free(monkeypatch) -> None:
+def test_maven_adapter_is_execution_free(monkeypatch: pytest.MonkeyPatch) -> None:
     import subprocess
 
-    def forbidden(*args, **kwargs):
+    def forbidden(*args: object, **kwargs: object) -> Never:
         raise AssertionError("Maven adapter must not execute package tooling")
 
     monkeypatch.setattr(subprocess, "run", forbidden)

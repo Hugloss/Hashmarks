@@ -149,7 +149,7 @@ def test_ledger_packet_and_verification_capture_subprocess_evidence(
         "find owner",
     )
 
-    def fake_run(argv, **kwargs):
+    def fake_run(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess:
         if "-c" in argv:
             return subprocess.CompletedProcess(
                 argv,

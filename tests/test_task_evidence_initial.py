@@ -25,7 +25,7 @@ from hashmarks.mcp_contract import tool_contract
 from hashmarks.mcp_surface import HashmarksMcpSurface, McpSurfaceError
 
 
-def test_initial_string_table_preserves_json_types_unicode_and_future_fields():
+def test_initial_string_table_preserves_json_types_unicode_and_future_fields() -> None:
     packet = {
         "schema": "hashmarks.task-evidence-initial.v2",
         "source_evidence_identity": "sha256:source",
@@ -65,7 +65,7 @@ def _compressible_initial() -> dict[str, Any]:
     return packet
 
 
-def test_compressed_initial_preserves_identity_types_and_all_records():
+def test_compressed_initial_preserves_identity_types_and_all_records() -> None:
     packet = _compressible_initial()
     encoded = encode_initial_packet(packet)
     assert encoded["encoding"]["kind"] == "json-string-table.v1+zlib"
@@ -95,7 +95,7 @@ def test_compressed_initial_preserves_identity_types_and_all_records():
         "changed-identity",
     ],
 )
-def test_compressed_initial_rejects_corrupt_or_unbounded_payload(mutation):
+def test_compressed_initial_rejects_corrupt_or_unbounded_payload(mutation: str) -> None:
     encoded = encode_initial_packet(_compressible_initial())
     raw = base64.b64decode(encoded["data"])
     if mutation == "bool-size":
@@ -118,7 +118,7 @@ def test_compressed_initial_rejects_corrupt_or_unbounded_payload(mutation):
         decode_initial_packet(encoded)
 
 
-def test_large_initial_falls_back_without_reducing_valid_capacity():
+def test_large_initial_falls_back_without_reducing_valid_capacity() -> None:
     packet = _compressible_initial()
     packet["future_fact"] = "x" * 1_048_577
     packet["evidence_packet_identity"] = initial_packet_identity(packet)
@@ -138,7 +138,7 @@ def test_large_initial_falls_back_without_reducing_valid_capacity():
         "header-shadow",
     ],
 )
-def test_initial_string_table_rejects_malformed_references(mutation):
+def test_initial_string_table_rejects_malformed_references(mutation: str) -> None:
     packet = encode_initial_packet(
         {
             "schema": "hashmarks.task-evidence-initial.v2",

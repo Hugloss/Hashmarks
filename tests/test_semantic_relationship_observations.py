@@ -877,7 +877,7 @@ def test_relationship_qualification_reuses_one_stable_read_per_member(
         read = cm._bounded_source_observation
         observed = []
 
-        def count(path: str, bound: int):
+        def count(path: str, bound: int) -> tuple[dict[str, object], bytes | None]:
             observed.append(path)
             return read(path, bound)
 

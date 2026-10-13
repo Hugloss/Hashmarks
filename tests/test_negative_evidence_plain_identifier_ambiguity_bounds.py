@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import pytest
+
 from hashmarks.codemap import CodeMap
 
 if TYPE_CHECKING:
@@ -23,7 +25,7 @@ def _write_plain_owners(tmp_path: Path, *, duplicate: bool = True) -> None:
         )
 
 
-def _bounded_plain_probe(codemap: CodeMap, monkeypatch) -> None:
+def _bounded_plain_probe(codemap: CodeMap, monkeypatch: pytest.MonkeyPatch) -> None:
     original = codemap._session_exact_symbol_candidates
     actual = list(original(["resolve"], limit=10))
     by_path = {str(row.get("path") or ""): dict(row) for row in actual}
@@ -36,7 +38,7 @@ def _bounded_plain_probe(codemap: CodeMap, monkeypatch) -> None:
     probe = [first, *noise, hidden]
     assert len(probe) == _INDEX_LIMIT + 1
 
-    def exact_symbols(names, *, limit):
+    def exact_symbols(names: list[str], *, limit: int) -> list[dict[str, object]]:
         normalized = {str(name).lower() for name in names}
         if "resolve" in normalized and limit == _INDEX_LIMIT + 1:
             return probe[:limit]
@@ -47,7 +49,7 @@ def _bounded_plain_probe(codemap: CodeMap, monkeypatch) -> None:
 
 def test_bounded_plain_identifier_scan_cannot_hide_duplicate_owner(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _write_plain_owners(tmp_path)
     task = "Fix resolve behavior"
@@ -123,7 +125,7 @@ def test_complete_plain_identifier_scan_can_leave_generic_name_unpromoted(
 
 def test_explicit_identifier_authority_is_independent_of_plain_scan_bound(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _write_plain_owners(tmp_path)
     (tmp_path / "src" / "owner.py").write_text(
@@ -148,7 +150,7 @@ def test_explicit_identifier_authority_is_independent_of_plain_scan_bound(
             hidden,
         ]
 
-        def exact_symbols(names, *, limit):
+        def exact_symbols(names: list[str], *, limit: int) -> list[dict[str, object]]:
             normalized = {str(name).lower() for name in names}
             if (
                 "resolve" in normalized

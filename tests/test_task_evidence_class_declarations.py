@@ -146,7 +146,9 @@ def test_class_disclosure_respects_source_visibility(
         )
 
 
-def test_retrieved_method_discloses_qualified_direct_class_scope(tmp_path):
+def test_retrieved_method_discloses_qualified_direct_class_scope(
+    tmp_path: Path,
+) -> None:
     from hashmarks.codemap.task_evidence_initial import (
         decode_initial_collection,
         decode_initial_packet,

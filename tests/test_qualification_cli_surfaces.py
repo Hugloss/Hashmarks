@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from scripts.qualification_economics import main as economics_main
 from scripts.qualification_handoff import main as handoff_main
 
@@ -9,7 +11,9 @@ def _root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
-def test_handoff_cli_emits_external_authority_contract(capsys) -> None:
+def test_handoff_cli_emits_external_authority_contract(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     assert handoff_main(["--root", str(_root())]) == 0
     value = json.loads(capsys.readouterr().out)
     assert value["execution_authority"] == "external"
@@ -19,7 +23,7 @@ def test_handoff_cli_emits_external_authority_contract(capsys) -> None:
 
 
 def test_economics_cli_reports_membership_preservation_without_execution_policy(
-    capsys,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     assert economics_main(["--root", str(_root())]) == 0
     value = json.loads(capsys.readouterr().out)

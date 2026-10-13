@@ -1,5 +1,6 @@
 import copy
 from pathlib import Path
+from typing import Iterator
 
 import pytest
 
@@ -39,7 +40,7 @@ def _coverage(plan: dict[str, object], unit: dict[str, object]) -> dict[str, obj
 
 
 def test_owner_units_exactly_partition_repository_test_membership(
-    repository_qualification_plan,
+    repository_qualification_plan: dict[str, object],
 ) -> None:
     root = _root()
     units = tuple(repository_qualification_plan["units"])
@@ -51,7 +52,7 @@ def test_owner_units_exactly_partition_repository_test_membership(
 
 
 def test_special_classifications_are_singleton_external_units(
-    repository_qualification_plan,
+    repository_qualification_plan: dict[str, object],
 ) -> None:
     units = tuple(repository_qualification_plan["units"])
     special = [unit for unit in units if unit["kind"] != "release-correctness"]
@@ -64,7 +65,7 @@ def test_special_classifications_are_singleton_external_units(
 
 
 def test_release_correctness_units_prefer_file_granularity_without_runtime_policy(
-    repository_qualification_plan,
+    repository_qualification_plan: dict[str, object],
 ) -> None:
     units = tuple(repository_qualification_plan["units"])
     correctness = [unit for unit in units if unit["kind"] == "release-correctness"]
@@ -94,7 +95,7 @@ def test_owner_plan_is_deterministic_and_binds_exact_membership_classification_a
 
 
 def test_external_coverage_validates_linkage_without_interpreting_pass_result(
-    repository_qualification_plan,
+    repository_qualification_plan: dict[str, object],
 ) -> None:
     plan = repository_qualification_plan
     unit = plan["units"][0]
@@ -116,7 +117,7 @@ def test_external_coverage_validates_linkage_without_interpreting_pass_result(
 
 
 def test_coverage_rejects_omission_duplicate_and_execution_policy(
-    repository_qualification_plan,
+    repository_qualification_plan: dict[str, object],
 ) -> None:
     plan = repository_qualification_plan
     unit = next(row for row in plan["units"] if len(row["nodeids"]) >= 2)
@@ -148,7 +149,7 @@ def test_coverage_rejects_omission_duplicate_and_execution_policy(
 
 
 def test_coverage_rejects_invalid_external_producer_metadata(
-    repository_qualification_plan,
+    repository_qualification_plan: dict[str, object],
 ) -> None:
     plan = repository_qualification_plan
     unit = plan["units"][0]
@@ -175,7 +176,7 @@ def test_coverage_rejects_invalid_external_producer_metadata(
 
 
 def test_native_handoff_keeps_execution_result_and_certification_external(
-    repository_qualification_handoff,
+    repository_qualification_handoff: dict[str, object],
 ) -> None:
     handoff = repository_qualification_handoff
     assert handoff["execution_authority"] == "external"
@@ -248,7 +249,9 @@ def test_repository_identity_can_exclude_declared_runtime_state_path(
     assert repository_content_identity(tmp_path, excluded_paths=(runtime,)) != first
 
 
-def test_owner_plan_reuses_one_repository_classification_snapshot(monkeypatch) -> None:
+def test_owner_plan_reuses_one_repository_classification_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     import hashmarks.qualification_units as qualification_units_module
     import hashmarks.test_shards as test_shards_module
 
@@ -257,12 +260,12 @@ def test_owner_plan_reuses_one_repository_classification_snapshot(monkeypatch) -
     real_nodeids = qualification_units_module._nodeids
     real_identity = test_shards_module.repository_content_identity
 
-    def counted_nodeids(root: Path):
+    def counted_nodeids(root: Path) -> list[str]:
         nonlocal nodeid_calls
         nodeid_calls += 1
         return real_nodeids(root)
 
-    def counted_identity(root: Path, *, excluded_paths=()):
+    def counted_identity(root: Path, *, excluded_paths: tuple[Path, ...] = ()) -> str:
         nonlocal identity_calls
         identity_calls += 1
         return real_identity(root, excluded_paths=excluded_paths)
@@ -280,7 +283,7 @@ def test_owner_plan_reuses_one_repository_classification_snapshot(monkeypatch) -
 
 
 def test_repository_identity_prunes_runtime_trees_before_walk(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     import hashmarks.test_shards as test_shards_module
 
@@ -294,7 +297,9 @@ def test_repository_identity_prunes_runtime_trees_before_walk(
     visited: list[str] = []
     real_walk = test_shards_module.os.walk
 
-    def observed_walk(*args, **kwargs):
+    def observed_walk(
+        *args: object, **kwargs: object
+    ) -> Iterator[tuple[str, list[str], list[str]]]:
         for row in real_walk(*args, **kwargs):
             visited.append(Path(row[0]).relative_to(tmp_path).as_posix())
             yield row
@@ -323,7 +328,7 @@ def test_external_result_rejects_nonportable_or_coerced_identity_state() -> None
 
 
 def test_native_handoff_rejects_rehashed_unit_authority_tampering(
-    repository_qualification_handoff,
+    repository_qualification_handoff: dict[str, object],
 ) -> None:
     handoff = copy.deepcopy(repository_qualification_handoff)
     unit = handoff["units"][0]
@@ -344,7 +349,7 @@ def test_native_handoff_rejects_rehashed_unit_authority_tampering(
 
 
 def test_coverage_rejects_rehashed_semantically_corrupt_hashmarks_plan(
-    repository_qualification_plan,
+    repository_qualification_plan: dict[str, object],
 ) -> None:
     original = repository_qualification_plan
     unit = original["units"][0]

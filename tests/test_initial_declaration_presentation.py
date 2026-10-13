@@ -45,7 +45,7 @@ def _read_table(text: str, shared: dict[str, Any]) -> dict[str, Any]:
 
 def test_compact_tables_recover_all_locators_qualifiers_and_future_fields(
     tmp_path: Path,
-):
+) -> None:
     (tmp_path / "répository.py").write_text(
         "class Worker:\n    def update(self):\n        return self.failed_update()\n    def failed_update(self):\n        return False\n"
     )

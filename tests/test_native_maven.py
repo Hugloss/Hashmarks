@@ -30,7 +30,7 @@ def test_collect_maven_modules_uses_native_effective_model(
     )
     commands: list[list[str]] = []
 
-    def fake_run(command: list[str], **_kwargs):
+    def fake_run(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess:
         commands.append(command)
         _output_path(command).write_text(
             "<project>"
@@ -111,7 +111,7 @@ def test_collect_maven_modules_uses_only_admitted_manifests(
     hidden.write_text("<project/>", encoding="utf-8")
     seen: list[Path] = []
 
-    def fake_run(command: list[str], **_kwargs):
+    def fake_run(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess:
         manifest = Path(command[command.index("-f") + 1])
         seen.append(manifest)
         _output_path(command).write_text(

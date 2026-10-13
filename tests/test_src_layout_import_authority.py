@@ -1,4 +1,9 @@
+from __future__ import annotations
+
 from pathlib import Path
+from typing import Never
+
+from pytest import MonkeyPatch
 
 from hashmarks.codemap import CodeMap
 
@@ -535,7 +540,7 @@ def test_uv_workspace_same_namespace_concrete_module_duplicate_fails_closed(
 
 
 def test_uv_workspace_transition_reprojection_does_not_scan_all_persisted_rows(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
     _write(
         tmp_path,
@@ -555,7 +560,7 @@ def test_uv_workspace_transition_reprojection_does_not_scan_all_persisted_rows(
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
 
-        def forbidden():
+        def forbidden() -> Never:
             raise AssertionError(
                 "uv member reprojection must not materialize all repository rows"
             )

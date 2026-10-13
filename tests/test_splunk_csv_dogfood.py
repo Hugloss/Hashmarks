@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import csv
 import hashlib
+from pathlib import Path
+from typing import Any
 
 import pytest
+from pytest import MonkeyPatch
 
 import scripts.agent_evaluation.splunk_csv_dogfood as splunk_csv_dogfood
 from hashmarks.codemap import evidence_request_budget_fits
@@ -14,13 +17,13 @@ HEADER = (
 )
 
 
-def _write(path, body: str) -> None:
+def _write(path: Path, body: str) -> None:
     path.write_text(HEADER + body, encoding="utf-8")
 
 
 def test_splunk_csv_dogfood_binds_artifact_hash_and_parse_to_same_snapshot(
-    monkeypatch,
-    tmp_path,
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     original_body = (
@@ -38,7 +41,7 @@ def test_splunk_csv_dogfood_binds_artifact_hash_and_parse_to_same_snapshot(
     real_collect_stream = splunk_csv_dogfood._collect_stream
     snapshots = []
 
-    def mutate_source_then_collect(snapshot):
+    def mutate_source_then_collect(snapshot: Path) -> object:
         snapshots.append(snapshot)
         _write(source, replacement_body)
         return real_collect_stream(snapshot)
@@ -63,7 +66,7 @@ def test_splunk_csv_dogfood_binds_artifact_hash_and_parse_to_same_snapshot(
 
 
 def test_splunk_csv_dogfood_accepts_strict_valid_raw_above_runtime_csv_limit(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     raw = "INFO name=tasks.worker " + ("x" * 150_000)
@@ -81,7 +84,7 @@ def test_splunk_csv_dogfood_accepts_strict_valid_raw_above_runtime_csv_limit(
     assert report["bundle"]["anchors"][0]["module"] == "tasks.worker"
 
 
-def test_splunk_csv_dogfood_restores_runtime_csv_field_limit(tmp_path) -> None:
+def test_splunk_csv_dogfood_restores_runtime_csv_field_limit(tmp_path: Path) -> None:
     source = tmp_path / "masked.csv"
     raw = "INFO name=tasks.worker " + ("x" * 150_000)
     _write(
@@ -96,7 +99,7 @@ def test_splunk_csv_dogfood_restores_runtime_csv_field_limit(tmp_path) -> None:
 
 
 def test_splunk_csv_dogfood_accepts_utf8_bom_as_transport_marker(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     plain = tmp_path / "plain.csv"
     bom = tmp_path / "bom.csv"
@@ -122,7 +125,7 @@ def test_splunk_csv_dogfood_accepts_utf8_bom_as_transport_marker(
     )
 
 
-def test_splunk_csv_dogfood_accepts_equivalent_header_quoting(tmp_path) -> None:
+def test_splunk_csv_dogfood_accepts_equivalent_header_quoting(tmp_path: Path) -> None:
     source = tmp_path / "masked.csv"
     source.write_text(
         "_serial,_time,source,sourcetype,host,index,splunk_server,_raw\n"
@@ -136,7 +139,7 @@ def test_splunk_csv_dogfood_accepts_equivalent_header_quoting(tmp_path) -> None:
     assert report["summary"]["csv_strict_valid"] == 1
 
 
-def test_splunk_csv_dogfood_keeps_header_schema_exact(tmp_path) -> None:
+def test_splunk_csv_dogfood_keeps_header_schema_exact(tmp_path: Path) -> None:
     source = tmp_path / "masked.csv"
     source.write_text(
         "_serial,_time,source,host,sourcetype,index,splunk_server,_raw\n"
@@ -149,7 +152,9 @@ def test_splunk_csv_dogfood_keeps_header_schema_exact(tmp_path) -> None:
         collect(source)
 
 
-def test_splunk_csv_dogfood_accepts_unquoted_serial_record_start(tmp_path) -> None:
+def test_splunk_csv_dogfood_accepts_unquoted_serial_record_start(
+    tmp_path: Path,
+) -> None:
     source = tmp_path / "masked.csv"
     _write(
         source,
@@ -165,7 +170,7 @@ def test_splunk_csv_dogfood_accepts_unquoted_serial_record_start(tmp_path) -> No
 
 
 def test_splunk_csv_dogfood_native_framing_ignores_full_row_like_raw_continuation(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     _write(
@@ -189,7 +194,7 @@ def test_splunk_csv_dogfood_native_framing_ignores_full_row_like_raw_continuatio
 
 
 def test_splunk_csv_dogfood_falls_back_only_for_damaged_csv_framing(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     _write(
@@ -209,7 +214,7 @@ def test_splunk_csv_dogfood_falls_back_only_for_damaged_csv_framing(
 
 
 def test_splunk_csv_dogfood_does_not_split_record_like_raw_continuation(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     _write(
@@ -226,7 +231,7 @@ def test_splunk_csv_dogfood_does_not_split_record_like_raw_continuation(
 
 
 def test_splunk_csv_dogfood_recovers_invalid_raw_without_hiding_parser_state(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     _write(
@@ -264,7 +269,7 @@ def test_splunk_csv_dogfood_recovers_invalid_raw_without_hiding_parser_state(
 
 
 def test_splunk_csv_dogfood_does_not_confuse_csv_validity_with_payload_validity(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     _write(
@@ -296,7 +301,7 @@ def test_splunk_csv_dogfood_does_not_confuse_csv_validity_with_payload_validity(
     }
 
 
-def test_splunk_csv_dogfood_accounts_for_locator_free_events(tmp_path) -> None:
+def test_splunk_csv_dogfood_accounts_for_locator_free_events(tmp_path: Path) -> None:
     source = tmp_path / "masked.csv"
     _write(
         source,
@@ -329,7 +334,7 @@ def test_splunk_csv_dogfood_accounts_for_locator_free_events(tmp_path) -> None:
 
 
 def test_splunk_csv_dogfood_rejects_invalid_module_locator_without_repair(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     _write(
@@ -348,7 +353,7 @@ def test_splunk_csv_dogfood_rejects_invalid_module_locator_without_repair(
 
 
 def test_splunk_csv_dogfood_rejects_locator_beyond_core_module_bound(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     module = "m" * 1025
@@ -365,7 +370,7 @@ def test_splunk_csv_dogfood_rejects_locator_beyond_core_module_bound(
 
 
 def test_splunk_csv_dogfood_rejects_invalid_traceback_locator_without_repair(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     _write(
@@ -383,7 +388,7 @@ def test_splunk_csv_dogfood_rejects_invalid_traceback_locator_without_repair(
 
 
 def test_splunk_csv_dogfood_does_not_strip_invalid_module_suffix(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     _write(
@@ -399,7 +404,7 @@ def test_splunk_csv_dogfood_does_not_strip_invalid_module_suffix(
 
 
 def test_splunk_csv_dogfood_does_not_salvage_module_prefix_before_slash(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     _write(
@@ -415,7 +420,7 @@ def test_splunk_csv_dogfood_does_not_salvage_module_prefix_before_slash(
 
 
 def test_splunk_csv_dogfood_counts_multiple_locator_types_once_per_event(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     _write(
@@ -438,7 +443,7 @@ def test_splunk_csv_dogfood_counts_multiple_locator_types_once_per_event(
     assert summary["unique_anchors_observed"] == 2
 
 
-def test_splunk_csv_dogfood_bounds_unlocated_event_samples(tmp_path) -> None:
+def test_splunk_csv_dogfood_bounds_unlocated_event_samples(tmp_path: Path) -> None:
     source = tmp_path / "masked.csv"
     rows = []
     for index in range(5):
@@ -457,7 +462,7 @@ def test_splunk_csv_dogfood_bounds_unlocated_event_samples(tmp_path) -> None:
 
 
 def test_splunk_csv_dogfood_separates_artifact_occurrence_and_observation_identity(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     quoted = tmp_path / "quoted.csv"
     unquoted = tmp_path / "unquoted.csv"
@@ -502,7 +507,7 @@ def test_splunk_csv_dogfood_separates_artifact_occurrence_and_observation_identi
 
 
 def test_splunk_csv_dogfood_projection_identity_is_order_independent(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     first = tmp_path / "first.csv"
     reversed_source = tmp_path / "reversed.csv"
@@ -544,7 +549,7 @@ def test_splunk_csv_dogfood_projection_identity_is_order_independent(
 
 
 def test_splunk_csv_dogfood_repeated_observation_keeps_distinct_occurrences(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     _write(
@@ -563,7 +568,7 @@ def test_splunk_csv_dogfood_repeated_observation_keeps_distinct_occurrences(
 
 
 def test_splunk_csv_dogfood_orders_scope_by_instant_across_offsets(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     _write(
@@ -591,7 +596,7 @@ def test_splunk_csv_dogfood_orders_scope_by_instant_across_offsets(
 
 
 def test_splunk_csv_dogfood_marks_unparseable_timestamp_ordering_fallback(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     _write(
@@ -614,7 +619,7 @@ def test_splunk_csv_dogfood_marks_unparseable_timestamp_ordering_fallback(
 
 
 def test_splunk_csv_dogfood_preserves_bounded_opaque_context_per_anchor(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     _write(
@@ -642,7 +647,7 @@ def test_splunk_csv_dogfood_preserves_bounded_opaque_context_per_anchor(
     assert context["values_truncated"] is False
 
 
-def test_splunk_csv_dogfood_preserves_runtime_placement_scope(tmp_path) -> None:
+def test_splunk_csv_dogfood_preserves_runtime_placement_scope(tmp_path: Path) -> None:
     source = tmp_path / "masked.csv"
     _write(
         source,
@@ -659,7 +664,7 @@ def test_splunk_csv_dogfood_preserves_runtime_placement_scope(tmp_path) -> None:
 
 
 def test_splunk_csv_dogfood_scope_truncation_is_order_independent(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     forward = tmp_path / "forward.csv"
     reverse = tmp_path / "reverse.csv"
@@ -691,7 +696,7 @@ def test_splunk_csv_dogfood_scope_truncation_is_order_independent(
 
 
 def test_splunk_csv_dogfood_context_truncation_is_order_independent(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     forward = tmp_path / "forward.csv"
     reverse = tmp_path / "reverse.csv"
@@ -727,7 +732,7 @@ def test_splunk_csv_dogfood_context_truncation_is_order_independent(
 
 
 def test_splunk_csv_dogfood_bounds_context_without_splitting_anchor(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     rows = []
@@ -753,7 +758,7 @@ def test_splunk_csv_dogfood_bounds_context_without_splitting_anchor(
 
 
 def test_splunk_csv_dogfood_fits_oversized_scope_to_core_budget(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     oversized_source = "[source-" + ("x" * 9_000) + "]"
@@ -784,7 +789,7 @@ def test_splunk_csv_dogfood_fits_oversized_scope_to_core_budget(
 
 
 def test_splunk_csv_dogfood_fits_oversized_context_to_core_budget(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     oversized_context = "[DOC-" + ("x" * 9_000) + "]"
@@ -819,7 +824,7 @@ def test_splunk_csv_dogfood_fits_oversized_context_to_core_budget(
 
 
 def test_splunk_csv_dogfood_fits_total_metadata_request_budget(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     rows = []
@@ -843,7 +848,7 @@ def test_splunk_csv_dogfood_fits_total_metadata_request_budget(
 
 
 def test_splunk_csv_dogfood_fits_encoded_request_budget(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     rows = []
@@ -868,7 +873,7 @@ def test_splunk_csv_dogfood_fits_encoded_request_budget(
 
 
 def test_splunk_csv_dogfood_nontruncated_projection_remains_unknown(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     _write(
@@ -887,7 +892,7 @@ def test_splunk_csv_dogfood_nontruncated_projection_remains_unknown(
 
 
 def test_splunk_csv_dogfood_preserves_multiline_record_and_exact_source_identity(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     body = (
@@ -906,7 +911,7 @@ def test_splunk_csv_dogfood_preserves_multiline_record_and_exact_source_identity
 
 
 def test_splunk_csv_dogfood_never_uses_repeated_serial_as_event_identity(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     _write(
@@ -925,7 +930,7 @@ def test_splunk_csv_dogfood_never_uses_repeated_serial_as_event_identity(
     assert all(value.startswith("event:") for value in metadata["sample_event_ids"])
 
 
-def test_splunk_csv_dogfood_bounds_module_anchor_projection(tmp_path) -> None:
+def test_splunk_csv_dogfood_bounds_module_anchor_projection(tmp_path: Path) -> None:
     source = tmp_path / "masked.csv"
     rows = []
     for index in range(20):
@@ -944,7 +949,7 @@ def test_splunk_csv_dogfood_bounds_module_anchor_projection(tmp_path) -> None:
 
 
 def test_splunk_csv_dogfood_correlates_through_existing_repository_owner(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     _write(
@@ -968,7 +973,7 @@ def test_splunk_csv_dogfood_correlates_through_existing_repository_owner(
 
 
 def test_splunk_csv_dogfood_prioritizes_traceback_path_line_symbol_anchor(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     _write(
@@ -993,7 +998,7 @@ def test_splunk_csv_dogfood_prioritizes_traceback_path_line_symbol_anchor(
 
 
 def test_splunk_csv_dogfood_anchor_ids_do_not_collide_for_distinct_tracebacks(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     _write(
@@ -1013,7 +1018,7 @@ def test_splunk_csv_dogfood_anchor_ids_do_not_collide_for_distinct_tracebacks(
 
 
 def test_splunk_csv_dogfood_module_anchor_id_stays_within_core_bound(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     module = "m" * 600
@@ -1030,7 +1035,7 @@ def test_splunk_csv_dogfood_module_anchor_id_stays_within_core_bound(
 
 
 def test_splunk_csv_dogfood_traceback_anchor_id_stays_within_core_bound(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     path = "/" + ("p" * 700) + ".py"
@@ -1049,7 +1054,7 @@ def test_splunk_csv_dogfood_traceback_anchor_id_stays_within_core_bound(
 
 
 def test_splunk_csv_dogfood_preserves_syntaxerror_path_line_without_symbol(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     _write(
@@ -1073,7 +1078,7 @@ def test_splunk_csv_dogfood_preserves_syntaxerror_path_line_without_symbol(
 
 
 def test_splunk_csv_dogfood_distinguishes_symbol_less_and_symbol_frames(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     _write(
@@ -1106,7 +1111,7 @@ def test_splunk_csv_dogfood_distinguishes_symbol_less_and_symbol_frames(
 
 
 def test_splunk_csv_dogfood_does_not_treat_nonframe_suffix_as_syntaxerror(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     _write(
@@ -1123,7 +1128,7 @@ def test_splunk_csv_dogfood_does_not_treat_nonframe_suffix_as_syntaxerror(
 
 
 def test_splunk_csv_dogfood_preserves_pseudo_traceback_symbols(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     _write(
@@ -1150,7 +1155,7 @@ def test_splunk_csv_dogfood_preserves_pseudo_traceback_symbols(
 
 
 def test_splunk_csv_dogfood_preserves_comma_in_quoted_traceback_path(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     _write(
@@ -1172,7 +1177,7 @@ def test_splunk_csv_dogfood_preserves_comma_in_quoted_traceback_path(
 
 
 def test_splunk_csv_dogfood_preserves_all_traceback_frames_in_one_event(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     _write(
@@ -1203,7 +1208,7 @@ def test_splunk_csv_dogfood_preserves_all_traceback_frames_in_one_event(
 
 
 def test_splunk_csv_dogfood_counts_repeated_traceback_frame_occurrences(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     _write(
@@ -1224,7 +1229,7 @@ def test_splunk_csv_dogfood_counts_repeated_traceback_frame_occurrences(
 
 
 def test_splunk_csv_dogfood_correlates_traceback_with_explicit_path_mapping(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     _write(
@@ -1257,7 +1262,7 @@ def test_splunk_csv_dogfood_correlates_traceback_with_explicit_path_mapping(
 
 
 def test_splunk_csv_dogfood_counts_final_physical_line_without_newline(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     source.write_text(
@@ -1272,7 +1277,7 @@ def test_splunk_csv_dogfood_counts_final_physical_line_without_newline(
 
 
 def test_splunk_csv_dogfood_recovery_quote_does_not_enter_opaque_context(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     _write(
@@ -1293,7 +1298,7 @@ def test_splunk_csv_dogfood_recovery_quote_does_not_enter_opaque_context(
 
 
 def test_splunk_csv_dogfood_recovers_traceback_after_quote_damage(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "masked.csv"
     _write(

@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Iterator
+
+import pytest
 
 from hashmarks.codemap import CodeMap
 from scripts.agent_evaluation.metrics_fresh_multi_repo import materialize_fixture
 
 
-def _cases(root: Path):
+def _cases(root: Path) -> Iterator[tuple[Path, dict[str, object]]]:
     for _name, repo, corpus in materialize_fixture(root):
         payload = json.loads(corpus.read_text(encoding="utf-8"))
         for task in payload["tasks"]:

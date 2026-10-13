@@ -17,7 +17,7 @@ class _NativeProjectProvider(ProjectGraphProvider):
 
     def __init__(
         self,
-        manifest_finder,
+        manifest_finder: object,
         *,
         include_denied_freshness: bool = False,
     ) -> None:

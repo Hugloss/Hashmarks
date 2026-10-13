@@ -11,7 +11,7 @@ from hashmarks.codemap import CodeMap
 from hashmarks.evidence_context import describe_evidence_binding_reacquisition
 
 
-def requery(cm: CodeMap, reference: Any) -> Any:
+def requery(cm: CodeMap, reference: dict[str, object]) -> dict[str, object]:
     query = reference["requery"]
     return cm.repository_evidence_bindings(
         [{"binding_id": query["binding_id"], "evidence": query["evidence"]}],

@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def test_cli_exposes_verification_relevance(tmp_path: Path, capsys) -> None:
+def test_cli_exposes_verification_relevance(tmp_path: Path, capsys: Any) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
     (tmp_path / "src" / "owner.py").write_text("def widget(value):\n    return value\n")

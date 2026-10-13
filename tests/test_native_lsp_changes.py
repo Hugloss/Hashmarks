@@ -26,7 +26,7 @@ from hashmarks.digest import FILE_DOMAIN, hash_bytes
 from hashmarks.evidence_presentation import FORMATS, present_repository_evidence
 
 
-def observe(cm: CodeMap, root: Path, source: Path, name: str) -> Any:
+def observe(cm: CodeMap, root: Path, source: Path, name: str) -> object:
     row = next(
         row
         for row in json.loads((source / "captures.json").read_text())
@@ -44,7 +44,7 @@ def observe(cm: CodeMap, root: Path, source: Path, name: str) -> Any:
         ) from exc
 
 
-def lsp_row(packet: Any) -> Any:
+def lsp_row(packet: object) -> object:
     return next(
         row
         for row in packet["observations"]
@@ -53,7 +53,7 @@ def lsp_row(packet: Any) -> Any:
     )
 
 
-def _assert_hover_formats(packet: Any, capture: Any) -> None:
+def _assert_hover_formats(packet: object, capture: object) -> None:
     for format in FORMATS:
         if format != "none":
             assert_hover_presentation(
@@ -207,7 +207,7 @@ def test_native_hover_save_delta_and_codemap_reopen_do_not_replay(
         _assert_hover_formats(after, changed_capture)
     with CodeMap(root, state_dir=state) as cm:
         cm.sync()
-        current: Any = cm.structural_locality(
+        current: object = cm.structural_locality(
             "src/source.py::target", result_mode="relationships"
         )
     assert all(

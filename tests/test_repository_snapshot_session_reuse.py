@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import pytest
+
 from hashmarks import CodeMap
 
 if TYPE_CHECKING:
@@ -24,21 +26,20 @@ def _repo(root: Path) -> tuple[str, list[str]]:
 
 
 def test_identical_snapshot_requests_reuse_one_generation_bound_composition(
-    tmp_path: Path,
-    monkeypatch,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    task, paths = _repo(tmp_path)
+    _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         calls = {"brief": 0, "freshness": 0}
         original_brief = codemap.change_intelligence_brief
         original_freshness = codemap.evidence_freshness_map
 
-        def counted_brief(*args, **kwargs):
+        def counted_brief(*args: object, **kwargs: object) -> dict[str, object]:
             calls["brief"] += 1
             return original_brief(*args, **kwargs)
 
-        def counted_freshness(*args, **kwargs):
+        def counted_freshness(*args: object, **kwargs: object) -> dict[str, object]:
             calls["freshness"] += 1
             return original_freshness(*args, **kwargs)
 
@@ -63,7 +64,7 @@ def test_identical_snapshot_requests_reuse_one_generation_bound_composition(
 
 
 def test_snapshot_reuse_key_includes_task_paths_and_all_bounds(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     task, paths = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
@@ -71,7 +72,7 @@ def test_snapshot_reuse_key_includes_task_paths_and_all_bounds(
         calls = 0
         original = codemap.change_intelligence_brief
 
-        def counted(*args, **kwargs):
+        def counted(*args: object, **kwargs: object) -> dict[str, object]:
             nonlocal calls
             calls += 1
             return original(*args, **kwargs)
@@ -114,7 +115,7 @@ def test_cached_snapshot_isolated_from_caller_mutation(tmp_path: Path) -> None:
 
 
 def test_snapshot_cache_is_not_reused_across_decision_sessions(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     task, paths = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
@@ -122,7 +123,7 @@ def test_snapshot_cache_is_not_reused_across_decision_sessions(
         calls = 0
         original = codemap.change_intelligence_brief
 
-        def counted(*args, **kwargs):
+        def counted(*args: object, **kwargs: object) -> dict[str, object]:
             nonlocal calls
             calls += 1
             return original(*args, **kwargs)

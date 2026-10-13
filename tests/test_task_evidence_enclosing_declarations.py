@@ -11,7 +11,7 @@ from hashmarks.evidence_presentation import presentation_response
 
 def test_nested_helper_discloses_source_bound_enclosing_method_in_initial_and_full(
     tmp_path: Path,
-):
+) -> None:
     path = tmp_path / "backend.py"
     path.write_text(
         "class Worker:\n    def drain(self):\n        def nested_cleanup_marker():\n            return 1\n        return nested_cleanup_marker()\n"
@@ -56,7 +56,7 @@ def test_nested_helper_discloses_source_bound_enclosing_method_in_initial_and_fu
     assert '["drain",2,5]' in text
 
 
-def test_deep_nesting_is_bounded_and_does_not_establish_absence(tmp_path: Path):
+def test_deep_nesting_is_bounded_and_does_not_establish_absence(tmp_path: Path) -> None:
     lines = []
     for level in range(6):
         lines.append("    " * level + f"def level_{level}():")

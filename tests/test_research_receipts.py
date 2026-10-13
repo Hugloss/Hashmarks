@@ -25,7 +25,7 @@ def test_research_receipt_reuses_exact_completed_work(tmp_path: Path) -> None:
     )
     calls = 0
 
-    def run():
+    def run() -> dict[str, object]:
         nonlocal calls
         calls += 1
         return {"value": 1}

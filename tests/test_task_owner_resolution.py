@@ -145,8 +145,7 @@ def test_owner_resolution_marks_structural_repository_owner(
 
 
 def test_unique_exact_owner_does_not_enter_weaker_structural_resolution(
-    tmp_path: Path,
-    monkeypatch,
+    tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
     from hashmarks.codemap.ownership_graph import OwnershipGraphMixin
 
@@ -157,7 +156,7 @@ def test_unique_exact_owner_does_not_enter_weaker_structural_resolution(
         "    del expected_sequence\n",
     )
 
-    def forbidden(*args, **kwargs):
+    def forbidden(*args, **kwargs) -> None:
         del args, kwargs
         raise AssertionError("exact owner must terminate before structural resolution")
 

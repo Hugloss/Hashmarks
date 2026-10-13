@@ -545,13 +545,13 @@ def test_verification_reference_index_invalidates_when_source_changes(
 
 
 def test_verification_candidate_projection_samples_pytest_config_once(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
     task, _ = _build_repetitive_verification_repo(tmp_path, distractors=80)
     calls = 0
     original = CodeMap._pytest_declared
 
-    def counted(self):
+    def counted(self: CodeMap) -> Any:
         nonlocal calls
         calls += 1
         return original(self)
@@ -566,7 +566,7 @@ def test_verification_candidate_projection_samples_pytest_config_once(
 
 
 def test_verification_reference_projection_reads_each_candidate_snapshot_once(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
     task, _ = _build_repetitive_verification_repo(tmp_path, distractors=80)
     import hashmarks.codemap.evidence_verification as verification_module
@@ -574,7 +574,7 @@ def test_verification_reference_projection_reads_each_candidate_snapshot_once(
     calls = 0
     original = verification_module.read_python_ast
 
-    def counted(path, *args, **kwargs):
+    def counted(path: str, *args, **kwargs) -> Any:
         nonlocal calls
         calls += 1
         return original(path, *args, **kwargs)

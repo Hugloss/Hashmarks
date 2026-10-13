@@ -19,7 +19,7 @@ def _interrupt_after_one_staged_batch(
     original = codemap._parse_or_reuse
     calls = 0
 
-    def interrupt(*args, **kwargs):
+    def interrupt(*args: object, **kwargs: object) -> object:
         nonlocal calls
         calls += 1
         if calls == 34:

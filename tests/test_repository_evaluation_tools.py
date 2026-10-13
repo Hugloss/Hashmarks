@@ -497,7 +497,7 @@ def test_repository_evaluation_grader_rejects_malformed_inputs(
 def test_profile_comparison_uses_same_version_noise_floor() -> None:
     from scripts.repository_evaluation.compare_profiles import compare_profiles
 
-    def doc(median: int):
+    def doc(median: int) -> dict[str, object]:
         return {
             "cases": [
                 {
@@ -523,7 +523,7 @@ def test_profile_comparison_uses_same_version_noise_floor() -> None:
 def test_profile_comparison_uses_per_case_noise_not_global_p90() -> None:
     from scripts.repository_evaluation.compare_profiles import compare_profiles
 
-    def doc(x: int, y: int):
+    def doc(x: int, y: int) -> dict[str, object]:
         return {
             "cases": [
                 {
@@ -557,7 +557,7 @@ def test_profile_comparison_uses_per_case_noise_not_global_p90() -> None:
 def test_profile_shards_merge_strict_identity_and_complete() -> None:
     from scripts.repository_evaluation.merge_profiles import merge_profiles
 
-    def shard(index: int, case_id: str):
+    def shard(index: int, case_id: str) -> dict[str, object]:
         return {
             "schema": "hashmarks.repository-evaluation-profile.v1",
             "suite": "s",
@@ -604,7 +604,7 @@ def test_paired_profile_interleaves_semantics_and_fails_closed_on_noise(
     timings = iter([100, 100, 100, 100, 100, 140, 100, 60, 100, 140])
     original = profiles._run_action
 
-    def fake(codemap, case):
+    def fake(codemap: object, case: dict[str, object]) -> tuple[float, str]:
         elapsed, _ = original(codemap, case)
         with contextlib.suppress(StopIteration):
             elapsed = next(timings)

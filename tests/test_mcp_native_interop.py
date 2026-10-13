@@ -231,7 +231,7 @@ def test_mcp_native_stdio_initialize_catalog_call_and_error(tmp_path: Path) -> N
     asyncio.run(exercise())
 
 
-async def _assert_initial_delivery(session):
+async def _assert_initial_delivery(session: ClientSession) -> None:
     from hashmarks.codemap.task_evidence_initial import (
         decode_initial_packet,
     )

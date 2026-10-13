@@ -29,7 +29,7 @@ def _install_competing_writer(
 ) -> None:
     original_sync = reader.sync
 
-    def racing_sync(paths=None):
+    def racing_sync(paths: list[str] | None = None) -> None:
         result = original_sync(paths)
         other.write_text("def other(): return 'new'\n", encoding="utf-8")
         writer.sync(["src/other.py"])
@@ -135,7 +135,7 @@ def test_declared_freshness_rebind_rejects_competing_generation(
         reader.enrich_projects(("npm-package-graph", "declared-project-links"))
         original_sync = reader.sync
 
-        def racing_sync(paths=None):
+        def racing_sync(paths: list[str] | None = None) -> None:
             result = original_sync(paths)
             (tmp_path / "src" / "other.py").write_text(
                 "def other(): return 'new'\n",

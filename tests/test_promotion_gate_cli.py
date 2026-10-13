@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from hashmarks.qualification_units import native_qualification_handoff
 from scripts.promotion_gate import main
 
@@ -16,7 +18,7 @@ def _write_handoff(tmp_path: Path, value: dict[str, object]) -> Path:
 
 
 def test_promotion_gate_cli_accepts_current_bound_handoff_without_authorizing_release(
-    tmp_path: Path, capsys
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     handoff = _write_handoff(tmp_path, native_qualification_handoff(_root()))
     code = main(
@@ -37,7 +39,7 @@ def test_promotion_gate_cli_accepts_current_bound_handoff_without_authorizing_re
 
 
 def test_promotion_gate_cli_fails_closed_for_handoff_from_different_repository(
-    tmp_path: Path, capsys
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     handoff = native_qualification_handoff(_root())
     handoff["repository_identity"] = "sha256:" + "a" * 64 + ":1"

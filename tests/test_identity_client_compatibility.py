@@ -39,7 +39,7 @@ class _FakeSocket:
 
 
 def _client_with_socket(
-    tmp_path: Path, monkeypatch, chunks: list[bytes]
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, chunks: list[bytes]
 ) -> IdentityClient:
     sock = _FakeSocket(chunks)
     monkeypatch.setattr("hashmarks.client.socket.socket", lambda *_args: sock)

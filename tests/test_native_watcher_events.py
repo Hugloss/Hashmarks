@@ -31,7 +31,7 @@ def _watcher(root: Path) -> NativeLinuxBatchWatcher:
 
 
 def test_inotify_event_buffer_tracks_file_and_directory_changes(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     watcher = _watcher(tmp_path)
     added: list[str] = []
@@ -53,7 +53,7 @@ def test_inotify_event_buffer_tracks_file_and_directory_changes(
 
 
 def test_inotify_event_buffer_marks_overflow_and_root_watch_loss(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     watcher = _watcher(tmp_path)
     reasons: list[str] = []
@@ -70,7 +70,7 @@ def test_inotify_event_buffer_marks_overflow_and_root_watch_loss(
 
 
 def test_inotify_root_move_marks_observation_unknown(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     watcher = _watcher(tmp_path)
     reasons: list[str] = []
@@ -82,7 +82,7 @@ def test_inotify_root_move_marks_observation_unknown(
 
 
 def test_inotify_recursive_watch_failure_stops_current_event_buffer(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     watcher = _watcher(tmp_path)
     reasons: list[str] = []

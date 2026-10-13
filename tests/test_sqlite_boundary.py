@@ -15,7 +15,7 @@ def test_configure_sqlite_connection_retries_only_wal_first_open_lock(
             self.wal_attempts = 0
             self.events: list[str] = []
 
-        def execute(self, statement: str):
+        def execute(self, statement: str) -> "FirstOpenRaceConnection":
             self.events.append(statement)
             if statement == "PRAGMA journal_mode=WAL":
                 self.wal_attempts += 1
@@ -38,7 +38,7 @@ def test_configure_sqlite_connection_retries_only_wal_first_open_lock(
 
 def test_configure_sqlite_connection_does_not_hide_unrelated_sqlite_error() -> None:
     class BrokenConnection:
-        def execute(self, statement: str):
+        def execute(self, statement: str) -> "BrokenConnection":
             if statement == "PRAGMA journal_mode=WAL":
                 raise sqlite3.OperationalError("disk I/O error")
             return self
@@ -79,7 +79,7 @@ def test_sqlite_transaction_rolls_back_failed_commit(
             self.in_transaction = False
             self.events: list[str] = []
 
-        def execute(self, statement: str):
+        def execute(self, statement: str) -> "FailingCommitConnection":
             self.events.append(statement)
             if statement.startswith("BEGIN"):
                 self.in_transaction = True

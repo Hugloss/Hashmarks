@@ -6,7 +6,7 @@ from scripts import windows_published_upgrade_smoke as smoke
 
 
 def test_previous_windows_release_selects_newest_qualified_stable_tag(
-    monkeypatch,
+    monkeypatch: MonkeyPatch,
 ) -> None:
     releases = [
         {
@@ -50,7 +50,9 @@ def test_previous_windows_release_selects_newest_qualified_stable_tag(
     assert smoke._previous_windows_release("Hugloss/Hashmarks", "v0.25.0") == "v0.24.0"
 
 
-def test_first_windows_release_has_explicit_no_prior_result(monkeypatch) -> None:
+def test_first_windows_release_has_explicit_no_prior_result(
+    monkeypatch: MonkeyPatch,
+) -> None:
     monkeypatch.setattr(smoke, "_read_url", lambda url, *, token=None: b"[]")
 
     assert smoke._previous_windows_release("Hugloss/Hashmarks", "v0.24.0") is None

@@ -154,7 +154,7 @@ def test_overlay_rejects_base_generation_change_during_fused_read(
             overlay.sync(["src/engine.py"])
             original_find = overlay.overlay.find_task
 
-            def advance_base_during_overlay_read(task: str, *, limit: int = 20):
+            def advance_base_during_overlay_read(task: str, *, limit: int = 20) -> Any:
                 hits = original_find(task, limit=limit)
                 with base.store.publication_transaction():
                     base.store.bump_generation()

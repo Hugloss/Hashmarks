@@ -190,7 +190,7 @@ def test_indirect_verification_reference_requires_the_correct_import_owner(
     assert rows["tests/test_unrelated.py"]["indirect_via_paths"] == []
 
 
-def test_verification_ownership_is_evidence_only_and_bounded(tmp_path):
+def test_verification_ownership_is_evidence_only_and_bounded(tmp_path: Path) -> None:
     (tmp_path / "pyproject.toml").write_text(
         "[tool.pytest.ini_options]\ntestpaths=['tests']\n", encoding="utf-8"
     )
@@ -217,7 +217,9 @@ def test_verification_ownership_is_evidence_only_and_bounded(tmp_path):
     assert verifier["plan"]["runner"] == "pytest"
 
 
-def test_verification_ownership_v2_links_direct_verifier_to_edit_authority(tmp_path):
+def test_verification_ownership_v2_links_direct_verifier_to_edit_authority(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "pyproject.toml").write_text(
         "[tool.pytest.ini_options]\ntestpaths=['tests']\n", encoding="utf-8"
     )
@@ -251,7 +253,9 @@ def test_verification_ownership_v2_links_direct_verifier_to_edit_authority(tmp_p
     )
 
 
-def test_verification_ownership_v2_does_not_link_wording_only_verifier(tmp_path):
+def test_verification_ownership_v2_does_not_link_wording_only_verifier(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "pyproject.toml").write_text(
         "[tool.pytest.ini_options]\ntestpaths=['tests']\n", encoding="utf-8"
     )

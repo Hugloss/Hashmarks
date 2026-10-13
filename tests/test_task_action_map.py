@@ -249,7 +249,7 @@ def test_task_action_map_no_edit_fails_closed(tmp_path: Path) -> None:
 
 
 def test_task_action_map_skips_structural_owner_after_exact_resolution(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
     """A stronger exact owner must terminate before weaker structural traversal."""
     from hashmarks.codemap.ownership_graph import OwnershipGraphMixin
@@ -265,7 +265,9 @@ def test_task_action_map_skips_structural_owner_after_exact_resolution(
     calls: list[str] = []
     original = OwnershipGraphMixin._structural_owner_candidate
 
-    def counted(self, start_path: str, *, max_depth: int = 2, task: str = ""):
+    def counted(
+        self: CodeMap, start_path: str, *, max_depth: int = 2, task: str = ""
+    ) -> Any:
         calls.append(start_path)
         return original(self, start_path, max_depth=max_depth, task=task)
 
@@ -677,7 +679,7 @@ def test_duplicate_owner_ambiguity_survives_codemap_reopen(tmp_path: Path) -> No
 
 
 def test_unresolved_edit_owner_cannot_rerank_verification(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
@@ -708,7 +710,7 @@ def test_unresolved_edit_owner_cannot_rerank_verification(
         assert selection.verify is not None
         initial_verify = str(selection.verify["path"])
 
-        def fail_if_provisional_edit_drives_verification(*_args, **_kwargs):
+        def fail_if_provisional_edit_drives_verification(*_args, **_kwargs) -> None:
             raise AssertionError(
                 "unadmitted edit must not drive verification relevance"
             )

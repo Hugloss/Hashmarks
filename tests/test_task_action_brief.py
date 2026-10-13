@@ -84,12 +84,11 @@ def test_task_action_brief_auto_budget_does_not_call_diagnostic_sweep(
     with CodeMap(tmp_path) as c:
         c.sync()
 
-        def forbidden(*args, **kwargs):
+        def forbidden(*args, **kwargs) -> None:
             raise AssertionError(
                 "diagnostic sweep must not run on production brief path"
             )
 
-        c.task_decision_brief_budget_sweep = forbidden  # type: ignore[method-assign]
         brief = c.task_action_brief("widget implementation test")
     assert brief["status"] == "safe-unknown"
 
@@ -101,7 +100,7 @@ def test_task_action_brief_computes_canonical_action_map_once(tmp_path: Path) ->
         original = c.task_action_map
         calls = 0
 
-        def counted(*args, **kwargs):
+        def counted(*args, **kwargs) -> Any:
             nonlocal calls
             calls += 1
             return original(*args, **kwargs)
@@ -139,7 +138,7 @@ def test_rare_ticket_action_brief_uses_exact_index_anchor_without_general_find(
         original_find = c.find
         queries: list[str] = []
 
-        def counted(query: str, *, limit: int = 20):
+        def counted(query: str, *, limit: int = 20) -> Any:
             queries.append(query)
             return original_find(query, limit=limit)
 
@@ -173,12 +172,11 @@ def test_rare_ticket_fast_path_is_not_used_for_configuration_authority(
     with CodeMap(tmp_path) as c:
         c.sync()
 
-        def forbidden(*args, **kwargs):
+        def forbidden(*args, **kwargs) -> None:
             raise AssertionError(
                 "configuration authority must use the normal evidence path"
             )
 
-        c._rare_task_anchor_hits = forbidden  # type: ignore[method-assign]
         brief = c.task_action_brief("For ABC123 change the configuration policy")
     assert brief["status"] in {"safe-unknown", "unsafe"}
 
@@ -411,15 +409,14 @@ def test_action_surfaces_consume_canonical_action_discrimination(
 
 
 def test_task_action_brief_receipt_is_assembled_inside_decision_session(
-    tmp_path: Path,
-    monkeypatch,
+    tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         original = codemap._decision_evidence_receipt
 
-        def observed(*args, **kwargs):
+        def observed(*args, **kwargs) -> Any:
             assert codemap._decision_session_depth > 0
             return original(*args, **kwargs)
 

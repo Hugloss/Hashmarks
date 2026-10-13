@@ -18,14 +18,14 @@ def _client(tmp_path: Path) -> IdentityClient:
     return client
 
 
-def test_protocol_is_explicitly_broken_for_atomic_observation_authority():
+def test_protocol_is_explicitly_broken_for_atomic_observation_authority() -> None:
     assert DAEMON_PROTOCOL_VERSION == 3
     assert DAEMON_SEMANTICS == "fastidentity.daemon-semantics.v3"
 
 
 def test_repository_observation_returns_typed_atomic_snapshot(
-    tmp_path: Path, monkeypatch
-):
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     client = _client(tmp_path)
     monkeypatch.setattr(
         client,
@@ -107,8 +107,8 @@ def test_repository_observation_returns_typed_atomic_snapshot(
     ],
 )
 def test_repository_observation_rejects_incoherent_payloads(
-    tmp_path: Path, monkeypatch, payload
-):
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, payload: dict[str, object]
+) -> None:
     client = _client(tmp_path)
     monkeypatch.setattr(
         client, "request", lambda op: {"ok": True, "reason": None, **payload}

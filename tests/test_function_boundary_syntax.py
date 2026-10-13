@@ -13,7 +13,7 @@ from hashmarks.python_ast_cache import read_python_ast
 from scripts.repository_evaluation.backend_transport import capture_cli
 
 
-def _observe(root: Path, *, start: int = 2, end: int = 2) -> dict[str, Any]:
+def _observe(root: Path, *, start: int = 2, end: int = 2) -> dict[str, object]:
     with CodeMap(root) as codemap:
         codemap.sync()
         packet = codemap.task_change_impact(
@@ -221,12 +221,12 @@ def test_file_backed_body_and_decorator_share_cached_tree(
         codemap.sync()
         read_python_ast(path)
 
-        def forbidden_parse(*args: Any, **kwargs: Any) -> Any:
+        def forbidden_parse(*_args: object, **_kwargs: object) -> object:
             raise AssertionError("file-backed observation reparsed cached source")
 
         monkeypatch.setattr(ast, "parse", forbidden_parse)
         packet = cast(
-            "dict[str, Any]",
+            "dict[str, object]",
             codemap.task_change_impact(
                 "Inspect service.py",
                 ["service.py"],

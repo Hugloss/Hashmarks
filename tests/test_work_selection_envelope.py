@@ -45,7 +45,7 @@ def test_envelope_binds_v3_plan_repository_and_producer_without_execution_policy
     assert envelope["envelope_identity"].startswith("sha256:")
     assert validate_work_selection_envelope(envelope)["valid"] is True
 
-    def keys(value):
+    def keys(value: Any) -> Any:
         if isinstance(value, dict):
             for key, child in value.items():
                 yield key

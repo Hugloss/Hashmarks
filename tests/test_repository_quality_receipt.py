@@ -93,7 +93,7 @@ def test_execution_receipt_refuses_to_seal_mutation_violation() -> None:
 
 
 def test_counterfactual_mutations_cover_invariant_and_authority_changes() -> None:
-    def evaluate(payload):
+    def evaluate(payload: dict[str, object]) -> str:
         mutation = payload.get("repository_mutation")
         if mutation in {
             "replace-owner-definition",

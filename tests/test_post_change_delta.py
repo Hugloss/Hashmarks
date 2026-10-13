@@ -3,6 +3,8 @@ import threading
 import time
 from pathlib import Path
 
+import pytest
+
 from hashmarks import cli
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
@@ -159,7 +161,7 @@ def test_task_post_change_delta_rejects_non_start_packet(tmp_path: Path) -> None
 
 
 def test_post_change_cli_reads_exact_previous_evidence_packet(
-    tmp_path: Path, capsys
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     source, task = _repo(tmp_path)
     previous_path = tmp_path / "previous-evidence.json"

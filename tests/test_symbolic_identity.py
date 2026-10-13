@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from hashmarks.symbolic_identity import symbolic_nomination_record, symbolic_task_terms
 
 
@@ -23,7 +25,9 @@ def test_symbolic_nomination_fails_closed_on_competing_paths() -> None:
     assert result["ranking_effect"] == "none"
 
 
-def test_decision_packet_exposes_nomination_without_ranking_authority(tmp_path) -> None:
+def test_decision_packet_exposes_nomination_without_ranking_authority(
+    tmp_path: Path,
+) -> None:
     from hashmarks.codemap import CodeMap
 
     (tmp_path / "src").mkdir()

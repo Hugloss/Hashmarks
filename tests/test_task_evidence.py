@@ -132,7 +132,7 @@ def test_task_evidence_computes_action_map_once(tmp_path: Path) -> None:
         original = codemap.task_action_map
         calls = 0
 
-        def counted(*args, **kwargs):
+        def counted(*args, **kwargs) -> Any:
             nonlocal calls
             calls += 1
             return original(*args, **kwargs)
@@ -144,7 +144,9 @@ def test_task_evidence_computes_action_map_once(tmp_path: Path) -> None:
     assert calls == 1
 
 
-def test_task_evidence_cli_exposes_native_start_packet(tmp_path: Path, capsys) -> None:
+def test_task_evidence_cli_exposes_native_start_packet(
+    tmp_path: Path, capsys: Any
+) -> None:
     _semantic_repo(tmp_path)
     assert (
         cli.main(

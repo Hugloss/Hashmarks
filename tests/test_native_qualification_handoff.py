@@ -2,7 +2,7 @@ from hashmarks.qualification_units import _native_qualification_handoff_from_pla
 
 
 def test_native_handoff_is_provenance_bound_without_execution_layout_authority(
-    repository_qualification_plan,
+    repository_qualification_plan: object,
 ) -> None:
     first = _native_qualification_handoff_from_plan(repository_qualification_plan)
     second = _native_qualification_handoff_from_plan(repository_qualification_plan)

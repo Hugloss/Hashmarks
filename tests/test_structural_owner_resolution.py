@@ -26,7 +26,9 @@ def _repo(root: Path) -> None:
     )
 
 
-def test_structural_owner_follows_active_test_route_engine_chain(tmp_path: Path):
+def test_structural_owner_follows_active_test_route_engine_chain(
+    tmp_path: Path,
+) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -46,7 +48,7 @@ def test_structural_owner_follows_active_test_route_engine_chain(tmp_path: Path)
 
 def test_structural_owner_does_not_choose_unreachable_duplicate_legacy_symbol(
     tmp_path: Path,
-):
+) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -56,7 +58,9 @@ def test_structural_owner_does_not_choose_unreachable_duplicate_legacy_symbol(
     assert action["edit"]["path"] != "src/case/legacy.py"
 
 
-def test_projected_file_owner_does_not_claim_an_unrelated_first_symbol(tmp_path: Path):
+def test_projected_file_owner_does_not_claim_an_unrelated_first_symbol(
+    tmp_path: Path,
+) -> None:
     _repo(tmp_path)
     engine = tmp_path / "src/case/engine.py"
     engine.write_text("def unrelated_helper():\n    return 0\n\n" + engine.read_text())
@@ -75,7 +79,9 @@ def test_projected_file_owner_does_not_claim_an_unrelated_first_symbol(tmp_path:
     assert action["ownership_resolution"]["authority_admissible"] is False
 
 
-def test_incomplete_structural_candidate_does_not_displace_named_source(tmp_path: Path):
+def test_incomplete_structural_candidate_does_not_displace_named_source(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
     (tmp_path / "src/__init__.py").write_text("")
@@ -106,7 +112,7 @@ def test_incomplete_structural_candidate_does_not_displace_named_source(tmp_path
     assert packet["verification"]["selected"]["path"] == "tests/test_owner.py"
 
 
-def test_explicit_policy_task_keeps_configuration_authority(tmp_path: Path):
+def test_explicit_policy_task_keeps_configuration_authority(tmp_path: Path) -> None:
     _repo(tmp_path)
     (tmp_path / "src/case/policy.toml").write_text("mode='active'\nfeature='ember'\n")
     with CodeMap(tmp_path) as codemap:
@@ -120,7 +126,7 @@ def test_explicit_policy_task_keeps_configuration_authority(tmp_path: Path):
 
 def test_contract_named_verification_surface_never_overrides_structural_edit_owner(
     tmp_path: Path,
-):
+) -> None:
     _repo(tmp_path)
     checks = tmp_path / "checks/case"
     checks.mkdir(parents=True)
@@ -138,7 +144,7 @@ def test_contract_named_verification_surface_never_overrides_structural_edit_own
     assert action["edit"]["path"] != action["verify"]["path"]
 
 
-def test_ownership_relation_graph_exposes_typed_owner_path(tmp_path: Path):
+def test_ownership_relation_graph_exposes_typed_owner_path(tmp_path: Path) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -165,7 +171,7 @@ def test_ownership_relation_graph_exposes_typed_owner_path(tmp_path: Path):
     assert graph["secret_knowledge_used"] is False
 
 
-def test_ownership_relation_graph_is_cycle_safe(tmp_path: Path):
+def test_ownership_relation_graph_is_cycle_safe(tmp_path: Path) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
     (tmp_path / "src/__init__.py").write_text("")
@@ -193,7 +199,7 @@ def test_ownership_relation_graph_is_cycle_safe(tmp_path: Path):
     assert graph["selected"] in {"src/a.py", "src/b.py"}
 
 
-def test_decision_brief_carries_compact_owner_path(tmp_path: Path):
+def test_decision_brief_carries_compact_owner_path(tmp_path: Path) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -208,7 +214,7 @@ def test_decision_brief_carries_compact_owner_path(tmp_path: Path):
     }
 
 
-def test_import_alone_nominates_but_does_not_prove_owner(tmp_path: Path):
+def test_import_alone_nominates_but_does_not_prove_owner(tmp_path: Path) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "src/__init__.py").write_text("")
     (tmp_path / "src/wrapper.py").write_text("from src.worker import run\n")

@@ -220,7 +220,7 @@ def test_generation_domain_and_identity_types_fail_closed() -> None:
 
     membership = verification_membership([verification_member("tests/test_a.py")])
 
-    def state(**changes):
+    def state(**changes) -> VerificationSelectionEnvelopeState:
         values = {
             "repository_identity": "git-tree:abc",
             "source_identity": "sha256:" + "1" * 64,
@@ -305,7 +305,7 @@ def test_membership_member_count_rejects_python_numeric_equality_aliases() -> No
         assert "member-count-mismatch" in result["reasons"]
 
 
-def test_envelope_rejects_invalid_membership_before_identity_formation():
+def test_envelope_rejects_invalid_membership_before_identity_formation() -> None:
     with pytest.raises(ValueError, match="membership is invalid"):
         verification_selection_envelope(
             VerificationSelectionEnvelopeState(
@@ -326,7 +326,9 @@ def test_envelope_rejects_invalid_membership_before_identity_formation():
         )
 
 
-def test_envelope_rejects_nonportable_owner_evidence_before_identity_formation():
+def test_envelope_rejects_nonportable_owner_evidence_before_identity_formation() -> (
+    None
+):
     membership = verification_membership([verification_member("tests/test_x.py")])
     with pytest.raises(ValueError, match="strict JSON-portable"):
         verification_selection_envelope(
@@ -343,7 +345,7 @@ def test_envelope_rejects_nonportable_owner_evidence_before_identity_formation()
         )
 
 
-def test_envelope_rejects_coerced_evidence_hash_before_identity_formation():
+def test_envelope_rejects_coerced_evidence_hash_before_identity_formation() -> None:
     membership = verification_membership([verification_member("tests/test_x.py")])
     with pytest.raises(ValueError, match="evidence hashes"):
         verification_selection_envelope(

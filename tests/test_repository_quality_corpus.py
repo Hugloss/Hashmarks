@@ -97,7 +97,7 @@ def test_historical_case_cannot_be_silently_repromoted() -> None:
 def test_mutation_harness_enforces_presentation_invariance_and_generation_change() -> (
     None
 ):
-    def evaluate(payload):
+    def evaluate(payload: dict[str, object]) -> str:
         if payload.get("owner_generation_mutation"):
             return "sha256:new-owner"
         return "sha256:baseline"
@@ -109,7 +109,7 @@ def test_mutation_harness_enforces_presentation_invariance_and_generation_change
 
 
 def test_mutation_harness_detects_limit_sensitive_authority_bug() -> None:
-    def evaluate(payload):
+    def evaluate(payload: dict[str, object]) -> str:
         return "sha256:wrong" if payload.get("limit") == 1 else "sha256:baseline"
 
     results = run_mutation_challenges(

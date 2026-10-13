@@ -5,6 +5,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "mcp_host_status.py"
 SPEC = importlib.util.spec_from_file_location("mcp_host_status", SCRIPT)
@@ -97,7 +99,9 @@ def _host() -> dict[str, dict[str, str]]:
     }
 
 
-def test_codex_discovery_reports_project_trust_required(tmp_path, monkeypatch) -> None:
+def test_codex_discovery_reports_project_trust_required(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     (workspace / ".codex").mkdir()
@@ -111,7 +115,9 @@ def test_codex_discovery_reports_project_trust_required(tmp_path, monkeypatch) -
         lambda *args, **kwargs: status.Check("PASS", "codex-cli 0.154.0"),
     )
 
-    def fake_run(argv, *, cwd, timeout=20):
+    def fake_run(
+        argv: list[str], *, cwd: Path, timeout: int = 20
+    ) -> subprocess.CompletedProcess[str]:
         import subprocess
 
         assert cwd == workspace
@@ -323,7 +329,7 @@ def test_host_receipt_rejects_registration_outside_workspace(tmp_path: Path) -> 
 
 
 def test_codex_discovery_reports_direct_success_and_hard_failure(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     workspace = tmp_path / "repo"
     config = workspace / ".codex" / "config.toml"
@@ -340,7 +346,9 @@ def test_codex_discovery_reports_direct_success_and_hard_failure(
     )
     calls = []
 
-    def direct_success(argv, *, cwd, timeout=20):
+    def direct_success(
+        argv: list[str], *, cwd: Path, timeout: int = 20
+    ) -> subprocess.CompletedProcess[str]:
         import subprocess
 
         calls.append(argv)
@@ -350,7 +358,9 @@ def test_codex_discovery_reports_direct_success_and_hard_failure(
     assert status._codex(workspace, "sha256:test:1").discovery == status.Check("PASS")
     assert len(calls) == 1
 
-    def hard_failure(argv, *, cwd, timeout=20):
+    def hard_failure(
+        argv: list[str], *, cwd: Path, timeout: int = 20
+    ) -> subprocess.CompletedProcess[str]:
         import subprocess
 
         message = "project disabled" if "-c" not in argv else "still unavailable"

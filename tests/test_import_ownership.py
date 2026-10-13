@@ -4,7 +4,9 @@ from hashmarks.cli import main
 from hashmarks.codemap import CodeMap
 
 
-def _write_package(repo, *, loader_path="scripts/research.py", register=False):
+def _write_package(
+    repo: Path, *, loader_path: str = "scripts/research.py", register: bool = False
+) -> None:
     (repo / "scripts").mkdir(parents=True, exist_ok=True)
     (repo / "scripts" / "__init__.py").write_text("", encoding="utf-8")
     (repo / "scripts" / "helper.py").write_text(
@@ -27,7 +29,9 @@ def _write_package(repo, *, loader_path="scripts/research.py", register=False):
     )
 
 
-def test_import_ownership_reports_repository_owned_dynamic_module_bypass(tmp_path):
+def test_import_ownership_reports_repository_owned_dynamic_module_bypass(
+    tmp_path: Path,
+) -> None:
     _write_package(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -47,7 +51,7 @@ def test_import_ownership_reports_repository_owned_dynamic_module_bypass(tmp_pat
     assert finding["confidence"] == "high"
 
 
-def test_import_ownership_does_not_flag_normal_package_import(tmp_path):
+def test_import_ownership_does_not_flag_normal_package_import(tmp_path: Path) -> None:
     (tmp_path / "scripts").mkdir()
     (tmp_path / "scripts" / "__init__.py").write_text("", encoding="utf-8")
     (tmp_path / "scripts" / "helper.py").write_text("CACHE = {}\n", encoding="utf-8")
@@ -61,7 +65,7 @@ def test_import_ownership_does_not_flag_normal_package_import(tmp_path):
     assert result["findings"] == []
 
 
-def test_import_ownership_downgrades_test_loader_to_advisory(tmp_path):
+def test_import_ownership_downgrades_test_loader_to_advisory(tmp_path: Path) -> None:
     _write_package(tmp_path, loader_path="tests/test_loader.py")
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -73,7 +77,7 @@ def test_import_ownership_downgrades_test_loader_to_advisory(tmp_path):
     assert finding["target_module"] == "scripts.helper"
 
 
-def test_import_ownership_recognizes_explicit_sys_modules_owner(tmp_path):
+def test_import_ownership_recognizes_explicit_sys_modules_owner(tmp_path: Path) -> None:
     _write_package(tmp_path, register=True)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -85,7 +89,7 @@ def test_import_ownership_recognizes_explicit_sys_modules_owner(tmp_path):
     assert finding["severity"] == "advisory"
 
 
-def test_import_ownership_can_inspect_explicit_path(tmp_path):
+def test_import_ownership_can_inspect_explicit_path(tmp_path: Path) -> None:
     _write_package(tmp_path)
     (tmp_path / "other.py").write_text("value = 1\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
@@ -95,7 +99,9 @@ def test_import_ownership_can_inspect_explicit_path(tmp_path):
     assert result["findings"][0]["path"] == "scripts/research.py"
 
 
-def test_cli_map_import_ownership_exposes_static_diagnostic(tmp_path, capsys):
+def test_cli_map_import_ownership_exposes_static_diagnostic(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     _write_package(tmp_path)
     assert main(["map", "sync", "--workspace", str(tmp_path)]) == 0
     capsys.readouterr()
@@ -105,7 +111,9 @@ def test_cli_map_import_ownership_exposes_static_diagnostic(tmp_path, capsys):
     assert '"target_module": "scripts.helper"' in output
 
 
-def test_import_ownership_resolves_bound_and_wrapped_target_path(tmp_path):
+def test_import_ownership_resolves_bound_and_wrapped_target_path(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "pkg").mkdir()
     (tmp_path / "pkg" / "__init__.py").write_text("", encoding="utf-8")
     (tmp_path / "pkg" / "helper.py").write_text("CACHE = {}\n", encoding="utf-8")
@@ -126,7 +134,7 @@ def test_import_ownership_resolves_bound_and_wrapped_target_path(tmp_path):
     assert result["findings"][0]["target_module"] == "pkg.helper"
 
 
-def test_import_ownership_reports_duplicate_module_identity(tmp_path):
+def test_import_ownership_reports_duplicate_module_identity(tmp_path: Path) -> None:
     (tmp_path / "pkg").mkdir()
     (tmp_path / "pkg" / "__init__.py").write_text("", encoding="utf-8")
     (tmp_path / "pkg" / "helper.py").write_text("CACHE = {}\n", encoding="utf-8")

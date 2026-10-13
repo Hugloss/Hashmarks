@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from pytest import MonkeyPatch
+
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.model import SearchHit
 
@@ -60,7 +62,7 @@ def _graph(start_path: str, *, incomplete: bool = False) -> dict[str, object]:
 
 
 def test_ninth_source_start_changes_observed_structural_ambiguity(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
     task, hits = _fixture(tmp_path)
     with CodeMap(tmp_path) as codemap:
@@ -94,7 +96,7 @@ def test_ninth_source_start_changes_observed_structural_ambiguity(
 
 
 def test_unselected_graph_bound_and_stale_competitor_remain_visible(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
     task, hits = _fixture(tmp_path)
     with CodeMap(tmp_path) as codemap:

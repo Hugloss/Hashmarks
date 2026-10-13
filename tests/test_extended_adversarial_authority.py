@@ -13,7 +13,9 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def _hard_repo(root: Path, *, cases_per_category: int = 4):
+def _hard_repo(
+    root: Path, *, cases_per_category: int = 4
+) -> tuple[Path, list[dict[str, object]]]:
     repo = root / "repo"
     public = root / "public.json"
     secret = root / "secret.json"

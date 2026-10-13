@@ -29,7 +29,7 @@ def _repository(root: Path) -> None:
 
 def test_candidate_disclosure_preserves_ambiguity_and_verification_selection(
     tmp_path: Path,
-):
+) -> None:
     _repository(tmp_path)
     task = "Inspect update_metadata behavior"
     with CodeMap(tmp_path) as codemap:
@@ -75,7 +75,9 @@ def test_candidate_disclosure_preserves_ambiguity_and_verification_selection(
         )
 
 
-def test_candidate_disclosure_never_promotes_stale_test_revision(tmp_path: Path):
+def test_candidate_disclosure_never_promotes_stale_test_revision(
+    tmp_path: Path,
+) -> None:
     _repository(tmp_path)
     path = tmp_path / "tests/test_original.py"
     with CodeMap(tmp_path) as codemap:
@@ -92,7 +94,7 @@ def test_candidate_disclosure_never_promotes_stale_test_revision(tmp_path: Path)
 
 def test_source_identifier_scout_keeps_late_test_body_without_claiming_reference(
     tmp_path: Path,
-):
+) -> None:
     for name in ("alpha", "beta"):
         (tmp_path / f"{name}.py").write_text(
             "class MetadataTokenPolicy:\n    def reset(self):\n        return None\n"

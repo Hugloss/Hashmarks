@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import importlib
-from typing import TYPE_CHECKING
+import types
+from typing import TYPE_CHECKING, Callable
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.watch_continuity import (
@@ -32,7 +33,7 @@ class _FakeWatcher:
         self._events.append("watcher-stop")
 
 
-def _watch_owner(codemap: CodeMap):
+def _watch_owner(codemap: CodeMap) -> types.ModuleType:
     return importlib.import_module(codemap.watch_forever.__module__)
 
 
@@ -53,13 +54,14 @@ def test_watch_forever_starts_observer_before_initial_sync_and_stops_cleanly(
         owner = _watch_owner(codemap)
 
         def fake_factory(
-            root,
-            callback,
+            root: Path,
+            update_callback: Callable[..., object],
             *,
-            debounce_seconds,
-            change_tracker,
-            exclude_relative_paths,
-        ):
+            debounce_seconds: float,
+            change_tracker: ChangeTracker,
+            exclude_relative_paths: list[str],
+        ) -> _FakeWatcher:
+
             del root, callback, debounce_seconds, change_tracker
             excluded = set(exclude_relative_paths)
             assert ".codemap-state" in excluded
@@ -68,7 +70,7 @@ def test_watch_forever_starts_observer_before_initial_sync_and_stops_cleanly(
             events.append("watcher-factory")
             return _FakeWatcher(events)
 
-        def fake_sync(paths=None):
+        def fake_sync(paths: list[str] | None = None) -> dict[str, object]:
             events.append("sync-full" if paths is None else f"sync:{paths}")
             return {"paths": paths}
 
@@ -112,13 +114,13 @@ def test_watch_forever_unknown_observation_forces_full_reconciliation(
         owner = _watch_owner(codemap)
 
         def fake_factory(
-            root,
-            callback,
+            root: Path,
+            callback: Callable[..., object],
             *,
-            debounce_seconds,
-            change_tracker,
-            exclude_relative_paths,
-        ):
+            debounce_seconds: float,
+            change_tracker: ChangeTracker,
+            exclude_relative_paths: list[str],
+        ) -> _FakeWatcher:
             nonlocal tracker
             del root, callback, debounce_seconds, exclude_relative_paths
             tracker = change_tracker
@@ -126,7 +128,7 @@ def test_watch_forever_unknown_observation_forces_full_reconciliation(
 
         sync_calls: list[object] = []
 
-        def fake_sync(paths=None):
+        def fake_sync(paths: list[str] | None = None) -> dict[str, object]:
             sync_calls.append(paths)
             return {"call": len(sync_calls), "paths": paths}
 
@@ -173,13 +175,14 @@ def test_watch_forever_incremental_callback_reconciles_observed_paths(
         owner = _watch_owner(codemap)
 
         def fake_factory(
-            root,
-            update_callback,
+            root: Path,
+            callback: Callable[..., object],
             *,
-            debounce_seconds,
-            change_tracker,
-            exclude_relative_paths,
-        ):
+            debounce_seconds: float,
+            change_tracker: ChangeTracker,
+            exclude_relative_paths: list[str],
+        ) -> _FakeWatcher:
+
             nonlocal callback
             del root, debounce_seconds, change_tracker
             callback = update_callback
@@ -188,7 +191,7 @@ def test_watch_forever_incremental_callback_reconciles_observed_paths(
 
         sync_calls: list[object] = []
 
-        def fake_sync(paths=None):
+        def fake_sync(paths: list[str] | None = None) -> dict[str, object]:
             sync_calls.append(paths)
             return {"paths": paths}
 

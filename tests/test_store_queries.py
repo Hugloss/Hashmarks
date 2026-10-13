@@ -1,7 +1,11 @@
+from pathlib import Path
+
 from hashmarks.codemap import CodeMap
 
 
-def test_refs_many_high_frequency_symbol_keeps_deterministic_bounded_prefix(tmp_path):
+def test_refs_many_high_frequency_symbol_keeps_deterministic_bounded_prefix(
+    tmp_path: Path,
+) -> None:
     src = tmp_path / "src"
     src.mkdir()
     (src / "__init__.py").write_text("")
@@ -24,7 +28,9 @@ def test_refs_many_high_frequency_symbol_keeps_deterministic_bounded_prefix(tmp_
         ]
 
 
-def test_paths_under_is_segment_safe_for_exact_and_descendant_ranges(tmp_path):
+def test_paths_under_is_segment_safe_for_exact_and_descendant_ranges(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "src/pkg").mkdir(parents=True)
     (tmp_path / "src2").mkdir()
     (tmp_path / "src0").mkdir()
@@ -46,7 +52,9 @@ def test_paths_under_is_segment_safe_for_exact_and_descendant_ranges(tmp_path):
         assert codemap.store.paths_under("missing") == set()
 
 
-def test_has_files_is_exact_and_independent_of_other_surface_counts(tmp_path):
+def test_has_files_is_exact_and_independent_of_other_surface_counts(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "src/a.py").write_text("VALUE = 1\n")
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
@@ -57,7 +65,9 @@ def test_has_files_is_exact_and_independent_of_other_surface_counts(tmp_path):
         assert codemap.store.has_files() is False
 
 
-def test_search_candidates_match_repository_fields_in_stable_order(tmp_path):
+def test_search_candidates_match_repository_fields_in_stable_order(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "z_path_needle.py").write_text(
         "def transform():\n    return 1\n",
         encoding="utf-8",
@@ -93,7 +103,7 @@ def test_search_candidates_match_repository_fields_in_stable_order(tmp_path):
     assert [row["path"] for row in files] == ["z_path_needle.py"]
 
 
-def test_scoped_references_filter_paths_before_row_bound(tmp_path):
+def test_scoped_references_filter_paths_before_row_bound(tmp_path: Path) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
     (tmp_path / "src" / "noise.py").write_text(

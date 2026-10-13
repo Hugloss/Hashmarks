@@ -167,7 +167,7 @@ def test_task_change_impact_never_discloses_denied_path(tmp_path: Path) -> None:
     assert impact["surfaces"]["verification"][0]["path"] == "tests/test_behavior.py"
 
 
-def test_task_change_impact_cli(tmp_path: Path, capsys) -> None:
+def test_task_change_impact_cli(tmp_path: Path, capsys: Any) -> None:
     task = _repo(tmp_path)
     assert (
         cli.main(
@@ -393,7 +393,7 @@ def test_exact_import_resolution_avoids_whole_file_map_materialization(
 
 
 def test_task_change_impact_declared_project_provenance_and_shared_input_refresh(
-    tmp_path: Path, fake_maven_wrapper
+    tmp_path: Path, fake_maven_wrapper: Any
 ) -> None:
     (tmp_path / "backend/src").mkdir(parents=True)
     (tmp_path / "frontend/src").mkdir(parents=True)
@@ -495,7 +495,7 @@ def test_task_change_impact_project_provenance_is_bounded(tmp_path: Path) -> Non
 
 
 def test_cross_repository_impact_qualification_small_smoke(
-    tmp_path: Path, fake_maven_wrapper
+    tmp_path: Path, fake_maven_wrapper: Any
 ) -> None:
     from scripts.score_cross_repository_impact import generate, run
 
@@ -513,7 +513,9 @@ def test_cross_repository_impact_qualification_small_smoke(
     assert payload["protocol"]["secret_join_after_packet_freeze"] is True
 
 
-def test_project_impact_limit_is_independent_and_reports_truncation(tmp_path: Path):
+def test_project_impact_limit_is_independent_and_reports_truncation(
+    tmp_path: Path,
+) -> None:
     root = tmp_path
     for index in range(10):
         project = root / f"p{index}"
@@ -563,7 +565,7 @@ def test_project_impact_limit_is_independent_and_reports_truncation(tmp_path: Pa
 
 
 def test_declared_shared_input_refresh_rebinds_freshness_without_recollecting_topology(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
     (tmp_path / "backend").mkdir()
     (tmp_path / "frontend").mkdir()
@@ -592,7 +594,7 @@ def test_declared_shared_input_refresh_rebinds_freshness_without_recollecting_to
         original_collect = provider.collect
         calls = 0
 
-        def counted_collect(workspace):
+        def counted_collect(workspace: Path) -> Any:
             nonlocal calls
             calls += 1
             return original_collect(workspace)
@@ -612,7 +614,7 @@ def test_declared_shared_input_refresh_rebinds_freshness_without_recollecting_to
 
 
 def test_declared_topology_change_recollects_provider(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
     for name in ("backend", "frontend", "mobile"):
         (tmp_path / name).mkdir()
@@ -638,7 +640,7 @@ def test_declared_topology_change_recollects_provider(
         original_collect = provider.collect
         calls = 0
 
-        def counted_collect(workspace):
+        def counted_collect(workspace: Path) -> Any:
             nonlocal calls
             calls += 1
             return original_collect(workspace)

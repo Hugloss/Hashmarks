@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def _provenance(version: object = 7, **overrides: Any) -> dict[str, object]:
+def _provenance(version: object = 7, **overrides: object) -> dict[str, object]:
     return {
         "producer_session": "server:1",
         "document_lifetime": "open:1",
@@ -34,11 +34,11 @@ def _provenance(version: object = 7, **overrides: Any) -> dict[str, object]:
     }
 
 
-def _diagnostic(path: object, rule: str = "E1") -> dict[str, object]:
+def _diagnostic(path: str | None, rule: str = "E1") -> dict[str, object]:
     return {"tool": "fixture-lsp", "path": path, "rule": rule, "message": rule}
 
 
-def _observe(rows: list[dict[str, object]], **options: Any) -> dict[str, Any]:
+def _observe(rows: list[dict[str, object]], **options: object) -> dict[str, object]:
     return RepositoryDeltaMixin.external_diagnostic_observation(
         producer="fixture-lsp",
         binding=options.pop("binding", RepositoryGenerationBinding("repo:fixture", 7)),
@@ -51,7 +51,7 @@ def _observe(rows: list[dict[str, object]], **options: Any) -> dict[str, Any]:
     )
 
 
-def _path_rows(delta: dict[str, Any]) -> dict[str | None, dict[str, Any]]:
+def _path_rows(delta: dict[str, object]) -> dict[str | None, dict[str, object]]:
     return {row["path"]: row for row in delta["diagnostics"]["path_deltas"]}
 
 
@@ -66,14 +66,14 @@ def test_delayed_publication_keeps_its_captured_revision(tmp_path: Path) -> None
     )
     with CodeMap(tmp_path) as cm:
         cm.sync()
-        current: Any = cm.source_observation("owner.py")
-    compared: Any = RepositoryDeltaMixin.diagnostic_source_revision_evidence(
+        current: object = cm.source_observation("owner.py")
+    compared: object = RepositoryDeltaMixin.diagnostic_source_revision_evidence(
         packet, [current]
     )
     assert compared["different_count"] == 1
     assert compared["rows"][0]["producer_claimed_member_revision"] == revision
     assert compared["source_provenance"]["owner.py"]["document_version"] == 6
-    checked: Any = validate_repository_intelligence_evidence(compared)
+    checked: object = validate_repository_intelligence_evidence(compared)
     assert checked["valid"] is True
     assert checked["normalized"]["source_provenance"] == packet["source_provenance"]
     assert checked["normalized"]["stale"] is None
@@ -98,8 +98,8 @@ def test_unsaved_buffer_uses_exact_utf8_without_normalization(tmp_path: Path) ->
     )
     with CodeMap(tmp_path) as cm:
         cm.sync()
-        source: Any = cm.source_observation("owner.py")
-    compared: Any = RepositoryDeltaMixin.diagnostic_source_revision_evidence(
+        source: object = cm.source_observation("owner.py")
+    compared: object = RepositoryDeltaMixin.diagnostic_source_revision_evidence(
         packet, [source]
     )
     assert compared["different_count"] == 1
@@ -123,7 +123,7 @@ def test_document_version_change_preserves_diagnostic_fact_identity() -> None:
     assert delta["diagnostics"]["added"] == delta["diagnostics"]["removed"] == []
     assert delta["diagnostics"]["unchanged_count"] == 1
     assert _path_rows(delta)["owner.py"]["source_revisions"]["state"] == "unchanged"
-    checked: Any = validate_repository_intelligence_evidence(delta)
+    checked: object = validate_repository_intelligence_evidence(delta)
     assert checked["valid"] is True
     assert checked["normalized"]["source_provenance"] == delta["source_provenance"]
     assert checked["normalized"]["projection_coverage"] == "projection-only"
@@ -179,7 +179,9 @@ def test_versionless_unbound_diagnostics_remain_unknown() -> None:
     )
     assert "source_revisions" not in packet
     assert validate_repository_intelligence_evidence(packet)["valid"] is True
-    compared: Any = RepositoryDeltaMixin.diagnostic_source_revision_evidence(packet, [])
+    compared: object = RepositoryDeltaMixin.diagnostic_source_revision_evidence(
+        packet, []
+    )
     assert compared["coverage"] == "unknown"
     assert compared["unclaimed_diagnostic_count"] == 1
     assert compared["source_provenance"] == packet["source_provenance"]
@@ -249,7 +251,7 @@ def test_per_path_complete_empty_report_differs_from_missing_report() -> None:
         collection_state="fresh-partial",
         collection_by_path={"related.py": "fresh-complete"},
     )
-    delta: Any = RepositoryDeltaMixin.diagnostic_observation_delta(
+    delta: object = RepositoryDeltaMixin.diagnostic_observation_delta(
         before, after, changed_paths=["owner.py"]
     )
     rows = _path_rows(delta)
@@ -288,7 +290,7 @@ def test_cross_file_changes_conserve_every_fact_without_claiming_causation(
         ],
         source_revisions={"related.py": "a" * 64},
     )
-    delta: Any = RepositoryDeltaMixin.diagnostic_observation_delta(
+    delta: object = RepositoryDeltaMixin.diagnostic_observation_delta(
         before, after, changed_paths=["owner.py"], change_set_complete=complete
     )
     rows = _path_rows(delta)
@@ -315,7 +317,7 @@ def test_unlocated_and_out_of_scope_diagnostics_are_accounted_for() -> None:
     after = _observe(
         [_diagnostic(None), _diagnostic("../outside.py"), _diagnostic("unscoped.py")]
     )
-    delta: Any = RepositoryDeltaMixin.diagnostic_observation_delta(
+    delta: object = RepositoryDeltaMixin.diagnostic_observation_delta(
         _observe([]), after, changed_paths=["owner.py"], change_set_complete=True
     )
     rows = _path_rows(delta)
@@ -341,7 +343,7 @@ def test_unlocated_and_out_of_scope_diagnostics_are_accounted_for() -> None:
     ],
 )
 def test_public_delta_validator_reproves_path_projection(mutation: str) -> None:
-    delta: Any = RepositoryDeltaMixin.diagnostic_observation_delta(
+    delta: object = RepositoryDeltaMixin.diagnostic_observation_delta(
         _observe([]), _observe([_diagnostic("related.py")]), changed_paths=["owner.py"]
     )
     tampered = deepcopy(delta)
@@ -366,7 +368,7 @@ def test_public_delta_validator_reproves_path_projection(mutation: str) -> None:
 
 
 def test_public_delta_validator_reproves_collection_qualification() -> None:
-    delta: Any = RepositoryDeltaMixin.diagnostic_observation_delta(
+    delta: object = RepositoryDeltaMixin.diagnostic_observation_delta(
         _observe([]), _observe([_diagnostic("related.py")])
     )
     delta["diagnostics"]["qualification"]["qualified_added_identities"] = []
@@ -374,7 +376,7 @@ def test_public_delta_validator_reproves_collection_qualification() -> None:
 
 
 def test_public_delta_validator_rejects_extra_producer_context_fields() -> None:
-    delta: Any = RepositoryDeltaMixin.diagnostic_observation_delta(
+    delta: object = RepositoryDeltaMixin.diagnostic_observation_delta(
         _observe([]), _observe([])
     )
     delta["producer_context"]["before"]["document_version"] = 7
@@ -383,7 +385,7 @@ def test_public_delta_validator_rejects_extra_producer_context_fields() -> None:
 
 @pytest.mark.parametrize("bad", [None, 0, 1, "true", [], {}])
 def test_change_set_completeness_requires_boolean_in_native_and_mcp(
-    tmp_path: Path, bad: Any
+    tmp_path: Path, bad: object
 ) -> None:
     before, after = _observe([]), _observe([])
     with pytest.raises(ValueError, match="change_set_complete"):
@@ -400,7 +402,7 @@ def test_change_set_completeness_requires_boolean_in_native_and_mcp(
         surface.close()
 
 
-def _correlation(root: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+def _correlation(root: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:
     (root / "owner.py").write_text("def f():\n    return 1\n", encoding="utf-8")
     (root / "related.py").write_text(
         "from owner import f\nprint(f())\n", encoding="utf-8"
@@ -440,7 +442,7 @@ def test_related_annotation_uses_qualified_native_evidence_without_short_name_fa
     after = _observe(
         [_diagnostic("related.py"), _diagnostic("other.py")], binding=binding
     )
-    delta: Any = RepositoryDeltaMixin.diagnostic_observation_delta(
+    delta: object = RepositoryDeltaMixin.diagnostic_observation_delta(
         before, after, changed_paths=["owner.py"], relationship_evidence=correlation
     )
     rows = _path_rows(delta)
@@ -500,7 +502,7 @@ def test_stale_or_foreign_relationship_evidence_never_hides_diagnostic_changes(
                 },
             )
         )
-    delta: Any = RepositoryDeltaMixin.diagnostic_observation_delta(
+    delta: object = RepositoryDeltaMixin.diagnostic_observation_delta(
         _observe([], binding=binding),
         _observe([_diagnostic("related.py")], binding=binding),
         changed_paths=["owner.py"],
@@ -543,7 +545,7 @@ def test_member_evidence_is_canonical_and_does_not_alias_producer_inputs() -> No
     collections["./owner.py"] = "unavailable"
     assert observed["source_provenance"]["owner.py"]["document_version"] == 7
     assert observed["collection_by_path"] == {"owner.py": "fresh-complete"}
-    checked: Any = validate_repository_intelligence_evidence(observed)
+    checked: object = validate_repository_intelligence_evidence(observed)
     assert checked["valid"] is True
     checked["normalized"]["source_provenance"]["owner.py"]["document_version"] = 200
     assert observed["source_provenance"]["owner.py"]["document_version"] == 7
@@ -565,7 +567,7 @@ def test_mcp_and_bounded_presentations_preserve_member_evidence(
     )
     surface = HashmarksMcpSurface(str(tmp_path), state_dir=str(tmp_path / "state"))
     try:
-        result: Any = surface.evidence_comparison(
+        result: object = surface.evidence_comparison(
             before,
             after,
             result_mode="diagnostics",
@@ -577,7 +579,7 @@ def test_mcp_and_bounded_presentations_preserve_member_evidence(
     assert result == RepositoryDeltaMixin.diagnostic_observation_delta(
         before, after, changed_paths=["owner.py"], change_set_complete=True
     )
-    projection: Any = present_repository_evidence(result, format=format)
+    projection: object = present_repository_evidence(result, format=format)
     findings = [
         finding for group in projection["groups"] for finding in group["findings"]
     ]
@@ -596,10 +598,10 @@ def test_mcp_and_bounded_presentations_preserve_member_evidence(
         )
         == 3
     )
-    wide: Any = RepositoryDeltaMixin.diagnostic_observation_delta(
+    wide: object = RepositoryDeltaMixin.diagnostic_observation_delta(
         _observe([]), _observe([_diagnostic(f"file_{index}.py") for index in range(60)])
     )
-    bounded: Any = present_repository_evidence(wide, format=format)
+    bounded: object = present_repository_evidence(wide, format=format)
     assert any(group["omitted_from_presentation"] > 0 for group in bounded["groups"])
     assert len(result["diagnostics"]["added"]) == 2
     assert validate_repository_intelligence_evidence(result)["valid"] is True

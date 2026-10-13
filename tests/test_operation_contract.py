@@ -672,18 +672,25 @@ def test_core_operation_dispatchers_consume_canonical_mode_admission() -> None:
 
 
 class _DependencyOperationHarness(DependencyResolutionEvidenceMixin):
-    def dependency_resolution_evidence(self, _snapshot):
+    def dependency_resolution_evidence(self, _snapshot: object) -> dict[str, object]:
         return {"schema": "fixture"}
 
-    def dependency_resolution_explain(self, _observation):
+    def dependency_resolution_explain(self, _observation: object) -> dict[str, object]:
         return {"schema": "hashmarks.wrong.v1"}
 
-    def dependency_resolution_delta(self, _before, _after):
+    def dependency_resolution_delta(
+        self, _before: object, _after: object
+    ) -> dict[str, object]:
         return {"schema": operation_schema("dependency_codemap", "compare")}
 
 
 class _DeclarationOperationHarness(RepositoryDeclarationsMixin):
-    def repository_declarations(self, _groups, *, previous_observation=None):
+    def repository_declarations(
+        self,
+        _groups: list[dict[str, object]],
+        *,
+        previous_observation: object | None = None,
+    ) -> dict[str, object]:
         del previous_observation
         return {
             "schema": operation_schema(
@@ -692,7 +699,7 @@ class _DeclarationOperationHarness(RepositoryDeclarationsMixin):
             )
         }
 
-    def repository_declaration_explain(self, _packet):
+    def repository_declaration_explain(self, _packet: object) -> dict[str, object]:
         return {"schema": "hashmarks.wrong.v1"}
 
 
