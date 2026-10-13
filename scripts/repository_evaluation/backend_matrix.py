@@ -8,7 +8,7 @@ from typing import Any
 from .backend_gates import combine_required
 from .backend_grading import witness_identity
 
-SCHEMA = "hashmarks.backend-evidence-matrix.v4"
+SCHEMA = "hashmarks.backend-evidence-matrix.v5"
 MIN_WORKFLOWS = 12
 MIN_REPOSITORIES = 3
 INITIAL_TOKEN_CEILING = 4_000

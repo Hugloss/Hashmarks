@@ -14,6 +14,7 @@ from typing import Any
 from .backend_corpus import SUITE_PATH, load_corpus
 from .backend_native import (
     NativeSpecimenOptions,
+    _capture_inputs,
     capture_artifact_digests,
     prepare_capture,
     qualify_native_workflow,
@@ -45,6 +46,34 @@ def _validate_destinations(
             (capture / stage).exists() for stage in ("before", "after")
         ):
             raise ValueError("fresh backend captures require a new output directory")
+
+
+def _validate_producers(
+    suite: dict[str, Any], grader: dict[str, Any], selected: set[str]
+) -> None:
+    """Check every nominated producer before acquiring any selected specimen."""
+    from scripts.native_evidence_capture import _tool
+
+    producers = {"python": "scip-python", "typescript": "scip-typescript"}
+    tools = {"scip"}
+    for workflow in suite["workflows"]:
+        if workflow["id"] not in selected:
+            continue
+        for stage in ("before", "after"):
+            language, _paths = _capture_inputs(
+                workflow, grader["cases"][workflow["id"]], stage
+            )
+            tools.add(producers[language])
+    missing = []
+    for tool in sorted(tools):
+        try:
+            _tool(tool)
+        except RuntimeError:
+            missing.append(tool)
+    if missing:
+        raise RuntimeError(
+            "fresh backend capture prerequisites missing: " + ", ".join(missing)
+        )
 
 
 def run_native(
@@ -89,6 +118,8 @@ def run_native(
     }
     outcomes = []
     _validate_destinations(selected, output, options)
+    if options.regenerated:
+        _validate_producers(suite, grader, selected)
     for workflow in suite["workflows"]:
         if workflow["id"] not in selected:
             continue

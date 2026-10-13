@@ -16,7 +16,16 @@ from scripts.repository_evaluation.common import write_json
 @pytest.fixture
 def native_runner(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     workflows = [
-        {"id": name, "before": "old", "after": "new"} for name in ("one", "two")
+        {
+            "id": name,
+            "before": "old",
+            "after": "new",
+            "native_observations": {
+                stage: {"language": "python", "paths": ["backend.py"]}
+                for stage in ("before", "after")
+            },
+        }
+        for name in ("one", "two")
     ]
     suite = {
         "workflows": workflows,
@@ -61,6 +70,9 @@ def native_runner(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(runner, "prepare_capture", acquire)
     monkeypatch.setattr(runner, "record_capture_acquisition", lambda *_: None)
     monkeypatch.setattr(runner, "qualify_native_workflow", qualify)
+    monkeypatch.setattr(
+        "scripts.native_evidence_capture._tool", lambda name: "/tools/" + name
+    )
     monkeypatch.setattr(
         runner,
         "capture_artifact_digests",
@@ -144,3 +156,31 @@ def test_fresh_preflight_checks_later_workflows_before_first_acquisition(
             options=NativeSpecimenOptions(captures, (), True),
         )
     assert calls == []
+
+
+def test_missing_later_language_producer_prevents_all_acquisition(
+    tmp_path, native_runner, monkeypatch
+):
+    captures, calls, _acquire = native_runner
+    original = runner.load_corpus
+    suite, grader = original(None, None)
+    suite["workflows"][1]["native_observations"]["after"] = {
+        "language": "typescript",
+        "paths": ["backend.ts"],
+    }
+
+    def tools(name):
+        if name == "scip-typescript":
+            raise RuntimeError("not installed")
+        return "/tools/" + name
+
+    monkeypatch.setattr("scripts.native_evidence_capture._tool", tools)
+    with pytest.raises(RuntimeError, match="prerequisites missing: scip-typescript"):
+        runner.run_native(
+            sources={"old": tmp_path, "new": tmp_path},
+            output=tmp_path / "reports",
+            options=NativeSpecimenOptions(captures, (), True),
+        )
+    assert calls == []
+    assert not captures.exists()
+    assert not (tmp_path / "reports").exists()

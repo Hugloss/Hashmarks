@@ -119,6 +119,107 @@ def test_api_revision_workflow_cannot_qualify_missing_transports_or_breadth(
     assert all(row["local_e2e_rating"] is None for row in report["capabilities"])
 
 
+def _aggregate_campaign(corpus, root: Path) -> Path:
+    from scripts.repository_evaluation.aggregate_backend import CAMPAIGN_SCHEMA
+    from scripts.repository_evaluation.backend_matrix import SCHEMA as MATRIX_SCHEMA
+    from scripts.repository_evaluation.common import canonical_sha256
+
+    suite_path, _sources = corpus
+    suite = json.loads(suite_path.read_text())
+    grader = json.loads((suite_path.parent / "grader.json").read_text())
+    campaign = root / "campaign.json"
+    write_json(
+        campaign,
+        {
+            "schema": CAMPAIGN_SCHEMA,
+            "matrix_schema": MATRIX_SCHEMA,
+            "capabilities": list(range(1, 21)),
+            "suites": [
+                {
+                    "id": name,
+                    "suite_file": "suite.json",
+                    "suite_sha256": canonical_sha256(suite),
+                    "grader_sha256": canonical_sha256(grader),
+                    "workflow_ids": ["handler"],
+                }
+                for name in ("good", "other")
+            ],
+        },
+    )
+    return campaign
+
+
+def test_aggregate_retains_valid_observations_and_rejected_input(
+    corpus, tmp_path: Path
+):
+    from scripts.repository_evaluation.aggregate_backend import aggregate_backend
+
+    suite_path, sources = corpus
+    valid_root = tmp_path / "valid"
+    run_backend(
+        sources=sources, suite_path=suite_path, output_dir=valid_root, transports=()
+    )
+    invalid = tmp_path / "invalid.json"
+    invalid.write_text("{invalid")
+    output = tmp_path / "aggregate"
+    report = aggregate_backend(
+        campaign_path=_aggregate_campaign(corpus, tmp_path),
+        sources=sources,
+        selections={
+            "good": {"workflow_report": str(valid_root / "summary.json")},
+            "other": {"workflow_report": str(invalid)},
+        },
+        output_dir=output,
+    )
+    assert report["status"] == "FAIL"
+    assert report["input_integrity"]["state"] == "FAIL"
+    inputs = {(row["suite"], row["proof"]): row for row in report["input_reports"]}
+    assert inputs[("good", "workflow")]["state"] == "ADMITTED"
+    rejected = inputs[("other", "workflow")]
+    assert rejected["state"] == "REJECTED"
+    assert rejected["sha256"] == hashlib.sha256(invalid.read_bytes()).hexdigest()
+    assert rejected["reason"]
+    outcomes = {row["id"]: row for row in report["outcomes"]}
+    assert outcomes["good/handler"]["gates"]["facts"] is True
+    assert outcomes["other/handler"]["gates"]["native_binding"] is None
+    assert "other/handler" in report["missing_workflow_reports"]
+    assert json.loads((output / "summary.json").read_text()) == report
+    assert "REJECTED" in (output / "summary.md").read_text()
+
+
+def test_aggregate_missing_expected_inputs_remain_incomplete(corpus, tmp_path: Path):
+    from scripts.repository_evaluation.aggregate_backend import aggregate_backend
+
+    report = aggregate_backend(
+        campaign_path=_aggregate_campaign(corpus, tmp_path),
+        sources=corpus[1],
+        selections={},
+        output_dir=tmp_path / "aggregate",
+    )
+    assert report["status"] == "INCOMPLETE"
+    assert report["input_integrity"]["state"] == "INCOMPLETE"
+    assert set(report["missing_workflow_reports"]) == {"good/handler", "other/handler"}
+    assert all(row["state"] == "MISSING" for row in report["input_reports"])
+
+
+def test_aggregate_unknown_selected_report_is_retained_as_rejection(
+    corpus, tmp_path: Path
+):
+    from scripts.repository_evaluation.aggregate_backend import aggregate_backend
+
+    report = aggregate_backend(
+        campaign_path=_aggregate_campaign(corpus, tmp_path),
+        sources=corpus[1],
+        selections={"unexpected": {}},
+        output_dir=tmp_path / "aggregate",
+    )
+    assert report["status"] == "FAIL"
+    assert any(
+        row["suite"] == "unexpected" and row["state"] == "REJECTED"
+        for row in report["input_reports"]
+    )
+
+
 def test_exact_workflow_receipt_reuses_then_rejects_changed_observation(
     corpus, tmp_path: Path
 ):
@@ -736,13 +837,26 @@ def test_aggregate_rejects_unbound_or_modified_evidence(
         else:
             payload["identity"]["observer"] = "sha256:" + "0" * 64
         write_json(output / "summary.json", payload)
-    with pytest.raises(ValueError, match="differs|mismatch|changed"):
-        aggregate_backend(
-            campaign_path=campaign,
-            sources=sources,
-            selections={"fixture": {"workflow_report": str(output / "summary.json")}},
-            output_dir=tmp_path / "aggregate",
+    options = {
+        "campaign_path": campaign,
+        "sources": sources,
+        "selections": {"fixture": {"workflow_report": str(output / "summary.json")}},
+        "output_dir": tmp_path / "aggregate",
+    }
+    if mutation == "campaign":
+        with pytest.raises(ValueError, match="differs|mismatch|changed"):
+            aggregate_backend(**options)
+    else:
+        report = aggregate_backend(**options)
+        assert report["status"] == "FAIL"
+        rejected = next(
+            row for row in report["input_reports"] if row["proof"] == "workflow"
         )
+        assert rejected["state"] == "REJECTED"
+        assert any(
+            word in rejected["reason"] for word in ("differs", "mismatch", "changed")
+        )
+        assert report["missing_workflow_reports"] == ["fixture/handler"]
 
 
 @pytest.mark.parametrize(

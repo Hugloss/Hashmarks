@@ -54,7 +54,10 @@ class FactObservation:
             ):
                 raise ValueError("backend witness requires complete source identity")
             _relative_reference(binding["path"])
-            identity = (binding["repository"], binding["path"])
+            stage = binding.get("stage")
+            if stage is not None and stage not in {"before", "after"}:
+                raise ValueError("backend source binding has invalid revision stage")
+            identity = (binding["repository"], binding["path"], stage)
             if identity in identities:
                 raise ValueError("backend witness contains duplicate source bindings")
             identities.add(identity)

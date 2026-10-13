@@ -1,6 +1,7 @@
 """Nested retrieval keeps exact lexical containers without resolving an owner."""
 
 from pathlib import Path
+from typing import Any, cast
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.task_evidence_initial import decode_initial_packet
@@ -17,7 +18,9 @@ def test_nested_helper_discloses_source_bound_enclosing_method_in_initial_and_fu
     )
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        full = codemap.task_evidence("Inspect nested_cleanup_marker")
+        full = cast(
+            "dict[str, Any]", codemap.task_evidence("Inspect nested_cleanup_marker")
+        )
         wire = codemap.task_evidence(
             "Inspect nested_cleanup_marker", result_mode="initial"
         )
@@ -41,10 +44,16 @@ def test_nested_helper_discloses_source_bound_enclosing_method_in_initial_and_fu
         assert context["ownership_authority"] is False
         assert context["runtime_members"] == "not-established"
         assert context["negative_evidence_admissible"] is False
-    response = presentation_response(
-        "task_evidence", wire, format="text", result_mode="initial"
+    response = cast(
+        "dict[str, Any]",
+        presentation_response(
+            "task_evidence", wire, format="text", result_mode="initial"
+        ),
     )
-    assert "backend.py::Worker.drain (2:5" in response["presentation"]["text"]
+    text = response["presentation"]["text"]
+    assert 'Common={"path":"backend.py"}' in text
+    assert 'prefix="Worker."' in text
+    assert '["drain",2,5]' in text
 
 
 def test_deep_nesting_is_bounded_and_does_not_establish_absence(tmp_path: Path):
@@ -55,7 +64,7 @@ def test_deep_nesting_is_bounded_and_does_not_establish_absence(tmp_path: Path):
     (tmp_path / "backend.py").write_text("\n".join(lines) + "\n")
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        packet = codemap.task_evidence("Inspect level_5")
+        packet = cast("dict[str, Any]", codemap.task_evidence("Inspect level_5"))
     rows = [
         row["enclosing_declarations"]
         for row in packet["retrieval"]["results"]

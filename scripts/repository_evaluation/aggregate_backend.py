@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -28,7 +29,7 @@ from .backend_native import (
 from .common import canonical_sha256, load_json, write_json
 from .run_backend import _check_implementation, _verify_artifacts
 
-CAMPAIGN_SCHEMA = "hashmarks.backend-evidence-campaign.v3"
+CAMPAIGN_SCHEMA = "hashmarks.backend-evidence-campaign.v4"
 NATIVE_SCHEMA = "hashmarks.backend-native-specimen-measurement.v4"
 NATIVE_GATES = (
     "before_definition_token",
@@ -478,8 +479,16 @@ def aggregate_backend(
 ) -> dict[str, Any]:
     """Validate existing receipts and emit an all-capability QA measurement."""
     campaign = _campaign(campaign_path)
-    if set(selections) - {entry["id"] for entry in campaign["suites"]}:
-        raise ValueError("unexpected backend campaign report selection")
+    expected = {entry["id"] for entry in campaign["suites"]}
+    inputs = [
+        {
+            "suite": key,
+            "proof": "selection",
+            "state": "REJECTED",
+            "reason": "unexpected backend campaign report selection",
+        }
+        for key in sorted(set(selections) - expected)
+    ]
     collected: dict[str, list[dict[str, Any]]] = {
         "workflows": [],
         "outcomes": [],
@@ -488,20 +497,25 @@ def aggregate_backend(
     for entry in campaign["suites"]:
         suite, grader = _load_campaign_suite(campaign_path, entry, sources)
         selection = selections.get(entry["id"], {})
-        observed = (
-            _workflow_results(
-                Path(selection["workflow_report"]).resolve(), suite, grader, sources
+        if not isinstance(selection, dict):
+            inputs.append(
+                {
+                    "suite": entry["id"],
+                    "proof": "selection",
+                    "state": "REJECTED",
+                    "reason": "backend report selection must be an object",
+                }
             )
-            if "workflow_report" in selection
-            else {}
-        )
-        native = (
-            _native_results(selection, suite, grader, sources)
-            if "native_report" in selection
-            else {}
-        )
+            selection = {}
+        reports = {}
+        for proof in ("workflow", "native"):
+            rows, evidence = _admit_report_input(
+                entry["id"], proof, selection, suite, grader, sources
+            )
+            reports[proof] = rows
+            inputs.append(evidence)
         for key, rows in _merge_suite(
-            entry["id"], suite, observed, native, grader
+            entry["id"], suite, reports["workflow"], reports["native"], grader
         ).items():
             collected[key].extend(rows)
     report: dict[str, Any] = {
@@ -514,7 +528,20 @@ def aggregate_backend(
             if row["proof"] == "workflow-report"
         ],
         "outcomes": collected["outcomes"],
+        "input_reports": inputs,
+        "input_integrity": {
+            "state": "FAIL"
+            if any(row["state"] == "REJECTED" for row in inputs)
+            else "INCOMPLETE"
+            if any(
+                row["state"] == "MISSING" and row.get("required") is True
+                for row in inputs
+            )
+            else "PASS"
+        },
     }
+    if report["input_integrity"]["state"] == "FAIL":
+        report["status"] = "FAIL"
     write_json(output_dir / "summary.json", report)
     lines = [
         "# Backend evidence qualification",
@@ -528,8 +555,65 @@ def aggregate_backend(
         f"| {row['capability']}. {row['name']} | {row['genuine_workflows']} | {len(row['repositories'])} | {row['status']} |"
         for row in report["capabilities"]
     )
+    lines.extend(
+        ["", "| Suite | Input | State | Reason |", "| --- | --- | --- | --- |"]
+    )
+    lines.extend(
+        f"| {_markdown_cell(row['suite'])} | {row['proof']} | {row['state']} | {_markdown_cell(row.get('reason', ''))} |"
+        for row in inputs
+    )
     (output_dir / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     return report
+
+
+def _markdown_cell(value: object) -> str:
+    return str(value).replace("|", "\\|").replace("\n", " ")
+
+
+def _admit_report_input(
+    suite_id: str,
+    proof: str,
+    selection: dict[str, Any],
+    suite: dict[str, Any],
+    grader: dict[str, Any],
+    sources: dict[str, Path],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Retain rejected inputs without weakening their membership into success."""
+    key = proof + "_report"
+    required = proof == "workflow" or any(
+        row.get("native_required") is True
+        or row.get("native_fresh_required") is True
+        or 18 in row["capabilities"]
+        for row in suite["workflows"]
+    )
+    evidence: dict[str, Any] = {
+        "suite": suite_id,
+        "proof": proof,
+        "required": required,
+        "state": "MISSING",
+        "reason": "not supplied",
+    }
+    if key not in selection:
+        return {}, evidence
+    try:
+        path = Path(selection[key]).resolve()
+        evidence["path"] = str(path)
+        contents = path.read_bytes()
+        evidence["sha256"] = hashlib.sha256(contents).hexdigest()
+        rows = (
+            _workflow_results(path, suite, grader, sources)
+            if proof == "workflow"
+            else _native_results(selection, suite, grader, sources)
+        )
+        if path.read_bytes() != contents:
+            raise ValueError("backend input report changed during revalidation")
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        evidence.update(state="REJECTED", reason=str(error))
+        return {}, evidence
+    evidence.update(
+        state="ADMITTED", reason="identity, receipt and artifact revalidation passed"
+    )
+    return rows, evidence
 
 
 def main() -> int:

@@ -21,8 +21,8 @@
     19,
     20
   ],
-  "matrix_schema": "hashmarks.backend-evidence-matrix.v4",
-  "schema": "hashmarks.backend-evidence-campaign.v3",
+  "matrix_schema": "hashmarks.backend-evidence-matrix.v5",
+  "schema": "hashmarks.backend-evidence-campaign.v4",
   "suites": [
     {
       "grader_sha256": "7d73de59010dc5bd67b78cafa4861b996b152bce3a9fd71357eeb91b3af928c7",

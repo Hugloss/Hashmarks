@@ -251,6 +251,206 @@ class TaskEvidenceScopedMethodMixin:
             if codemap._indexed_path_current(path):
                 row["class_declarations"] = context
 
+    def _task_evidence_verification_subject(
+        self, row: Mapping[str, object]
+    ) -> Mapping[str, object] | None:
+        codemap = cast("CodeMap", self)
+        path = str(row.get("path") or "")
+        if not path or not codemap._indexed_path_current(path):
+            return None
+        if not codemap._task_evidence_declaration_visible(path):
+            return None
+        parent = codemap._task_evidence_retrieved_class_scope(path, row)
+        if parent is not None:
+            return parent
+        matches = [
+            symbol
+            for symbol in codemap._session_symbols_for_path(path)
+            if symbol.get("qualname") == row.get("symbol")
+            and (symbol.get("start_line"), symbol.get("end_line"))
+            == (row.get("start_line"), row.get("end_line"))
+        ]
+        return matches[0] if len(matches) == 1 else None
+
+    def _task_evidence_candidate_verifiers(
+        self, task: str, row: Mapping[str, object]
+    ) -> list[dict[str, object]]:
+        """References to an observed declaration do not prove its behavior ownership."""
+        from .query_primitives import _query_terms
+        from .repository_domains import RepositoryDomain, classify_repository_path
+        from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
+
+        codemap = cast("CodeMap", self)
+        path = str(row.get("path") or "")
+        if RepositoryDomain.TEST in classify_repository_path(path):
+            return []
+        subject = codemap._task_evidence_verification_subject(row)
+        member = codemap._session_file_row(path)
+        if subject is None or member is None:
+            return []
+        state = codemap._verification_state(task, path, "", ())
+        subject_terms = sorted(
+            state.task_terms.intersection(
+                _query_terms(
+                    str(subject["qualname"]) + " " + str(row.get("symbol") or "")
+                )
+            )
+        )
+        lexical = (
+            codemap._session_lexical_file_candidates(subject_terms, limit=65)
+            if subject_terms
+            else []
+        )
+        if len(lexical) > 64:
+            state.search_bound_reasons.add("source-identifier-lexical-file-limit")
+        term_counts = {
+            str(match["path"]): cast("int", match["matches"])
+            for match in lexical[:64]
+            if codemap._verification_ref_visible(match)
+            and RepositoryDomain.TEST in classify_repository_path(str(match["path"]))
+        }
+        state.candidate_paths.update(term_counts)
+        names: list[str] = []
+        codemap._append_verification_symbol_names(names, subject)
+        codemap._verification_collect_direct_references(state, names)
+        codemap._verification_collect_indirect_references(state)
+        candidates = codemap._verification_candidates(state)
+        candidates.extend(codemap._verification_lexical_candidates(state))
+        for candidate in candidates:
+            candidate["subject_term_matches"] = term_counts.get(
+                str(candidate["path"]), 0
+            )
+        candidates.sort(
+            key=codemap._task_evidence_candidate_verifier_score, reverse=True
+        )
+        basis = {
+            "path": path,
+            "symbol": subject["qualname"],
+            "start_line": subject["start_line"],
+            "end_line": subject["end_line"],
+            "source_revision": member["file_digest"],
+            "ownership_authority": False,
+            "search_bound_reasons": sorted(state.search_bound_reasons),
+            "subject_task_terms": subject_terms,
+        }
+        result = []
+        for candidate in candidates[: VERIFICATION_RELEVANCE_DEFAULTS.candidate_limit]:
+            test_path = str(candidate["path"])
+            test_member = codemap._session_file_row(test_path)
+            if (
+                test_member is None
+                or not codemap._indexed_path_current(test_path)
+                or not codemap._task_evidence_declaration_visible(test_path)
+            ):
+                continue
+            result.append(
+                {
+                    **candidate,
+                    "candidate_origin": "indexed-source-candidate-disclosure",
+                    "source_candidate_basis": [
+                        {
+                            **basis,
+                            "reference_strength": candidate.get("reference_strength"),
+                            "reference_symbols": candidate.get("reference_symbols", []),
+                            "indirect_reference_symbols": candidate.get(
+                                "indirect_reference_symbols", []
+                            ),
+                            "indirect_via_paths": candidate.get(
+                                "indirect_via_paths", []
+                            ),
+                        }
+                    ],
+                    "test_revision": test_member["file_digest"],
+                    "verification_selection_authority": False,
+                    "edit_relationship": "unestablished",
+                    "negative_evidence_admissible": False,
+                }
+            )
+        return result if codemap._indexed_path_current(path) else []
+
+    def _task_evidence_candidate_verifier_score(
+        self, row: Mapping[str, object]
+    ) -> tuple:
+        """Projection ordering only; lexical locality never grants selection proof."""
+        codemap = cast("CodeMap", self)
+        score = codemap._verification_candidate_score(row)
+        return (*score[:2], cast("int", row.get("subject_term_matches", 0)), *score[2:])
+
+    def _task_evidence_attach_candidate_verifiers(
+        self, packet: dict[str, object], task: str
+    ) -> None:
+        """Disclose test candidates without altering unresolved edit/verify selection."""
+        from .repository_domains import RepositoryDomain, classify_repository_path
+        from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
+
+        codemap = cast("CodeMap", self)
+        ownership, retrieval, verification = (
+            packet[key] for key in ("ownership", "retrieval", "verification")
+        )
+        if not isinstance(ownership, dict) or ownership.get("owner") is not None:
+            return
+        if not isinstance(retrieval, dict) or not isinstance(verification, dict):
+            return
+        relevance = verification.get("relevance")
+        if not isinstance(relevance, dict):
+            return
+        source_rows = [
+            row
+            for row in retrieval.get("results", [])
+            if RepositoryDomain.TEST
+            not in classify_repository_path(str(row.get("path") or ""))
+        ][:3]
+        candidates = [
+            candidate
+            for row in source_rows
+            for candidate in codemap._task_evidence_candidate_verifiers(task, row)
+        ]
+        by_path = {
+            str(row["path"]): dict(row) for row in relevance.get("candidates", [])
+        }
+        for candidate in candidates:
+            path = str(candidate["path"])
+            previous = by_path.get(path)
+            if previous is None:
+                by_path[path] = candidate
+            else:
+                previous_bases = cast(
+                    "list[dict[str, object]]",
+                    previous.get("source_candidate_basis", []),
+                )
+                new_bases = cast(
+                    "list[dict[str, object]]", candidate["source_candidate_basis"]
+                )
+                merged_bases = previous_bases + [
+                    basis for basis in new_bases if basis not in previous_bases
+                ]
+                if (
+                    "test_revision" not in previous
+                    or codemap._task_evidence_candidate_verifier_score(candidate)
+                    > codemap._task_evidence_candidate_verifier_score(previous)
+                ):
+                    by_path[path] = candidate
+                by_path[path]["source_candidate_basis"] = merged_bases
+        ordered = sorted(
+            by_path.values(),
+            key=codemap._task_evidence_candidate_verifier_score,
+            reverse=True,
+        )
+        limit = VERIFICATION_RELEVANCE_DEFAULTS.candidate_limit
+        relevance["candidates"] = codemap._verification_bounded_candidates(
+            ordered, relevance.get("selected"), limit
+        )
+        relevance["candidate_disclosure"] = {
+            "basis": "indexed-source-candidates-and-task-matches",
+            "subject_bound": 3,
+            "returned_bound": limit,
+            "observed_candidates": len(ordered),
+            "returned_candidates": len(relevance["candidates"]),
+            "omitted_candidates": max(0, len(ordered) - len(relevance["candidates"])),
+            "verification_selection_authority": False,
+            "negative_evidence_admissible": False,
+        }
+
     def _task_evidence_named_class_scope(
         self, task: str
     ) -> tuple[str, str, EvidenceVisibility] | None:

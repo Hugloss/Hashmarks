@@ -10,8 +10,8 @@ that those capabilities have passed.
 The frozen campaign is
 `benchmarks/repository_evaluation/manifests/backend-campaign-v1/campaign.json`.
 It binds the three existing suites and their source-oracle digests. The shared
-active schemas are `hashmarks.backend-evidence-campaign.v2` and
-`hashmarks.backend-evidence-matrix.v3`; older reports are historical evidence.
+active schemas are `hashmarks.backend-evidence-campaign.v4` and
+`hashmarks.backend-evidence-matrix.v5`; older reports are historical evidence.
 The directory name identifies the frozen source corpus, not the active report
 schema version. The shared
 matrix owns the unchanged minima: twelve distinct genuine problems and three
@@ -29,6 +29,20 @@ fill those rows. Their precise problems, semantic oracles and transport proof
 must be admitted before they contribute.
 
 ## Observation contracts
+
+### Candidate verification disclosure ownership note
+
+Observed repository fact/evidence: bounded test references and task matches around
+already retrieved source declarations while task behavior ownership is unresolved.
+Authority source: existing indexed declaration, qualified-import and verification
+reference owners; exact source/test revisions accompany the correspondence.
+Completeness/freshness behavior: three source locators and eight returned test
+candidates at most; stale or denied sources are excluded; omitted/unknown evidence
+does not establish absence. A parent class is a lexical declaration subject only.
+Existing Hashmarks owner extended: task evidence and verification candidate disclosure.
+Consumer/execution responsibility explicitly not acquired: edit or verification
+selection, behavior ownership, test execution, coverage and sufficiency.
+Decision: OBSERVER.
 
 ### Lexical enclosing declarations ownership note
 
@@ -89,6 +103,42 @@ matching source binding while its old capture remains generation-stale; neither
 dimension strengthens the other.
 
 ## Remaining implementation tickets
+
+### Remaining-work checkpoint
+
+The prior 22-file repair is committed at `70283d2`. The retained four-workflow
+report at `.hashmarks/backend-e2e/implementation-20261013/v4-class-scope/summary.json`
+is FAIL: cancellation passes its current gates; sender and metadata expose their
+changed methods but exceed the initial response limit, and sender, metadata and
+logging omit the reviewed verifier candidates. Initial MCP compact/text maxima
+are 5,167/4,994 tokens for sender and 4,774/4,397 for metadata.
+
+The current three catalogs have no independently frozen display checks or
+capability-proof membership. Their 36 entries include repeated upstream problems,
+which do not contribute additional breadth. The missing twelve capability rows
+still require genuine admitted corpora. No current capability rating is implied.
+
+The implementation order is: retain the baseline; repair initial size; repair
+verification disclosure; finish source-reviewed oracles; extend all-family
+witnesses/regrading; retain aggregate input rejections; qualify genuine
+add/delete/rename and fresh native captures; admit missing corpora; repair their
+generic omissions; clear full Ty/Pyright; then freeze and qualify final economics,
+bounded regression batches and independent artifacts. The final gate includes
+full typing, not only typing of changed files.
+
+Local measurements and logs belong under `.hashmarks/backend-e2e/remaining-work/`.
+Historical reports remain unchanged. A renderer-only replay is an iteration
+measurement and must be followed by actual API/CLI/official-MCP acquisition.
+
+Initial transport now optionally wraps the existing v1 string table in bounded
+zlib/base64 when the complete encoding is smaller. The semantic packet identity
+is computed from the unchanged decoded facts, never compression bytes. Decoders
+retain uncompressed v1 support and reject invalid sizes, truncated streams and
+trailing/concatenated data. Payloads above the compression allocation bound use
+the existing uncompressed representation without losing valid packet capacity.
+Readable declaration tables factor only JSON-identical qualifiers and common
+paths/prefixes. Table rows retain native order and future fields; shared metadata
+never makes boolean false equivalent to numeric zero.
 
 ### Current implementation checkpoint
 

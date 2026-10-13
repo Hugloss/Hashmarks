@@ -129,3 +129,146 @@ def task_fact_witnesses(
                         )["witnesses"]
                     )
     return witnesses
+
+
+def stage_fact_witnesses(
+    source: Path, output: Path, workflow: dict[str, Any], rule: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """One witness owner for task, selected boundary and declaration observations."""
+    witnesses = task_fact_witnesses(source, output, workflow, rule)
+    stage = rule["_stage"]
+    for family, input_key, oracle_key, path_key in (
+        (
+            "boundary",
+            "boundary_observations",
+            "function_boundary_oracles",
+            "changed_paths",
+        ),
+        (
+            "declarations",
+            "declaration_observations",
+            "declaration_oracles",
+            "python_backend_paths",
+        ),
+    ):
+        inputs = workflow.get(input_key, {}).get(stage)
+        oracle = rule.get(oracle_key, {}).get(stage)
+        if inputs is None or oracle is None:
+            continue
+        bindings = tuple(
+            {
+                "repository": workflow["repository"],
+                "path": path,
+                "revision": hash_file(
+                    confined_file(source, path), domain=FILE_DOMAIN
+                ).hash,
+            }
+            for path in sorted(set(inputs[path_key]))
+        )
+        scope = f"/cases/{workflow['id']}/{oracle_key}/{stage}"
+        witnesses.extend(
+            _component_fact_witnesses(
+                output,
+                workflow["id"],
+                stage,
+                family,
+                oracle,
+                scope,
+                bindings,
+            )
+        )
+    return witnesses
+
+
+def _component_fact_witnesses(
+    output: Path,
+    unit: str,
+    stage: str,
+    family: str,
+    rule: dict[str, Any],
+    scope: str,
+    bindings: tuple[dict[str, str], ...],
+) -> list[dict[str, Any]]:
+    witnesses = []
+    for surface in ("api", "cli", "mcp"):
+        relative = family + "/" + surface + ".json"
+        contents = confined_file(output, relative).read_bytes()
+        decoded = json.loads(contents)
+        captures = (
+            [("none", decoded)]
+            if surface == "api"
+            else [(row["format"], row) for row in decoded]
+        )
+        for format, captured in captures:
+            response = captured
+            if surface != "api":
+                validate_transport_capture(captured)
+                response = captured["response"]
+            packet = response.get("result", response)
+            context = FactObservation(
+                family + "_facts",
+                unit,
+                stage,
+                None,
+                surface,
+                format,
+                scope + "/checks",
+                (stage + "/" + relative, contents),
+                bindings,
+            )
+            witnesses.extend(grade_fact_observation(packet, rule, context)["witnesses"])
+            display = rule.get("display_checks", {}).get(format)
+            if surface != "api" and format != "none" and display:
+                context = FactObservation(
+                    family + "_presentation",
+                    unit,
+                    stage,
+                    None,
+                    surface,
+                    format,
+                    scope + "/display_checks/" + format,
+                    (stage + "/" + relative, contents),
+                    bindings,
+                )
+                witnesses.extend(
+                    grade_fact_observation(
+                        response["presentation"], {"checks": display}, context
+                    )["witnesses"]
+                )
+    return witnesses
+
+
+def delta_fact_witnesses(
+    sources: dict[str, Path],
+    output: Path,
+    workflow: dict[str, Any],
+    rule: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Bind comparison facts to independently admitted before/after source bytes."""
+    bindings = tuple(
+        {
+            "repository": workflow["repository"],
+            "path": path,
+            "stage": stage,
+            "revision": hash_file(
+                confined_file(sources[workflow[stage]], path), domain=FILE_DOMAIN
+            ).hash,
+        }
+        for stage in ("before", "after")
+        for path in sorted({label["path"] for label in rule["source_labels"][stage]})
+    )
+    contents = confined_file(output, "delta.json").read_bytes()
+    context = FactObservation(
+        "delta",
+        workflow["id"],
+        "delta",
+        None,
+        "api",
+        "none",
+        f"/cases/{workflow['id']}/delta_checks",
+        ("delta.json", contents),
+        bindings,
+    )
+    return grade_fact_observation(
+        json.loads(contents), {"checks": rule["delta_checks"]}, context
+    )["witnesses"]

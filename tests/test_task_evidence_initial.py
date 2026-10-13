@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import base64
 import json
+import zlib
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, cast
@@ -44,6 +46,85 @@ def test_initial_string_table_preserves_json_types_unicode_and_future_fields():
     encoded["data"][next(iter(encoded["data"]))][1] = False
     with pytest.raises(ValueError, match="semantic identity"):
         decode_initial_packet(encoded)
+
+
+def _compressible_initial() -> dict[str, Any]:
+    packet = {
+        "schema": "hashmarks.task-evidence-initial.v2",
+        "source_evidence_identity": "sha256:source",
+        "facts": [
+            {
+                "path": "répository/worker.py",
+                "symbol": "Worker.run",
+                "types": ["0", 0, False, None, 0.0],
+            }
+            for _ in range(80)
+        ],
+    }
+    packet["evidence_packet_identity"] = initial_packet_identity(packet)
+    return packet
+
+
+def test_compressed_initial_preserves_identity_types_and_all_records():
+    packet = _compressible_initial()
+    encoded = encode_initial_packet(packet)
+    assert encoded["encoding"]["kind"] == "json-string-table.v1+zlib"
+    decoded = decode_initial_packet(json.loads(json.dumps(encoded)))
+    assert decoded == packet
+    assert decoded["evidence_packet_identity"] == packet["evidence_packet_identity"]
+    assert len(decoded["facts"]) == 80
+    assert [type(value) for value in decoded["facts"][0]["types"]] == [
+        str,
+        int,
+        bool,
+        type(None),
+        float,
+    ]
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "bool-size",
+        "wrong-size",
+        "over-bound",
+        "invalid-base64",
+        "truncated",
+        "trailing-data",
+        "concatenated",
+        "changed-identity",
+    ],
+)
+def test_compressed_initial_rejects_corrupt_or_unbounded_payload(mutation):
+    encoded = encode_initial_packet(_compressible_initial())
+    raw = base64.b64decode(encoded["data"])
+    if mutation == "bool-size":
+        encoded["encoding"]["decoded_bytes"] = True
+    elif mutation == "wrong-size":
+        encoded["encoding"]["decoded_bytes"] -= 1
+    elif mutation == "over-bound":
+        encoded["encoding"]["decoded_bytes"] = 2**32
+    elif mutation == "invalid-base64":
+        encoded["data"] = "!"
+    elif mutation == "truncated":
+        encoded["data"] = base64.b64encode(raw[:-1]).decode("ascii")
+    elif mutation == "trailing-data":
+        encoded["data"] = base64.b64encode(raw + b"extra").decode("ascii")
+    elif mutation == "concatenated":
+        encoded["data"] = base64.b64encode(raw + zlib.compress(b"{}")).decode("ascii")
+    else:
+        encoded["evidence_packet_identity"] = "sha256:changed"
+    with pytest.raises(ValueError, match="initial"):
+        decode_initial_packet(encoded)
+
+
+def test_large_initial_falls_back_without_reducing_valid_capacity():
+    packet = _compressible_initial()
+    packet["future_fact"] = "x" * 1_048_577
+    packet["evidence_packet_identity"] = initial_packet_identity(packet)
+    encoded = encode_initial_packet(packet)
+    assert encoded["encoding"]["kind"] == "json-string-table.v1"
+    assert decode_initial_packet(encoded) == packet
 
 
 @pytest.mark.parametrize(
@@ -259,7 +340,7 @@ def test_initial_disclosure_keeps_admitted_owner_and_verification_alternatives(
 ) -> None:
     (tmp_path / "owner.py").write_text("def widget(): return 1\n")
     (tmp_path / "tests").mkdir()
-    for index in range(3):
+    for index in range(9):
         (tmp_path / "tests" / f"test_widget_{index}.py").write_text(
             "from owner import widget\n"
             f"def test_widget_{index}(): assert widget() == 1\n"
@@ -302,6 +383,23 @@ def test_initial_disclosure_keeps_admitted_owner_and_verification_alternatives(
     ledger = initial["initial_projection"]["omissions"]["collections"]
     assert ledger["/verification/relevance/candidates"]["omitted"] == 0
     assert initial["ownership"]["authority"] == packet["ownership"]["authority"]
+    initial["evidence_packet_identity"] = initial_packet_identity(initial)
+    display = cast(
+        "dict[str, Any]",
+        presentation_response(
+            "task_evidence",
+            encode_initial_packet(initial),
+            result_mode="initial",
+            format="compact",
+        ),
+    )["presentation"]
+    verification_group = next(
+        group for group in display["groups"] if group["family"] == "verification"
+    )
+    assert verification_group["omitted_from_presentation"] == 0
+    assert {row["details"]["path"] for row in verification_group["findings"]} == {
+        row["path"] for row in projected["candidates"]
+    }
 
 
 def test_initial_tables_preserve_missing_extra_fields_and_reject_corruption() -> None:

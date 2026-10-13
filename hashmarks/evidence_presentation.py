@@ -1592,7 +1592,9 @@ def present_repository_evidence(
         from hashmarks.codemap.task_evidence_initial import decode_initial_packet
 
         packet = decode_initial_packet(dict(packet))
-    limit = _MAX_PRESENTED_ROWS if format == "structured" else 5
+    # Initial collections are already bounded by their producer. A second cap
+    # must not hide the relevant verifier or an admitted owner alternative.
+    limit = _MAX_PRESENTED_ROWS if initial or format == "structured" else 5
     projection = _Projection(limit)
     supported = projection.project(packet)
     groups = [
@@ -1626,6 +1628,8 @@ def present_repository_evidence(
     if initial:
         result["reference_space"] = "decoded-initial-data"
         _compact_initial_groups(groups)
+        if format == "compact":
+            _compact_initial_declarations(groups)
     if format == "text":
         if packet.get("schema") == operation_schema("task_evidence", "initial"):
             result["text"] = _initial_evidence_text(packet)
@@ -1669,6 +1673,45 @@ def _compact_initial_groups(groups: list[dict[str, Any]]) -> None:
                 finding.pop(key)
             if not finding.get("source_context"):
                 finding.pop("source_context", None)
+
+
+def _compact_initial_declarations(groups: list[dict[str, Any]]) -> None:
+    """Render lexical scopes once; the native packet retains the exact records."""
+    from hashmarks.evidence_declaration_text import (
+        declaration_common_qualifiers,
+        declaration_scope_text,
+    )
+
+    for group in groups:
+        if group["family"] != "retrieval_evidence":
+            continue
+        contexts = [
+            details[family]
+            for finding in group["findings"]
+            if isinstance(details := finding.get("details"), dict)
+            for family in ("class_declarations", "enclosing_declarations")
+            if isinstance(details.get(family), dict)
+        ]
+        shared = declaration_common_qualifiers(contexts)
+        if contexts:
+            group["declaration_qualifiers"] = shared
+            group["declaration_table"] = (
+                "Rows preserve native order; <scope>/declarations/<row>; prefix applies to symbol; extras preserve missing fields."
+            )
+        for finding in group["findings"]:
+            details = finding.get("details")
+            if not isinstance(details, dict):
+                continue
+            for family in ("class_declarations", "enclosing_declarations"):
+                context = details.get(family)
+                if isinstance(context, dict):
+                    ref = finding["source_refs"][0] + "/" + family
+                    details[family] = {
+                        "source_ref": ref,
+                        "text": "\n".join(
+                            declaration_scope_text(context, ref, shared=shared)
+                        ),
+                    }
 
 
 def _initial_task(
@@ -1771,24 +1814,16 @@ def _initial_task(
 
 
 def _initial_declaration_text(row: dict[str, Any], index: int) -> list[str]:
-    from hashmarks.codemap.task_evidence_initial import decode_initial_collection
+    from hashmarks.evidence_declaration_text import declaration_scope_text
 
     lines = []
     for family in ("class_declarations", "enclosing_declarations"):
         declarations = row.get(family)
-        if not isinstance(declarations, dict):
-            continue
-        declared = declarations.get("declarations", [])
-        if isinstance(declarations.get("declarations_encoding"), dict):
-            declared = decode_initial_collection(
-                declared, declarations["declarations_encoding"]
-            )
-        lines.append(
-            f"Declaration qualification: authority: {declarations.get('authority', 'unknown')}; ownership: {declarations.get('ownership_authority', 'unknown')}; runtime: {declarations.get('runtime_members', 'unknown')}; negative evidence: {declarations.get('negative_evidence_admissible', 'unknown')}; revision: {declarations.get('source_revision', 'unknown')}; bound: {declarations.get('bound', 'unknown')}; omitted: {declarations.get('omitted', 'unknown')}; truncated: {declarations.get('truncated', 'unknown')} (@ /retrieval/results/{index}/{family})."
-        )
-        for declaration in declared:
-            lines.append(
-                f"Declaration: {declaration.get('path')}::{declaration.get('symbol')} ({declaration.get('start_line')}:{declaration.get('end_line')}; @ /retrieval/results/{index}/{family})."
+        if isinstance(declarations, dict):
+            lines.extend(
+                declaration_scope_text(
+                    declarations, f"/retrieval/results/{index}/{family}"
+                )
             )
     return lines
 
@@ -1796,6 +1831,7 @@ def _initial_declaration_text(row: dict[str, Any], index: int) -> list[str]:
 def _initial_evidence_text(packet: Mapping[str, object]) -> str:
     """Describe admitted initial locators; their native qualifications still govern."""
     from hashmarks.codemap.task_evidence_initial import decode_initial_collection
+    from hashmarks.evidence_declaration_text import declaration_scopes_text
 
     ownership = packet["ownership"]
     retrieval = packet["retrieval"]
@@ -1827,7 +1863,7 @@ def _initial_evidence_text(packet: Mapping[str, object]) -> str:
         lines.append(
             f"Source candidate: {row['path']}::{row.get('symbol', row.get('qualname', ''))} ({row.get('start_line', 'unknown')}:{row.get('end_line', 'unknown')}; @ /retrieval/results/{index})."
         )
-        lines.extend(_initial_declaration_text(row, index))
+    lines.extend(declaration_scopes_text(retrieval.get("results", [])))
     relevance = verification.get("relevance")
     if isinstance(relevance, Mapping):
         rows = relevance.get("candidates", [])

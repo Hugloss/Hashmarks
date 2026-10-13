@@ -158,10 +158,15 @@ def test_retrieved_method_discloses_qualified_direct_class_scope(tmp_path):
     )
     with CodeMap(tmp_path) as cm:
         cm.sync()
-        full = cast("dict", cm.task_evidence("Inspect Worker.metadata_update in backend.py"))
-        initial = cast("dict", cm.task_evidence(
-            "Inspect Worker.metadata_update in backend.py", result_mode="initial"
-        ))
+        full = cast(
+            "dict", cm.task_evidence("Inspect Worker.metadata_update in backend.py")
+        )
+        initial = cast(
+            "dict",
+            cm.task_evidence(
+                "Inspect Worker.metadata_update in backend.py", result_mode="initial"
+            ),
+        )
     for packet in (full, decode_initial_packet(initial)):
         row = next(
             row
@@ -191,11 +196,15 @@ def test_retrieved_method_discloses_qualified_direct_class_scope(tmp_path):
         assert context["runtime_members"] == "not-established"
         assert context["negative_evidence_admissible"] is False
         assert context["source_revision"] == hash_file(path, domain=FILE_DOMAIN).hash
-    response = cast("dict", presentation_response(
-        "task_evidence", initial, format="text", result_mode="initial"
-    ))
-    text = response["presentation"]["text"]
-    assert "Worker.failed_update (4:5" in text
-    assert (
-        "ownership: False; runtime: not-established; negative evidence: False" in text
+    response = cast(
+        "dict",
+        presentation_response(
+            "task_evidence", initial, format="text", result_mode="initial"
+        ),
     )
+    text = response["presentation"]["text"]
+    assert 'prefix="Worker."' in text
+    assert '["failed_update",4,5]' in text
+    assert '"ownership_authority":false' in text
+    assert '"runtime_members":"not-established"' in text
+    assert '"negative_evidence_admissible":false' in text
