@@ -400,6 +400,15 @@ def test_initial_disclosure_keeps_admitted_owner_and_verification_alternatives(
     assert {row["details"]["path"] for row in verification_group["findings"]} == {
         row["path"] for row in projected["candidates"]
     }
+    expected = {row["path"]: row for row in projected["candidates"]}
+    for finding in verification_group["findings"]:
+        recovered = {
+            **verification_group.get("locator_qualifiers", {}),
+            **finding["details"],
+        }
+        for key in ("reference_strength", "direct_reference", "indirect_reference"):
+            if key in expected[recovered["path"]]:
+                assert recovered[key] == expected[recovered["path"]][key]
 
 
 def test_initial_tables_preserve_missing_extra_fields_and_reject_corruption() -> None:

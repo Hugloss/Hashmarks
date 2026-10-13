@@ -115,6 +115,16 @@ def test_api_revision_workflow_cannot_qualify_missing_transports_or_breadth(
     assert outcome["gates"]["freshness"] is True
     assert outcome["gates"]["cli"] is None
     assert outcome["gates"]["mcp"] is None
+    comparison = next(
+        row for row in outcome["gate_witnesses"] if row["gate"] == "delta"
+    )
+    assert comparison["state"] == "PASS"
+    assert {
+        (row["stage"], row["revision"]) for row in comparison["source_bindings"]
+    } == {
+        (stage, hash_file(sources[stage] / "backend.py", domain=FILE_DOMAIN).hash)
+        for stage in ("before", "after")
+    }
     assert report["status"] == "INCOMPLETE"
     assert all(row["local_e2e_rating"] is None for row in report["capabilities"])
 
@@ -366,6 +376,16 @@ def test_boundary_revision_observations_preserve_actual_cli_facts_and_missing_mc
             "mcp": None,
         }
         assert len(boundary["cli"]["grades"]) == 4
+        witnesses = [
+            row
+            for row in outcome["gate_witnesses"]
+            if row["gate"] == "boundary_facts" and row["stage"] == stage
+        ]
+        assert {row["surface"] for row in witnesses} == {"api", "cli"}
+        assert all(
+            row["state"] == "PASS" and row["source_bindings"][0]["path"] == "backend.py"
+            for row in witnesses
+        )
     assert outcome["gates"]["initial_evidence"] is None
     assert report["status"] == "INCOMPLETE"
     assert all(row["local_e2e_rating"] is None for row in report["capabilities"])
@@ -527,6 +547,16 @@ def test_declaration_workflow_preserves_real_cli_facts_and_missing_mcp(
             "mcp": None,
         }
         assert len(observation["cli"]["grades"]) == 4
+        witnesses = [
+            row
+            for row in outcome["gate_witnesses"]
+            if row["gate"] == "declarations_facts" and row["stage"] == stage
+        ]
+        assert {row["surface"] for row in witnesses} == {"api", "cli"}
+        assert all(
+            row["state"] == "PASS" and row["source_bindings"][0]["path"] == "backend.py"
+            for row in witnesses
+        )
     assert outcome["gates"]["mcp"] is None
     assert outcome["gates"]["freshness"] is True
     assert outcome["gates"]["facts"] is True

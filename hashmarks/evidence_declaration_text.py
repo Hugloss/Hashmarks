@@ -90,7 +90,7 @@ def declaration_scope_text(
         if key not in (shared or {})
     }
     return [
-        f"Declarations @ {ref}: {_dump(metadata)}",
+        f"{'Declarations @ ' + ref if ref else 'Declarations'}: {_dump(metadata)}",
         f"Common={_dump(common)}; prefix={_dump(prefix)}; columns={_dump(columns)}; extras={_dump(extras)}",
         *(_dump(row) for row in table),
     ]

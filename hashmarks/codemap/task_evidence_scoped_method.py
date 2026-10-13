@@ -374,7 +374,13 @@ class TaskEvidenceScopedMethodMixin:
         """Projection ordering only; lexical locality never grants selection proof."""
         codemap = cast("CodeMap", self)
         score = codemap._verification_candidate_score(row)
-        return (*score[:2], cast("int", row.get("subject_term_matches", 0)), *score[2:])
+        return (
+            int(bool(row.get("direct_reference"))),
+            score[1],
+            cast("int", row.get("subject_term_matches", 0)),
+            int(bool(row.get("indirect_reference"))),
+            *score[2:],
+        )
 
     def _task_evidence_attach_candidate_verifiers(
         self, packet: dict[str, object], task: str

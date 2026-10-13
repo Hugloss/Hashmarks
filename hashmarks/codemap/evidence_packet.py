@@ -1241,24 +1241,26 @@ class TaskEvidencePacketMixin(
                 "omitted": max(0, len(exact) - exact_bound),
                 "ownership_authority": False,
             }
-        if not supplements:
-            return
-        keep = max(0, limit - len(supplements))
-        retrieval["results"] = [
-            *current[:keep],
-            *[self._task_evidence_retrieval_locator(row) for row in supplements],
-        ]
-        retrieval["canonical_omitted_results"] = max(0, len(current) - keep)
-        retrieval["supplemental_results"] = len(supplements)
-        retrieval["supplemental_authority"] = False
-        retrieval["ordering"] = (
-            "canonical-then-bounded-supplements"
-            if any(
-                row.get("retrieval_supplement") == "exact-qualified-identifier"
-                for row in supplements
+        if supplements:
+            keep = max(0, limit - len(supplements))
+            retrieval["results"] = [
+                *current[:keep],
+                *[self._task_evidence_retrieval_locator(row) for row in supplements],
+            ]
+            retrieval["canonical_omitted_results"] = max(0, len(current) - keep)
+            retrieval["supplemental_results"] = len(supplements)
+            retrieval["supplemental_authority"] = False
+            retrieval["ordering"] = (
+                "canonical-then-bounded-supplements"
+                if any(
+                    row.get("retrieval_supplement") == "exact-qualified-identifier"
+                    for row in supplements
+                )
+                else "canonical-then-bounded-natural-language"
             )
-            else "canonical-then-bounded-natural-language"
-        )
+        self._task_evidence_attach_class_declarations(result)
+        self._task_evidence_attach_enclosing_functions(result)
+        self._task_evidence_attach_candidate_verifiers(result, task)
 
     @staticmethod
     def _task_evidence_compact_evidence(
@@ -1512,9 +1514,6 @@ class TaskEvidencePacketMixin(
                 task,
                 limit=limit,
             )
-            self._task_evidence_attach_class_declarations(result)
-            self._task_evidence_attach_enclosing_functions(result)
-            self._task_evidence_attach_candidate_verifiers(result, task)
 
         self._task_evidence_attach_owner_source(
             result,

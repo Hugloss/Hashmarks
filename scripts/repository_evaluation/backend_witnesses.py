@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -166,15 +167,23 @@ def stage_fact_witnesses(
             for path in sorted(set(inputs[path_key]))
         )
         scope = f"/cases/{workflow['id']}/{oracle_key}/{stage}"
+        context = FactObservation(
+            family + "_facts",
+            workflow["id"],
+            stage,
+            None,
+            "api",
+            "none",
+            scope + "/checks",
+            None,
+            bindings,
+        )
         witnesses.extend(
             _component_fact_witnesses(
                 output,
-                workflow["id"],
-                stage,
                 family,
                 oracle,
-                scope,
-                bindings,
+                context,
             )
         )
     return witnesses
@@ -182,12 +191,9 @@ def stage_fact_witnesses(
 
 def _component_fact_witnesses(
     output: Path,
-    unit: str,
-    stage: str,
     family: str,
     rule: dict[str, Any],
-    scope: str,
-    bindings: tuple[dict[str, str], ...],
+    context: FactObservation,
 ) -> list[dict[str, Any]]:
     witnesses = []
     for surface in ("api", "cli", "mcp"):
@@ -205,34 +211,27 @@ def _component_fact_witnesses(
                 validate_transport_capture(captured)
                 response = captured["response"]
             packet = response.get("result", response)
-            context = FactObservation(
-                family + "_facts",
-                unit,
-                stage,
-                None,
-                surface,
-                format,
-                scope + "/checks",
-                (stage + "/" + relative, contents),
-                bindings,
+            captured_context = replace(
+                context,
+                surface=surface,
+                format=format,
+                artifact=(context.stage + "/" + relative, contents),
             )
-            witnesses.extend(grade_fact_observation(packet, rule, context)["witnesses"])
+            witnesses.extend(
+                grade_fact_observation(packet, rule, captured_context)["witnesses"]
+            )
             display = rule.get("display_checks", {}).get(format)
             if surface != "api" and format != "none" and display:
-                context = FactObservation(
-                    family + "_presentation",
-                    unit,
-                    stage,
-                    None,
-                    surface,
-                    format,
-                    scope + "/display_checks/" + format,
-                    (stage + "/" + relative, contents),
-                    bindings,
+                display_context = replace(
+                    captured_context,
+                    gate=family + "_presentation",
+                    oracle_pointer=context.oracle_pointer.removesuffix("/checks")
+                    + "/display_checks/"
+                    + format,
                 )
                 witnesses.extend(
                     grade_fact_observation(
-                        response["presentation"], {"checks": display}, context
+                        response["presentation"], {"checks": display}, display_context
                     )["witnesses"]
                 )
     return witnesses

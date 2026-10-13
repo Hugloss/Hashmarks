@@ -128,3 +128,21 @@ def test_owner_binding_cannot_qualify_a_missing_test_source(observation):
     result = grade_fact_observation({"value": 1}, rule, observation)
     assert result["gate"] is None
     assert result["witnesses"][0]["source_bindings"] == []
+
+
+def test_comparison_bindings_distinguish_revision_roles_and_reject_duplicates(
+    observation,
+):
+    before = {
+        "repository": "repo",
+        "path": "owner.py",
+        "revision": "old",
+        "stage": "before",
+    }
+    after = {**before, "revision": "new", "stage": "after"}
+    comparison = replace(observation, stage="delta", source_bindings=(before, after))
+    assert comparison.source_bindings == (before, after)
+    with pytest.raises(ValueError, match="duplicate source"):
+        replace(observation, source_bindings=(before, before))
+    with pytest.raises(ValueError, match="invalid revision stage"):
+        replace(observation, source_bindings=({**before, "stage": "unknown"},))

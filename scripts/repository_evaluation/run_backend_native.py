@@ -49,10 +49,17 @@ def _validate_destinations(
 
 
 def _validate_producers(
-    suite: dict[str, Any], grader: dict[str, Any], selected: set[str]
+    suite: dict[str, Any],
+    grader: dict[str, Any],
+    selected: set[str],
+    *,
+    regenerated: bool,
 ) -> None:
     """Check every nominated producer before acquiring any selected specimen."""
     from scripts.native_evidence_capture import _tool
+
+    if not regenerated:
+        return
 
     producers = {"python": "scip-python", "typescript": "scip-typescript"}
     tools = {"scip"}
@@ -118,8 +125,7 @@ def run_native(
     }
     outcomes = []
     _validate_destinations(selected, output, options)
-    if options.regenerated:
-        _validate_producers(suite, grader, selected)
+    _validate_producers(suite, grader, selected, regenerated=options.regenerated)
     for workflow in suite["workflows"]:
         if workflow["id"] not in selected:
             continue

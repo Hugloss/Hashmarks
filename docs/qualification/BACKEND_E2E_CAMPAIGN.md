@@ -91,7 +91,7 @@ Sources remain immutable; workflow copies are disposable.
 Native preparation includes all labelled files and only genuinely reviewed
 optional verifiers. Explicit `native_observations` may nominate stage-specific
 `language` and `paths`. Python and TypeScript specimens use their respective
-installed producers. Native v3 reports retain source identities, observation
+installed producers. Native v4 reports retain source identities, observation
 artifact hashes and capture artifact hashes. Their scope remains source binding
 and native transport; they cannot prove an execution path or verifier recall.
 Reports require every target's API/CLI/MCP and definition-token artifacts plus
@@ -258,6 +258,18 @@ uv run --frozen python -m scripts.repository_evaluation.aggregate_backend \
 The command emits `summary.json` and `summary.md`. It only reads admitted
 measurements; it never launches producers or selected work. Exit zero requires
 the complete campaign to pass. Rejected or incompatible inputs cannot qualify.
+Each selected input is retained as ADMITTED, MISSING or REJECTED, with its digest
+and reason when available. Rejected reports make the aggregate FAIL while valid
+unrelated reports remain visible. Missing required inputs remain INCOMPLETE;
+optional native replay omission does not imply acquisition or binding proof.
+Frozen campaign/source/oracle admission still fails closed before report grading.
+
+Task, boundary and declaration fact witnesses retain each captured context.
+Delta witnesses bind reviewed before/after source revisions separately, even when
+both endpoints use the same repository path. Shared regrading recomputes these
+witnesses from artifacts rather than trusting their supplied summaries. Debugging,
+native, dependency, service, authority/freshness and economics witness families
+still need their complete reviewed membership before all twenty rows can qualify.
 
 ## Remaining work before 5/5
 

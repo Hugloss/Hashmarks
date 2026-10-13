@@ -163,7 +163,9 @@ def test_missing_later_language_producer_prevents_all_acquisition(
 ):
     captures, calls, _acquire = native_runner
     original = runner.load_corpus
-    suite, grader = original(None, None)
+    suite, grader = original(
+        tmp_path / "suite.json", {"old": tmp_path, "new": tmp_path}
+    )
     suite["workflows"][1]["native_observations"]["after"] = {
         "language": "typescript",
         "paths": ["backend.ts"],

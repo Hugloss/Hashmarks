@@ -1630,6 +1630,7 @@ def present_repository_evidence(
         _compact_initial_groups(groups)
         if format == "compact":
             _compact_initial_declarations(groups)
+            _compact_initial_verification_qualifiers(groups)
     if format == "text":
         if packet.get("schema") == operation_schema("task_evidence", "initial"):
             result["text"] = _initial_evidence_text(packet)
@@ -1696,7 +1697,7 @@ def _compact_initial_declarations(groups: list[dict[str, Any]]) -> None:
         if contexts:
             group["declaration_qualifiers"] = shared
             group["declaration_table"] = (
-                "Rows preserve native order; <scope>/declarations/<row>; prefix applies to symbol; extras preserve missing fields."
+                "Native row order; <scope>/declarations/<row>; symbol prefix; extras retain absence."
             )
         for finding in group["findings"]:
             details = finding.get("details")
@@ -1709,9 +1710,32 @@ def _compact_initial_declarations(groups: list[dict[str, Any]]) -> None:
                     details[family] = {
                         "source_ref": ref,
                         "text": "\n".join(
-                            declaration_scope_text(context, ref, shared=shared)
+                            declaration_scope_text(context, "", shared=shared)
                         ),
                     }
+
+
+def _compact_initial_verification_qualifiers(groups: list[dict[str, Any]]) -> None:
+    """Common qualifier values apply to each locator, never to omitted evidence."""
+    for group in groups:
+        if group["family"] != "verification" or len(group["findings"]) < 2:
+            continue
+        details = [finding["details"] for finding in group["findings"]]
+        common = {
+            key: details[0][key]
+            for key in ("reference_strength", "direct_reference", "indirect_reference")
+            if key in details[0]
+            and all(
+                key in row and json.dumps(row[key]) == json.dumps(details[0][key])
+                for row in details
+            )
+        }
+        if not common:
+            continue
+        group["locator_qualifiers"] = common
+        for row in details:
+            for key in common:
+                row.pop(key)
 
 
 def _initial_task(
@@ -1811,21 +1835,6 @@ def _initial_task(
                 {},
                 assertion="producer_claim",
             )
-
-
-def _initial_declaration_text(row: dict[str, Any], index: int) -> list[str]:
-    from hashmarks.evidence_declaration_text import declaration_scope_text
-
-    lines = []
-    for family in ("class_declarations", "enclosing_declarations"):
-        declarations = row.get(family)
-        if isinstance(declarations, dict):
-            lines.extend(
-                declaration_scope_text(
-                    declarations, f"/retrieval/results/{index}/{family}"
-                )
-            )
-    return lines
 
 
 def _initial_evidence_text(packet: Mapping[str, object]) -> str:

@@ -98,6 +98,9 @@ def test_source_identifier_scout_keeps_late_test_body_without_claiming_reference
             "class MetadataTokenPolicy:\n    def reset(self):\n        return None\n"
         )
     (tmp_path / "tests").mkdir()
+    (tmp_path / "bridge.py").write_text(
+        "from alpha import MetadataTokenPolicy\ndef helper():\n    return MetadataTokenPolicy()\n"
+    )
     (tmp_path / "tests/test_neutral.py").write_text(
         "".join(
             f"def test_unrelated_{index}():\n    assert True\n" for index in range(80)
@@ -106,7 +109,7 @@ def test_source_identifier_scout_keeps_late_test_body_without_claiming_reference
     )
     for index in range(10):
         (tmp_path / f"tests/test_noise_{index}.py").write_text(
-            "def test_result():\n    assert 'metadata'\n"
+            "from bridge import helper\ndef test_result():\n    helper()\n    assert 'metadata'\n"
         )
     with CodeMap(tmp_path) as codemap:
         codemap.sync()

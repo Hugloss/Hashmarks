@@ -137,12 +137,25 @@ source body, ancillary locator/ranking detail and related sections. Every
 collection reduction and omitted section is recorded in `initial_projection`.
 The v2 wire packet uses a lossless packet-local `json-string-table.v1` encoding:
 keys and string values reference a sorted prefix-compressed table; JSON numbers,
-booleans, nulls and array order retain their types and meaning. Use
+booleans, nulls and array order retain their types and meaning. When smaller, the
+same table/data is wrapped as `json-string-table.v1+zlib`, with base64 data and
+an exact decoded-byte count. Decoder allocation is bounded to 1 MiB for that
+encoding; larger valid packets retain the uncompressed representation. Truncated,
+concatenated or trailing compressed data and identity mismatches fail closed. Use
 `decode_initial_packet` before interpreting data. Its semantic identity is
 verified against the decoded view. Presentation references use the explicit
 `decoded-initial-data` namespace. Initial MCP responses deliver the native packet
 once in `structuredContent`, with the readable projection in text content.
 Default full MCP responses retain their JSON mirror.
+
+Initial compact/text rendering factors identical declaration qualifications and
+common source locators into readable scope tables. Rows preserve declaration
+order, exact ranges, future fields and field absence. All already-bounded initial
+verification alternatives are displayed; a second five-row presentation cap does
+not hide a relevant test. Unresolved task ownership may expose fresh test candidates
+around three retrieved source declarations, with qualified reference or explicitly
+weak source-identifier/task matches. Those candidates do not change edit/verification
+selection or establish coverage, sufficiency, runtime behavior or repository absence.
 The full packet and projection have distinct identities. Re-observing the full
 mode may observe changed source, so consumers must compare the supplied full
 packet identity before treating an expansion as the same observation.
