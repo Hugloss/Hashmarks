@@ -60,19 +60,7 @@ def evaluate_with_receipt(
     It is not runtime retry/resume/process authority.
     """
     if receipt_path.exists():
-        payload = json.loads(receipt_path.read_text(encoding="utf-8"))
-        if (
-            payload.get("schema") != SCHEMA
-            or payload.get("identity") != identity
-            or payload.get("complete") is not True
-        ):
-            raise ValueError("research work receipt identity mismatch")
-        result = payload.get("result")
-        if not isinstance(result, dict):
-            raise ValueError("research work receipt result is malformed")
-        if payload.get("result_sha256") != canonical_sha256(result):
-            raise ValueError("research work receipt result integrity mismatch")
-        return result, True
+        return read_work_receipt(receipt_path, identity=identity), True
     result = evaluate()
     atomic_write_json(
         receipt_path,
@@ -85,6 +73,23 @@ def evaluate_with_receipt(
         },
     )
     return result, False
+
+
+def read_work_receipt(path: Path, *, identity: dict[str, str]) -> dict[str, Any]:
+    """Read exact completed evidence without executing or creating any work."""
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if (
+        payload.get("schema") != SCHEMA
+        or payload.get("identity") != identity
+        or payload.get("complete") is not True
+    ):
+        raise ValueError("research work receipt identity mismatch")
+    result = payload.get("result")
+    if not isinstance(result, dict):
+        raise ValueError("research work receipt result is malformed")
+    if payload.get("result_sha256") != canonical_sha256(result):
+        raise ValueError("research work receipt result integrity mismatch")
+    return result
 
 
 def durability_summary(

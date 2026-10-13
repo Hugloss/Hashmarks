@@ -919,7 +919,7 @@ class VerificationMixin:
         matches = [
             {
                 "path": str(row["path"]),
-                "matched_term_count": int(row.get("matches") or 0),
+                "matched_term_count": row["matches"],
                 "evidence_visibility": row.get("evidence_visibility"),
             }
             for row in rows[:64]

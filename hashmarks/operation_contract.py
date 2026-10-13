@@ -69,7 +69,7 @@ OPERATION_CONTRACTS = (
         "task_evidence",
         (
             ("default", "hashmarks.task-evidence.v5"),
-            ("initial", "hashmarks.task-evidence-initial.v1"),
+            ("initial", "hashmarks.task-evidence-initial.v2"),
         ),
     ),
     OperationContract(

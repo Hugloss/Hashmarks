@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
 from typing import Any
 
@@ -14,24 +15,88 @@ from hashmarks.test_shards import repository_content_identity
 from .common import GRADER_SCHEMA, load_json
 from .run_cases import _validate_case_membership
 
-SCHEMA = "hashmarks.backend-evidence-workflows.v1"
+SCHEMA = "hashmarks.backend-evidence-workflows.v2"
+LEGACY_SCHEMA = "hashmarks.backend-evidence-workflows.v1"
 SUITE_PATH = (
     Path(__file__).resolve().parents[2]
     / "benchmarks/repository_evaluation/manifests/backend-v1/suite.json"
 )
 
 
-def confined_file(root: Path, relative: str) -> Path:
+def confined_path(root: Path, relative: str) -> Path:
     path = (root / relative).resolve()
-    if (
-        Path(relative).is_absolute()
-        or not path.is_relative_to(root.resolve())
-        or not path.is_file()
-    ):
+    if Path(relative).is_absolute() or not path.is_relative_to(root.resolve()):
         raise ValueError(
             f"backend source reference is not a repository file: {relative}"
         )
     return path
+
+
+def confined_file(root: Path, relative: str) -> Path:
+    path = confined_path(root, relative)
+    if not path.is_file():
+        raise ValueError(
+            f"backend source reference is not a repository file: {relative}"
+        )
+    return path
+
+
+def workflow_transitions(workflow: dict[str, Any]) -> list[dict[str, Any]]:
+    """Translate legacy modifications without inferring rename correspondence."""
+    transitions = workflow.get("transitions")
+    if transitions is None:
+        transitions = [
+            {"kind": "modify", "before_path": path, "after_path": path}
+            for path in workflow.get("changed_paths", [])
+        ]
+    if not isinstance(transitions, list) or not transitions:
+        raise ValueError("backend workflow requires genuine source transitions")
+    for transition in transitions:
+        _check_transition_shape(transition)
+    for stage in ("before_path", "after_path"):
+        paths = [row[stage] for row in transitions if row[stage] is not None]
+        if len(set(paths)) != len(paths):
+            raise ValueError("backend transition endpoints must be distinct per stage")
+    return transitions
+
+
+def _check_transition_shape(transition: object) -> None:
+    if not isinstance(transition, dict) or set(transition) != {
+        "kind",
+        "before_path",
+        "after_path",
+    }:
+        raise ValueError("backend transition requires explicit path endpoints")
+    kind = transition["kind"]
+    before, after = transition["before_path"], transition["after_path"]
+    if any(
+        path is not None and (not isinstance(path, str) or not path)
+        for path in (before, after)
+    ):
+        raise ValueError("backend transition endpoints must be nonempty paths or null")
+    valid = {
+        "modify": before is not None and before == after,
+        "add": before is None and after is not None,
+        "delete": before is not None and after is None,
+        "rename": before is not None and after is not None and before != after,
+    }
+    if kind not in valid or not valid[kind]:
+        raise ValueError("backend transition kind differs from its endpoints")
+
+
+def workflow_changed_paths(workflow: dict[str, Any]) -> list[str]:
+    paths = sorted(
+        {
+            row[key]
+            for row in workflow_transitions(workflow)
+            for key in ("before_path", "after_path")
+            if row[key] is not None
+        }
+    )
+    declared = workflow.get("changed_paths")
+    if declared is not None and sorted(declared) != paths:
+        raise ValueError("backend changed paths differ from transition endpoints")
+    return paths
 
 
 def _check_label(root: Path, label: dict[str, Any]) -> None:
@@ -50,6 +115,14 @@ def _check_label(root: Path, label: dict[str, Any]) -> None:
 
 
 def _check_workflow_metadata(workflow: dict[str, Any]) -> None:
+    identifier = workflow["id"]
+    if (
+        not isinstance(identifier, str)
+        or identifier in {".", ".."}
+        or "/" in identifier
+        or "\\" in identifier
+    ):
+        raise ValueError("backend workflow ID must be one confined path component")
     capabilities = workflow["capabilities"]
     if (
         not capabilities
@@ -74,15 +147,48 @@ def _check_workflow(
     for stage in ("before", "after"):
         root = sources[workflow[stage]]
         _check_revision_labels(root, rule, stage)
-    if not workflow["changed_paths"]:
-        raise ValueError("backend workflow requires a genuine source change")
-    for relative in workflow["changed_paths"]:
-        before = confined_file(sources[workflow["before"]], relative)
-        after = confined_file(sources[workflow["after"]], relative)
-        if before.read_bytes() == after.read_bytes():
-            raise ValueError(f"backend changed path is unchanged: {relative}")
+    workflow_changed_paths(workflow)
+    for transition in workflow_transitions(workflow):
+        _check_transition(
+            transition, sources[workflow["before"]], sources[workflow["after"]]
+        )
     _check_boundary_inputs(workflow, rule, sources)
     _check_declaration_inputs(workflow, rule, sources)
+
+
+def _check_transition(
+    transition: dict[str, Any], before_root: Path, after_root: Path
+) -> None:
+    kind = transition["kind"]
+    before = (
+        confined_file(before_root, transition["before_path"])
+        if transition["before_path"] is not None
+        else None
+    )
+    after = (
+        confined_file(after_root, transition["after_path"])
+        if transition["after_path"] is not None
+        else None
+    )
+    if kind == "modify":
+        if before is None or after is None:
+            raise ValueError("backend modification requires both source endpoints")
+        if before.read_bytes() == after.read_bytes():
+            raise ValueError(
+                f"backend changed path is unchanged: {transition['before_path']}"
+            )
+    if (
+        kind in {"add", "rename"}
+        and confined_path(before_root, transition["after_path"]).exists()
+    ):
+        raise ValueError(
+            "backend added/renamed target already exists before transition"
+        )
+    if (
+        kind in {"delete", "rename"}
+        and confined_path(after_root, transition["before_path"]).exists()
+    ):
+        raise ValueError("backend deleted/renamed source still exists after transition")
 
 
 def _check_declaration_inputs(
@@ -154,9 +260,58 @@ def _check_revision_labels(root: Path, rule: dict[str, Any], stage: str) -> None
         raise ValueError("backend workflow requires source labels for both revisions")
     for label in labels:
         _check_label(root, label)
+    stage_rule = {**rule, **rule.get(stage, {})}
+    oracle = stage_rule.get("owner_oracle")
+    if oracle is not None:
+        _check_owner_oracle(root, oracle, labels)
     for check in rule.get(stage, rule).get("checks", []):
         if check.get("id") == "existing-verifier-visible":
             confined_file(root, check["value"])
+
+
+def _check_owner_oracle(
+    root: Path, oracle: dict[str, Any], labels: list[dict[str, Any]]
+) -> None:
+    scope, resolution = oracle.get("scope"), oracle.get("resolution")
+    candidates = oracle.get("candidates")
+    if (
+        scope not in {"file", "symbol"}
+        or resolution not in {"unique", "ambiguous", "unknown"}
+        or not isinstance(candidates, list)
+    ):
+        raise ValueError("backend owner oracle requires explicit scope and resolution")
+    valid_count = {
+        "unique": len(candidates) == 1,
+        "ambiguous": len(candidates) >= 2,
+        "unknown": not candidates,
+    }
+    if not valid_count[resolution]:
+        raise ValueError("backend owner oracle resolution differs from candidate count")
+    keys = (
+        ("path",) if scope == "file" else ("path", "qualname", "start_line", "end_line")
+    )
+    identities = set()
+    for candidate in candidates:
+        if not isinstance(candidate, dict) or any(key not in candidate for key in keys):
+            raise ValueError("backend owner oracle lacks exact candidate identity")
+        confined_file(root, candidate["path"])
+        identity = tuple(candidate[key] for key in keys)
+        if identity in identities:
+            raise ValueError("backend owner oracle contains duplicate candidates")
+        identities.add(identity)
+        if not any(
+            label["path"] == candidate["path"]
+            and (
+                scope == "file"
+                or (
+                    label.get("symbol") == candidate["qualname"]
+                    and label["start_line"] == candidate["start_line"]
+                    and label["end_line"] == candidate["end_line"]
+                )
+            )
+            for label in labels
+        ):
+            raise ValueError("backend owner oracle lacks independent source label")
 
 
 def _check_boundary_inputs(
@@ -188,7 +343,7 @@ def _check_boundary_inputs(
                 "max_depth": 1,
             }
             or oracle["source"] != workflow[stage]
-            or span["path"] not in workflow["changed_paths"]
+            or span["path"] not in workflow_changed_paths(workflow)
         ):
             raise ValueError(
                 "backend boundary inputs differ from the admitted source scope"
@@ -221,7 +376,7 @@ def _check_boundary_oracle(root: Path, oracle: dict[str, Any]) -> None:
 def load_corpus(
     suite_path: Path, sources: dict[str, Path]
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    suite = load_json(suite_path, schema=SCHEMA)
+    suite = _load_suite(suite_path)
     grader = load_json(suite_path.parent / suite["grader_file"], schema=GRADER_SCHEMA)
     workflows = suite["workflows"]
     if not isinstance(workflows, list) or not workflows:
@@ -242,3 +397,17 @@ def load_corpus(
             raise ValueError("backend workflow source repository identity differs")
         _check_workflow(workflow, grader["cases"][workflow["id"]], sources)
     return suite, grader
+
+
+def _load_suite(suite_path: Path) -> dict[str, Any]:
+    suite = json.loads(suite_path.read_text(encoding="utf-8"))
+    if not isinstance(suite, dict) or suite.get("schema") not in {
+        SCHEMA,
+        LEGACY_SCHEMA,
+    }:
+        raise ValueError(f"unsupported schema in {suite_path}")
+    if suite["schema"] == SCHEMA and any(
+        "transitions" not in workflow for workflow in suite.get("workflows", [])
+    ):
+        raise ValueError("backend v2 workflows require explicit source transitions")
+    return suite

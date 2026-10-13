@@ -342,6 +342,22 @@ def test_source_refs_point_to_exact_records_and_details_are_independent(
             source, format="structured"
         )
         for row in _findings(projected):
+            if projected.get("reference_space") == "decoded-initial-data":
+                from scripts.repository_evaluation.fact_grading import pointer_values
+
+                values = pointer_values(source, row["source_refs"][0])
+                assert len(values) == 1
+                value = values[0]
+                # Initial locators explicitly retain display fields. Check each
+                # field against the decoded source record, including typed
+                # collection decoding, rather than following wire-table keys.
+                if isinstance(row["details"], dict):
+                    assert all(
+                        value[key] == item for key, item in row["details"].items()
+                    )
+                else:
+                    assert row["details"] == value
+                continue
             value = source
             pointer = row["source_refs"][0]
             for part in pointer.split("/")[1:] if pointer else ():
@@ -625,16 +641,9 @@ def test_sdk_calls_all_tools_with_native_defaults_and_optional_formats(
                     ),
                 }
                 called = await server.call_tool(contract.name, request)
-                contract.validate_response(
-                    called.structured_content, result_mode=mode, presentation=format
+                _assert_mode_delivery(
+                    contract, called, packets[contract.operation, mode], mode, format
                 )
-                assert called.structured_content == presentation_response(
-                    contract.operation,
-                    packets[contract.operation, mode],
-                    format=format,
-                    result_mode=mode,
-                )
-                _assert_task_json_mirror(contract.operation, called)
 
     try:
         asyncio.run(exercise())
@@ -719,3 +728,36 @@ def test_omitted_record_qualifications_remain_visible_outside_display_bounds() -
     row = _findings(projected)[0]
     assert row["source_context"]["freshness"] == "unknown"
     assert row["source_context"]["record_qualification"]["state"] == "observed"
+
+
+def _assert_initial_delivery(called: Any, native: dict[str, Any], format: str) -> None:
+    assert called.structured_content == native
+    text = called.content[0].text
+    if format == "none":
+        assert "structuredContent" in text
+    else:
+        projected = present_repository_evidence(native, format=format)
+        assert (text if format == "text" else json.loads(text)) == (
+            projected["text"] if format == "text" else projected
+        )
+
+
+def _assert_mode_delivery(
+    contract: Any, called: Any, native: dict[str, Any], mode: str, format: str
+) -> None:
+    initial = contract.operation == "task_evidence" and mode == "initial"
+    contract.validate_response(
+        called.structured_content,
+        result_mode=mode,
+        presentation="none" if initial else format,
+    )
+    if initial:
+        _assert_initial_delivery(called, native, format)
+    else:
+        assert called.structured_content == presentation_response(
+            contract.operation,
+            native,
+            format=format,
+            result_mode=mode,
+        )
+        _assert_task_json_mirror(contract.operation, called)

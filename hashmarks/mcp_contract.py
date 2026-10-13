@@ -210,7 +210,9 @@ MCP_TOOL_CONTRACTS = (
         (
             "Semantic first choice for unknown-path behavior before exploratory "
             "grep/read. Separates retrieval from ownership; resolves owner/ambiguity, "
-            "returns source/next-read, verification, freshness and bounded SCIP evidence."
+            "returns source/next-read, verification, freshness and bounded SCIP evidence. "
+            "Initial mode delivers the lossless v2 packet once in structuredContent "
+            "and a readable projection in text; default mode retains its JSON mirror."
         ),
         "task_evidence",
     ),

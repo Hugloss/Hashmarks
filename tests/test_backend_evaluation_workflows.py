@@ -48,10 +48,18 @@ def corpus(tmp_path: Path):
         "before": "before",
         "after": "after",
         "changed_paths": ["backend.py"],
+        "transitions": [
+            {"kind": "modify", "before_path": "backend.py", "after_path": "backend.py"}
+        ],
         "capabilities": [1, 6, 7, 17],
     }
     rule = {
         "expected_owner_path": "backend.py",
+        "owner_oracle": {
+            "scope": "file",
+            "resolution": "unique",
+            "candidates": [{"path": "backend.py"}],
+        },
         "source_labels": labels,
         "checks": [
             {
@@ -102,8 +110,8 @@ def test_api_revision_workflow_cannot_qualify_missing_transports_or_breadth(
     )
     outcome = report["outcomes"][0]
     assert outcome["gates"]["facts"] is True
-    assert outcome["gates"]["authority"] is True
-    assert outcome["gates"]["revision"] is True
+    assert outcome["gates"]["authority"] is None
+    assert outcome["gates"]["revision"] is None
     assert outcome["gates"]["freshness"] is True
     assert outcome["gates"]["cli"] is None
     assert outcome["gates"]["mcp"] is None
@@ -257,8 +265,8 @@ def test_boundary_revision_observations_preserve_actual_cli_facts_and_missing_mc
             "mcp": None,
         }
         assert len(boundary["cli"]["grades"]) == 4
-    assert outcome["gates"]["initial_evidence"] is False
-    assert report["status"] == "FAIL"
+    assert outcome["gates"]["initial_evidence"] is None
+    assert report["status"] == "INCOMPLETE"
     assert all(row["local_e2e_rating"] is None for row in report["capabilities"])
 
 
@@ -282,7 +290,7 @@ def test_boundary_failed_fact_cannot_be_compensated_by_task_or_revision_success(
     outcome = report["outcomes"][0]
     assert outcome["before"]["classification"] == "PASS"
     assert outcome["after"]["classification"] == "PASS"
-    assert outcome["gates"]["revision"] is True
+    assert outcome["gates"]["revision"] is None
     assert outcome["gates"]["facts"] is False
     assert report["status"] == "FAIL"
 
@@ -442,7 +450,7 @@ def test_failed_declaration_fact_cannot_be_masked_by_successful_task(
     )
     outcome = report["outcomes"][0]
     assert outcome["gates"]["freshness"] is True
-    assert outcome["gates"]["revision"] is True
+    assert outcome["gates"]["revision"] is None
     assert outcome["gates"]["facts"] is False
     assert outcome["declaration_observations"]["after"]["gates"]["facts"] is False
 
@@ -482,3 +490,193 @@ def test_declaration_admission_requires_complete_source_oracles(
     write_json(path, grader)
     with pytest.raises(ValueError, match="backend declaration"):
         load_corpus(suite_path, sources)
+
+
+@pytest.mark.parametrize("kind", ["add", "delete", "rename"])
+def test_added_deleted_and_renamed_files_preserve_revision_invalidation(
+    corpus, tmp_path: Path, kind: str
+):
+    suite_path, sources = corpus
+    suite = json.loads(suite_path.read_text())
+    before = "extra.py" if kind != "add" else None
+    after = "renamed.py" if kind == "rename" else "extra.py" if kind == "add" else None
+    for stage, path in (("before", before), ("after", after)):
+        if path is not None:
+            (sources[stage] / path).write_text("def extra():\n    return 3\n")
+        suite["sources"][stage]["content_identity"] = repository_content_identity(
+            sources[stage]
+        )
+    workflow = suite["workflows"][0]
+    workflow["transitions"].append(
+        {"kind": kind, "before_path": before, "after_path": after}
+    )
+    workflow["changed_paths"] = sorted(
+        {"backend.py", *[p for p in (before, after) if p is not None]}
+    )
+    write_json(suite_path, suite)
+    report = run_backend(
+        sources=sources,
+        suite_path=suite_path,
+        output_dir=tmp_path / "result",
+        transports=(),
+    )
+    outcome = report["outcomes"][0]
+    assert outcome["gates"]["freshness"] is True
+    assert outcome["gates"]["facts"] is True
+    stale = json.loads(
+        (tmp_path / "result/handler/observations/stale.json").read_text()
+    )
+    assert {row["member"]["path"] for row in stale["observations"]} == set(
+        workflow["changed_paths"]
+    )
+    assert all(
+        row["negative_evidence"] == "not-admissible" for row in stale["observations"]
+    )
+
+
+def test_v2_workflow_cannot_silently_fall_back_to_legacy_transitions(corpus):
+    suite_path, sources = corpus
+    suite = json.loads(suite_path.read_text())
+    del suite["workflows"][0]["transitions"]
+    write_json(suite_path, suite)
+    with pytest.raises(ValueError, match="explicit source transitions"):
+        load_corpus(suite_path, sources)
+
+
+def test_legacy_modification_manifest_remains_readable(corpus):
+    from scripts.repository_evaluation.backend_corpus import LEGACY_SCHEMA
+
+    suite_path, sources = corpus
+    suite = json.loads(suite_path.read_text())
+    suite["schema"] = LEGACY_SCHEMA
+    del suite["workflows"][0]["transitions"]
+    write_json(suite_path, suite)
+    loaded, _ = load_corpus(suite_path, sources)
+    assert loaded["schema"] == LEGACY_SCHEMA
+
+
+def _campaign_for_fixture(suite_path: Path) -> Path:
+    from scripts.repository_evaluation.aggregate_backend import CAMPAIGN_SCHEMA
+    from scripts.repository_evaluation.backend_matrix import SCHEMA as MATRIX_SCHEMA
+    from scripts.repository_evaluation.common import canonical_sha256
+
+    suite = json.loads(suite_path.read_text())
+    grader = json.loads((suite_path.parent / suite["grader_file"]).read_text())
+    path = suite_path.parent / "campaign.json"
+    write_json(
+        path,
+        {
+            "schema": CAMPAIGN_SCHEMA,
+            "matrix_schema": MATRIX_SCHEMA,
+            "capabilities": list(range(1, 21)),
+            "suites": [
+                {
+                    "id": "fixture",
+                    "suite_file": "suite.json",
+                    "suite_sha256": canonical_sha256(suite),
+                    "grader_sha256": canonical_sha256(grader),
+                    "workflow_ids": ["handler"],
+                }
+            ],
+        },
+    )
+    return path
+
+
+def test_aggregate_reads_current_receipts_without_executing_work(
+    corpus, tmp_path: Path
+):
+    from scripts.repository_evaluation.aggregate_backend import aggregate_backend
+
+    suite_path, sources = corpus
+    campaign = _campaign_for_fixture(suite_path)
+    run_backend(
+        sources=sources,
+        suite_path=suite_path,
+        output_dir=tmp_path / "measure",
+        transports=(),
+    )
+    report = aggregate_backend(
+        campaign_path=campaign,
+        sources=sources,
+        selections={
+            "fixture": {"workflow_report": str(tmp_path / "measure/summary.json")}
+        },
+        output_dir=tmp_path / "aggregate",
+    )
+    assert report["status"] == "INCOMPLETE"
+    assert report["outcomes"][0]["id"] == "fixture/handler"
+    assert all(row["local_e2e_rating"] is None for row in report["capabilities"])
+    assert (tmp_path / "aggregate/summary.md").is_file()
+
+
+def test_aggregate_accounts_for_missing_reports(corpus, tmp_path: Path):
+    from scripts.repository_evaluation.aggregate_backend import aggregate_backend
+
+    suite_path, sources = corpus
+    report = aggregate_backend(
+        campaign_path=_campaign_for_fixture(suite_path),
+        sources=sources,
+        selections={},
+        output_dir=tmp_path / "aggregate",
+    )
+    assert report["status"] == "INCOMPLETE"
+    assert report["missing_workflow_reports"] == ["fixture/handler"]
+
+
+def test_initial_is_the_first_public_task_request_at_each_revision(
+    corpus, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    from hashmarks.operation_contract import operation_default_mode
+    from scripts.repository_evaluation import backend_workflows
+
+    suite_path, sources = corpus
+    requests = []
+
+    def capture(_workspace, _state, case):
+        requests.append(case["inputs"]["result_mode"])
+        return []
+
+    monkeypatch.setattr(backend_workflows, "capture_cli", capture)
+    report = run_backend(
+        sources=sources,
+        suite_path=suite_path,
+        output_dir=tmp_path / "result",
+        transports=("cli",),
+    )
+    assert requests == ["initial", operation_default_mode("task_evidence")] * 2
+    assert report["status"] == "INCOMPLETE"
+
+
+@pytest.mark.parametrize("mutation", ["summary", "artifact", "observer", "campaign"])
+def test_aggregate_rejects_unbound_or_modified_evidence(
+    corpus, tmp_path: Path, mutation: str
+):
+    from scripts.repository_evaluation.aggregate_backend import aggregate_backend
+
+    suite_path, sources = corpus
+    campaign = _campaign_for_fixture(suite_path)
+    output = tmp_path / "measure"
+    run_backend(
+        sources=sources, suite_path=suite_path, output_dir=output, transports=()
+    )
+    if mutation == "artifact":
+        (output / "handler/observations/before/api.json").write_text("{}")
+    elif mutation == "campaign":
+        payload = json.loads(campaign.read_text())
+        payload["suites"][0]["grader_sha256"] = "0" * 64
+        write_json(campaign, payload)
+    else:
+        payload = json.loads((output / "summary.json").read_text())
+        if mutation == "summary":
+            payload["outcomes"][0]["gates"]["facts"] = False
+        else:
+            payload["identity"]["observer"] = "sha256:" + "0" * 64
+        write_json(output / "summary.json", payload)
+    with pytest.raises(ValueError, match="differs|mismatch|changed"):
+        aggregate_backend(
+            campaign_path=campaign,
+            sources=sources,
+            selections={"fixture": {"workflow_report": str(output / "summary.json")}},
+            output_dir=tmp_path / "aggregate",
+        )

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, cast
@@ -11,11 +12,75 @@ import pytest
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.task_evidence_initial import (
     decode_initial_collection,
+    decode_initial_packet,
+    encode_initial_packet,
+    initial_packet_identity,
     initial_task_evidence,
 )
 from hashmarks.evidence_presentation import FORMATS, presentation_response
+from hashmarks.evidence_presentation_conformance import validate_evidence_presentation
 from hashmarks.mcp_contract import tool_contract
 from hashmarks.mcp_surface import HashmarksMcpSurface, McpSurfaceError
+
+
+def test_initial_string_table_preserves_json_types_unicode_and_future_fields():
+    packet = {
+        "schema": "hashmarks.task-evidence-initial.v2",
+        "source_evidence_identity": "sha256:source",
+        "evidence_packet_identity": "sha256:initial",
+        "0": ["0", 0, False, None, 0.0, "💚é", {"future": "💚ê", "empty": ""}],
+    }
+    packet["evidence_packet_identity"] = initial_packet_identity(packet)
+    encoded = encode_initial_packet(packet)
+    decoded = decode_initial_packet(json.loads(json.dumps(encoded)))
+    assert decoded == packet
+    assert [type(value) for value in decoded["0"][:5]] == [
+        str,
+        int,
+        bool,
+        type(None),
+        float,
+    ]
+    encoded["data"][next(iter(encoded["data"]))][1] = False
+    with pytest.raises(ValueError, match="semantic identity"):
+        decode_initial_packet(encoded)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "bool-prefix",
+        "oversized-prefix",
+        "duplicate-string",
+        "bad-index",
+        "leading-zero",
+        "header-shadow",
+    ],
+)
+def test_initial_string_table_rejects_malformed_references(mutation):
+    packet = encode_initial_packet(
+        {
+            "schema": "hashmarks.task-evidence-initial.v2",
+            "source_evidence_identity": "sha256:source",
+            "evidence_packet_identity": "sha256:initial",
+            "a": "b",
+        }
+    )
+    if mutation == "bool-prefix":
+        packet["encoding"]["strings"][0][0] = False
+    elif mutation == "oversized-prefix":
+        packet["encoding"]["strings"][0][0] = 1
+    elif mutation == "duplicate-string":
+        packet["encoding"]["strings"][1] = [1, ""]
+    elif mutation == "bad-index":
+        packet["data"]["0"] = "999"
+    elif mutation == "leading-zero":
+        packet["data"]["0"] = "01"
+    else:
+        packet["encoding"]["strings"] = [[0, "schema"]]
+        packet["data"] = {"0": 1}
+    with pytest.raises(ValueError, match="initial"):
+        decode_initial_packet(packet)
 
 
 def _decoded_task_matches(matches: dict[str, Any]) -> dict[str, Any]:
@@ -28,19 +93,51 @@ def _decoded_task_matches(matches: dict[str, Any]) -> dict[str, Any]:
     return matches
 
 
-def _assert_metadata_only_display(
-    response: dict[str, Any], packet: dict[str, Any]
-) -> None:
+def _assert_initial_display(response: dict[str, Any], packet: dict[str, Any]) -> None:
+    logical = decode_initial_packet(packet)
+    transported = json.loads(json.dumps(response, sort_keys=True))
+    assert (
+        validate_evidence_presentation(
+            transported["result"], transported["presentation"]
+        )["valid"]
+        is True
+    )
     assert response["result"] == packet
-    assert response["presentation"]["groups"] == []
-    assert response["presentation"]["source_context"] == []
-    assert response["presentation"]["unprojected_sections"] == [
-        {
-            "source_ref": "",
-            "reason": "native-packet-not-displayed",
-            "native_item_count": len(packet),
-        }
-    ]
+    assert response["presentation"]["reference_space"] == "decoded-initial-data"
+    groups = response["presentation"]["groups"]
+    if response["presentation"]["format"] != "text":
+        owner = next(
+            group for group in groups if group["family"] == "ownership_evidence"
+        )["findings"][0]
+        assert owner["details"] == logical["ownership"]["owner"]
+        assert (
+            owner["source_context"]["ambiguity"]["ambiguous"]
+            == logical["ownership"]["ambiguity"]["ambiguous"]
+        )
+        assert (
+            owner["source_context"]["ambiguity"]["reason"]
+            == logical["ownership"]["ambiguity"]["reason"]
+        )
+        assert (
+            owner["source_context"]["proof_scope_complete"]
+            == logical["ownership"]["proof_scope_complete"]
+        )
+        assert response["presentation"]["unprojected_sections"] == [
+            {
+                "source_ref": "",
+                "reason": "native-packet-details-not-displayed",
+                "native_item_count": len(logical),
+            }
+        ]
+    if response["presentation"]["format"] == "text":
+        text = response["presentation"]["text"]
+        assert "Ownership:" in text
+        assert "freshness:" in text
+        assert "Ambiguity:" in text
+        assert "omissions do not establish absence" in text
+        assert "tests were not executed" in text
+        for row in logical["retrieval"]["results"]:
+            assert row["path"] in text
 
 
 @pytest.mark.parametrize("ambiguous", [False, True])
@@ -65,7 +162,7 @@ def test_initial_profile_preserves_authority_and_source_identity(
             codemap.task_evidence("Fix widget", result_mode="initial"),
         )
     assert native == before
-    assert api["schema"] == "hashmarks.task-evidence-initial.v1"
+    assert api["schema"] == "hashmarks.task-evidence-initial.v2"
     assert initial["source_evidence_identity"] == native["evidence_packet_identity"]
     assert api["evidence_packet_identity"] != api["source_evidence_identity"]
     for key in ("status", "authority", "proof_scope", "proof_scope_complete", "basis"):
@@ -100,14 +197,17 @@ def test_initial_profile_preserves_authority_and_source_identity(
             response, result_mode="initial", presentation=mode
         )
         if mode != "none":
-            _assert_metadata_only_display(response, api)
+            _assert_initial_display(response, api)
     surface = HashmarksMcpSurface(str(tmp_path))
     try:
         observed = cast(
             "dict[str, Any]", surface.task_evidence("Fix widget", result_mode="initial")
         )
         assert observed["schema"] == api["schema"]
-        assert observed["ownership"]["status"] == api["ownership"]["status"]
+        assert (
+            decode_initial_packet(observed)["ownership"]["status"]
+            == decode_initial_packet(api)["ownership"]["status"]
+        )
     finally:
         surface.close()
 

@@ -129,12 +129,20 @@ hashmarks task-evidence 'Describe the repository question' --result-mode initial
 
 The API and MCP accept `result_mode="initial"` as well. The default remains the
 full `hashmarks.task-evidence.v5` packet. The initial mode returns
-`hashmarks.task-evidence-initial.v1`: the same admitted owner, selected verifier,
+`hashmarks.task-evidence-initial.v2`: the same admitted owner, selected verifier,
 provenance, freshness and uncertainty, canonical first-three locators and bounded
-declaration supplements, one selected/canonical relevance record, and the
+declaration supplements, all already-bounded verification alternatives, and the
 separate weak task matches. It retains exact source locations while omitting the
 source body, ancillary locator/ranking detail and related sections. Every
 collection reduction and omitted section is recorded in `initial_projection`.
+The v2 wire packet uses a lossless packet-local `json-string-table.v1` encoding:
+keys and string values reference a sorted prefix-compressed table; JSON numbers,
+booleans, nulls and array order retain their types and meaning. Use
+`decode_initial_packet` before interpreting data. Its semantic identity is
+verified against the decoded view. Presentation references use the explicit
+`decoded-initial-data` namespace. Initial MCP responses deliver the native packet
+once in `structuredContent`, with the readable projection in text content.
+Default full MCP responses retain their JSON mirror.
 The full packet and projection have distinct identities. Re-observing the full
 mode may observe changed source, so consumers must compare the supplied full
 packet identity before treating an expansion as the same observation.
@@ -144,6 +152,32 @@ In initial mode, weak matches use lossless `columns-rows.v1` encoding: the
 visibility, ordering and all match-scope/authority qualifiers are retained.
 Unexpected row fields retain the original object encoding. The full mode
 continues to return object rows.
+
+Verification candidates use `columns-rows-with-extras.v1`. Common columns are
+named once; each row also carries an extras object for fields that are not
+present in every candidate. Decoding preserves missing versus null values and
+rejects extras that overwrite a declared column. No bounded alternative is
+removed merely because another verifier was selected.
+
+Initial text now displays ownership status, freshness, ambiguity, source
+locators and bounded verification candidates with native source pointers.
+Qualification details remain in the native packet. Text rendering is stable
+across JSON key ordering; display omissions do not establish absence.
+
+The v2 backend matrix separates the hard `initial_size` gate from the
+`initial_evidence` recall measurement. The workflow runner explicitly captures
+default/full and initial responses at both revisions. Missing required proof
+remains incomplete, while any known hard failure dominates missing proof.
+Legacy oracles without independently declared initial checks or owner scope
+cannot qualify those missing measurements.
+
+The workflow v2 contract additionally supports explicit `modify`, `add`,
+`delete` and `rename` transitions. Legacy v1 manifests remain readable as
+modification workflows. Renames are caller-nominated, never inferred semantic
+equivalence. Every transition endpoint is confined to its admitted source root.
+
+See [the campaign contract](BACKEND_E2E_CAMPAIGN.md) for the read-only aggregate
+entrypoint, current membership and remaining qualification requirements.
 
 Initial class declaration lists use the same lossless encoding, with
 `declarations_encoding.columns` naming `path`, `symbol`, `start_line`, and

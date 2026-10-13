@@ -12,9 +12,9 @@ from typing import Any
 from hashmarks.codemap import ChangeImpactOptions, CodeMap
 from hashmarks.digest import FILE_DOMAIN, hash_file
 from hashmarks.evidence_presentation import FORMATS
-from hashmarks.evidence_presentation_conformance import validate_evidence_presentation
 
 from .backend_corpus import confined_file
+from .backend_gates import combine_required, fact_state, presentation_conformance
 from .backend_transport import capture_cli, capture_mcp
 from .common import write_json
 from .fact_grading import grade_facts
@@ -38,7 +38,7 @@ def _grade(
 ) -> dict[str, Any]:
     facts = grade_facts("function-boundary", {"packet": packet}, rule)
     return {
-        "facts": facts["classification"] == "PASS",
+        "facts": fact_state(facts["classification"]),
         "authority": facts["authority_violations"] == 0,
         "revision": _bound(workspace, packet, paths),
         "checks": facts["checks"],
@@ -78,9 +78,7 @@ def observe_boundary(
             graded = _grade(workspace, native, rule, paths)
             graded["parity"] = (
                 row["format"] == "none"
-                or validate_evidence_presentation(native, response["presentation"])[
-                    "valid"
-                ]
+                or presentation_conformance(native, response["presentation"])["valid"]
                 is True
             )
             grades.append({"format": row["format"], **graded})
@@ -90,20 +88,27 @@ def observe_boundary(
             "grades": grades,
         }
     results["gates"] = {
-        name: api[name]
-        and all(
-            row[name]
-            for transport in ("cli", "mcp")
-            for row in results[transport]["grades"]
+        name: combine_required(
+            [
+                api[name],
+                *(
+                    row[name]
+                    for transport in ("cli", "mcp")
+                    for row in results[transport]["grades"]
+                ),
+            ]
         )
         for name in ("facts", "authority", "revision")
     }
     for transport in ("cli", "mcp"):
         result = results[transport]
-        results["gates"][transport] = (
-            None
-            if result["complete"] is None
-            else result["complete"]
-            and all(row["facts"] and row["parity"] for row in result["grades"])
+        results["gates"][transport] = combine_required(
+            [
+                True if result["complete"] is True else None,
+                *(
+                    combine_required([row["facts"], row["parity"]])
+                    for row in result["grades"]
+                ),
+            ]
         )
     return results

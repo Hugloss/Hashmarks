@@ -49,7 +49,7 @@ _EXPECTED = {
     "find": {"default": "hashmarks.find.v2"},
     "task_evidence": {
         "default": "hashmarks.task-evidence.v5",
-        "initial": "hashmarks.task-evidence-initial.v1",
+        "initial": "hashmarks.task-evidence-initial.v2",
     },
     "change_impact": {"default": "hashmarks.task-change-impact.v1"},
     "correlate_evidence": {"default": "hashmarks.evidence-correlation.v2"},

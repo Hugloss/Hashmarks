@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -11,11 +12,32 @@ from typing import Any
 from .backend_corpus import SUITE_PATH, load_corpus
 from .backend_native import (
     NativeSpecimenOptions,
+    capture_artifact_digests,
     prepare_capture,
     qualify_native_workflow,
 )
 from .common import canonical_sha256, evaluator_implementation_identity, write_json
 from .run_backend import _check_implementation, _observer_identity
+
+
+def _validate_destinations(
+    selected: set[str], output: Path, capture_root: Path
+) -> None:
+    # A report binds this invocation's observations, never leftovers from an
+    # earlier qualification. Validate all destinations before acquiring bytes.
+    for workflow_id in selected:
+        destination = output / workflow_id
+        if destination.exists():
+            raise ValueError("native observations require a new output directory")
+        capture = capture_root / workflow_id
+        if (
+            destination.resolve() == capture.resolve()
+            or destination.resolve() in capture.resolve().parents
+            or capture.resolve() in destination.resolve().parents
+        ):
+            raise ValueError(
+                "native observations and captures must have separate destinations"
+            )
 
 
 def run_native(
@@ -49,8 +71,13 @@ def run_native(
         "evaluator": evaluator_implementation_identity(),
         "transports": options.transports,
         "regenerate": options.regenerated,
+        "source_identities": {
+            name: definition["content_identity"]
+            for name, definition in suite["sources"].items()
+        },
     }
     outcomes = []
+    _validate_destinations(selected, output, options.capture_root)
     for workflow in suite["workflows"]:
         if workflow["id"] not in selected:
             continue
@@ -80,6 +107,19 @@ def run_native(
             output / workflow["id"],
             options,
         )
+        outcome["artifacts"] = {
+            path.relative_to(output / workflow["id"]).as_posix(): hashlib.sha256(
+                path.read_bytes()
+            ).hexdigest()
+            for path in sorted((output / workflow["id"]).rglob("*.json"))
+            if path.name != "report.json"
+        }
+        outcome["capture_artifacts"] = {
+            stage: capture_artifact_digests(
+                options.capture_root / workflow["id"] / stage
+            )
+            for stage in ("before", "after")
+        }
         _check_implementation(identity)
         outcomes.append(outcome)
         write_json(output / workflow["id"] / "report.json", outcome)
@@ -91,7 +131,7 @@ def run_native(
         else "PASS"
     )
     report = {
-        "schema": "hashmarks.backend-native-specimen-measurement.v1",
+        "schema": "hashmarks.backend-native-specimen-measurement.v3",
         "status": status,
         "identity": identity,
         "outcomes": outcomes,

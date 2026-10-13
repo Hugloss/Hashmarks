@@ -12,9 +12,34 @@ from hashmarks.digest import FILE_DOMAIN, hash_file
 from scripts.repository_evaluation.backend_native import (
     SCOPE,
     _native_definition,
+    _transport,
+    capture_artifact_digests,
+    prepare_capture,
     validate_capture,
 )
 from scripts.repository_evaluation.common import write_json
+
+
+def test_stage_specimen_preserves_unchanged_files_outside_new_capture(tmp_path):
+    from scripts.repository_evaluation.backend_native import _replace_specimens
+
+    before, after, workspace = (
+        tmp_path / name for name in ("before", "after", "workspace")
+    )
+    before.mkdir()
+    after.mkdir()
+    for root in (before, after):
+        (root / "existing.py").write_text("class Existing: pass\n")
+    (before / "removed.py").write_text("class Removed: pass\n")
+    (after / "added.py").write_text("class Added: pass\n")
+    paths = {"existing.py", "removed.py", "added.py"}
+    _replace_specimens(workspace, before, paths)
+    _replace_specimens(workspace, after, paths)
+    assert (workspace / "existing.py").read_bytes() == (
+        before / "existing.py"
+    ).read_bytes()
+    assert (workspace / "added.py").is_file()
+    assert not (workspace / "removed.py").exists()
 
 
 @pytest.fixture
@@ -82,6 +107,73 @@ def test_native_specimen_admission_preserves_exact_source_revision(specimen):
         provenance["source_revisions"]["backend.py"]
         == hash_file(source / "backend.py", domain=FILE_DOMAIN).hash
     )
+
+
+@pytest.mark.parametrize("language,suffix", [("python", ".py"), ("typescript", ".ts")])
+def test_capture_preparation_preserves_all_sources_without_inventing_verifier(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, language: str, suffix: str
+):
+    from scripts import native_evidence_capture
+
+    source, destination = tmp_path / "source", tmp_path / "capture"
+    source.mkdir()
+    paths = ["model" + suffix, "provider" + suffix]
+    for path in paths:
+        (source / path).write_text("# explicitly admitted fixture\n")
+    observed = {}
+
+    def capture(root, _destination, selected_language):
+        observed["language"] = selected_language
+        observed["sources"] = {path: (root / path).read_bytes() for path in paths}
+
+    monkeypatch.setattr(native_evidence_capture, "capture_scip", capture)
+    prepare_capture(
+        {"id": "annotation-only"},
+        {
+            "source_labels": {"before": [{"path": path} for path in paths]},
+            "checks": [{"id": "source-owner-visible", "value": paths[0]}],
+            "verification_oracle_state": "unknown-no-reviewed-direct-test",
+        },
+        "before",
+        source,
+        {"repository": "controlled-fixture"},
+        destination,
+    )
+    assert observed["language"] == language
+    assert observed["sources"] == {path: (source / path).read_bytes() for path in paths}
+    binding = json.loads((destination / "backend-binding.json").read_text())
+    assert binding["paths"] == paths
+    assert binding["scope"] == SCOPE
+
+
+def test_native_missing_formats_preserve_known_failure():
+    assert (
+        _transport([], {"path": "backend.py", "symbol": "handle"}, "revision") is None
+    )
+    assert (
+        _transport(
+            [
+                {
+                    "format": "none",
+                    "response": {"target": "backend.py::handle", "observations": []},
+                }
+            ],
+            {"path": "backend.py", "symbol": "handle"},
+            "revision",
+        )
+        is False
+    )
+
+
+def test_native_artifact_scope_does_not_expand_into_tool_caches(specimen):
+    capture, _source, _definition = specimen
+    extra = capture / "node_modules/ignored.py"
+    extra.parent.mkdir()
+    extra.write_text("not an admitted producer input\n")
+    digests = capture_artifact_digests(capture)
+    assert "backend.py" in digests
+    assert "index.scip" in digests
+    assert not any(name.startswith("node_modules/") for name in digests)
 
 
 @pytest.mark.parametrize(

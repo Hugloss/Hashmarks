@@ -1546,12 +1546,15 @@ class TaskEvidencePacketMixin(
         )
         validate_operation_response("task_evidence", result)
         if result_mode == "initial":
-            from .task_evidence_initial import initial_task_evidence
+            from .task_evidence_initial import (
+                encode_initial_packet,
+                initial_packet_identity,
+                initial_task_evidence,
+            )
 
             result = initial_task_evidence(result)
-            result["evidence_packet_identity"] = "sha256:" + self._packet_digest(
-                operation_schema("task_evidence", "initial"), result
-            )
+            result["evidence_packet_identity"] = initial_packet_identity(result)
+            result = encode_initial_packet(result)
         return validate_operation_response("task_evidence", result, mode=result_mode)
 
     @operation_response("task_action_brief")

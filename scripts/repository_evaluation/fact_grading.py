@@ -5,7 +5,10 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from hashmarks.codemap.task_evidence_initial import decode_initial_collection
+from hashmarks.codemap.task_evidence_initial import (
+    decode_initial_collection,
+    decode_initial_packet,
+)
 from hashmarks.operation_contract import operation_schema
 
 
@@ -42,6 +45,12 @@ def _values(
 
 def pointer_values(packet: object, pointer: str) -> list[object]:
     """RFC 6901 pointers plus explicit wildcard collection for oracle checks."""
+    if (
+        isinstance(packet, dict)
+        and packet.get("schema") == operation_schema("task_evidence", "initial")
+        and "encoding" in packet
+    ):
+        packet = decode_initial_packet(packet)
     if pointer == "":
         return [packet]
     if not pointer.startswith("/"):
@@ -57,12 +66,30 @@ def pointer_values(packet: object, pointer: str) -> list[object]:
     )
 
 
+def _json_equal(value: object, expected: object) -> bool:
+    """Oracle comparisons preserve JSON types, including bool/int/float."""
+    if type(value) is not type(expected):
+        return False
+    if isinstance(value, dict) and isinstance(expected, dict):
+        return value.keys() == expected.keys() and all(
+            _json_equal(item, expected[key]) for key, item in value.items()
+        )
+    if isinstance(value, list) and isinstance(expected, list):
+        return len(value) == len(expected) and all(
+            _json_equal(a, b) for a, b in zip(value, expected, strict=True)
+        )
+    return value == expected
+
+
 def _matches_record(value: object, expected: object) -> bool:
     return (
         isinstance(value, Mapping)
         and isinstance(expected, dict)
         and bool(expected)
-        and all(key in value and value[key] == item for key, item in expected.items())
+        and all(
+            key in value and _json_equal(value[key], item)
+            for key, item in expected.items()
+        )
     )
 
 
@@ -107,17 +134,19 @@ def _check(packet: object, rule: Mapping[str, Any]) -> dict[str, object]:
             )
         )
     predicates = {
-        "equals": lambda: len(values) == 1 and values[0] == expected,
-        "includes": lambda: any(value == expected for value in values),
+        "equals": lambda: len(values) == 1 and _json_equal(values[0], expected),
+        "includes": lambda: any(_json_equal(value, expected) for value in values),
         "includes_record": lambda: any(
             any(_matches_record(value, record_expected) for value in record_values)
             for _, record_expected, record_values in records
         ),
         "includes_scoped_record": lambda: _includes_scoped_record(values, expected),
         "all_equal": lambda: (
-            bool(values) and all(value == expected for value in values)
+            bool(values) and all(_json_equal(value, expected) for value in values)
         ),
-        "excludes": lambda: bool(values) and all(value != expected for value in values),
+        "excludes": lambda: (
+            bool(values) and all(not _json_equal(value, expected) for value in values)
+        ),
     }
     if predicate not in predicates:
         raise ValueError(f"unsupported fact predicate: {predicate}")

@@ -5,7 +5,9 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-SCHEMA = "hashmarks.backend-evidence-matrix.v1"
+from .backend_gates import combine_required
+
+SCHEMA = "hashmarks.backend-evidence-matrix.v3"
 MIN_WORKFLOWS = 12
 MIN_REPOSITORIES = 3
 INITIAL_TOKEN_CEILING = 4_000
@@ -32,7 +34,18 @@ CAPABILITIES = (
     "More language/framework coverage",
     "Indexing, packet size and performance",
 )
-COMMON_GATES = frozenset({"facts", "authority", "revision", "freshness", "cli", "mcp"})
+COMMON_GATES = frozenset(
+    {
+        "facts",
+        "authority",
+        "revision",
+        "freshness",
+        "cli",
+        "mcp",
+        "presentation",
+        "initial_size",
+    }
+)
 SPECIAL_GATES = {
     1: "owner_top_three",
     4: "debug_correspondence",
@@ -77,18 +90,26 @@ def _gate(
         by_problem.setdefault(problem, []).append(
             outcomes.get(str(workflow["id"]), {}).get("gates", {}).get(name)
         )
-    values = [_problem_gate(group) for group in by_problem.values()]
+    values = (
+        _frame_values(workflows, outcomes)
+        if name == "debug_correspondence"
+        else [_problem_gate(group) for group in by_problem.values()]
+    )
     missing = sum(type(value) is not bool for value in values)
     passed = sum(value is True for value in values)
     fraction = passed / len(values) if values else 0.0
     threshold = THRESHOLDS.get(name, 1.0)
+    required_percent = round(threshold * 100)
     state = (
         "FAIL"
-        if threshold == 1.0 and any(value is False for value in values)
+        if threshold == 1.0
+        and any(value is False for value in values)
+        or values
+        and 100 * (passed + missing) < required_percent * len(values)
         else "INCOMPLETE"
         if missing or not values
         else "PASS"
-        if fraction >= threshold
+        if 100 * passed >= required_percent * len(values)
         else "FAIL"
     )
     return {
@@ -102,9 +123,43 @@ def _gate(
 
 
 def _problem_gate(values: list[object]) -> bool | None:
-    if any(value is False for value in values):
-        return False
-    return True if all(value is True for value in values) else None
+    checked: list[bool | None] = []
+    for value in values:
+        if value is None or isinstance(value, bool):
+            checked.append(value)
+        else:
+            raise ValueError("backend gate observations must be bool or None")
+    return combine_required(checked)
+
+
+def _frame_values(
+    workflows: list[Mapping[str, Any]], outcomes: Mapping[str, Any]
+) -> list[bool | None]:
+    """Reduce frozen repository-frame units; transports never add frame breadth."""
+    by_frame: dict[tuple[str, str, str], list[bool | None]] = {}
+    unreviewed = []
+    for workflow in workflows:
+        units = workflow.get("debug_frame_units")
+        if units is None:
+            unreviewed.append(None)
+            continue
+        if (
+            not isinstance(units, list)
+            or not units
+            or not all(isinstance(unit, str) and unit for unit in units)
+            or len(set(units)) != len(units)
+        ):
+            raise ValueError(
+                "debug frame units must be distinct reviewed frame identities"
+            )
+        rows = outcomes.get(str(workflow["id"]), {}).get("debug_frame_observations", [])
+        observed = {row["unit_id"]: row["correspondence"] for row in rows}
+        if len(observed) != len(rows) or set(observed) - set(units):
+            raise ValueError("unexpected or duplicate debug frame observation")
+        for unit in units:
+            key = (str(workflow["repository"]), str(workflow["problem_id"]), unit)
+            by_frame.setdefault(key, []).append(observed.get(unit))
+    return [*unreviewed, *(combine_required(group) for group in by_frame.values())]
 
 
 def _capability(
@@ -120,7 +175,13 @@ def _capability(
     }
     repositories = {str(workflow["repository"]) for workflow in selected}
     gates = {
-        name: _gate(selected, outcomes, name)
+        name: _gate(
+            [row for row in selected if row.get("native_required") is True]
+            if name == "live" and capability != 18
+            else selected,
+            outcomes,
+            name,
+        )
         for name in sorted(_required_gates(capability, selected))
     }
     breadth = len(problems) >= MIN_WORKFLOWS and len(repositories) >= MIN_REPOSITORIES

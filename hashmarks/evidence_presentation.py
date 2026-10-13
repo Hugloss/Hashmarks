@@ -320,12 +320,11 @@ class _Projection:
         schema = packet.get("schema")
         if schema == operation_schema("task_evidence", "initial"):
             _require_fields(packet, str(schema))
-            # This profile admits no display findings. Account for the entire
-            # native packet, including all qualifiers, without cloning them.
+            _initial_task(self, packet, ref)
             self.unprojected.append(
                 {
                     "source_ref": _pointer(ref),
-                    "reason": "native-packet-not-displayed",
+                    "reason": "native-packet-details-not-displayed",
                     "native_item_count": len(packet),
                 }
             )
@@ -1588,6 +1587,11 @@ def present_repository_evidence(
     """Render an already observed packet; bounds apply only to displayed records."""
     if validate_presentation(format) == "none":
         raise ValueError("presentation must be one of: structured, compact, text")
+    initial = packet.get("schema") == operation_schema("task_evidence", "initial")
+    if initial:
+        from hashmarks.codemap.task_evidence_initial import decode_initial_packet
+
+        packet = decode_initial_packet(dict(packet))
     limit = _MAX_PRESENTED_ROWS if format == "structured" else 5
     projection = _Projection(limit)
     supported = projection.project(packet)
@@ -1619,16 +1623,218 @@ def present_repository_evidence(
         "authority": "descriptive-only",
         "execution_effect": "none",
     }
+    if initial:
+        result["reference_space"] = "decoded-initial-data"
+        _compact_initial_groups(groups)
     if format == "text":
         if packet.get("schema") == operation_schema("task_evidence", "initial"):
-            result["text"] = (
-                "Initial facts and qualifications are in the native packet. "
-                "This display projection contains metadata only. "
-                "Omitted display detail does not establish repository absence."
-            )
+            result["text"] = _initial_evidence_text(packet)
+            result["groups"] = []
+            result["unprojected_sections"] = [
+                *projection.unprojected,
+                {
+                    "source_ref": "",
+                    "reason": "initial-locators-rendered-in-text",
+                    "native_item_count": sum(projection.counts.values()),
+                },
+            ]
         else:
             result["text"] = evidence_projection_text(result)
     return result
+
+
+def _compact_initial_groups(groups: list[dict[str, Any]]) -> None:
+    # Initial records already carry their complete display details. Avoid
+    # repeating locator fields at both record and details levels.
+    for group in groups:
+        findings = group["findings"]
+        common = {
+            key: findings[0][key]
+            for key in ("kind", "assertion")
+            if findings
+            and all(row.get(key) == findings[0].get(key) for row in findings)
+        }
+        group["finding_qualifiers"] = common
+        for finding in group["findings"]:
+            for key in list(finding):
+                if key not in {
+                    "kind",
+                    "assertion",
+                    "details",
+                    "source_refs",
+                    "source_context",
+                }:
+                    finding.pop(key)
+            for key in common:
+                finding.pop(key)
+            if not finding.get("source_context"):
+                finding.pop("source_context", None)
+
+
+def _initial_task(
+    p: _Projection, packet: Mapping[str, object], ref: tuple[object, ...]
+) -> None:
+    """Expose initial locators with the producer's qualifications and omissions."""
+    from hashmarks.codemap.task_evidence_initial import decode_initial_collection
+
+    ownership = packet["ownership"]
+    retrieval = packet["retrieval"]
+    verification = packet["verification"]
+    if not all(
+        isinstance(value, Mapping) for value in (ownership, retrieval, verification)
+    ):
+        raise ValueError("malformed initial task evidence")
+    assert isinstance(ownership, Mapping)
+    assert isinstance(retrieval, Mapping)
+    assert isinstance(verification, Mapping)
+    qualification = {
+        key: ownership.get(key)
+        for key in (
+            "status",
+            "authority",
+            "proof_scope",
+            "proof_scope_complete",
+            "ambiguity",
+        )
+    }
+    ambiguity = qualification.get("ambiguity")
+    if isinstance(ambiguity, Mapping):
+        qualification["ambiguity"] = {
+            key: deepcopy(ambiguity[key])
+            for key in ("ambiguous", "reason", "discrimination_question")
+            if key in ambiguity
+        }
+        qualification["ambiguity"]["alternatives"] = [
+            {
+                key: alternative[key]
+                for key in ("path", "qualname", "start_line", "end_line")
+                if key in alternative
+            }
+            for alternative in ambiguity.get("alternatives", [])
+        ]
+    qualification["freshness"] = packet.get("freshness")
+    p.add(
+        "ownership_evidence",
+        "initial_owner",
+        ownership.get("owner"),
+        (*ref, "ownership", "owner"),
+        qualification,
+        assertion="producer_claim",
+    )
+    for index, row in enumerate(retrieval.get("results", [])):
+        locator = {
+            key: row[key]
+            for key in (
+                "path",
+                "symbol",
+                "qualname",
+                "start_line",
+                "end_line",
+                "class_declarations",
+            )
+            if key in row
+        }
+        p.add(
+            "retrieval_evidence",
+            "initial_source_locator",
+            locator,
+            (*ref, "retrieval", "results", index),
+            {},
+            assertion="producer_claim",
+        )
+    relevance = verification.get("relevance")
+    if isinstance(relevance, Mapping):
+        rows = relevance.get("candidates", [])
+        if isinstance(relevance.get("candidates_encoding"), dict):
+            rows = decode_initial_collection(rows, relevance["candidates_encoding"])
+        for index, row in enumerate(rows):
+            locator = {
+                key: row[key]
+                for key in (
+                    "path",
+                    "qualname",
+                    "reference_strength",
+                    "direct_reference",
+                    "indirect_reference",
+                )
+                if key in row
+            }
+            p.add(
+                "verification",
+                "initial_verification_locator",
+                locator,
+                (*ref, "verification", "relevance", "candidates", index),
+                {},
+                assertion="producer_claim",
+            )
+
+
+def _initial_declaration_text(row: dict[str, Any], index: int) -> list[str]:
+    from hashmarks.codemap.task_evidence_initial import decode_initial_collection
+
+    lines = []
+    declarations = row.get("class_declarations")
+    if isinstance(declarations, dict):
+        declared = declarations.get("declarations", [])
+        if isinstance(declarations.get("declarations_encoding"), dict):
+            declared = decode_initial_collection(
+                declared, declarations["declarations_encoding"]
+            )
+        for declaration in declared:
+            lines.append(
+                f"Declaration: {declaration.get('path')}::{declaration.get('symbol')} ({declaration.get('start_line')}:{declaration.get('end_line')}; @ /retrieval/results/{index}/class_declarations)."
+            )
+    return lines
+
+
+def _initial_evidence_text(packet: Mapping[str, object]) -> str:
+    """Describe admitted initial locators; their native qualifications still govern."""
+    from hashmarks.codemap.task_evidence_initial import decode_initial_collection
+
+    ownership = packet["ownership"]
+    retrieval = packet["retrieval"]
+    verification = packet["verification"]
+    if not all(
+        isinstance(value, Mapping) for value in (ownership, retrieval, verification)
+    ):
+        raise ValueError("malformed initial task evidence")
+    assert isinstance(ownership, Mapping)
+    assert isinstance(retrieval, Mapping)
+    assert isinstance(verification, Mapping)
+    ambiguity = ownership["ambiguity"]
+    if not isinstance(ambiguity, Mapping):
+        raise ValueError("malformed initial ownership ambiguity")
+    freshness = json.dumps(packet["freshness"], sort_keys=True, ensure_ascii=False)
+    lines = [
+        f"Ownership: {ownership['status']}; freshness: {freshness} (@ /ownership, /freshness).",
+        f"Ambiguity: {ambiguity.get('ambiguous', 'unknown')} (@ /ownership/ambiguity).",
+        f"Owner proof scope: {ownership.get('proof_scope', 'unknown')}; complete: {ownership.get('proof_scope_complete', 'unknown')}; authority: {ownership.get('authority', 'unknown')} (@ /ownership).",
+    ]
+    owner = ownership.get("owner")
+    if isinstance(owner, Mapping):
+        owner_name = owner.get("qualname")
+        owner_locator = str(owner["path"]) + (f"::{owner_name}" if owner_name else "")
+        lines.append(f"Owner observation: {owner_locator} (@ /ownership/owner).")
+    else:
+        lines.append("Owner unresolved (@ /ownership/owner).")
+    for index, row in enumerate(retrieval.get("results", [])):
+        lines.append(
+            f"Source candidate: {row['path']}::{row.get('symbol', row.get('qualname', ''))} ({row.get('start_line', 'unknown')}:{row.get('end_line', 'unknown')}; @ /retrieval/results/{index})."
+        )
+        lines.extend(_initial_declaration_text(row, index))
+    relevance = verification.get("relevance")
+    if isinstance(relevance, Mapping):
+        rows = relevance.get("candidates", [])
+        if isinstance(relevance.get("candidates_encoding"), dict):
+            rows = decode_initial_collection(rows, relevance["candidates_encoding"])
+        for index, row in enumerate(rows):
+            lines.append(
+                f"Verification candidate: {row['path']}; reference: {row.get('reference_strength', 'unknown')}; direct: {row.get('direct_reference', 'unknown')}; indirect: {row.get('indirect_reference', 'unknown')} (@ /verification/relevance/candidates/{index})."
+            )
+    lines.append(
+        "Qualification details remain in the native packet. Omissions: /initial_projection/omissions; omissions do not establish absence. Verification is relevance evidence; tests were not executed."
+    )
+    return "\n".join(lines)
 
 
 def presentation_response(

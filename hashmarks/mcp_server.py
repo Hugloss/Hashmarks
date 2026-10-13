@@ -104,6 +104,28 @@ def _compact_json_tool_result(result: dict[str, object]) -> CallToolResult:
     )
 
 
+def _task_evidence_tool_result(
+    result: dict[str, Any], mode: str, presentation: str
+) -> CallToolResult:
+    if mode != "initial":
+        return _compact_json_tool_result(result)
+    from mcp.types import CallToolResult, TextContent
+
+    native = result.get("result", result)
+    projection = result.get("presentation")
+    if projection is None:
+        text = "Initial repository evidence is available in structuredContent."
+    elif presentation == "text":
+        text = str(projection["text"])
+    else:
+        text = json.dumps(
+            projection, separators=(",", ":"), ensure_ascii=False, allow_nan=False
+        )
+    return CallToolResult(
+        content=[TextContent(type="text", text=text)], structured_content=native
+    )
+
+
 def _register_json_mirror_tool(
     server: Any,
     contract: McpToolContract,
@@ -515,7 +537,7 @@ def build_server(
             response_mode=result_mode,
             presentation=presentation,
         )
-        return _compact_json_tool_result(result)
+        return _task_evidence_tool_result(result, result_mode, presentation)
 
     _register_json_mirror_tool(
         server, task_evidence_contract, annotations, task_evidence

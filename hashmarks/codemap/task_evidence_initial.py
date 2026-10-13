@@ -7,10 +7,177 @@ with a later full observation; they are not durable replay state.
 
 from __future__ import annotations
 
+import json
 from copy import deepcopy
 from typing import Any
 
+from hashmarks.digest import hash_bytes
 from hashmarks.operation_contract import operation_schema, validate_operation_response
+
+
+def initial_packet_identity(packet: dict[str, Any]) -> str:
+    """Bind the decoded semantic view, independent of its wire encoding."""
+    semantic = {
+        key: value for key, value in packet.items() if key != "evidence_packet_identity"
+    }
+    encoded = json.dumps(
+        semantic,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+    domain = operation_schema("task_evidence", "initial").encode("utf-8") + b"\0"
+    return "sha256:" + hash_bytes(encoded, domain=domain).hash
+
+
+def _collect_strings(value: Any, strings: set[str]) -> None:
+    if isinstance(value, str):
+        strings.add(value)
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise ValueError("initial object keys must be strings")
+            strings.add(key)
+            _collect_strings(item, strings)
+    elif isinstance(value, list):
+        for item in value:
+            _collect_strings(item, strings)
+
+
+def _encode_strings(value: Any, indices: dict[str, str]) -> Any:
+    if isinstance(value, str):
+        return indices[value]
+    if isinstance(value, dict):
+        return {
+            indices[key]: _encode_strings(item, indices) for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_encode_strings(item, indices) for item in value]
+    return value
+
+
+def encode_initial_packet(packet: dict[str, Any]) -> dict[str, Any]:
+    """Losslessly serialize a semantic initial packet using a local string table."""
+    headers = {
+        key: packet[key]
+        for key in ("schema", "source_evidence_identity", "evidence_packet_identity")
+    }
+    data = {key: value for key, value in packet.items() if key not in headers}
+    strings: set[str] = set()
+
+    _collect_strings(data, strings)
+    ordered = sorted(strings)
+    indices = {value: str(index) for index, value in enumerate(ordered)}
+    table = []
+    previous = ""
+    for value in ordered:
+        prefix = 0
+        while (
+            prefix < min(len(previous), len(value))
+            and previous[prefix] == value[prefix]
+        ):
+            prefix += 1
+        table.append([prefix, value[prefix:]])
+        previous = value
+
+    return {
+        **headers,
+        "encoding": {"kind": "json-string-table.v1", "strings": table},
+        "data": _encode_strings(data, indices),
+    }
+
+
+def _decode_string_table(encoding: dict[str, Any]) -> list[str]:
+    strings: list[str] = []
+    previous = ""
+    for row in encoding["strings"]:
+        if (
+            not isinstance(row, list)
+            or len(row) != 2
+            or type(row[0]) is not int
+            or not isinstance(row[1], str)
+            or not 0 <= row[0] <= len(previous)
+        ):
+            raise ValueError("invalid initial string table row")
+        value = previous[: row[0]] + row[1]
+        if strings and value <= previous:
+            raise ValueError("initial string table must be distinct and sorted")
+        strings.append(value)
+        previous = value
+
+    return strings
+
+
+def _decode_strings(encoding: dict[str, Any], data: Any) -> Any:
+    strings = _decode_string_table(encoding)
+
+    def string(index: str) -> str:
+        if (
+            not index.isascii()
+            or not index.isdecimal()
+            or (len(index) > 1 and index[0] == "0")
+            or int(index) >= len(strings)
+        ):
+            raise ValueError("invalid initial string reference")
+        return strings[int(index)]
+
+    def decode(value: Any) -> Any:
+        if isinstance(value, str):
+            return string(value)
+        if isinstance(value, dict):
+            return {string(key): decode(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [decode(item) for item in value]
+        if value is None or type(value) in (bool, int, float):
+            return value
+        raise ValueError("invalid initial JSON value")
+
+    return decode(data)
+
+
+def decode_initial_packet(packet: dict[str, Any]) -> dict[str, Any]:
+    """Resolve wire references without conflating numeric strings and numbers."""
+    if packet.get("schema") != operation_schema("task_evidence", "initial"):
+        raise ValueError("unsupported initial packet schema")
+    if set(packet) != {
+        "schema",
+        "source_evidence_identity",
+        "evidence_packet_identity",
+        "encoding",
+        "data",
+    }:
+        raise ValueError("invalid initial packet fields")
+    encoding = packet["encoding"]
+    if (
+        not isinstance(encoding, dict)
+        or set(encoding) != {"kind", "strings"}
+        or encoding["kind"] != "json-string-table.v1"
+        or not isinstance(encoding["strings"], list)
+    ):
+        raise ValueError("invalid initial string table")
+    data = _decode_strings(encoding, packet["data"])
+    if not isinstance(data, dict) or set(data) & {
+        "schema",
+        "source_evidence_identity",
+        "evidence_packet_identity",
+    }:
+        raise ValueError("invalid initial semantic data")
+    result = {
+        **{
+            key: packet[key]
+            for key in (
+                "schema",
+                "source_evidence_identity",
+                "evidence_packet_identity",
+            )
+        },
+        **data,
+    }
+    if initial_packet_identity(result) != result["evidence_packet_identity"]:
+        raise ValueError("initial semantic identity differs from decoded packet")
+    return result
+
 
 _LOCATOR_OMISSIONS = (
     "canonical_rank",

@@ -226,4 +226,51 @@ def test_mcp_native_stdio_initialize_catalog_call_and_error(tmp_path: Path) -> N
                     "recovery_authority": "consumer-owned",
                 }
 
+                await _assert_initial_delivery(session)
+
     asyncio.run(exercise())
+
+
+async def _assert_initial_delivery(session):
+    from hashmarks.codemap.task_evidence_initial import (
+        decode_initial_packet,
+    )
+    from hashmarks.evidence_presentation import (
+        FORMATS,
+        present_repository_evidence,
+    )
+
+    initial_identity = None
+    for mode in FORMATS:
+        initial = await session.call_tool(
+            "task_evidence",
+            arguments={
+                "task": "Fix flare041",
+                "result_mode": "initial",
+                "presentation": mode,
+            },
+        )
+        assert not initial.is_error
+        native = initial.structured_content
+        assert isinstance(native, dict)
+        logical = decode_initial_packet(native)
+        assert logical["ownership"]["owner"]["path"] == "src/feature.py"
+        identity = logical["evidence_packet_identity"]
+        if initial_identity is None:
+            initial_identity = identity
+        assert identity == initial_identity
+        assert len(initial.content) == 1
+        text = initial.content[0].text
+        if mode != "none":
+            projection = present_repository_evidence(native, format=mode)
+            assert (text if mode == "text" else json.loads(text)) == (
+                projection["text"] if mode == "text" else projection
+            )
+        assert (
+            "encoding" not in json.loads(text)
+            if mode in {"structured", "compact"}
+            else True
+        )
+    full = await session.call_tool("task_evidence", arguments={"task": "Fix flare041"})
+    assert full.structured_content["schema"] == "hashmarks.task-evidence.v5"
+    assert json.loads(full.content[0].text) == full.structured_content

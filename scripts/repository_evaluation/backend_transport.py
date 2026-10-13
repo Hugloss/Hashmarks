@@ -188,7 +188,40 @@ async def _mcp_captures(
                 if reply.is_error:
                     raise ValueError(f"backend MCP returned an error: {reply.content}")
                 texts = [part.text for part in reply.content if part.type == "text"]
-                if len(texts) != 1 or json.loads(texts[0]) != reply.structured_content:
+                initial = (
+                    case["operation"] == "task_evidence"
+                    and case["inputs"].get("result_mode") == "initial"
+                )
+                response = reply.structured_content
+                if len(texts) != 1 or not isinstance(response, dict):
+                    raise ValueError(
+                        "backend MCP must provide one text and a native object"
+                    )
+                if initial:
+                    from hashmarks.codemap.task_evidence_initial import (
+                        decode_initial_packet,
+                    )
+                    from hashmarks.evidence_presentation import (
+                        present_repository_evidence,
+                    )
+
+                    decode_initial_packet(response)
+                    if presentation != "none":
+                        projection = present_repository_evidence(
+                            response, format=presentation
+                        )
+                        displayed = (
+                            projection["text"]
+                            if presentation == "text"
+                            else json.loads(texts[0])
+                        )
+                        expected = texts[0] if presentation == "text" else projection
+                        if displayed != expected:
+                            raise ValueError(
+                                "backend MCP initial projection differs from native packet"
+                            )
+                        response = {"result": response, "presentation": projection}
+                elif json.loads(texts[0]) != response:
                     raise ValueError("backend MCP text and structured content disagree")
                 # Both fields are consumer-visible. Count their duplication;
                 # measuring only the pretty projection would hide real cost.
@@ -196,7 +229,7 @@ async def _mcp_captures(
                 captures.append(
                     {
                         "format": presentation,
-                        **_capture(reply.structured_content, visible, transport="mcp"),
+                        **_capture(response, visible, transport="mcp"),
                     }
                 )
     return captures

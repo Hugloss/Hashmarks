@@ -13,6 +13,47 @@ from scripts.repository_evaluation.grade_cases import grade_run
 from scripts.repository_evaluation.run_cases import run_cases
 
 
+@pytest.mark.parametrize(
+    "actual,expected", [(False, 0), (0, 0.0), ({"x": False}, {"x": 0}), ([0], [False])]
+)
+def test_source_oracle_does_not_conflate_json_types(actual, expected):
+    from scripts.repository_evaluation.fact_grading import grade_facts
+
+    rule = {
+        "checks": [
+            {
+                "id": "typed",
+                "pointer": "/value",
+                "predicate": "equals",
+                "value": expected,
+            }
+        ]
+    }
+    assert (
+        grade_facts("typed", {"packet": {"value": actual}}, rule)["classification"]
+        == "OTHER_FAILURE"
+    )
+
+
+def test_native_summary_cannot_qualify_a_definition_without_observation_membership(
+    tmp_path, monkeypatch
+):
+    from scripts.repository_evaluation import aggregate_backend
+
+    monkeypatch.setattr(aggregate_backend, "_verify_artifacts", lambda *_: None)
+    with pytest.raises(ValueError, match="required observations"):
+        aggregate_backend._verify_native_outcome(
+            {"id": "forged"},
+            {},
+            {
+                "artifacts": {"before/definition-token.json": "digest"},
+                "gates": {"before_binding": True},
+            },
+            (tmp_path, tmp_path),
+            ({}, {}),
+        )
+
+
 def test_source_observation_is_graded_from_separate_oracle(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -90,6 +131,7 @@ def _workflows() -> list[dict]:
             "problem_id": str(index),
             "capabilities": list(range(1, 21)),
             "native_required": True,
+            "debug_frame_units": ["frame-0"],
         }
         for index in range(20)
     ]
@@ -108,13 +150,23 @@ def _outcomes(workflows: list[dict]) -> list[dict]:
             "owner_top_three",
             "debug_correspondence",
             "initial_evidence",
+            "initial_size",
             "presentation",
             "live",
             "language_parity",
             "performance",
         )
     }
-    return [{"id": workflow["id"], "gates": dict(gates)} for workflow in workflows]
+    return [
+        {
+            "id": workflow["id"],
+            "gates": dict(gates),
+            "debug_frame_observations": [
+                {"unit_id": "frame-0", "correspondence": True}
+            ],
+        }
+        for workflow in workflows
+    ]
 
 
 def test_matrix_requires_every_capability_gate_and_full_membership() -> None:
@@ -172,6 +224,75 @@ def test_known_authority_failure_is_not_hidden_by_missing_outcomes() -> None:
     assert report["status"] == "FAIL"
     assert report["capabilities"][0]["gates"]["authority"]["state"] == "FAIL"
     assert report["missing_outcomes"]
+
+
+def test_initial_size_cannot_be_averaged_into_a_recall_pass() -> None:
+    workflows = _workflows()
+    outcomes = _outcomes(workflows)
+    outcomes[0]["gates"]["initial_size"] = False
+    matrix = capability_matrix(workflows, outcomes)
+    assert matrix["status"] == "FAIL"
+    assert all(row["status"] == "FAIL" for row in matrix["capabilities"])
+
+
+def test_legacy_outcomes_without_initial_size_remain_incomplete() -> None:
+    workflows = _workflows()
+    outcomes = _outcomes(workflows)
+    for row in outcomes:
+        del row["gates"]["initial_size"]
+    assert capability_matrix(workflows, outcomes)["status"] == "INCOMPLETE"
+
+
+def test_native_requirement_is_scoped_to_eligible_workflows() -> None:
+    workflows = _workflows()
+    outcomes = _outcomes(workflows)
+    workflows[0]["native_required"] = False
+    outcomes[0]["gates"]["live"] = None
+    matrix = capability_matrix(workflows, outcomes)
+    assert matrix["capabilities"][0]["status"] == "PASS"
+    assert matrix["capabilities"][0]["gates"]["live"]["expected"] == 19
+    assert matrix["capabilities"][17]["status"] == "INCOMPLETE"
+
+
+def test_debug_correspondence_counts_frames_instead_of_successful_problems():
+    workflows = _workflows()[:12]
+    outcomes = _outcomes(workflows)
+    workflows[-1]["debug_frame_units"] = [f"frame-{index}" for index in range(100)]
+    outcomes[-1]["debug_frame_observations"] = [
+        {"unit_id": unit, "correspondence": False}
+        for unit in workflows[-1]["debug_frame_units"]
+    ]
+    gate = capability_matrix(workflows, outcomes)["capabilities"][3]["gates"][
+        "debug_correspondence"
+    ]
+    assert gate["state"] == "FAIL"
+    assert gate["passed"] == 11
+    assert gate["expected"] == 111
+    assert gate["fraction"] == 11 / 111
+
+
+def test_missing_recall_cannot_hide_an_unreachable_threshold():
+    workflows = _workflows()
+    outcomes = _outcomes(workflows)
+    outcomes[0]["gates"]["owner_top_three"] = False
+    outcomes[1]["gates"]["owner_top_three"] = False
+    outcomes.pop()
+    gate = capability_matrix(workflows, outcomes)["capabilities"][0]["gates"][
+        "owner_top_three"
+    ]
+    assert gate["state"] == "FAIL"
+    assert gate["observed"] == 19
+
+
+def test_unreviewed_frames_are_not_qualified_by_a_debug_summary_boolean():
+    workflows = _workflows()
+    outcomes = _outcomes(workflows)
+    for workflow in workflows:
+        workflow.pop("debug_frame_units")
+    assert (
+        capability_matrix(workflows, outcomes)["capabilities"][3]["status"]
+        == "INCOMPLETE"
+    )
 
 
 def test_exact_record_checks_bind_symbol_to_its_own_source_range() -> None:
