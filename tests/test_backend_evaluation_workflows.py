@@ -648,6 +648,69 @@ def test_initial_is_the_first_public_task_request_at_each_revision(
     assert report["status"] == "INCOMPLETE"
 
 
+def test_regrading_rejects_a_passing_summary_without_artifact_proof(corpus, tmp_path):
+    from scripts.repository_evaluation.backend_regrading import verify_task_summary
+
+    suite_path, sources = corpus
+    report = run_backend(
+        sources=sources,
+        suite_path=suite_path,
+        output_dir=tmp_path / "result",
+        transports=("cli",),
+    )
+    suite, grader = load_corpus(suite_path, sources)
+    outcome = report["outcomes"][0]
+    root = tmp_path / "result/handler/observations"
+    verify_task_summary(
+        root, suite["workflows"][0], grader["cases"]["handler"], sources, outcome
+    )
+    outcome["gates"]["mcp"] = True
+    with pytest.raises(ValueError, match="summary differs from artifact proof"):
+        verify_task_summary(
+            root, suite["workflows"][0], grader["cases"]["handler"], sources, outcome
+        )
+
+
+def test_regrading_recomputes_actual_visible_size(corpus, tmp_path):
+    from scripts.repository_evaluation.backend_regrading import verify_task_summary
+
+    suite_path, sources = corpus
+    report = run_backend(
+        sources=sources,
+        suite_path=suite_path,
+        output_dir=tmp_path / "result",
+        transports=("cli",),
+    )
+    suite, grader = load_corpus(suite_path, sources)
+    root = tmp_path / "result/handler/observations"
+    path = root / "before/initial/cli.json"
+    captures = json.loads(path.read_text())
+    captures[0]["estimated_tokens"] = 0
+    write_json(path, captures)
+    with pytest.raises(ValueError, match="measurement differs from visible bytes"):
+        verify_task_summary(
+            root,
+            suite["workflows"][0],
+            grader["cases"]["handler"],
+            sources,
+            report["outcomes"][0],
+        )
+
+
+def test_correct_source_digest_cannot_qualify_wrong_symbol_name(corpus):
+    suite_path, sources = corpus
+    path = suite_path.parent / "grader.json"
+    grader = json.loads(path.read_text())
+    grader["cases"]["handler"]["source_labels"]["before"][0]["symbol"] = (
+        "different_handler"
+    )
+    write_json(path, grader)
+    with pytest.raises(
+        ValueError, match="symbol does not match its source declaration"
+    ):
+        load_corpus(suite_path, sources)
+
+
 @pytest.mark.parametrize("mutation", ["summary", "artifact", "observer", "campaign"])
 def test_aggregate_rejects_unbound_or_modified_evidence(
     corpus, tmp_path: Path, mutation: str

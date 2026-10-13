@@ -109,6 +109,32 @@ def test_native_specimen_admission_preserves_exact_source_revision(specimen):
     )
 
 
+def test_non_ascii_definition_prefix_is_incomplete_not_a_false_token_failure(tmp_path):
+    (tmp_path / "backend.py").write_text("é = 1; target = 2\n")
+    write_json(
+        tmp_path / "index.json",
+        {
+            "documents": [
+                {
+                    "relative_path": "backend.py",
+                    "occurrences": [
+                        {
+                            "symbol_roles": 1,
+                            "range": [0, 7, 13],
+                            "symbol": "opaque-native-symbol",
+                        }
+                    ],
+                }
+            ]
+        },
+    )
+    result = _native_definition(
+        tmp_path, {"path": "backend.py", "symbol": "target", "start_line": 1}
+    )
+    assert result["unique_definition_token"] is None
+    assert result["token_qualification"] == "unqualified-non-ascii-prefix"
+
+
 @pytest.mark.parametrize("language,suffix", [("python", ".py"), ("typescript", ".ts")])
 def test_capture_preparation_preserves_all_sources_without_inventing_verifier(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, language: str, suffix: str

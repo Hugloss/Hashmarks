@@ -248,6 +248,7 @@ def _native_definition(capture: Path, label: dict[str, Any]) -> dict[str, Any]:
     name = label["symbol"].rsplit(".", 1)[-1]
     index = json.loads(confined_file(capture, "index.json").read_text())
     symbols: set[str] = set()
+    unqualified_encoding = False
     for document in index["documents"]:
         if document.get("relative_path", document.get("relativePath")) != path:
             continue
@@ -256,17 +257,20 @@ def _native_definition(capture: Path, label: dict[str, Any]) -> dict[str, Any]:
             location = row.get("range", [])
             if not role & 1 or len(location) != 3 or location[0] != line - 1:
                 continue
-            if (
-                content[: location[2]].isascii()
-                and content[location[1] : location[2]] == name
-            ):
+            if not content[: location[2]].isascii():
+                unqualified_encoding = True
+                continue
+            if content[location[1] : location[2]] == name:
                 symbols.add(row["symbol"])
     return {
         "path": path,
         "declaration_line": line,
         "symbol": name,
         "producer_symbols": sorted(symbols),
-        "unique_definition_token": len(symbols) == 1,
+        "unique_definition_token": None if unqualified_encoding else len(symbols) == 1,
+        "token_qualification": "unqualified-non-ascii-prefix"
+        if unqualified_encoding
+        else "ascii-source-token",
         "basis": "raw-producer-definition-role-and-frozen-source-token",
     }
 
@@ -327,20 +331,30 @@ def _stale_native_observation(
 
 def _transition_observation(
     codemap: CodeMap, prior: dict[str, Any], provenance: dict[str, Any]
-) -> tuple[dict[str, Any], bool, dict[str, Any]]:
+) -> tuple[dict[str, Any], bool | None, dict[str, Any]]:
     previous_revision = provenance["before"]["source_revisions"][prior["path"]]
     member = codemap.workspace / prior["path"]
     unchanged = (
         member.is_file()
         and hash_file(member, domain=FILE_DOMAIN).hash == previous_revision
     )
-    if unchanged:
-        packet = codemap.structural_locality(
-            prior["path"] + "::" + prior["symbol"], result_mode="relationships"
-        )
-        valid = _matching_binding(packet, prior, previous_revision)
-    else:
-        packet, valid = _stale_native_observation(codemap, prior)
+    try:
+        if unchanged:
+            packet = codemap.structural_locality(
+                prior["path"] + "::" + prior["symbol"], result_mode="relationships"
+            )
+            valid = _matching_binding(packet, prior, previous_revision)
+        else:
+            packet, valid = _stale_native_observation(codemap, prior)
+    except (KeyError, PermissionError) as error:
+        packet = {
+            "target": prior["path"] + "::" + prior["symbol"],
+            "status": "unresolved",
+            "reason": "prior-subject-not-uniquely-observed",
+            "error_type": type(error).__name__,
+            "negative_evidence_admissible": False,
+        }
+        valid = None
     return (
         packet,
         valid,
@@ -383,6 +397,29 @@ def _capture_native_transports(
         write_json(output / (transport + ".json"), rows)
         gates[transport] = _transport(rows, label, revision) if rows else None
     return gates
+
+
+def _observe_native_transitions(
+    context: tuple[Path, Path],
+    labels: list[dict[str, Any]],
+    provenance: dict[str, Any],
+    output: Path,
+) -> bool | None:
+    workspace, state = context
+    gates = []
+    with CodeMap(workspace, state_dir=state) as codemap:
+        for ordinal, prior in enumerate(labels):
+            destination = (
+                output if ordinal == 0 else output / "transitions" / str(ordinal)
+            )
+            packet, valid, transition = _transition_observation(
+                codemap, prior, provenance
+            )
+            write_json(destination / "stale-reopened.json", packet)
+            write_json(destination / "transition.json", transition)
+            gates.append(valid)
+    write_json(output / "transition-membership.json", labels)
+    return combine_required(gates)
 
 
 def _observe_native_targets(
@@ -464,13 +501,12 @@ def qualify_native_workflow(
         for stage in ("before", "after"):
             _replace_specimens(workspace, sources[workflow[stage]], specimen_paths)
             if stage == "after":
-                prior = rule["source_labels"]["before"][0]
-                with CodeMap(workspace, state_dir=state) as codemap:
-                    stale, gates["stale_reopened"], transition = (
-                        _transition_observation(codemap, prior, provenance)
-                    )
-                write_json(output / "stale-reopened.json", stale)
-                write_json(output / "transition.json", transition)
+                gates["stale_reopened"] = _observe_native_transitions(
+                    (workspace, state),
+                    rule["source_labels"]["before"],
+                    provenance,
+                    output,
+                )
             with CodeMap(workspace, state_dir=state) as codemap:
                 codemap.sync()
                 write_json(

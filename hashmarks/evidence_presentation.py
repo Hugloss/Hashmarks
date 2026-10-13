@@ -1731,6 +1731,7 @@ def _initial_task(
                 "start_line",
                 "end_line",
                 "class_declarations",
+                "enclosing_declarations",
             )
             if key in row
         }
@@ -1773,8 +1774,10 @@ def _initial_declaration_text(row: dict[str, Any], index: int) -> list[str]:
     from hashmarks.codemap.task_evidence_initial import decode_initial_collection
 
     lines = []
-    declarations = row.get("class_declarations")
-    if isinstance(declarations, dict):
+    for family in ("class_declarations", "enclosing_declarations"):
+        declarations = row.get(family)
+        if not isinstance(declarations, dict):
+            continue
         declared = declarations.get("declarations", [])
         if isinstance(declarations.get("declarations_encoding"), dict):
             declared = decode_initial_collection(
@@ -1782,7 +1785,7 @@ def _initial_declaration_text(row: dict[str, Any], index: int) -> list[str]:
             )
         for declaration in declared:
             lines.append(
-                f"Declaration: {declaration.get('path')}::{declaration.get('symbol')} ({declaration.get('start_line')}:{declaration.get('end_line')}; @ /retrieval/results/{index}/class_declarations)."
+                f"Declaration: {declaration.get('path')}::{declaration.get('symbol')} ({declaration.get('start_line')}:{declaration.get('end_line')}; @ /retrieval/results/{index}/{family})."
             )
     return lines
 

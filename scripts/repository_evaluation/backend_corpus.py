@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 from pathlib import Path
@@ -10,6 +11,7 @@ from typing import Any
 from hashmarks.codemap.static_python_backend_declarations import (
     StaticPythonBackendDeclarations,
 )
+from hashmarks.python_ast_cache import read_python_ast
 from hashmarks.test_shards import repository_content_identity
 
 from .common import GRADER_SCHEMA, load_json
@@ -109,9 +111,41 @@ def _check_label(root: Path, label: dict[str, Any]) -> None:
         or not 1 <= start <= end <= len(lines)
     ):
         raise ValueError("backend oracle source range is invalid")
+    declaration = label.get("declaration_line", start)
+    if type(declaration) is not int or not start <= declaration <= end:
+        raise ValueError(
+            "backend oracle declaration line must be inside its source range"
+        )
     digest = hashlib.sha256(b"".join(lines[start - 1 : end])).hexdigest()
     if label["sha256"] != digest:
         raise ValueError(f"backend oracle source range changed: {label['path']}")
+    if path.suffix == ".py" and "symbol" in label:
+        declarations = _python_declaration_ranges(read_python_ast(path).tree)
+        exact = declarations.get(label["symbol"], [])
+        if not any(
+            first <= start <= declaration <= end <= last
+            for first, last, declaration in exact
+        ):
+            raise ValueError(
+                f"backend oracle symbol does not match its source declaration: {label['symbol']}"
+            )
+
+
+def _python_declaration_ranges(tree: ast.AST) -> dict[str, list[tuple[int, int, int]]]:
+    result: dict[str, list[tuple[int, int, int]]] = {}
+
+    def visit(node: ast.AST, scope: tuple[str, ...]) -> None:
+        if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+            scope = (*scope, node.name)
+            first = min([node.lineno, *(item.lineno for item in node.decorator_list)])
+            result.setdefault(".".join(scope), []).append(
+                (first, node.end_lineno or node.lineno, node.lineno)
+            )
+        for child in ast.iter_child_nodes(node):
+            visit(child, scope)
+
+    visit(tree, ())
+    return result
 
 
 def _check_workflow_metadata(workflow: dict[str, Any]) -> None:

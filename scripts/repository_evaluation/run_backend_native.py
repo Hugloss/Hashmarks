@@ -21,7 +21,7 @@ from .run_backend import _check_implementation, _observer_identity
 
 
 def _validate_destinations(
-    selected: set[str], output: Path, capture_root: Path
+    selected: set[str], output: Path, options: NativeSpecimenOptions
 ) -> None:
     # A report binds this invocation's observations, never leftovers from an
     # earlier qualification. Validate all destinations before acquiring bytes.
@@ -29,7 +29,7 @@ def _validate_destinations(
         destination = output / workflow_id
         if destination.exists():
             raise ValueError("native observations require a new output directory")
-        capture = capture_root / workflow_id
+        capture = options.capture_root / workflow_id
         if (
             destination.resolve() == capture.resolve()
             or destination.resolve() in capture.resolve().parents
@@ -38,6 +38,10 @@ def _validate_destinations(
             raise ValueError(
                 "native observations and captures must have separate destinations"
             )
+        if options.regenerated and any(
+            (capture / stage).exists() for stage in ("before", "after")
+        ):
+            raise ValueError("fresh backend captures require a new output directory")
 
 
 def run_native(
@@ -77,7 +81,7 @@ def run_native(
         },
     }
     outcomes = []
-    _validate_destinations(selected, output, options.capture_root)
+    _validate_destinations(selected, output, options)
     for workflow in suite["workflows"]:
         if workflow["id"] not in selected:
             continue

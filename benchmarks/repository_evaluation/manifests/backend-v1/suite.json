@@ -1,6 +1,6 @@
 {
   "grader_file": "grader.json",
-  "schema": "hashmarks.backend-evidence-workflows.v1",
+  "schema": "hashmarks.backend-evidence-workflows.v2",
   "sources": {
     "aiokafka-fetch-cancellation-after": {
       "commit": "79c9bf5fe557cd2a70451a1a8709ca64c2b28500",
@@ -192,7 +192,25 @@
       "problem_id": "79c9bf5fe557cd2a70451a1a8709ca64c2b28500",
       "problem_source": "https://github.com/aio-libs/aiokafka/commit/79c9bf5fe557cd2a70451a1a8709ca64c2b28500",
       "repository": "aiokafka",
-      "task": "Fix cancellation escaping Fetcher._fetch_requests_routine while draining finished fetch tasks."
+      "task": "Kafka consumer fetch-task cleanup lets cancellation escape while draining already finished or cancelled background tasks.",
+      "transitions": [
+        {
+          "after_path": "aiokafka/consumer/fetcher.py",
+          "before_path": "aiokafka/consumer/fetcher.py",
+          "kind": "modify"
+        }
+      ],
+      "explicit_target_task": "Fix cancellation escaping Fetcher._fetch_requests_routine while draining finished fetch tasks.",
+      "metric_eligibility": {
+        "owner_top_three": {
+          "eligible": true,
+          "reason": "source-reviewed behavior task without a named owner"
+        },
+        "initial_evidence": {
+          "eligible": true,
+          "reason": "frozen source owner and changed-symbol facts"
+        }
+      }
     },
     {
       "after": "aiokafka-sender-node-failure-after",
@@ -213,7 +231,25 @@
       "problem_id": "9f9161eb78785683edc7a8821983491221ccd9c6",
       "problem_source": "https://github.com/aio-libs/aiokafka/commit/9f9161eb78785683edc7a8821983491221ccd9c6",
       "repository": "aiokafka",
-      "task": "Fix Sender._find_coordinator after node failure so the coordinator can be rediscovered."
+      "task": "Kafka transactional producer coordinator discovery must recover after a node becomes unavailable or a request times out.",
+      "transitions": [
+        {
+          "after_path": "aiokafka/producer/sender.py",
+          "before_path": "aiokafka/producer/sender.py",
+          "kind": "modify"
+        }
+      ],
+      "explicit_target_task": "Fix Sender._find_coordinator after node failure so the coordinator can be rediscovered.",
+      "metric_eligibility": {
+        "owner_top_three": {
+          "eligible": true,
+          "reason": "source-reviewed behavior task without a named owner"
+        },
+        "initial_evidence": {
+          "eligible": true,
+          "reason": "frozen source owner and changed-symbol facts"
+        }
+      }
     },
     {
       "after": "aiokafka-metadata-future-after",
@@ -234,7 +270,25 @@
       "problem_id": "608ab2443510c92226de0eb3fc2065f5d1307e12",
       "problem_source": "https://github.com/aio-libs/aiokafka/commit/608ab2443510c92226de0eb3fc2065f5d1307e12",
       "repository": "aiokafka",
-      "task": "Fix ClusterMetadata.failed_update completing a request_update future through unsupported methods."
+      "task": "Kafka metadata update notifications complete an asyncio future using methods that the future does not support.",
+      "transitions": [
+        {
+          "after_path": "aiokafka/cluster.py",
+          "before_path": "aiokafka/cluster.py",
+          "kind": "modify"
+        }
+      ],
+      "explicit_target_task": "Fix ClusterMetadata.failed_update completing a request_update future through unsupported methods.",
+      "metric_eligibility": {
+        "owner_top_three": {
+          "eligible": true,
+          "reason": "source-reviewed behavior task without a named owner"
+        },
+        "initial_evidence": {
+          "eligible": true,
+          "reason": "frozen source owner and changed-symbol facts"
+        }
+      }
     },
     {
       "after": "aiokafka-stable-offset-after",
@@ -255,7 +309,25 @@
       "problem_id": "7d331e0fe948a022cddeb6f1ea2da94fbeaa39a2",
       "problem_source": "https://github.com/aio-libs/aiokafka/commit/7d331e0fe948a022cddeb6f1ea2da94fbeaa39a2",
       "repository": "aiokafka",
-      "task": "Fix Fetcher._proc_fetch_request parsing last_stable_offset for fetch response versions five through ten."
+      "task": "Kafka consumer fetch responses from protocol versions five through ten read the last stable offset from the wrong response field.",
+      "transitions": [
+        {
+          "after_path": "aiokafka/consumer/fetcher.py",
+          "before_path": "aiokafka/consumer/fetcher.py",
+          "kind": "modify"
+        }
+      ],
+      "explicit_target_task": "Fix Fetcher._proc_fetch_request parsing last_stable_offset for fetch response versions five through ten.",
+      "metric_eligibility": {
+        "owner_top_three": {
+          "eligible": true,
+          "reason": "source-reviewed behavior task without a named owner"
+        },
+        "initial_evidence": {
+          "eligible": true,
+          "reason": "frozen source owner and changed-symbol facts"
+        }
+      }
     },
     {
       "after": "sqlalchemy-failed-begin-after",
@@ -276,7 +348,25 @@
       "problem_id": "d29277af2b8046e9ac98ea0ddcf254fe2abc758e",
       "problem_source": "https://github.com/sqlalchemy/sqlalchemy/commit/d29277af2b8046e9ac98ea0ddcf254fe2abc758e",
       "repository": "sqlalchemy",
-      "task": "Fix AsyncAdapt_asyncpg_connection._start_transaction retaining a failed BEGIN transaction and masking the original exception during cleanup."
+      "task": "The PostgreSQL async driver adapter retains a transaction whose BEGIN failed, so later cleanup can mask the original failure.",
+      "transitions": [
+        {
+          "after_path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+          "before_path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+          "kind": "modify"
+        }
+      ],
+      "explicit_target_task": "Fix AsyncAdapt_asyncpg_connection._start_transaction retaining a failed BEGIN transaction and masking the original exception during cleanup.",
+      "metric_eligibility": {
+        "owner_top_three": {
+          "eligible": true,
+          "reason": "source-reviewed behavior task without a named owner"
+        },
+        "initial_evidence": {
+          "eligible": true,
+          "reason": "frozen source owner and changed-symbol facts"
+        }
+      }
     },
     {
       "after": "sqlalchemy-logging-token-reset-after",
@@ -297,7 +387,25 @@
       "problem_id": "975ffa7d77ee3bbf5afd470bc93a1bc1d7f88df4",
       "problem_source": "https://github.com/sqlalchemy/sqlalchemy/commit/975ffa7d77ee3bbf5afd470bc93a1bc1d7f88df4",
       "repository": "sqlalchemy",
-      "task": "Fix LoggingTokenCharacteristic.set_connection_characteristic raising AttributeError when resetting a logging token twice."
+      "task": "Resetting a SQL connection logging token twice raises AttributeError instead of clearing its message formatter.",
+      "transitions": [
+        {
+          "after_path": "lib/sqlalchemy/engine/characteristics.py",
+          "before_path": "lib/sqlalchemy/engine/characteristics.py",
+          "kind": "modify"
+        }
+      ],
+      "explicit_target_task": "Fix LoggingTokenCharacteristic.set_connection_characteristic raising AttributeError when resetting a logging token twice.",
+      "metric_eligibility": {
+        "owner_top_three": {
+          "eligible": true,
+          "reason": "source-reviewed behavior task without a named owner"
+        },
+        "initial_evidence": {
+          "eligible": true,
+          "reason": "frozen source owner and changed-symbol facts"
+        }
+      }
     },
     {
       "after": "sqlalchemy-pickle-extra-criteria-after",
@@ -318,7 +426,25 @@
       "problem_id": "0be8efc7a100b2713bcae591f55cb53d3800152b",
       "problem_source": "https://github.com/sqlalchemy/sqlalchemy/commit/0be8efc7a100b2713bcae591f55cb53d3800152b",
       "repository": "sqlalchemy",
-      "task": "Fix _LazyLoader.create_row_processor reattaching extra criteria after repeated pickle and unpickle operations."
+      "task": "Pickling and unpickling a lazy ORM loader repeatedly incorrectly reattaches additional query criteria.",
+      "transitions": [
+        {
+          "after_path": "lib/sqlalchemy/orm/strategies.py",
+          "before_path": "lib/sqlalchemy/orm/strategies.py",
+          "kind": "modify"
+        }
+      ],
+      "explicit_target_task": "Fix _LazyLoader.create_row_processor reattaching extra criteria after repeated pickle and unpickle operations.",
+      "metric_eligibility": {
+        "owner_top_three": {
+          "eligible": true,
+          "reason": "source-reviewed behavior task without a named owner"
+        },
+        "initial_evidence": {
+          "eligible": true,
+          "reason": "frozen source owner and changed-symbol facts"
+        }
+      }
     },
     {
       "after": "sqlalchemy-aggregate-strings-after",
@@ -339,7 +465,25 @@
       "problem_id": "7e80ddda2a6b820860f8fc1fa8213b85e2819d2b",
       "problem_source": "https://github.com/sqlalchemy/sqlalchemy/commit/7e80ddda2a6b820860f8fc1fa8213b85e2819d2b",
       "repository": "sqlalchemy",
-      "task": "Fix SQLCompiler.visit_aggregate_strings_func raising TypeError when aggregate_strings is compiled as a string."
+      "task": "Compiling a string aggregation expression raises TypeError when the dialect does not supply its function name.",
+      "transitions": [
+        {
+          "after_path": "lib/sqlalchemy/sql/compiler.py",
+          "before_path": "lib/sqlalchemy/sql/compiler.py",
+          "kind": "modify"
+        }
+      ],
+      "explicit_target_task": "Fix SQLCompiler.visit_aggregate_strings_func raising TypeError when aggregate_strings is compiled as a string.",
+      "metric_eligibility": {
+        "owner_top_three": {
+          "eligible": true,
+          "reason": "source-reviewed behavior task without a named owner"
+        },
+        "initial_evidence": {
+          "eligible": true,
+          "reason": "frozen source owner and changed-symbol facts"
+        }
+      }
     },
     {
       "after": "faststream-middleware-enter-error-after",
@@ -360,7 +504,25 @@
       "problem_id": "71bd3234fcd8799f2405c2a23badf6dfd8eb2e32",
       "problem_source": "https://github.com/ag2ai/faststream/commit/71bd3234fcd8799f2405c2a23badf6dfd8eb2e32",
       "repository": "faststream",
-      "task": "Fix SubscriberUsecase.process_message failing to exit already entered middleware when later middleware entry raises."
+      "task": "Message processing fails to exit middleware contexts that were already entered when a later middleware entry raises.",
+      "transitions": [
+        {
+          "after_path": "faststream/_internal/endpoint/subscriber/usecase.py",
+          "before_path": "faststream/_internal/endpoint/subscriber/usecase.py",
+          "kind": "modify"
+        }
+      ],
+      "explicit_target_task": "Fix SubscriberUsecase.process_message failing to exit already entered middleware when later middleware entry raises.",
+      "metric_eligibility": {
+        "owner_top_three": {
+          "eligible": true,
+          "reason": "source-reviewed behavior task without a named owner"
+        },
+        "initial_evidence": {
+          "eligible": true,
+          "reason": "frozen source owner and changed-symbol facts"
+        }
+      }
     },
     {
       "after": "faststream-subscriber-stop-after",
@@ -381,7 +543,25 @@
       "problem_id": "31df8dac071bb47d05537afdf8fa50b36eda6354",
       "problem_source": "https://github.com/ag2ai/faststream/commit/31df8dac071bb47d05537afdf8fa50b36eda6354",
       "repository": "faststream",
-      "task": "Fix BrokerUsecase.stop blocking other subscribers from shutting down when one subscriber stops slowly or raises."
+      "task": "Broker shutdown stops subscribers sequentially, so one slow or failing subscriber prevents other subscribers from closing.",
+      "transitions": [
+        {
+          "after_path": "faststream/_internal/broker/broker.py",
+          "before_path": "faststream/_internal/broker/broker.py",
+          "kind": "modify"
+        }
+      ],
+      "explicit_target_task": "Fix BrokerUsecase.stop blocking other subscribers from shutting down when one subscriber stops slowly or raises.",
+      "metric_eligibility": {
+        "owner_top_three": {
+          "eligible": true,
+          "reason": "source-reviewed behavior task without a named owner"
+        },
+        "initial_evidence": {
+          "eligible": true,
+          "reason": "frozen source owner and changed-symbol facts"
+        }
+      }
     },
     {
       "after": "faststream-concurrent-queue-lifetime-after",
@@ -402,7 +582,25 @@
       "problem_id": "af579438de685e7aeed97d02e422b363f983b721",
       "problem_source": "https://github.com/ag2ai/faststream/commit/af579438de685e7aeed97d02e422b363f983b721",
       "repository": "faststream",
-      "task": "Fix ConcurrentMixin.__init__ opening a concurrent subscriber queue before start and leaking it after stop."
+      "task": "Declaring a concurrent message subscriber opens its in-memory queue before startup and leaves queue endpoints open after shutdown.",
+      "transitions": [
+        {
+          "after_path": "faststream/_internal/endpoint/subscriber/mixins.py",
+          "before_path": "faststream/_internal/endpoint/subscriber/mixins.py",
+          "kind": "modify"
+        }
+      ],
+      "explicit_target_task": "Fix ConcurrentMixin.__init__ opening a concurrent subscriber queue before start and leaking it after stop.",
+      "metric_eligibility": {
+        "owner_top_three": {
+          "eligible": true,
+          "reason": "source-reviewed behavior task without a named owner"
+        },
+        "initial_evidence": {
+          "eligible": true,
+          "reason": "frozen source owner and changed-symbol facts"
+        }
+      }
     },
     {
       "after": "faststream-partial-pull-batch-after",
@@ -423,7 +621,25 @@
       "problem_id": "3509bd2b16a57918dfe2f4b8f44ae1912a866332",
       "problem_source": "https://github.com/ag2ai/faststream/commit/3509bd2b16a57918dfe2f4b8f44ae1912a866332",
       "repository": "faststream",
-      "task": "Fix BatchPullStreamSubscriber._consume_pull discarding partially collected messages while waiting for a full batch."
+      "task": "A NATS pull subscriber discards messages already collected in a partial batch while waiting for a full batch.",
+      "transitions": [
+        {
+          "after_path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+          "before_path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+          "kind": "modify"
+        }
+      ],
+      "explicit_target_task": "Fix BatchPullStreamSubscriber._consume_pull discarding partially collected messages while waiting for a full batch.",
+      "metric_eligibility": {
+        "owner_top_three": {
+          "eligible": true,
+          "reason": "source-reviewed behavior task without a named owner"
+        },
+        "initial_evidence": {
+          "eligible": true,
+          "reason": "frozen source owner and changed-symbol facts"
+        }
+      }
     }
   ]
 }

@@ -118,3 +118,19 @@ def test_runner_rejects_reused_or_overlapping_destinations_before_acquisition(
             workflow_ids=["one"],
         )
     assert calls == []
+
+
+def test_fresh_preflight_checks_later_workflows_before_first_acquisition(
+    tmp_path, native_runner
+):
+    captures, calls, _acquire = native_runner
+    (captures / "two/after").mkdir(parents=True)
+    with pytest.raises(
+        ValueError, match="fresh backend captures require a new output directory"
+    ):
+        runner.run_native(
+            sources={"old": tmp_path, "new": tmp_path},
+            output=tmp_path / "reports",
+            options=NativeSpecimenOptions(captures, (), True),
+        )
+    assert calls == []

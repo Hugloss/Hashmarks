@@ -85,10 +85,35 @@ def _gate(
     workflows: list[Mapping[str, Any]], outcomes: Mapping[str, Any], name: str
 ) -> dict[str, object]:
     by_problem: dict[tuple[str, str], list[object]] = {}
+    eligibility_missing = []
+    ineligible = []
+    eligible_repositories = set()
     for workflow in workflows:
+        qualified = True
+        if name in {"owner_top_three", "initial_evidence"}:
+            eligibility = workflow.get("metric_eligibility", {}).get(name)
+            if eligibility is None:
+                eligibility_missing.append(str(workflow["id"]))
+                qualified = False
+            elif (
+                not isinstance(eligibility, Mapping)
+                or type(eligibility.get("eligible")) is not bool
+                or not isinstance(eligibility.get("reason"), str)
+                or not eligibility["reason"]
+            ):
+                raise ValueError(
+                    "backend metric eligibility requires a boolean and reason"
+                )
+            elif eligibility["eligible"] is False:
+                ineligible.append(str(workflow["id"]))
+                continue
+            else:
+                eligible_repositories.add(str(workflow["repository"]))
         problem = (str(workflow["repository"]), str(workflow["problem_id"]))
         by_problem.setdefault(problem, []).append(
             outcomes.get(str(workflow["id"]), {}).get("gates", {}).get(name)
+            if qualified
+            else None
         )
     values = (
         _frame_values(workflows, outcomes)
@@ -112,6 +137,16 @@ def _gate(
         if 100 * passed >= required_percent * len(values)
         else "FAIL"
     )
+    if (
+        name in {"owner_top_three", "initial_evidence"}
+        and state == "PASS"
+        and (
+            eligibility_missing
+            or len(by_problem) < MIN_WORKFLOWS
+            or len(eligible_repositories) < MIN_REPOSITORIES
+        )
+    ):
+        state = "INCOMPLETE"
     return {
         "state": state,
         "expected": len(values),
@@ -119,6 +154,8 @@ def _gate(
         "passed": passed,
         "fraction": fraction,
         "threshold": threshold,
+        "eligibility_missing": eligibility_missing,
+        "ineligible_workflows": ineligible,
     }
 
 
@@ -184,6 +221,7 @@ def _capability(
         )
         for name in sorted(_required_gates(capability, selected))
     }
+    gates["capability_proof"] = _capability_proof(capability, selected, outcomes)
     breadth = len(problems) >= MIN_WORKFLOWS and len(repositories) >= MIN_REPOSITORIES
     states = {row["state"] for row in gates.values()}
     status = (
@@ -204,6 +242,61 @@ def _capability(
         "status": status,
         "local_e2e_rating": 5 if status == "PASS" else None,
     }
+
+
+def _capability_proof(
+    capability: int, workflows: list[Mapping[str, Any]], outcomes: Mapping[str, Any]
+) -> dict[str, object]:
+    """Tags cannot replace independently reviewed semantic proof membership."""
+    by_problem: dict[tuple[str, str], list[bool | None]] = {}
+    for workflow in workflows:
+        proof = workflow.get("capability_proofs", {}).get(str(capability))
+        value = _reviewed_proof(proof, outcomes.get(str(workflow["id"]), {}))
+        key = (str(workflow["repository"]), str(workflow["problem_id"]))
+        by_problem.setdefault(key, []).append(value)
+    values = [combine_required(group) for group in by_problem.values()]
+    value = combine_required(values)
+    return {
+        "state": "PASS"
+        if value is True
+        else "FAIL"
+        if value is False
+        else "INCOMPLETE",
+        "expected": len(values),
+        "observed": sum(item is not None for item in values),
+        "passed": sum(item is True for item in values),
+    }
+
+
+def _reviewed_proof(proof: object, outcome: Mapping[str, Any]) -> bool | None:
+    if not isinstance(proof, Mapping) or proof.get("reviewed") is not True:
+        return None
+    positive, adversarial = (
+        proof.get("positive_check_ids"),
+        proof.get("adversarial_check_ids"),
+    )
+    if (
+        not isinstance(positive, list)
+        or not positive
+        or not isinstance(adversarial, list)
+        or not adversarial
+    ):
+        return None
+    required = set(positive) | set(adversarial)
+    witnessed: dict[str, list[bool | None]] = {}
+    for row in outcome.get("gate_witnesses", []):
+        if row["state"] not in {"PASS", "FAIL", "INCOMPLETE"}:
+            raise ValueError("unsupported capability witness state")
+        witnessed.setdefault(row["check_id"], []).append(
+            True
+            if row["state"] == "PASS"
+            else False
+            if row["state"] == "FAIL"
+            else None
+        )
+    return combine_required(
+        combine_required(witnessed.get(check, [])) for check in required
+    )
 
 
 def capability_matrix(

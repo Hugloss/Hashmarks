@@ -17,22 +17,12 @@ from .backend_boundary import observe_boundary
 from .backend_corpus import confined_path, workflow_changed_paths
 from .backend_declarations import observe_declarations
 from .backend_gates import combine_required, fact_state, presentation_conformance
+from .backend_grading import _authority_safe, _gates, _packet
 from .backend_matrix import INITIAL_TOKEN_CEILING
 from .backend_transport import capture_cli, capture_mcp
+from .backend_witnesses import api_fact_witnesses
 from .common import canonical_sha256, write_json
 from .fact_grading import grade_facts
-
-
-def _packet(response: dict[str, Any]) -> dict[str, Any]:
-    packet = response.get("result", response)
-    if (
-        packet.get("schema") == operation_schema("task_evidence", "initial")
-        and "encoding" in packet
-    ):
-        from hashmarks.codemap.task_evidence_initial import decode_initial_packet
-
-        return decode_initial_packet(packet)
-    return packet
 
 
 def _transport_grade(
@@ -121,29 +111,6 @@ def _transport_grade(
         "authority": required("authority"),
         "revision": required("revision"),
     }
-
-
-def _authority_safe(packet: dict[str, Any], rule: dict[str, Any]) -> bool | None:
-    packet = _packet(packet)
-    owner = packet["ownership"]["owner"]
-    if owner is None:
-        return True  # Unresolved ownership does not assert an exact owner.
-    oracle = rule.get("owner_oracle")
-    if oracle is None:
-        # A legacy path label can disprove a wrong path, but cannot qualify an
-        # exact symbol assertion. Preserve that missing proof explicitly.
-        return False if owner["path"] != rule["expected_owner_path"] else None
-    if oracle["resolution"] != "unique":
-        return False
-    if oracle["scope"] == "file" and owner.get("qualname"):
-        # A reviewed file owner does not establish a more precise symbol.
-        return False if owner["path"] != oracle["candidates"][0]["path"] else None
-    fields = (
-        ("path",)
-        if oracle["scope"] == "file"
-        else ("path", "qualname", "start_line", "end_line")
-    )
-    return all(owner.get(key) == oracle["candidates"][0][key] for key in fields)
 
 
 def _observe_task_profiles(
@@ -245,6 +212,7 @@ def _observe_stage(
     _check_snapshot(workspace, snapshot)
     return {
         **profiles["full"],
+        "fact_witnesses": api_fact_witnesses(workspace, output, workflow, rule, packet),
         "grade": grade_facts(workflow["id"], {"packet": packet}, rule),
         "revision_bound": _revision_bound(workspace, packet),
         "initial": profiles["initial"],
@@ -307,79 +275,6 @@ def _invalidated_member(
         and member["reason"] == "member-revision-mismatch"
         and member["member_revision"] == prior_revision
     )
-
-
-def _gates(
-    before: dict[str, Any],
-    after: dict[str, Any],
-    stale: dict[str, Any],
-    rule: dict[str, Any],
-    delta_grade: dict[str, Any],
-) -> dict[str, bool | None]:
-    authority = combine_required(
-        [
-            *(
-                _authority_safe(stage["packet"], {**rule, **rule.get(label, {})})
-                for label, stage in (("before", before), ("after", after))
-            ),
-            *(stage["grade"]["authority_violations"] == 0 for stage in (before, after)),
-            *(
-                _authority_safe(
-                    stage["initial"]["packet"], {**rule, **rule.get(label, {})}
-                )
-                for label, stage in (("before", before), ("after", after))
-            ),
-            delta_grade["authority_violations"] == 0,
-        ]
-    )
-    transport_rows = [
-        profile[name]
-        for stage in (before, after)
-        for profile in (stage, stage["initial"])
-        for name in ("cli", "mcp")
-    ]
-    initial_rows = [
-        stage["initial"][name] for stage in (before, after) for name in ("cli", "mcp")
-    ]
-
-    def transport_gate(name: str) -> bool | None:
-        return combine_required(
-            profile[name]["parity"]
-            for stage in (before, after)
-            for profile in (stage, stage["initial"])
-        )
-
-    return {
-        "facts": combine_required(
-            fact_state(grade["classification"])
-            for grade in (before["grade"], after["grade"], delta_grade)
-        ),
-        "authority": combine_required(
-            [authority, *(row["authority"] for row in transport_rows)]
-        ),
-        "revision": combine_required(
-            [
-                before["revision_bound"],
-                after["revision_bound"],
-                before["initial"]["revision_bound"],
-                after["initial"]["revision_bound"],
-                *(row["revision"] for row in transport_rows),
-            ]
-        ),
-        "freshness": stale["passed"],
-        "cli": transport_gate("cli"),
-        "mcp": transport_gate("mcp"),
-        "presentation": combine_required(row["parity"] for row in transport_rows),
-        "owner_top_three": combine_required(
-            rule.get(label, {}).get("expected_owner_path", rule["expected_owner_path"])
-            in {row["path"] for row in stage["packet"]["retrieval"]["results"][:3]}
-            for label, stage in (("before", before), ("after", after))
-        ),
-        "initial_size": combine_required(row["initial_size"] for row in initial_rows),
-        "initial_evidence": combine_required(
-            row["initial_evidence"] for row in initial_rows
-        ),
-    }
 
 
 def execute_workflow(
@@ -453,6 +348,7 @@ def execute_workflow(
     return {
         "id": workflow["id"],
         "gates": gates,
+        "gate_witnesses": [*before["fact_witnesses"], *after["fact_witnesses"]],
         "before": before["grade"],
         "after": after["grade"],
         "delta": delta_grade,

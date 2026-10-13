@@ -13,6 +13,106 @@ if TYPE_CHECKING:
 
 
 class TaskEvidenceScopedMethodMixin:
+    @staticmethod
+    def _enclosing_span_stop(
+        parent: Mapping[str, object], child: Mapping[str, object]
+    ) -> str | None:
+        if parent.get("kind") not in {"function", "method"}:
+            return "scope-boundary"
+        bounds = [
+            parent.get("start_line"),
+            child.get("start_line"),
+            child.get("end_line"),
+            parent.get("end_line"),
+        ]
+        qualified = [
+            value
+            for value in bounds
+            if isinstance(value, int) and not isinstance(value, bool)
+        ]
+        return (
+            None
+            if len(qualified) == 4 and qualified == sorted(qualified)
+            else "unqualified-parent-span"
+        )
+
+    def _task_evidence_enclosing_functions(
+        self, path: str, symbol: str
+    ) -> dict[str, object] | None:
+        """Observe indexed lexical containers without assigning behavior ownership."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        indexed: dict[str, list[dict]] = {}
+        for row in self._session_symbols_for_path(path):
+            indexed.setdefault(str(row.get("qualname") or ""), []).append(row)
+        selected = indexed.get(symbol, [])
+        member = self._session_file_row(path)
+        if len(selected) != 1 or member is None:
+            return None
+        child = selected[0]
+        declarations = []
+        seen = {symbol}
+        stop = "scope-boundary"
+        while child.get("parent") and len(declarations) < 4:
+            parent_name = str(child["parent"])
+            parents = indexed.get(parent_name, [])
+            if parent_name in seen or len(parents) != 1:
+                stop = "unresolved-parent"
+                break
+            parent = parents[0]
+            reason = self._enclosing_span_stop(parent, child)
+            if reason is not None:
+                stop = reason
+                break
+            declarations.append(
+                {
+                    "path": path,
+                    "symbol": parent["qualname"],
+                    "start_line": parent["start_line"],
+                    "end_line": parent["end_line"],
+                }
+            )
+            seen.add(parent_name)
+            child = parent
+        if not declarations:
+            return None
+        return {
+            "authority": "indexed-lexical-declarations-only",
+            "scope": "direct-enclosing-function-declarations",
+            "ownership_authority": False,
+            "runtime_members": "not-established",
+            "negative_evidence_admissible": False,
+            "source_revision": member["file_digest"],
+            "index_generation": self.store.generation(),
+            "bound": 4,
+            "truncated": len(declarations) == 4 and bool(child.get("parent")),
+            "stop_reason": stop,
+            "declarations": declarations,
+        }
+
+    def _task_evidence_attach_enclosing_functions(
+        self, packet: dict[str, object]
+    ) -> None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        retrieval = packet.get("retrieval")
+        if not isinstance(retrieval, dict):
+            return
+        for row in retrieval.get("results", [])[:3]:
+            path, symbol = row.get("path"), row.get("symbol")
+            if not path or not symbol or not self._indexed_path_current(path):
+                continue
+            if (
+                self._task_evidence_visibility(path)
+                not in {EvidenceVisibility.SOURCE, EvidenceVisibility.OUTLINE}
+                or self.policy.decide(path).evidence_visibility
+                is EvidenceVisibility.DENY
+            ):
+                continue
+            context = self._task_evidence_enclosing_functions(path, symbol)
+            if context is not None and self._indexed_path_current(path):
+                row["enclosing_declarations"] = context
+
     def _task_evidence_class_declarations(
         self, path: str, parent: Mapping[str, object]
     ) -> dict[str, object]:

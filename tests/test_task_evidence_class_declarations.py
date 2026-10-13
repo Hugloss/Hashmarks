@@ -15,6 +15,10 @@ from hashmarks.evidence_presentation import FORMATS, presentation_response
 
 
 def _context(packet: dict) -> dict:
+    if "encoding" in packet:
+        from hashmarks.codemap.task_evidence_initial import decode_initial_packet
+
+        packet = decode_initial_packet(packet)
     return next(
         row["class_declarations"]
         for row in packet["retrieval"]["results"]

@@ -132,6 +132,18 @@ def _workflows() -> list[dict]:
             "capabilities": list(range(1, 21)),
             "native_required": True,
             "debug_frame_units": ["frame-0"],
+            "metric_eligibility": {
+                name: {"eligible": True, "reason": "controlled metric population"}
+                for name in ("owner_top_three", "initial_evidence")
+            },
+            "capability_proofs": {
+                str(capability): {
+                    "reviewed": True,
+                    "positive_check_ids": ["positive"],
+                    "adversarial_check_ids": ["adversarial"],
+                }
+                for capability in range(1, 21)
+            },
         }
         for index in range(20)
     ]
@@ -161,6 +173,10 @@ def _outcomes(workflows: list[dict]) -> list[dict]:
         {
             "id": workflow["id"],
             "gates": dict(gates),
+            "gate_witnesses": [
+                {"check_id": "positive", "state": "PASS"},
+                {"check_id": "adversarial", "state": "PASS"},
+            ],
             "debug_frame_observations": [
                 {"unit_id": "frame-0", "correspondence": True}
             ],
@@ -214,6 +230,35 @@ def test_matrix_rejects_duplicate_or_unexpected_outcomes() -> None:
         capability_matrix(workflows, [*outcomes, outcomes[0]])
     with pytest.raises(ValueError, match="unexpected"):
         capability_matrix(workflows, [{"id": "not-selected", "gates": {}}])
+
+
+def test_explicit_target_variants_cannot_improve_blind_owner_recall():
+    workflows = _workflows()
+    outcomes = _outcomes(workflows)
+    for workflow in workflows:
+        workflow["metric_eligibility"]["owner_top_three"] = {
+            "eligible": False,
+            "reason": "explicit target",
+        }
+    gate = capability_matrix(workflows, outcomes)["capabilities"][0]["gates"][
+        "owner_top_three"
+    ]
+    assert gate["state"] == "INCOMPLETE"
+    assert gate["expected"] == 0
+    assert len(gate["ineligible_workflows"]) == 20
+
+
+def test_capability_tags_do_not_replace_reviewed_positive_and_adversarial_proof():
+    workflows = _workflows()
+    outcomes = _outcomes(workflows)
+    for workflow in workflows:
+        workflow.pop("capability_proofs")
+    matrix = capability_matrix(workflows, outcomes)
+    assert matrix["status"] == "INCOMPLETE"
+    assert all(
+        row["gates"]["capability_proof"]["state"] == "INCOMPLETE"
+        for row in matrix["capabilities"]
+    )
 
 
 def test_known_authority_failure_is_not_hidden_by_missing_outcomes() -> None:

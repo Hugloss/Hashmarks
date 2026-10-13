@@ -25,10 +25,10 @@
   "schema": "hashmarks.backend-evidence-campaign.v2",
   "suites": [
     {
-      "grader_sha256": "9697552f888aeec2c6d7a835a54233a081c15ffb49e2500e04eafe73d49e25a0",
+      "grader_sha256": "2f7b64b0fd7d822413c05d98205feb07de9cd962d9e4d12d3d2477b18b07f4ea",
       "id": "backend-v1",
       "suite_file": "../backend-v1/suite.json",
-      "suite_sha256": "b62df0724ad1627f95811ada5393553e331f1a08e849eb1a9fa13ef3d955110e",
+      "suite_sha256": "b67112bb47d6e355a91dddfeb8399dddf9af72ca5fba1e69c9fb88e0338d58f4",
       "workflow_ids": [
         "aiokafka-fetch-cancellation",
         "aiokafka-sender-node-failure",
@@ -48,7 +48,7 @@
       "grader_sha256": "34a1fba7c3fc05a8bef11ad7ea2de335292fa1e30e0db2371f5fdfe35a31b772",
       "id": "backend-async-v1",
       "suite_file": "../backend-async-v1/suite.json",
-      "suite_sha256": "135ddca3ab4470c3f664616096a015e1773b68f88b006793dfa9d5ab89e1a9d2",
+      "suite_sha256": "783d7b390517ba0bad8023c7652102dce4e1a3c1b38f32c71187657d7d48dfcf",
       "workflow_ids": [
         "aiokafka-fetch-cancellation",
         "aiokafka-sender-node-failure",
@@ -68,7 +68,7 @@
       "grader_sha256": "32c46f270d27b58cd49eb0057adc5514844cf048aac5e5d4079284cc109ca034",
       "id": "backend-model-v1",
       "suite_file": "../backend-model-v1/suite.json",
-      "suite_sha256": "84a082553ff611008b1f6bcb4fa7b683998b3156d881afb2e1b345f30c39afc3",
+      "suite_sha256": "5e84b9e6c1272bac10614878a79a9dd1dd9517724c02215937ca2cf0b7ff3856",
       "workflow_ids": [
         "fastapi-dict-exclude-defaults",
         "litestar-notrequired-field-schema",

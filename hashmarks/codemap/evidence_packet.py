@@ -1513,6 +1513,7 @@ class TaskEvidencePacketMixin(
                 limit=limit,
             )
             self._task_evidence_attach_class_declarations(result)
+            self._task_evidence_attach_enclosing_functions(result)
 
         self._task_evidence_attach_owner_source(
             result,

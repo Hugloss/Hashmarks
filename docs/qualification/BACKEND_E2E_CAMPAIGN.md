@@ -30,6 +30,19 @@ must be admitted before they contribute.
 
 ## Observation contracts
 
+### Lexical enclosing declarations ownership note
+
+Observed repository fact/evidence: exact indexed function declarations enclosing
+a retrieved nested function, with source spans and revision binding.
+Authority source: existing CodeMap symbol parent and span records.
+Completeness/freshness behavior: visible current indexed sources only; four
+enclosing function declarations at most; unresolved parents and bounds remain
+explicit; no negative evidence is derived.
+Existing Hashmarks owner extended: task-local indexed declaration disclosure.
+Consumer/execution responsibility explicitly not acquired: behavior ownership,
+runtime execution, repair selection, and verification sufficiency.
+Decision: OBSERVER.
+
 Each workflow retains both stages, full/default and explicit initial profiles,
 API packets, actual CLI/MCP responses, byte/token measurements and source delta.
 Required observations use failure-preserving three-state composition:
@@ -76,6 +89,56 @@ matching source binding while its old capture remains generation-stale; neither
 dimension strengthens the other.
 
 ## Remaining implementation tickets
+
+### Current implementation checkpoint
+
+The three existing catalogs now use workflow v2. All 36 workflows validate
+against their pinned trees, including two genuine model-fixture additions.
+Python symbol labels also validate qualified declaration names against cached
+AST snapshots; a matching range digest alone no longer qualifies a wrong name.
+
+The twelve base tasks now have behavior descriptions without the expected
+owner's exact method name. Their original explicit-target descriptions remain
+as metadata. File-owner and changed-symbol oracles were reviewed from pinned
+source diffs. Review records explicitly retain pending test-correspondence,
+display and capability-adversarial work; they are not complete review claims.
+
+Shared task grading now has artifact/source-bound fact witnesses. Ordinary
+aggregation recomputes task, initial, stale, delta, boundary and declaration
+gates, verifies API witnesses, and checks response/size metadata against actual
+consumer-visible bytes. Native regrading performs that wire check too.
+Capability qualification requires reviewed positive and adversarial witness
+membership; tags alone cannot establish 5/5. Recall qualification also requires
+explicit eligibility and representative eligible populations.
+
+Native transition observations now include every prior target, with explicit
+transition membership. Fresh-capture preflight checks all selected destinations
+before acquisition. Non-ASCII token prefixes remain incomplete until their
+producer coordinate encoding is qualified, rather than being graded as a
+false definition-token contradiction.
+
+The genuine blind cancellation workflow exposed a retrieved nested helper
+whose enclosing method was absent. Bounded indexed enclosing declarations now
+retain that exact source locator without granting ownership/runtime authority.
+The repaired workflow passed every current gate through API, CLI and official
+MCP; its initial MCP compact/text replies measured 3,141/2,534 tokens at both
+revisions.
+
+The complete twelve-problem run at
+`.hashmarks/backend-e2e/implementation-20261013/base-blind-twelve/summary.json`
+reported FAIL: one workflow passed every current gate, while eleven retained
+retrieval, changed-symbol or verification omissions. This is an iteration
+measurement, not final-candidate qualification. Later grading/validation edits
+require a new identity-bound measurement. Do not change expected facts to match
+these omissions. A source fact already carried in a qualified class-declaration
+record is admissible at that location; it need not be duplicated as a top-level
+retrieval row.
+
+Latest focused regression ring: 136 tests passed. A separate official MCP and
+presentation ring passed 40 tests before the final grading edits. Ruff,
+compilation and scoped typechecks passed. Full project typing, fresh acquisition,
+all missing capability catalogs, complete witness coverage, final bounded
+batches and artifact qualification remain unfinished.
 
 The repair and disclosure foundation is implemented, but this campaign is not
 5/5. Complete these dependencies before making that claim:

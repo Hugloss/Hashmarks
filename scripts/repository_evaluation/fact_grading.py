@@ -3,13 +3,21 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, TypedDict
 
 from hashmarks.codemap.task_evidence_initial import (
     decode_initial_collection,
     decode_initial_packet,
 )
 from hashmarks.operation_contract import operation_schema
+
+
+class FactGrade(TypedDict):
+    id: str
+    classification: str
+    failure_stage: str
+    checks: list[dict[str, Any]]
+    authority_violations: int
 
 
 def _values(
@@ -175,7 +183,7 @@ def _check(packet: object, rule: Mapping[str, Any]) -> dict[str, object]:
 
 def grade_facts(
     case_id: str, result: Mapping[str, Any], rule: Mapping[str, Any]
-) -> dict[str, object]:
+) -> FactGrade:
     packet = result.get("packet")
     checks = rule.get("checks")
     if not isinstance(packet, dict) or not isinstance(checks, list) or not checks:

@@ -12,6 +12,7 @@ from benchmarks.research_receipts import read_work_receipt, work_identity
 
 from .backend_corpus import confined_file, load_corpus
 from .backend_gates import combine_required
+from .backend_grading import validate_transport_capture
 from .backend_matrix import SCHEMA as MATRIX_SCHEMA
 from .backend_matrix import capability_matrix
 from .backend_native import (
@@ -93,7 +94,7 @@ def _outcomes(report: dict[str, Any], suite: dict[str, Any]) -> dict[str, Any]:
 
 
 def _workflow_results(
-    path: Path, suite: dict[str, Any], grader: dict[str, Any]
+    path: Path, suite: dict[str, Any], grader: dict[str, Any], sources: dict[str, Path]
 ) -> dict[str, Any]:
     report = load_json(path, schema=MATRIX_SCHEMA)
     _report_identity(report, suite, grader)
@@ -134,6 +135,15 @@ def _workflow_results(
         )
         if not required <= set(retained["artifacts"]):
             raise ValueError("backend aggregate lacks required profile artifacts")
+        from .backend_regrading import verify_task_summary
+
+        verify_task_summary(
+            work_root / "observations",
+            workflow,
+            grader["cases"][workflow["id"]],
+            sources,
+            retained,
+        )
     return outcomes
 
 
@@ -175,11 +185,20 @@ def _verify_native_outcome(
     report_root, capture_root = roots
     definitions, sources = inputs
     _verify_artifacts(report_root / workflow["id"], outcome)
-    required = {"stale-reopened.json", "transition.json"} | {
+    required = {
+        "stale-reopened.json",
+        "transition.json",
+        "transition-membership.json",
+    } | {
         f"{stage}/{artifact}.json"
         for stage in ("before", "after")
         for artifact in ("import", "definition-token", "api", "cli", "mcp")
     }
+    required.update(
+        f"transitions/{ordinal}/{name}.json"
+        for ordinal in range(1, len(rule.get("source_labels", {}).get("before", [])))
+        for name in ("stale-reopened", "transition")
+    )
     for stage in ("before", "after"):
         required.add(stage + "/target-membership.json")
         required.update(
@@ -240,8 +259,21 @@ def _regrade_native_observations(
                 ).items()
             }
         )
-    gates["stale_reopened"] = _regrade_native_transition(
-        workflow, rule, observed, capture_root, inputs[1]
+    labels = rule["source_labels"]["before"]
+    if (
+        json.loads(confined_file(observed, "transition-membership.json").read_bytes())
+        != labels
+    ):
+        raise ValueError("backend native transition membership differs from oracle")
+    gates["stale_reopened"] = combine_required(
+        _regrade_native_transition(
+            workflow,
+            prior,
+            observed if ordinal == 0 else observed / "transitions" / str(ordinal),
+            capture_root,
+            inputs[1],
+        )
+        for ordinal, prior in enumerate(labels)
     )
     if any(
         type(outcome["gates"].get(name)) is not type(value)
@@ -277,6 +309,8 @@ def _regrade_native_targets(
         }
         for transport in ("cli", "mcp"):
             rows = json.loads(confined_file(root, transport + ".json").read_text())
+            for capture_row in rows:
+                validate_transport_capture(capture_row)
             row[transport] = _transport(rows, label, revision) if rows else None
         gates.append(row)
     return {
@@ -287,14 +321,13 @@ def _regrade_native_targets(
 
 def _regrade_native_transition(
     workflow: dict[str, Any],
-    rule: dict[str, Any],
+    prior: dict[str, Any],
     observed: Path,
     captures: Path,
     sources: dict[str, Path],
-) -> bool:
+) -> bool | None:
     from hashmarks.digest import FILE_DOMAIN, hash_file
 
-    prior = rule["source_labels"]["before"][0]
     before = json.loads(
         confined_file(captures, f"{workflow['id']}/before/provenance.json").read_text()
     )
@@ -314,6 +347,13 @@ def _regrade_native_transition(
     ):
         raise ValueError("backend native transition differs from genuine source change")
     packet = json.loads(confined_file(observed, "stale-reopened.json").read_text())
+    if packet.get("status") == "unresolved":
+        return (
+            None
+            if packet.get("target") == prior["path"] + "::" + prior["symbol"]
+            and packet.get("negative_evidence_admissible") is False
+            else False
+        )
     if unchanged:
         return _matching_binding(packet, prior, revision)
     if not member.is_file():
@@ -351,11 +391,17 @@ def _merge_suite(
     suite: dict[str, Any],
     observed: dict[str, Any],
     native: dict[str, Any],
+    grader: dict[str, Any] | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
     workflows, outcomes, missing = [], [], []
     for workflow in suite["workflows"]:
         qualified_id = f"{suite_id}/{workflow['id']}"
-        workflows.append({**workflow, "id": qualified_id})
+        proofs = (
+            grader["cases"][workflow["id"]].get("capability_proofs", {})
+            if grader is not None
+            else workflow.get("capability_proofs", {})
+        )
+        workflows.append({**workflow, "id": qualified_id, "capability_proofs": proofs})
         if workflow["id"] not in observed:
             missing.append({"id": qualified_id, "proof": "workflow-report"})
         outcome = observed.get(workflow["id"], {"id": workflow["id"], "gates": {}})
@@ -398,7 +444,7 @@ def aggregate_backend(
         selection = selections.get(entry["id"], {})
         observed = (
             _workflow_results(
-                Path(selection["workflow_report"]).resolve(), suite, grader
+                Path(selection["workflow_report"]).resolve(), suite, grader, sources
             )
             if "workflow_report" in selection
             else {}
@@ -408,7 +454,9 @@ def aggregate_backend(
             if "native_report" in selection
             else {}
         )
-        for key, rows in _merge_suite(entry["id"], suite, observed, native).items():
+        for key, rows in _merge_suite(
+            entry["id"], suite, observed, native, grader
+        ).items():
             collected[key].extend(rows)
     report: dict[str, Any] = {
         **capability_matrix(collected["workflows"], collected["outcomes"]),
