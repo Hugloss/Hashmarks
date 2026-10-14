@@ -1,16 +1,16 @@
 {
-  "captures_sha256": "7abdcc7dcea06be78fbbf2b28be6a3550918a30c5dc2bee5c0ea92a33f4b9a3a",
+  "captures_sha256": "f2769ab0b3f136538683b3de813c4e0cefde17296203f6e5c9f5ea38242cfdc6",
   "configuration": {
     "pyrightconfig.json": "{\n  \"include\": [\"src\"],\n  \"typeCheckingMode\": \"basic\"\n}\n"
   },
-  "original_root_uri": "file:///tmp/hashmarks-hover-capture-3kpqb84g/hover",
+  "original_root_uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/hover",
   "producer": "pyright-langserver",
   "producer_version": "pyright 1.1.414",
   "qualification_authority": "external-capture-caller-claim",
   "source_revisions": {
     "src/source.py": "30d61d02d83e04be70944285f9790f2d3a55ec7fa736536a527edff2134453af"
   },
-  "transcript_sha256": "17253a13156d6d0ecf0e42650759ea726653e325fefef317e6e81c005797339f",
+  "transcript_sha256": "4d4ed794e30dab93266254a5cbec16d75bc2fd06e01917055ae25ef22a6b6890",
   "typescript_runtime": null,
   "typescript_runtime_sha256": null
 }

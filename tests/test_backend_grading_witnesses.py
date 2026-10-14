@@ -1,6 +1,7 @@
 """Required facts must have artifact/source bindings and reproducible witnesses."""
 
 from dataclasses import replace
+from typing import Any, cast
 
 import pytest
 
@@ -111,7 +112,7 @@ def test_capture_grade_cannot_disagree_with_actual_wire(mutation: str) -> None:
     ],
 )
 def test_witness_context_and_references_fail_closed(
-    observation: FactObservation, field: str, value: Any
+    observation: FactObservation, field: str, value: object
 ) -> None:
     with pytest.raises(ValueError, match="witness"):
         replace(observation, **{field: value})

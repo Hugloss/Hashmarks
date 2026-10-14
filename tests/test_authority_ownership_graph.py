@@ -40,7 +40,9 @@ def test_authority_graph_composes_loader_cache_and_reader(tmp_path: Path) -> Non
     assert graph["boundary"].startswith("repository-evidence-only")
 
 
-def test_authority_graph_cli(tmp_path: Path, capsys: pytest.Capsys) -> None:
+def test_authority_graph_cli(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     _repo(tmp_path)
     assert main(["map", "sync", "--workspace", str(tmp_path)]) == 0
     capsys.readouterr()

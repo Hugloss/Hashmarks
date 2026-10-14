@@ -72,7 +72,7 @@
         }
       },
       "collection_state": "fresh-complete",
-      "configuration_identity": "sha256:ad9db6e6457d9d64eb7199f260ece2d9232575d7c39e6efb475ca8d554623117",
+      "configuration_identity": "sha256:64dcc671467c0e0f982de6fed79fdcfca6402957ad8cbfe659ffd5df27a99aa7",
       "documents": {
         "src/callee.py": {
           "provenance": {
@@ -83,7 +83,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "def target():\n    return 2\n"
+          "text": "def target() -> int:\n    return 2\n"
         },
         "src/caller.py": {
           "provenance": {
@@ -94,7 +94,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "from callee import target\n\n\ndef caller():\n    return target()\n"
+          "text": "from callee import target\n\n\ndef caller() -> int:\n    return target()\n"
         },
         "src/duplicate.py": {
           "provenance": {
@@ -105,7 +105,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "from other import target as other_target\n\n\ndef duplicate():\n    return other_target()\n"
+          "text": "from other import target as other_target\n\n\ndef duplicate() -> int:\n    return other_target()\n"
         },
         "src/other.py": {
           "provenance": {
@@ -116,7 +116,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "def target():\n    return 3\n"
+          "text": "def target() -> int:\n    return 3\n"
         }
       },
       "position_encoding": "utf-16",
@@ -131,7 +131,7 @@
             "line": 0
           },
           "textDocument": {
-            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/callee.py"
+            "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/after/src/callee.py"
           }
         }
       },
@@ -150,7 +150,7 @@
                 "line": 0
               }
             },
-            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/callee.py"
+            "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/after/src/callee.py"
           }
         ]
       },
@@ -232,7 +232,7 @@
         }
       },
       "collection_state": "fresh-complete",
-      "configuration_identity": "sha256:ad9db6e6457d9d64eb7199f260ece2d9232575d7c39e6efb475ca8d554623117",
+      "configuration_identity": "sha256:64dcc671467c0e0f982de6fed79fdcfca6402957ad8cbfe659ffd5df27a99aa7",
       "documents": {
         "src/callee.py": {
           "provenance": {
@@ -243,7 +243,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "def target():\n    return 2\n"
+          "text": "def target() -> int:\n    return 2\n"
         },
         "src/caller.py": {
           "provenance": {
@@ -254,7 +254,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "from callee import target\n\n\ndef caller():\n    return target()\n"
+          "text": "from callee import target\n\n\ndef caller() -> int:\n    return target()\n"
         },
         "src/duplicate.py": {
           "provenance": {
@@ -265,7 +265,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "from other import target as other_target\n\n\ndef duplicate():\n    return other_target()\n"
+          "text": "from other import target as other_target\n\n\ndef duplicate() -> int:\n    return other_target()\n"
         },
         "src/other.py": {
           "provenance": {
@@ -276,7 +276,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "def target():\n    return 3\n"
+          "text": "def target() -> int:\n    return 3\n"
         }
       },
       "position_encoding": "utf-16",
@@ -291,7 +291,7 @@
             "line": 4
           },
           "textDocument": {
-            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/caller.py"
+            "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/after/src/caller.py"
           }
         }
       },
@@ -310,7 +310,7 @@
                 "line": 0
               }
             },
-            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/callee.py"
+            "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/after/src/callee.py"
           }
         ]
       },
@@ -392,7 +392,7 @@
         }
       },
       "collection_state": "fresh-complete",
-      "configuration_identity": "sha256:ad9db6e6457d9d64eb7199f260ece2d9232575d7c39e6efb475ca8d554623117",
+      "configuration_identity": "sha256:64dcc671467c0e0f982de6fed79fdcfca6402957ad8cbfe659ffd5df27a99aa7",
       "documents": {
         "src/callee.py": {
           "provenance": {
@@ -403,7 +403,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "def target():\n    return 2\n"
+          "text": "def target() -> int:\n    return 2\n"
         },
         "src/caller.py": {
           "provenance": {
@@ -414,7 +414,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "from callee import target\n\n\ndef caller():\n    return target()\n"
+          "text": "from callee import target\n\n\ndef caller() -> int:\n    return target()\n"
         },
         "src/duplicate.py": {
           "provenance": {
@@ -425,7 +425,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "from other import target as other_target\n\n\ndef duplicate():\n    return other_target()\n"
+          "text": "from other import target as other_target\n\n\ndef duplicate() -> int:\n    return other_target()\n"
         },
         "src/other.py": {
           "provenance": {
@@ -436,7 +436,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "def target():\n    return 3\n"
+          "text": "def target() -> int:\n    return 3\n"
         }
       },
       "position_encoding": "utf-16",
@@ -451,7 +451,7 @@
             "line": 4
           },
           "textDocument": {
-            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/duplicate.py"
+            "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/after/src/duplicate.py"
           }
         }
       },
@@ -470,7 +470,7 @@
                 "line": 0
               }
             },
-            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/other.py"
+            "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/after/src/other.py"
           }
         ]
       },
@@ -552,7 +552,7 @@
         }
       },
       "collection_state": "fresh-complete",
-      "configuration_identity": "sha256:ad9db6e6457d9d64eb7199f260ece2d9232575d7c39e6efb475ca8d554623117",
+      "configuration_identity": "sha256:64dcc671467c0e0f982de6fed79fdcfca6402957ad8cbfe659ffd5df27a99aa7",
       "documents": {
         "src/callee.py": {
           "provenance": {
@@ -563,7 +563,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "def target():\n    return 2\n"
+          "text": "def target() -> int:\n    return 2\n"
         },
         "src/caller.py": {
           "provenance": {
@@ -574,7 +574,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "from callee import target\n\n\ndef caller():\n    return target()\n"
+          "text": "from callee import target\n\n\ndef caller() -> int:\n    return target()\n"
         },
         "src/duplicate.py": {
           "provenance": {
@@ -585,7 +585,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "from other import target as other_target\n\n\ndef duplicate():\n    return other_target()\n"
+          "text": "from other import target as other_target\n\n\ndef duplicate() -> int:\n    return other_target()\n"
         },
         "src/other.py": {
           "provenance": {
@@ -596,7 +596,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "def target():\n    return 3\n"
+          "text": "def target() -> int:\n    return 3\n"
         }
       },
       "position_encoding": "utf-16",
@@ -614,7 +614,7 @@
             "line": 0
           },
           "textDocument": {
-            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/callee.py"
+            "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/after/src/callee.py"
           }
         }
       },
@@ -633,7 +633,7 @@
                 "line": 0
               }
             },
-            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/callee.py"
+            "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/after/src/callee.py"
           },
           {
             "range": {
@@ -646,7 +646,7 @@
                 "line": 0
               }
             },
-            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/caller.py"
+            "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/after/src/caller.py"
           },
           {
             "range": {
@@ -659,7 +659,7 @@
                 "line": 4
               }
             },
-            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/caller.py"
+            "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/after/src/caller.py"
           }
         ]
       },
@@ -741,7 +741,7 @@
         }
       },
       "collection_state": "fresh-complete",
-      "configuration_identity": "sha256:ad9db6e6457d9d64eb7199f260ece2d9232575d7c39e6efb475ca8d554623117",
+      "configuration_identity": "sha256:64dcc671467c0e0f982de6fed79fdcfca6402957ad8cbfe659ffd5df27a99aa7",
       "documents": {
         "src/callee.py": {
           "provenance": {
@@ -752,7 +752,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "def target():\n    return 2\n"
+          "text": "def target() -> int:\n    return 2\n"
         },
         "src/caller.py": {
           "provenance": {
@@ -763,7 +763,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "from callee import target\n\n\ndef caller():\n    return target()\n"
+          "text": "from callee import target\n\n\ndef caller() -> int:\n    return target()\n"
         },
         "src/duplicate.py": {
           "provenance": {
@@ -774,7 +774,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "from other import target as other_target\n\n\ndef duplicate():\n    return other_target()\n"
+          "text": "from other import target as other_target\n\n\ndef duplicate() -> int:\n    return other_target()\n"
         },
         "src/other.py": {
           "provenance": {
@@ -785,7 +785,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "def target():\n    return 3\n"
+          "text": "def target() -> int:\n    return 3\n"
         }
       },
       "position_encoding": "utf-16",
@@ -803,7 +803,7 @@
             "line": 0
           },
           "textDocument": {
-            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/callee.py"
+            "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/after/src/callee.py"
           }
         }
       },
@@ -822,7 +822,7 @@
                 "line": 0
               }
             },
-            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/caller.py"
+            "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/after/src/caller.py"
           },
           {
             "range": {
@@ -835,7 +835,7 @@
                 "line": 4
               }
             },
-            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/caller.py"
+            "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/after/src/caller.py"
           }
         ]
       },
@@ -917,7 +917,7 @@
         }
       },
       "collection_state": "fresh-complete",
-      "configuration_identity": "sha256:ad9db6e6457d9d64eb7199f260ece2d9232575d7c39e6efb475ca8d554623117",
+      "configuration_identity": "sha256:64dcc671467c0e0f982de6fed79fdcfca6402957ad8cbfe659ffd5df27a99aa7",
       "documents": {
         "src/callee.py": {
           "provenance": {
@@ -928,7 +928,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "def target():\n    return 2\n"
+          "text": "def target() -> int:\n    return 2\n"
         },
         "src/caller.py": {
           "provenance": {
@@ -939,7 +939,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "from callee import target\n\n\ndef caller():\n    return target()\n"
+          "text": "from callee import target\n\n\ndef caller() -> int:\n    return target()\n"
         },
         "src/duplicate.py": {
           "provenance": {
@@ -950,7 +950,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "from other import target as other_target\n\n\ndef duplicate():\n    return other_target()\n"
+          "text": "from other import target as other_target\n\n\ndef duplicate() -> int:\n    return other_target()\n"
         },
         "src/other.py": {
           "provenance": {
@@ -961,7 +961,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "def target():\n    return 3\n"
+          "text": "def target() -> int:\n    return 3\n"
         }
       },
       "position_encoding": "utf-16",
@@ -976,7 +976,7 @@
             "line": 0
           },
           "textDocument": {
-            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/callee.py"
+            "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/after/src/callee.py"
           }
         }
       },
@@ -1008,7 +1008,7 @@
                 "line": 0
               }
             },
-            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/callee.py"
+            "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/after/src/callee.py"
           }
         ]
       },
@@ -1090,7 +1090,7 @@
         }
       },
       "collection_state": "fresh-complete",
-      "configuration_identity": "sha256:ad9db6e6457d9d64eb7199f260ece2d9232575d7c39e6efb475ca8d554623117",
+      "configuration_identity": "sha256:64dcc671467c0e0f982de6fed79fdcfca6402957ad8cbfe659ffd5df27a99aa7",
       "documents": {
         "src/callee.py": {
           "provenance": {
@@ -1101,7 +1101,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "def target():\n    return 2\n"
+          "text": "def target() -> int:\n    return 2\n"
         },
         "src/caller.py": {
           "provenance": {
@@ -1112,7 +1112,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "from callee import target\n\n\ndef caller():\n    return target()\n"
+          "text": "from callee import target\n\n\ndef caller() -> int:\n    return target()\n"
         },
         "src/duplicate.py": {
           "provenance": {
@@ -1123,7 +1123,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "from other import target as other_target\n\n\ndef duplicate():\n    return other_target()\n"
+          "text": "from other import target as other_target\n\n\ndef duplicate() -> int:\n    return other_target()\n"
         },
         "src/other.py": {
           "provenance": {
@@ -1134,7 +1134,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "def target():\n    return 3\n"
+          "text": "def target() -> int:\n    return 3\n"
         }
       },
       "position_encoding": "utf-16",
@@ -1168,7 +1168,7 @@
                 "line": 0
               }
             },
-            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/callee.py"
+            "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/after/src/callee.py"
           }
         }
       },
@@ -1201,7 +1201,7 @@
                   "line": 3
                 }
               },
-              "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/caller.py"
+              "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/after/src/caller.py"
             },
             "fromRanges": [
               {
@@ -1296,7 +1296,7 @@
         }
       },
       "collection_state": "fresh-complete",
-      "configuration_identity": "sha256:ad9db6e6457d9d64eb7199f260ece2d9232575d7c39e6efb475ca8d554623117",
+      "configuration_identity": "sha256:64dcc671467c0e0f982de6fed79fdcfca6402957ad8cbfe659ffd5df27a99aa7",
       "documents": {
         "src/callee.py": {
           "provenance": {
@@ -1307,7 +1307,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "def target():\n    return 2\n"
+          "text": "def target() -> int:\n    return 2\n"
         },
         "src/caller.py": {
           "provenance": {
@@ -1318,7 +1318,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "from callee import target\n\n\ndef caller():\n    return target()\n"
+          "text": "from callee import target\n\n\ndef caller() -> int:\n    return target()\n"
         },
         "src/duplicate.py": {
           "provenance": {
@@ -1329,7 +1329,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "from other import target as other_target\n\n\ndef duplicate():\n    return other_target()\n"
+          "text": "from other import target as other_target\n\n\ndef duplicate() -> int:\n    return other_target()\n"
         },
         "src/other.py": {
           "provenance": {
@@ -1340,7 +1340,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "def target():\n    return 3\n"
+          "text": "def target() -> int:\n    return 3\n"
         }
       },
       "position_encoding": "utf-16",
@@ -1355,7 +1355,7 @@
             "line": 3
           },
           "textDocument": {
-            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/caller.py"
+            "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/after/src/caller.py"
           }
         }
       },
@@ -1387,7 +1387,7 @@
                 "line": 3
               }
             },
-            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/caller.py"
+            "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/after/src/caller.py"
           }
         ]
       },
@@ -1469,7 +1469,7 @@
         }
       },
       "collection_state": "fresh-complete",
-      "configuration_identity": "sha256:ad9db6e6457d9d64eb7199f260ece2d9232575d7c39e6efb475ca8d554623117",
+      "configuration_identity": "sha256:64dcc671467c0e0f982de6fed79fdcfca6402957ad8cbfe659ffd5df27a99aa7",
       "documents": {
         "src/callee.py": {
           "provenance": {
@@ -1480,7 +1480,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "def target():\n    return 2\n"
+          "text": "def target() -> int:\n    return 2\n"
         },
         "src/caller.py": {
           "provenance": {
@@ -1491,7 +1491,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "from callee import target\n\n\ndef caller():\n    return target()\n"
+          "text": "from callee import target\n\n\ndef caller() -> int:\n    return target()\n"
         },
         "src/duplicate.py": {
           "provenance": {
@@ -1502,7 +1502,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "from other import target as other_target\n\n\ndef duplicate():\n    return other_target()\n"
+          "text": "from other import target as other_target\n\n\ndef duplicate() -> int:\n    return other_target()\n"
         },
         "src/other.py": {
           "provenance": {
@@ -1513,7 +1513,7 @@
             "source_kind": "buffer"
           },
           "revision_kind": "utf8-document-text",
-          "text": "def target():\n    return 3\n"
+          "text": "def target() -> int:\n    return 3\n"
         }
       },
       "position_encoding": "utf-16",
@@ -1547,7 +1547,7 @@
                 "line": 3
               }
             },
-            "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/caller.py"
+            "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/after/src/caller.py"
           }
         }
       },
@@ -1592,7 +1592,7 @@
                   "line": 0
                 }
               },
-              "uri": "file:///tmp/hashmarks-lsp-captured/python/after/src/callee.py"
+              "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/after/src/callee.py"
             }
           }
         ]

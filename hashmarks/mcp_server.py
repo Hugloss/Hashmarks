@@ -230,12 +230,13 @@ def _register_agent_evidence_tools(
     surface: HashmarksMcpSurface,
     annotations: object,
     tool_error: type[Exception],
+    query_surfaces: tuple[str, ...] | list[str] | None = None,
 ) -> None:
     """Expose existing producers while keeping MCP registration bounded."""
     intelligence_contract = tool_contract("repository_intelligence_query")
 
     query_description = intelligence_contract.description
-    if query_surfaces != tuple(QUERY_SURFACES):
+    if query_surfaces is not None and query_surfaces != tuple(QUERY_SURFACES):
         query_description += (
             " This server projection permits only these surfaces: "
             + ", ".join(query_surfaces)

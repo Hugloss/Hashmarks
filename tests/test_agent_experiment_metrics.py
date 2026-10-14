@@ -3,7 +3,8 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Callable
-from typing import TYPE_CHECKING, ModuleType
+from types import ModuleType
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 

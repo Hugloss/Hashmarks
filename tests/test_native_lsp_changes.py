@@ -11,6 +11,7 @@ import pytest
 from native_evidence_support import (
     assert_hover_capture,
     assert_hover_presentation,
+    assert_lsp_transcript,
     assert_projection,
     import_native_scip,
     lsp_capture,
@@ -94,6 +95,7 @@ def test_native_lsp_raw_capture_integrity_and_uri_only_replay(
             == revision
         )
     originals = json.loads((source / "captures.json").read_text())
+    assert_lsp_transcript(source, metadata, originals)
     for row in originals:
         replay = lsp_capture(tmp_path, source, row["name"])
         # Undo only admitted URI replacements; all other captured fields are exact.
@@ -103,6 +105,27 @@ def test_native_lsp_raw_capture_integrity_and_uri_only_replay(
                 (tmp_path / path).as_uri(), metadata["original_root_uri"] + "/" + path
             )
         assert json.loads(restored) == row["capture"]
+
+
+@pytest.mark.parametrize(
+    "field", ["text", "document_version", "document_lifetime", "response"]
+)
+def test_native_lsp_transcript_rejects_altered_capture(
+    field: str, native_lsp_corpus: Path
+) -> None:
+    source = native_lsp_corpus / "python" / "hover"
+    metadata = json.loads((source / "capture.json").read_text())
+    captures = json.loads((source / "captures.json").read_text())
+    capture = next(row["capture"] for row in captures if row["name"] == "hover-buffer")
+    document = capture["documents"]["src/source.py"]
+    if field == "text":
+        document["text"] = (source / "src/source.py").read_text(encoding="utf-8")
+    elif field == "response":
+        capture["response"]["result"] = None
+    else:
+        document["provenance"][field] = "altered"
+    with pytest.raises(AssertionError):
+        assert_lsp_transcript(source, metadata, captures)
 
 
 @pytest.mark.parametrize(

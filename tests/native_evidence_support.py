@@ -101,6 +101,74 @@ def lsp_capture(root: Path, source: Path, name: str) -> dict[str, object]:
     return rebase(row["capture"])
 
 
+def _lsp_document_event(
+    source: Path,
+    event: dict,
+    owned: dict[str, str],
+    documents: dict[str, dict],
+    lifetimes: Counter[str],
+) -> None:
+    document = event["params"]["textDocument"]
+    path = owned[document["uri"]]
+    method = event["method"]
+    if method == "textDocument/didOpen":
+        assert document["text"] == (source / path).read_text(encoding="utf-8")
+        lifetimes[path] += 1
+        documents[path] = {
+            "text": document["text"],
+            "revision_kind": "utf8-document-text",
+            "provenance": {
+                "producer_session": "fixture-session",
+                "document_lifetime": f"open-{lifetimes[path]}",
+                "document_version": document["version"],
+                "source_kind": "buffer",
+                "binding_basis": "producer-snapshot",
+            },
+        }
+    elif method == "textDocument/didChange":
+        (change,) = event["params"]["contentChanges"]
+        assert set(change) == {"text"}, "this corpus records full document changes"
+        documents[path]["text"] = change["text"]
+        documents[path]["provenance"]["document_version"] = document["version"]
+    else:
+        documents[path]["text"] = (source / path).read_text(encoding="utf-8")
+        documents[path]["provenance"]["source_kind"] = "disk"
+
+
+def assert_lsp_transcript(source: Path, metadata: dict, captures: list[dict]) -> None:
+    """Bind each retained request, reply and snapshot to the raw protocol events."""
+    owned = {
+        metadata["original_root_uri"] + "/" + path: path
+        for path in metadata["source_revisions"]
+    }
+    expected = {row["capture"]["request"]["id"]: row["capture"] for row in captures}
+    assert len(expected) == len(captures)
+    documents: dict[str, dict] = {}
+    lifetimes: Counter[str] = Counter()
+    requests, responses = set(), set()
+    for entry in json.loads((source / "transcript.json").read_text()):
+        if "sent" in entry:
+            event = entry["sent"]
+            method = event.get("method")
+            if method in (
+                "textDocument/didOpen",
+                "textDocument/didChange",
+                "textDocument/didClose",
+            ):
+                _lsp_document_event(source, event, owned, documents, lifetimes)
+            elif method and event.get("id") in expected:
+                capture = expected[event["id"]]
+                assert capture["request"] == event
+                assert capture["documents"] == documents
+                requests.add(event["id"])
+        else:
+            event = entry["received"]
+            if "method" not in event and event.get("id") in expected:
+                assert expected[event["id"]]["response"] == event
+                responses.add(event["id"])
+    assert requests == responses == set(expected)
+
+
 def import_native_scip(cm: object, source: Path) -> None:
     cm.import_scip(
         source / "index.json",

@@ -1,6 +1,8 @@
 import json
 import sys
+from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -26,7 +28,7 @@ class _FakeClient:
         self.root = root
         self.registered = False
 
-    def register_manifest(self, manifest: Any) -> str:
+    def register_manifest(self, manifest: object) -> str:
         self.registered = True
         return "manifest-handle"
 

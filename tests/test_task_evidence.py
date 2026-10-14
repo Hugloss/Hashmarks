@@ -2,6 +2,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from hashmarks import cli
 from hashmarks.codemap import CodeMap
 
@@ -146,7 +148,7 @@ def test_task_evidence_computes_action_map_once(tmp_path: Path) -> None:
 
 
 def test_task_evidence_cli_exposes_native_start_packet(
-    tmp_path: Path, capsys: pytest.Capsys
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     _semantic_repo(tmp_path)
     assert (

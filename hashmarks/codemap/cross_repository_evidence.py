@@ -163,7 +163,7 @@ class CrossRepositoryEvidenceMixin:
         per_role: int = 3,
         options: ChangeImpactOptions | None = None,
     ) -> dict[str, object]:
-        options = options or CROSS_REPOSITORY_EVIDENCE_DEFAULT_OPTIONS
+        options = options or self.CROSS_REPOSITORY_EVIDENCE_DEFAULT_OPTIONS
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         if options.project_impact_limit is None or options.project_impact_limit < 1:

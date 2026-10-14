@@ -5,7 +5,8 @@ import json
 import subprocess
 import sys
 from pathlib import Path
-from typing import ModuleType
+from types import ModuleType
+from typing import Any, cast
 
 import pytest
 

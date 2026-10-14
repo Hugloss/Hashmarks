@@ -79,6 +79,7 @@ class _TimeoutProcess:
         self.wait_count = 0
 
     def poll(self) -> int | None:
+        self.calls.append(("poll",))
         return None
 
     def send_signal(self, signal: int) -> None:
@@ -100,6 +101,7 @@ class _ExitedProcess:
         self.calls: list[tuple[object, ...]] = []
 
     def poll(self) -> int | None:
+        self.calls.append(("poll",))
         return 0
 
 
