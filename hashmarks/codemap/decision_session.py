@@ -9,6 +9,8 @@ from functools import wraps
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, cast
 
+from .store_queries import MAX_REFERENCE_QUERY_ROWS
+
 if TYPE_CHECKING:
     from .engine import CodeMap
 
@@ -490,7 +492,7 @@ class DecisionSessionMixin:
         unique = list(dict.fromkeys(str(target) for target in targets if target))
         if not unique:
             return {}
-        requested = min(max(1, int(limit_per_target)), 1024)
+        requested = min(max(1, int(limit_per_target)), MAX_REFERENCE_QUERY_ROWS)
         if self._decision_session_depth <= 0:
             return self.store.refs_many(unique, limit_per_target=requested)
         generation = int(self._decision_session_generation or self.store.generation())

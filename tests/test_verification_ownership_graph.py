@@ -8,6 +8,77 @@ from hashmarks.codemap import CodeMap
 from hashmarks.evidence_presentation import present_repository_evidence
 
 
+def test_verification_ownership_keeps_unobserved_owner_scope_unknown(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "backend.py").write_text("def unrelated():\n    return 1\n")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        graph = codemap.verification_ownership_graph(
+            "Inspect an unknown qx_helix_mirror task"
+        )
+    summary = graph["summary"]
+    qualification = graph["verification_qualification"]
+    assert isinstance(summary, dict)
+    assert isinstance(qualification, dict)
+    assert graph["edit_candidates"] == []
+    assert summary["unowned"] is None
+    assert summary["ambiguous"] is None
+    assert qualification["selection_reason"] == "no-edit-owner"
+
+
+@pytest.mark.parametrize(
+    "admissible,count,returned,expected",
+    [
+        (False, 0, 0, (None, None)),
+        (False, 1, 1, (False, None)),
+        (True, 2, 1, (False, True)),
+        (True, 0, 0, (True, False)),
+        (True, False, 0, (None, None)),
+    ],
+)
+def test_verification_summary_preserves_scope_and_hidden_alternatives(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    admissible: bool,
+    count: int,
+    returned: int,
+    expected: tuple[bool | None, bool | None],
+) -> None:
+    (tmp_path / "backend.py").write_text("def target42():\n    return 1\n")
+    tests = tmp_path / "tests"
+    tests.mkdir()
+    (tests / "test_backend.py").write_text(
+        "from backend import target42\n\ndef test_target42():\n    assert target42() == 1\n"
+    )
+    relevance: dict[str, object] = {
+        "candidates": [{"path": "tests/test_backend.py"}] if returned else [],
+        "candidate_count": count,
+        "selected": None,
+        "negative_evidence_admissible": admissible,
+        "completeness": "complete" if admissible else "incomplete",
+        "truncation": "complete" if admissible else "truncated",
+        "bounds": {"returned_candidates": 1},
+        "search_bound_reasons": [] if admissible else ["direct-reverse-ref-limit"],
+    }
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        # Supply the existing semantic owner's observation to the public graph
+        # projection; this test does not nominate edit/verification authority.
+        monkeypatch.setattr(
+            codemap, "verification_relevance", lambda _task, **_bounds: relevance
+        )
+        graph = codemap.verification_ownership_graph("Change target42 in backend.py")
+    summary = graph["summary"]
+    assert isinstance(summary, dict)
+    assert (summary["unowned"], summary["ambiguous"]) == expected
+    assert graph["verification_qualification"] == {
+        key: value
+        for key, value in relevance.items()
+        if key not in {"candidates", "selected"}
+    }
+
+
 def test_task_test_match_bounds_do_not_establish_absence(tmp_path: Path) -> None:
     tests = tmp_path / "tests"
     tests.mkdir()

@@ -31,6 +31,41 @@ def _ref(path: str) -> dict[str, object]:
     }
 
 
+@pytest.mark.parametrize("reference_count", [1023, 1030])
+def test_real_indexed_reference_window_qualifies_completeness_before_projection(
+    tmp_path: Path, reference_count: int
+) -> None:
+    _write_owner(tmp_path)
+    (tmp_path / "src" / "callers.py").write_text(
+        "from src.owner import target\n\ndef caller():\n"
+        + "".join(
+            f"    value_{index} = target()\n" for index in range(reference_count)
+        ),
+        encoding="utf-8",
+    )
+    task = "Change target in src/owner.py"
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        # A smaller cached prefix must not hide the larger lookahead request.
+        with codemap.decision_session():
+            prefix = codemap._session_refs_many(["target"], limit_per_target=1024)
+            lookahead = codemap._session_refs_many(["target"], limit_per_target=1025)
+        assert len(prefix["target"]) == 1024
+        assert len(lookahead["target"]) == min(reference_count + 1, 1025)
+        assert prefix["target"] == lookahead["target"][:1024]
+        packet = codemap.verification_relevance(task)
+        graph = codemap.verification_ownership_graph(task)
+    truncated = reference_count + 1 > 1024
+    reasons = packet["search_bound_reasons"]
+    assert isinstance(reasons, list)
+    assert packet["negative_evidence_admissible"] is not truncated
+    assert ("direct-reverse-ref-limit" in reasons) is truncated
+    assert packet["completeness"] == ("incomplete" if truncated else "complete")
+    summary = graph["summary"]
+    assert isinstance(summary, dict)
+    assert summary["unowned"] is (None if truncated else True)
+
+
 def test_bounded_reference_search_cannot_report_no_verification_candidate(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

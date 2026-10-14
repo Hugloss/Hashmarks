@@ -256,6 +256,138 @@ precede this production repair. They remain historical; affected qualification
 must be repeated on the new observer bytes. Full typing, missing corpora and
 the independent capability-proof requirements still prevent a 5/5 claim.
 
+### Regression and typing checkpoint on 2026-10-14
+
+The repaired candidate's focused source/native/presentation ring passes 143
+tests, including the independent reader for the initial relationship view.
+The remaining deterministic development batches 12–15 pass, completing the
+bounded regression sequence. Earlier failing batch attempts remain retained;
+their repaired batches and the affected MCP catalog/fixture checks pass. These
+are source regression results, not twenty-capability qualification.
+
+The full configured typing measurements at
+`.hashmarks/backend-e2e/remaining-work/typing-current-ty.log` and
+`typing-current-pyright.log` remain red: Ty reports 4,695 diagnostics and Pyright
+4,837 errors with zero warnings. Static re-exports now describe the existing
+lazy public imports to type checkers without changing runtime loading. More
+precise types expose previously obscured errors; counts from older type runs
+are historical measurements, not a green baseline.
+
+The modified observation/presentation owners and the new tests pass scoped Ty.
+The expanded scoped Pyright run also includes the MCP contract owner and exposes
+three errors there: selector defaults include `None`, SDK model lists need a
+covariant read-only sequence parameter, and the server surface is attached
+dynamically. Repair these at their existing owners, then remeasure both tools;
+do not hide them with ignores, blanket `Any`, exclusions or narrower project
+configuration. The broader full-project typing backlog remains required.
+
+Fresh four-workflow and twelve-specimen native captures are being acquired
+against stable current observer/evaluator bytes. Only completed, identity-bound
+reports may replace the historical qualification results above. A later
+production repair invalidates their current-candidate status again.
+
+### Responsibility and authority repairs on 2026-10-14
+
+Classification: **EXTRACT RESPONSIBILITY** for task presentation, bounded task
+retrieval supplements and verifier correspondence; **KEEP COHESIVE** for the
+canonical indexing lifecycle/store. The measured reasons are the required
+quality gate's three oversized owners, their distinct observation contracts,
+and reproduced typing/authority failures. This is a bounded repair, not a new
+refactoring queue or an extraction requirement based on LOC alone.
+
+| Responsibility | Current owner | Contract retained |
+| --- | --- | --- |
+| Default/initial task presentation | `hashmarks/evidence_presentation_task.py` | Existing producer facts, order, references, uncertainty and omissions |
+| Bounded task retrieval supplements | `hashmarks/codemap/task_evidence_retrieval.py` | Existing ranking/bounds; no edit or verification selection authority |
+| Existing verifier/edit-authority correspondence | `hashmarks/codemap/verification_ownership.py` | Existing CodeMap links; no inferred semantic graph or execution authority |
+| Stable indexing/persistence and measured store counts | Existing lifecycle/store owners | Existing source admission, freshness and persistence rules |
+
+The canonical presentation builder still owns reference escaping, counts and
+omission accounting. Task presentation imports its type only; the runtime
+dependency goes from the generic presentation entry to the task renderer.
+Existing CodeMap mixins inherit each extracted implementation once, with no
+forwarding compatibility implementations or additional state/cache owners.
+The architecture test's canonical verifier location was updated to the new
+implementation owner; its core response-validation requirement is unchanged.
+
+Sixteen retained before/after default/initial packets yield 48 exactly matching
+public structured/compact/text projections before and after the extraction.
+This comparison retains JSON type distinctions and is recorded in
+`task-presentation-refactor-comparison.json`. It proves projection preservation
+for those packets, not fresh acquisition or additional genuine corpus breadth.
+The presentation/native ring passes 144 tests; the affected ownership/task
+contract ring passes 177 tests after correcting the architecture-test location.
+The configured size/complexity gate now reports zero rule findings and zero
+oversized production files. The indexing repair passes 100 focused regressions.
+
+Negative-evidence review reproduced a separate generic defect through the
+public API: without an admitted edit owner, the verifier graph reported
+`unowned=true` and `ambiguous=false`, although the underlying observation had
+no eligible verifier scope. The repaired summary preserves `null` for unknown
+states, derives ambiguity from the observed candidate population before display
+bounds, and carries `verification_qualification` from the existing relevance
+owner. Qualified empty observations still admit absence; observed positive
+candidates remain visible. Boolean counts cannot impersonate integer counts.
+Actual API/CLI evidence is retained in `verifier-negative-after.json`; 143
+affected tests pass, including bounded, hidden-alternative and unknown cases.
+Further inspection of the large-reference probe reproduced a lower-layer
+lookahead defect: the semantic reader requested 1,025 rows to detect its 1,024
+reference bound, but both the store and generation-bound session clipped the
+request to 1,024. The actual indexed fixture contains 1,031 reference rows and
+was reported complete. The shared reference-query ceiling now admits the
+lookahead row for global and qualified-suffix reads. Semantic consumers retain
+their existing 1,024 bounds and qualify truncation themselves. Actual-source
+regressions cover an exactly full, complete window, an overfull window and
+expansion of a smaller cached prefix. The repaired fixture reports incomplete
+scope, denied negative evidence and unknown verifier ownership; its retained
+evidence is `reference-lookahead-after.json`. This controlled fixture adds no
+genuine corpus breadth. Captures preceding this repair remain historical.
+
+The MCP contract, indexing/store, extracted presentation/retrieval/correspondence
+owners pass scoped Ty/Pyright. This does not make every modified owner green:
+the retained verification-relevance implementation still has typing debt.
+The full configured measurements in `typing-final-observer-ty.log` and
+`typing-final-observer-pyright.log` remain red at **4,649 diagnostics** and
+**4,786 errors, zero warnings**, respectively. No typing scope, threshold,
+ignore or dependency configuration was weakened.
+
+Fresh acquisition for this observer passes all twelve nominated native
+specimens at `native-final-observer/qualification/summary.json`. The fresh
+uv/Maven/SCIP/LSP and transport ring passes 92 tests in
+`semantic-evidence-live-final-observer.log`. Four-workflow composed acquisition
+and the final deterministic batch sequence must finish before their results
+are admitted. None of these bounded results closes the twenty-capability 5/5
+requirements below.
+
+After the reference lookahead repair, fresh acquisition at
+`four-workflow-reference-candidate/summary.json` passes every current workflow
+gate for cancellation, sender, metadata and logging at both revisions through
+API, CLI and official MCP. Its aggregate status is **INCOMPLETE**, because four
+passing workflows do not supply the full corpus or independent capability
+proofs. The contemporaneous twelve-specimen native report at
+`native-reference-candidate/qualification/summary.json` is PASS with no missing
+workflows, and `semantic-evidence-live-reference-candidate.log` records 92 fresh
+producer/transport tests passing. Full configured typing remains red at 4,649
+Ty diagnostics and 4,786 Pyright errors, with zero Pyright warnings. The
+size/complexity gate passes with no oversized files or rule findings. The
+all sixteen reference-candidate development batches pass in
+`dev-batches-reference-candidate.log`. Earlier partial/failed attempts remain
+historical and are not substituted for this completed sequence.
+
+Maximum current initial compact/text estimated-token counts across both
+revisions are:
+
+| Workflow | CLI compact/text | MCP compact/text |
+| --- | --- | --- |
+| Cancellation | 2,730 / 2,514 | 2,820 / 2,278 |
+| Sender | 3,754 / 3,504 | 3,952 / 3,267 |
+| Metadata | 3,687 / 3,431 | 3,873 / 3,194 |
+| Logging | 3,184 / 2,831 | 3,320 / 2,595 |
+
+These are actual consumer-visible transport measurements using the existing
+estimator. They do not substitute for unseen workflow/format proof or an
+independently frozen essential-fact population.
+
 ### Earlier implementation checkpoint
 
 The three existing catalogs now use workflow v2. All 36 workflows validate
@@ -388,6 +520,40 @@ native, dependency, service, authority/freshness and economics witness families
 still need their complete reviewed membership before all twenty rows can qualify.
 
 ## Remaining work before 5/5
+
+The following tickets remain the implementation handoff. Complete a ticket's
+named evidence contract before changing its status; a focused pass or additional
+capability tag cannot substitute for its missing proof.
+
+| Ticket | Current state | Next concrete implementation and proof |
+| --- | --- | --- |
+| T00 — Baseline | Retained | Preserve failed and incomplete reports; bind each new report to actual observer/evaluator and source bytes. Do not overwrite earlier measurements. |
+| T01 — Initial size | Four-workflow proof; broader population open | Finish the current reference-candidate capture, then run all 36 catalog entries through initial API/CLI/MCP. Require compact/text to retain essential facts and stay within the 4,000 estimated-token limit at both revisions. Any repaired population must be acquired again. |
+| T02 — Verifier disclosure | Four reviewed workflows pass; authority repairs added | Check all existing reviewed verifier paths through the public initial reply. Keep candidates separate from edit/verification selection; preserve bounded scope, source revision and unknown relationships. Retain the real-index lookahead regressions. |
+| T03 — Independent oracles | Open | For every catalog entry, review the pinned source/change and existing tests without using candidate output as the oracle. Freeze owner scope, eligible ambiguity, essential initial facts, default/initial display checks and positive/adversarial capability witness membership. Bind facts to exact source ranges/revisions. Do not supply oracle hints to product calls. |
+| T04 — All-family witnesses | Partial | Reuse `FactObservation`, canonical witness identity and pure regrading. Task, declaration, boundary and delta witnesses exist. Add artifact/source-bound witnesses for authority, freshness, native claims, runtime-frame correspondence, dependencies, nominated services and economics. Live grading and retained-artifact regrading must use the same semantic owner; changed bytes or missing source bindings cannot preserve PASS. |
+| T05 — Aggregate input accounting | Implemented regression ring; final admission open | Aggregate every expected input with ADMITTED/REJECTED/MISSING status, exact digest and regrading. Exercise malformed, unknown-suite, changed-artifact and omitted-required-input cases. Known failure dominates missing proof; required missing work stays INCOMPLETE. Retain valid inputs alongside rejection reasons. |
+| T06 — Genuine transitions/native acquisition | Existing native specimens pass; expanded coverage open | Admit genuine add/delete/rename tasks and independently label unchanged versus deliberately invalidated source bindings. Preflight every required producer before any acquisition. Fresh captures and offline replay are separate evidence; qualifying a nominated native specimen does not qualify composed task sufficiency. |
+| T07 — Missing catalogs | Open | Build the twelve missing capability catalogs listed below, each with at least twelve distinct upstream problems across three admitted repositories. Reuse a problem across capabilities only when each capability has independently reviewed evidence; variants/transports do not add breadth. Freeze eligibility before measurement. |
+| T08 — Generic observer gaps | Active repair queue | Run the frozen problems first, retain omissions/false claims, repair the existing observer owner, and add a minimal neutral regression. Re-run the same public workflow and adjacent adversaries. Keep external dependency implementations and consumer reasoning/execution outside the investigation. |
+| T09 — Full typing | Red | Repair bounded owner groups using precise producer result types and consumer narrowing. Start with retained verification relevance and session/query typing debt, then qualification owners and test fixtures. Run scoped Ty/Pyright and affected behavior tests per group; periodically remeasure the unchanged full configuration. No blanket `Any`, ignores, exclusions or weakened tool policy. |
+| T10 — Final qualification | Open | Complete fresh public/native acquisition, all named regression batches, comparable cold/warm/incremental measurements with a same-version noise control, and independent heldout evaluation. Build one deterministic source ZIP with modes/untracked source included and smoke-test its independent extraction. Broader rebuild/wheel/sdist proof belongs to final promotion. Full configured quality/typing and all twenty independent capability rows must pass. |
+
+T07 still needs capabilities **2, 4, 8, 9, 11, 13, 14, 15, 16, 18, 19 and 20**.
+Their minimum targets are directly evidenced call segments, real failure frames,
+handlers, producer/consumer data, DI/configuration, messaging, transactions,
+dependency changes, independently versioned nominated services, additional
+native evidence, Python/TypeScript backend behavior and comparable economics.
+Existing capability labels alone do not qualify any of these rows.
+
+For T09, first reproduce each owner's current diagnostics from the full logs.
+Inspect the value's producer before adding its type; do not cast external
+unvalidated input into certainty. Preserve runtime/source decisions while
+repairing types. A parser that actually returns a list must not be declared a
+set merely to silence a checker. Once an owner passes scoped checks, run its
+existing behavioral/authority ring before proceeding to another owner. The
+remaining full-project diagnostic count is a failing gate, never a suppression
+baseline or a rating.
 
 1. Review explicit owner scopes and essential initial facts for existing cases.
 2. Finish scoped authority checks for every exact relationship family and freeze

@@ -9,7 +9,7 @@ import threading
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 from hashmarks.paths import canonical_host_path
 from hashmarks.sqlite_boundary import configure_sqlite_connection, sqlite_transaction
@@ -26,6 +26,15 @@ from .store_queries import WorkspaceMapQueryMixin
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
+
+
+class RepositoryIndexEconomics(TypedDict):
+    """Counts and surface facts returned by the canonical repository store."""
+
+    files: int
+    lexical_occurrences: int
+    parse_errors: int
+    surfaces: dict[str, dict[str, int]]
 
 
 class WorkspaceStateMismatchError(ValueError):
@@ -820,7 +829,7 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         module_name: str | None,
         visibility: EvidenceVisibility,
         index_surface: str = "other",
-    ) -> dict[str, object]:
+    ) -> dict[str, tuple[str, ...]]:
         new_nodes = derive_file_nodes(path, artifact)
         old_nodes = {row["kind"]: row for row in self.derived_nodes(path)}
         changed_kinds = tuple(
@@ -1349,7 +1358,7 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                 ),
             }
 
-    def economics_counts_by_surface(self) -> dict[str, object]:
+    def economics_counts_by_surface(self) -> RepositoryIndexEconomics:
         """Return exact economics from compact per-file facts, not lexical scans."""
         with self._lock:
             rows = self._db.execute(

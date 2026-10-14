@@ -6,7 +6,7 @@ import hashlib
 import json
 import sys
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from .evidence_presentation import (
     FORMATS,
@@ -22,6 +22,11 @@ from .operation_contract import (
     require_registered_operation,
     validate_operation_response,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from .mcp_surface import HashmarksMcpSurface
 
 MCP_CONTRACT_SCHEMA = "hashmarks.mcp-contract.v1"
 MCP_PROJECTION_SCHEMA = "hashmarks.mcp-projection.v1"
@@ -539,7 +544,9 @@ def _canonical_tool_input_schema(
         raise ValueError(
             f"Hashmarks MCP {expected.name} input properties are unavailable"
         )
-    selectors = {"presentation": (FORMATS, expected.default_presentation)}
+    selectors: dict[str, tuple[tuple[str, ...], str | None]] = {
+        "presentation": (FORMATS, expected.default_presentation)
+    }
     if len(expected.response_modes) > 1:
         selectors["result_mode"] = (
             expected.response_modes,
@@ -681,7 +688,7 @@ def qualify_mcp_observation(observation: dict[str, Any]) -> dict[str, object]:
 
 def contract_from_tool_models(
     version: str,
-    tools: list[object] | tuple[object, ...],
+    tools: Sequence[object],
 ) -> dict[str, object]:
     catalog: list[dict[str, object | None]] = []
     for tool in tools:
@@ -758,7 +765,8 @@ async def _current_contract_summary(
         tools = await server.list_tools()
         return contract_summary(contract_from_tool_models(__version__, tools))
     finally:
-        server._hashmarks_surface.close()
+        surface = cast("HashmarksMcpSurface", getattr(server, "_hashmarks_surface"))
+        surface.close()
 
 
 def current_contract_summary(

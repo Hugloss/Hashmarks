@@ -9,6 +9,11 @@ if TYPE_CHECKING:
     from .repository_index_store import WorkspaceMapStore
 
 
+# Bounded semantic readers retain at most 1,024 references and request one
+# additional row to distinguish a complete prefix from a truncated universe.
+MAX_REFERENCE_QUERY_ROWS = 1025
+
+
 class WorkspaceMapQueryMixin:
     def has_derived_nodes(self, path: str) -> bool:
         if TYPE_CHECKING:
@@ -257,7 +262,7 @@ class WorkspaceMapQueryMixin:
             return {}
         if limit_per_target < 1:
             raise ValueError("limit_per_target must be >= 1")
-        limit_per_target = min(int(limit_per_target), 1024)
+        limit_per_target = min(int(limit_per_target), MAX_REFERENCE_QUERY_ROWS)
         target_short = {target: target.rsplit(".", 1)[-1] for target in unique_targets}
         unique_shorts = list(dict.fromkeys(target_short.values()))
         self._count_read("refs_many")
@@ -293,7 +298,7 @@ class WorkspaceMapQueryMixin:
         suffix = str(target_suffix).strip(".")
         if not short or not suffix:
             return []
-        limit = min(int(limit), 1024)
+        limit = min(int(limit), MAX_REFERENCE_QUERY_ROWS)
         self._count_read("refs_matching_target_suffix")
         with self._lock:
             rows = self._db.execute(

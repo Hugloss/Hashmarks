@@ -388,7 +388,7 @@ _FIXED_MODE_CORE_BOUNDARIES = {
         "concurrency_risk_findings",
     ),
     "verification_ownership": (
-        "hashmarks/codemap/evidence_verification.py",
+        "hashmarks/codemap/verification_ownership.py",
         "verification_ownership_graph",
     ),
     "repository_ownership": (

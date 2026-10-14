@@ -455,8 +455,14 @@ def test_owned_file_query_does_not_promote_unqualified_native_subjects(
             supplied_observations=[capture],
         )
     assert "semantic_relationships" not in packet
-    assert packet["supplied_observation_accounting"]["omitted"] == 1
-    assert packet["ownership"]["owner"]["qualname"] is None
+    accounting = packet["supplied_observation_accounting"]
+    ownership = packet["ownership"]
+    assert isinstance(accounting, dict)
+    assert isinstance(ownership, dict)
+    owner = ownership["owner"]
+    assert isinstance(owner, dict)
+    assert accounting["omitted"] == 1
+    assert owner["qualname"] is None
 
 
 def test_owned_file_query_keeps_repeated_tokens_and_multiple_subjects_unresolved(
@@ -479,7 +485,9 @@ def test_owned_file_query_keeps_repeated_tokens_and_multiple_subjects_unresolved
         second["request"]["params"]["position"] = {"line": 3, "character": 7}
         multiple = codemap.task_evidence(task, supplied_observations=[first, second])
     assert "semantic_relationships" not in multiple
-    assert multiple["supplied_observation_accounting"]["omitted"] == 2
+    accounting = multiple["supplied_observation_accounting"]
+    assert isinstance(accounting, dict)
+    assert accounting["omitted"] == 2
 
 
 def test_warm_service_client_and_dispatch_preserve_supplied_capture(
