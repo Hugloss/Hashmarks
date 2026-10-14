@@ -18,7 +18,7 @@ from hashmarks.codemap.task_evidence_initial import (
 from hashmarks.evidence_presentation import presentation_response
 
 
-def _pointer(value: Any, pointer: str) -> Any:
+def _pointer(value: object, pointer: str) -> object:
     for part in pointer.lstrip("/").split("/") if pointer else []:
         key = part.replace("~1", "/").replace("~0", "~")
         value = value[int(key)] if isinstance(value, list) else value[key]

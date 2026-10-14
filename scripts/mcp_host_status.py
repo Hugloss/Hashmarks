@@ -87,7 +87,7 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _is_uv_registration(command: Any, args: Any = None) -> bool:
+def _is_uv_registration(command: object, args: object | None = None) -> bool:
     expected = list(source_mcp_command("."))
     if isinstance(command, list):
         return command == expected

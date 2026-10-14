@@ -205,7 +205,7 @@ def _policy_report(
 
 
 def _aggregate_summary(reports: list[dict]) -> dict[str, float]:
-    def total(policy, key):
+    def total(policy: str, key: str) -> float:
         return sum(
             float(report["policies"][policy]["summary"][key]) for report in reports
         )
@@ -287,7 +287,7 @@ def collect(root: Path, limit: int = 20) -> dict[str, object]:
     }
 
 
-def main():
+def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--worker", action="store_true")
     p.add_argument("--packet", type=Path)

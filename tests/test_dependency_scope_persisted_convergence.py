@@ -2,6 +2,7 @@ import hashlib
 import json
 import tomllib
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -21,7 +22,7 @@ def _dependency_path(root: Path) -> Path:
 
 
 def _simulate_historical_dependency_row(
-    codemap: CodeMap, rel: str, monkeypatch
+    codemap: CodeMap, rel: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     original = codemap._path_admitted_for_analysis
     monkeypatch.setattr(codemap, "_path_admitted_for_analysis", lambda _rel: True)

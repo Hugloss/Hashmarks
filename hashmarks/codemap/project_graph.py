@@ -289,7 +289,9 @@ class MavenProjectGraphProvider(ProjectGraphProvider):
         return bool(self._manifest_paths("pom.xml"))
 
     @staticmethod
-    def _module_indexes(modules):
+    def _module_indexes(
+        modules: Sequence[Any],
+    ) -> tuple[dict[str, str], dict[tuple[str, str], str], dict[str, list[str]]]:
         ids = {row.module_id: f"maven:{row.module_id}" for row in modules}
         by_ga = {(row.group_id, row.artifact_id): row.module_id for row in modules}
         by_artifact: dict[str, list[str]] = {}
@@ -297,7 +299,9 @@ class MavenProjectGraphProvider(ProjectGraphProvider):
             by_artifact.setdefault(row.artifact_id, []).append(row.module_id)
         return ids, by_ga, by_artifact
 
-    def _maven_nodes(self, modules, ids: dict[str, str]) -> tuple[ProjectNode, ...]:
+    def _maven_nodes(
+        self, modules: Sequence[Any], ids: dict[str, str]
+    ) -> tuple[ProjectNode, ...]:
         return tuple(
             ProjectNode(
                 project_id=ids[row.module_id],
@@ -316,7 +320,10 @@ class MavenProjectGraphProvider(ProjectGraphProvider):
 
     @staticmethod
     def _resolve_maven_target(
-        group_id: str, artifact_id: str, by_ga, by_artifact
+        group_id: str,
+        artifact_id: str,
+        by_ga: dict[tuple[str, str], str],
+        by_artifact: dict[str, list[str]],
     ) -> str | None:
         target_id = by_ga.get((group_id, artifact_id))
         if target_id is not None:
@@ -324,7 +331,13 @@ class MavenProjectGraphProvider(ProjectGraphProvider):
         candidates = by_artifact.get(artifact_id, ())
         return candidates[0] if not group_id and len(candidates) == 1 else None
 
-    def _maven_edges(self, modules, ids, by_ga, by_artifact) -> tuple[ProjectEdge, ...]:
+    def _maven_edges(
+        self,
+        modules: Sequence[Any],
+        ids: dict[str, str],
+        by_ga: dict[tuple[str, str], str],
+        by_artifact: dict[str, list[str]],
+    ) -> tuple[ProjectEdge, ...]:
         edges: list[ProjectEdge] = []
         for row in modules:
             for group_id, artifact_id in row.dependencies:

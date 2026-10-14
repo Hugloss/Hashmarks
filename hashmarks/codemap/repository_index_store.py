@@ -166,7 +166,7 @@ def git_overlay_paths(
     return _parse_git_overlay_paths(completed.stdout, state_rel=state_rel)
 
 
-def _symbol_from(value: dict) -> SymbolRecord:
+def _symbol_from(value: dict[str, object]) -> SymbolRecord:
     lines = value.get("lines") or [1, 1]
     return SymbolRecord(
         name=str(value["name"]),
@@ -181,7 +181,7 @@ def _symbol_from(value: dict) -> SymbolRecord:
     )
 
 
-def _edge_from(value: dict) -> EdgeRecord:
+def _edge_from(value: dict[str, object]) -> EdgeRecord:
     return EdgeRecord(
         source=None if value.get("source") is None else str(value["source"]),
         kind=str(value["kind"]),
@@ -416,7 +416,7 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         self._publication_transaction_active = False
 
     @contextmanager
-    def publication_transaction(self):
+    def publication_transaction(self) -> Generator[None, None, None]:
         """Own one atomic, cross-process CodeMap generation publication.
 
         BEGIN IMMEDIATE serializes writers while WAL keeps the previously
@@ -497,7 +497,7 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
     @contextmanager
     def bulk_file_writes(
         self, *, batch_size: int = 32, on_commit: Callable[[int], None] | None = None
-    ):
+    ) -> Generator[None, None, None]:
         """Batch file writes without weakening generation publication authority.
 
         Standalone callers retain bounded commits. During CodeMap sync, the
@@ -766,7 +766,7 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
             with sqlite_transaction(self._db, begin="BEGIN IMMEDIATE"):
                 return bump_locked()
 
-    def file_row(self, path: str):
+    def file_row(self, path: str) -> object:
         self._count_read("file_row")
         with self._lock:
             return self._db.execute(
@@ -992,7 +992,9 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                     delete_locked()
         return len(values)
 
-    def replace_native_file_edges(self, producer_prefix: str, edges) -> None:
+    def replace_native_file_edges(
+        self, producer_prefix: str, edges: list[object]
+    ) -> None:
         def replace_locked() -> None:
             self._db.execute(
                 "DELETE FROM native_file_edge WHERE producer LIKE ?",
@@ -1035,7 +1037,9 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
             ).fetchall()
         return [dict(row) for row in rows]
 
-    def replace_native_occurrences(self, producer: str, definitions, edges) -> None:
+    def replace_native_occurrences(
+        self, producer: str, definitions: list[object], edges: list[object]
+    ) -> None:
         def replace_locked() -> None:
             self._db.execute(
                 "DELETE FROM native_definition WHERE producer=?", (producer,)
@@ -1205,7 +1209,9 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                 ).fetchall()
         return [self._native_reference_value(row) for row in rows]
 
-    def replace_project_graph(self, producer: str, nodes, edges) -> None:
+    def replace_project_graph(
+        self, producer: str, nodes: list[object], edges: list[object]
+    ) -> None:
         def replace_locked() -> None:
             self._db.execute("DELETE FROM project_edge WHERE producer=?", (producer,))
             self._db.execute("DELETE FROM project_node WHERE producer=?", (producer,))

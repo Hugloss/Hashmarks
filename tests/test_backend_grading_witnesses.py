@@ -13,7 +13,7 @@ from scripts.repository_evaluation.backend_transport import _capture
 
 
 @pytest.fixture
-def observation():
+def observation() -> FactObservation:
     return FactObservation(
         "facts",
         "problem",
@@ -27,7 +27,7 @@ def observation():
     )
 
 
-def test_witness_binds_check_source_and_artifact(observation):
+def test_witness_binds_check_source_and_artifact(observation: FactObservation) -> None:
     rule = {
         "checks": [
             {"id": "value", "pointer": "/value", "predicate": "equals", "value": 1}
@@ -45,7 +45,9 @@ def test_witness_binds_check_source_and_artifact(observation):
 
 
 @pytest.mark.parametrize("missing", ["artifact", "source"])
-def test_matching_fact_without_required_binding_is_incomplete(observation, missing):
+def test_matching_fact_without_required_binding_is_incomplete(
+    observation: FactObservation, missing: str
+) -> None:
     observation = (
         replace(observation, artifact=None)
         if missing == "artifact"
@@ -61,8 +63,8 @@ def test_matching_fact_without_required_binding_is_incomplete(observation, missi
 
 @pytest.mark.parametrize("predicate,expected", [("equals", False), ("excludes", None)])
 def test_missing_supported_positive_fact_fails_without_inventing_absence(
-    observation, predicate, expected
-):
+    observation: FactObservation, predicate: str, expected: bool | None
+) -> None:
     rule = {
         "checks": [
             {
@@ -78,7 +80,7 @@ def test_missing_supported_positive_fact_fails_without_inventing_absence(
 
 
 @pytest.mark.parametrize("mutation", ["tokens", "bytes", "response"])
-def test_capture_grade_cannot_disagree_with_actual_wire(mutation):
+def test_capture_grade_cannot_disagree_with_actual_wire(mutation: str) -> None:
     capture = {
         "format": "none",
         **_capture({"value": 1}, '{"value":1}', transport="cli"),
@@ -108,12 +110,16 @@ def test_capture_grade_cannot_disagree_with_actual_wire(mutation):
         ),
     ],
 )
-def test_witness_context_and_references_fail_closed(observation, field, value):
+def test_witness_context_and_references_fail_closed(
+    observation: FactObservation, field: str, value: Any
+) -> None:
     with pytest.raises(ValueError, match="witness"):
         replace(observation, **{field: value})
 
 
-def test_owner_binding_cannot_qualify_a_missing_test_source(observation):
+def test_owner_binding_cannot_qualify_a_missing_test_source(
+    observation: FactObservation,
+) -> None:
     rule = {
         "checks": [
             {
@@ -131,8 +137,8 @@ def test_owner_binding_cannot_qualify_a_missing_test_source(observation):
 
 
 def test_comparison_bindings_distinguish_revision_roles_and_reject_duplicates(
-    observation,
-):
+    observation: FactObservation,
+) -> None:
     before = {
         "repository": "repo",
         "path": "owner.py",
@@ -148,7 +154,7 @@ def test_comparison_bindings_distinguish_revision_roles_and_reject_duplicates(
         replace(observation, source_bindings=({**before, "stage": "unknown"},))
 
 
-def _qualified_check(selectors):
+def _qualified_check(selectors: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "checks": [
             {
@@ -162,7 +168,9 @@ def _qualified_check(selectors):
     }
 
 
-def test_same_relative_path_in_another_repository_cannot_bind_a_fact(observation):
+def test_same_relative_path_in_another_repository_cannot_bind_a_fact(
+    observation: FactObservation,
+) -> None:
     rule = _qualified_check([{"repository": "peer", "path": "owner.py"}])
     result = grade_fact_observation({"value": 1}, rule, observation)
     assert result["gate"] is None
@@ -170,7 +178,9 @@ def test_same_relative_path_in_another_repository_cannot_bind_a_fact(observation
     assert result["witnesses"][0]["source_bindings"] == []
 
 
-def test_qualified_fact_retains_only_its_repository_endpoint(observation):
+def test_qualified_fact_retains_only_its_repository_endpoint(
+    observation: FactObservation,
+) -> None:
     peer = {"repository": "peer", "path": "owner.py", "revision": "peer-revision"}
     observation = replace(
         observation, source_bindings=(*observation.source_bindings, peer)
@@ -185,7 +195,9 @@ def test_qualified_fact_retains_only_its_repository_endpoint(observation):
         grade_fact_observation({"value": 1}, rule, observation)
 
 
-def test_qualified_comparison_cannot_substitute_the_other_revision(observation):
+def test_qualified_comparison_cannot_substitute_the_other_revision(
+    observation: FactObservation,
+) -> None:
     binding = {**observation.source_bindings[0], "stage": "before"}
     observation = replace(observation, stage="delta", source_bindings=(binding,))
     rule = _qualified_check(
@@ -204,18 +216,24 @@ def test_qualified_comparison_cannot_substitute_the_other_revision(observation):
         [{"repository": "repo", "path": "owner.py"}] * 2,
     ],
 )
-def test_malformed_qualified_selectors_fail_closed(observation, selectors):
+def test_malformed_qualified_selectors_fail_closed(
+    observation: FactObservation, selectors: list[Any]
+) -> None:
     with pytest.raises(ValueError):
         grade_fact_observation({"value": 1}, _qualified_check(selectors), observation)
 
 
-def test_known_fact_failure_survives_missing_qualified_binding(observation):
+def test_known_fact_failure_survives_missing_qualified_binding(
+    observation: FactObservation,
+) -> None:
     rule = _qualified_check([{"repository": "peer", "path": "owner.py"}])
     result = grade_fact_observation({"value": 2}, rule, observation)
     assert result["gate"] is False
 
 
-def test_path_and_qualified_selectors_cannot_be_combined(observation):
+def test_path_and_qualified_selectors_cannot_be_combined(
+    observation: FactObservation,
+) -> None:
     rule = _qualified_check([{"repository": "repo", "path": "owner.py"}])
     rule["checks"][0]["source_paths"] = ["owner.py"]
     with pytest.raises(ValueError, match="cannot mix"):

@@ -20,7 +20,9 @@ from scripts.repository_evaluation.backend_native import (
 from scripts.repository_evaluation.common import write_json
 
 
-def test_stage_specimen_preserves_unchanged_files_outside_new_capture(tmp_path):
+def test_stage_specimen_preserves_unchanged_files_outside_new_capture(
+    tmp_path: Path,
+) -> None:
     from scripts.repository_evaluation.backend_native import _replace_specimens
 
     before, after, workspace = (
@@ -43,7 +45,7 @@ def test_stage_specimen_preserves_unchanged_files_outside_new_capture(tmp_path):
 
 
 @pytest.fixture
-def specimen(tmp_path: Path):
+def specimen(tmp_path: Path) -> tuple[Path, Path, dict[str, object]]:
     source, capture = tmp_path / "source", tmp_path / "capture"
     source.mkdir()
     capture.mkdir()
@@ -98,7 +100,9 @@ def specimen(tmp_path: Path):
     return capture, source, definition
 
 
-def test_native_specimen_admission_preserves_exact_source_revision(specimen):
+def test_native_specimen_admission_preserves_exact_source_revision(
+    specimen: tuple[Path, Path, dict[str, object]],
+) -> None:
     capture, source, definition = specimen
     provenance = validate_capture(
         capture, source, workflow_id="handler", stage="before", definition=definition
@@ -109,7 +113,9 @@ def test_native_specimen_admission_preserves_exact_source_revision(specimen):
     )
 
 
-def test_non_ascii_definition_prefix_is_incomplete_not_a_false_token_failure(tmp_path):
+def test_non_ascii_definition_prefix_is_incomplete_not_a_false_token_failure(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "backend.py").write_text("é = 1; target = 2\n")
     write_json(
         tmp_path / "index.json",
@@ -136,7 +142,9 @@ def test_non_ascii_definition_prefix_is_incomplete_not_a_false_token_failure(tmp
 
 
 @pytest.mark.parametrize("role", [True, False, -1, 1.0, "1"])
-def test_malformed_producer_role_cannot_qualify_an_exact_definition(tmp_path, role):
+def test_malformed_producer_role_cannot_qualify_an_exact_definition(
+    tmp_path: Path, role: object
+) -> None:
     (tmp_path / "backend.py").write_text("def handler():\n    return 1\n")
     write_json(
         tmp_path / "index.json",
@@ -164,7 +172,7 @@ def test_malformed_producer_role_cannot_qualify_an_exact_definition(tmp_path, ro
 @pytest.mark.parametrize("language,suffix", [("python", ".py"), ("typescript", ".ts")])
 def test_capture_preparation_preserves_all_sources_without_inventing_verifier(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, language: str, suffix: str
-):
+) -> None:
     from scripts import native_evidence_capture
 
     source, destination = tmp_path / "source", tmp_path / "capture"
@@ -174,7 +182,7 @@ def test_capture_preparation_preserves_all_sources_without_inventing_verifier(
         (source / path).write_text("# explicitly admitted fixture\n")
     observed = {}
 
-    def capture(root, _destination, selected_language):
+    def capture(root: Path, _destination: Path, selected_language: str) -> None:
         observed["language"] = selected_language
         observed["sources"] = {path: (root / path).read_bytes() for path in paths}
 
@@ -198,7 +206,7 @@ def test_capture_preparation_preserves_all_sources_without_inventing_verifier(
     assert binding["scope"] == SCOPE
 
 
-def test_native_missing_formats_preserve_known_failure():
+def test_native_missing_formats_preserve_known_failure() -> None:
     assert (
         _transport([], {"path": "backend.py", "symbol": "handle"}, "revision") is None
     )
@@ -217,7 +225,9 @@ def test_native_missing_formats_preserve_known_failure():
     )
 
 
-def test_native_artifact_scope_does_not_expand_into_tool_caches(specimen):
+def test_native_artifact_scope_does_not_expand_into_tool_caches(
+    specimen: tuple[Path, Path, dict[str, object]],
+) -> None:
     capture, _source, _definition = specimen
     extra = capture / "node_modules/ignored.py"
     extra.parent.mkdir()
@@ -231,7 +241,9 @@ def test_native_artifact_scope_does_not_expand_into_tool_caches(specimen):
 @pytest.mark.parametrize(
     "changed", ["backend.py", "index.json", "index.scip", "environment.json"]
 )
-def test_mutated_native_specimen_is_rejected_before_import(specimen, changed: str):
+def test_mutated_native_specimen_is_rejected_before_import(
+    specimen: tuple[Path, Path, dict[str, object]], changed: str
+) -> None:
     capture, source, definition = specimen
     (capture / changed).write_bytes((capture / changed).read_bytes() + b"changed")
     with pytest.raises(ValueError, match="differs"):
@@ -253,8 +265,8 @@ def test_mutated_native_specimen_is_rejected_before_import(specimen, changed: st
     ],
 )
 def test_native_scope_or_revision_identity_cannot_be_reinterpreted(
-    specimen, key, value
-):
+    specimen: tuple[Path, Path, dict[str, object]], key: str, value: object
+) -> None:
     capture, source, definition = specimen
     binding = json.loads((capture / "backend-binding.json").read_text())
     binding[key] = value
@@ -280,8 +292,12 @@ def test_native_scope_or_revision_identity_cannot_be_reinterpreted(
     ],
 )
 def test_native_definition_token_preserves_location_and_identity_ambiguity(
-    specimen, role, location, symbols, unique
-):
+    specimen: tuple[Path, Path, dict[str, object]],
+    role: int,
+    location: list[int],
+    symbols: list[str],
+    unique: bool,
+) -> None:
     capture, _source, _definition = specimen
     write_json(
         capture / "index.json",
@@ -338,8 +354,8 @@ def test_present_ambiguous_native_subject_does_not_pass_invalidation(
 
 @pytest.mark.parametrize("mutation", [None, "artifact", "invocation", "scope"])
 def test_fresh_acquisition_requires_current_invocation_and_untouched_output(
-    specimen, mutation
-):
+    specimen: tuple[Path, Path, dict[str, object]], mutation: str | None
+) -> None:
     from scripts.repository_evaluation.backend_native import (
         record_capture_acquisition,
         validate_capture_acquisition,
@@ -365,7 +381,9 @@ def test_fresh_acquisition_requires_current_invocation_and_untouched_output(
     )
 
 
-def test_fresh_request_without_acquisition_receipt_is_incomplete(specimen):
+def test_fresh_request_without_acquisition_receipt_is_incomplete(
+    specimen: tuple[Path, Path, dict[str, object]],
+) -> None:
     from scripts.repository_evaluation.backend_native import (
         validate_capture_acquisition,
     )

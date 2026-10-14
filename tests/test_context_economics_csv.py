@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import csv
 import json
+from pathlib import Path
+from typing import Any
 
 import pytest
 
 from scripts.agent_evaluation.context_economics_csv import INPUT_SCHEMA, main
 
 
-def _lane(tokens, elapsed):
+def _lane(tokens: int | None, elapsed: int) -> dict[str, object]:
     return {
         "tasks": [
             {
@@ -36,7 +38,9 @@ def _lane(tokens, elapsed):
     }
 
 
-def _report(native=None, hashmarks=None):
+def _report(
+    native: dict[str, object] | None = None, hashmarks: dict[str, object] | None = None
+) -> dict[str, object]:
     return {
         "schema": INPUT_SCHEMA,
         "protocol_identity": "sha256:p",
@@ -57,7 +61,9 @@ def _report(native=None, hashmarks=None):
     }
 
 
-def _run(tmp_path, monkeypatch, report):
+def _run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, report: dict[str, object]
+) -> tuple[Path, Path]:
     source = tmp_path / "r.json"
     raw = tmp_path / "raw.csv"
     summary = tmp_path / "summary.csv"
@@ -79,8 +85,8 @@ def _run(tmp_path, monkeypatch, report):
 
 
 def test_context_economics_csv_preserves_token_counters_and_paired_reduction(
-    tmp_path, monkeypatch
-):
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     raw, summary = _run(tmp_path, monkeypatch, _report())
     with raw.open(encoding="utf-8", newline="") as handle:
         rows = list(csv.DictReader(handle))
@@ -91,8 +97,8 @@ def test_context_economics_csv_preserves_token_counters_and_paired_reduction(
 
 
 def test_context_economics_csv_does_not_infer_missing_token_usage(
-    tmp_path, monkeypatch
-):
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     lane = _lane(None, 10)
     raw, _ = _run(tmp_path, monkeypatch, _report(lane, lane))
     with raw.open(encoding="utf-8", newline="") as handle:
@@ -103,14 +109,18 @@ def test_context_economics_csv_does_not_infer_missing_token_usage(
     )
 
 
-def test_context_economics_csv_rejects_wrong_input_schema(tmp_path, monkeypatch):
+def test_context_economics_csv_rejects_wrong_input_schema(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     report = _report()
     report["schema"] = "wrong"
     with pytest.raises(ValueError, match="input must use schema"):
         _run(tmp_path, monkeypatch, report)
 
 
-def test_context_economics_csv_rejects_duplicate_condition_rows(tmp_path, monkeypatch):
+def test_context_economics_csv_rejects_duplicate_condition_rows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     report = _report()
     duplicate = dict(report["repositories"][0]["lanes"]["native"]["tasks"][0])
     report["repositories"][0]["lanes"]["native"]["tasks"].append(duplicate)
@@ -119,8 +129,8 @@ def test_context_economics_csv_rejects_duplicate_condition_rows(tmp_path, monkey
 
 
 def test_context_economics_csv_rejects_duplicate_raw_run_identity(
-    tmp_path, monkeypatch
-):
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     report = _report()
     duplicate = dict(report["repositories"][0]["lanes"]["native"]["raw_runs"][0])
     report["repositories"][0]["lanes"]["native"]["raw_runs"].append(duplicate)

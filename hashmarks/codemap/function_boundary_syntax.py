@@ -35,7 +35,10 @@ class _BoundarySites(ast.NodeVisitor):
         self.sites: list[dict[str, Any]] = []
 
     def _add(
-        self, node: ast.expr | ast.stmt | ast.ExceptHandler, kind: str, **details: Any
+        self,
+        node: ast.expr | ast.stmt | ast.ExceptHandler,
+        kind: str,
+        **details: object,
     ) -> None:
         self.sites.append(
             {

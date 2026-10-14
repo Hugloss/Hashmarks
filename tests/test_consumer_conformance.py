@@ -64,7 +64,7 @@ def test_consumer_bundle_rejects_same_version_cross_pair() -> None:
 
 
 def test_native_handoff_validator_rejects_tampering_and_keeps_authority_external(
-    repository_qualification_handoff,
+    repository_qualification_handoff: dict[str, object],
 ) -> None:
     handoff = repository_qualification_handoff
     assert validate_native_qualification_handoff(handoff)["valid"] is True
@@ -76,7 +76,7 @@ def test_native_handoff_validator_rejects_tampering_and_keeps_authority_external
 
 
 def test_consumer_conformance_vectors_are_deterministic_and_self_describing(
-    repository_qualification_handoff,
+    repository_qualification_handoff: dict[str, object],
 ) -> None:
     first = _consumer_conformance_vectors_from_handoff(repository_qualification_handoff)
     second = _consumer_conformance_vectors_from_handoff(
@@ -103,7 +103,7 @@ def test_consumer_conformance_vectors_are_deterministic_and_self_describing(
 
 
 def test_consumer_bundle_cross_binds_native_handoff_producer(
-    repository_qualification_handoff,
+    repository_qualification_handoff: dict[str, object],
 ) -> None:
     handoff = repository_qualification_handoff
     identity = str(handoff["producer"]["implementation_identity"])
@@ -259,7 +259,7 @@ def test_invalid_bundle_never_emits_normalized_projection() -> None:
 
 
 def test_native_handoff_validator_fails_closed_for_nonportable_payload(
-    repository_qualification_handoff,
+    repository_qualification_handoff: dict[str, object],
 ) -> None:
     tampered = deepcopy(repository_qualification_handoff)
     tampered["nonportable"] = float("nan")

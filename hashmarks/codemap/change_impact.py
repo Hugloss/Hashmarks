@@ -377,7 +377,9 @@ class ChangeImpactMixin:
         generation = int(self._decision_session_generation or self.store.generation())
         return generation, task, limit, per_role
 
-    def _same_package_go_owner(self, verify_path: str, visible) -> str | None:
+    def _same_package_go_owner(
+        self, verify_path: str, visible: Callable[[str], bool]
+    ) -> str | None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         parent = Path(verify_path).parent
@@ -392,7 +394,11 @@ class ChangeImpactMixin:
         return siblings[0] if len(siblings) == 1 else None
 
     def _reconstruct_change_impact_owner_edges(
-        self, task: str, edit_path: str, verify_path: str, visible
+        self,
+        task: str,
+        edit_path: str,
+        verify_path: str,
+        visible: Callable[[str], bool],
     ) -> list[dict[str, object]] | None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -436,7 +442,11 @@ class ChangeImpactMixin:
                 relations[(source, target)] = str(edge.get("relation") or "related")
         return chain, relations
 
-    def _change_impact_owner_chain(self, task: str, action: dict[str, object], visible):
+    def _change_impact_owner_chain(
+        self, task: str, action: dict[str, object], visible: Callable[[str], bool]
+    ) -> tuple[
+        str, dict[str, object] | None, str, list[str], dict[tuple[str, str], str]
+    ]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         cache_key = self._change_impact_owner_cache_key(task, action)

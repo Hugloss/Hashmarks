@@ -1,5 +1,5 @@
 from callee import target
 
 
-def caller():
+def caller() -> int:
     return target()

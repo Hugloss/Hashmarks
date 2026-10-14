@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import threading
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Never
 
 from hashmarks.client import IdentityClient
 from hashmarks.daemon import IdentityDaemon
@@ -42,8 +42,8 @@ def _wait_for_identity_client(client: IdentityClient, deadline: float) -> None:
 
 
 def test_manifest_hot_equality_cutoff_skips_all_file_metadata(
-    tmp_path: Path, monkeypatch
-):
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     paths = []
@@ -59,7 +59,7 @@ def test_manifest_hot_equality_cutoff_skips_all_file_metadata(
     calls = {"count": 0}
     original = engine.file_store._metadata
 
-    def counting(path):
+    def counting(path: Path) -> object:
         calls["count"] += 1
         return original(path)
 
@@ -69,7 +69,9 @@ def test_manifest_hot_equality_cutoff_skips_all_file_metadata(
     engine.close()
 
 
-def test_unrelated_dirty_path_does_not_invalidate_manifest(tmp_path: Path, monkeypatch):
+def test_unrelated_dirty_path_does_not_invalidate_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     workspace = tmp_path / "repo"
     (workspace / "src").mkdir(parents=True)
     (workspace / "docs").mkdir()
@@ -83,7 +85,7 @@ def test_unrelated_dirty_path_does_not_invalidate_manifest(tmp_path: Path, monke
     (workspace / "docs" / "readme.md").write_text("two")
     engine.record_changes(["docs/readme.md"])
 
-    def should_not_stat(_path):
+    def should_not_stat(_path: Path) -> Never:
         raise AssertionError("unrelated dirty path invalidated manifest")
 
     monkeypatch.setattr(engine.file_store, "_metadata", should_not_stat)
@@ -91,7 +93,9 @@ def test_unrelated_dirty_path_does_not_invalidate_manifest(tmp_path: Path, monke
     engine.close()
 
 
-def test_related_dirty_path_invalidates_manifest_and_changes_root(tmp_path: Path):
+def test_related_dirty_path_invalidates_manifest_and_changes_root(
+    tmp_path: Path,
+) -> None:
     workspace = tmp_path / "repo"
     (workspace / "src").mkdir(parents=True)
     target = workspace / "src" / "a.py"
@@ -108,7 +112,9 @@ def test_related_dirty_path_invalidates_manifest_and_changes_root(tmp_path: Path
     engine.close()
 
 
-def test_dirty_directory_ancestor_invalidates_explicit_file_manifest(tmp_path: Path):
+def test_dirty_directory_ancestor_invalidates_explicit_file_manifest(
+    tmp_path: Path,
+) -> None:
     workspace = tmp_path / "repo"
     (workspace / "src" / "pkg").mkdir(parents=True)
     target = workspace / "src" / "pkg" / "a.py"
@@ -125,7 +131,7 @@ def test_dirty_directory_ancestor_invalidates_explicit_file_manifest(tmp_path: P
     engine.close()
 
 
-def test_default_engine_does_not_persist_unused_directory_nodes(tmp_path: Path):
+def test_default_engine_does_not_persist_unused_directory_nodes(tmp_path: Path) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     (workspace / "a.txt").write_text("A")
@@ -137,7 +143,7 @@ def test_default_engine_does_not_persist_unused_directory_nodes(tmp_path: Path):
     engine.close()
 
 
-def test_directory_store_can_still_be_enabled_explicitly(tmp_path: Path):
+def test_directory_store_can_still_be_enabled_explicitly(tmp_path: Path) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     (workspace / "a.txt").write_text("A")
@@ -153,7 +159,7 @@ def test_directory_store_can_still_be_enabled_explicitly(tmp_path: Path):
     engine.close()
 
 
-def test_engine_watcher_excludes_internal_state_path(tmp_path: Path):
+def test_engine_watcher_excludes_internal_state_path(tmp_path: Path) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     engine = IdentityEngine(workspace)
@@ -163,8 +169,8 @@ def test_engine_watcher_excludes_internal_state_path(tmp_path: Path):
 
 
 def test_daemon_preserves_hot_manifest_state_across_clients(
-    tmp_path: Path, monkeypatch
-):
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     for i in range(50):
@@ -199,7 +205,7 @@ def test_daemon_preserves_hot_manifest_state_across_clients(
     calls = {"count": 0}
     original = daemon.engine.file_store._metadata
 
-    def counting(path):
+    def counting(path: Path) -> object:
         calls["count"] += 1
         return original(path)
 
@@ -221,7 +227,7 @@ def test_daemon_preserves_hot_manifest_state_across_clients(
     assert fake.stopped
 
 
-def test_input_manifest_fingerprint_is_stable_and_path_sensitive():
+def test_input_manifest_fingerprint_is_stable_and_path_sensitive() -> None:
     a = InputManifest(("a", "b/c"))
     b = InputManifest(("a", "b/c"))
     c = InputManifest(("a", "b/d"))
@@ -229,7 +235,7 @@ def test_input_manifest_fingerprint_is_stable_and_path_sensitive():
     assert a.fingerprint != c.fingerprint
 
 
-def test_parent_directory_modified_event_is_observer_noise():
+def test_parent_directory_modified_event_is_observer_noise() -> None:
     from hashmarks.watcher import should_ignore_observer_event
 
     assert should_ignore_observer_event(event_type="modified", is_directory=True)
@@ -241,7 +247,7 @@ def test_parent_directory_modified_event_is_observer_noise():
 
 def test_strong_manifest_verify_detects_leaf_type_change_without_tracker(
     tmp_path: Path,
-):
+) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     target = workspace / "item"

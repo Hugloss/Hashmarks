@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 # Research scripts are intentionally importable modules as well as CLI entrypoints.
@@ -14,7 +15,7 @@ import pytest  # noqa: E402 - import follows standalone script path setup
 
 
 @pytest.fixture
-def fake_maven_wrapper():
+def fake_maven_wrapper() -> Callable[[Path], Path]:
     """Install a deterministic test Maven boundary that emits the requested effective POM."""
 
     def install(root: Path) -> Path:
@@ -36,7 +37,7 @@ def fake_maven_wrapper():
 
 
 @pytest.fixture(scope="session")
-def native_dependency_corpus(tmp_path_factory):
+def native_dependency_corpus(tmp_path_factory: object) -> Path:
     import os
 
     from native_evidence_support import CORPUS
@@ -51,7 +52,7 @@ def native_dependency_corpus(tmp_path_factory):
 
 
 @pytest.fixture(scope="session")
-def native_scip_corpus(tmp_path_factory):
+def native_scip_corpus(tmp_path_factory: object) -> Path:
     import os
 
     from native_evidence_support import SCIP_CORPUS
@@ -68,7 +69,7 @@ def native_scip_corpus(tmp_path_factory):
 
 
 @pytest.fixture(scope="session")
-def native_lsp_corpus(tmp_path_factory):
+def native_lsp_corpus(tmp_path_factory: object) -> Path:
     import os
 
     from native_evidence_support import LSP_CORPUS
@@ -94,7 +95,7 @@ def native_lsp_corpus(tmp_path_factory):
 
 
 @pytest.fixture(scope="session")
-def repository_qualification_plan():
+def repository_qualification_plan() -> object:
     """One immutable repository qualification snapshot for read-only contract tests."""
     from hashmarks.qualification_units import qualification_owner_plan
 
@@ -102,7 +103,7 @@ def repository_qualification_plan():
 
 
 @pytest.fixture(scope="session")
-def repository_qualification_handoff(repository_qualification_plan):
+def repository_qualification_handoff(repository_qualification_plan: object) -> object:
     """Project the shared qualification snapshot without rescanning repository source."""
     from hashmarks.qualification_units import _native_qualification_handoff_from_plan
 
@@ -121,7 +122,7 @@ def _constrained_host_capabilities() -> dict[str, bool]:
     }
 
 
-def pytest_collection_modifyitems(config, items):
+def pytest_collection_modifyitems(config: object, items: list[object]) -> None:
     """Make constrained-host capability absence explicit without weakening normal tests."""
     import os
 

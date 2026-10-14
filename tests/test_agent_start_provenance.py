@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any
 
 from hashmarks.codemap import CodeMap
 
@@ -59,7 +60,7 @@ def test_task_evidence_exposes_compact_selection_source_revision_and_unknown_fre
 
 
 def test_task_evidence_maps_generation_bound_continuity_to_current(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: object
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
@@ -78,7 +79,7 @@ def test_task_evidence_maps_generation_bound_continuity_to_current(
 
 
 def test_task_evidence_reports_stale_when_continuity_reports_change(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: object
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
@@ -95,14 +96,16 @@ def test_task_evidence_reports_stale_when_continuity_reports_change(
 
 
 def test_task_evidence_marks_action_stale_if_selected_source_refresh_changes_generation(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: object
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         original = codemap._task_evidence_evidence_item
 
-        def mutate_then_project(row, *, role, token_budget, task=""):
+        def mutate_then_project(
+            row: dict[str, object], *, role: str, token_budget: int, task: str = ""
+        ) -> dict[str, object]:
             path = tmp_path / str(row["path"])
             path.write_text(
                 path.read_text(encoding="utf-8") + "# changed during packet\n",
@@ -166,7 +169,7 @@ def test_task_evidence_context_identity_is_budget_independent_and_revision_bound
 
 
 def test_task_evidence_context_identity_changes_with_freshness_authority(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: object
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
@@ -237,14 +240,16 @@ def test_task_evidence_marks_stale_when_selected_verification_is_renamed_after_s
 
 
 def test_task_evidence_closing_fence_catches_verification_mutation_during_packet_projection(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: object
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         original = codemap._task_evidence_evidence_item
 
-        def mutate_verification_then_project(row, *, role, token_budget, task=""):
+        def mutate_verification_then_project(
+            row: dict[str, object], *, role: str, token_budget: int, task: str = ""
+        ) -> dict[str, object]:
             (tmp_path / "tests" / "test_engine.py").write_text(
                 "def test_replaced():\n    assert True\n", encoding="utf-8"
             )

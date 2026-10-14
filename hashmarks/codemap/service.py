@@ -279,7 +279,7 @@ class CodeMapService:
         self._initial_sync_ms = 0.0
 
     @staticmethod
-    def _write(stream, response: dict[str, Any]) -> None:
+    def _write(stream: object, response: dict[str, object]) -> None:
         payload = (
             json.dumps(response, separators=(",", ":"), sort_keys=True) + "\n"
         ).encode("utf-8")
@@ -847,7 +847,7 @@ class CodeMapServiceClient:
                     ) from None
                 time.sleep(0.005)
 
-    def request(self, op: str, **payload: Any) -> dict[str, Any]:
+    def request(self, op: str, **payload: object) -> dict[str, object]:
         message = {"protocol": PROTOCOL, "op": op, **payload}
         raw = (
             json.dumps(message, separators=(",", ":"), sort_keys=True) + "\n"

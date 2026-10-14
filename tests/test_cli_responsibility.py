@@ -42,14 +42,14 @@ def test_repository_cli_registers_structural_locality_commands() -> None:
 
 
 def test_top_level_cli_delegates_repository_command_family(
-    tmp_path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     import hashmarks.cli as cli
     import hashmarks.repository_cli as repository_cli
 
     seen: dict[str, object] = {}
 
-    def fake_symbol(args) -> int:
+    def fake_symbol(args: argparse.Namespace) -> int:
         seen["query"] = args.query
         seen["workspace"] = args.workspace
         return 0
@@ -112,7 +112,10 @@ def test_repository_cli_operation_projection_validates_before_print(
     ],
 )
 def test_repository_cli_projects_all_canonical_cli_operations_through_one_guard(
-    command: tuple[str, ...], operation: str, tmp_path, monkeypatch: pytest.MonkeyPatch
+    command: tuple[str, ...],
+    operation: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     import argparse
 

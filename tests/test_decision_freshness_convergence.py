@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any
 
 from hashmarks.codemap import CodeMap
 
@@ -19,7 +20,7 @@ def _repo(root: Path) -> None:
 
 
 def test_unknown_freshness_converges_across_decision_surfaces(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _repo(tmp_path)
     task = "widget implementation test"
@@ -28,7 +29,7 @@ def test_unknown_freshness_converges_across_decision_surfaces(
         codemap.sync()
         generation = codemap.store.generation()
 
-        def unknown_status(observation=None):
+        def unknown_status(observation: object = None) -> tuple[int, int, bool | None]:
             del observation
             return generation, generation, None
 
@@ -50,7 +51,7 @@ def test_unknown_freshness_converges_across_decision_surfaces(
 
 
 def test_codemap_completeness_does_not_redefine_freshness(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _repo(tmp_path)
     task = "widget implementation test"
@@ -59,7 +60,7 @@ def test_codemap_completeness_does_not_redefine_freshness(
         codemap.sync()
         generation = codemap.store.generation()
 
-        def current_status(observation=None):
+        def current_status(observation: object = None) -> tuple[int, int, bool]:
             del observation
             return generation, generation, False
 
@@ -78,7 +79,7 @@ def test_codemap_completeness_does_not_redefine_freshness(
 
 
 def test_action_brief_status_consumes_receipt_freshness_once(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _repo(tmp_path)
     task = "widget implementation test"
@@ -89,7 +90,7 @@ def test_action_brief_status_consumes_receipt_freshness_once(
         action = codemap.task_action_map(task)
         reads = 0
 
-        def one_freshness_read(observation=None):
+        def one_freshness_read(observation: object = None) -> tuple[int, int, bool]:
             nonlocal reads
             del observation
             reads += 1

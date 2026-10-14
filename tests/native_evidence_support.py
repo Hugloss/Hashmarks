@@ -22,7 +22,7 @@ LSP_CORPUS = Path(__file__).parent / "fixtures" / "native_lsp"
 TASK = "Change normalize_widget in src/engine.py to lowercase the trimmed value and verify its semantics."
 
 
-def assert_literal_returned_counts(packet: Any) -> None:
+def assert_literal_returned_counts(packet: dict[str, object]) -> None:
     """Every advertised returned count accounts for the emitted rows only."""
     rows = packet["occurrences"]
     members = [
@@ -75,7 +75,7 @@ def materialize_scip(root: Path, source: Path) -> None:
     _replace_inputs(root, source, paths)
 
 
-def lsp_capture(root: Path, source: Path, name: str) -> dict[str, Any]:
+def lsp_capture(root: Path, source: Path, name: str) -> dict[str, object]:
     """Rebase only fixture-owned file URIs; raw capture bytes remain untouched."""
     metadata = json.loads((source / "capture.json").read_text())
     original = metadata["original_root_uri"]
@@ -84,7 +84,7 @@ def lsp_capture(root: Path, source: Path, name: str) -> dict[str, Any]:
         for path in metadata["source_revisions"]
     }
 
-    def rebase(value: Any) -> Any:
+    def rebase(value: object) -> object:
         if isinstance(value, str):
             return owned.get(value, value)
         if isinstance(value, list):
@@ -101,7 +101,7 @@ def lsp_capture(root: Path, source: Path, name: str) -> dict[str, Any]:
     return rebase(row["capture"])
 
 
-def import_native_scip(cm: Any, source: Path) -> None:
+def import_native_scip(cm: object, source: Path) -> None:
     cm.import_scip(
         source / "index.json",
         provenance=json.loads((source / "provenance.json").read_text()),
@@ -132,7 +132,7 @@ def input_revisions(root: Path, paths: list[str]) -> list[dict[str, str]]:
 
 def dependency_capture(
     producer: str, source: Path, inputs: list[dict[str, str]]
-) -> Any:
+) -> dict[str, object]:
     if producer == "uv":
         return uv_lock_dependency_observation(
             lock=(source / "uv.lock").read_bytes(), repository_inputs=inputs
@@ -146,10 +146,10 @@ def dependency_capture(
     )
 
 
-def assert_projection(native: Any, operation: str, mode: str = "default") -> None:
+def assert_projection(native: object, operation: str, mode: str = "default") -> None:
     """Check exact selected evidence and explicit exclusions across all encodings."""
     for format in FORMATS:
-        response: Any = presentation_response(
+        response: dict[str, object] = presentation_response(
             operation, native, format=format, result_mode=mode
         )
         if format == "none":
@@ -172,7 +172,9 @@ def assert_projection(native: Any, operation: str, mode: str = "default") -> Non
                 assert row["details"] == value
 
 
-def assert_hover_capture(packet: Any, capture: Any) -> Any:
+def assert_hover_capture(
+    packet: dict[str, object], capture: dict[str, object]
+) -> dict[str, object]:
     """A genuine hover's exact text remains an attributed, non-relational claim."""
     row = next(
         row for row in packet["observations"] if row["producer"] == capture["producer"]
@@ -195,7 +197,11 @@ def assert_hover_capture(packet: Any, capture: Any) -> Any:
     return row
 
 
-def assert_hover_presentation(packet: Any, presentation: Any, capture: Any) -> None:
+def assert_hover_presentation(
+    packet: dict[str, object],
+    presentation: dict[str, object],
+    capture: dict[str, object],
+) -> None:
     """Check the transported context, including its independent qualifications."""
     row = assert_hover_capture(packet, capture)
     assert validate_evidence_presentation(packet, presentation)["valid"] is True
@@ -217,7 +223,7 @@ def assert_hover_presentation(packet: Any, presentation: Any, capture: Any) -> N
         assert contents in presentation["text"]
 
 
-def semantic_dependency_fields(observation: Any) -> Any:
+def semantic_dependency_fields(observation: dict[str, object]) -> dict[str, object]:
     return {
         key: observation[key]
         for key in (

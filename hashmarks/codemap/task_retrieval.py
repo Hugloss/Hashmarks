@@ -118,7 +118,9 @@ class TaskRetrievalMixin:
         }
     )
 
-    def _decision_preflight(self, method_name, args, kwargs):
+    def _decision_preflight(
+        self, method_name: str, args: tuple[Any, ...], kwargs: dict[str, Any]
+    ) -> None:
         """Reconcile known stale task evidence before authority is sampled."""
         if method_name not in self._TASK_CACHE_PREFLIGHT_METHODS or not args:
             return
@@ -275,8 +277,8 @@ class TaskRetrievalMixin:
         return min(60.0, boost), tuple(domain.value for domain in matches)
 
     def _apply_repository_domain_hints(
-        self, rows: tuple[dict, ...], route: QueryRoute
-    ) -> tuple[dict, ...]:
+        self, rows: tuple[dict[str, Any], ...], route: QueryRoute
+    ) -> tuple[dict[str, Any], ...]:
         if not route.preferred_domains:
             return rows
         enriched: list[dict] = []
@@ -300,7 +302,7 @@ class TaskRetrievalMixin:
         return tuple(enriched)
 
     @staticmethod
-    def _score_surface(row: dict) -> _ScoreSurface:
+    def _score_surface(row: dict[str, Any]) -> _ScoreSurface:
         return _ScoreSurface(
             path=str(row.get("path", "")).lower(),
             name=str(row.get("name", "")).lower(),
@@ -355,7 +357,7 @@ class TaskRetrievalMixin:
     def _score(
         self,
         query: str,
-        row: dict,
+        row: dict[str, Any],
         *,
         ranks: dict[str, float] | None = None,
         recent: set[str] | None = None,
@@ -385,7 +387,7 @@ class TaskRetrievalMixin:
     def _candidate_prescore(
         self,
         query: str,
-        row: dict,
+        row: dict[str, Any],
         *,
         tokens: tuple[str, ...],
         raw_query: str,
@@ -405,8 +407,8 @@ class TaskRetrievalMixin:
 
     @staticmethod
     def _best_rerank_candidate_by_path(
-        scored: Sequence[tuple[tuple[float, str, str, int], dict]],
-    ) -> dict[str, tuple[tuple[float, str, str, int], dict]]:
+        scored: Sequence[tuple[tuple[float, str, str, int], dict[str, Any]]],
+    ) -> dict[str, tuple[tuple[float, str, str, int], dict[str, Any]]]:
         best_by_path: dict[str, tuple[tuple[float, str, str, int], dict]] = {}
         for item in scored:
             path = str(item[1].get("path", ""))
@@ -418,11 +420,11 @@ class TaskRetrievalMixin:
     def _bounded_rerank_rows(
         self,
         query: str,
-        rows: tuple[dict, ...],
+        rows: tuple[dict[str, Any], ...],
         *,
         limit: int,
         tokens: tuple[str, ...],
-    ) -> tuple[dict, ...]:
+    ) -> tuple[dict[str, Any], ...]:
         """Keep the full candidate set for small queries; bound huge reranks.
 
         The cap is intentionally generous and path-diverse.  This makes the

@@ -33,7 +33,7 @@ HASHMARKS_KINDS = {
 }
 
 
-def _validate_trace_event(event: Any, path: Path) -> None:
+def _validate_trace_event(event: object, path: Path) -> None:
     if not isinstance(event, dict) or not isinstance(event.get("kind"), str):
         raise ValueError(f"invalid trace event: {path}")
     for field in (
@@ -69,14 +69,14 @@ def _validate_trace_event(event: Any, path: Path) -> None:
         raise ValueError(f"finished_at_ns must be >= started_at_ns: {path}")
 
 
-def _validate_exact_model_tokens(value: Any, path: Path) -> None:
+def _validate_exact_model_tokens(value: object, path: Path) -> None:
     if value is not None and (
         not isinstance(value, int) or isinstance(value, bool) or value < 0
     ):
         raise ValueError(f"model_input_tokens must be a non-negative integer: {path}")
 
 
-def load_trace(path: Path) -> dict[str, Any]:
+def load_trace(path: Path) -> dict[str, object]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict) or value.get("schema") != TRACE_SCHEMA:
         raise ValueError(f"unsupported agent trace schema: {path}")
@@ -97,7 +97,7 @@ def load_trace(path: Path) -> dict[str, Any]:
     return value
 
 
-def load_verdict(path: Path) -> dict[str, Any]:
+def load_verdict(path: Path) -> dict[str, object]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict) or value.get("schema") != VERDICT_SCHEMA:
         raise ValueError(f"unsupported agent verdict schema: {path}")
@@ -113,7 +113,7 @@ def load_verdict(path: Path) -> dict[str, Any]:
     return value
 
 
-def load_usage(path: Path) -> dict[str, Any]:
+def load_usage(path: Path) -> dict[str, object]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict) or value.get("schema") != USAGE_SCHEMA:
         raise ValueError(f"unsupported agent model-usage schema: {path}")
@@ -140,7 +140,7 @@ def load_usage(path: Path) -> dict[str, Any]:
     return value
 
 
-def summarize(trace: dict[str, Any]) -> dict[str, object]:
+def summarize(trace: dict[str, object]) -> dict[str, object]:
     events = trace["events"]
     exact_model_tokens = trace.get("model_input_tokens")
     event_model_tokens = sum(int(e.get("model_input_tokens", 0)) for e in events)
@@ -243,8 +243,8 @@ def _pair_gate(
 
 
 def _records_by_run(
-    records: list[dict[str, Any]], record_name: str
-) -> dict[tuple[str, str, str], dict[str, Any]]:
+    records: list[dict[str, object]], record_name: str
+) -> dict[tuple[str, str, str], dict[str, object]]:
     indexed = {}
     for record in records:
         key = (
@@ -260,8 +260,8 @@ def _records_by_run(
 
 def _bind_external_records(
     rows: list[dict[str, object]],
-    verdicts: dict[tuple[str, str, str], dict[str, Any]],
-    usages: dict[tuple[str, str, str], dict[str, Any]],
+    verdicts: dict[tuple[str, str, str], dict[str, object]],
+    usages: dict[tuple[str, str, str], dict[str, object]],
 ) -> None:
     for row in rows:
         run_id = row.get("run_id")

@@ -13,7 +13,7 @@ from .full_edit_verify_benchmark import build_combined, run_lane
 logger = logging.getLogger(__name__)
 
 
-def main():
+def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--old-source", type=Path, required=True)
     ap.add_argument("--new-source", type=Path, required=True)

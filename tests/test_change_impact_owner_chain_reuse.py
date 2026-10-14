@@ -44,12 +44,12 @@ def test_owner_chain_reuse_keeps_sync_currentness_check(tmp_path: Path) -> None:
         original_relation = codemap.ownership_relation_graph
         original_sync = codemap.sync
 
-        def counted_relation(*args, **kwargs):
+        def counted_relation(*args: Any, **kwargs: Any) -> Any:
             nonlocal relation_calls
             relation_calls += 1
             return original_relation(*args, **kwargs)
 
-        def counted_sync(*args, **kwargs):
+        def counted_sync(*args: Any, **kwargs: Any) -> Any:
             nonlocal sync_calls
             sync_calls += 1
             return original_sync(*args, **kwargs)
@@ -90,7 +90,7 @@ def test_owner_chain_reuse_does_not_cross_decision_sessions(tmp_path: Path) -> N
         relation_calls = 0
         original_relation = codemap.ownership_relation_graph
 
-        def counted_relation(*args, **kwargs):
+        def counted_relation(*args: Any, **kwargs: Any) -> Any:
             nonlocal relation_calls
             relation_calls += 1
             return original_relation(*args, **kwargs)
@@ -125,13 +125,13 @@ def test_owner_chain_cached_result_is_detached(tmp_path: Path) -> None:
 
 
 def test_owner_chain_reconstruction_failure_keeps_selected_paths(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     task, paths = _go_repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
 
-        def unavailable(*_args, **_kwargs):
+        def unavailable(*_args: Any, **_kwargs: Any) -> Never:
             raise ValueError("owner evidence unavailable")
 
         monkeypatch.setattr(codemap, "ownership_relation_graph", unavailable)

@@ -41,7 +41,7 @@ def content_identity(value: object) -> str:
     return "sha256:" + hashlib.sha256(raw).hexdigest()
 
 
-def portable_copy(value: Any, *, maximum: int = CAPTURE_MAX_BYTES) -> Any:
+def portable_copy(value: object, *, maximum: int = CAPTURE_MAX_BYTES) -> object:
     try:
         raw = json.dumps(value, ensure_ascii=False, allow_nan=False).encode("utf-8")
     except (TypeError, ValueError) as exc:

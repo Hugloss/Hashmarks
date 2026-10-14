@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
@@ -114,7 +115,10 @@ class RelationshipsMixin:
             )
 
     def _collect_adjacency_seeds(
-        self, state: _TaskAdjacencyState, primary, per_seed_edge_limit: int
+        self,
+        state: _TaskAdjacencyState,
+        primary: Iterable[SearchHit],
+        per_seed_edge_limit: int,
     ) -> None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -135,7 +139,9 @@ class RelationshipsMixin:
                     )
 
     @staticmethod
-    def _adjacency_symbol_rows(resolved, symbolic_targets) -> dict[str, list[dict]]:
+    def _adjacency_symbol_rows(
+        resolved: Iterable[dict[str, object]], symbolic_targets: set[str]
+    ) -> dict[str, list[dict]]:
         rows_by_alias: dict[str, list[dict]] = {}
         for row in resolved:
             aliases = {
@@ -246,7 +252,7 @@ class RelationshipsMixin:
 
     @classmethod
     def _seed_adjacency_rows(
-        cls, primary, ordered, per_seed_result_limit: int
+        cls, primary: object, ordered: list[object], per_seed_result_limit: int
     ) -> list[dict[str, object]]:
         result: list[dict[str, object]] = []
         for seed_rank, seed in enumerate(primary, 1):
@@ -403,8 +409,8 @@ class RelationshipsMixin:
 
     @staticmethod
     def _append_relationship(
-        relationships,
-        seen,
+        relationships: list[dict[str, object]],
+        seen: set[tuple[str, str, str]],
         source: str,
         target: str,
         relation: str,
@@ -428,7 +434,11 @@ class RelationshipsMixin:
 
     @classmethod
     def _append_adjacency_provenance(
-        cls, relationships, seen, target: str, item: object
+        cls,
+        relationships: list[dict[str, object]],
+        seen: set[tuple[str, str, str]],
+        target: str,
+        item: object,
     ) -> None:
         if not isinstance(item, dict):
             return
@@ -442,7 +452,12 @@ class RelationshipsMixin:
         )
 
     @classmethod
-    def _relationship_adjacency_edges(cls, adjacency, relationships, seen) -> None:
+    def _relationship_adjacency_edges(
+        cls,
+        adjacency: dict[str, object],
+        relationships: list[dict[str, object]],
+        seen: set[tuple[str, str, str]],
+    ) -> None:
         for row in adjacency.get("adjacent", []):
             if not isinstance(row, dict):
                 continue
@@ -455,7 +470,11 @@ class RelationshipsMixin:
 
     @classmethod
     def _relationship_impact_edges(
-        cls, surfaces, primary_paths, relationships, seen
+        cls,
+        surfaces: dict[str, list[dict[str, object]]],
+        primary_paths: list[str],
+        relationships: list[dict[str, object]],
+        seen: set[tuple[str, str, str]],
     ) -> None:
         for surface, rows in surfaces.items():
             if not isinstance(rows, list):
@@ -481,7 +500,10 @@ class RelationshipsMixin:
                     )
 
     def _relationship_authority_edges(
-        self, primary_paths, relationships, seen
+        self,
+        primary_paths: list[str],
+        relationships: list[dict[str, object]],
+        seen: set[tuple[str, str, str]],
     ) -> list[dict[str, object]]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -518,7 +540,9 @@ class RelationshipsMixin:
         return authority_rows
 
     @staticmethod
-    def _relationship_layer_counts(relationships) -> dict[str, int]:
+    def _relationship_layer_counts(
+        relationships: Iterable[dict[str, object]],
+    ) -> dict[str, int]:
         counts: dict[str, int] = {}
         for row in relationships:
             layer = str(row["layer"])

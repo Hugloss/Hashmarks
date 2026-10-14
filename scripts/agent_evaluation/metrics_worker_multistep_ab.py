@@ -314,7 +314,7 @@ def collect(root: Path, *, limit: int = 20) -> dict[str, object]:
             }
         )
 
-    def total(policy, key):
+    def total(policy: str, key: str) -> int:
         return sum(int(r[policy]["summary"][key]) for r in reports)
 
     tasks = total("direct_sequence", "tasks")

@@ -198,7 +198,7 @@ def _starts_logical_record(line: str) -> bool:
     return bool(_TIMESTAMP_START.match(row[1]))
 
 
-def _logical_records(handle: TextIO):
+def _logical_records(handle: TextIO) -> Iterator[list[str]]:
     current: list[str] = []
     ordinal = 0
     for line in handle:
@@ -634,7 +634,7 @@ class _TrackingLineIterator:
         return text
 
 
-def _strict_logical_records(handle: TextIO):
+def _strict_logical_records(handle: TextIO) -> Iterator[list[str]]:
     tracker = _TrackingLineIterator(handle)
     reader = csv.reader(tracker, strict=True)
     ordinal = 0

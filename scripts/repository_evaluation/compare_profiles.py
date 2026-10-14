@@ -4,7 +4,7 @@ import argparse
 import math
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -28,8 +28,8 @@ def compare_profiles(
     candidate: Mapping[str, object],
     repeat: Mapping[str, object] | None = None,
     minimum_gain_pct: float = 3.0,
-) -> dict[str, Any]:
-    def rows(doc):
+) -> dict[str, object]:
+    def rows(doc: Mapping[str, object]) -> Mapping[str, object]:
         return {str(row["id"]): row for row in doc.get("cases", [])}
 
     b, c = rows(baseline), rows(candidate)

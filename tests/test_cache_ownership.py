@@ -4,7 +4,9 @@ from hashmarks.cli import main
 from hashmarks.codemap import CodeMap
 
 
-def test_cache_ownership_maps_module_cache_and_unproven_invalidation(tmp_path):
+def test_cache_ownership_maps_module_cache_and_unproven_invalidation(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "cache_owner.py").write_text(
         "CACHE = {}\n\ndef get(k):\n    return CACHE.get(k)\n", encoding="utf-8"
     )
@@ -18,7 +20,7 @@ def test_cache_ownership_maps_module_cache_and_unproven_invalidation(tmp_path):
     assert owner["invalidation"] == "not-proven"
 
 
-def test_cache_ownership_maps_lru_cache_as_decorator_managed(tmp_path):
+def test_cache_ownership_maps_lru_cache_as_decorator_managed(tmp_path: Path) -> None:
     (tmp_path / "memo.py").write_text(
         "from functools import lru_cache\n@lru_cache(maxsize=8)\ndef value(x):\n    return x\n",
         encoding="utf-8",
@@ -32,7 +34,7 @@ def test_cache_ownership_maps_lru_cache_as_decorator_managed(tmp_path):
     assert owner["confidence"] == "high"
 
 
-def test_cache_ownership_composes_with_import_identity_risk(tmp_path):
+def test_cache_ownership_composes_with_import_identity_risk(tmp_path: Path) -> None:
     (tmp_path / "pkg").mkdir()
     (tmp_path / "pkg" / "__init__.py").write_text("", encoding="utf-8")
     (tmp_path / "pkg" / "helper.py").write_text("CACHE = {}\n", encoding="utf-8")
@@ -56,7 +58,7 @@ def test_cache_ownership_composes_with_import_identity_risk(tmp_path):
     assert "duplicate module identity" in owner["reason"]
 
 
-def test_cache_ownership_does_not_invent_ordinary_module_state(tmp_path):
+def test_cache_ownership_does_not_invent_ordinary_module_state(tmp_path: Path) -> None:
     (tmp_path / "plain.py").write_text("VALUES = {}\nCOUNT = 0\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -64,7 +66,7 @@ def test_cache_ownership_does_not_invent_ordinary_module_state(tmp_path):
     assert result["owners"] == []
 
 
-def test_cli_cache_ownership(tmp_path, capsys):
+def test_cli_cache_ownership(tmp_path: Path, capsys: pytest.Capsys) -> None:
     (tmp_path / "state.py").write_text("CACHE = {}\n", encoding="utf-8")
     assert main(["map", "sync", "--workspace", str(tmp_path)]) == 0
     capsys.readouterr()

@@ -113,7 +113,7 @@ class _JsonRpcProcess:
             return
 
     @staticmethod
-    def _message_length(stream) -> int | None:
+    def _message_length(stream: Any) -> int | None:
         length: int | None = None
         while True:
             raw = stream.readline()
@@ -127,7 +127,7 @@ class _JsonRpcProcess:
                 length = int(value.strip())
 
     @staticmethod
-    def _read_message(stream, length: int) -> dict | None:
+    def _read_message(stream: Any, length: int) -> dict | None:
         payload = stream.read(length)
         if len(payload) != length:
             return None

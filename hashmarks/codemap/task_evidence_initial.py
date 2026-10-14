@@ -36,7 +36,7 @@ def initial_packet_identity(packet: dict[str, Any]) -> str:
     return "sha256:" + hash_bytes(encoded, domain=domain).hash
 
 
-def _collect_strings(value: Any, strings: set[str]) -> None:
+def _collect_strings(value: object, strings: set[str]) -> None:
     if isinstance(value, str):
         strings.add(value)
     elif isinstance(value, dict):
@@ -50,7 +50,7 @@ def _collect_strings(value: Any, strings: set[str]) -> None:
             _collect_strings(item, strings)
 
 
-def _encode_strings(value: Any, indices: dict[str, str]) -> Any:
+def _encode_strings(value: object, indices: dict[str, str]) -> object:
     if isinstance(value, str):
         return indices[value]
     if isinstance(value, dict):
@@ -114,8 +114,8 @@ def encode_initial_packet(packet: dict[str, Any]) -> dict[str, Any]:
 
 
 def _unpack_string_table(
-    encoding: dict[str, Any], data: Any
-) -> tuple[dict[str, Any], Any]:
+    encoding: dict[str, object], data: object
+) -> tuple[dict[str, object], object]:
     limit = encoding.get("decoded_bytes")
     if (
         set(encoding) != {"kind", "decoded_bytes"}
@@ -173,7 +173,7 @@ def _decode_string_table(encoding: dict[str, Any]) -> list[str]:
     return strings
 
 
-def _decode_strings(encoding: dict[str, Any], data: Any) -> Any:
+def _decode_strings(encoding: dict[str, object], data: object) -> object:
     strings = _decode_string_table(encoding)
 
     def string(index: str) -> str:
@@ -186,7 +186,7 @@ def _decode_strings(encoding: dict[str, Any], data: Any) -> Any:
             raise ValueError("invalid initial string reference")
         return strings[int(index)]
 
-    def decode(value: Any) -> Any:
+    def decode(value: object) -> object:
         if isinstance(value, str):
             return string(value)
         if isinstance(value, dict):
@@ -271,7 +271,7 @@ _LOCATOR_OMISSIONS = (
 )
 
 
-def _locator(value: Any) -> Any:
+def _locator(value: object) -> object:
     if not isinstance(value, dict):
         return value
     omitted = set(_LOCATOR_OMISSIONS)
@@ -323,8 +323,8 @@ def _encode_candidate_rows(relevance: dict[str, Any]) -> None:
 
 
 def decode_initial_collection(
-    rows: Any, encoding: dict[str, Any]
-) -> list[dict[str, Any]]:
+    rows: list[object], encoding: dict[str, object]
+) -> list[dict[str, object]]:
     """Read the explicit lossless table contract without guessing missing fields."""
     columns = encoding.get("columns")
     kind = encoding.get("kind")

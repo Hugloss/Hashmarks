@@ -16,7 +16,7 @@ _IDENTIFIER_TYPES = frozenset(
 )
 
 
-def _identifier_node_or_child(value: Any) -> Any | None:
+def _identifier_node_or_child(value: object) -> object | None:
     if getattr(value, "type", "") in _IDENTIFIER_TYPES:
         return value
     for child in getattr(value, "children", ()):
@@ -134,7 +134,7 @@ class TreeSitterRangeProvider:
             return None
         return f"{TREE_SITTER_RANGE_SCHEMA}:{self.version or 'unknown'}:{self._LANGUAGE_NAMES[language]}"
 
-    def _parser(self, language: str):
+    def _parser(self, language: str) -> object:
         name = self._LANGUAGE_NAMES[language]
         parser = self._parsers.get(name)
         if parser is not None:
@@ -145,7 +145,7 @@ class TreeSitterRangeProvider:
         return parser
 
     @staticmethod
-    def _name_node(node: Any):
+    def _name_node(node: object) -> object | None:
         getter = getattr(node, "child_by_field_name", None)
         if getter is not None:
             for field in ("name", "declarator"):
@@ -164,13 +164,13 @@ class TreeSitterRangeProvider:
         return None
 
     @staticmethod
-    def _text(source_bytes: bytes, node: Any) -> str:
+    def _text(source_bytes: bytes, node: object) -> str:
         return source_bytes[int(node.start_byte) : int(node.end_byte)].decode(
             "utf-8", errors="replace"
         )
 
     def _symbol_from_tree_node(
-        self, node: Any, parent: str | None, source_bytes: bytes
+        self, node: object, parent: str | None, source_bytes: bytes
     ) -> SymbolRecord | None:
         node_type = str(getattr(node, "type", ""))
         if node_type not in self._SYMBOL_TYPES:
@@ -211,7 +211,7 @@ class TreeSitterRangeProvider:
         tree = parser.parse(source_bytes)
         found: list[SymbolRecord] = []
 
-        def visit(node: Any, parent: str | None = None) -> None:
+        def visit(node: object, parent: str | None = None) -> None:
             current_parent = parent
             symbol = self._symbol_from_tree_node(node, parent, source_bytes)
             if symbol is not None:

@@ -105,7 +105,7 @@ class CaptureClient:
                 self.process.wait()
 
 
-def _write(path: Path, value: Any) -> None:
+def _write(path: Path, value: object) -> None:
     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
 
 

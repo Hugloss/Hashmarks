@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
 from hashmarks.codemap.engine import CodeMap
 from hashmarks.codemap.find_engine import _FindEvidence
+from hashmarks.codemap.model import SearchHit
 from hashmarks.codemap.query_router import QueryIntent, route_query
 
 if TYPE_CHECKING:
@@ -169,7 +170,7 @@ def test_task_query_evidence_family_does_not_change_exact_identifier_leader(
 
 
 def test_find_task_deduplicates_identical_query_views(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     (tmp_path / "service.py").write_text("class Widget:\n    pass\n", encoding="utf-8")
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
@@ -177,7 +178,7 @@ def test_find_task_deduplicates_identical_query_views(
         original = codemap.find
         calls: list[str] = []
 
-        def counted(query: str, *, limit: int = 20):
+        def counted(query: str, *, limit: int = 20) -> list[SearchHit]:
             calls.append(query)
             return original(query, limit=limit)
 
@@ -188,7 +189,7 @@ def test_find_task_deduplicates_identical_query_views(
 
 
 def test_find_task_preserves_scoped_agents_for_ambiguous_localized_task(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from hashmarks.codemap.model import SearchHit
 
@@ -234,7 +235,7 @@ def test_find_task_preserves_scoped_agents_for_ambiguous_localized_task(
 
 
 def test_find_task_does_not_override_high_confidence_relationship_route(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from hashmarks.codemap.model import SearchHit
 
@@ -280,7 +281,7 @@ def test_find_task_does_not_override_high_confidence_relationship_route(
 
 
 def test_find_task_preserves_deep_scoped_readme_for_conceptual_localization(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from hashmarks.codemap.model import SearchHit
 
@@ -330,7 +331,7 @@ def test_find_task_preserves_deep_scoped_readme_for_conceptual_localization(
 
 
 def test_find_task_does_not_preserve_scoped_readme_without_two_localized_results(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from hashmarks.codemap.model import SearchHit
 
@@ -375,7 +376,7 @@ def test_find_task_does_not_preserve_scoped_readme_without_two_localized_results
 
 
 def test_find_task_does_not_preserve_scoped_readme_for_relationship_route(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from hashmarks.codemap.model import SearchHit
 
@@ -488,7 +489,7 @@ def test_task_graph_adjacency_validates_bounds(tmp_path: Path) -> None:
 
 def test_scoped_authority_resolves_root_nested_and_override_without_ranking_effect(
     tmp_path: Path,
-):
+) -> None:
     (tmp_path / "AGENTS.md").write_text("root authority\n", encoding="utf-8")
     backend = tmp_path / "backend"
     backend.mkdir()
@@ -517,7 +518,7 @@ def test_scoped_authority_resolves_root_nested_and_override_without_ranking_effe
     assert value["ranking_effect"] == "none"
 
 
-def test_scoped_authority_does_not_treat_readme_as_authority(tmp_path: Path):
+def test_scoped_authority_does_not_treat_readme_as_authority(tmp_path: Path) -> None:
     (tmp_path / "AGENTS.md").write_text("root authority\n", encoding="utf-8")
     area = tmp_path / "area"
     area.mkdir()
@@ -533,8 +534,8 @@ def test_scoped_authority_does_not_treat_readme_as_authority(tmp_path: Path):
 
 
 def test_explain_task_retrieval_reports_rrf_provenance_without_changing_results(
-    tmp_path,
-):
+    tmp_path: Path,
+) -> None:
     root = tmp_path / "repo"
     root.mkdir()
     (root / "alpha.py").write_text(
@@ -560,7 +561,7 @@ def test_explain_task_retrieval_reports_rrf_provenance_without_changing_results(
     } <= {"base", "governance", "evidence"}
 
 
-def test_explain_task_retrieval_validates_limit(tmp_path):
+def test_explain_task_retrieval_validates_limit(tmp_path: Path) -> None:
     root = tmp_path / "repo"
     root.mkdir()
     with CodeMap(root, state_dir=tmp_path / "state") as codemap:
@@ -569,7 +570,7 @@ def test_explain_task_retrieval_validates_limit(tmp_path):
 
 
 def test_find_task_reuses_generation_bound_result_without_replaying_views(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     path = tmp_path / "src" / "alpha.py"
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -579,7 +580,7 @@ def test_find_task_reuses_generation_bound_result_without_replaying_views(
         calls = 0
         original_find = codemap._find_evidence
 
-        def counted_find(query: str, *, limit: int = 20):
+        def counted_find(query: str, *, limit: int = 20) -> _FindEvidence:
             nonlocal calls
             calls += 1
             return original_find(query, limit=limit)
@@ -594,7 +595,7 @@ def test_find_task_reuses_generation_bound_result_without_replaying_views(
 
 
 def test_find_task_cache_is_invalidated_by_codemap_generation(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     source = tmp_path / "src" / "alpha.py"
     source.parent.mkdir(parents=True, exist_ok=True)
@@ -604,7 +605,7 @@ def test_find_task_cache_is_invalidated_by_codemap_generation(
         calls = 0
         original_find = codemap._find_evidence
 
-        def counted_find(query: str, *, limit: int = 20):
+        def counted_find(query: str, *, limit: int = 20) -> _FindEvidence:
             nonlocal calls
             calls += 1
             return original_find(query, limit=limit)

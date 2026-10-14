@@ -35,7 +35,7 @@ _CHILD = (
 )
 
 
-def _logging_reset(sqlalchemy: Any) -> dict[str, object]:
+def _logging_reset(sqlalchemy: object) -> dict[str, object]:
     engine = sqlalchemy.create_engine("sqlite://")
     try:
         with engine.connect() as connection:
@@ -49,7 +49,7 @@ def _logging_reset(sqlalchemy: Any) -> dict[str, object]:
         engine.dispose()
 
 
-def _aggregate_strings(sqlalchemy: Any) -> dict[str, object]:
+def _aggregate_strings(sqlalchemy: object) -> dict[str, object]:
     compiler = cast("Any", importlib.import_module("sqlalchemy.sql.compiler"))
     dialect = cast("Any", importlib.import_module("sqlalchemy.engine.default"))
     statement = sqlalchemy.select(
@@ -60,8 +60,10 @@ def _aggregate_strings(sqlalchemy: Any) -> dict[str, object]:
     }
 
 
-def _repository_frames(exc: Exception, root: Path) -> tuple[list[dict[str, Any]], int]:
-    frames: list[dict[str, Any]] = []
+def _repository_frames(
+    exc: Exception, root: Path
+) -> tuple[list[dict[str, object]], int]:
+    frames: list[dict[str, object]] = []
     excluded = 0
     for frame, line in traceback.walk_tb(exc.__traceback__):
         path = Path(frame.f_code.co_filename).resolve()
@@ -82,7 +84,7 @@ def _repository_frames(exc: Exception, root: Path) -> tuple[list[dict[str, Any]]
     return frames, excluded
 
 
-def capture_scenario(root: Path, scenario: str) -> dict[str, Any]:
+def capture_scenario(root: Path, scenario: str) -> dict[str, object]:
     """Record actual exceptions and stack frames, without choosing a repair."""
     examples = {
         "logging-token-reset": _logging_reset,
@@ -96,7 +98,7 @@ def capture_scenario(root: Path, scenario: str) -> dict[str, Any]:
         raise ValueError(
             "runtime did not import the explicitly selected source archive"
         )
-    result: dict[str, Any] = {
+    result: dict[str, object] = {
         "schema": "hashmarks.backend-runtime-failure-capture.v1",
         "scenario": scenario,
         "source_identity": repository_content_identity(root),
@@ -135,7 +137,7 @@ def capture_scenario(root: Path, scenario: str) -> dict[str, Any]:
     return result
 
 
-def acquire_failure_capture(source: Path, scenario: str) -> dict[str, Any]:
+def acquire_failure_capture(source: Path, scenario: str) -> dict[str, object]:
     """Use a fresh interpreter so before/after imports cannot contaminate each other."""
     completed = subprocess.run(
         [sys.executable, "-c", _CHILD, str(source.resolve()), scenario],

@@ -6,7 +6,9 @@ import logging
 import shutil
 import tempfile
 import time
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from hashmarks import InputManifest
 from hashmarks._command_output import log_command_output
@@ -15,13 +17,13 @@ from hashmarks.engine import IdentityEngine
 logger = logging.getLogger(__name__)
 
 
-def timed(fn):
+def timed(fn: Callable[[], object]) -> tuple[object, float]:
     started = time.perf_counter()
     value = fn()
     return value, time.perf_counter() - started
 
 
-def measure(seconds: dict[str, float], name: str, fn):
+def measure(seconds: dict[str, float], name: str, fn: Callable[[], object]) -> object:
     value, seconds[name] = timed(fn)
     return value
 

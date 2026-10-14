@@ -497,7 +497,9 @@ class IndexingLifecycleMixin:
                 result.append(item)
         return result, warnings
 
-    def _parse_or_reuse(self, rel: str, path: Path, language: str, digest_hash: str):
+    def _parse_or_reuse(
+        self, rel: str, path: Path, language: str, digest_hash: str
+    ) -> tuple[ParsedArtifact, bool]:
         self = cast("CodeMap", self)
         key = artifact_key_for(
             digest_hash, language, range_provider=self.range_provider
@@ -920,8 +922,8 @@ class IndexingLifecycleMixin:
         *,
         warnings: list[str],
         state: _SyncIndexState,
-        digest=None,
-    ):
+        digest: str | None = None,
+    ) -> str | None:
         self = cast("CodeMap", self)
         if digest is not None:
             return digest
@@ -936,7 +938,7 @@ class IndexingLifecycleMixin:
             state.skipped += 1
             return None
 
-    def _sync_reuse_state(self, rel: str, row) -> _FileReuseState:
+    def _sync_reuse_state(self, rel: str, row: object) -> _FileReuseState:
         self = cast("CodeMap", self)
         if isinstance(row, tuple):
             digest, artifact, visibility, module, has_derived = row
@@ -998,8 +1000,8 @@ class IndexingLifecycleMixin:
         item: _DiscoveredFile,
         warnings: list[str],
         state: _SyncIndexState,
-        digest=None,
-        row=None,
+        digest: str | None = None,
+        row: object | None = None,
         module_name: str,
     ) -> None:
         """Reuse or parse one already-discovered repository file and persist its evidence."""

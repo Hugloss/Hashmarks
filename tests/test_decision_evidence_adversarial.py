@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from hashmarks.codemap import CodeMap
 
 if TYPE_CHECKING:
-    from pathlib import Path
+    pass
 
 
 def _write(root: Path, rel: str, text: str) -> None:
@@ -217,7 +218,7 @@ def test_explicit_test_edit_is_target_evidence_not_implementation_ownership(
 
 def test_freshness_state_does_not_upgrade_or_downgrade_owner_identity(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _write(tmp_path, "src/owner.py", "def target_impl():\n    return 1\n")
 

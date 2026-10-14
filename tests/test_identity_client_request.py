@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -12,7 +13,7 @@ from hashmarks.client import (
 )
 
 if TYPE_CHECKING:
-    from pathlib import Path
+    pass
 
 
 class _FakeSocket:
@@ -47,7 +48,7 @@ def _client_with_socket(
 
 
 def test_request_reads_first_complete_response_and_closes_socket(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     sock = _FakeSocket([b'{"ok":tr', b'ue,"value":3}\nignored'])
     client = _client_with_socket(tmp_path, monkeypatch, sock)
@@ -68,7 +69,7 @@ def test_request_reads_first_complete_response_and_closes_socket(
     ],
 )
 def test_request_rejects_invalid_responses_and_closes_socket(
-    tmp_path: Path, monkeypatch, chunks: list[bytes], message: str
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, chunks: list[bytes], message: str
 ) -> None:
     sock = _FakeSocket(chunks)
     client = _client_with_socket(tmp_path, monkeypatch, sock)
@@ -79,7 +80,7 @@ def test_request_rejects_invalid_responses_and_closes_socket(
 
 
 def test_request_translates_connection_failure_and_closes_socket(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     sock = _FakeSocket([], connect_error=ConnectionRefusedError("refused"))
     client = _client_with_socket(tmp_path, monkeypatch, sock)
@@ -89,7 +90,9 @@ def test_request_translates_connection_failure_and_closes_socket(
     assert sock.closed
 
 
-def test_request_rejects_response_above_size_limit(tmp_path: Path, monkeypatch) -> None:
+def test_request_rejects_response_above_size_limit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     sock = _FakeSocket([b"x" * (_MAX_RESPONSE + 1)])
     client = _client_with_socket(tmp_path, monkeypatch, sock)
 

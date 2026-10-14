@@ -5,8 +5,8 @@ import json
 import logging
 import math
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any
 
 from hashmarks._command_output import log_command_output
 from hashmarks.codemap import CodeMap
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 SCHEMA = "hashmarks.agent-corpus-metrics.v1"
 
 
-def _load(path: Path) -> list[dict[str, Any]]:
+def _load(path: Path) -> list[dict[str, object]]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if value.get("schema") != "hashmarks.agent-task-corpus.v1":
         raise ValueError("unsupported agent task corpus schema")
@@ -26,7 +26,7 @@ def _load(path: Path) -> list[dict[str, Any]]:
     return [row for row in tasks if isinstance(row, dict)]
 
 
-def _timed(fn):
+def _timed(fn: Callable[[], object]) -> tuple[object, float]:
     started = time.perf_counter()
     value = fn()
     return value, time.perf_counter() - started
@@ -42,7 +42,7 @@ def _percentile(values: list[float], fraction: float) -> float:
 
 def _task_metrics(
     codemap: CodeMap,
-    task: dict[str, Any],
+    task: dict[str, object],
     full_tokens: dict[str, int],
     repository_file_count: int,
     budget: int,

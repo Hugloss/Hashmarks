@@ -1,10 +1,14 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from scripts.consumer_conformance import main
 
 
-def test_consumer_conformance_cli_emits_self_checking_vectors(capsys) -> None:
+def test_consumer_conformance_cli_emits_self_checking_vectors(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     root = Path(__file__).resolve().parents[1]
     assert main(["--root", str(root)]) == 0
     payload = json.loads(capsys.readouterr().out)

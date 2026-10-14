@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from contextlib import closing
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Never, cast
 
 import pytest
 
@@ -190,7 +190,7 @@ def test_mcp_capture_keeps_multiple_transport_failures(
         [ValueError("response invalid"), RuntimeError("reader closed")],
     )
 
-    async def failed_capture(*_args):
+    async def failed_capture(*_args: object) -> Never:
         raise failures
 
     monkeypatch.setattr(backend_transport, "_mcp_captures", failed_capture)

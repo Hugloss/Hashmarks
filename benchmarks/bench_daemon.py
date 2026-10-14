@@ -9,6 +9,7 @@ import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from hashmarks._command_output import log_command_output
 from hashmarks.client import IdentityClient
@@ -18,7 +19,7 @@ from hashmarks.inputs import InputManifest
 logger = logging.getLogger(__name__)
 
 
-def timed(fn):
+def timed(fn: Callable[[], Any]) -> tuple[Any, float]:
     started = time.perf_counter()
     value = fn()
     return value, time.perf_counter() - started
@@ -111,7 +112,13 @@ def _measure_identities(
     }
 
 
-def _result(args, root: Path, measurements: dict, registration_s: float, status: dict):
+def _result(
+    args: argparse.Namespace,
+    root: Path,
+    measurements: dict[str, object],
+    registration_s: float,
+    status: dict[str, object],
+) -> dict[str, object]:
     hot_times = measurements["hot_times"]
     return {
         "files": args.files,

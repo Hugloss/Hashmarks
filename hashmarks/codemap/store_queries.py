@@ -24,7 +24,7 @@ class WorkspaceMapQueryMixin:
             ).fetchone()
         return row is not None
 
-    def derived_paths(self, paths) -> set[str]:
+    def derived_paths(self, paths: Iterable[str]) -> set[str]:
         """Return paths with derived evidence using bounded SQLite batches."""
         if TYPE_CHECKING:
             self = cast("WorkspaceMapStore", self)
@@ -43,7 +43,9 @@ class WorkspaceMapQueryMixin:
                 result.update(str(row[0]) for row in rows)
         return result
 
-    def file_reuse_rows(self, paths) -> dict[str, tuple[str, str, str, str, bool]]:
+    def file_reuse_rows(
+        self, paths: Iterable[str]
+    ) -> dict[str, tuple[str, str, str, str, bool]]:
         """Load only warm-reuse authority fields in bounded SQLite batches."""
         if TYPE_CHECKING:
             self = cast("WorkspaceMapStore", self)

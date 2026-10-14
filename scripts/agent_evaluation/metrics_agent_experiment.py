@@ -21,17 +21,17 @@ REPORT_SCHEMA = "hashmarks.agent-experiment-report.v1"
 MODES = {"baseline", "hashmarks"}
 
 
-def _load_trace_module() -> Any:
+def _load_trace_module() -> object:
     return import_sibling("metrics_agent_trace", __package__)
 
 
-def _nonempty(value: Any, field: str, path: Path) -> str:
+def _nonempty(value: object, field: str, path: Path) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{field} must be a non-empty string: {path}")
     return value
 
 
-def _relative_file(root: Path, value: Any, field: str, manifest_path: Path) -> Path:
+def _relative_file(root: Path, value: object, field: str, manifest_path: Path) -> Path:
     raw = _nonempty(value, field, manifest_path)
     relative = Path(raw)
     if relative.is_absolute():
@@ -60,7 +60,7 @@ def _sha256(path: Path) -> str:
 
 
 def _validate_manifest_run(
-    run: Any,
+    run: object,
     index: int,
     path: Path,
     seen_run_ids: set[str],
@@ -95,7 +95,7 @@ def _validate_manifest_run(
     seen_task_modes.add(task_mode)
 
 
-def load_manifest(path: Path) -> dict[str, Any]:
+def load_manifest(path: Path) -> dict[str, object]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict) or value.get("schema") != MANIFEST_SCHEMA:
         raise ValueError(f"unsupported agent experiment manifest schema: {path}")
@@ -133,7 +133,9 @@ def _validate_digest_binding(
         )
 
 
-def _expected_run_identity(manifest: dict[str, Any], run: dict[str, Any]) -> dict:
+def _expected_run_identity(
+    manifest: dict[str, object], run: dict[str, object]
+) -> dict[str, object]:
     return {
         "task_id": run["task_id"],
         "task_revision": run["task_revision"],
@@ -147,11 +149,11 @@ def _expected_run_identity(manifest: dict[str, Any], run: dict[str, Any]) -> dic
 
 
 def _validate_run_records(
-    run: dict[str, Any],
-    expected: dict[str, Any],
-    trace: dict[str, Any],
-    verdict: dict[str, Any],
-    usage: dict[str, Any],
+    run: dict[str, object],
+    expected: dict[str, object],
+    trace: dict[str, object],
+    verdict: dict[str, object],
+    usage: dict[str, object],
 ) -> None:
     for field, expected_value in expected.items():
         if trace.get(field) != expected_value:
@@ -169,7 +171,10 @@ def _validate_run_records(
 
 
 def _validate_optional_identities(
-    manifest: dict[str, Any], run: dict[str, Any], verdict: dict, usage: dict
+    manifest: dict[str, object],
+    run: dict[str, object],
+    verdict: dict[str, object],
+    usage: dict[str, object],
 ) -> None:
     grader_identity = manifest.get("grader_identity")
     if (
@@ -188,9 +193,9 @@ def _validate_optional_identities(
 def _validate_raw_evidence(
     root: Path,
     manifest_path: Path,
-    run: dict[str, Any],
-    verdict: dict,
-    usage: dict,
+    run: dict[str, object],
+    verdict: dict[str, object],
+    usage: dict[str, object],
     strict_raw_evidence: bool,
 ) -> None:
     for field, record, kind in (
@@ -210,9 +215,9 @@ def _validate_raw_evidence(
 def _validate_experiment_run(
     root: Path,
     manifest_path: Path,
-    manifest: dict[str, Any],
-    run: dict[str, Any],
-    trace_module: Any,
+    manifest: dict[str, object],
+    run: dict[str, object],
+    trace_module: object,
     strict_raw_evidence: bool,
 ) -> tuple[Path, Path, Path]:
     trace_path = _relative_file(root, run["trace"], "trace", manifest_path)
@@ -239,7 +244,7 @@ def _validate_experiment_run(
 
 def run_experiment(
     manifest_path: Path, *, strict_raw_evidence: bool = False
-) -> dict[str, Any]:
+) -> dict[str, object]:
     trace_module = _load_trace_module()
     manifest = load_manifest(manifest_path)
     root = manifest_path.parent

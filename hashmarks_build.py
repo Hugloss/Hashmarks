@@ -266,15 +266,17 @@ def _write_wheel(wheel_directory: str, *, editable: bool) -> str:
     return wheel_name
 
 
-def get_requires_for_build_wheel(config_settings=None):
+def get_requires_for_build_wheel(config_settings: object | None = None) -> list[str]:
     return []
 
 
-def get_requires_for_build_editable(config_settings=None):
+def get_requires_for_build_editable(config_settings: object | None = None) -> list[str]:
     return []
 
 
-def prepare_metadata_for_build_wheel(metadata_directory, config_settings=None):
+def prepare_metadata_for_build_wheel(
+    metadata_directory: str | Path, config_settings: object | None = None
+) -> None:
     dist_info = Path(metadata_directory) / _dist_info()
     dist_info.mkdir(parents=True, exist_ok=True)
     (dist_info / "METADATA").write_bytes(_metadata_bytes())
@@ -283,19 +285,29 @@ def prepare_metadata_for_build_wheel(metadata_directory, config_settings=None):
     return dist_info.name
 
 
-def prepare_metadata_for_build_editable(metadata_directory, config_settings=None):
+def prepare_metadata_for_build_editable(
+    metadata_directory: str | Path, config_settings: object | None = None
+) -> None:
     return prepare_metadata_for_build_wheel(metadata_directory, config_settings)
 
 
-def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
+def build_wheel(
+    wheel_directory: str | Path,
+    config_settings: object | None = None,
+    metadata_directory: str | Path | None = None,
+) -> None:
     return _write_wheel(wheel_directory, editable=False)
 
 
-def build_editable(wheel_directory, config_settings=None, metadata_directory=None):
+def build_editable(
+    wheel_directory: str | Path,
+    config_settings: object | None = None,
+    metadata_directory: str | Path | None = None,
+) -> None:
     return _write_wheel(wheel_directory, editable=True)
 
 
-def get_requires_for_build_sdist(config_settings=None):
+def get_requires_for_build_sdist(config_settings: object | None = None) -> list[str]:
     return []
 
 
@@ -377,7 +389,9 @@ def _deterministic_tar_info(info: tarfile.TarInfo) -> tarfile.TarInfo:
     return info
 
 
-def build_sdist(sdist_directory, config_settings=None):
+def build_sdist(
+    sdist_directory: str | Path, config_settings: object | None = None
+) -> None:
     name, version, _, _ = _project()
     normalized = name.replace("-", "_")
     root_name = f"{normalized}-{version}"

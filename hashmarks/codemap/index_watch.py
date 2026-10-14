@@ -129,7 +129,12 @@ class _IndexWatchSession:
 class IndexWatchMixin:
     """Foreground CodeMap watch orchestration over repository sync authority."""
 
-    def watch_forever(self, *, debounce_seconds: float = 0.05, on_update=None) -> None:
+    def watch_forever(
+        self,
+        *,
+        debounce_seconds: float = 0.05,
+        on_update: Callable[[object, list[str]], None] | None = None,
+    ) -> None:
         """Maintain CodeMap incrementally in a separate foreground process.
 
         Watcher loss/overflow is fail-safe: the control loop observes UNKNOWN

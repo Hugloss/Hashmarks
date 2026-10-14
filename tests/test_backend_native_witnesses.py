@@ -16,7 +16,9 @@ from scripts.repository_evaluation.common import write_json
 
 
 @pytest.fixture
-def native_observations(tmp_path: Path):
+def native_observations(
+    tmp_path: Path,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Path], Path]:
     output = tmp_path / "observations"
     sources = {}
     workflow = {"id": "handler", "repository": "repo", "before": "old", "after": "new"}
@@ -71,8 +73,8 @@ def native_observations(tmp_path: Path):
 
 
 def test_native_facts_retain_source_stage_target_and_actual_artifact(
-    native_observations,
-):
+    native_observations: tuple[dict[str, Any], dict[str, Any], dict[str, Path], Path],
+) -> None:
     witnesses = native_fact_witnesses(*native_observations)
     assert native_witness_gate(witnesses) is True
     assert {(w["stage"], w["surface"], w["gate"]) for w in witnesses} == {
@@ -101,8 +103,8 @@ def test_native_facts_retain_source_stage_target_and_actual_artifact(
 
 
 def test_wrong_native_endpoint_cannot_hide_behind_other_passing_targets(
-    native_observations,
-):
+    native_observations: tuple[dict[str, Any], dict[str, Any], dict[str, Path], Path],
+) -> None:
     workflow, rule, sources, output = native_observations
     write_json(output / "after/api.json", {"target": "other.py::handler"})
     witnesses = native_fact_witnesses(workflow, rule, sources, output)
@@ -111,14 +113,18 @@ def test_wrong_native_endpoint_cannot_hide_behind_other_passing_targets(
     assert any(w["state"] == "FAIL" and w["stage"] == "after" for w in witnesses)
 
 
-def test_missing_native_artifact_cannot_preserve_a_fact_pass(native_observations):
+def test_missing_native_artifact_cannot_preserve_a_fact_pass(
+    native_observations: tuple[dict[str, Any], dict[str, Any], dict[str, Path], Path],
+) -> None:
     native_observations[3].joinpath("after/api.json").unlink()
     with pytest.raises(ValueError, match="not a repository file"):
         native_fact_witnesses(*native_observations)
     assert native_witness_gate([]) is None
 
 
-def test_definition_boolean_cannot_be_replaced_with_an_integer(native_observations):
+def test_definition_boolean_cannot_be_replaced_with_an_integer(
+    native_observations: tuple[dict[str, Any], dict[str, Any], dict[str, Path], Path],
+) -> None:
     write_json(
         native_observations[3] / "after/definition-token.json",
         {"unique_definition_token": 1},

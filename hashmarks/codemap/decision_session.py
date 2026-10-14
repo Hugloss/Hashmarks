@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import time
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Generator, Iterable, Mapping, Sequence
 from contextlib import contextmanager
 from functools import wraps
 from pathlib import Path
@@ -32,7 +32,7 @@ def _decision_scoped(
     """Bind one public CodeMap decision to one freshness/readiness sample."""
 
     @wraps(method)
-    def wrapped(self, *args, **kwargs):
+    def wrapped(self: "CodeMap", *args: object, **kwargs: object) -> _R:
         if self._decision_session_depth > 0:
             with self.decision_session(_allow_incomplete=allow_incomplete):
                 return method(self, *args, **kwargs)
@@ -71,7 +71,7 @@ def diagnostic_producer(method: Callable[_P, _R]) -> Callable[_P, _R]:
     """Measure one high-level repository-intelligence producer when diagnostics are active."""
 
     @wraps(method)
-    def wrapped(self, *args, **kwargs):
+    def wrapped(self: "CodeMap", *args: object, **kwargs: object) -> _R:
         if not getattr(self, "_decision_diagnostics_enabled", False):
             return method(self, *args, **kwargs)
         with self._decision_diagnostic_span(method.__name__, args, kwargs):
@@ -204,7 +204,7 @@ class DecisionSessionMixin:
         diagnostics: bool = False,
         _allow_incomplete: bool = False,
         expected_generation: int | None = None,
-    ):
+    ) -> Generator[None, None, None]:
         """Reuse immutable evidence primitives across many decisions on one generation.
 
         The session is read-only and generation-bound. It never caches final
@@ -258,7 +258,7 @@ class DecisionSessionMixin:
     @contextmanager
     def _decision_diagnostic_span(
         self, name: str, args: tuple[object, ...], kwargs: Mapping[str, object]
-    ):
+    ) -> Generator[None, None, None]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         self._decision_diagnostics_sequence += 1

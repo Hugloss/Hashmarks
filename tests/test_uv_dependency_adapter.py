@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tomllib
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -40,15 +41,21 @@ def test_uv_lock_adapter_preserves_selection_source_and_factual_delta(
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        before = codemap.dependency_resolution_evidence(before_raw)
-        after = codemap.dependency_resolution_evidence(after_raw)
-        delta = codemap.dependency_resolution_delta(before, after)
+        before = cast(
+            dict[str, Any], codemap.dependency_resolution_evidence(before_raw)
+        )
+        after = cast(dict[str, Any], codemap.dependency_resolution_evidence(after_raw))
+        delta = cast(dict[str, Any], codemap.dependency_resolution_delta(before, after))
 
     before_dep = next(
-        row for row in before["selections"] if row["component_id"] == "dummy-dep"
+        row
+        for row in cast(list[dict[str, Any]], before["selections"])
+        if row["component_id"] == "dummy-dep"
     )
     after_dep = next(
-        row for row in after["selections"] if row["component_id"] == "dummy-dep"
+        row
+        for row in cast(list[dict[str, Any]], after["selections"])
+        if row["component_id"] == "dummy-dep"
     )
     assert before_dep["version"] == "1.0.0"
     assert after_dep["version"] == "2.0.0"
@@ -67,19 +74,21 @@ def test_uv_lock_adapter_preserves_relationship_and_inventory_change(
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        before = codemap.dependency_resolution_evidence(before_raw)
-        after = codemap.dependency_resolution_evidence(after_raw)
-        delta = codemap.dependency_resolution_delta(before, after)
+        before = cast(
+            dict[str, Any], codemap.dependency_resolution_evidence(before_raw)
+        )
+        after = cast(dict[str, Any], codemap.dependency_resolution_evidence(after_raw))
+        delta = cast(dict[str, Any], codemap.dependency_resolution_delta(before, after))
 
     assert before["definition_identity"] == after["definition_identity"]
-    assert len(delta["inventory_added"]) == 1
-    assert len(delta["inventory_removed"]) == 1
-    assert len(delta["relationships_added"]) == 1
-    assert len(delta["relationships_removed"]) == 1
+    assert len(cast(list[object], delta["inventory_added"])) == 1
+    assert len(cast(list[object], delta["inventory_removed"])) == 1
+    assert len(cast(list[object], delta["relationships_added"])) == 1
+    assert len(cast(list[object], delta["relationships_removed"])) == 1
 
 
 def test_uv_lock_adapter_uses_one_multi_authority_physical_source() -> None:
-    raw = uv_lock_dependency_observation(lock=_lock())
+    raw = cast(dict[str, Any], uv_lock_dependency_observation(lock=_lock()))
 
     assert raw["producer"]["adapter_semantics"] == "hashmarks.uv-dependency-adapter.v1"
     assert raw["evidence_sources"] == [
@@ -94,19 +103,23 @@ def test_uv_lock_adapter_uses_one_multi_authority_physical_source() -> None:
             "context": "lock",
             "completeness": "complete",
             "truncation": "complete",
-            "producer_digest": raw["evidence_sources"][0]["producer_digest"],
+            "producer_digest": cast(list[dict[str, Any]], raw["evidence_sources"])[0][
+                "producer_digest"
+            ],
         }
     ]
-    assert {ref for row in raw["inventory"] for ref in row["evidence_sources"]} == {
-        "uv:lock"
-    }
+    assert {
+        ref
+        for row in cast(list[dict[str, Any]], raw["inventory"])
+        for ref in row["evidence_sources"]
+    } == {"uv:lock"}
 
 
 def test_uv_lock_adapter_does_not_promote_declared_metadata_to_resolution() -> None:
-    raw = uv_lock_dependency_observation(lock=_lock())
+    raw = cast(dict[str, Any], uv_lock_dependency_observation(lock=_lock()))
 
-    assert len(raw["relationships"]) == 1
-    assert raw["relationships"][0]["kind"] == "dependency"
+    assert len(cast(list[object], raw["relationships"])) == 1
+    assert cast(list[dict[str, Any]], raw["relationships"])[0]["kind"] == "dependency"
     assert raw["scope"] == {"requires_python": ">=3.11"}
     assert raw["module_ownership"] == []
 
@@ -122,36 +135,45 @@ def test_uv_lock_adapter_includes_every_committed_lock_dependency_group(
         + sum(len(rows) for rows in package.get("dev-dependencies", {}).values())
         for package in document["package"]
     )
-    raw = uv_lock_dependency_observation(lock=lock)
+    raw = cast(dict[str, Any], uv_lock_dependency_observation(lock=lock))
     assert raw["producer"]["resolution_markers"] == document.get(
         "resolution-markers", []
     )
-    assert len(raw["relationships"]) == expected
-    assert len(raw["evidence_sources"]) == 1
+    assert len(cast(list[object], raw["relationships"])) == expected
+    assert len(cast(list[object], raw["evidence_sources"])) == 1
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        observation = codemap.dependency_resolution_evidence(raw)
+        observation = cast(dict[str, Any], codemap.dependency_resolution_evidence(raw))
         root_id = next(
             row["node_id"]
-            for row in observation["roots"]
+            for row in cast(list[dict[str, Any]], observation["roots"])
             if row["node_id"].startswith("hashmarks:")
         )
-        query = codemap.dependency_resolution_queries(
-            observation,
-            [{"operation": "dependencies", "node_id": root_id, "context": "lock"}],
+        query = cast(
+            dict[str, Any],
+            codemap.dependency_resolution_queries(
+                observation,
+                [{"operation": "dependencies", "node_id": root_id, "context": "lock"}],
+            ),
         )["results"][0]
 
     assert query["result"]
-    assert {row["selection"]["component_id"] for row in query["result"]} >= {
+    assert {
+        row["selection"]["component_id"]
+        for row in cast(list[dict[str, Any]], query["result"])
+    } >= {
         "mcp",
         "ruff",
     }
     assert query["completeness"] == "incomplete"
-    assert any(row["reason"] == "conditional-edge" for row in query["omissions"])
+    assert any(
+        row["reason"] == "conditional-edge"
+        for row in cast(list[dict[str, Any]], query["omissions"])
+    )
     assert {
         row["effective_scope"]
-        for row in observation["relationships"]
+        for row in cast(list[dict[str, Any]], observation["relationships"])
         if row["source"] == root_id
     } >= {
         "extra:mcp",
@@ -493,14 +515,16 @@ version = "1.0.0"
 source = {{ registry = "https://example.invalid/simple" }}
 """.encode()
 
-    raw = uv_lock_dependency_observation(lock=lock)
+    raw = cast(dict[str, Any], uv_lock_dependency_observation(lock=lock))
 
-    assert len(raw["roots"]) == 1
-    root_id = raw["roots"][0]["node_id"]
+    assert len(cast(list[object], raw["roots"])) == 1
+    root_id = cast(list[dict[str, Any]], raw["roots"])[0]["node_id"]
     assert root_id.startswith("app:0.1.0@")
-    assert {row["node_id"] for row in raw["inventory"]} == {
+    assert {row["node_id"] for row in cast(list[dict[str, Any]], raw["inventory"])} == {
         next(
-            row["node_id"] for row in raw["selections"] if row["component_id"] == "dep"
+            row["node_id"]
+            for row in cast(list[dict[str, Any]], raw["selections"])
+            if row["component_id"] == "dep"
         )
     }
 

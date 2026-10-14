@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -20,7 +21,9 @@ from scripts.repository_evaluation.operations import observe_case
 
 
 @pytest.fixture
-def observation_inputs(tmp_path: Path):
+def observation_inputs(
+    tmp_path: Path,
+) -> tuple[Path, Path, list[dict[str, object]], list[dict[str, object]]]:
     root, state = tmp_path / "repo", tmp_path / "state"
     root.mkdir()
     (root / "backend.py").write_text("def handler():\n    return 1\n")
@@ -47,7 +50,9 @@ def observation_inputs(tmp_path: Path):
     return root, state, cases, packets
 
 
-def _assert_captures(captures, packet, operation: str) -> None:
+def _assert_captures(
+    captures: list[dict[str, object]], packet: dict[str, object], operation: str
+) -> None:
     assert {row["format"] for row in captures} == {
         "none",
         "structured",
@@ -74,15 +79,21 @@ def _assert_captures(captures, packet, operation: str) -> None:
 
 
 def test_cli_json_observations_keep_canonical_evidence_in_every_format(
-    observation_inputs,
-):
+    observation_inputs: tuple[
+        Path, Path, list[dict[str, object]], list[dict[str, object]]
+    ],
+) -> None:
     root, state, cases, packets = observation_inputs
     for case, packet in zip(cases, packets, strict=True):
         _assert_captures(capture_cli(root, state, case), packet, case["operation"])
 
 
 @pytest.mark.host_mcp_sdk
-def test_official_mcp_matches_json_cli_observation_contract(observation_inputs):
+def test_official_mcp_matches_json_cli_observation_contract(
+    observation_inputs: tuple[
+        Path, Path, list[dict[str, object]], list[dict[str, object]]
+    ],
+) -> None:
     root, state, cases, packets = observation_inputs
     for case, packet in zip(cases, packets, strict=True):
         _assert_captures(capture_mcp(root, state, case), packet, case["operation"])

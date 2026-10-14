@@ -130,13 +130,13 @@ class IdentityEngine:
         self.changes.mark_unknown(reason)
         self.merkle.drop_hot_cache()
 
-    def input_root(self, manifest: InputManifest, *, verify: bool = False):
+    def input_root(self, manifest: InputManifest, *, verify: bool = False) -> str:
         return self.merkle.digest_manifest(manifest, verify=verify)
 
-    def workspace_root(self, *, verify: bool = False):
+    def workspace_root(self, *, verify: bool = False) -> str:
         return self.merkle.directory_digest("", verify=verify)
 
-    def watcher(self, *, debounce_seconds: float = 0.05):
+    def watcher(self, *, debounce_seconds: float = 0.05) -> object:
         """Create the optional watcher wired to this engine's safety state."""
         from .watcher import create_default_watcher
 

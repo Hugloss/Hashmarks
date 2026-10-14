@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import logging
 import re
@@ -115,9 +116,7 @@ def _summary(findings: list[dict[str, object]]) -> dict[str, object]:
     }
 
 
-def _parse_args():
-    import argparse
-
+def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Exact current Ruff complexity inventory and production size gate."
     )

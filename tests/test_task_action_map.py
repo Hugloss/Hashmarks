@@ -269,7 +269,7 @@ def test_task_action_map_skips_structural_owner_after_exact_resolution(
 
     def counted(
         self: CodeMap, start_path: str, *, max_depth: int = 2, task: str = ""
-    ) -> Any:
+    ) -> object:
         calls.append(start_path)
         return original(self, start_path, max_depth=max_depth, task=task)
 

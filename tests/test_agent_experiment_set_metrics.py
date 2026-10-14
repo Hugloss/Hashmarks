@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ModuleType
 
 import pytest
 
@@ -14,7 +14,7 @@ _MODULE = __import__(
 )
 
 
-def _load():
+def _load() -> ModuleType:
     return _MODULE
 
 

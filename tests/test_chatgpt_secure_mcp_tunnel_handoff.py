@@ -240,7 +240,7 @@ def test_handoff_rejects_implementation_generation_change(
     ],
 )
 def test_handoff_rejects_unqualified_catalog(
-    mutation,
+    mutation: callable,
     message: str,
 ) -> None:
     value = _observation()

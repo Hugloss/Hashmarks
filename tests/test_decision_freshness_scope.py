@@ -32,7 +32,7 @@ def _map(tmp_path: Path) -> CodeMap:
     return codemap
 
 
-def _count_observations(codemap: CodeMap, monkeypatch) -> list[int]:
+def _count_observations(codemap: CodeMap, monkeypatch: pytest.MonkeyPatch) -> list[int]:
     generation = codemap.store.generation()
     calls: list[int] = []
 
@@ -51,8 +51,8 @@ def _count_observations(codemap: CodeMap, monkeypatch) -> list[int]:
 
 
 def test_find_task_reuses_one_freshness_sample_for_nested_find(
-    tmp_path: Path, monkeypatch
-):
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     codemap = _map(tmp_path)
     calls = _count_observations(codemap, monkeypatch)
     try:
@@ -63,8 +63,8 @@ def test_find_task_reuses_one_freshness_sample_for_nested_find(
 
 
 def test_context_reuses_one_freshness_sample_for_nested_find(
-    tmp_path: Path, monkeypatch
-):
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     codemap = _map(tmp_path)
     calls = _count_observations(codemap, monkeypatch)
     try:
@@ -75,8 +75,8 @@ def test_context_reuses_one_freshness_sample_for_nested_find(
 
 
 def test_decision_packet_reuses_one_freshness_sample_for_nested_surfaces(
-    tmp_path: Path, monkeypatch
-):
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     codemap = _map(tmp_path)
     calls = _count_observations(codemap, monkeypatch)
     try:
@@ -88,7 +88,7 @@ def test_decision_packet_reuses_one_freshness_sample_for_nested_surfaces(
         codemap.close()
 
 
-def test_decision_session_still_fails_if_generation_changes(tmp_path: Path):
+def test_decision_session_still_fails_if_generation_changes(tmp_path: Path) -> None:
     codemap = _map(tmp_path)
     try:
         try:
@@ -103,8 +103,8 @@ def test_decision_session_still_fails_if_generation_changes(tmp_path: Path):
 
 
 def test_task_evidence_uses_selection_and_closing_freshness_samples(
-    tmp_path: Path, monkeypatch
-):
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     codemap = _map(tmp_path)
     calls = _count_observations(codemap, monkeypatch)
     try:
@@ -127,7 +127,12 @@ def test_task_evidence_uses_selection_and_closing_freshness_samples(
     ],
 )
 def test_map_readiness_reconciles_changed_daemon_generation(
-    tmp_path: Path, monkeypatch, state, paths, complete, expected_sync
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    state: ObservationState,
+    paths: tuple[str, ...],
+    complete: bool,
+    expected_sync: tuple[str, ...] | None,
 ) -> None:
     codemap = _map(tmp_path)
     calls: list[tuple[str, ...] | None] = []

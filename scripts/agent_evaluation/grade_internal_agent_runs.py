@@ -11,7 +11,7 @@ from hashmarks._command_output import log_command_output
 logger = logging.getLogger(__name__)
 
 
-def main():
+def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", type=Path, required=True)
     ap.add_argument("--secret", type=Path, required=True)
@@ -46,7 +46,7 @@ def main():
             }
         )
 
-    def agg(lane):
+    def agg(lane: str) -> dict[str, object]:
         xs = [x for x in rows if x["lane"] == lane]
         return {
             "tasks": len(xs),

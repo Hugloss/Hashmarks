@@ -75,7 +75,7 @@ def _trace(
     ],
 )
 def test_trace_rejects_malformed_evidence(
-    tmp_path: Path, mutation, message: str
+    tmp_path: Path, mutation: object, message: str
 ) -> None:
     path = _trace(tmp_path / "trace.json", "baseline")
     value = json.loads(path.read_text())

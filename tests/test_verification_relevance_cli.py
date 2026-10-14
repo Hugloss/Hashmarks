@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
+
+import pytest
 
 from hashmarks.cli import main
 
@@ -9,7 +11,9 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def test_cli_exposes_verification_relevance(tmp_path: Path, capsys: Any) -> None:
+def test_cli_exposes_verification_relevance(
+    tmp_path: Path, capsys: pytest.Capsys
+) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
     (tmp_path / "src" / "owner.py").write_text("def widget(value):\n    return value\n")
@@ -29,7 +33,7 @@ def test_cli_exposes_verification_relevance(tmp_path: Path, capsys: Any) -> None
         )
         == 0
     )
-    payload = json.loads(capsys.readouterr().out)
+    payload = cast(dict[str, Any], json.loads(capsys.readouterr().out))
     assert payload["schema"] == "hashmarks.verification-relevance.v1"
     assert payload["selected"]["path"] == "tests/test_owner.py"
     assert len(payload["candidates"]) == 1

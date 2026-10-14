@@ -23,7 +23,9 @@ SCHEMA = "hashmarks.retrieval-residual-classification.v1"
 FAMILY = "hashmarks-residual-classification-a"
 
 
-def _task_report(cm, task, secret, *, limit: int) -> dict[str, object]:
+def _task_report(
+    cm: object, task: dict[str, object], secret: dict[str, object], *, limit: int
+) -> dict[str, object]:
     hits = cm.find_task(task["query"], limit=limit)
     paths = [hit.path for hit in hits]
     expected = set(secret.get("expected_files") or ())
@@ -131,7 +133,7 @@ def collect(root: Path, limit: int = 20) -> dict[str, object]:
     }
 
 
-def main():
+def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--root", type=Path, required=True)
     p.add_argument("--output", type=Path)

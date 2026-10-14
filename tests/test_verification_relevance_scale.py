@@ -553,7 +553,7 @@ def test_verification_candidate_projection_samples_pytest_config_once(
     calls = 0
     original = CodeMap._pytest_declared
 
-    def counted(self: CodeMap) -> Any:
+    def counted(self: CodeMap) -> object:
         nonlocal calls
         calls += 1
         return original(self)
@@ -576,7 +576,7 @@ def test_verification_reference_projection_reads_each_candidate_snapshot_once(
     calls = 0
     original = verification_module.read_python_ast
 
-    def counted(path: str, *args, **kwargs) -> Any:
+    def counted(path: str, *args: object, **kwargs: object) -> object:
         nonlocal calls
         calls += 1
         return original(path, *args, **kwargs)

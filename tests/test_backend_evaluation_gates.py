@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from typing import Any
 
 import pytest
 
@@ -22,17 +23,19 @@ from scripts.repository_evaluation.backend_workflows import _authority_safe, _ga
         ([True, False], False),
     ],
 )
-def test_required_proof_is_non_vacuous_and_failure_preserving(observations, expected):
+def test_required_proof_is_non_vacuous_and_failure_preserving(
+    observations: list[object], expected: object
+) -> None:
     assert combine_required(observations) is expected
 
 
 @pytest.mark.parametrize("invalid", [0, 1, "PASS", {}])
-def test_gate_values_cannot_gain_authority_by_truthiness(invalid):
+def test_gate_values_cannot_gain_authority_by_truthiness(invalid: object) -> None:
     with pytest.raises(ValueError, match="bool or None"):
         combine_required([invalid])
 
 
-def _stage():
+def _stage() -> dict[str, object]:
     transport = {
         "parity": True,
         "authority": True,
@@ -58,7 +61,7 @@ def _stage():
     }
 
 
-def _evaluate(before, after):
+def _evaluate(before: dict[str, object], after: dict[str, object]) -> dict[str, object]:
     return _gates(
         before,
         after,
@@ -75,7 +78,7 @@ def _evaluate(before, after):
     )
 
 
-def test_after_initial_oversize_is_a_hard_gate_independent_of_recall():
+def test_after_initial_oversize_is_a_hard_gate_independent_of_recall() -> None:
     before, after = _stage(), _stage()
     after["initial"]["mcp"]["initial_size"] = False
     gates = _evaluate(before, after)
@@ -83,7 +86,7 @@ def test_after_initial_oversize_is_a_hard_gate_independent_of_recall():
     assert gates["initial_evidence"] is True
 
 
-def test_unresolved_owner_does_not_hide_another_false_authority_claim():
+def test_unresolved_owner_does_not_hide_another_false_authority_claim() -> None:
     packet = {"ownership": {"owner": None}, "runtime_compatibility": "established"}
     rule = {
         "authority_checks": [
@@ -103,12 +106,12 @@ def test_unresolved_owner_does_not_hide_another_false_authority_claim():
     assert _authority_safe(packet, rule) is None
 
 
-def test_empty_authority_checks_are_not_a_successful_observation():
+def test_empty_authority_checks_are_not_a_successful_observation() -> None:
     with pytest.raises(ValueError, match="non-empty checks"):
         _authority_safe({"ownership": {"owner": None}}, {"authority_checks": []})
 
 
-def test_known_after_transport_failure_dominates_missing_before_proof():
+def test_known_after_transport_failure_dominates_missing_before_proof() -> None:
     before, after = _stage(), _stage()
     before["mcp"]["parity"] = None
     after["mcp"]["parity"] = False
@@ -117,25 +120,25 @@ def test_known_after_transport_failure_dominates_missing_before_proof():
     assert gates["presentation"] is False
 
 
-def test_initial_profile_failure_cannot_be_hidden_by_full_profile():
+def test_initial_profile_failure_cannot_be_hidden_by_full_profile() -> None:
     before, after = _stage(), _stage()
     after["initial"]["cli"]["authority"] = False
     assert _evaluate(before, after)["authority"] is False
 
 
-def test_missing_initial_proof_cannot_be_certified_by_full_profile():
+def test_missing_initial_proof_cannot_be_certified_by_full_profile() -> None:
     before, after = _stage(), _stage()
     after["initial"]["mcp"]["initial_size"] = None
     assert _evaluate(before, after)["initial_size"] is None
 
 
-def test_owner_recall_requires_the_after_stage():
+def test_owner_recall_requires_the_after_stage() -> None:
     before, after = _stage(), _stage()
     after["packet"]["retrieval"]["results"] = []
     assert _evaluate(before, after)["owner_top_three"] is False
 
 
-def test_wrong_symbol_in_correct_file_is_not_exact_owner_proof():
+def test_wrong_symbol_in_correct_file_is_not_exact_owner_proof() -> None:
     expected = {
         "path": "backend.py",
         "qualname": "CorrectOwner",
@@ -155,7 +158,7 @@ def test_wrong_symbol_in_correct_file_is_not_exact_owner_proof():
     assert _authority_safe(packet, rule) is True
 
 
-def test_legacy_file_label_does_not_qualify_exact_symbol_authority():
+def test_legacy_file_label_does_not_qualify_exact_symbol_authority() -> None:
     assert (
         _authority_safe(
             {"ownership": {"owner": {"path": "backend.py", "qualname": "Anything"}}},
@@ -165,7 +168,7 @@ def test_legacy_file_label_does_not_qualify_exact_symbol_authority():
     )
 
 
-def test_ambiguous_oracle_cannot_admit_unique_owner():
+def test_ambiguous_oracle_cannot_admit_unique_owner() -> None:
     packet = {"ownership": {"owner": {"path": "backend.py"}}}
     assert (
         _authority_safe(
@@ -182,7 +185,7 @@ def test_ambiguous_oracle_cannot_admit_unique_owner():
     )
 
 
-def test_native_failure_survives_missing_workflow_report():
+def test_native_failure_survives_missing_workflow_report() -> None:
     from scripts.repository_evaluation.aggregate_backend import _merge_suite
     from scripts.repository_evaluation.backend_matrix import capability_matrix
 
@@ -206,7 +209,7 @@ def test_native_failure_survives_missing_workflow_report():
     assert {row["proof"] for row in merged["missing"]} == {"workflow-report"}
 
 
-def test_rejected_presentation_is_retained_as_failure_evidence():
+def test_rejected_presentation_is_retained_as_failure_evidence() -> None:
     from scripts.repository_evaluation.backend_gates import presentation_conformance
 
     result = presentation_conformance({}, {"format": "bad"})
@@ -216,7 +219,7 @@ def test_rejected_presentation_is_retained_as_failure_evidence():
     assert "format" in error
 
 
-def test_symbol_recall_rejects_right_file_with_wrong_declaration():
+def test_symbol_recall_rejects_right_file_with_wrong_declaration() -> None:
     from scripts.repository_evaluation.backend_grading import _owner_top_three
 
     expected = {
@@ -249,7 +252,9 @@ def test_symbol_recall_rejects_right_file_with_wrong_declaration():
     assert _owner_top_three(packet, rule) is True
 
 
-def test_symbol_recall_accepts_qualified_bounded_declaration_without_ownership():
+def test_symbol_recall_accepts_qualified_bounded_declaration_without_ownership() -> (
+    None
+):
     from scripts.repository_evaluation.backend_grading import _owner_top_three
 
     expected = {

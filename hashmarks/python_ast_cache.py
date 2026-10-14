@@ -74,7 +74,7 @@ def read_python_ast(
     raise UnstablePythonSourceError(f"could not read stable Python source: {candidate}")
 
 
-def ast_cache_info():
+def ast_cache_info() -> Any:
     return _cached_snapshot.cache_info()
 
 

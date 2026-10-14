@@ -73,7 +73,7 @@ class FieldedBM25Index:
             self._dfs[field] = dict(df)
 
     @classmethod
-    def build(cls, codemap) -> FieldedBM25Index:
+    def build(cls, codemap: object) -> FieldedBM25Index:
         workspace = Path(codemap.workspace)
         paths = sorted(codemap.store.paths())
         symbols = codemap.store.symbols_for_paths(

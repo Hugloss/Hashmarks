@@ -5,7 +5,7 @@ repository-intelligence primitives. Agent workflow, execution, result caching,
 and certification belong to external consumers and execution systems.
 """
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ._version import __version__
 from .digest import Digest, hash_bytes, hash_file
@@ -90,7 +90,7 @@ __all__ = [
 ]
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> object:
     """Lazily expose CodeMap APIs without loading the analysis graph eagerly."""
     if name == "CodeMap":
         from .codemap import CodeMap

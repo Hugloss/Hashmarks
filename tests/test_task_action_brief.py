@@ -102,7 +102,7 @@ def test_task_action_brief_computes_canonical_action_map_once(tmp_path: Path) ->
         original = c.task_action_map
         calls = 0
 
-        def counted(*args, **kwargs) -> Any:
+        def counted(*args, **kwargs) -> object:
             nonlocal calls
             calls += 1
             return original(*args, **kwargs)
@@ -140,7 +140,7 @@ def test_rare_ticket_action_brief_uses_exact_index_anchor_without_general_find(
         original_find = c.find
         queries: list[str] = []
 
-        def counted(query: str, *, limit: int = 20) -> Any:
+        def counted(query: str, *, limit: int = 20) -> object:
             queries.append(query)
             return original_find(query, limit=limit)
 
@@ -418,7 +418,7 @@ def test_task_action_brief_receipt_is_assembled_inside_decision_session(
         codemap.sync()
         original = codemap._decision_evidence_receipt
 
-        def observed(*args, **kwargs) -> Any:
+        def observed(*args, **kwargs) -> object:
             assert codemap._decision_session_depth > 0
             return original(*args, **kwargs)
 

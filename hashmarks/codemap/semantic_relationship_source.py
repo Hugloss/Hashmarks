@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from .engine import CodeMap
 
 
-def uri_member(uri: object, workspace: Any) -> str | None:
+def uri_member(uri: object, workspace: object) -> str | None:
     if not isinstance(uri, str):
         raise ValueError("LSP location URI must be a string")
     value = urlsplit(uri)

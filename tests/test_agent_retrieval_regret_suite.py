@@ -14,7 +14,7 @@ _MODULE = __import__(
 )
 
 
-def _load():
+def _load() -> object:
     return _MODULE
 
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -16,7 +17,9 @@ from scripts.repository_evaluation.run_cases import run_cases
 @pytest.mark.parametrize(
     "actual,expected", [(False, 0), (0, 0.0), ({"x": False}, {"x": 0}), ([0], [False])]
 )
-def test_source_oracle_does_not_conflate_json_types(actual, expected):
+def test_source_oracle_does_not_conflate_json_types(
+    actual: object, expected: object
+) -> None:
     from scripts.repository_evaluation.fact_grading import grade_facts
 
     rule = {
@@ -36,8 +39,8 @@ def test_source_oracle_does_not_conflate_json_types(actual, expected):
 
 
 def test_native_summary_cannot_qualify_a_definition_without_observation_membership(
-    tmp_path, monkeypatch
-):
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from scripts.repository_evaluation import aggregate_backend
 
     monkeypatch.setattr(aggregate_backend, "_verify_artifacts", lambda *_: None)
@@ -268,7 +271,7 @@ def test_matrix_rejects_duplicate_or_unexpected_outcomes() -> None:
         capability_matrix(workflows, [{"id": "not-selected", "gates": {}}])
 
 
-def test_explicit_target_variants_cannot_improve_blind_owner_recall():
+def test_explicit_target_variants_cannot_improve_blind_owner_recall() -> None:
     workflows = _workflows()
     outcomes = _outcomes(workflows)
     for workflow in workflows:
@@ -284,7 +287,9 @@ def test_explicit_target_variants_cannot_improve_blind_owner_recall():
     assert len(gate["ineligible_workflows"]) == 20
 
 
-def test_capability_tags_do_not_replace_reviewed_positive_and_adversarial_proof():
+def test_capability_tags_do_not_replace_reviewed_positive_and_adversarial_proof() -> (
+    None
+):
     workflows = _workflows()
     outcomes = _outcomes(workflows)
     for workflow in workflows:
@@ -335,7 +340,7 @@ def test_native_requirement_is_scoped_to_eligible_workflows() -> None:
     assert matrix["capabilities"][17]["status"] == "INCOMPLETE"
 
 
-def test_debug_correspondence_counts_frames_instead_of_successful_problems():
+def test_debug_correspondence_counts_frames_instead_of_successful_problems() -> None:
     workflows = _workflows()[:12]
     outcomes = _outcomes(workflows)
     workflows[-1]["debug_frame_units"] = [f"frame-{index}" for index in range(100)]
@@ -352,7 +357,7 @@ def test_debug_correspondence_counts_frames_instead_of_successful_problems():
     assert gate["fraction"] == 11 / 111
 
 
-def test_missing_recall_cannot_hide_an_unreachable_threshold():
+def test_missing_recall_cannot_hide_an_unreachable_threshold() -> None:
     workflows = _workflows()
     outcomes = _outcomes(workflows)
     outcomes[0]["gates"]["owner_top_three"] = False
@@ -365,7 +370,7 @@ def test_missing_recall_cannot_hide_an_unreachable_threshold():
     assert gate["observed"] == 19
 
 
-def test_unreviewed_frames_are_not_qualified_by_a_debug_summary_boolean():
+def test_unreviewed_frames_are_not_qualified_by_a_debug_summary_boolean() -> None:
     workflows = _workflows()
     outcomes = _outcomes(workflows)
     for workflow in workflows:
@@ -521,7 +526,7 @@ def test_non_initial_provider_data_does_not_acquire_table_semantics() -> None:
     assert pointer_values(packet, "/records") == [raw]
 
 
-def test_capability_proof_requires_every_frozen_witness_context():
+def test_capability_proof_requires_every_frozen_witness_context() -> None:
     workflows = _workflows()
     outcomes = _outcomes(workflows)
     outcomes[0]["gate_witnesses"] = [
@@ -532,7 +537,7 @@ def test_capability_proof_requires_every_frozen_witness_context():
     assert report["capabilities"][0]["gates"]["capability_proof"]["observed"] == 19
 
 
-def test_capability_proof_rejects_duplicate_contexts():
+def test_capability_proof_rejects_duplicate_contexts() -> None:
     workflows = _workflows()
     outcomes = _outcomes(workflows)
     outcomes[0]["gate_witnesses"].append(dict(outcomes[0]["gate_witnesses"][0]))
@@ -540,7 +545,7 @@ def test_capability_proof_rejects_duplicate_contexts():
         capability_matrix(workflows, outcomes)
 
 
-def test_unknown_eligibility_does_not_manufacture_a_metric_unit():
+def test_unknown_eligibility_does_not_manufacture_a_metric_unit() -> None:
     workflows = _workflows()
     del workflows[0]["metric_eligibility"]["owner_top_three"]
     report = capability_matrix(workflows, _outcomes(workflows))

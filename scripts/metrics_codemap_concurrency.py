@@ -53,7 +53,9 @@ def probe(
         for concurrency in concurrencies:
             barrier = threading.Barrier(concurrency)
 
-            def worker(worker_id: int, barrier=barrier) -> list[dict[str, object]]:
+            def worker(
+                worker_id: int, barrier: threading.Barrier = barrier
+            ) -> list[dict[str, object]]:
                 client = CodeMapServiceClient(
                     workspace, socket_path=socket_path, timeout=30.0
                 )

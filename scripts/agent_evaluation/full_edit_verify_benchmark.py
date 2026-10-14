@@ -18,7 +18,7 @@ from hashmarks._command_output import log_command_output
 logger = logging.getLogger(__name__)
 
 
-def _sha_obj(x):
+def _sha_obj(x: object) -> str:
     return (
         "sha256:"
         + hashlib.sha256(
@@ -159,7 +159,7 @@ def run_lane(
     }
 
 
-def main():
+def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--old-source", type=Path, required=True)
     ap.add_argument("--new-source", type=Path, required=True)

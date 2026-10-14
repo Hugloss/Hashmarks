@@ -12,6 +12,11 @@ import tarfile
 import tomllib
 import zipfile
 from pathlib import Path
+from typing import Protocol
+
+
+class SubParsers(Protocol):
+    def add_parser(self, name: str, **kwargs: object) -> argparse.ArgumentParser: ...
 
 
 def _log_command_output(*values: object) -> None:
@@ -753,7 +758,7 @@ def _add_publication_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--source-sha", required=True)
 
 
-def _add_validation_commands(sub) -> None:
+def _add_validation_commands(sub: SubParsers) -> None:
     tag = sub.add_parser("validate-tag")
     tag.add_argument("--root", default=".")
     tag.add_argument("--tag", required=True)
@@ -768,7 +773,7 @@ def _add_validation_commands(sub) -> None:
     candidate.add_argument("--normal-only", action="store_true")
 
 
-def _add_package_commands(sub) -> None:
+def _add_package_commands(sub: SubParsers) -> None:
     manifest = sub.add_parser("manifest")
     manifest.add_argument("--root", default=".")
     manifest.add_argument("--dist", required=True)
@@ -783,7 +788,7 @@ def _add_package_commands(sub) -> None:
     verify.add_argument("--manifest", required=True)
 
 
-def _add_standalone_commands(sub) -> None:
+def _add_standalone_commands(sub: SubParsers) -> None:
     standalone = sub.add_parser("standalone-qualification")
     standalone.add_argument("--root", default=".")
     standalone.add_argument("--artifact", required=True)
@@ -797,7 +802,7 @@ def _add_standalone_commands(sub) -> None:
     verify.add_argument("--bundle", required=True)
 
 
-def _add_publication_commands(sub) -> None:
+def _add_publication_commands(sub: SubParsers) -> None:
     publication = sub.add_parser("publication-manifest")
     _add_publication_arguments(publication)
     publication.add_argument("--output", required=True)
@@ -845,7 +850,7 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit(str(exc)) from exc
 
 
-def _run_validate_tag(args, root: Path) -> int:
+def _run_validate_tag(args: argparse.Namespace, root: Path) -> int:
     expected = _expected_tag(root)
     if args.tag != expected:
         raise SystemExit(
@@ -855,7 +860,7 @@ def _run_validate_tag(args, root: Path) -> int:
     return 0
 
 
-def _run_standalone_command(args, root: Path) -> int:
+def _run_standalone_command(args: argparse.Namespace, root: Path) -> int:
     if args.command == "standalone-qualification":
         value = standalone_qualification(
             root,
@@ -872,7 +877,7 @@ def _run_standalone_command(args, root: Path) -> int:
     return 0
 
 
-def _run_publication_assets(args) -> int:
+def _run_publication_assets(args: argparse.Namespace) -> int:
     manifest = json.loads(Path(args.manifest).read_text(encoding="utf-8"))
     if not isinstance(manifest, dict):
         raise ValueError("publication manifest must be an object")
@@ -882,7 +887,7 @@ def _run_publication_assets(args) -> int:
     return 0
 
 
-def _run_materialize_publication(args) -> int:
+def _run_materialize_publication(args: argparse.Namespace) -> int:
     manifest_path = Path(args.manifest)
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if not isinstance(manifest, dict):
@@ -900,7 +905,7 @@ def _run_materialize_publication(args) -> int:
     return 0
 
 
-def _run_publication_command(args, root: Path) -> int:
+def _run_publication_command(args: argparse.Namespace, root: Path) -> int:
     value = publication_manifest(
         root,
         Path(args.dist),
@@ -924,7 +929,7 @@ def _run_publication_command(args, root: Path) -> int:
     return 0
 
 
-def _run_package_command(args, root: Path) -> int:
+def _run_package_command(args: argparse.Namespace, root: Path) -> int:
     value = release_manifest(root, Path(args.dist), tag=args.tag)
     if args.command == "manifest":
         _write_manifest(
@@ -942,7 +947,7 @@ def _run_package_command(args, root: Path) -> int:
     return 0
 
 
-def _run_command(args) -> int:
+def _run_command(args: argparse.Namespace) -> int:
     root = Path(getattr(args, "root", ".")).resolve()
     if args.command == "validate-tag":
         result = _run_validate_tag(args, root)

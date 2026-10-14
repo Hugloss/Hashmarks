@@ -1,8 +1,13 @@
+from pathlib import Path
+from typing import Any
+
+import pytest
+
 from hashmarks.cli import main
 from hashmarks.codemap import CodeMap
 
 
-def _repo(root):
+def _repo(root: Path) -> None:
     (root / "pkg").mkdir()
     (root / "pkg" / "__init__.py").write_text("", encoding="utf-8")
     (root / "pkg" / "state.py").write_text("CACHE = {}\n", encoding="utf-8")
@@ -19,7 +24,7 @@ def _repo(root):
     )
 
 
-def test_authority_graph_composes_loader_cache_and_reader(tmp_path):
+def test_authority_graph_composes_loader_cache_and_reader(tmp_path: Path) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -35,7 +40,7 @@ def test_authority_graph_composes_loader_cache_and_reader(tmp_path):
     assert graph["boundary"].startswith("repository-evidence-only")
 
 
-def test_authority_graph_cli(tmp_path, capsys):
+def test_authority_graph_cli(tmp_path: Path, capsys: pytest.Capsys) -> None:
     _repo(tmp_path)
     assert main(["map", "sync", "--workspace", str(tmp_path)]) == 0
     capsys.readouterr()
@@ -44,7 +49,7 @@ def test_authority_graph_cli(tmp_path, capsys):
     assert '"schema": "hashmarks.authority-ownership-graph.v3"' in out
 
 
-def test_authority_graph_v2_composes_exact_imported_invalidator(tmp_path):
+def test_authority_graph_v2_composes_exact_imported_invalidator(tmp_path: Path) -> None:
     (tmp_path / "state.py").write_text("CACHE = {}\n", encoding="utf-8")
     (tmp_path / "maintenance.py").write_text(
         "from state import CACHE as SHARED\n\ndef reset():\n    SHARED.clear()\n",
@@ -63,7 +68,9 @@ def test_authority_graph_v2_composes_exact_imported_invalidator(tmp_path):
     assert graph["summary"]["unresolved_invalidation_owners"] == 0
 
 
-def test_authority_graph_v2_keeps_unqualified_same_name_invalidator_ambiguous(tmp_path):
+def test_authority_graph_v2_keeps_unqualified_same_name_invalidator_ambiguous(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "a.py").write_text("CACHE = {}\n", encoding="utf-8")
     (tmp_path / "b.py").write_text("CACHE = {}\n", encoding="utf-8")
     (tmp_path / "maintenance.py").write_text(
@@ -78,7 +85,9 @@ def test_authority_graph_v2_keeps_unqualified_same_name_invalidator_ambiguous(tm
     assert graph["summary"]["unresolved_invalidation_owners"] == 2
 
 
-def test_authority_graph_v3_composes_unguarded_concurrency_risk_as_nomination(tmp_path):
+def test_authority_graph_v3_composes_unguarded_concurrency_risk_as_nomination(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "store.py").write_text(
         "def bump(store):\n current=store.get('generation')\n store.set('generation',current+1)\n",
         encoding="utf-8",
@@ -101,7 +110,9 @@ def test_authority_graph_v3_composes_unguarded_concurrency_risk_as_nomination(tm
     assert graph["boundary"].startswith("repository-evidence-only")
 
 
-def test_authority_graph_v3_keeps_visible_guard_as_non_runtime_proof(tmp_path):
+def test_authority_graph_v3_keeps_visible_guard_as_non_runtime_proof(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "store.py").write_text(
         "def bump(store):\n with store.transaction():\n  current=store.get('generation')\n  store.set('generation',current+1)\n",
         encoding="utf-8",
@@ -117,15 +128,15 @@ def test_authority_graph_v3_keeps_visible_guard_as_non_runtime_proof(tmp_path):
 
 
 def test_repository_ownership_graph_materializes_repository_rows_once(
-    tmp_path, monkeypatch
-):
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         original = codemap.store.all_file_rows
         calls = 0
 
-        def counted_all_file_rows():
+        def counted_all_file_rows() -> list[dict[str, object]]:
             nonlocal calls
             calls += 1
             return original()
@@ -138,8 +149,8 @@ def test_repository_ownership_graph_materializes_repository_rows_once(
 
 
 def test_scoped_repository_ownership_graph_reuses_rows_without_collapsing_evidence_scope(
-    tmp_path, monkeypatch
-):
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _repo(tmp_path)
     (tmp_path / "maintenance.py").write_text(
         "from pkg.state import CACHE\n\ndef reset():\n    CACHE.clear()\n",
@@ -150,7 +161,7 @@ def test_scoped_repository_ownership_graph_reuses_rows_without_collapsing_eviden
         original = codemap.store.all_file_rows
         calls = 0
 
-        def counted_all_file_rows():
+        def counted_all_file_rows() -> list[dict[str, object]]:
             nonlocal calls
             calls += 1
             return original()

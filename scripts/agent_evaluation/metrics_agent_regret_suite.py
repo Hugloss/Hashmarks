@@ -21,7 +21,7 @@ MANIFEST_SCHEMA = "hashmarks.agent-retrieval-regret-suite.v1"
 REPORT_SCHEMA = "hashmarks.agent-retrieval-regret-suite-report.v1"
 
 
-def _load_regret_module() -> Any:
+def _load_regret_module() -> object:
     return import_sibling("metrics_agent_regret", __package__)
 
 
@@ -29,13 +29,13 @@ def _digest_bytes(path: Path) -> str:
     return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _nonempty(value: Any, field: str, path: Path) -> str:
+def _nonempty(value: object, field: str, path: Path) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{field} must be a non-empty string: {path}")
     return value
 
 
-def _resolve_member(base: Path, raw: Any, field: str, manifest_path: Path) -> Path:
+def _resolve_member(base: Path, raw: object, field: str, manifest_path: Path) -> Path:
     text = _nonempty(raw, field, manifest_path).replace("\\", "/")
     member = Path(text)
     if member.is_absolute() or ".." in member.parts:
@@ -52,7 +52,7 @@ def _resolve_member(base: Path, raw: Any, field: str, manifest_path: Path) -> Pa
     return resolved
 
 
-def load_manifest(path: Path) -> dict[str, Any]:
+def load_manifest(path: Path) -> dict[str, object]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict) or value.get("schema") != MANIFEST_SCHEMA:
         raise ValueError(f"unsupported regret suite schema: {path}")
@@ -64,12 +64,12 @@ def load_manifest(path: Path) -> dict[str, Any]:
 
 
 def _entry_report(
-    regret: Any,
+    regret: object,
     base: Path,
-    entry: Any,
+    entry: object,
     index: int,
     manifest_path: Path,
-) -> dict[str, Any]:
+) -> dict[str, object]:
     if not isinstance(entry, dict):
         raise ValueError(f"entry {index} must be an object: {manifest_path}")
     trace_path = _resolve_member(
@@ -94,9 +94,9 @@ def _entry_report(
 
 
 def _comparisons(
-    regret: Any, reports: list[dict[str, Any]]
-) -> tuple[dict[str, dict[str, dict[str, Any]]], list[dict[str, Any]]]:
-    by_task: dict[str, dict[str, dict[str, Any]]] = defaultdict(dict)
+    regret: object, reports: list[dict[str, object]]
+) -> tuple[dict[str, dict[str, dict[str, object]]], list[dict[str, object]]]:
+    by_task: dict[str, dict[str, dict[str, object]]] = defaultdict(dict)
     for report in reports:
         by_task[str(report["task_id"])][str(report["mode"])] = report
     comparisons = [
@@ -108,8 +108,8 @@ def _comparisons(
 
 
 def _opportunities(
-    reports: list[dict[str, Any]],
-) -> tuple[list[dict[str, Any]], dict[str, int], list[dict[str, Any]]]:
+    reports: list[dict[str, object]],
+) -> tuple[list[dict[str, object]], dict[str, int], list[dict[str, object]]]:
     complete = [
         report for report in reports if report["summary"]["required_evidence_complete"]
     ]
@@ -130,11 +130,11 @@ def _opportunities(
     return complete, totals, ranked
 
 
-def analyze(manifest_path: Path) -> dict[str, Any]:
+def analyze(manifest_path: Path) -> dict[str, object]:
     regret = _load_regret_module()
     manifest = load_manifest(manifest_path)
     base = manifest_path.parent.resolve()
-    reports: list[dict[str, Any]] = []
+    reports: list[dict[str, object]] = []
     seen: set[tuple[str, str]] = set()
     for index, entry in enumerate(manifest["entries"]):
         report = _entry_report(regret, base, entry, index, manifest_path)

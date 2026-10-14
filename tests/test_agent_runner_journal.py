@@ -12,11 +12,11 @@ if TYPE_CHECKING:
 _MODULE = __import__("scripts.agent_evaluation.agent_runner_journal", fromlist=["*"])
 
 
-def _load():
+def _load() -> object:
     return _MODULE
 
 
-def _init(module, journal: Path) -> None:
+def _init(module: object, journal: Path) -> None:
     module.init_journal(
         journal,
         module.JournalIdentity(

@@ -5,6 +5,7 @@ import os
 import re
 import shutil
 import subprocess
+from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -40,8 +41,11 @@ class ScipOccurrence:
 
 
 def _field(
-    value: dict[str, Any], camel: str, snake: str | None = None, default=None
-) -> Any:
+    value: dict[str, object],
+    camel: str,
+    snake: str | None = None,
+    default: object | None = None,
+) -> object:
     if camel in value:
         return value[camel]
     if snake and snake in value:
@@ -98,7 +102,7 @@ _SCIP_RELATION_FLAGS = (
 )
 
 
-def _scip_relation_rows(info: dict[str, Any]):
+def _scip_relation_rows(info: dict[str, Any]) -> Iterator[ScipRelationship]:
     """Yield only flags explicitly asserted by this SCIP SymbolInformation."""
     for relation in info.get("relationships") or ():
         if not isinstance(relation, dict):

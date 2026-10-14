@@ -168,7 +168,7 @@ def test_task_change_impact_never_discloses_denied_path(tmp_path: Path) -> None:
     assert impact["surfaces"]["verification"][0]["path"] == "tests/test_behavior.py"
 
 
-def test_task_change_impact_cli(tmp_path: Path, capsys: Any) -> None:
+def test_task_change_impact_cli(tmp_path: Path, capsys: pytest.Capsys) -> None:
     task = _repo(tmp_path)
     assert (
         cli.main(
@@ -394,7 +394,7 @@ def test_exact_import_resolution_avoids_whole_file_map_materialization(
 
 
 def test_task_change_impact_declared_project_provenance_and_shared_input_refresh(
-    tmp_path: Path, fake_maven_wrapper: Any
+    tmp_path: Path, fake_maven_wrapper: Callable[[Path], None]
 ) -> None:
     (tmp_path / "backend/src").mkdir(parents=True)
     (tmp_path / "frontend/src").mkdir(parents=True)
@@ -496,7 +496,7 @@ def test_task_change_impact_project_provenance_is_bounded(tmp_path: Path) -> Non
 
 
 def test_cross_repository_impact_qualification_small_smoke(
-    tmp_path: Path, fake_maven_wrapper: Any
+    tmp_path: Path, fake_maven_wrapper: Callable[[Path], None]
 ) -> None:
     from scripts.score_cross_repository_impact import generate, run
 
@@ -595,7 +595,7 @@ def test_declared_shared_input_refresh_rebinds_freshness_without_recollecting_to
         original_collect = provider.collect
         calls = 0
 
-        def counted_collect(workspace: Path) -> Any:
+        def counted_collect(workspace: Path) -> object:
             nonlocal calls
             calls += 1
             return original_collect(workspace)
@@ -641,7 +641,7 @@ def test_declared_topology_change_recollects_provider(
         original_collect = provider.collect
         calls = 0
 
-        def counted_collect(workspace: Path) -> Any:
+        def counted_collect(workspace: Path) -> object:
             nonlocal calls
             calls += 1
             return original_collect(workspace)

@@ -39,7 +39,7 @@ SEARCH_KINDS = {
 }
 
 
-def _load_trace_module() -> Any:
+def _load_trace_module() -> object:
     return import_sibling("metrics_agent_trace", __package__)
 
 
@@ -48,7 +48,7 @@ def _sha256(path: Path) -> str:
     return "sha256:" + digest
 
 
-def _nonempty(value: Any, field: str, path: Path) -> str:
+def _nonempty(value: object, field: str, path: Path) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{field} must be a non-empty string: {path}")
     return value
@@ -63,7 +63,7 @@ def _relative_path(value: str, field: str, path: Path) -> str:
     return normalized
 
 
-def load_evidence(path: Path) -> dict[str, Any]:
+def load_evidence(path: Path) -> dict[str, object]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict) or value.get("schema") != EVIDENCE_SCHEMA:
         raise ValueError(f"unsupported retrieval evidence schema: {path}")
@@ -89,7 +89,7 @@ def load_evidence(path: Path) -> dict[str, Any]:
     return value
 
 
-def _event_paths(event: dict[str, Any]) -> list[str]:
+def _event_paths(event: dict[str, object]) -> list[str]:
     values: list[str] = []
     if isinstance(event.get("path"), str):
         values.append(event["path"])
@@ -107,7 +107,7 @@ def _event_paths(event: dict[str, Any]) -> list[str]:
     return normalized
 
 
-def _event_tokens(event: dict[str, Any]) -> int:
+def _event_tokens(event: dict[str, object]) -> int:
     return int(event.get("estimated_tokens", 0))
 
 
@@ -138,7 +138,7 @@ class RegretObservations:
     repeated_queries: list[dict[str, Any]] = field(default_factory=list)
     repeated_reads: list[dict[str, Any]] = field(default_factory=list)
 
-    def _observe_timing(self, event: dict[str, Any]) -> int | None:
+    def _observe_timing(self, event: dict[str, object]) -> int | None:
         started = event.get("started_at_ns")
         finished = event.get("finished_at_ns")
         if isinstance(started, int) and self.navigation_start_ns is None:
@@ -149,7 +149,7 @@ class RegretObservations:
             )
         return started if isinstance(started, int) else None
 
-    def _observe_query(self, index: int, event: dict[str, Any], tokens: int) -> None:
+    def _observe_query(self, index: int, event: dict[str, object], tokens: int) -> None:
         query = event.get("query")
         if not isinstance(query, str) or not query.strip():
             return
@@ -201,7 +201,7 @@ class RegretObservations:
             self.all_tokens = self.cumulative_tokens
             self.all_evidence_started_ns = started_at_ns
 
-    def observe(self, index: int, event: dict[str, Any]) -> None:
+    def observe(self, index: int, event: dict[str, object]) -> None:
         kind = event["kind"]
         tokens = _event_tokens(event)
         paths = _event_paths(event)
@@ -220,7 +220,7 @@ class RegretObservations:
             self.reads_before_all += int(kind in READ_KINDS)
         self.cumulative_tokens += tokens
 
-    def summary(self) -> dict[str, Any]:
+    def summary(self) -> dict[str, object]:
         missing = sorted(self.required - self.discovered)
         return {
             "required_path_count": len(self.required),
@@ -270,7 +270,7 @@ def _elapsed_ms(start: int | None, finish: int | None) -> float | None:
     return None if start is None or finish is None else (finish - start) / 1_000_000.0
 
 
-def analyze(trace_path: Path, evidence_path: Path) -> dict[str, Any]:
+def analyze(trace_path: Path, evidence_path: Path) -> dict[str, object]:
     trace_module = _load_trace_module()
     trace = trace_module.load_trace(trace_path)
     evidence = load_evidence(evidence_path)
@@ -303,7 +303,9 @@ def analyze(trace_path: Path, evidence_path: Path) -> dict[str, Any]:
     }
 
 
-def compare(baseline: dict[str, Any], hashmarks: dict[str, Any]) -> dict[str, Any]:
+def compare(
+    baseline: dict[str, object], hashmarks: dict[str, object]
+) -> dict[str, object]:
     for field in ("task_id", "task_revision", "repository_identity", "evidence_sha256"):
         if baseline.get(field) != hashmarks.get(field):
             raise ValueError(f"regret comparison {field} mismatch")

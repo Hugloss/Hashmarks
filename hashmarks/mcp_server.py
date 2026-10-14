@@ -77,7 +77,7 @@ else:
     _TaskEvidenceResultMode = Literal[*tuple(operation_modes("task_evidence"))]
 
 
-def _sdk():
+def _sdk() -> tuple[type[Any], type[Any], type[Any]]:
     try:
         from mcp.server import MCPServer
         from mcp.server.mcpserver.exceptions import ToolError
@@ -127,10 +127,10 @@ def _task_evidence_tool_result(
 
 
 def _register_json_mirror_tool(
-    server: Any,
+    server: object,
     contract: McpToolContract,
-    annotations: Any,
-    handler: Callable[..., Any],
+    annotations: object,
+    handler: Callable[..., object],
 ) -> None:
     from mcp.types import CallToolResult
 
@@ -149,10 +149,10 @@ def _call_surface(
     tool_error: type[Exception],
     operation: Callable[..., dict[str, object]],
     /,
-    *args: Any,
+    *args: object,
     response_mode: str | None = None,
     presentation: str = "none",
-    **kwargs: Any,
+    **kwargs: object,
 ) -> dict[str, object]:
     """Translate consumer errors and enforce the canonical response contract."""
 
@@ -185,9 +185,9 @@ def _call_surface(
 
 
 def _register_repository_declarations_tool(
-    server: Any,
+    server: object,
     surface: HashmarksMcpSurface,
-    annotations: Any,
+    annotations: object,
     tool_error: type[Exception],
 ) -> None:
     contract = tool_contract("repository_declarations")
@@ -226,12 +226,10 @@ def _register_repository_declarations_tool(
 
 
 def _register_agent_evidence_tools(
-    server: Any,
+    server: object,
     surface: HashmarksMcpSurface,
-    annotations: Any,
+    annotations: object,
     tool_error: type[Exception],
-    *,
-    query_surfaces: tuple[str, ...],
 ) -> None:
     """Expose existing producers while keeping MCP registration bounded."""
     intelligence_contract = tool_contract("repository_intelligence_query")
@@ -381,9 +379,9 @@ def _register_agent_evidence_tools(
 
 
 def _register_evidence_comparison_tool(
-    server: Any,
+    server: object,
     surface: HashmarksMcpSurface,
-    annotations: Any,
+    annotations: object,
     tool_error: type[Exception],
 ) -> None:
     """Expose native two-endpoint comparisons with no history or execution state."""
@@ -418,7 +416,7 @@ def _register_evidence_comparison_tool(
         )
 
 
-def _apply_tool_projection(server: Any, selected_tools: tuple[str, ...]) -> None:
+def _apply_tool_projection(server: object, selected_tools: tuple[str, ...]) -> None:
     selected = set(selected_tools)
     for name in MCP_TOOL_NAMES:
         if name not in selected:
@@ -448,7 +446,7 @@ def build_server(
     state_dir: str | Path | None = None,
     tool_names: tuple[str, ...] | list[str] | None = None,
     query_surfaces: tuple[str, ...] | list[str] | None = None,
-):
+) -> object:
     MCPServer, ToolAnnotations, ToolError = _sdk()
     selected_tools, selected_query_surfaces = _server_projection_selection(
         tool_names,

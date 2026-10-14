@@ -14,7 +14,9 @@ from scripts.repository_evaluation.common import write_json
 
 
 @pytest.fixture
-def native_runner(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def native_runner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> tuple[Path, list[tuple[str, str]], Any]:
     workflows = [
         {
             "id": name,
@@ -45,19 +47,26 @@ def native_runner(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     calls = []
 
     def acquire(
-        workflow,
-        _rule,
-        stage,
-        _source,
-        _definition,
-        destination,
+        workflow: dict[str, Any],
+        _rule: Any,
+        stage: str,
+        _source: Any,
+        _definition: Any,
+        destination: Path,
         *,
-        acquisition_id=None,
-    ):
+        acquisition_id: str | None = None,
+    ) -> None:
         calls.append((workflow["id"], stage))
         write_json(destination / "capture.json", {"id": workflow["id"], "stage": stage})
 
-    def qualify(workflow, _rule, _sources, _definitions, output, _options):
+    def qualify(
+        workflow: dict[str, Any],
+        _rule: Any,
+        _sources: Any,
+        _definitions: Any,
+        output: Path,
+        _options: Any,
+    ) -> dict[str, Any]:
         # Acquisition must finish before observation, and report digests must
         # be computed after the observer has written its output.
         for stage in ("before", "after"):
@@ -89,8 +98,11 @@ def native_runner(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     "fresh,selection", [(False, ["one"]), (False, None), (True, None)]
 )
 def test_runner_attaches_current_workflow_artifacts_after_observation(
-    tmp_path, native_runner, fresh, selection
-):
+    tmp_path: Path,
+    native_runner: tuple[Path, list[tuple[str, str]], Any],
+    fresh: bool,
+    selection: list[str] | None,
+) -> None:
     captures, calls, acquire = native_runner
     if not fresh:
         for name in ("one", "two"):
@@ -120,8 +132,8 @@ def test_runner_attaches_current_workflow_artifacts_after_observation(
     "overlap", ["same", "capture-inside", "report-inside", "existing"]
 )
 def test_runner_rejects_reused_or_overlapping_destinations_before_acquisition(
-    tmp_path, native_runner, overlap
-):
+    tmp_path: Path, native_runner: tuple[Path, list[tuple[str, str]], Any], overlap: str
+) -> None:
     captures, calls, _acquire = native_runner
     output = tmp_path / "reports"
     if overlap == "same":
@@ -143,8 +155,8 @@ def test_runner_rejects_reused_or_overlapping_destinations_before_acquisition(
 
 
 def test_fresh_preflight_checks_later_workflows_before_first_acquisition(
-    tmp_path, native_runner
-):
+    tmp_path: Path, native_runner: tuple[Path, list[tuple[str, str]], Any]
+) -> None:
     captures, calls, _acquire = native_runner
     (captures / "two/after").mkdir(parents=True)
     with pytest.raises(
@@ -159,8 +171,10 @@ def test_fresh_preflight_checks_later_workflows_before_first_acquisition(
 
 
 def test_missing_later_language_producer_prevents_all_acquisition(
-    tmp_path, native_runner, monkeypatch
-):
+    tmp_path: Path,
+    native_runner: tuple[Path, list[tuple[str, str]], Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     captures, calls, _acquire = native_runner
     original = runner.load_corpus
     suite, grader = original(
@@ -171,7 +185,7 @@ def test_missing_later_language_producer_prevents_all_acquisition(
         "paths": ["backend.ts"],
     }
 
-    def tools(name):
+    def tools(name: str) -> str:
         if name == "scip-typescript":
             raise RuntimeError("not installed")
         return "/tools/" + name

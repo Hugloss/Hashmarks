@@ -22,7 +22,7 @@ from .backend_workflows import _invalidated_member, _revision_bound, _transport_
 from .fact_grading import _json_equal, grade_facts
 
 
-def _read(root: Path, relative: str) -> Any:
+def _read(root: Path, relative: str) -> object:
     result = json.loads(confined_file(root, relative).read_bytes())
     if Path(relative).name in {"cli.json", "mcp.json"}:
         for capture in result:
@@ -31,8 +31,8 @@ def _read(root: Path, relative: str) -> Any:
 
 
 def _stage(
-    root: Path, source: Path, workflow: dict[str, Any], rule: dict[str, Any]
-) -> dict[str, Any]:
+    root: Path, source: Path, workflow: dict[str, object], rule: dict[str, object]
+) -> dict[str, object]:
     packet = _read(root, "api.json")
     initial = _read(root, "initial/api.json")
     profiles = {}
@@ -62,8 +62,8 @@ def _stage(
 
 
 def _freshness(
-    root: Path, workflow: dict[str, Any], sources: dict[str, Path]
-) -> dict[str, Any]:
+    root: Path, workflow: dict[str, object], sources: dict[str, Path]
+) -> dict[str, object]:
     retained = _read(root, "stale.json")
     paths = workflow_changed_paths(workflow)
     rows = retained["observations"]
@@ -84,8 +84,11 @@ def _freshness(
 
 
 def regrade_task_workflow(
-    root: Path, workflow: dict[str, Any], rule: dict[str, Any], sources: dict[str, Path]
-) -> dict[str, Any]:
+    root: Path,
+    workflow: dict[str, object],
+    rule: dict[str, object],
+    sources: dict[str, Path],
+) -> dict[str, object]:
     """Recompute task and composed component gates from retained observations."""
     before = _stage(
         root / "before",
@@ -147,10 +150,10 @@ def regrade_task_workflow(
 
 def verify_task_summary(
     root: Path,
-    workflow: dict[str, Any],
-    rule: dict[str, Any],
+    workflow: dict[str, object],
+    rule: dict[str, object],
     sources: dict[str, Path],
-    outcome: dict[str, Any],
+    outcome: dict[str, object],
 ) -> None:
     expected = regrade_task_workflow(root, workflow, rule, sources)
     witnesses = [
@@ -177,8 +180,12 @@ def verify_task_summary(
 
 
 def _component(
-    root: Path, source: Path, inputs: dict[str, Any], rule: dict[str, Any], family: str
-) -> dict[str, Any]:
+    root: Path,
+    source: Path,
+    inputs: dict[str, object],
+    rule: dict[str, object],
+    family: str,
+) -> dict[str, object]:
     grader = _boundary_grade if family == "boundary" else _declaration_grade
     paths = (
         inputs["changed_paths"]

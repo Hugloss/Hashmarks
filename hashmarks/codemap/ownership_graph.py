@@ -90,7 +90,7 @@ class OwnershipGraphMixin:
 
     @staticmethod
     def _entry_role_match(
-        role: str, accepted, domains: tuple[RepositoryDomain, ...], path: str
+        role: str, accepted: set[str], domains: tuple[RepositoryDomain, ...], path: str
     ) -> bool:
         role_match = bool(set(domains).intersection(accepted))
         if role == "implementation" and RepositoryDomain.TEST in domains:
@@ -102,7 +102,7 @@ class OwnershipGraphMixin:
 
     def _entry_role_rows(
         self,
-        hits,
+        hits: Sequence[Any],
         role_domains: dict[str, tuple[RepositoryDomain, ...]],
         task_terms: set[str],
     ) -> dict[str, list[dict[str, object]]]:
@@ -440,7 +440,10 @@ class OwnershipGraphMixin:
 
     @staticmethod
     def _entry_resolution(
-        ambiguous: bool, resolved_role: str | None, role_rows, role_anchor_tokens
+        ambiguous: bool,
+        resolved_role: str | None,
+        role_rows: dict[str, list[dict[str, object]]],
+        role_anchor_tokens: dict[str, list[str]],
     ) -> dict[str, object]:
         if resolved_role is not None:
             return {
@@ -713,7 +716,10 @@ class OwnershipGraphMixin:
         )
 
     @staticmethod
-    def _ownership_call_shorts(expandable, edge_map) -> list[str]:
+    def _ownership_call_shorts(
+        expandable: Sequence[tuple[str, int, tuple[str, ...]]],
+        edge_map: dict[str, Sequence[dict[str, object]]],
+    ) -> list[str]:
         return sorted(
             {
                 str(edge.get("target_short") or "")
@@ -727,7 +733,7 @@ class OwnershipGraphMixin:
     @staticmethod
     def _index_ownership_symbols(
         state: _OwnershipGraphState,
-        call_symbols,
+        call_symbols: Sequence[dict[str, object]],
         wanted: set[str],
     ) -> dict[str, list[dict]]:
         symbols_by_short: dict[str, list[dict]] = {}
@@ -747,8 +753,8 @@ class OwnershipGraphMixin:
     def _ownership_symbol_map(
         self,
         state: _OwnershipGraphState,
-        expandable,
-        edge_map,
+        expandable: object,
+        edge_map: object,
     ) -> dict[str, list[dict]]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -787,7 +793,7 @@ class OwnershipGraphMixin:
 
     @classmethod
     def _ownership_call_targets(
-        cls, path: str, edge: dict, imported_paths: set[str], symbols_by_short
+        cls, path: str, edge: dict, imported_paths: set[str], symbols_by_short: object
     ) -> list[tuple[str, str]]:
         short = str(edge.get("target_short") or "")
         if not short:
@@ -889,7 +895,7 @@ class OwnershipGraphMixin:
         )
 
     @staticmethod
-    def _ownership_import_targets(path_edges) -> list[str]:
+    def _ownership_import_targets(path_edges: Sequence[dict[str, object]]) -> list[str]:
         return list(
             dict.fromkeys(
                 str(edge.get("target") or "")
@@ -900,7 +906,7 @@ class OwnershipGraphMixin:
         )
 
     def _ownership_import_resolution(
-        self, path: str, path_edges
+        self, path: str, path_edges: Sequence[dict[str, object]]
     ) -> tuple[dict[str, list[str]], set[str]]:
         targets = self._ownership_import_targets(path_edges)
         resolved = {
@@ -914,9 +920,9 @@ class OwnershipGraphMixin:
         self,
         state: _OwnershipGraphState,
         item: tuple[str, int, tuple[str, ...]],
-        edge_map,
-        symbols_by_short,
-        frontier,
+        edge_map: dict[str, Sequence[dict[str, object]]],
+        symbols_by_short: dict[str, list[dict[str, object]]],
+        frontier: list[tuple[str, int, tuple[str, ...]]],
     ) -> None:
         path, depth, ancestry = item
         path_edges = edge_map.get(path, ())
@@ -932,7 +938,11 @@ class OwnershipGraphMixin:
                     state, expansion, target_path, resolution, kind
                 )
 
-    def _preload_direct_ownership_import_modules(self, expandable, edge_map) -> None:
+    def _preload_direct_ownership_import_modules(
+        self,
+        expandable: Sequence[tuple[str, int, tuple[str, ...]]],
+        edge_map: dict[str, Sequence[dict[str, object]]],
+    ) -> None:
         """Preload only the exact module probe each ownership import will ask first."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -1013,7 +1023,9 @@ class OwnershipGraphMixin:
         return ranked
 
     @staticmethod
-    def _ownership_edge_delegates(edge, base_path: str, base_depth: int) -> bool:
+    def _ownership_edge_delegates(
+        edge: dict[str, object], base_path: str, base_depth: int
+    ) -> bool:
         return (
             str(edge.get("from") or "") == base_path
             and int(edge.get("depth") or 0) == base_depth + 1
@@ -1022,7 +1034,7 @@ class OwnershipGraphMixin:
 
     @staticmethod
     def _ownership_edge_refines(
-        edge, target_locality: set[str], base_locality: set[str]
+        edge: dict[str, object], target_locality: set[str], base_locality: set[str]
     ) -> bool:
         if (
             edge.get("relation") == "calls"
@@ -1038,11 +1050,11 @@ class OwnershipGraphMixin:
     @classmethod
     def _delegated_target_for_edge(
         cls,
-        edge: dict,
+        edge: dict[str, object],
         base_path: str,
         base_depth: int,
         base_locality: set[str],
-        ranked_by_path,
+        ranked_by_path: dict[str, dict[str, object]],
     ) -> str | None:
         if not cls._ownership_edge_delegates(edge, base_path, base_depth):
             return None
@@ -1080,7 +1092,9 @@ class OwnershipGraphMixin:
         }
 
     @staticmethod
-    def _delegated_candidates(ranked, targets: set[str]) -> list[dict[str, object]]:
+    def _delegated_candidates(
+        ranked: Sequence[dict[str, object]], targets: set[str]
+    ) -> list[dict[str, object]]:
         return [
             row
             for row in ranked
@@ -1090,7 +1104,9 @@ class OwnershipGraphMixin:
         ]
 
     @staticmethod
-    def _baseline_ownership_candidate(ranked) -> dict[str, object] | None:
+    def _baseline_ownership_candidate(
+        ranked: Sequence[dict[str, object]],
+    ) -> dict[str, object] | None:
         baseline = [row for row in ranked if int(row.get("depth") or 0) <= 2]
         return next((row for row in baseline if row.get("corroborated")), None)
 

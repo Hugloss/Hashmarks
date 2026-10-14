@@ -471,7 +471,7 @@ def _explicit_operation_metrics(
     repository_observation_calls = 0
     original_observer = codemap._repository_member_observation
 
-    def counted_observer(*args: Any, **kwargs: Any):
+    def counted_observer(*args: object, **kwargs: object) -> object:
         nonlocal repository_observation_calls
         repository_observation_calls += 1
         return original_observer(*args, **kwargs)

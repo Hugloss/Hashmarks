@@ -193,7 +193,7 @@ def test_unsignaled_rename_reconciliation_retires_obsolete_history(
         original_sync = codemap.sync
         sync_calls: list[tuple[str, ...]] = []
 
-        def counted_sync(paths: list[str] | None = None) -> Any:
+        def counted_sync(paths: list[str] | None = None) -> object:
             sync_calls.append(tuple(paths or ()))
             return original_sync(paths)
 
@@ -330,7 +330,7 @@ def test_missing_resurrection_tombstone_does_not_poll_repository_and_recovers_pa
         original_sync = codemap.sync
         sync_calls: list[tuple[str, ...]] = []
 
-        def counted_sync(paths: list[str] | None = None) -> Any:
+        def counted_sync(paths: list[str] | None = None) -> object:
             sync_calls.append(tuple(paths or ()))
             return original_sync(paths)
 

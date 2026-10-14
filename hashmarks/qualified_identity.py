@@ -13,7 +13,7 @@ QUALIFIED_IMPORT_SCHEMA = "hashmarks.qualified-import-identity.v1"
 QUALIFIED_SHARED_INPUT_SCHEMA = "hashmarks.qualified-shared-input-identity.v1"
 
 
-def _codemap_repository_identity(codemap: Any) -> str:
+def _codemap_repository_identity(codemap: object) -> str:
     excluded = [codemap.state_dir]
     artifact_path = getattr(getattr(codemap, "artifacts", None), "db_path", None)
     if isinstance(artifact_path, Path):
@@ -33,7 +33,7 @@ def _identity(domain: str, value: Mapping[str, object]) -> str:
 
 
 def qualified_import_identity(
-    codemap: Any, *, source_path: str, target: str
+    codemap: object, *, source_path: str, target: str
 ) -> dict[str, object]:
     """Project exact import-owner identity from existing Hashmarks resolver evidence."""
     # Qualified identity is stronger than a best-effort query: every path that
@@ -76,7 +76,7 @@ def _is_declared_shared_edge(row: Mapping[str, object], synthetic: str) -> bool:
     )
 
 
-def _shared_input_projects(codemap: Any, synthetic: str) -> list[dict[str, str]]:
+def _shared_input_projects(codemap: object, synthetic: str) -> list[dict[str, str]]:
     rows = [
         row
         for row in codemap.store.project_edges()
@@ -108,8 +108,9 @@ def _shared_input_status(node: object, fresh: bool) -> str:
 
 
 def _shared_input_payload(
-    codemap: Any, rel: str, projects: list[dict[str, str]]
+    codemap: object, rel: str, projects: list[dict[str, str]]
 ) -> dict[str, object]:
+
     return {
         "schema": QUALIFIED_SHARED_INPUT_SCHEMA,
         "repository_identity": _codemap_repository_identity(codemap),
@@ -120,7 +121,9 @@ def _shared_input_payload(
     }
 
 
-def qualified_shared_input_identity(codemap: Any, *, relpath: str) -> dict[str, object]:
+def qualified_shared_input_identity(
+    codemap: object, *, relpath: str
+) -> dict[str, object]:
     """Bind declared cross-repository shared-input provenance without execution semantics."""
     from .paths import normalize_relative_path
 

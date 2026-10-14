@@ -17,7 +17,7 @@ from scripts.repository_evaluation.run_backend import run_backend
 
 
 @pytest.fixture
-def corpus(tmp_path: Path):
+def corpus(tmp_path: Path) -> tuple[Path, dict[str, Path]]:
     sources = {}
     definitions = {}
     labels = {}
@@ -99,8 +99,8 @@ def corpus(tmp_path: Path):
 
 
 def test_api_revision_workflow_cannot_qualify_missing_transports_or_breadth(
-    corpus, tmp_path: Path
-):
+    corpus: tuple[Path, dict[str, Path]], tmp_path: Path
+) -> None:
     suite_path, sources = corpus
     report = run_backend(
         sources=sources,
@@ -130,7 +130,7 @@ def test_api_revision_workflow_cannot_qualify_missing_transports_or_breadth(
 
 
 def test_authority_and_freshness_witnesses_are_regraded_from_actual_artifacts(
-    corpus, tmp_path: Path
+    corpus: tuple[Path, dict[str, Path]], tmp_path: Path
 ) -> None:
     from scripts.repository_evaluation.backend_regrading import verify_task_summary
     from scripts.repository_evaluation.backend_witnesses import freshness_fact_witnesses
@@ -190,7 +190,7 @@ def test_authority_and_freshness_witnesses_are_regraded_from_actual_artifacts(
         freshness_fact_witnesses(sources, root, workflow, rule)
 
 
-def _aggregate_campaign(corpus, root: Path) -> Path:
+def _aggregate_campaign(corpus: tuple[Path, dict[str, Path]], root: Path) -> Path:
     from scripts.repository_evaluation.aggregate_backend import CAMPAIGN_SCHEMA
     from scripts.repository_evaluation.backend_matrix import SCHEMA as MATRIX_SCHEMA
     from scripts.repository_evaluation.common import canonical_sha256
@@ -221,8 +221,8 @@ def _aggregate_campaign(corpus, root: Path) -> Path:
 
 
 def test_aggregate_retains_valid_observations_and_rejected_input(
-    corpus, tmp_path: Path
-):
+    corpus: tuple[Path, dict[str, Path]], tmp_path: Path
+) -> None:
     from scripts.repository_evaluation.aggregate_backend import aggregate_backend
 
     suite_path, sources = corpus
@@ -258,7 +258,9 @@ def test_aggregate_retains_valid_observations_and_rejected_input(
     assert "REJECTED" in (output / "summary.md").read_text()
 
 
-def test_aggregate_missing_expected_inputs_remain_incomplete(corpus, tmp_path: Path):
+def test_aggregate_missing_expected_inputs_remain_incomplete(
+    corpus: tuple[Path, dict[str, Path]], tmp_path: Path
+) -> None:
     from scripts.repository_evaluation.aggregate_backend import aggregate_backend
 
     report = aggregate_backend(
@@ -274,8 +276,8 @@ def test_aggregate_missing_expected_inputs_remain_incomplete(corpus, tmp_path: P
 
 
 def test_aggregate_unknown_selected_report_is_retained_as_rejection(
-    corpus, tmp_path: Path
-):
+    corpus: tuple[Path, dict[str, Path]], tmp_path: Path
+) -> None:
     from scripts.repository_evaluation.aggregate_backend import aggregate_backend
 
     report = aggregate_backend(
@@ -292,8 +294,8 @@ def test_aggregate_unknown_selected_report_is_retained_as_rejection(
 
 
 def test_exact_workflow_receipt_reuses_then_rejects_changed_observation(
-    corpus, tmp_path: Path
-):
+    corpus: tuple[Path, dict[str, Path]], tmp_path: Path
+) -> None:
     suite_path, sources = corpus
     options: dict[str, Any] = {
         "sources": sources,
@@ -313,7 +315,9 @@ def test_exact_workflow_receipt_reuses_then_rejects_changed_observation(
         run_backend(**options)
 
 
-def test_changed_archive_and_oracle_ranges_fail_before_observation(corpus):
+def test_changed_archive_and_oracle_ranges_fail_before_observation(
+    corpus: tuple[Path, dict[str, Path]],
+) -> None:
     suite_path, sources = corpus
     path = sources["before"] / "backend.py"
     original = path.read_bytes()
@@ -344,7 +348,7 @@ def test_changed_archive_and_oracle_ranges_fail_before_observation(corpus):
     ],
 )
 def test_incomplete_native_oracles_fail_during_source_admission(
-    corpus, native_oracles, reason: str
+    corpus: tuple[Path, dict[str, Path]], native_oracles: object, reason: str
 ) -> None:
     suite_path, sources = corpus
     grader_path = suite_path.parent / "grader.json"
@@ -355,7 +359,9 @@ def test_incomplete_native_oracles_fail_during_source_admission(
         load_corpus(suite_path, sources)
 
 
-def test_invalid_workflow_selection_is_not_an_empty_success(corpus, tmp_path: Path):
+def test_invalid_workflow_selection_is_not_an_empty_success(
+    corpus: tuple[Path, dict[str, Path]], tmp_path: Path
+) -> None:
     suite_path, sources = corpus
     for selected in ([], ["missing"], ["handler", "handler"]):
         with pytest.raises(ValueError, match="selection"):
@@ -369,13 +375,15 @@ def test_invalid_workflow_selection_is_not_an_empty_success(corpus, tmp_path: Pa
 
 
 def test_transport_source_mutation_invalidates_the_observation(
-    corpus, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    corpus: tuple[Path, dict[str, Path]],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from scripts.repository_evaluation import backend_workflows
 
     suite_path, sources = corpus
 
-    def changing_transport(workspace: Path, *_args):
+    def changing_transport(workspace: Path, *_args: object) -> list[object]:
         (workspace / "backend.py").write_text("def handler():\n    return 999\n")
         return []
 
@@ -439,7 +447,7 @@ def _add_boundary_observations(suite_path: Path, sources: dict[str, Path]) -> No
 
 
 def test_boundary_revision_observations_preserve_actual_cli_facts_and_missing_mcp(
-    corpus, tmp_path: Path
+    corpus: tuple[Path, dict[str, Path]], tmp_path: Path
 ) -> None:
     suite_path, sources = corpus
     _add_boundary_observations(suite_path, sources)
@@ -479,7 +487,7 @@ def test_boundary_revision_observations_preserve_actual_cli_facts_and_missing_mc
 
 
 def test_boundary_failed_fact_cannot_be_compensated_by_task_or_revision_success(
-    corpus, tmp_path: Path
+    corpus: tuple[Path, dict[str, Path]], tmp_path: Path
 ) -> None:
     suite_path, sources = corpus
     _add_boundary_observations(suite_path, sources)
@@ -505,7 +513,7 @@ def test_boundary_failed_fact_cannot_be_compensated_by_task_or_revision_success(
 
 @pytest.mark.parametrize("mutation", ["missing-stage", "line-hash", "scope"])
 def test_boundary_source_admission_rejects_incomplete_or_unbound_oracles(
-    corpus, mutation: str
+    corpus: tuple[Path, dict[str, Path]], mutation: str
 ) -> None:
     suite_path, sources = corpus
     _add_boundary_observations(suite_path, sources)
@@ -524,7 +532,7 @@ def test_boundary_source_admission_rejects_incomplete_or_unbound_oracles(
 
 
 def test_existing_verifier_oracle_cannot_name_a_test_absent_at_that_revision(
-    corpus,
+    corpus: tuple[Path, dict[str, Path]],
 ) -> None:
     suite_path, sources = corpus
     grader_path = suite_path.parent / "grader.json"
@@ -613,7 +621,7 @@ def _add_declaration_observations(suite_path: Path, sources: dict[str, Path]) ->
 
 
 def test_declaration_workflow_preserves_real_cli_facts_and_missing_mcp(
-    corpus, tmp_path: Path
+    corpus: tuple[Path, dict[str, Path]], tmp_path: Path
 ) -> None:
     suite_path, sources = corpus
     _add_declaration_observations(suite_path, sources)
@@ -650,7 +658,7 @@ def test_declaration_workflow_preserves_real_cli_facts_and_missing_mcp(
 
 
 def test_failed_declaration_fact_cannot_be_masked_by_successful_task(
-    corpus, tmp_path: Path
+    corpus: tuple[Path, dict[str, Path]], tmp_path: Path
 ) -> None:
     suite_path, sources = corpus
     _add_declaration_observations(suite_path, sources)
@@ -684,7 +692,7 @@ def test_failed_declaration_fact_cannot_be_masked_by_successful_task(
     ],
 )
 def test_declaration_admission_requires_complete_source_oracles(
-    corpus, mutation: str
+    corpus: tuple[Path, dict[str, Path]], mutation: str
 ) -> None:
     suite_path, sources = corpus
     _add_declaration_observations(suite_path, sources)
@@ -712,8 +720,8 @@ def test_declaration_admission_requires_complete_source_oracles(
 
 @pytest.mark.parametrize("kind", ["add", "delete", "rename"])
 def test_added_deleted_and_renamed_files_preserve_revision_invalidation(
-    corpus, tmp_path: Path, kind: str
-):
+    corpus: tuple[Path, dict[str, Path]], tmp_path: Path, kind: str
+) -> None:
     suite_path, sources = corpus
     suite = json.loads(suite_path.read_text())
     before = "extra.py" if kind != "add" else None
@@ -752,7 +760,9 @@ def test_added_deleted_and_renamed_files_preserve_revision_invalidation(
     )
 
 
-def test_v2_workflow_cannot_silently_fall_back_to_legacy_transitions(corpus):
+def test_v2_workflow_cannot_silently_fall_back_to_legacy_transitions(
+    corpus: tuple[Path, dict[str, Path]],
+) -> None:
     suite_path, sources = corpus
     suite = json.loads(suite_path.read_text())
     del suite["workflows"][0]["transitions"]
@@ -761,7 +771,9 @@ def test_v2_workflow_cannot_silently_fall_back_to_legacy_transitions(corpus):
         load_corpus(suite_path, sources)
 
 
-def test_legacy_modification_manifest_remains_readable(corpus):
+def test_legacy_modification_manifest_remains_readable(
+    corpus: tuple[Path, dict[str, Path]],
+) -> None:
     from scripts.repository_evaluation.backend_corpus import LEGACY_SCHEMA
 
     suite_path, sources = corpus
@@ -802,8 +814,8 @@ def _campaign_for_fixture(suite_path: Path) -> Path:
 
 
 def test_aggregate_reads_current_receipts_without_executing_work(
-    corpus, tmp_path: Path
-):
+    corpus: tuple[Path, dict[str, Path]], tmp_path: Path
+) -> None:
     from scripts.repository_evaluation.aggregate_backend import aggregate_backend
 
     suite_path, sources = corpus
@@ -828,7 +840,9 @@ def test_aggregate_reads_current_receipts_without_executing_work(
     assert (tmp_path / "aggregate/summary.md").is_file()
 
 
-def test_aggregate_accounts_for_missing_reports(corpus, tmp_path: Path):
+def test_aggregate_accounts_for_missing_reports(
+    corpus: tuple[Path, dict[str, Path]], tmp_path: Path
+) -> None:
     from scripts.repository_evaluation.aggregate_backend import aggregate_backend
 
     suite_path, sources = corpus
@@ -843,15 +857,19 @@ def test_aggregate_accounts_for_missing_reports(corpus, tmp_path: Path):
 
 
 def test_initial_is_the_first_public_task_request_at_each_revision(
-    corpus, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-):
+    corpus: tuple[Path, dict[str, Path]],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from hashmarks.operation_contract import operation_default_mode
     from scripts.repository_evaluation import backend_workflows
 
     suite_path, sources = corpus
     requests = []
 
-    def capture(_workspace, _state, case):
+    def capture(
+        _workspace: object, _state: object, case: dict[str, object]
+    ) -> list[object]:
         requests.append(case["inputs"]["result_mode"])
         return []
 
@@ -866,7 +884,9 @@ def test_initial_is_the_first_public_task_request_at_each_revision(
     assert report["status"] == "INCOMPLETE"
 
 
-def test_regrading_rejects_a_passing_summary_without_artifact_proof(corpus, tmp_path):
+def test_regrading_rejects_a_passing_summary_without_artifact_proof(
+    corpus: tuple[Path, dict[str, Path]], tmp_path: Path
+) -> None:
     from scripts.repository_evaluation.backend_regrading import verify_task_summary
 
     suite_path, sources = corpus
@@ -889,7 +909,9 @@ def test_regrading_rejects_a_passing_summary_without_artifact_proof(corpus, tmp_
         )
 
 
-def test_regrading_recomputes_actual_visible_size(corpus, tmp_path):
+def test_regrading_recomputes_actual_visible_size(
+    corpus: tuple[Path, dict[str, Path]], tmp_path: Path
+) -> None:
     from scripts.repository_evaluation.backend_regrading import verify_task_summary
 
     suite_path, sources = corpus
@@ -915,7 +937,9 @@ def test_regrading_recomputes_actual_visible_size(corpus, tmp_path):
         )
 
 
-def test_correct_source_digest_cannot_qualify_wrong_symbol_name(corpus):
+def test_correct_source_digest_cannot_qualify_wrong_symbol_name(
+    corpus: tuple[Path, dict[str, Path]],
+) -> None:
     suite_path, sources = corpus
     path = suite_path.parent / "grader.json"
     grader = json.loads(path.read_text())
@@ -931,8 +955,8 @@ def test_correct_source_digest_cannot_qualify_wrong_symbol_name(corpus):
 
 @pytest.mark.parametrize("mutation", ["summary", "artifact", "observer", "campaign"])
 def test_aggregate_rejects_unbound_or_modified_evidence(
-    corpus, tmp_path: Path, mutation: str
-):
+    corpus: tuple[Path, dict[str, Path]], tmp_path: Path, mutation: str
+) -> None:
     from scripts.repository_evaluation.aggregate_backend import aggregate_backend
 
     suite_path, sources = corpus
@@ -980,7 +1004,9 @@ def test_aggregate_rejects_unbound_or_modified_evidence(
     "field",
     ["before", "after", "delta", "transport_grades", "initial_transport_grades"],
 )
-def test_regrading_rejects_forged_retained_subgrades(corpus, tmp_path, field):
+def test_regrading_rejects_forged_retained_subgrades(
+    corpus: tuple[Path, dict[str, Path]], tmp_path: Path, field: str
+) -> None:
     from scripts.repository_evaluation.backend_regrading import verify_task_summary
 
     suite_path, sources = corpus
@@ -1003,7 +1029,9 @@ def test_regrading_rejects_forged_retained_subgrades(corpus, tmp_path, field):
         )
 
 
-def test_regrading_rejects_uncomputed_gate_claim(corpus, tmp_path):
+def test_regrading_rejects_uncomputed_gate_claim(
+    corpus: tuple[Path, dict[str, Path]], tmp_path: Path
+) -> None:
     from scripts.repository_evaluation.backend_regrading import verify_task_summary
 
     suite_path, sources = corpus

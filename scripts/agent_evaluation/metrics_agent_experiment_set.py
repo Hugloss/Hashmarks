@@ -31,7 +31,7 @@ class _SetAggregation:
     run_ids: set[str] = field(default_factory=set)
     task_keys: set[tuple[str, str, str]] = field(default_factory=set)
     repositories: set[str] = field(default_factory=set)
-    experiment_reports: list[dict[str, Any]] = field(default_factory=list)
+    experiment_reports: list[dict[str, object]] = field(default_factory=list)
     total_baseline_tokens: int = 0
     total_hashmarks_tokens: int = 0
 
@@ -43,7 +43,7 @@ class _SetAggregation:
             raise ValueError(f"duplicate experiment_id: {experiment_id}")
         self.experiment_ids.add(experiment_id)
 
-    def admit_runs(self, experiment: dict[str, Any]) -> None:
+    def admit_runs(self, experiment: dict[str, object]) -> None:
         for run in experiment["runs"]:
             run_id = run["run_id"]
             if run_id in self.run_ids:
@@ -53,7 +53,7 @@ class _SetAggregation:
             if run["mode"] == "baseline":
                 self._admit_task(run)
 
-    def _admit_task(self, run: dict[str, Any]) -> None:
+    def _admit_task(self, run: dict[str, object]) -> None:
         key = (run["repository_identity"], run["task_id"], run["task_revision"])
         if key in self.task_keys:
             raise ValueError(
@@ -62,7 +62,7 @@ class _SetAggregation:
         self.task_keys.add(key)
 
     def admit_report(
-        self, experiment_id: str, digest: str, report: dict[str, Any]
+        self, experiment_id: str, digest: str, report: dict[str, object]
     ) -> None:
         summary = report["comparison"]["summary"]
         if not summary.get("token_reduction_claim_eligible"):
@@ -94,17 +94,17 @@ class _SetAggregation:
         )
 
 
-def _load_experiment_module() -> Any:
+def _load_experiment_module() -> object:
     return import_sibling("metrics_agent_experiment", __package__)
 
 
-def _nonempty(value: Any, field: str, path: Path) -> str:
+def _nonempty(value: object, field: str, path: Path) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{field} must be a non-empty string: {path}")
     return value
 
 
-def _relative_file(root: Path, value: Any, field: str, manifest_path: Path) -> Path:
+def _relative_file(root: Path, value: object, field: str, manifest_path: Path) -> Path:
     raw = _nonempty(value, field, manifest_path)
     relative = Path(raw)
     if relative.is_absolute():
@@ -133,7 +133,7 @@ def _sha256(path: Path) -> str:
 
 
 def _validate_set_entry(
-    entry: Any, index: int, path: Path, seen_paths: set[str]
+    entry: object, index: int, path: Path, seen_paths: set[str]
 ) -> None:
     if not isinstance(entry, dict):
         raise ValueError(f"experiment-set entry {index} must be an object: {path}")
@@ -160,7 +160,7 @@ def _validate_set_entry(
     seen_paths.add(rel)
 
 
-def load_set_manifest(path: Path) -> dict[str, Any]:
+def load_set_manifest(path: Path) -> dict[str, object]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict) or value.get("schema") != SET_SCHEMA:
         raise ValueError(f"unsupported agent experiment-set manifest schema: {path}")
@@ -180,7 +180,7 @@ def load_set_manifest(path: Path) -> dict[str, Any]:
     return value
 
 
-def _replication_policy(manifest: dict[str, Any]) -> tuple[int, float, int]:
+def _replication_policy(manifest: dict[str, object]) -> tuple[int, float, int]:
     policy = manifest.get("replication_policy", {})
     min_repeats = policy.get("min_repeats_per_group", 3)
     confidence = policy.get("confidence", 0.95)
@@ -200,10 +200,10 @@ def _replication_policy(manifest: dict[str, Any]) -> tuple[int, float, int]:
 
 def _bootstrap_interval(
     manifest_path: Path,
-    experiment_reports: list[dict[str, Any]],
+    experiment_reports: list[dict[str, object]],
     confidence: float,
     bootstrap_samples: int,
-) -> dict[str, Any] | None:
+) -> dict[str, object] | None:
     import math
     import random
 
@@ -235,10 +235,10 @@ def _bootstrap_interval(
 
 
 def _replication_report(
-    manifest: dict[str, Any],
+    manifest: dict[str, object],
     manifest_path: Path,
-    experiment_reports: list[dict[str, Any]],
-) -> dict[str, Any]:
+    experiment_reports: list[dict[str, object]],
+) -> dict[str, object]:
     # Repetitions describe variation and never add repository/task breadth.
     groups: dict[str, list[dict[str, Any]]] = {}
     for index, entry in enumerate(manifest["experiments"]):
@@ -285,7 +285,7 @@ def _replication_report(
     }
 
 
-def _set_consistency_fields(manifest: dict[str, Any]) -> dict[str, Any]:
+def _set_consistency_fields(manifest: dict[str, object]) -> dict[str, object]:
     fields = {
         "model_identity": manifest["model_identity"],
         "model_config_identity": manifest["model_config_identity"],
@@ -309,10 +309,10 @@ def _set_consistency_fields(manifest: dict[str, Any]) -> dict[str, Any]:
 def _load_bound_experiment(
     root: Path,
     manifest_path: Path,
-    entry: dict[str, Any],
+    entry: dict[str, object],
     index: int,
-    experiment_module: Any,
-) -> tuple[Path, str, dict[str, Any]]:
+    experiment_module: object,
+) -> tuple[Path, str, dict[str, object]]:
     experiment_path = _relative_file(
         root, entry["manifest"], f"experiment {index} manifest", manifest_path
     )
@@ -326,7 +326,7 @@ def _load_bound_experiment(
 
 
 def _validate_experiment_consistency(
-    experiment: dict[str, Any], expected_fields: dict[str, Any]
+    experiment: dict[str, object], expected_fields: dict[str, object]
 ) -> None:
     experiment_id = experiment["experiment_id"]
     for field_name, expected in expected_fields.items():
@@ -357,7 +357,7 @@ def _public_claim_blockers(state: _SetAggregation) -> list[str]:
 
 def run_experiment_set(
     manifest_path: Path, *, strict_raw_evidence: bool = True
-) -> dict[str, Any]:
+) -> dict[str, object]:
     experiment_module = _load_experiment_module()
     manifest = load_set_manifest(manifest_path)
     root = manifest_path.parent
@@ -415,7 +415,7 @@ def run_experiment_set(
 
 
 def gate(
-    report: dict[str, Any], *, require_public_broad_claim: bool = False
+    report: dict[str, object], *, require_public_broad_claim: bool = False
 ) -> list[str]:
     summary = report["summary"]
     failures: list[str] = []

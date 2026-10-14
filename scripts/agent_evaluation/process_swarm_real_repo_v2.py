@@ -399,7 +399,7 @@ def run(config: SwarmRunConfig) -> dict[str, Any]:
     return result
 
 
-def main():
+def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--repo", type=Path, required=True)
     p.add_argument("--public", type=Path, required=True)

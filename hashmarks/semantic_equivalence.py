@@ -63,7 +63,7 @@ def _canonical_json(value: object) -> str:
     )
 
 
-def _run_query(codemap, query: QueryKind, task: str, limit: int) -> object:
+def _run_query(codemap: Any, query: QueryKind, task: str, limit: int) -> object:
     if query == "find_task":
         return codemap.find_task(task, limit=limit)
     if query == "task_action_map":

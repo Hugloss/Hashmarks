@@ -107,7 +107,7 @@ def _prompt(lane: str, task: dict[str, str], workspace: Path, bridge: Path) -> s
     )
 
 
-def _walk_json(value: Any):
+def _walk_json(value: object) -> Iterator[dict[str, object]]:
     if isinstance(value, dict):
         yield value
         for child in value.values():
@@ -247,7 +247,7 @@ def _score(
         )
     n = len(rows)
 
-    def tsum(k):
+    def tsum(k: str) -> int:
         return sum(int((r["usage"] or {}).get(k) or 0) for r in rows)
 
     return {

@@ -4,12 +4,12 @@ from hashmarks.cli import main
 from hashmarks.codemap import CodeMap
 
 
-def _package(root) -> None:
+def _package(root: Path) -> None:
     (root / "pkg").mkdir()
     (root / "pkg" / "__init__.py").write_text("", encoding="utf-8")
 
 
-def test_cache_invalidation_resolves_local_alias_to_exact_owner(tmp_path):
+def test_cache_invalidation_resolves_local_alias_to_exact_owner(tmp_path: Path) -> None:
     _package(tmp_path)
     (tmp_path / "pkg" / "state.py").write_text(
         "CACHE = {}\nALIAS = CACHE\n\ndef reset():\n    ALIAS.clear()\n",
@@ -27,7 +27,7 @@ def test_cache_invalidation_resolves_local_alias_to_exact_owner(tmp_path):
     assert edge["target"] not in graph["unresolved_cache_owners"]
 
 
-def test_cache_invalidation_resolves_imported_symbol_alias(tmp_path):
+def test_cache_invalidation_resolves_imported_symbol_alias(tmp_path: Path) -> None:
     _package(tmp_path)
     (tmp_path / "pkg" / "state.py").write_text("CACHE = {}\n", encoding="utf-8")
     (tmp_path / "consumer.py").write_text(
@@ -43,7 +43,9 @@ def test_cache_invalidation_resolves_imported_symbol_alias(tmp_path):
     assert edge["confidence"] == "qualified-symbol-import"
 
 
-def test_cache_invalidation_resolves_module_alias_without_same_name_guess(tmp_path):
+def test_cache_invalidation_resolves_module_alias_without_same_name_guess(
+    tmp_path: Path,
+) -> None:
     _package(tmp_path)
     (tmp_path / "pkg" / "a.py").write_text("CACHE = {}\n", encoding="utf-8")
     (tmp_path / "pkg" / "b.py").write_text("CACHE = {}\n", encoding="utf-8")
@@ -61,7 +63,7 @@ def test_cache_invalidation_resolves_module_alias_without_same_name_guess(tmp_pa
     assert "cache:pkg/b.py:CACHE" in graph["unresolved_cache_owners"]
 
 
-def test_cache_invalidation_resolves_relative_import(tmp_path):
+def test_cache_invalidation_resolves_relative_import(tmp_path: Path) -> None:
     _package(tmp_path)
     (tmp_path / "pkg" / "state.py").write_text("CACHE = {}\n", encoding="utf-8")
     (tmp_path / "pkg" / "consumer.py").write_text(
@@ -74,7 +76,9 @@ def test_cache_invalidation_resolves_relative_import(tmp_path):
     assert graph["edges"][0]["target"] == "cache:pkg/state.py:CACHE"
 
 
-def test_cache_invalidation_does_not_attach_unqualified_same_name(tmp_path):
+def test_cache_invalidation_does_not_attach_unqualified_same_name(
+    tmp_path: Path,
+) -> None:
     _package(tmp_path)
     (tmp_path / "pkg" / "state.py").write_text("CACHE = {}\n", encoding="utf-8")
     (tmp_path / "other.py").write_text(
@@ -88,7 +92,7 @@ def test_cache_invalidation_does_not_attach_unqualified_same_name(tmp_path):
     assert graph["summary"]["owners_without_resolved_invalidator"] == 1
 
 
-def test_cache_invalidation_resolves_decorator_cache_clear(tmp_path):
+def test_cache_invalidation_resolves_decorator_cache_clear(tmp_path: Path) -> None:
     _package(tmp_path)
     (tmp_path / "pkg" / "memo.py").write_text(
         "from functools import lru_cache\n\n@lru_cache(maxsize=8)\ndef value(x):\n    return x\n",
@@ -106,7 +110,9 @@ def test_cache_invalidation_resolves_decorator_cache_clear(tmp_path):
     assert edge["method"] == "cache_clear"
 
 
-def test_cli_cache_invalidation_ownership(tmp_path, capsys):
+def test_cli_cache_invalidation_ownership(
+    tmp_path: Path, capsys: pytest.Capsys
+) -> None:
     _package(tmp_path)
     (tmp_path / "pkg" / "state.py").write_text(
         "CACHE = {}\n\ndef reset():\n    CACHE.clear()\n", encoding="utf-8"
@@ -122,8 +128,8 @@ def test_cli_cache_invalidation_ownership(tmp_path, capsys):
 
 
 def test_cache_invalidation_imported_symbol_shadowed_by_parameter_is_not_authority(
-    tmp_path,
-):
+    tmp_path: Path,
+) -> None:
     _package(tmp_path)
     (tmp_path / "pkg" / "state.py").write_text("CACHE = {}\n", encoding="utf-8")
     (tmp_path / "consumer.py").write_text(
@@ -136,7 +142,9 @@ def test_cache_invalidation_imported_symbol_shadowed_by_parameter_is_not_authori
     assert graph["edges"] == []
 
 
-def test_cache_invalidation_module_alias_shadowed_by_local_is_not_authority(tmp_path):
+def test_cache_invalidation_module_alias_shadowed_by_local_is_not_authority(
+    tmp_path: Path,
+) -> None:
     _package(tmp_path)
     (tmp_path / "pkg" / "state.py").write_text("CACHE = {}\n", encoding="utf-8")
     (tmp_path / "consumer.py").write_text(
@@ -149,7 +157,9 @@ def test_cache_invalidation_module_alias_shadowed_by_local_is_not_authority(tmp_
     assert graph["edges"] == []
 
 
-def test_cache_invalidation_function_local_alias_to_import_remains_resolvable(tmp_path):
+def test_cache_invalidation_function_local_alias_to_import_remains_resolvable(
+    tmp_path: Path,
+) -> None:
     _package(tmp_path)
     (tmp_path / "pkg" / "state.py").write_text("CACHE = {}\n", encoding="utf-8")
     (tmp_path / "consumer.py").write_text(

@@ -22,12 +22,12 @@ CATEGORIES = (
 SCHEMA = "hashmarks.full-edit-agent-corpus.v1"
 
 
-def _w(p: Path, t: str):
+def _w(p: Path, t: str) -> None:
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(t, encoding="utf-8")
 
 
-def _digest(x):
+def _digest(x: object) -> str:
     return (
         "sha256:"
         + hashlib.sha256(
@@ -136,7 +136,7 @@ def _case(root: Path, index: int, category: str) -> tuple[dict, dict]:
 
 def generate(
     root: Path, public_path: Path, secret_path: Path, *, cases_per_category: int = 10
-):
+) -> dict[str, object]:
     root = root.resolve()
     public_path = public_path.resolve()
     secret_path = secret_path.resolve()
@@ -169,7 +169,7 @@ def generate(
     }
 
 
-def main():
+def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", type=Path, required=True)
     ap.add_argument("--public", type=Path, required=True)
