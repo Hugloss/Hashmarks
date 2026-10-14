@@ -7,8 +7,8 @@ import shutil
 import tempfile
 import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from hashmarks._command_output import log_command_output
 from hashmarks.client import IdentityClient

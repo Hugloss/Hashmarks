@@ -208,21 +208,24 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 }
             )
 
-            def visit(raw: Mapping[str, object], parent: str | None = None) -> str:
+            def visit(
+                raw: Mapping[str, object],
+                parent: str | None = None,
+                _ctx: str = context,
+                _src: str = tree_source,
+            ) -> str:
                 component, node, _group, artifact, version, scope = _tree_node(raw)
-                admit_selection(
-                    component, node, artifact, version, context, tree_source
-                )
+                admit_selection(component, node, artifact, version, _ctx, _src)
                 if parent is not None:
                     relationships.append(
                         {
                             "source": parent,
                             "target": node,
                             "kind": "dependency",
-                            "context": context,
+                            "context": _ctx,
                             "effective_scope": scope,
                             "marker": "",
-                            "evidence_sources": [tree_source],
+                            "evidence_sources": [_src],
                         }
                     )
                 children = raw.get("children", ())
@@ -235,7 +238,7 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 for child in children:
                     if not isinstance(child, Mapping):
                         raise ValueError(f"Maven tree child must be an object: {node}")
-                    visit(child, node)
+                    visit(child, node, _ctx=_ctx, _src=_src)
                 return node
 
             roots.append(

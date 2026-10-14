@@ -146,6 +146,13 @@ class CrossRepositoryEvidenceMixin:
             "explanation_identity": explanation.get("explanation_identity"),
         }, explanation
 
+    CROSS_REPOSITORY_EVIDENCE_DEFAULT_OPTIONS = ChangeImpactOptions(
+        impact_limit_per_surface=4,
+        max_depth=3,
+        project_impact_limit=12,
+        project_impact_encoding="compact",
+    )
+
     @diagnostic_producer
     def cross_repository_evidence_packet(
         self,
@@ -154,13 +161,9 @@ class CrossRepositoryEvidenceMixin:
         *,
         limit: int = 20,
         per_role: int = 3,
-        options: ChangeImpactOptions = ChangeImpactOptions(
-            impact_limit_per_surface=4,
-            max_depth=3,
-            project_impact_limit=12,
-            project_impact_encoding="compact",
-        ),
+        options: ChangeImpactOptions | None = None,
     ) -> dict[str, object]:
+        options = options or CROSS_REPOSITORY_EVIDENCE_DEFAULT_OPTIONS
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         if options.project_impact_limit is None or options.project_impact_limit < 1:
@@ -190,19 +193,19 @@ class CrossRepositoryEvidenceMixin:
             ),
         )
 
-        project_impact = impact.get("project_impact")
         expanded, roots, dependents, relationships = self._cross_project_impact(
-            project_impact
+            impact.get("project_impact")
         )
 
-        ownership_projection = self._cross_ownership_projection(action)
         verification_projection, verification = self._cross_verification_evidence(
             task, action, limit
         )
 
-        freshness_projection = self._cross_freshness_projection(freshness)
         unresolved = self._cross_unresolved_evidence(
-            project_impact, expanded, ownership_projection, verification
+            impact.get("project_impact"),
+            expanded,
+            self._cross_ownership_projection(action),
+            verification,
         )
 
         payload: dict[str, object] = {
@@ -224,7 +227,7 @@ class CrossRepositoryEvidenceMixin:
             "dependents": dependents,
             "relationships": relationships,
             "affected_ownership_surface": {
-                "ownership": ownership_projection,
+                "ownership": self._cross_ownership_projection(action),
                 "surfaces": {
                     key: list(value)
                     for key, value in (
@@ -236,7 +239,7 @@ class CrossRepositoryEvidenceMixin:
                 },
             },
             "verification": verification_projection,
-            "freshness": freshness_projection,
+            "freshness": self._cross_freshness_projection(freshness),
             "unresolved": unresolved,
             "bounds": {
                 "depth": options.max_depth,

@@ -284,6 +284,9 @@ class _SourceSyntaxOptions:
     include_inputs: bool = False
 
 
+SOURCE_SYNTAX_DEFAULT_OPTIONS = _SourceSyntaxOptions()
+
+
 def _source_groups(
     path: str,
     source: str,
@@ -291,8 +294,9 @@ def _source_groups(
     route_objects: frozenset[str],
     tool_objects: frozenset[str],
     provider: str,
-    syntax_options: _SourceSyntaxOptions = _SourceSyntaxOptions(),
+    syntax_options: _SourceSyntaxOptions | None = None,
 ) -> tuple[list[dict[str, object]], ast.Module]:
+    syntax_options = syntax_options or SOURCE_SYNTAX_DEFAULT_OPTIONS
     groups: list[dict[str, object]] = []
     tree = ast.parse(source, filename=path)
     for declaration in tree.body:

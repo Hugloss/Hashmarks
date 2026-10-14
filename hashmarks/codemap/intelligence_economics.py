@@ -14,6 +14,10 @@ if TYPE_CHECKING:
 
 
 INTELLIGENCE_ECONOMICS_SCHEMA = "hashmarks.intelligence-economics-receipt.v1"
+INTELLIGENCE_ECONOMICS_DEFAULT_OPTIONS = ChangeImpactOptions(
+    impact_limit_per_surface=4,
+    max_depth=3,
+)
 
 
 class IntelligenceEconomicsMixin:
@@ -72,11 +76,9 @@ class IntelligenceEconomicsMixin:
         previous_snapshot: Mapping[str, object] | None = None,
         limit: int = 20,
         per_role: int = 3,
-        options: ChangeImpactOptions = ChangeImpactOptions(
-            impact_limit_per_surface=4,
-            max_depth=3,
-        ),
+        options: ChangeImpactOptions | None = None,
     ) -> dict[str, object]:
+        options = options or INTELLIGENCE_ECONOMICS_DEFAULT_OPTIONS
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         if not task.strip():

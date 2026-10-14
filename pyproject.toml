@@ -113,12 +113,12 @@ select = [
     #"ANN001",  # Require parameter annotations
     #"ANN201",  # Require public function return annotations
     #"ANN202",  # Require private function return annotations
-    #"B",
-    #"UP006",
-    #"UP007",
-    #"UP035",
-    #"UP045",
-    #"RUF013",
+    "B",
+    "UP006",
+    "UP007",
+    "UP035",
+    "UP045",
+    "RUF013",
     #"TC004",
 ]
 

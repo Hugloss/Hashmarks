@@ -4,8 +4,9 @@ import inspect
 import json
 import sys
 import types
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Never
+from typing import Never
 
 import pytest
 

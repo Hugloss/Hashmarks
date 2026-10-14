@@ -36,6 +36,11 @@ from .source_line_correspondence import (
     validated_source_lines,
 )
 
+REPOSITORY_DELTA_DEFAULT_OPTIONS = ChangeImpactOptions(
+    impact_limit_per_surface=4,
+    max_depth=3,
+)
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -1390,11 +1395,9 @@ class RepositoryDeltaMixin(ScopedSourceLiteralsMixin):
         previous_snapshot: Mapping[str, object],
         limit: int = 20,
         per_role: int = 3,
-        options: ChangeImpactOptions = ChangeImpactOptions(
-            impact_limit_per_surface=4,
-            max_depth=3,
-        ),
+        options: ChangeImpactOptions | None = None,
     ) -> dict[str, object]:
+        options = options or REPOSITORY_DELTA_DEFAULT_OPTIONS
         """Return changed repository-intelligence facts between admitted states."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)

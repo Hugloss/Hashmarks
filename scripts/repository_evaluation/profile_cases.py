@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
 PROFILE_SCHEMA = "hashmarks.repository-evaluation-profile.v1"
+PAIRED_PROFILE_DEFAULT_PROTOCOL = PairedProfileProtocol()
 PAIRED_PROFILE_SCHEMA = "hashmarks.repository-evaluation-paired-profile.v1"
 
 
@@ -192,8 +193,9 @@ def paired_profile_cases(
     workspace_a: Path,
     workspace_b: Path,
     cases_path: Path,
-    protocol: PairedProfileProtocol = PairedProfileProtocol(),
+    protocol: PairedProfileProtocol | None = None,
 ) -> dict[str, Any]:
+    protocol = protocol or PAIRED_PROFILE_DEFAULT_PROTOCOL
     if (
         protocol.warmups < 0
         or protocol.pairs < 3

@@ -4,9 +4,10 @@ import asyncio
 import copy
 import importlib.util
 import json
+from collections.abc import Callable
 from itertools import product
 from pathlib import Path
-from typing import Any, Callable, Never
+from typing import Any, Never
 
 import pytest
 

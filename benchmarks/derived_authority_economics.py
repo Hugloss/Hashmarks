@@ -469,7 +469,7 @@ def _explicit_operation_metrics(
     iterations: int,
 ) -> dict[str, object]:
     repository_observation_calls = 0
-    original_observer = getattr(codemap, "_repository_member_observation")
+    original_observer = codemap._repository_member_observation
 
     def counted_observer(*args: Any, **kwargs: Any):
         nonlocal repository_observation_calls

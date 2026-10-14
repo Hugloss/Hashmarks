@@ -14,7 +14,6 @@ SURFACES = {
     "outline",
     "affected",
     "tests",
-    "task-evidence",
     "findings",
     "mcp",
     "compact",

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import wraps
-from typing import Callable, TypeVar, cast
+from typing import TypeVar, cast
 
 OPERATION_CONTRACT_SCHEMA = "hashmarks.operation-contract.v1"
 

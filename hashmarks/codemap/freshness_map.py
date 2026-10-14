@@ -34,6 +34,8 @@ class FreshnessMapOptions:
     max_depth: int = 3
 
 
+FRESHNESS_MAP_DEFAULT_OPTIONS = FreshnessMapOptions()
+
 FRESHNESS_MAP_SCHEMA = "hashmarks.evidence-freshness-map.v1"
 
 
@@ -362,8 +364,9 @@ class EvidenceFreshnessMapMixin:
         *,
         negative_members: Sequence[str | Path] = (),
         previous_map: Mapping[str, object] | None = None,
-        options: FreshnessMapOptions = FreshnessMapOptions(),
+        options: FreshnessMapOptions | None = None,
     ) -> dict[str, object]:
+        options = options or FRESHNESS_MAP_DEFAULT_OPTIONS
         """Return current and prior freshness without persisting duplicate truth."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)

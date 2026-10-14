@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import importlib
-from typing import TYPE_CHECKING, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.watch_continuity import (
@@ -168,7 +169,7 @@ def test_watch_forever_incremental_callback_reconciles_observed_paths(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     updates: list[tuple[object, list[str]]] = []
-    callback = None
+    captured_callback = None
     external_state = tmp_path.parent / f"{tmp_path.name}-state"
 
     with CodeMap(tmp_path, state_dir=external_state) as codemap:
@@ -183,9 +184,9 @@ def test_watch_forever_incremental_callback_reconciles_observed_paths(
             exclude_relative_paths: list[str],
         ) -> _FakeWatcher:
 
-            nonlocal callback
+            nonlocal captured_callback
             del root, debounce_seconds, change_tracker
-            callback = update_callback
+            captured_callback = update_callback
             assert set(exclude_relative_paths) == {".git"}
             return _FakeWatcher([])
 
@@ -197,8 +198,8 @@ def test_watch_forever_incremental_callback_reconciles_observed_paths(
 
         def drive_update_then_stop(_seconds: float) -> None:
             if len(sync_calls) == 1:
-                assert callback is not None
-                callback(["src/owner.py"])
+                assert captured_callback is not None
+                captured_callback(["src/owner.py"])
                 return
             raise KeyboardInterrupt
 

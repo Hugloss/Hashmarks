@@ -57,7 +57,10 @@ def _qualification_rows() -> list[dict[str, object]]:
         {"state": "no-edit-authority", "owner": None},
         {"state": "explicit-test-target", "owner": None},
     ]
-    return [evaluate_case(case, result) for case, result in zip(cases, observed)]
+    return [
+        evaluate_case(case, result)
+        for case, result in zip(cases, observed, strict=True)
+    ]
 
 
 def test_sufficient_unique_owner_resolves_without_authority_violation() -> None:

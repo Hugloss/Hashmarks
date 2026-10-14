@@ -765,7 +765,7 @@ async def _current_contract_summary(
         tools = await server.list_tools()
         return contract_summary(contract_from_tool_models(__version__, tools))
     finally:
-        surface = cast("HashmarksMcpSurface", getattr(server, "_hashmarks_surface"))
+        surface = cast("HashmarksMcpSurface", server._hashmarks_surface)
         surface.close()
 
 
