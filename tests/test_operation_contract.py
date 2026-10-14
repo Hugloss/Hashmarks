@@ -37,6 +37,7 @@ from hashmarks.operation_contract import (
     require_registered_operation,
     validate_operation_response,
 )
+from hashmarks.python_ast_cache import read_python_ast
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -223,8 +224,7 @@ def test_public_surfaces_do_not_mint_versioned_semantic_schemas() -> None:
 
 
 def test_cli_operation_projection_names_are_registered_literals() -> None:
-    source = (ROOT / "hashmarks" / "repository_cli.py").read_text(encoding="utf-8")
-    tree = ast.parse(source)
+    tree = read_python_ast(ROOT / "hashmarks" / "repository_cli.py").tree
     projected: list[str] = []
     for node in ast.walk(tree):
         if not (

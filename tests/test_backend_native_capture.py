@@ -135,6 +135,32 @@ def test_non_ascii_definition_prefix_is_incomplete_not_a_false_token_failure(tmp
     assert result["token_qualification"] == "unqualified-non-ascii-prefix"
 
 
+@pytest.mark.parametrize("role", [True, False, -1, 1.0, "1"])
+def test_malformed_producer_role_cannot_qualify_an_exact_definition(tmp_path, role):
+    (tmp_path / "backend.py").write_text("def handler():\n    return 1\n")
+    write_json(
+        tmp_path / "index.json",
+        {
+            "documents": [
+                {
+                    "relative_path": "backend.py",
+                    "occurrences": [
+                        {
+                            "symbol_roles": role,
+                            "range": [0, 4, 11],
+                            "symbol": "opaque-symbol",
+                        }
+                    ],
+                }
+            ]
+        },
+    )
+    with pytest.raises(ValueError, match="nonnegative integers"):
+        _native_definition(
+            tmp_path, {"path": "backend.py", "symbol": "handler", "start_line": 1}
+        )
+
+
 @pytest.mark.parametrize("language,suffix", [("python", ".py"), ("typescript", ".ts")])
 def test_capture_preparation_preserves_all_sources_without_inventing_verifier(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, language: str, suffix: str

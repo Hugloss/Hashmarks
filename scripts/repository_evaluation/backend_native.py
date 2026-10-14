@@ -311,7 +311,11 @@ def _native_definition(capture: Path, label: dict[str, Any]) -> dict[str, Any]:
         for row in document["occurrences"]:
             role = row.get("symbol_roles", row.get("symbolRoles", 0))
             location = row.get("range", [])
-            if not role & 1 or len(location) != 3 or location[0] != line - 1:
+            if (
+                not _definition_role(role)
+                or len(location) != 3
+                or location[0] != line - 1
+            ):
                 continue
             if not content[: location[2]].isascii():
                 unqualified_encoding = True
@@ -329,6 +333,12 @@ def _native_definition(capture: Path, label: dict[str, Any]) -> dict[str, Any]:
         else "ascii-source-token",
         "basis": "raw-producer-definition-role-and-frozen-source-token",
     }
+
+
+def _definition_role(value: object) -> bool:
+    if type(value) is not int or value < 0:
+        raise ValueError("native definition roles must be nonnegative integers")
+    return bool(value & 1)
 
 
 def _transport(

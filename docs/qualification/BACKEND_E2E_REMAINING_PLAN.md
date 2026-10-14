@@ -31,6 +31,59 @@ Full configured Ty, Pyright, Ruff, formatting, hygiene, complexity, deterministi
 regressions, heldout evaluation and artifact qualification must pass. Historical
 scoped passes cannot replace these checks.
 
+## Successor foundation checkpoint
+
+The successor now has executable task authority checks, transition-bound
+freshness witnesses, native packet/definition witnesses and shared retained-byte
+regrading. Repository-qualified selectors distinguish identical relative paths
+and comparison stages. Native/workflow artifact namespaces remain explicit in
+aggregation. Native oracle admission requires both stages and exact target
+membership. Invalid boolean, floating-point, negative or textual definition roles
+are rejected instead of being promoted to a native definition token.
+
+The two JSON CLI commands are implemented under repository CLI ownership and
+covered through actual CLI and official MCP. Query envelopes use their existing
+canonical presentation; dependency snapshots remain supplied inputs rather than
+instructions to run a dependency tool.
+
+The first complete successor core measurement acquired twelve genuine public
+workflows. Five pass every current workflow gate: fetch cancellation, sender node
+failure, metadata future, logging-token reset and partial pull batch. Seven retain
+owner/symbol/verifier or initial-evidence failures: stable offset, failed begin,
+pickle extra criteria, aggregate strings, middleware enter error, subscriber stop
+and concurrent queue lifetime. Failed begin also returns initial MCP compact
+responses of 4,080/4,082 estimated tokens before/after, exceeding the hard limit.
+These are retained repair inputs, not waived cases.
+
+The corresponding fresh native run passes twelve specimens and retains 1,440
+source/artifact-bound witnesses. It proves nominated native binding/transport,
+not task sufficiency. Core workflow and native inputs were both ADMITTED by the
+first aggregate, which remains FAIL. Missing model/async reports and the twelve
+missing catalogs remain incomplete. No row is qualified at 5/5.
+
+Measurements are under `.hashmarks/backend-e2e/campaign-v2/`: `input-baseline-01`,
+`core-public-01`, `core-native-live-01`, and `aggregate-01`. The final native-role
+hardening changes evaluator identity: earlier reports remain bound to their
+original evaluator and must not be relabelled as current campaign admission.
+`native-post-hardening-revalidation-01.json` records the narrower retained-native
+artifact/source revalidation; it does not claim a new acquisition.
+
+Full configured typing remains red in `typing-full-ty-01.log` and
+`typing-full-pyright-01.log`: 4,649 Ty diagnostics and 4,783 Pyright errors.
+Modified production/qualification owners pass scoped checks. This does not close
+T09 or substitute for full configured validation.
+
+The final focused correctness/architecture/presentation ring passes 371 tests;
+the official MCP CLI-parity regression passes separately. Ruff/formatting and the
+zero-debt gate pass. All twelve retained native specimens pass post-hardening
+artifact/source revalidation. Full regression membership, source-extraction and
+promotion artifacts remain open; these bounded passes do not close T10.
+
+Additional source-review gap: model workflows often label their test-model
+declarations but omit changed production files from task-source bindings. Complete
+the task oracle scope independently without silently changing native target
+membership. Independent display/adversarial/capability review remains pending.
+
 ## Ordered work
 
 ### T00: baseline and prerequisites
