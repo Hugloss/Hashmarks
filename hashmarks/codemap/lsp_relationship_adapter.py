@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from hashmarks.digest import FILE_DOMAIN, hash_bytes
 from hashmarks.paths import normalize_relative_path
@@ -405,12 +408,10 @@ def _locations(capture: Mapping[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
-def _query_endpoint(
-    capture: Mapping[str, Any],
-    target: Mapping[str, Any],
-    resolver: RelationshipSourceResolver,
-) -> dict[str, Any]:
-    subject = f"{target['path']}::{target['qualname']}"
+def lsp_query_locator(
+    capture: Mapping[str, Any], workspace: Path
+) -> tuple[str | None, dict[str, Any]]:
+    """Translate an already normalized producer request into its query locator."""
     params = capture["request"]["params"]
     item = params.get("item")
     if item is not None:
@@ -419,7 +420,22 @@ def _query_endpoint(
     else:
         query_uri = params["textDocument"]["uri"]
         position = params["position"]
-    path = uri_member(query_uri, resolver.codemap.workspace)
+    path = uri_member(query_uri, workspace)
+    return path, {
+        "path": path,
+        "start": position,
+        "end": position,
+        "position_encoding": capture["position_encoding"],
+    }
+
+
+def _query_endpoint(
+    capture: Mapping[str, Any],
+    target: Mapping[str, Any],
+    resolver: RelationshipSourceResolver,
+) -> dict[str, Any]:
+    subject = f"{target['path']}::{target['qualname']}"
+    path, locator = lsp_query_locator(capture, resolver.codemap.workspace)
     if (
         path is None
         or path != subject.split("::", 1)[0]
@@ -428,18 +444,12 @@ def _query_endpoint(
         raise ValueError("LSP request must name the subject's admitted snapshot")
     if (
         not int(target["start_line"])
-        <= position["line"] + 1
+        <= locator["start"]["line"] + 1
         <= int(target.get("end_line", target["start_line"]))
     ):
         raise ValueError("LSP request position is outside the supplied query subject")
-    locator = {
-        "path": path,
-        "start": position,
-        "end": position,
-        "position_encoding": capture["position_encoding"],
-    }
     resolution = resolver.candidates(
-        path, locator, capture["documents"][path], name=str(target["name"])
+        path, locator, capture["documents"][path], name=str(target["name"]), query=True
     )
     if resolution["state"] == "unique-candidate" and (
         resolution["candidates"][0]["symbol_id"] != subject

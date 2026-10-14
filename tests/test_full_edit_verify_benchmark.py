@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from scripts.agent_evaluation import full_edit_verify_benchmark as benchmark
 
 

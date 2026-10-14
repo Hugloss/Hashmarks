@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 
 from scripts import windows_published_upgrade_smoke as smoke
+
+if TYPE_CHECKING:
+    from pytest import MonkeyPatch
 
 
 def test_previous_windows_release_selects_newest_qualified_stable_tag(

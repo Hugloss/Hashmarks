@@ -127,46 +127,32 @@ class TaskEvidencePacketMixin(
         used = {row["path"] for row in (edit, verify) if row is not None}
         if contract is not None and contract["path"] in used:
             contract = None
-        plan = (
-            packet.get("verification_plan")
-            if isinstance(packet.get("verification_plan"), dict)
-            else {}
-        )
-        context = (
-            packet.get("context_budget")
-            if isinstance(packet.get("context_budget"), dict)
-            else {}
-        )
-        discrimination = (
-            packet.get("discrimination")
-            if isinstance(packet.get("discrimination"), dict)
-            else {}
-        )
-        identity = (
-            packet.get("identity") if isinstance(packet.get("identity"), dict) else {}
-        )
-        ownership = (
-            packet.get("ownership_resolution")
-            if isinstance(packet.get("ownership_resolution"), dict)
-            else {}
-        )
-        owner_path = (
-            ownership.get("owner_path")
-            if isinstance(ownership.get("owner_path"), list)
-            else []
-        )
+        plan = packet.get("verification_plan")
+        plan = plan if isinstance(plan, dict) else {}
+        context = packet.get("context_budget")
+        context = context if isinstance(context, dict) else {}
+        discrimination = packet.get("discrimination")
+        discrimination = discrimination if isinstance(discrimination, dict) else {}
+        identity = packet.get("identity")
+        identity = identity if isinstance(identity, dict) else {}
+        ownership = packet.get("ownership_resolution")
+        ownership = ownership if isinstance(ownership, dict) else {}
+        owner_path = ownership.get("owner_path")
+        owner_path = owner_path if isinstance(owner_path, list) else []
         result: dict[str, object] = {
             "schema": operation_schema("task_decision_brief"),
             "edit": edit,
             "candidate": candidate,
             "verify": verify,
-            "verification_argv": list(plan.get("argv") or [])
+            "verification_argv": list(cast(list[str], plan.get("argv") or []))
             if plan.get("available")
             else None,
             "safe": bool(context.get("safe")) and edit is not None,
             "stale": identity.get("stale"),
             "decision_generation": identity.get("decision_generation"),
-            "evidence_receipt": dict(packet.get("evidence_receipt") or {}),
+            "evidence_receipt": dict(
+                cast(Mapping[str, object], packet.get("evidence_receipt") or {})
+            ),
             "full_packet_available": True,
         }
         if owner_path:
@@ -180,7 +166,7 @@ class TaskEvidencePacketMixin(
             ]
         if contract is not None:
             result["contract"] = contract
-        missing = list(context.get("missing_roles") or [])
+        missing = list(cast(list[str], context.get("missing_roles") or []))
         if missing:
             result["missing_roles"] = missing
         if bool(discrimination.get("needed")):
@@ -210,7 +196,9 @@ class TaskEvidencePacketMixin(
             if not path or path in seen:
                 continue
             seen.add(path)
-            used += int(self._work_context_anchor(row, role=role)["estimated_tokens"])
+            used += int(
+                cast(int, self._work_context_anchor(row, role=role)["estimated_tokens"])
+            )
         return used
 
     @staticmethod
@@ -315,6 +303,8 @@ class TaskEvidencePacketMixin(
             and edit is not None
             and bool(verification.get("available"))
         )
+        authority = action.get("ownership_authority")
+        authority = authority if isinstance(authority, Mapping) else {}
         result: dict[str, object] = {
             "schema": operation_schema("task_action_brief"),
             "status": (
@@ -328,12 +318,7 @@ class TaskEvidencePacketMixin(
             ),
             "candidate": action.get("candidate_path"),
             "authority_proof_identity": str(
-                (
-                    action.get("ownership_authority")
-                    if isinstance(action.get("ownership_authority"), Mapping)
-                    else {}
-                ).get("authority_proof_identity")
-                or ""
+                authority.get("authority_proof_identity") or ""
             ),
             "evidence_receipt": evidence_receipt,
         }
@@ -357,7 +342,7 @@ class TaskEvidencePacketMixin(
         ):
             result["contract"] = str(contract["path"])
 
-        missing = list(context.get("missing_roles") or [])
+        missing = list(cast(list[str], context.get("missing_roles") or []))
         if missing:
             result["missing"] = missing
 
@@ -663,8 +648,10 @@ class TaskEvidencePacketMixin(
         )
         if projection_reason is not None:
             return projection_reason
-        domains = {str(value) for value in (edit.get("domains") or [])}
-        roles = {str(value) for value in (edit.get("roles") or [])}
+        domains = {
+            str(value) for value in cast(Sequence[str], edit.get("domains") or [])
+        }
+        roles = {str(value) for value in cast(Sequence[str], edit.get("roles") or [])}
         reason = "canonical-edit-role"
         if "contract" in roles and domains.intersection({"contract", "ownership"}):
             reason = "contract-authority"
@@ -700,7 +687,8 @@ class TaskEvidencePacketMixin(
         """Return compact source-revision and freshness evidence for a start packet."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        edit = action.get("edit") if isinstance(action.get("edit"), dict) else None
+        edit = action.get("edit")
+        edit = edit if isinstance(edit, dict) else None
         generation, identity_generation, stale = self._generation_status()
         freshness, freshness_reason = self._task_evidence_freshness(
             generation, selection_generation, stale, verification_stale
@@ -756,24 +744,14 @@ class TaskEvidencePacketMixin(
         verification_plan: Mapping[str, object],
     ) -> dict[str, object]:
         """Project task evidence into role-separated repository observations."""
-        authority = (
-            action.get("ownership_authority")
-            if isinstance(action.get("ownership_authority"), Mapping)
-            else {}
-        )
-        ambiguity = (
-            action.get("ambiguity")
-            if isinstance(action.get("ambiguity"), Mapping)
-            else {}
-        )
-        candidate = (
-            action.get("edit") if isinstance(action.get("edit"), Mapping) else None
-        )
-        owner = (
-            action.get("admitted_edit")
-            if isinstance(action.get("admitted_edit"), Mapping)
-            else None
-        )
+        authority = action.get("ownership_authority")
+        authority = authority if isinstance(authority, Mapping) else {}
+        ambiguity = action.get("ambiguity")
+        ambiguity = ambiguity if isinstance(ambiguity, Mapping) else {}
+        candidate = action.get("edit")
+        candidate = candidate if isinstance(candidate, Mapping) else None
+        owner = action.get("admitted_edit")
+        owner = owner if isinstance(owner, Mapping) else None
         basis = str(action.get("owner_basis") or "") or None
         explicit_target_basis = (
             str(candidate.get("explicit_target_basis") or "")
@@ -802,21 +780,19 @@ class TaskEvidencePacketMixin(
                 "symbol": None,
             }
         )
-        verify = (
-            action.get("verify") if isinstance(action.get("verify"), Mapping) else None
-        )
-        contract = (
-            action.get("contract")
-            if isinstance(action.get("contract"), Mapping)
-            else None
-        )
+        verify = action.get("verify")
+        verify = verify if isinstance(verify, Mapping) else None
+        contract = action.get("contract")
+        contract = contract if isinstance(contract, Mapping) else None
         return {
             "schema": operation_schema("task_evidence"),
             "task": task,
             "evidence_receipt": dict(evidence_receipt),
             "retrieval": {
-                "results": list(action.get("canonical") or []),
-                "bounds": dict(action.get("bounds") or {}),
+                "results": list(
+                    cast(list[dict[str, object]], action.get("canonical") or [])
+                ),
+                "bounds": dict(cast(Mapping[str, object], action.get("bounds") or {})),
                 "ordering": "retrieval-relevance-only",
                 "ownership_authority": False,
             },
@@ -846,8 +822,12 @@ class TaskEvidencePacketMixin(
             },
             "related": {
                 "contract": None if contract is None else dict(contract),
-                "inspect": list(action.get("inspect") or []),
-                "candidates": list(action.get("related") or []),
+                "inspect": list(
+                    cast(list[dict[str, object]], action.get("inspect") or [])
+                ),
+                "candidates": list(
+                    cast(list[dict[str, object]], action.get("related") or [])
+                ),
             },
             "consumer_action": "external",
         }
@@ -1113,6 +1093,7 @@ class TaskEvidencePacketMixin(
         limit: int,
     ) -> list[dict[str, object]]:
         """Add bounded retrieval-only evidence without changing action authority."""
+        self = cast("CodeMap", self)
         if limit < 10:
             return []
         existing_keys = {
@@ -1277,7 +1258,7 @@ class TaskEvidencePacketMixin(
             compact_item = {
                 key: value for key, value in item.items() if key not in {"role", "path"}
             }
-            used = int(item.get("estimated_tokens") or 0)
+            used = int(cast(int, item.get("estimated_tokens") or 0))
             complete = item.get("representation") in {
                 "source-range",
                 "config-key-range",
@@ -1478,11 +1459,8 @@ class TaskEvidencePacketMixin(
                 per_role=per_role,
             )
             selection_generation = self.store.generation()
-            verify_row = (
-                action.get("verify")
-                if isinstance(action.get("verify"), Mapping)
-                else None
-            )
+            verify_row = action.get("verify")
+            verify_row = verify_row if isinstance(verify_row, Mapping) else None
             verification_plan = self._task_action_verification_plan(verify_row)
             evidence_receipt = self._decision_evidence_receipt(
                 task, action, verification_plan
@@ -1634,7 +1612,7 @@ class TaskEvidencePacketMixin(
             encoded = json.dumps(brief, sort_keys=True, separators=(",", ":")).encode(
                 "utf-8"
             )
-            missing = list(brief.get("missing_roles") or [])
+            missing = list(cast(list[str], brief.get("missing_roles") or []))
             rows.append(
                 {
                     "budget": budget,
@@ -1649,14 +1627,16 @@ class TaskEvidencePacketMixin(
                 }
             )
         safe = [row for row in rows if bool(row["safe"])]
-        smallest = int(safe[0]["budget"]) if safe else None
+        smallest = int(cast(int, safe[0]["budget"])) if safe else None
         smallest_row = safe[0] if safe else None
         return {
             "schema": operation_schema("task_decision_brief_budget_sweep"),
             "rows": rows,
             "smallest_safe_budget": smallest,
             "smallest_safe_visible_brief_bytes": (
-                int(smallest_row["visible_brief_bytes"]) if smallest_row else None
+                int(cast(int, smallest_row["visible_brief_bytes"]))
+                if smallest_row
+                else None
             ),
             "optimization_target": "minimum-safe-agent-visible-evidence",
             "token_accounting": "visible-bytes-proxy-exact-model-tokens-harness-owned",

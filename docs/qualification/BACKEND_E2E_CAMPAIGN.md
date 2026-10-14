@@ -140,7 +140,123 @@ Readable declaration tables factor only JSON-identical qualifiers and common
 paths/prefixes. Table rows retain native order and future fields; shared metadata
 never makes boolean false equivalent to numeric zero.
 
-### Current implementation checkpoint
+Compact initial verification groups also factor identical locator qualifiers
+into `group.locator_qualifiers`. A reader reconstructs each locator as
+`{**group.get("locator_qualifiers", {}), **finding["details"]}`. Path, source
+references and any differing qualifiers remain on the individual finding.
+This preserves all admitted alternatives while avoiding repeated qualification
+fields; it does not change verification selection or ownership authority.
+
+### Current implementation measurements on 2026-10-13
+
+The fresh four-workflow CLI measurement at
+`.hashmarks/backend-e2e/remaining-work/four-workflow-cli-03/summary.json`
+retains the required methods and reviewed test candidates at both revisions.
+Maximum actual initial compact/text sizes are 2,732/2,516 tokens for
+cancellation, 3,752/3,502 for sender, 3,691/3,435 for metadata and 3,184/2,832
+for logging. This report is INCOMPLETE because MCP was deliberately omitted;
+these measurements do not establish the complete transport gate or 5/5.
+
+The focused source ring passed 221 tests (four MCP tests excluded), and the
+separate official-MCP/presentation ring passed 51 tests. These are bounded
+iteration checks. The subsequent Ruff cleanup commit introduced a watcher-test
+syntax error, callback parameter mismatches and missing annotation imports.
+Their repair passes 21 focused tests and full collection (3,916 tests).
+
+Task-evidence composition now narrows each nested mapping from one observation
+and records precise types for collection/token fields owned by existing packet
+producers. The production owner passes both Ty and Pyright; its focused public
+surface ring passes 92 tests. This is an internal typing repair, with no new
+observer responsibility or changed authority/selection rules. Full project Ty
+still reports 4,203 diagnostics and Pyright 6,595 errors and eight warnings.
+Neither full typing gate is green.
+
+Fresh acquisition after that typing repair is retained at
+`.hashmarks/backend-e2e/remaining-work/four-workflow-public-typed-01/summary.json`.
+All four workflows pass every current workflow gate at both revisions through
+API, CLI and official MCP. Maximum actual initial MCP compact/text sizes are
+2,822/2,280 tokens for cancellation, 3,952/3,267 for sender, 3,876/3,197 for
+metadata and 3,320/2,595 for logging. The report remains INCOMPLETE because four
+passing workflows do not close the twelve-problem corpus or independent
+capability-proof requirements.
+
+Fresh native qualification at
+`.hashmarks/backend-e2e/remaining-work/native-fresh-01/qualification/summary.json`
+passes all twelve existing backend workflows, including both source bindings,
+definition tokens, stale reopen checks and CLI/MCP. Its scope is nominated SCIP
+specimens; it does not establish composed backend sufficiency or 5/5. Installed
+producer and runtime identities are recorded as temporary QA provenance.
+The broader fresh native ring's initial run passed 59 tests and had 33 LSP
+fixture setup errors from a missing TypeScript runtime. That run remains failed;
+after installing the prerequisite, the complete fresh ring passed all 92 tests.
+Its log is
+`.hashmarks/backend-e2e/remaining-work/semantic-evidence-live-repaired.log`.
+This is fresh uv/Maven/SCIP/LSP production, not committed-capture replay.
+
+Two actual SQLAlchemy runtime specimens are retained under
+`.hashmarks/backend-e2e/remaining-work/runtime-fresh-01/`. Logging reproduces an
+AttributeError before the change and a usable connection afterward. Aggregate
+strings reproduces the unintended TypeError before the change and the expected
+unsupported-dialect CompileError afterward. Repository stack frames are retained
+without asserting causal diagnosis or broad debugging qualification.
+
+The existing twelve base problems, model catalog and async catalog still lack
+complete independently reviewed display/adversarial proof membership. The
+twelve missing capability catalogs, remaining witness families, fresh native
+producer runs, full bounded regression batches, comparable economics and final
+artifact qualification remain required. Historical measurements and the first
+independent source artifact do not qualify later modified source bytes.
+
+### Owned-file native-query repair on 2026-10-14
+
+The first broader regression pass completed batches 0–3 and failed batch 4:
+native request-local claims were omitted when the admitted owner was a file
+without a symbol locator. The repair keeps file ownership unchanged and uses
+the existing source resolver to qualify the producer's explicit query within
+that file. Matching snapshot bytes, admitted/current source, a unique indexed
+declaration and an unambiguous declaration-token cursor are required. Keyword
+or body positions, stale snapshots, other files, repeated tokens and multiple
+subjects remain unqualified. Query cursors may lie inside a unique token;
+result-endpoint token rules retain their existing stricter behavior.
+
+The relationship count scope explicitly says `owned-file-query`; it does not
+claim a uniquely established symbol owner. Captures remain request-local and
+previous packets remain comparison input. No inferred, transitive or persistent
+semantic relationships are introduced.
+
+```text
+Observed fact: Producer-nominated declaration/relationship claims within an
+  already admitted owner file, with exact source-byte/token correspondence.
+Authority source: Existing ownership qualification and relationship source resolver.
+Completeness/freshness: Existing capture/source bounds and uncertainty; unresolved
+  nominations are accounted for, never promoted to absence or unique ownership.
+Existing owner extended: Task evidence and native relationship projection.
+Consumer/execution responsibility not acquired: Edit decisions, runtime compatibility,
+  graph traversal, verification execution or certification.
+Decision: OBSERVER
+```
+
+Initial compact/text views retain these records using lossless native value
+references for JSON-identical duplicate evidence/bindings. A compact finding's
+`details` contains `record`, `value_refs` and `value_ref_base`; the text line
+`Producer relationships:` carries the same wrapper. Restore each destination
+JSON pointer from decoded native data at `value_ref_base + source_pointer`.
+Pointers use ordinary JSON-pointer escaping. Different/future fields and
+boolean/numeric distinctions are retained. Qualification contexts are removed
+only when their values are already identically present in that record.
+
+Independent readers reconstruct every original value, including escaped future
+keys, Unicode and differing qualifications. The controlled public-transport
+regression at `.hashmarks/backend-e2e/remaining-work/semantic-wire-current/`
+measures actual CLI compact/text at 3,610/3,627 tokens and official MCP at
+3,796/3,391. This controlled case does not add genuine corpus breadth.
+
+The earlier four-workflow, native, live-ring and source-artifact measurements
+precede this production repair. They remain historical; affected qualification
+must be repeated on the new observer bytes. Full typing, missing corpora and
+the independent capability-proof requirements still prevent a 5/5 claim.
+
+### Earlier implementation checkpoint
 
 The three existing catalogs now use workflow v2. All 36 workflows validate
 against their pinned trees, including two genuine model-fixture additions.

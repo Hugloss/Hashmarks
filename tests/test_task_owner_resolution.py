@@ -13,6 +13,8 @@ from hashmarks.codemap.task_action_types import (
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from pytest import MonkeyPatch
+
 
 def _write(root: Path, rel: str, text: str) -> None:
     path = root / rel

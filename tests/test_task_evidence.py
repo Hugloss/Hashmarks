@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Any
 
 from hashmarks import cli
 from hashmarks.codemap import CodeMap

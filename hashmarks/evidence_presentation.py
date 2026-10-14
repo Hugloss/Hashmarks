@@ -1628,6 +1628,7 @@ def present_repository_evidence(
     if initial:
         result["reference_space"] = "decoded-initial-data"
         _compact_initial_groups(groups)
+        _compact_initial_relationships(result)
         if format == "compact":
             _compact_initial_declarations(groups)
             _compact_initial_verification_qualifiers(groups)
@@ -1646,6 +1647,48 @@ def present_repository_evidence(
         else:
             result["text"] = evidence_projection_text(result)
     return result
+
+
+def _compact_initial_relationships(result: dict[str, Any]) -> None:
+    """Retain relationship values once, with explicit references for duplicates."""
+    from hashmarks.evidence_presentation_text import (
+        initial_semantic_relationship_details,
+    )
+
+    for group in result["groups"]:
+        if group.get("finding_qualifiers", {}).get("kind") != "scip_semantic_discovery":
+            continue
+        for finding in group["findings"]:
+            native = finding["details"]
+            ref = finding["source_refs"][0]
+            details, refs = initial_semantic_relationship_details(native)
+            finding["details"] = {
+                "record": details,
+                "value_refs": refs,
+                "value_ref_base": ref,
+            }
+            context = finding.get("source_context", {})
+            qualification = context.get("record_qualification", {})
+            if len(context) == 1 and _initial_qualification_repeated(
+                qualification, native
+            ):
+                finding.pop("source_context")
+            result["source_context"] = [
+                context
+                for context in result["source_context"]
+                if context["source_ref"] != ref
+                or not _initial_qualification_repeated(context["details"], native)
+            ]
+
+
+def _initial_qualification_repeated(
+    qualification: Mapping[str, Any], native: Mapping[str, Any]
+) -> bool:
+    return all(
+        key in native
+        and json.dumps(value, sort_keys=True) == json.dumps(native[key], sort_keys=True)
+        for key, value in qualification.items()
+    )
 
 
 def _compact_initial_groups(groups: list[dict[str, Any]]) -> None:
@@ -1744,6 +1787,16 @@ def _initial_task(
     """Expose initial locators with the producer's qualifications and omissions."""
     from hashmarks.codemap.task_evidence_initial import decode_initial_collection
 
+    p.field(
+        packet,
+        "semantic_relationships",
+        "relationship",
+        ref,
+        {},
+        kind="scip_semantic_discovery",
+        shape="record",
+        assertion="producer_claim",
+    )
     ownership = packet["ownership"]
     retrieval = packet["retrieval"]
     verification = packet["verification"]
@@ -1841,6 +1894,7 @@ def _initial_evidence_text(packet: Mapping[str, object]) -> str:
     """Describe admitted initial locators; their native qualifications still govern."""
     from hashmarks.codemap.task_evidence_initial import decode_initial_collection
     from hashmarks.evidence_declaration_text import declaration_scopes_text
+    from hashmarks.evidence_presentation_text import initial_semantic_relationship_text
 
     ownership = packet["ownership"]
     retrieval = packet["retrieval"]
@@ -1873,6 +1927,7 @@ def _initial_evidence_text(packet: Mapping[str, object]) -> str:
             f"Source candidate: {row['path']}::{row.get('symbol', row.get('qualname', ''))} ({row.get('start_line', 'unknown')}:{row.get('end_line', 'unknown')}; @ /retrieval/results/{index})."
         )
     lines.extend(declaration_scopes_text(retrieval.get("results", [])))
+    lines.extend(initial_semantic_relationship_text(packet))
     relevance = verification.get("relevance")
     if isinstance(relevance, Mapping):
         rows = relevance.get("candidates", [])

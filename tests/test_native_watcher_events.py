@@ -17,6 +17,8 @@ from hashmarks.watcher import (
 if TYPE_CHECKING:
     from pathlib import Path
 
+    import pytest
+
 
 def _event(mask: int, name: bytes = b"", *, wd: int = 1) -> bytes:
     raw = name + b"\0" if name else b""

@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from hashmarks.codemap import CodeMap
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from pytest import MonkeyPatch
 
 
 def test_task_action_map_routes_source_test_contract_without_changing_ranking(

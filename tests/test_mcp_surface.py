@@ -618,7 +618,7 @@ def test_mcp_server_registers_exact_small_read_only_tool_catalog(
             self, **metadata: object
         ) -> Callable[[Callable[..., object]], Callable[..., object]]:
             def decorate(fn: Callable[..., object]) -> Callable[..., object]:
-                registered.append(str(metadata["name"]))
+                registered.append({"fn": fn, **metadata})
                 return fn
 
             return decorate
@@ -796,7 +796,7 @@ def test_mcp_server_construction_does_not_scan_or_build_repository(
             self, **metadata: object
         ) -> Callable[[Callable[..., object]], Callable[..., object]]:
             def decorate(fn: Callable[..., object]) -> Callable[..., object]:
-                registered.append({"fn": fn, **metadata})
+                registered.append(str(metadata["name"]))
                 return fn
 
             return decorate

@@ -1,7 +1,14 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from hashmarks.cli import main
 from hashmarks.codemap import CodeMap
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    import pytest
 
 
 def _write_package(

@@ -45,6 +45,7 @@ This is the single catalog for the current maintained documentation in `docs/`.
 
 - [`qualification/AGENT_EVIDENCE_FORMATS.md`](qualification/AGENT_EVIDENCE_FORMATS.md) — paired evidence-presentation export and external agent grading.
 - [`qualification/BACKEND_E2E.md`](qualification/BACKEND_E2E.md) — genuine backend revision workflows, source oracles and all-capability qualification accounting.
+- [`qualification/BACKEND_E2E_CAMPAIGN.md`](qualification/BACKEND_E2E_CAMPAIGN.md) — frozen capability membership, current measurements and remaining backend qualification work.
 - [`qualification/REPOSITORY_QUALITY.md`](qualification/REPOSITORY_QUALITY.md) — repository-quality qualification semantics.
 - [`qualification/TEST_RUNTIME_ECONOMICS.md`](qualification/TEST_RUNTIME_ECONOMICS.md) — test-proof scope and runtime-economics guidance.
 

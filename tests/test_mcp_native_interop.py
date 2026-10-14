@@ -23,6 +23,8 @@ from hashmarks.operation_contract import operation_default_mode, operation_modes
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from mcp import ClientSession
+
 pytestmark = pytest.mark.host_mcp_sdk
 
 _MCP_AVAILABLE = importlib.util.find_spec("mcp") is not None
@@ -102,13 +104,15 @@ def test_mcp_native_server_catalog_and_structured_call(tmp_path: Path) -> None:
         ] == _EXPECTED_TOOLS
         task_description = descriptions["task_evidence"]
         for phrase in (
-            "Semantic first choice",
-            "exploratory grep/read",
-            "retrieval from ownership",
-            "owner/ambiguity",
+            "Unknown paths",
+            "retrieval",
+            "ownership/ambiguity",
             "source/next-read",
             "verification",
             "freshness",
+            "structuredContent",
+            "readable text",
+            "JSON mirror",
         ):
             assert phrase in task_description
         schemas = _assert_canonical_result_mode_schemas(

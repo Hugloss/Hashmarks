@@ -3,9 +3,10 @@ from __future__ import annotations
 import json
 import threading
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
+from pytest import MonkeyPatch
 
 from hashmarks import cli
 from hashmarks.codemap import ChangeImpactOptions, CodeMap

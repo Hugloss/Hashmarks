@@ -128,6 +128,8 @@ class RelationshipSourceResolver:
         locator: Mapping[str, Any],
         snapshot: Mapping[str, Any],
         name: str,
+        *,
+        query: bool = False,
     ) -> bool:
         position = locator["start"]
         encoding = locator.get("position_encoding", "unknown")
@@ -146,7 +148,11 @@ class RelationshipSourceResolver:
             return False
         codec = "utf-16-le" if encoding == "utf-16" else encoding
         offset = character_offset(lines[line], position["character"], codec)
-        return offset is not None and _name_at_offset(lines[line], name, offset)
+        return offset is not None and (
+            _name_at_query_offset(lines[line], name, offset)
+            if query
+            else _name_at_offset(lines[line], name, offset)
+        )
 
     def candidates(
         self,
@@ -155,6 +161,7 @@ class RelationshipSourceResolver:
         snapshot: Mapping[str, Any],
         *,
         name: str | None = None,
+        query: bool = False,
     ) -> dict[str, Any]:
         if not self.admitted(path) or locator is None:
             return {
@@ -178,7 +185,9 @@ class RelationshipSourceResolver:
         qualified = (
             len(rows) == 1
             and binding["state"] == "matching"
-            and self.position_qualified(path, locator, snapshot, str(rows[0]["name"]))
+            and self.position_qualified(
+                path, locator, snapshot, str(rows[0]["name"]), query=query
+            )
         )
         return {
             "state": "incomplete-candidate-search"
@@ -211,6 +220,16 @@ class RelationshipSourceResolver:
             "source_binding": binding,
             "negative_evidence_admissible": False,
         }
+
+
+def _name_at_query_offset(text: str, name: str, offset: int) -> bool:
+    """An LSP query cursor may lie inside one unambiguous declaration token."""
+    starts = [
+        match.start()
+        for match in re.finditer(re.escape(name), text)
+        if _name_at_offset(text, name, match.start())
+    ]
+    return len(starts) == 1 and starts[0] <= offset < starts[0] + len(name)
 
 
 def _name_at_offset(text: str, name: str, offset: int) -> bool:

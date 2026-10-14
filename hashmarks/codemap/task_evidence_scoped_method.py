@@ -554,26 +554,60 @@ class TaskEvidenceScopedMethodMixin:
         return owner if isinstance(owner, Mapping) else None
 
     def _task_evidence_current_scip_symbol(
-        self, owner: Mapping[str, object]
-    ) -> Mapping[str, object] | None:
+        self,
+        owner: Mapping[str, object],
+        captures: Sequence[Mapping[str, object]] = (),
+    ) -> tuple[Mapping[str, object] | None, str]:
         """Rebind the admitted locator to an exact, visible current symbol."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         path = str(owner.get("path") or "")
         qualname = str(owner.get("qualname") or "")
-        if not path or not qualname:
-            return None
+        scope = "owner" if qualname else "owned-file-query"
+        if not path:
+            return None, scope
         if self._task_evidence_visibility(path) not in {
             EvidenceVisibility.SOURCE,
             EvidenceVisibility.OUTLINE,
         }:
-            return None
+            return None, scope
         if (
             self.policy.decide(path).evidence_visibility is EvidenceVisibility.DENY
             or not self._indexed_path_current(path)
         ):
+            return None, scope
+        return (
+            self.store.symbol_at(path, qualname)
+            if qualname
+            else self._task_evidence_owned_file_query(path, captures),
+            scope,
+        )
+
+    def _task_evidence_owned_file_query(
+        self, path: str, captures: Sequence[Mapping[str, object]]
+    ) -> Mapping[str, object] | None:
+        """Bind one explicit producer query; never infer a symbol owner from a file."""
+        self = cast("CodeMap", self)
+        from .lsp_relationship_adapter import lsp_query_locator
+        from .semantic_relationship_source import RelationshipSourceResolver
+
+        resolver = RelationshipSourceResolver(self)
+        subjects: set[str] = set()
+        for capture in captures:
+            query_path, locator = lsp_query_locator(capture, self.workspace)
+            if query_path != path:
+                continue
+            documents = capture.get("documents")
+            snapshot = documents.get(path) if isinstance(documents, Mapping) else None
+            if not isinstance(snapshot, Mapping):
+                return None
+            resolution = resolver.candidates(path, locator, snapshot, query=True)
+            if resolution["state"] != "unique-candidate" or resolution["truncated"]:
+                return None
+            subjects.add(str(resolution["candidates"][0]["symbol_id"]))
+        if len(subjects) != 1:
             return None
-        return self.store.symbol_at(path, qualname)
+        return self.store.symbol_at(path, subjects.pop().split("::", 1)[1])
 
     def _task_evidence_attach_scip_discovery(
         self,
@@ -605,7 +639,9 @@ class TaskEvidenceScopedMethodMixin:
         from .semantic_relationship_observation import semantic_relationship_observation
 
         with self.decision_session(expected_generation=selection_generation):
-            current = self._task_evidence_current_scip_symbol(owner)
+            current, subject_scope = self._task_evidence_current_scip_symbol(
+                owner, supplied_observations
+            )
             if current is None:
                 return
             observation = semantic_relationship_observation(
@@ -637,15 +673,15 @@ class TaskEvidenceScopedMethodMixin:
                 **(discovery or compact),
                 "repository_freshness": freshness["state"],
                 "observed_relationship_count_scope": (
-                    "exact-owner-scip-definition-outgoing"
+                    f"exact-{subject_scope}-scip-definition-outgoing"
                     if discovery is not None
-                    else "explicit-producer-claims-associated-with-owner"
+                    else f"explicit-producer-claims-associated-with-{subject_scope}"
                 ),
                 "associated_observed_relationship_count": compact[
                     "observed_relationship_count"
                 ],
                 "associated_observed_relationship_count_scope": (
-                    "explicit-producer-claims-associated-with-owner"
+                    f"explicit-producer-claims-associated-with-{subject_scope}"
                 ),
                 "evidence": compact,
                 "evidence_refs": {

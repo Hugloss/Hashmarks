@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import pytest
-
 from hashmarks import CodeMap
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    import pytest
 
 
 def _repo(root: Path) -> tuple[str, list[str]]:
@@ -28,7 +28,7 @@ def _repo(root: Path) -> tuple[str, list[str]]:
 def test_identical_snapshot_requests_reuse_one_generation_bound_composition(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _repo(tmp_path)
+    task, paths = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         calls = {"brief": 0, "freshness": 0}

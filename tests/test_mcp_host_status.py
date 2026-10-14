@@ -4,8 +4,12 @@ import importlib.util
 import json
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-import pytest
+if TYPE_CHECKING:
+    import subprocess
+
+    import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "mcp_host_status.py"

@@ -11,6 +11,8 @@ from hashmarks.codemap.ownership_graph import (
 if TYPE_CHECKING:
     from pathlib import Path
 
+    import pytest
+
 
 def _state() -> _OwnershipGraphState:
     return _OwnershipGraphState(

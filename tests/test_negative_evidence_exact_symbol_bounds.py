@@ -8,6 +8,8 @@ from hashmarks.codemap.model import SearchHit
 if TYPE_CHECKING:
     from pathlib import Path
 
+    import pytest
+
 _INDEX_LIMIT = 1024
 
 
@@ -211,7 +213,7 @@ def test_skipped_exact_identifier_search_cannot_claim_negative_or_unique_evidenc
 
         def tracked(*_args: object, **_kwargs: object) -> object:
             calls.append(True)
-            return original(*args, **kwargs)
+            return original(*_args, **_kwargs)
 
         monkeypatch.setattr(
             codemap, "_task_action_exact_identifier_edit_candidates", tracked

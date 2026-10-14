@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import importlib
-import types
 from typing import TYPE_CHECKING, Callable
 
 from hashmarks.codemap import CodeMap
@@ -11,6 +10,7 @@ from hashmarks.codemap.watch_continuity import (
 )
 
 if TYPE_CHECKING:
+    import types
     from pathlib import Path
 
     import pytest
@@ -55,7 +55,7 @@ def test_watch_forever_starts_observer_before_initial_sync_and_stops_cleanly(
 
         def fake_factory(
             root: Path,
-            update_callback: Callable[..., object],
+            callback: Callable[..., object],
             *,
             debounce_seconds: float,
             change_tracker: ChangeTracker,
@@ -115,14 +115,14 @@ def test_watch_forever_unknown_observation_forces_full_reconciliation(
 
         def fake_factory(
             root: Path,
-            callback: Callable[..., object],
+            update_callback: Callable[..., object],
             *,
             debounce_seconds: float,
             change_tracker: ChangeTracker,
             exclude_relative_paths: list[str],
         ) -> _FakeWatcher:
             nonlocal tracker
-            del root, callback, debounce_seconds, exclude_relative_paths
+            del root, update_callback, debounce_seconds, exclude_relative_paths
             tracker = change_tracker
             return _FakeWatcher(events)
 
@@ -176,7 +176,7 @@ def test_watch_forever_incremental_callback_reconciles_observed_paths(
 
         def fake_factory(
             root: Path,
-            callback: Callable[..., object],
+            update_callback: Callable[..., object],
             *,
             debounce_seconds: float,
             change_tracker: ChangeTracker,

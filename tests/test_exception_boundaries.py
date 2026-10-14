@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from hashmarks import cli, repository_cli, repository_retry
 from hashmarks.errors import RepositoryCliError
+
+if TYPE_CHECKING:
+    import types
 
 ROOT = Path(__file__).resolve().parents[1]
 
