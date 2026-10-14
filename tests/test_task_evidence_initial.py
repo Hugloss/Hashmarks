@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import json
 import zlib
+from collections.abc import Mapping
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, cast
@@ -19,6 +20,7 @@ from hashmarks.codemap.task_evidence_initial import (
     initial_packet_identity,
     initial_task_evidence,
 )
+from hashmarks.codemap.task_evidence_types import InitialTaskEvidenceEnvelope
 from hashmarks.evidence_presentation import FORMATS, presentation_response
 from hashmarks.evidence_presentation_conformance import validate_evidence_presentation
 from hashmarks.mcp_contract import tool_contract
@@ -43,7 +45,11 @@ def test_initial_string_table_preserves_json_types_unicode_and_future_fields() -
         type(None),
         float,
     ]
-    encoded["data"][next(iter(encoded["data"]))][1] = False
+    data = encoded["data"]
+    assert isinstance(data, dict)
+    value = data[next(iter(data))]
+    assert isinstance(value, list)
+    value[1] = False
     with pytest.raises(ValueError, match="semantic identity"):
         decode_initial_packet(encoded)
 
@@ -96,7 +102,7 @@ def test_compressed_initial_preserves_identity_types_and_all_records() -> None:
     ],
 )
 def test_compressed_initial_rejects_corrupt_or_unbounded_payload(mutation: str) -> None:
-    encoded = encode_initial_packet(_compressible_initial())
+    encoded = json.loads(json.dumps(encode_initial_packet(_compressible_initial())))
     raw = base64.b64decode(encoded["data"])
     if mutation == "bool-size":
         encoded["encoding"]["decoded_bytes"] = True
@@ -147,6 +153,7 @@ def test_initial_string_table_rejects_malformed_references(mutation: str) -> Non
             "a": "b",
         }
     )
+    packet = json.loads(json.dumps(packet))
     if mutation == "bool-prefix":
         packet["encoding"]["strings"][0][0] = False
     elif mutation == "oversized-prefix":
@@ -174,7 +181,9 @@ def _decoded_task_matches(matches: dict[str, Any]) -> dict[str, Any]:
     return matches
 
 
-def _assert_initial_display(response: dict[str, Any], packet: dict[str, Any]) -> None:
+def _assert_initial_display(
+    response: dict[str, Any], packet: Mapping[str, object]
+) -> None:
     logical = decode_initial_packet(packet)
     transported = json.loads(json.dumps(response, sort_keys=True))
     assert (
@@ -238,10 +247,7 @@ def test_initial_profile_preserves_authority_and_source_identity(
         native = cast("dict[str, Any]", codemap.task_evidence("Fix widget"))
         before = deepcopy(native)
         initial = initial_task_evidence(native)
-        api = cast(
-            "dict[str, Any]",
-            codemap.task_evidence("Fix widget", result_mode="initial"),
-        )
+        api = codemap.task_evidence("Fix widget", result_mode="initial")
     assert native == before
     assert api["schema"] == "hashmarks.task-evidence-initial.v2"
     assert initial["source_evidence_identity"] == native["evidence_packet_identity"]
@@ -255,6 +261,7 @@ def test_initial_profile_preserves_authority_and_source_identity(
     assert initial["freshness"] == native["freshness"]
     assert initial["provenance"] == native["provenance"]
     assert initial["verification"]["plan"] == native["verification"]["plan"]
+    assert "task_matches" in initial["verification"]["relevance"]
     assert (
         _decoded_task_matches(initial["verification"]["relevance"]["task_matches"])
         == native["verification"]["relevance"]["task_matches"]
@@ -262,6 +269,7 @@ def test_initial_profile_preserves_authority_and_source_identity(
     if native["ownership"]["owner"] is None:
         assert initial["ownership"]["owner"] is None
     else:
+        assert initial["ownership"]["owner"] is not None
         assert (
             initial["ownership"]["owner"]["path"]
             == (native["ownership"]["owner"]["path"])
@@ -279,15 +287,19 @@ def test_initial_profile_preserves_authority_and_source_identity(
         )
         if mode != "none":
             _assert_initial_display(response, api)
-    surface = HashmarksMcpSurface(str(tmp_path))
+    _assert_mcp_initial_authority(tmp_path, api)
+
+
+def _assert_mcp_initial_authority(
+    root: Path, expected: InitialTaskEvidenceEnvelope
+) -> None:
+    surface = HashmarksMcpSurface(str(root))
     try:
-        observed = cast(
-            "dict[str, Any]", surface.task_evidence("Fix widget", result_mode="initial")
-        )
-        assert observed["schema"] == api["schema"]
+        observed = surface.task_evidence("Fix widget", result_mode="initial")
+        assert observed["schema"] == expected["schema"]
         assert (
             decode_initial_packet(observed)["ownership"]["status"]
-            == decode_initial_packet(api)["ownership"]["status"]
+            == decode_initial_packet(expected)["ownership"]["status"]
         )
     finally:
         surface.close()
@@ -362,14 +374,15 @@ def test_initial_disclosure_keeps_admitted_owner_and_verification_alternatives(
     assert owner_row in initial["retrieval"]["results"]
     relevance = packet["verification"]["relevance"]
     projected = deepcopy(initial["verification"]["relevance"])
-    projected["candidates"] = decode_initial_collection(
+    assert "candidates_encoding" in projected
+    decoded_candidates = decode_initial_collection(
         projected["candidates"], projected["candidates_encoding"]
     )
-    assert [row["path"] for row in projected["candidates"]] == [
+    assert [row["path"] for row in decoded_candidates] == [
         row["path"] for row in relevance["candidates"]
     ]
     for source, returned in zip(
-        relevance["candidates"], projected["candidates"], strict=True
+        relevance["candidates"], decoded_candidates, strict=True
     ):
         for key in (
             "direct_reference",
@@ -398,9 +411,9 @@ def test_initial_disclosure_keeps_admitted_owner_and_verification_alternatives(
     )
     assert verification_group["omitted_from_presentation"] == 0
     assert {row["details"]["path"] for row in verification_group["findings"]} == {
-        row["path"] for row in projected["candidates"]
+        row["path"] for row in decoded_candidates
     }
-    expected = {row["path"]: row for row in projected["candidates"]}
+    expected = {row["path"]: row for row in decoded_candidates}
     for finding in verification_group["findings"]:
         recovered = {
             **verification_group.get("locator_qualifiers", {}),

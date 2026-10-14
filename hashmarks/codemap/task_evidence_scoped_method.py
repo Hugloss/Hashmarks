@@ -7,9 +7,11 @@ from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, cast
 
 from .model import EvidenceVisibility
+from .task_evidence_contract import read_task_candidate
 
 if TYPE_CHECKING:
     from .engine import CodeMap
+    from .task_evidence_types import TaskEvidenceDraft
 
 
 class TaskEvidenceScopedMethodMixin:
@@ -101,7 +103,7 @@ class TaskEvidenceScopedMethodMixin:
         )
 
     def _task_evidence_attach_enclosing_functions(
-        self, packet: dict[str, object]
+        self, packet: TaskEvidenceDraft
     ) -> None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -225,7 +227,7 @@ class TaskEvidenceScopedMethodMixin:
         return parent
 
     def _task_evidence_attach_class_declarations(
-        self, packet: dict[str, object]
+        self, packet: TaskEvidenceDraft
     ) -> None:
         """Disclose bounded class scopes for the first three source locators."""
         codemap = cast("CodeMap", self)
@@ -383,16 +385,16 @@ class TaskEvidenceScopedMethodMixin:
         )
 
     def _task_evidence_attach_candidate_verifiers(
-        self, packet: dict[str, object], task: str
+        self, packet: TaskEvidenceDraft, task: str
     ) -> None:
         """Disclose test candidates without altering unresolved edit/verify selection."""
         from .repository_domains import RepositoryDomain, classify_repository_path
         from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 
         codemap = cast("CodeMap", self)
-        ownership, retrieval, verification = (
-            packet[key] for key in ("ownership", "retrieval", "verification")
-        )
+        ownership = packet["ownership"]
+        retrieval = packet["retrieval"]
+        verification = packet["verification"]
         if not isinstance(ownership, dict) or ownership.get("owner") is not None:
             return
         if not isinstance(retrieval, dict) or not isinstance(verification, dict):
@@ -443,9 +445,12 @@ class TaskEvidenceScopedMethodMixin:
             reverse=True,
         )
         limit = VERIFICATION_RELEVANCE_DEFAULTS.candidate_limit
-        relevance["candidates"] = codemap._verification_bounded_candidates(
-            ordered, relevance.get("selected"), limit
-        )
+        relevance["candidates"] = [
+            read_task_candidate(row)
+            for row in codemap._verification_bounded_candidates(
+                ordered, relevance.get("selected"), limit
+            )
+        ]
         relevance["candidate_disclosure"] = {
             "basis": "indexed-source-candidates-and-task-matches",
             "subject_bound": 3,
@@ -611,7 +616,7 @@ class TaskEvidenceScopedMethodMixin:
 
     def _task_evidence_attach_scip_discovery(
         self,
-        packet: dict[str, object],
+        packet: TaskEvidenceDraft,
         supplied_observations: Sequence[Mapping[str, object]] = (),
         *,
         selection_generation: int | None = None,

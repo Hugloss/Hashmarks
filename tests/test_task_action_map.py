@@ -38,7 +38,7 @@ def test_task_action_map_routes_source_test_contract_without_changing_ranking(
     assert [row["path"] for row in action["canonical"]] == [
         hit.path for hit in canonical
     ]
-    assert [row["canonical_rank"] for row in action["canonical"]] == list(
+    assert [row.get("canonical_rank") for row in action["canonical"]] == list(
         range(1, len(action["canonical"]) + 1)
     )
     assert all("canonical_score" in row for row in action["canonical"])
@@ -310,7 +310,10 @@ def test_qualified_module_function_target_wins_over_lexically_stronger_sibling(
         action = codemap.task_action_map(task, limit=20)
 
     assert action["edit"]["path"] == "src/repository_understanding_policy.py"
+    assert action["edit"] is not None
+    assert "name" in action["edit"]
     assert action["edit"]["name"] == "evaluate"
+    assert "exact_identifier_projection" in action["edit"]
     assert action["edit"]["exact_identifier_projection"] is True
 
 
@@ -389,8 +392,12 @@ def test_qualified_target_recovers_from_index_when_canonical_limit_excludes_sour
         "tests/test_test_batches.py"
     ]
     assert action["edit"]["path"] == "src/test_batches.py"
+    assert action["edit"] is not None
+    assert "name" in action["edit"]
     assert action["edit"]["name"] == "main"
+    assert "exact_identifier_projection" in action["edit"]
     assert action["edit"]["exact_identifier_projection"] is True
+    assert "qualified_identifier_index_projection" in action["edit"]
     assert action["edit"]["qualified_identifier_index_projection"] is True
     assert action["ambiguity"]["ambiguous"] is False
 
@@ -422,8 +429,12 @@ def test_structural_owner_projection_preserves_unique_qualified_symbol_evidence(
         evidence = codemap.task_evidence(task, limit=20)
 
     assert action["edit"]["path"] == "src/capability.py"
+    assert action["edit"] is not None
+    assert "name" in action["edit"]
     assert action["edit"]["name"] == "target"
+    assert "qualname" in action["edit"]
     assert action["edit"]["qualname"] == "target"
+    assert "exact_identifier_projection" in action["edit"]
     assert action["edit"]["exact_identifier_projection"] is True
     ownership = evidence["ownership"]
     assert ownership["candidate"]["path"] == "src/capability.py"
@@ -451,7 +462,10 @@ def test_qualified_identifier_does_not_inherit_plain_same_name_ambiguity(
         action = codemap.task_action_map(task, limit=20)
 
     assert action["edit"]["path"] == "src/bootstrap.py"
+    assert action["edit"] is not None
+    assert "name" in action["edit"]
     assert action["edit"]["name"] == "_require_regular"
+    assert "exact_identifier_projection" in action["edit"]
     assert action["edit"]["exact_identifier_projection"] is True
     assert action["ambiguity"]["ambiguous"] is False
     assert action["ownership_authority"]["owner_resolved"] is True
@@ -726,6 +740,8 @@ def test_unresolved_edit_owner_cannot_rerank_verification(
 
     assert choices.verify is not None
     assert choices.verify["path"] == initial_verify
+    assert choices.verification_relevance["selected"] is not None
+    assert "selection_reason" in choices.verification_relevance["selected"]
     assert (
         choices.verification_relevance["selected"]["selection_reason"]
         == "canonical-verification-without-edit-owner"
@@ -770,4 +786,6 @@ def test_ranked_candidate_without_positive_proof_is_not_owner_authority(
     assert (
         action["verification_relevance"]["selected"]["path"] == "tests/test_policy.py"
     )
+    assert action["verification_relevance"]["selected"] is not None
+    assert "direct_reference" in action["verification_relevance"]["selected"]
     assert action["verification_relevance"]["selected"]["direct_reference"] is True

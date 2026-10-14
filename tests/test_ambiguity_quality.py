@@ -20,8 +20,9 @@ def test_action_ambiguity_explains_plausibility_and_discriminator_without_secret
     assert ambiguity["secret_knowledge_used"] is False
     if ambiguity["ambiguous"]:
         assert len(ambiguity["candidates"]) >= 2
-        assert all(row["plausibility"] for row in ambiguity["candidates"])
-        assert all(row["discriminator"] for row in ambiguity["candidates"])
+        for row in ambiguity["candidates"]:
+            assert "plausibility" in row and row["plausibility"]
+            assert "discriminator" in row and row["discriminator"]
         assert ambiguity["discrimination_question"]
 
 

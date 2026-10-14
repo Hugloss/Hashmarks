@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -9,6 +9,13 @@ from hashmarks.codemap import CodeMap
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from hashmarks.codemap.task_evidence_types import TaskActionMap
+
+
+def _codemap(root: Path) -> CodeMap:
+    state = root / ".hashmarks"
+    return CodeMap(root, state_dir=state, artifact_db=state / "artifacts.sqlite3")
 
 
 def _write(root: Path, rel: str, text: str) -> None:
@@ -36,7 +43,7 @@ def test_named_class_scopes_method_evidence_without_resolving_class_as_method(
         "Identify the consumer-facing WidgetSurface semantic method that "
         "validates bounded input and returns task evidence."
     )
-    with CodeMap(tmp_path) as codemap:
+    with _codemap(tmp_path) as codemap:
         codemap.sync()
         packet = codemap.task_evidence(task)
         exact = codemap.task_evidence("Change WidgetSurface.task_evidence method")
@@ -49,6 +56,8 @@ def test_named_class_scopes_method_evidence_without_resolving_class_as_method(
         for row in packet["retrieval"]["results"]
     )
     assert exact["ownership"]["status"] == "resolved"
+    assert exact["ownership"]["owner"] is not None
+    assert "qualname" in exact["ownership"]["owner"]
     assert exact["ownership"]["owner"]["qualname"] == "WidgetSurface.task_evidence"
 
 
@@ -68,7 +77,7 @@ def test_task_evidence_v5_separates_retrieval_ownership_and_freshness(
         "    assert target_impl(1) == 2\n",
     )
 
-    with CodeMap(tmp_path) as codemap:
+    with _codemap(tmp_path) as codemap:
         codemap.sync()
         packet = codemap.task_evidence("change target_impl behavior", token_budget=256)
 
@@ -78,9 +87,11 @@ def test_task_evidence_v5_separates_retrieval_ownership_and_freshness(
     assert packet["retrieval"]["bounds"]["canonical_completeness"] == "complete"
     assert packet["retrieval"]["bounds"]["canonical_truncation"] == "complete"
     assert packet["ownership"]["status"] == "resolved"
+    assert packet["ownership"]["owner"] is not None
     assert packet["ownership"]["owner"]["path"] == "src/owner.py"
     assert packet["ownership"]["basis"] in {"unique-exact-symbol", "exact-symbol"}
     assert packet["ownership"]["authority"] == "repository-ownership-only"
+    assert packet["verification"]["selected"] is not None
     assert packet["verification"]["selected"]["path"] == "tests/test_owner.py"
     assert packet["freshness"]["state"] in {"unknown", "current", "stale"}
     assert packet["consumer_action"] == "external"
@@ -101,7 +112,7 @@ def test_task_evidence_v5_retrieval_is_compact_non_authoritative_projection(
     )
     task = "locate target_impl behavior"
 
-    with CodeMap(tmp_path) as codemap:
+    with _codemap(tmp_path) as codemap:
         codemap.sync()
         action = codemap.task_action_map(task, limit=20)
         packet = codemap.task_evidence(task, limit=20, token_budget=256)
@@ -113,7 +124,7 @@ def test_task_evidence_v5_retrieval_is_compact_non_authoritative_projection(
     projected = retrieval["results"][0]
     internal = action["canonical"][0]
     assert projected["path"] == internal["path"]
-    assert projected["rank"] == 1
+    assert projected.get("rank") == 1
     assert projected.get("symbol") == (internal.get("qualname") or internal.get("name"))
     assert projected.get("roles") == internal.get("roles")
     assert projected.get("evidence_visibility") == internal.get("evidence_visibility")
@@ -132,6 +143,7 @@ def test_task_evidence_v5_retrieval_is_compact_non_authoritative_projection(
 
 def test_task_evidence_v5_consumes_canonical_admitted_edit(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _write(
         tmp_path,
@@ -147,17 +159,26 @@ def test_task_evidence_v5_consumes_canonical_admitted_edit(
     )
     task = "change target_impl behavior"
 
-    with CodeMap(tmp_path) as codemap:
+    with _codemap(tmp_path) as codemap:
         codemap.sync()
         action = codemap.task_action_map(task)
         assert action["ownership_authority"]["owner_resolved"] is True
+        assert action["edit"] is not None
         assert action["edit"]["path"] == "src/owner.py"
+        assert action["admitted_edit"] is not None
         assert action["admitted_edit"]["path"] == "src/owner.py"
 
         action["admitted_edit"] = None
-        codemap.task_action_map = lambda *args, **kwargs: action  # type: ignore[method-assign]
+
+        def action_without_admitted_edit(
+            task: str, *, limit: int = 20, per_role: int = 3
+        ) -> TaskActionMap:
+            return action
+
+        monkeypatch.setattr(codemap, "task_action_map", action_without_admitted_edit)
         packet = codemap.task_evidence(task, token_budget=256)
 
+    assert packet["ownership"]["candidate"] is not None
     assert packet["ownership"]["candidate"]["path"] == "src/owner.py"
     assert packet["ownership"]["owner"] is None
     assert packet["ownership"]["basis"] is None
@@ -171,7 +192,7 @@ def test_task_evidence_v5_keeps_ambiguity_independent_from_freshness(
     _write(tmp_path, "src/b.py", "def calculate_value():\n    return 2\n")
 
     task = "fix calculate_value"
-    with CodeMap(tmp_path) as codemap:
+    with _codemap(tmp_path) as codemap:
         codemap.sync()
         action = codemap.task_action_map(task)
         packet = codemap.task_evidence(task, token_budget=256)
@@ -230,7 +251,7 @@ def test_task_evidence_v5_prefers_complete_unique_structural_owner_for_discrimin
         "canonical": [],
     }
 
-    with CodeMap(tmp_path) as codemap:
+    with _codemap(tmp_path) as codemap:
         codemap.sync()
         next_read = codemap._task_evidence_discrimination_next_read(action)
 
@@ -238,6 +259,7 @@ def test_task_evidence_v5_prefers_complete_unique_structural_owner_for_discrimin
     assert next_read["path"] == "src/structural.py"
     assert next_read["selection_basis"] == "unique-complete-structural-owner"
     assert next_read["authority"] == "non-authoritative-discrimination"
+    assert "discriminator" in next_read
     assert "ownership remains unadmitted" in next_read["discriminator"]
 
 
@@ -282,7 +304,7 @@ def test_task_evidence_v5_structural_discrimination_fails_closed_on_incomplete_o
         "canonical": [],
     }
 
-    with CodeMap(tmp_path) as codemap:
+    with _codemap(tmp_path) as codemap:
         codemap.sync()
         next_read = codemap._task_evidence_discrimination_next_read(action)
 
@@ -311,7 +333,7 @@ def test_task_evidence_v5_structural_discrimination_fails_closed_on_multiple_own
         "canonical": [],
     }
 
-    with CodeMap(tmp_path) as codemap:
+    with _codemap(tmp_path) as codemap:
         codemap.sync()
         next_read = codemap._task_evidence_discrimination_next_read(action)
 
@@ -338,14 +360,16 @@ def test_task_evidence_v5_owner_is_invariant_to_bounded_retrieval(
         )
 
     task = "cancel_queued_admission expected_sequence"
-    with CodeMap(tmp_path) as codemap:
+    with _codemap(tmp_path) as codemap:
         codemap.sync()
         narrow = codemap.task_evidence(task, limit=1, per_role=1, token_budget=256)
         wide = codemap.task_evidence(task, limit=20, per_role=3, token_budget=256)
 
     assert narrow["ownership"]["status"] == "resolved"
     assert wide["ownership"]["status"] == "resolved"
+    assert narrow["ownership"]["owner"] is not None
     assert narrow["ownership"]["owner"]["path"] == "backend/runtime/executor_pool.py"
+    assert wide["ownership"]["owner"] is not None
     assert wide["ownership"]["owner"]["path"] == "backend/runtime/executor_pool.py"
     assert narrow["ownership"]["basis"] in {"exact-symbol", "unique-exact-symbol"}
     assert wide["ownership"]["basis"] in {"exact-symbol", "unique-exact-symbol"}
@@ -364,13 +388,15 @@ def test_task_evidence_v5_keeps_dependency_as_related_evidence_not_owner(
     )
     task = "Fix publish_result so it uses AuthorityReceipt.canonical_identity"
 
-    with CodeMap(tmp_path) as codemap:
+    with _codemap(tmp_path) as codemap:
         codemap.sync()
         action = codemap.task_action_map(task, limit=20)
         packet = codemap.task_evidence(task, limit=20, token_budget=256)
 
     assert packet["ownership"]["status"] == "resolved"
+    assert packet["ownership"]["owner"] is not None
     assert packet["ownership"]["owner"]["path"] == "src/publish.py"
+    assert packet["ownership"]["candidate"] is not None
     assert packet["ownership"]["candidate"]["path"] == "src/publish.py"
     assert packet["explicit_target"]["path"] == "src/publish.py"
     assert packet["ownership"]["ambiguity"]["ambiguous"] is False
@@ -409,13 +435,17 @@ def test_natural_language_prefix_path_owner_does_not_drift_to_query_neighbor(
         "Change the behavior that enumerates indexed repository paths underneath "
         "a requested prefix."
     )
-    with CodeMap(tmp_path) as codemap:
+    with _codemap(tmp_path) as codemap:
         codemap.sync()
         action = codemap.task_action_map(task, limit=20, per_role=3)
 
     assert action["ambiguity"]["ambiguous"] is False
+    assert action["edit"] is not None
     assert action["edit"]["path"] == "hashmarks/codemap/repository_index_store.py"
-    assert action["edit"]["qualname"].endswith("WorkspaceMapStore.paths_under")
+    assert "qualname" in action["edit"]
+    qualname = action["edit"]["qualname"]
+    assert isinstance(qualname, str)
+    assert qualname.endswith("WorkspaceMapStore.paths_under")
 
 
 def test_behavioral_test_shaped_source_requires_production_reference(
@@ -426,7 +456,7 @@ def test_behavioral_test_shaped_source_requires_production_reference(
         "pkg/test_support.py",
         "def runtime_probe_state():\n    return 'ready'\n",
     )
-    with CodeMap(tmp_path) as codemap:
+    with _codemap(tmp_path) as codemap:
         codemap.sync()
         action = codemap.task_action_map(
             "Change the behavior that reports runtime probe state."
@@ -525,10 +555,11 @@ def test_behavioral_owner_discovery_stays_on_semantic_owner(tmp_path: Path) -> N
         root.mkdir()
         for rel, content in files.items():
             _write(root, rel, content)
-        with CodeMap(root) as codemap:
+        with _codemap(root) as codemap:
             codemap.sync()
             action = codemap.task_action_map(task, limit=20, per_role=3)
         assert action["ambiguity"]["ambiguous"] is False, case_id
+        assert action["edit"] is not None
         assert action["edit"]["path"] == expected_path, case_id
 
 
@@ -537,7 +568,7 @@ def test_task_evidence_projects_same_authority_proof_across_bounds(
 ) -> None:
     _write(tmp_path, "src/owner.py", "def unique_owner(value):\n    return value\n")
     task = "Refactor owner.unique_owner without changing behavior"
-    with CodeMap(tmp_path) as codemap:
+    with _codemap(tmp_path) as codemap:
         codemap.sync()
         action = codemap.task_action_map(task, limit=1, per_role=1)
         narrow = codemap.task_evidence(task, limit=1, per_role=1, token_budget=64)
@@ -546,7 +577,9 @@ def test_task_evidence_projects_same_authority_proof_across_bounds(
     proof = action["ownership_authority"]["authority_proof_identity"]
     assert narrow["ownership"]["authority_proof_identity"] == proof
     assert wide["ownership"]["authority_proof_identity"] == proof
+    assert narrow["ownership"]["owner"] is not None
     assert narrow["ownership"]["owner"]["path"] == "src/owner.py"
+    assert wide["ownership"]["owner"] is not None
     assert wide["ownership"]["owner"]["path"] == "src/owner.py"
     assert narrow["ownership"]["proof_scope_complete"] is True
     assert wide["ownership"]["proof_scope_complete"] is True
@@ -636,7 +669,7 @@ def test_task_evidence_preserves_dense_natural_language_owner_candidates(
                 decoy_source.format(index=index),
             )
 
-        with CodeMap(root) as codemap:
+        with _codemap(root) as codemap:
             codemap.sync()
             for query in (
                 task,
@@ -680,7 +713,7 @@ def test_task_evidence_natural_supplements_respect_deny_visibility(
         '[[rule]]\npattern = "hidden/**"\nvisibility = "deny"\n',
     )
 
-    with CodeMap(tmp_path) as codemap:
+    with _codemap(tmp_path) as codemap:
         codemap.sync()
         packet = codemap.task_evidence(
             "Change cobalt route behavior and verify it",
@@ -739,9 +772,9 @@ def test_named_method_remains_visible_when_retrieval_prefers_its_class(
         "from route import handle\ndef test_message():\n    assert handle() == 1\n",
     )
     task = "Fix Subscriber.start blocking other subscribers from shutting down when one stops slowly."
-    with CodeMap(tmp_path) as codemap:
+    with _codemap(tmp_path) as codemap:
         codemap.sync()
-        packet = cast("dict[str, Any]", codemap.task_evidence(task))
+        packet = codemap.task_evidence(task)
         candidate = packet["ownership"]["candidate"]
         rows = packet["retrieval"]["results"]
         assert any(row.get("symbol") == "Subscriber" for row in rows)
@@ -753,9 +786,10 @@ def test_named_method_remains_visible_when_retrieval_prefers_its_class(
             for row in rows
         )
         assert packet["retrieval"]["ownership_authority"] is False
+        assert candidate is not None
         assert candidate["path"] == "backend.py"
         (tmp_path / "backend.py").write_text("class Subscriber:\n    pass\n")
-        stale = cast("dict[str, Any]", codemap.task_evidence(task))
+        stale = codemap.task_evidence(task)
         assert not any(
             row.get("symbol") == "Subscriber.start"
             for row in stale["retrieval"]["results"]
@@ -766,7 +800,7 @@ def test_task_evidence_v5_compact_retrieval_is_materially_smaller_than_internal_
     tmp_path: Path,
 ) -> None:
     _owner, task = _dense_prefix_repository(tmp_path)
-    with CodeMap(tmp_path) as codemap:
+    with _codemap(tmp_path) as codemap:
         codemap.sync()
         action = codemap.task_action_map(task, limit=9)
         packet = codemap.task_evidence(task, limit=9, token_budget=256)
@@ -790,7 +824,7 @@ def test_task_evidence_supplements_account_for_displaced_canonical_hits(
     tmp_path: Path,
 ) -> None:
     owner, task = _dense_prefix_repository(tmp_path)
-    with CodeMap(tmp_path) as codemap:
+    with _codemap(tmp_path) as codemap:
         codemap.sync()
         action = codemap.task_action_map(task, limit=20)
         packet = codemap.task_evidence(task, limit=20, token_budget=256)
@@ -815,7 +849,7 @@ def test_task_evidence_supplements_account_for_displaced_canonical_hits(
         1,
     ):
         assert projected["path"] == internal["path"]
-        assert projected["rank"] == rank
+        assert projected.get("rank") == rank
         assert projected.get("symbol") == (
             internal.get("qualname") or internal.get("name")
         )
@@ -828,12 +862,13 @@ def test_task_evidence_supplements_account_for_displaced_canonical_hits(
         assert "signature" not in projected
         assert "canonical_score" not in projected
         assert "domains" not in projected
-    assert retrieval["canonical_omitted_results"] == len(action["canonical"]) - len(
-        canonical_prefix
+    assert (
+        retrieval.get("canonical_omitted_results")
+        == len(action["canonical"]) - len(canonical_prefix)
+        > 0
     )
-    assert retrieval["canonical_omitted_results"] > 0
-    assert retrieval["supplemental_results"] == len(supplements)
-    assert retrieval["supplemental_authority"] is False
+    assert retrieval.get("supplemental_results") == len(supplements)
+    assert retrieval.get("supplemental_authority") is False
     assert retrieval["ordering"] == "canonical-then-bounded-natural-language"
     assert retrieval["bounds"]["canonical_completeness"] == "incomplete"
     assert retrieval["bounds"]["canonical_truncation"] == "truncated"
@@ -843,11 +878,17 @@ def test_task_evidence_supplements_account_for_displaced_canonical_hits(
         str(row.get("symbol") or "").rsplit(".", 1)[-1] == "paths_under"
         for row in supplements
     )
-    assert all(row["supplement"] == "bounded-natural-language" for row in supplements)
-    assert all(row["evidence_visibility"] == "source" for row in supplements)
+    assert all(
+        row.get("supplement") == "bounded-natural-language" for row in supplements
+    )
+    assert all(row.get("evidence_visibility") == "source" for row in supplements)
     assert all(not row.get("supplement") for row in tight["retrieval"]["results"])
     assert "canonical_omitted_results" not in tight["retrieval"]
-    assert packet["ownership"]["candidate"]["path"] == action["edit"]["path"]
+    assert (
+        packet["ownership"]["candidate"] is not None
+        and action["edit"] is not None
+        and packet["ownership"]["candidate"]["path"] == action["edit"]["path"]
+    )
     assert delta["schema"] == "hashmarks.task-post-change-delta.v2"
 
 
@@ -857,7 +898,7 @@ def test_task_evidence_supplement_excludes_unsignaled_stale_symbol(
     mutation: str,
 ) -> None:
     owner, task = _dense_prefix_repository(tmp_path)
-    with CodeMap(tmp_path) as codemap:
+    with _codemap(tmp_path) as codemap:
         codemap.sync()
         before = codemap.task_evidence(task, limit=20, token_budget=256)
         assert any(
@@ -892,7 +933,7 @@ def test_task_evidence_supplement_preserves_outline_visibility(
         '[[rule]]\npattern = "hashmarks/codemap/repository_index_store.py"\n'
         'visibility = "outline"\n',
     )
-    with CodeMap(tmp_path) as codemap:
+    with _codemap(tmp_path) as codemap:
         codemap.sync()
         packet = codemap.task_evidence(task, limit=20, token_budget=256)
 
@@ -903,4 +944,4 @@ def test_task_evidence_supplement_preserves_outline_visibility(
         and row["path"] == owner.relative_to(tmp_path).as_posix()
     ]
     assert supplements
-    assert all(row["evidence_visibility"] == "outline" for row in supplements)
+    assert all(row.get("evidence_visibility") == "outline" for row in supplements)

@@ -94,7 +94,7 @@ class ChangeIntelligenceMixin:
         ownership_projection = None
         if isinstance(ownership, dict):
             ownership_projection = {
-                key: ownership[key]
+                key: ownership.get(key)
                 for key in ("selected", "via", "owner_path")
                 if key in ownership
             }

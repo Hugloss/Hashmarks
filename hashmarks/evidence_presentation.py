@@ -1485,14 +1485,15 @@ def present_repository_evidence(
 
 def presentation_response(
     operation: str,
-    result: dict[str, object],
+    result: Mapping[str, object],
     *,
     format: str = "none",
     result_mode: str | None = None,
 ) -> dict[str, object]:
     """Keep the validated native response alongside an optional projection."""
     validate_presentation(format)
-    validate_operation_response(operation, result, mode=result_mode)
+    native = result if isinstance(result, dict) else dict(result)
+    result = validate_operation_response(operation, native, mode=result_mode)
     if format == "none":
         return result
     if operation == "repository_intelligence_query":

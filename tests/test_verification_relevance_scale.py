@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 from hashmarks.codemap import CodeMap
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from pathlib import Path
 
     from pytest import MonkeyPatch
@@ -51,17 +52,25 @@ def test_verification_relevance_recovers_local_test_outside_canonical_top20(
         )
 
     relevance = action["verification_relevance"]
+    assert "current_canonical_verify" in relevance
+    assert relevance["current_canonical_verify"] is not None
     assert relevance["current_canonical_verify"].startswith("tests/regression/")
     assert relevance["selection_changed"] is True
+    assert relevance["selected"] is not None
     assert relevance["selected"]["path"] == expected
+    assert "canonical_rank" in relevance["selected"]
     assert relevance["selected"]["canonical_rank"] is None
+    assert "selection_reason" in relevance["selected"]
     assert (
         relevance["selected"]["selection_reason"]
         == "unique-exact-reference-plus-namespace-locality"
     )
     assert action["verify"]["path"] == expected
+    assert action["verify"] is not None
+    assert "verification_test_symbol" in action["verify"]
     assert action["verify"]["verification_test_symbol"] == "test_contract"
     assert action["discovery_effect"] == "bounded-verification-reference-projection"
+    assert "argv" in plan
     assert plan["argv"][-1] == f"{expected}::test_contract"
 
 
@@ -82,6 +91,7 @@ def test_verification_relevance_preserves_canonical_choice_when_reference_eviden
 
     relevance = action["verification_relevance"]
     assert relevance["selection_changed"] is False
+    assert "current_canonical_verify" in relevance
     assert action["verify"]["path"] == relevance["current_canonical_verify"]
     assert relevance["selection_reason"] == "canonical-verification"
     assert action["discovery_effect"] == "none"
@@ -94,9 +104,12 @@ def test_public_verification_relevance_is_bounded(tmp_path: Path) -> None:
         relevance = codemap.verification_relevance(task, limit=20, candidate_limit=3)
 
     assert relevance["schema"] == "hashmarks.verification-relevance.v1"
+    assert relevance["selected"] is not None
     assert relevance["selected"]["path"] == expected
     assert len(relevance["candidates"]) == 3
+    assert "candidate_count" in relevance
     assert relevance["candidate_count"] == 31
+    assert "bounds" in relevance
     assert relevance["bounds"]["reverse_refs_per_symbol"] == 1024
     assert relevance["secret_knowledge_used"] is False
 
@@ -138,6 +151,7 @@ def test_unique_indirect_active_verifier_overrides_stale_direct_legacy_decoys(
         action = codemap.task_action_map(task, limit=20)
         packet = codemap.task_decision_packet(task, limit=20)
 
+    assert action["edit"] is not None
     assert action["edit"]["path"] == "src/case/engine.py"
     assert action["verify"]["path"] == "tests/contract/test_public_contract.py"
     assert (
@@ -174,6 +188,7 @@ def test_reexported_active_symbol_keeps_exact_owner_identity(tmp_path: Path) -> 
             "Fix src.case.engine.ember_snow accepted response implementation and verify behavior",
             limit=20,
         )
+    assert action["edit"] is not None
     assert action["edit"]["path"] == "src/case/engine.py"
     assert action["verify"]["path"] == "tests/contract/test_public_contract.py"
 
@@ -194,6 +209,7 @@ def test_aliased_import_preserves_underlying_owner_identity(tmp_path: Path) -> N
         action = codemap.task_action_map(
             "Fix ember_snow implementation and verify behavior", limit=20
         )
+    assert action["edit"] is not None
     assert action["edit"]["path"] == "src/case/engine.py"
     assert action["verify"]["path"] == "tests/test_contract.py"
 
@@ -252,6 +268,7 @@ def test_two_hop_reexport_keeps_unique_underlying_owner_identity(
             "Fix src.case.engine.ember_snow accepted response implementation and verify behavior",
             limit=20,
         )
+    assert action["edit"] is not None
     assert action["edit"]["path"] == "src/case/engine.py"
     assert action["verify"]["path"] == "tests/contract/test_public_contract.py"
 
@@ -290,6 +307,7 @@ def test_two_hop_alias_chain_keeps_unique_underlying_owner_identity(
             "Fix src.case.engine.ember_snow accepted response implementation and verify behavior",
             limit=20,
         )
+    assert action["edit"] is not None
     assert action["edit"]["path"] == "src/case/engine.py"
     assert action["verify"]["path"] == "tests/contract/test_public_contract.py"
 
@@ -321,6 +339,7 @@ def test_star_reexport_keeps_name_scoped_unique_owner_identity(tmp_path: Path) -
             "Fix src.case.engine.ember_snow accepted response implementation and verify behavior",
             limit=20,
         )
+    assert action["edit"] is not None
     assert action["edit"]["path"] == "src/case/engine.py"
     assert action["verify"]["path"] == "tests/contract/test_public_contract.py"
 
@@ -407,7 +426,9 @@ def test_reexport_chain_beyond_bound_fails_closed_instead_of_stale_verifier(
         codemap.sync()
         action = codemap.task_action_map(task, limit=20)
         packet = codemap.task_decision_packet(task, limit=20)
+    assert action["edit"] is not None
     assert action["edit"]["path"] == "src/case/engine.py"
+    assert "qualified_identity_ambiguous" in action["verification_relevance"]
     assert action["verification_relevance"]["qualified_identity_ambiguous"] is True
     assert action["ambiguity"]["reason"] == "unresolved-qualified-import-identity"
     assert packet["discrimination"]["needed"] is True
@@ -440,7 +461,7 @@ def test_multiple_star_reexports_do_not_invent_unique_owner(tmp_path: Path) -> N
 
 def _verification_reference_case(
     tmp_path: Path, verifier_source: str
-) -> dict[str, object]:
+) -> Mapping[str, object]:
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
     (tmp_path / "src" / "owner.py").write_text(
@@ -527,6 +548,7 @@ def test_verification_reference_index_invalidates_when_source_changes(
         first_row = next(
             row for row in first["candidates"] if row["path"] == "tests/test_owner.py"
         )
+        assert "reference_strength" in first_row
         assert first_row["reference_strength"] == "reachable-symbol-use"
 
         verifier.write_text(
@@ -542,7 +564,9 @@ def test_verification_reference_index_invalidates_when_source_changes(
         second_row = next(
             row for row in second["candidates"] if row["path"] == "tests/test_owner.py"
         )
+        assert "reference_strength" in second_row
         assert second_row["reference_strength"] == "type-checking-only"
+        assert "direct_reference" in second_row
         assert second_row["direct_reference"] is False
 
 
@@ -563,6 +587,7 @@ def test_verification_candidate_projection_samples_pytest_config_once(
         codemap.sync()
         action = codemap.task_action_map(task, limit=20)
 
+    assert "candidate_count" in action["verification_relevance"]
     assert action["verification_relevance"]["candidate_count"] == 81
     assert calls == 1
 
@@ -586,6 +611,7 @@ def test_verification_reference_projection_reads_each_candidate_snapshot_once(
         codemap.sync()
         action = codemap.task_action_map(task, limit=20)
 
+    assert "candidate_count" in action["verification_relevance"]
     candidate_count = action["verification_relevance"]["candidate_count"]
     assert candidate_count == 81
     assert calls == candidate_count
@@ -610,9 +636,13 @@ def test_file_target_keeps_module_declarations_visible_after_many_nested_helpers
         packet = codemap.task_evidence("Inspect src/owner.py.")
     relevance = packet["verification"]["relevance"]
     candidate = next(row for row in relevance["candidates"] if row["path"] == expected)
+    assert "direct_reference" in candidate
     assert candidate["direct_reference"] is True
+    assert "reference_symbols" in candidate
     assert "ApiModel" in candidate["reference_symbols"]
+    assert "completeness" in relevance
     assert relevance["completeness"] == "incomplete"
+    assert "negative_evidence_admissible" in relevance
     assert relevance["negative_evidence_admissible"] is False
     assert packet["explicit_target"]["symbol"] is None
 
@@ -644,12 +674,16 @@ def test_indirect_test_scope_keeps_import_identity_and_incomplete_bounds(
     actual = next(
         row for row in relevance["candidates"] if row["path"] == "tests/test_actual.py"
     )
+    assert "indirect_reference" in actual
     assert actual["indirect_reference"] is True
+    assert "indirect_reference_symbols" in actual
     assert actual["indirect_reference_symbols"] == ["endpoint"]
     assert all(
-        not row["indirect_reference"]
+        row.get("indirect_reference") is False
         for row in relevance["candidates"]
         if row["path"] == "tests/test_foreign.py"
     )
+    assert "completeness" in relevance
     assert relevance["completeness"] == "incomplete"
+    assert "negative_evidence_admissible" in relevance
     assert relevance["negative_evidence_admissible"] is False

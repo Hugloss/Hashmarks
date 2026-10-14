@@ -7,7 +7,9 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
     from .model import SearchHit
+    from .ownership_relation_types import StructuralOwnerResolution, StructuralStarts
     from .repository_domains import RepositoryDomain
+    from .task_evidence_types import VerificationRelevance
 
 
 @dataclass(frozen=True)
@@ -89,7 +91,7 @@ class _TaskActionInitialSurfaceState:
     explicit_surface_ambiguity: bool
     explicit_edit_surface_selected: bool
     verification_anchor_tokens: Sequence[str]
-    literal_reference_owner: dict[str, object] | None
+    literal_reference_owner: StructuralOwnerResolution | None
     localized_config_edit: bool
     explicit_config_surface_request: bool
 
@@ -105,11 +107,11 @@ class _TaskActionExactIdentifierEvidence:
 class _TaskActionOwnerResolutionState:
     edit: dict[str, object] | None
     basis: str | None
-    structural_owner: dict[str, object] | None
+    structural_owner: StructuralOwnerResolution | None
     exact_identifier_paths: tuple[str, ...]
     exact_identifier_search_complete: bool | None
     exact_identifier_search_bound_reasons: tuple[str, ...]
-    structural_starts: dict[str, object]
+    structural_starts: StructuralStarts
 
 
 @dataclass(frozen=True)
@@ -125,7 +127,7 @@ class _TaskActionOwnerResolutionRequest:
 class _TaskActionOwnerCandidateState:
     edit: dict[str, object] | None
     basis: str | None
-    structural_owner: dict[str, object] | None
+    structural_owner: StructuralOwnerResolution | None
     exact_identifier_edits: list[dict[str, object]]
     exact_identifier_paths: tuple[str, ...]
     exact_identifier_search_complete: bool | None
@@ -145,11 +147,11 @@ class _TaskActionSelectionState:
     localized_config_edit: bool
     explicit_config_surface_request: bool
     owner_basis: str | None
-    structural_owner: dict[str, object] | None
+    structural_owner: StructuralOwnerResolution | None
     exact_identifier_paths: tuple[str, ...]
     exact_identifier_search_complete: bool | None
     exact_identifier_search_bound_reasons: tuple[str, ...]
-    structural_starts: dict[str, object]
+    structural_starts: StructuralStarts
     inspect_rows: list[dict[str, object]]
     related_rows: list[dict[str, object]]
 
@@ -159,7 +161,7 @@ class _TaskActionProjectionChoices:
     edit: dict[str, object] | None
     verify: dict[str, object] | None
     contract: dict[str, object] | None
-    verification_relevance: Mapping[str, object]
+    verification_relevance: VerificationRelevance
 
 
 @dataclass
@@ -167,8 +169,8 @@ class _TaskActionFinalState:
     edit: dict[str, object] | None
     verify: dict[str, object] | None
     contract: dict[str, object] | None
-    structural_owner: dict[str, object] | None
-    verification_relevance: Mapping[str, object]
+    structural_owner: StructuralOwnerResolution | None
+    verification_relevance: VerificationRelevance
     ambiguity_state: Mapping[str, object]
     competing: list[dict[str, object]]
     ambiguous: bool

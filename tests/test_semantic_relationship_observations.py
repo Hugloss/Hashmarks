@@ -422,6 +422,7 @@ def test_cli_initial_keeps_request_local_semantic_facts_without_replay(
     assert main([*arguments, "--supplied-observations", str(captures)]) == 0
     response = printed.pop()
     initial = decode_initial_packet(response["result"])
+    assert "semantic_relationships" in full
     assert initial["semantic_relationships"] == full["semantic_relationships"]
     assert initial["semantic_relationships"]["evidence"]["claims"]
     assert "Semantic subject:" in response["presentation"]["text"]
@@ -455,6 +456,7 @@ def test_owned_file_query_does_not_promote_unqualified_native_subjects(
             supplied_observations=[capture],
         )
     assert "semantic_relationships" not in packet
+    assert "supplied_observation_accounting" in packet
     accounting = packet["supplied_observation_accounting"]
     ownership = packet["ownership"]
     assert isinstance(accounting, dict)
@@ -462,6 +464,7 @@ def test_owned_file_query_does_not_promote_unqualified_native_subjects(
     owner = ownership["owner"]
     assert isinstance(owner, dict)
     assert accounting["omitted"] == 1
+    assert "qualname" in owner
     assert owner["qualname"] is None
 
 
@@ -485,6 +488,7 @@ def test_owned_file_query_keeps_repeated_tokens_and_multiple_subjects_unresolved
         second["request"]["params"]["position"] = {"line": 3, "character": 7}
         multiple = codemap.task_evidence(task, supplied_observations=[first, second])
     assert "semantic_relationships" not in multiple
+    assert "supplied_observation_accounting" in multiple
     accounting = multiple["supplied_observation_accounting"]
     assert isinstance(accounting, dict)
     assert accounting["omitted"] == 2
@@ -510,7 +514,11 @@ def test_warm_service_client_and_dispatch_preserve_supplied_capture(
         )
         task = "Change Interface in contract.py to document its behavior."
         result = client.task_evidence(task, supplied_observations=[_capture(tmp_path)])
-    assert result["semantic_relationships"]["evidence"]["claims"]
+    assert "semantic_relationships" in result
+    relationships = result["semantic_relationships"]
+    evidence = relationships["evidence"]
+    assert isinstance(evidence, dict)
+    assert evidence["claims"]
 
 
 @pytest.mark.host_mcp_sdk

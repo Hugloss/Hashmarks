@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from copy import deepcopy
 from pathlib import Path
 from typing import cast
@@ -14,15 +15,17 @@ from hashmarks.digest import FILE_DOMAIN, hash_file
 from hashmarks.evidence_presentation import FORMATS, presentation_response
 
 
-def _context(packet: dict) -> dict:
+def _context(packet: Mapping[str, object]) -> dict:
     if "encoding" in packet:
         from hashmarks.codemap.task_evidence_initial import decode_initial_packet
 
         packet = decode_initial_packet(packet)
+    retrieval = packet["retrieval"]
+    assert isinstance(retrieval, dict)
+    results = retrieval["results"]
+    assert isinstance(results, list)
     return next(
-        row["class_declarations"]
-        for row in packet["retrieval"]["results"]
-        if "class_declarations" in row
+        row["class_declarations"] for row in results if "class_declarations" in row
     )
 
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from threading import RLock
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, overload
 
 from . import repository_retry
 from .codemap import ChangeImpactOptions, CodeMap
@@ -20,6 +20,12 @@ from .codemap.repository_declaration_contract import (
 from .codemap.repository_declaration_provider import MAX_DISCOVERY_PACKET_BYTES
 from .codemap.repository_intelligence_query import RepositoryIntelligenceQueryOptions
 from .codemap.static_python_backend_declarations import StaticPythonBackendDeclarations
+from .codemap.task_evidence_types import (
+    InitialTaskEvidenceEnvelope,
+    PreviousTaskEvidence,
+    TaskEvidencePacket,
+    TaskPostChangeDelta,
+)
 from .file_store import UnstableFileError
 from .mcp_contract import (
     MCP_ERROR_REASONS,
@@ -171,7 +177,7 @@ def _source_context_request(
     return 0, sorted(requested), 1
 
 
-def _previous_evidence(value: dict[str, Any]) -> dict[str, Any]:
+def _previous_evidence(value: PreviousTaskEvidence) -> PreviousTaskEvidence:
     if not isinstance(value, dict):
         raise McpSurfaceError("previous_evidence must be an object")
     try:
@@ -189,9 +195,7 @@ def _previous_evidence(value: dict[str, Any]) -> dict[str, Any]:
     return value
 
 
-def _bounded_json(
-    value: object, *, name: str, maximum: int, expected_type: type
-) -> object:
+def _bounded_json(value: _T, *, name: str, maximum: int, expected_type: type) -> _T:
     if not isinstance(value, expected_type):
         kind = "an object" if expected_type is dict else "a list"
         raise McpSurfaceError(f"{name} must be {kind}")
@@ -297,6 +301,42 @@ class HashmarksMcpSurface:
         limit = _bounded_int(limit, name="limit", minimum=1, maximum=_MAX_LIMIT)
         return self._read(lambda: self._map.find_packet(query, limit=limit))
 
+    @overload
+    def task_evidence(
+        self,
+        task: str,
+        *,
+        limit: int = TASK_EVIDENCE_DEFAULT_OPTIONS.limit,
+        per_role: int = TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
+        token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
+        supplied_observations: list[dict[str, Any]] | None = None,
+        result_mode: Literal["default"] = "default",
+    ) -> TaskEvidencePacket: ...
+
+    @overload
+    def task_evidence(
+        self,
+        task: str,
+        *,
+        limit: int = TASK_EVIDENCE_DEFAULT_OPTIONS.limit,
+        per_role: int = TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
+        token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
+        supplied_observations: list[dict[str, Any]] | None = None,
+        result_mode: Literal["initial"],
+    ) -> InitialTaskEvidenceEnvelope: ...
+
+    @overload
+    def task_evidence(
+        self,
+        task: str,
+        *,
+        limit: int = TASK_EVIDENCE_DEFAULT_OPTIONS.limit,
+        per_role: int = TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
+        token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
+        supplied_observations: list[dict[str, Any]] | None = None,
+        result_mode: str,
+    ) -> TaskEvidencePacket | InitialTaskEvidenceEnvelope: ...
+
     def task_evidence(
         self,
         task: str,
@@ -306,7 +346,7 @@ class HashmarksMcpSurface:
         token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
         supplied_observations: list[dict[str, Any]] | None = None,
         result_mode: str = "default",
-    ) -> dict[str, object]:
+    ) -> TaskEvidencePacket | InitialTaskEvidenceEnvelope:
         if not isinstance(result_mode, str) or result_mode not in operation_modes(
             "task_evidence"
         ):
@@ -820,10 +860,10 @@ class HashmarksMcpSurface:
         self,
         task: str,
         changed_paths: list[str],
-        previous_evidence: dict[str, Any],
+        previous_evidence: PreviousTaskEvidence,
         *,
         token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
-    ) -> dict[str, object]:
+    ) -> TaskPostChangeDelta:
         task = _bounded_text(task, name="task", maximum=_MAX_TASK_CHARS)
         paths = _changed_paths(changed_paths)
         previous_evidence = _previous_evidence(previous_evidence)
@@ -831,7 +871,7 @@ class HashmarksMcpSurface:
             token_budget, name="token_budget", minimum=1, maximum=_MAX_TOKEN_BUDGET
         )
 
-        def project() -> dict[str, object]:
+        def project() -> TaskPostChangeDelta:
             try:
                 return self._map.task_post_change_delta(
                     task,

@@ -7,6 +7,10 @@ from hashmarks.codemap.ownership_graph import (
     OwnershipGraphMixin,
     _OwnershipGraphState,
 )
+from hashmarks.codemap.ownership_relation_types import (
+    OwnershipCandidate,
+    OwnershipRelationEdge,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -26,7 +30,7 @@ def _state() -> _OwnershipGraphState:
     )
 
 
-def _ranked_delegation() -> list[dict[str, object]]:
+def _ranked_delegation() -> list[OwnershipCandidate]:
     return [
         {
             "path": "src/owner.py",
@@ -47,7 +51,7 @@ def _ranked_delegation() -> list[dict[str, object]]:
     ]
 
 
-def _delegation_edge() -> dict[str, object]:
+def _delegation_edge() -> OwnershipRelationEdge:
     return {
         "from": "src/facade.py",
         "to": "src/owner.py",
@@ -103,7 +107,7 @@ def test_symbol_candidate_bound_is_observed_before_ownership_filtering(
 ) -> None:
     state = _state()
     expandable = [("src/start.py", 0, ("src/start.py",))]
-    edge_map = {
+    edge_map: dict[str, list[dict[str, object]]] = {
         "src/start.py": [
             {
                 "kind": "call",

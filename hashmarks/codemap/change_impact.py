@@ -18,9 +18,10 @@ from .project_impact_codec import compact_project_impact
 from .repository_domains import RepositoryDomain, classify_repository_path
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Mapping, Sequence
 
     from .engine import CodeMap
+    from .ownership_relation_types import OwnershipPathHop
 
 
 @dataclass(frozen=True)
@@ -316,7 +317,7 @@ class ChangeImpactMixin:
                         cast("Sequence[object]", refreshed.get("warnings") or ())
                     ),
                 },
-                int(refreshed["generation"]),
+                int(cast("int | str", refreshed["generation"])),
             )
         return None, None
 
@@ -356,7 +357,7 @@ class ChangeImpactMixin:
         return state
 
     def _change_impact_owner_cache_key(
-        self, task: str, action: dict[str, object]
+        self, task: str, action: Mapping[str, object]
     ) -> tuple[int, str, int, int] | None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -399,7 +400,7 @@ class ChangeImpactMixin:
         edit_path: str,
         verify_path: str,
         visible: Callable[[str], bool],
-    ) -> list[dict[str, object]] | None:
+    ) -> list[OwnershipPathHop] | None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         starts = [verify_path]
@@ -443,7 +444,7 @@ class ChangeImpactMixin:
         return chain, relations
 
     def _change_impact_owner_chain(
-        self, task: str, action: dict[str, object], visible: Callable[[str], bool]
+        self, task: str, action: Mapping[str, object], visible: Callable[[str], bool]
     ) -> tuple[
         str, dict[str, object] | None, str, list[str], dict[tuple[str, str], str]
     ]:
@@ -529,7 +530,7 @@ class ChangeImpactMixin:
         }
         for key in ("runner", "scope", "confidence"):
             if key in plan:
-                verification_meta[key] = plan[key]
+                verification_meta[key] = plan.get(key)
         state.add(
             _ImpactCandidate(
                 verify_path,

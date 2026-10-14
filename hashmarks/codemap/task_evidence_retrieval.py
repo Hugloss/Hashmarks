@@ -11,6 +11,7 @@ from .model import EvidenceVisibility, SearchHit
 
 if TYPE_CHECKING:
     from .engine import CodeMap
+    from .task_evidence_types import TaskEvidenceDraft
 
 
 class TaskEvidenceRetrievalMixin:
@@ -294,7 +295,7 @@ class TaskEvidenceRetrievalMixin:
 
     def _task_evidence_attach_retrieval_supplements(
         self,
-        result: dict[str, object],
+        result: TaskEvidenceDraft,
         task: str,
         *,
         limit: int,

@@ -77,6 +77,7 @@ from .repository_task_action import TaskActionMixin
 from .singleflight import SingleFlight
 from .structural_locality import StructuralLocalityMixin
 from .structural_search import AstGrepSearchProvider
+from .task_evidence_types import TaskActionMap
 from .task_retrieval import TaskRetrievalMixin, _TaskRetrievalResult
 from .typescript_resolver import TypeScriptResolverProvider
 from .verification_explanation import VerificationExplanationMixin
@@ -275,7 +276,7 @@ class CodeMap(
         # generation-bound retrieval/ownership evidence. Reuse only exact request
         # identities inside one explicit decision session.
         self._decision_task_action_cache: dict[
-            tuple[int, str, int, int], dict[str, object]
+            tuple[int, str, int, int], TaskActionMap
         ] = {}
         # Owner-chain reconstruction can traverse the bounded ownership relation
         # graph repeatedly while several impact-derived surfaces share one task

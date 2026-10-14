@@ -91,6 +91,7 @@ def test_selected_verification_mutation_is_never_safe_fresh_across_hard_corpus(
             stale = codemap.task_evidence(row["query"])
             assert _freshness_state(stale) == "stale"
             assert stale["provenance"]["freshness"] == "stale"
+            assert "freshness_reason" in stale["provenance"]
             assert (
                 stale["provenance"]["freshness_reason"]
                 == "verification-changed-since-selection"

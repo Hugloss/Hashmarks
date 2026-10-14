@@ -37,6 +37,8 @@ def test_structural_owner_follows_active_test_route_engine_chain(
         )
     assert action["verify"]["path"] == "tests/case/test_behavior.py"
     assert action["edit"]["path"] == "src/case/engine.py"
+    assert action["ownership_resolution"] is not None
+    assert "depth" in action["ownership_resolution"]
     assert action["ownership_resolution"]["depth"] == 2
     assert action["ownership_resolution"]["secret_knowledge_used"] is False
     assert any(

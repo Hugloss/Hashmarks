@@ -56,10 +56,13 @@ def test_real_indexed_reference_window_qualifies_completeness_before_projection(
         packet = codemap.verification_relevance(task)
         graph = codemap.verification_ownership_graph(task)
     truncated = reference_count + 1 > 1024
+    assert "search_bound_reasons" in packet
     reasons = packet["search_bound_reasons"]
     assert isinstance(reasons, list)
+    assert "negative_evidence_admissible" in packet
     assert packet["negative_evidence_admissible"] is not truncated
     assert ("direct-reverse-ref-limit" in reasons) is truncated
+    assert "completeness" in packet
     assert packet["completeness"] == ("incomplete" if truncated else "complete")
     summary = graph["summary"]
     assert isinstance(summary, dict)
@@ -106,9 +109,13 @@ def test_bounded_reference_search_cannot_report_no_verification_candidate(
 
     assert packet["selected"] is None
     assert packet["selection_reason"] == "verification-candidate-search-bounded"
+    assert "completeness" in packet
     assert packet["completeness"] == "incomplete"
+    assert "truncation" in packet
     assert packet["truncation"] == "truncated"
+    assert "negative_evidence_admissible" in packet
     assert packet["negative_evidence_admissible"] is False
+    assert "search_bound_reasons" in packet
     assert "direct-reverse-ref-limit" in packet["search_bound_reasons"]
 
 
@@ -152,12 +159,17 @@ def test_bounded_reference_search_cannot_manufacture_unique_verifier(
             rows=[],
         )
 
+    assert packet["selected"] is not None
     assert packet["selected"]["path"] == "tests/test_owner.py"
+    assert "selection_reason" in packet["selected"]
     assert (
         packet["selected"]["selection_reason"] == "best-bounded-verification-evidence"
     )
+    assert "completeness" in packet
     assert packet["completeness"] == "incomplete"
+    assert "negative_evidence_admissible" in packet
     assert packet["negative_evidence_admissible"] is False
+    assert "search_bound_reasons" in packet
     assert "direct-reverse-ref-limit" in packet["search_bound_reasons"]
 
 
@@ -190,7 +202,11 @@ def test_exhausted_verification_search_can_still_authorize_absence(
 
     assert packet["selected"] is None
     assert packet["selection_reason"] == "no-verification-candidate"
+    assert "completeness" in packet
     assert packet["completeness"] == "complete"
+    assert "truncation" in packet
     assert packet["truncation"] == "complete"
+    assert "negative_evidence_admissible" in packet
     assert packet["negative_evidence_admissible"] is True
+    assert "search_bound_reasons" in packet
     assert packet["search_bound_reasons"] == []

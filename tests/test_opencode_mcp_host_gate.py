@@ -305,10 +305,13 @@ def test_selection_scenarios_are_neutral_and_keep_negative_controls(
                 row for row in host_gate.SELECTION_SCENARIOS if row.name == name
             )
             packet = surface.task_evidence(scenario.prompt)
+            assert packet["ownership"]["candidate"] is not None
+            assert packet["verification"]["selected"] is not None
             assert packet["ownership"]["candidate"]["path"] == owner
             assert packet["verification"]["selected"]["path"] == verification
         ambiguous = surface.task_evidence(host_gate.SELECTION_SCENARIOS[1].prompt)
         assert ambiguous["ownership"]["basis"] == "exact-import-owner"
+        assert ambiguous["ownership"]["owner"] is not None
         assert ambiguous["ownership"]["owner"]["path"] == "src/checkout/pricing.py"
     finally:
         surface.close()

@@ -21,10 +21,13 @@ from .task_action_types import (
     _TaskActionProjectionChoices,
     _TaskActionSelectionState,
 )
+from .task_evidence_contract import read_task_candidate
 from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 
 if TYPE_CHECKING:
     from .engine import CodeMap
+    from .ownership_relation_types import StructuralOwnerResolution
+    from .task_evidence_types import ActionDiscrimination, TaskActionMap
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,7 +51,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         *,
         limit: int = TASK_ACTION_DEFAULT_OPTIONS.limit,
         per_role: int = TASK_ACTION_DEFAULT_OPTIONS.per_role,
-    ) -> dict[str, object]:
+    ) -> TaskActionMap:
         """Translate canonical task evidence into worker actions without reranking it.
 
         ``find_task`` remains retrieval authority.  This projection classifies only
@@ -77,7 +80,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
 
     def _task_action_cache_lookup(
         self, task: str, limit: int, per_role: int
-    ) -> tuple[tuple[int, str, int, int] | None, dict[str, object] | None]:
+    ) -> tuple[tuple[int, str, int, int] | None, TaskActionMap | None]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         if self._decision_session_depth <= 0:
@@ -147,9 +150,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             discrimination=discrimination,
             explicit_surface_ambiguity=surface.explicit_surface_ambiguity,
             explicit_edit_surface_selected=bool(surface.explicit_edit_surface_selected),
-            verification_anchor_tokens=cast(
-                "Sequence[str]", surface.verification_anchor_tokens
-            ),
+            verification_anchor_tokens=surface.verification_anchor_tokens,
             localized_config_edit=surface.localized_config_edit,
             explicit_config_surface_request=bool(
                 surface.explicit_config_surface_request
@@ -162,12 +163,16 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                 owner.exact_identifier_search_bound_reasons
             ),
             structural_starts=owner.structural_starts,
-            inspect_rows=[row for row in context.rows if "inspect" in row["roles"]][
-                :per_role
-            ],
-            related_rows=[row for row in context.rows if "related" in row["roles"]][
-                :per_role
-            ],
+            inspect_rows=[
+                row
+                for row in context.rows
+                if "inspect" in cast("Sequence[str]", row["roles"])
+            ][:per_role],
+            related_rows=[
+                row
+                for row in context.rows
+                if "related" in cast("Sequence[str]", row["roles"])
+            ][:per_role],
         )
 
     def _task_action_promoted_edit(
@@ -255,10 +260,14 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         contract = self._task_action_local_contract(selection, edit)
         structural_starts = selection.structural_starts
         structural_conflict = bool(
-            len(structural_starts.get("observed_owners") or []) > 1
+            len(cast("Sequence[str]", structural_starts.get("observed_owners") or []))
+            > 1
             or any(
                 row.get("status") in {"graph-incomplete", "stale", "unresolved"}
-                for row in structural_starts.get("candidates") or []
+                for row in cast(
+                    "Sequence[Mapping[str, object]]",
+                    structural_starts.get("candidates") or [],
+                )
             )
         )
         if self._task_action_verification_edit_is_admitted(selection) and not (
@@ -355,7 +364,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
     def _task_action_discrimination_payload(
         final: _TaskActionFinalState,
         authority: Mapping[str, object],
-    ) -> dict[str, object]:
+    ) -> ActionDiscrimination:
         """Classify unresolved action evidence once for downstream projections."""
         reason = "resolved"
         if final.edit is None:
@@ -378,7 +387,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         selection: _TaskActionSelectionState,
         final: _TaskActionFinalState,
         bounds: tuple[int, int],
-    ) -> dict[str, object]:
+    ) -> TaskActionMap:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         limit, per_role = bounds
@@ -390,7 +399,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             final.ambiguity_reason,
             selection.owner_basis,
         )
-        authority = cast("Mapping[str, object]", ownership["ownership_authority"])
+        authority = ownership["ownership_authority"]
         action_edit = ownership.get("action_edit")
         action_discrimination = self._task_action_discrimination_payload(
             final, authority
@@ -408,13 +417,17 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         return {
             "schema": operation_schema("task_action_map"),
             "task": task,
-            "edit": final.edit,
+            "edit": None if final.edit is None else read_task_candidate(final.edit),
             "action_edit": action_edit,
             "action_discrimination": action_discrimination,
-            "verify": final.verify,
-            "contract": final.contract,
-            "inspect": selection.inspect_rows,
-            "related": selection.related_rows,
+            "verify": None
+            if final.verify is None
+            else read_task_candidate(final.verify),
+            "contract": None
+            if final.contract is None
+            else read_task_candidate(final.contract),
+            "inspect": [read_task_candidate(row) for row in selection.inspect_rows],
+            "related": [read_task_candidate(row) for row in selection.related_rows],
             "ownership_resolution": final.structural_owner,
             "structural_starts": selection.structural_starts,
             "owner_basis": selection.owner_basis,
@@ -464,7 +477,9 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                     ),
                 )
             ),
-            "canonical": [dict(row) for row in context.canonical_rows],
+            "canonical": [
+                read_task_candidate(dict(row)) for row in context.canonical_rows
+            ],
             "bounds": self._task_action_bounds_payload(limit, per_role),
             "authority_non_interference": {
                 "presentation_bounded": True,
@@ -483,7 +498,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         task: str,
         limit: int,
         action_key: tuple[int, str, int, int] | None,
-        result: dict[str, object],
+        result: TaskActionMap,
     ) -> None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -500,11 +515,15 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         if isinstance(starts, Mapping):
             authority_paths.update(
                 str(row.get("start_path"))
-                for row in starts.get("candidates") or []
+                for row in cast(
+                    "Sequence[Mapping[str, object]]", starts.get("candidates") or []
+                )
                 if isinstance(row, Mapping) and row.get("start_path")
             )
             authority_paths.update(
-                str(path) for path in starts.get("observed_owners") or [] if path
+                str(path)
+                for path in cast("Sequence[str]", starts.get("observed_owners") or [])
+                if path
             )
         generation = self.store.generation()
         self._task_authority_paths_cache[(generation, task, int(limit))] = tuple(
@@ -525,7 +544,9 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         rows: Sequence[dict[str, object]],
         role: str,
     ) -> dict[str, object] | None:
-        return next((row for row in rows if role in row["roles"]), None)
+        return next(
+            (row for row in rows if role in cast("Sequence[str]", row["roles"])), None
+        )
 
     def _task_action_explicit_surface_selection(
         self,
@@ -538,6 +559,8 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         bool,
         bool,
     ]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         explicit_surface_ambiguity = False
         explicit_edit_surface_selected = False
         if context.cues.explicit_test_edit:
@@ -550,7 +573,11 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                     "explicit_target_basis": "explicit-test-edit",
                     "roles": list(
                         dict.fromkeys(
-                            [*test_surface.get("roles", []), "edit", "verify"]
+                            [
+                                *cast("Sequence[str]", test_surface.get("roles", [])),
+                                "edit",
+                                "verify",
+                            ]
                         )
                     ),
                 }
@@ -575,7 +602,11 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                     **build_surface,
                     "roles": list(
                         dict.fromkeys(
-                            [*build_surface.get("roles", []), "edit", "related"]
+                            [
+                                *cast("Sequence[str]", build_surface.get("roles", [])),
+                                "edit",
+                                "related",
+                            ]
                         )
                     ),
                 }
@@ -601,9 +632,11 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         dict[str, object] | None,
         dict[str, object] | None,
         Sequence[str],
-        dict[str, object] | None,
+        StructuralOwnerResolution | None,
         bool,
     ]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         verification_anchor_tokens = self._task_identifier_anchor_tokens(task)
         if verification_anchor_tokens:
             local_verify = self._task_identifier_verification_row(
@@ -621,7 +654,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                     }
                     explicit_edit_surface_selected = True
 
-        literal_reference_owner: dict[str, object] | None = None
+        literal_reference_owner: StructuralOwnerResolution | None = None
         if (
             "sql" in context.cue_words
             and isinstance(verify, dict)
@@ -649,6 +682,8 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         explicit_edit_surface_selected: bool,
         limit: int,
     ) -> tuple[dict[str, object] | None, bool, bool]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         explicit_config_surface_request = bool(
             context.cue_words.intersection(context.strong_config_cues)
             or context.cues.explicit_policy_surface
@@ -761,6 +796,8 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         choices: _TaskActionProjectionChoices,
         ambiguity_flags: tuple[bool, bool],
     ) -> tuple[bool, bool, bool]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         (
             multi_structural_owner_ambiguity,
             verification_identity_ambiguity,
@@ -826,6 +863,8 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         choices: _TaskActionProjectionChoices,
         decisive_qualified_verification: bool,
     ) -> bool:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         repository_rare_anchor = self._task_action_repository_rare_anchor(
             context.projection_state,
             selection.discrimination.task_terms,
@@ -856,18 +895,23 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         starts = selection.structural_starts
         if starts.get("status") != "observed" or selection.localized_config_edit:
             return {}, []
-        owners = {
+        owners: dict[str, dict[str, object]] = {
             str(path): {"path": str(path)}
-            for path in starts.get("observed_owners") or []
+            for path in cast("Sequence[str]", starts.get("observed_owners") or [])
         }
-        origins = [
+        origins: list[dict[str, object]] = [
             {
                 "path": str(row["start_path"]),
                 "owner_path": str(row["observed_owner"]),
-                "canonical_rank": int(row.get("canonical_rank") or 0),
+                "canonical_rank": int(
+                    cast("int | str", row.get("canonical_rank") or 0)
+                ),
             }
-            for row in starts.get("candidates") or []
-            if "verify" in row.get("roles", []) and row.get("observed_owner")
+            for row in cast(
+                "Sequence[Mapping[str, object]]", starts.get("candidates") or []
+            )
+            if "verify" in cast("Sequence[str]", row.get("roles", []))
+            and row.get("observed_owner")
         ]
         return owners, origins
 

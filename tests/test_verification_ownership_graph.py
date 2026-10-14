@@ -14,10 +14,12 @@ def test_verification_ownership_keeps_unobserved_owner_scope_unknown(
     (tmp_path / "backend.py").write_text("def unrelated():\n    return 1\n")
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-    graph = cast(
-        dict[str, Any],
-        codemap.verification_ownership_graph("Inspect an unknown qx_helix_root task"),
-    )
+        graph = cast(
+            dict[str, Any],
+            codemap.verification_ownership_graph(
+                "Inspect an unknown qx_helix_root task"
+            ),
+        )
     summary = cast(dict[str, Any], graph["summary"])
     qualification = cast(dict[str, Any], graph["verification_qualification"])
     assert isinstance(summary, dict)
@@ -762,7 +764,9 @@ def test_module_alias_local_override_cannot_claim_reexported_owner(
         for candidate in relevance["candidates"]
         if candidate["path"] == "tests/test_facade.py"
     )
+    assert "direct_reference" in row
     assert row["direct_reference"] is False
+    assert "qualified_identity_ambiguous" in relevance
     assert relevance["qualified_identity_ambiguous"] is False
 
 

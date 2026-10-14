@@ -14,21 +14,24 @@ from hashmarks.operation_contract import operation_response, operation_schema
 from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from .engine import CodeMap
+    from .task_evidence_types import TaskVerificationPlan
 
 
 class _VerificationOwner(TypedDict):
     path: str
     score: object
     reason: object
-    plan: dict[str, object]
+    plan: TaskVerificationPlan
     covers_edit_candidates: list[str]
     coverage_evidence: str | None
 
 
 class VerificationOwnershipMixin:
     @staticmethod
-    def _verification_edit_paths(action: dict[str, object]) -> list[str]:
+    def _verification_edit_paths(action: Mapping[str, object]) -> list[str]:
         edit = action.get("edit")
         if not isinstance(edit, dict):
             return []
@@ -162,7 +165,7 @@ class VerificationOwnershipMixin:
         }
 
     def _verification_owner_rows(
-        self, relevance: dict[str, object], edit_paths: list[str]
+        self, relevance: Mapping[str, object], edit_paths: list[str]
     ) -> tuple[list[_VerificationOwner], int]:
         candidates = relevance.get("candidates")
         if not isinstance(candidates, list):
@@ -187,7 +190,7 @@ class VerificationOwnershipMixin:
 
     @staticmethod
     def _verification_summary_state(
-        relevance: dict[str, object], returned_owners: int
+        relevance: Mapping[str, object], returned_owners: int
     ) -> tuple[bool | None, bool | None]:
         """Derive summary claims before the bounded owner projection."""
         count = relevance.get("candidate_count")
@@ -247,7 +250,7 @@ class VerificationOwnershipMixin:
             "edit_authorities": edit_authorities,
             "verification_owners": verifiers,
             "verification_qualification": {
-                key: deepcopy(relevance[key])
+                key: deepcopy(relevance.get(key))
                 for key in (
                     "authority",
                     "completeness",

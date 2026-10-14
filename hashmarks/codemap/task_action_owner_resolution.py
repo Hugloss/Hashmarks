@@ -16,7 +16,14 @@ from .task_action_types import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from .engine import CodeMap
+    from .ownership_relation_types import (
+        StructuralOwnerCandidate,
+        StructuralStartObservation,
+        StructuralStarts,
+    )
 
 
 class TaskActionOwnerResolutionMixin:
@@ -227,7 +234,7 @@ class TaskActionOwnerResolutionMixin:
         failed: set[str],
     ) -> bool:
         path = str(row.get("path") or "")
-        domains = set(map(str, row.get("domains") or ()))
+        domains = set(map(str, cast("Sequence[str]", row.get("domains") or ())))
         return bool(
             path
             and path not in failed
@@ -310,7 +317,7 @@ class TaskActionOwnerResolutionMixin:
     @staticmethod
     def _task_action_owner_state(
         candidate: _TaskActionOwnerCandidateState,
-        structural_starts: dict[str, object] | None = None,
+        structural_starts: StructuralStarts | None = None,
     ) -> _TaskActionOwnerResolutionState:
         return _TaskActionOwnerResolutionState(
             edit=candidate.edit,
@@ -338,7 +345,7 @@ class TaskActionOwnerResolutionMixin:
         self,
         request: _TaskActionOwnerResolutionRequest,
         candidate: _TaskActionOwnerCandidateState,
-        resolved_by_path: dict[str, dict[str, object] | None],
+        resolved_by_path: dict[str, StructuralOwnerCandidate | None],
         matched_rows: list[dict[str, object]],
     ) -> str | None:
         if TYPE_CHECKING:
@@ -350,7 +357,9 @@ class TaskActionOwnerResolutionMixin:
         source_rows = [
             row
             for row in matched_rows
-            if "edit" in row.get("roles", []) or "related" in row.get("roles", [])
+            if {"edit", "related"}.intersection(
+                cast("Sequence[str]", row.get("roles", []))
+            )
         ]
         source_candidate = max(
             source_rows,
@@ -363,7 +372,7 @@ class TaskActionOwnerResolutionMixin:
                     or []
                 ),
                 self._task_action_specificity(row, request.discrimination),
-                -int(row.get("canonical_rank") or 10_000),
+                -int(cast("int", row.get("canonical_rank") or 10_000)),
             ),
             default=None,
         )
@@ -404,14 +413,14 @@ class TaskActionOwnerResolutionMixin:
         row: dict[str, object],
         terms: list[str],
         origin: str,
-    ) -> tuple[dict[str, object], dict[str, object] | None]:
+    ) -> tuple[StructuralStartObservation, StructuralOwnerCandidate | None]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         path = str(row.get("path") or "")
-        entry: dict[str, object] = {
+        entry: StructuralStartObservation = {
             "start_path": path,
-            "roles": list(row.get("roles") or []),
-            "canonical_rank": row.get("canonical_rank"),
+            "roles": list(cast("list[str]", row.get("roles") or [])),
+            "canonical_rank": cast("int | None", row.get("canonical_rank")),
             "anchor_terms": terms,
             "origin": origin,
             "observed_owner": None,
@@ -456,7 +465,9 @@ class TaskActionOwnerResolutionMixin:
         self,
         request: _TaskActionOwnerResolutionRequest,
         candidate: _TaskActionOwnerCandidateState,
-    ) -> tuple[str | None, dict[str, dict[str, object] | None], dict[str, object]]:
+    ) -> tuple[
+        str | None, dict[str, StructuralOwnerCandidate | None], StructuralStarts
+    ]:
         """Observe each nominated start once before selecting an owner candidate."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -466,8 +477,8 @@ class TaskActionOwnerResolutionMixin:
         nominated = self._task_action_structural_start_rows(
             request.task, canonical_rows, request.discrimination
         )
-        resolved_by_path: dict[str, dict[str, object] | None] = {}
-        entries: dict[str, dict[str, object]] = {}
+        resolved_by_path: dict[str, StructuralOwnerCandidate | None] = {}
+        entries: dict[str, StructuralStartObservation] = {}
         for row, terms in nominated:
             path = str(row.get("path") or "")
             if path and path not in entries:
@@ -480,7 +491,7 @@ class TaskActionOwnerResolutionMixin:
             request, candidate, resolved_by_path, [row for row, _ in nominated]
         )
         if owner_start and owner_start not in entries:
-            selected_row = next(
+            selected_row: dict[str, object] = next(
                 (
                     row
                     for row in canonical_rows

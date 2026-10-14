@@ -6,7 +6,7 @@ import sys
 import types
 from collections.abc import Callable
 from pathlib import Path
-from typing import Never
+from typing import Never, NoReturn
 
 import pytest
 
@@ -119,7 +119,10 @@ def test_mcp_surface_rejects_unbounded_or_empty_inputs(tmp_path: Path) -> None:
             surface.find("flare041", limit=51)
         with pytest.raises(McpSurfaceError, match="changed_paths exceeds"):
             surface.change_impact("task", [f"p{i}.py" for i in range(257)])
-        huge = {"schema": "hashmarks.task-evidence.v5", "payload": "x" * 300_000}
+        huge: dict[str, object] = {
+            "schema": "hashmarks.task-evidence.v5",
+            "payload": "x" * 300_000,
+        }
         with pytest.raises(McpSurfaceError, match="encoded bytes"):
             surface.post_change("task", ["src/feature.py"], huge)
         with pytest.raises((ValueError, McpSurfaceError)):
@@ -541,10 +544,10 @@ def test_mcp_server_boundary_translates_only_surface_errors() -> None:
     class FakeToolError(Exception):
         pass
 
-    def invalid() -> None:
+    def invalid() -> NoReturn:
         raise McpSurfaceError("invalid query")
 
-    def broken() -> None:
+    def broken() -> NoReturn:
         raise RuntimeError("implementation bug")
 
     with pytest.raises(FakeToolError, match="invalid query") as translated:

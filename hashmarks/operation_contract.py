@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from functools import wraps
 from typing import TypeVar, cast
@@ -290,7 +290,7 @@ def validate_operation_response(
 
 _OperationResponse = TypeVar(
     "_OperationResponse",
-    bound=Callable[..., dict[str, object]],
+    bound=Callable[..., Mapping[str, object]],
 )
 
 
@@ -305,12 +305,10 @@ def operation_response(
 
     def decorate(function: _OperationResponse) -> _OperationResponse:
         @wraps(function)
-        def wrapped(*args: object, **kwargs: object) -> dict[str, object]:
-            return validate_operation_response(
-                operation,
-                function(*args, **kwargs),
-                mode=mode,
-            )
+        def wrapped(*args: object, **kwargs: object) -> Mapping[str, object]:
+            response = function(*args, **kwargs)
+            validate_operation_response(operation, response, mode=mode)
+            return response
 
         return cast(_OperationResponse, wrapped)
 

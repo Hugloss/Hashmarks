@@ -20,6 +20,7 @@ from .task_action_types import (
 
 if TYPE_CHECKING:
     from .engine import CodeMap
+    from .ownership_relation_types import StructuralOwnerResolution
 
 _WORD_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
@@ -474,7 +475,7 @@ class TaskActionEvidenceMixin:
 
     def _literal_sql_reference_projection(
         self, verify: dict[str, object], rows: list[dict[str, object]], limit: int
-    ) -> tuple[dict[str, object] | None, dict[str, object] | None]:
+    ) -> tuple[dict[str, object] | None, StructuralOwnerResolution | None]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         verify_path = str(verify["path"])
@@ -508,7 +509,7 @@ class TaskActionEvidenceMixin:
                 "literal_reference_projection": True,
             }
             rows.append(existing)
-        owner = {
+        owner: StructuralOwnerResolution = {
             "path": owner_path,
             "depth": 1,
             "via": "references",

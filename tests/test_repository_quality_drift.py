@@ -226,6 +226,8 @@ def test_typescript_generic_function_is_an_exact_owner(tmp_path: Path) -> None:
         action = codemap.task_action_map("Fix withRefreshOutcome", limit=1)
 
     assert action["admitted_edit"]["path"] == "src/result.ts"
+    assert action["admitted_edit"] is not None
+    assert "name" in action["admitted_edit"]
     assert action["admitted_edit"]["name"] == "withRefreshOutcome"
 
 
@@ -247,6 +249,8 @@ def test_typescript_overload_signatures_share_the_implementation_owner(
         action = codemap.task_action_map("Fix encodePayload", limit=1)
 
     assert action["admitted_edit"]["path"] == "src/encoding.ts"
+    assert action["admitted_edit"] is not None
+    assert "name" in action["admitted_edit"]
     assert action["admitted_edit"]["name"] == "encodePayload"
 
 

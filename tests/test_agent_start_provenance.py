@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Any
 
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.task_evidence_types import SourceReadPending, TaskSourceEvidence
 
 
 def _repo(root: Path) -> None:
@@ -52,6 +53,7 @@ def test_task_evidence_exposes_compact_selection_source_revision_and_unknown_fre
     provenance = start["provenance"]
     assert _ownership(start)["basis"] in {"exact-symbol", "unique-exact-symbol"}
     assert provenance["why"] == "canonical-edit-role"
+    assert "revision" in provenance
     assert provenance["revision"] == expected
     assert provenance["freshness"] == "unknown"
     assert _freshness(start)["state"] == "unknown"
@@ -92,6 +94,7 @@ def test_task_evidence_reports_stale_when_continuity_reports_change(
 
     assert _freshness(start)["state"] == "stale"
     assert start["provenance"]["freshness"] == "stale"
+    assert "freshness_reason" in start["provenance"]
     assert start["provenance"]["freshness_reason"] == "continuity-reported-change"
 
 
@@ -105,7 +108,7 @@ def test_task_evidence_marks_action_stale_if_selected_source_refresh_changes_gen
 
         def mutate_then_project(
             row: dict[str, object], *, role: str, token_budget: int, task: str = ""
-        ) -> dict[str, object]:
+        ) -> tuple[TaskSourceEvidence | None, SourceReadPending | None]:
             path = tmp_path / str(row["path"])
             path.write_text(
                 path.read_text(encoding="utf-8") + "# changed during packet\n",
@@ -121,7 +124,10 @@ def test_task_evidence_marks_action_stale_if_selected_source_refresh_changes_gen
     assert _freshness(start)["state"] == "stale"
     provenance = start["provenance"]
     assert provenance["freshness"] == "stale"
+    assert "freshness_reason" in provenance
     assert provenance["freshness_reason"] == "generation-changed-during-start"
+    assert "selection_generation" in provenance
+    assert "generation" in provenance
     assert provenance["selection_generation"] < provenance["generation"]
 
 
@@ -143,6 +149,7 @@ def test_config_projection_provenance_stays_post_selection(tmp_path: Path) -> No
     assert _ownership(start)["candidate"]["path"].endswith("policy.toml")
     assert _ownership(start)["source_evidence"]["representation"] == "config-key-range"
     assert start["provenance"]["why"] == "contract-authority"
+    assert "revision" in start["provenance"]
     assert len(start["provenance"]["revision"]) == 64
 
 
@@ -201,6 +208,7 @@ def test_task_evidence_marks_stale_when_selected_verification_contents_change_af
     assert _freshness(start)["state"] == "stale"
     assert _verification(start)["selected"]["path"] == "tests/test_engine.py"
     assert start["provenance"]["freshness"] == "stale"
+    assert "freshness_reason" in start["provenance"]
     assert (
         start["provenance"]["freshness_reason"]
         == "verification-changed-since-selection"
@@ -216,6 +224,7 @@ def test_task_evidence_marks_stale_when_selected_verification_is_deleted_after_s
         (tmp_path / "tests" / "test_engine.py").unlink()
         start = codemap.task_evidence(_task(), token_budget=512)
     assert _freshness(start)["state"] == "stale"
+    assert "freshness_reason" in start["provenance"]
     assert (
         start["provenance"]["freshness_reason"]
         == "verification-changed-since-selection"
@@ -233,6 +242,7 @@ def test_task_evidence_marks_stale_when_selected_verification_is_renamed_after_s
         )
         start = codemap.task_evidence(_task(), token_budget=512)
     assert _freshness(start)["state"] == "stale"
+    assert "freshness_reason" in start["provenance"]
     assert (
         start["provenance"]["freshness_reason"]
         == "verification-changed-since-selection"
@@ -249,7 +259,7 @@ def test_task_evidence_closing_fence_catches_verification_mutation_during_packet
 
         def mutate_verification_then_project(
             row: dict[str, object], *, role: str, token_budget: int, task: str = ""
-        ) -> dict[str, object]:
+        ) -> tuple[TaskSourceEvidence | None, SourceReadPending | None]:
             (tmp_path / "tests" / "test_engine.py").write_text(
                 "def test_replaced():\n    assert True\n", encoding="utf-8"
             )
@@ -260,6 +270,7 @@ def test_task_evidence_closing_fence_catches_verification_mutation_during_packet
         )
         start = codemap.task_evidence(_task(), token_budget=512)
     assert _freshness(start)["state"] == "stale"
+    assert "freshness_reason" in start["provenance"]
     assert (
         start["provenance"]["freshness_reason"]
         == "verification-changed-since-selection"

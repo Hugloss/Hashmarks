@@ -23,6 +23,7 @@ from .model import EvidenceVisibility
 from .query_primitives import _TASK_STOPWORDS, _query_terms
 from .repository_domains import RepositoryDomain, classify_repository_path
 from .repository_index_store import git_base_identity
+from .task_evidence_contract import read_task_candidate
 from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 from .verification_ownership import VerificationOwnershipMixin
 
@@ -30,6 +31,11 @@ _LIMIT = VERIFICATION_RELEVANCE_DEFAULTS.limit
 _CANDIDATES = VERIFICATION_RELEVANCE_DEFAULTS.candidate_limit
 if TYPE_CHECKING:
     from .engine import CodeMap
+    from .task_evidence_types import (
+        TaskCandidate,
+        TaskVerificationPlan,
+        VerificationRelevance,
+    )
 
 
 @dataclass(frozen=True)
@@ -176,8 +182,8 @@ class VerificationMixin(VerificationOwnershipMixin):
     """Repository-owned verification relevance, ownership, plan, and selection semantics."""
 
     @staticmethod
-    def _verification_without_edit_owner(current_path: str) -> dict[str, object]:
-        selected = None
+    def _verification_without_edit_owner(current_path: str) -> VerificationRelevance:
+        selected: TaskCandidate | None = None
         if current_path:
             selected = {
                 "path": current_path,
@@ -273,7 +279,7 @@ class VerificationMixin(VerificationOwnershipMixin):
             path = str(row.get("path") or "")
             if not path:
                 continue
-            rank = int(row.get("canonical_rank") or 10_000)
+            rank = int(cast("int | str", row.get("canonical_rank") or 10_000))
             canonical_rank[path] = min(rank, canonical_rank.get(path, rank))
             if RepositoryDomain.TEST in set(classify_repository_path(path)):
                 candidate_paths.add(path)
@@ -379,7 +385,7 @@ class VerificationMixin(VerificationOwnershipMixin):
         keep = max(0, len(source_parts) - max(0, leading - 1))
         absolute_target = ".".join(source_parts[:keep] + ([suffix] if suffix else []))
         return (
-            self._resolve_import_paths(ref_path, absolute_target)
+            set(self._resolve_import_paths(ref_path, absolute_target))
             if absolute_target
             else set()
         )
@@ -543,7 +549,7 @@ class VerificationMixin(VerificationOwnershipMixin):
     ) -> tuple[str, int, str, str]:
         return (
             str(ref.get("path") or ""),
-            int(ref.get("line") or 0),
+            int(cast("int | str", ref.get("line") or 0)),
             str(ref.get("kind") or ""),
             str(ref.get("target") or ""),
         )
@@ -558,7 +564,7 @@ class VerificationMixin(VerificationOwnershipMixin):
         raw = self._session_refs_many(selected_symbols, limit_per_target=1025)
         bounded: dict[str, list[Mapping[str, object]]] = {}
         for symbol in selected_symbols:
-            refs = list(raw.get(symbol, ()))
+            refs: list[Mapping[str, object]] = list(raw.get(symbol, ()))
             if len(refs) > 1024:
                 state.search_bound_reasons.add("direct-reverse-ref-limit")
             bounded[symbol] = refs[:1024]
@@ -812,6 +818,8 @@ class VerificationMixin(VerificationOwnershipMixin):
         *,
         pytest_declared: bool | None = None,
     ) -> dict[str, object]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         path_parts = {
             part.casefold()
             for part in Path(path).parent.parts
@@ -954,8 +962,8 @@ class VerificationMixin(VerificationOwnershipMixin):
         canonical = int(rank) if isinstance(rank, int) else 10_000
         return (
             reference_strength,
-            int(row.get("namespace_overlap") or 0),
-            int(row.get("task_anchor_count") or 0),
+            int(cast("int | str", row.get("namespace_overlap") or 0)),
+            int(cast("int | str", row.get("task_anchor_count") or 0)),
             -canonical,
             str(row.get("path") or ""),
         )
@@ -1025,10 +1033,14 @@ class VerificationMixin(VerificationOwnershipMixin):
             for row in (best, selected)
         ):
             return False
-        best_namespace = int(best.get("namespace_overlap") or 0)
-        selected_namespace = int(selected.get("namespace_overlap") or 0)
-        best_anchors = int(best.get("task_anchor_count") or 0)
-        selected_anchors = int(selected.get("task_anchor_count") or 0)
+        best_namespace = int(cast("int | str", best.get("namespace_overlap") or 0))
+        selected_namespace = int(
+            cast("int | str", selected.get("namespace_overlap") or 0)
+        )
+        best_anchors = int(cast("int | str", best.get("task_anchor_count") or 0))
+        selected_anchors = int(
+            cast("int | str", selected.get("task_anchor_count") or 0)
+        )
         return (
             bool(best.get("runner_available"))
             and best_namespace > selected_namespace
@@ -1046,7 +1058,10 @@ class VerificationMixin(VerificationOwnershipMixin):
         best_score = cls._verification_candidate_score(best)
         if best_score[0] <= 0:
             return False
-        if int(best.get("namespace_overlap") or 0) <= 0 and not unique_reference:
+        if (
+            int(cast("int | str", best.get("namespace_overlap") or 0)) <= 0
+            and not unique_reference
+        ):
             return False
         if selected is None or str(best.get("path") or "") == current_path:
             return True
@@ -1065,7 +1080,7 @@ class VerificationMixin(VerificationOwnershipMixin):
 
     @staticmethod
     def _verification_bounded_candidates(
-        candidates: Sequence[dict[str, object]],
+        candidates: Sequence[Mapping[str, object]],
         selected: Mapping[str, object] | None,
         limit: int,
     ) -> list[dict[str, object]]:
@@ -1106,11 +1121,13 @@ class VerificationMixin(VerificationOwnershipMixin):
         selected_row: Mapping[str, object] | None,
         selection_reason: str,
         limit: int,
-    ) -> dict[str, object]:
+    ) -> VerificationRelevance:
         selected = (
             None
             if selected_row is None
-            else {**selected_row, "selection_reason": selection_reason}
+            else read_task_candidate(
+                {**selected_row, "selection_reason": selection_reason}
+            )
         )
         identity_ambiguous = bool(state.unresolved_import_identity_paths) and not bool(
             state.refs_by_path
@@ -1127,9 +1144,12 @@ class VerificationMixin(VerificationOwnershipMixin):
         return {
             "schema": operation_schema("verification_relevance"),
             "selected": selected,
-            "candidates": VerificationMixin._verification_bounded_candidates(
-                candidates, selected_row, limit
-            ),
+            "candidates": [
+                read_task_candidate(row)
+                for row in VerificationMixin._verification_bounded_candidates(
+                    candidates, selected_row, limit
+                )
+            ],
             "candidate_count": len(candidates),
             "selection_reason": projected_reason,
             "completeness": "complete" if search_complete else "incomplete",
@@ -1170,7 +1190,7 @@ class VerificationMixin(VerificationOwnershipMixin):
         current_verify: Mapping[str, object] | None,
         rows: Sequence[Mapping[str, object]],
         limit: int = _CANDIDATES,
-    ) -> dict[str, object]:
+    ) -> VerificationRelevance:
         """Rank bounded verification surfaces around an already-selected edit owner."""
         if limit < 1:
             raise ValueError("limit must be >= 1")
@@ -1224,7 +1244,7 @@ class VerificationMixin(VerificationOwnershipMixin):
         *,
         limit: int = _LIMIT,
         candidate_limit: int = (_CANDIDATES),
-    ) -> dict[str, object]:
+    ) -> VerificationRelevance:
         """Return the task's bounded verification relevance evidence."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -1234,15 +1254,18 @@ class VerificationMixin(VerificationOwnershipMixin):
             raise RuntimeError("task action map did not produce verification relevance")
         if candidate_limit < 1:
             raise ValueError("candidate_limit must be >= 1")
-        result = dict(relevance)
+        result = relevance.copy()
         candidates = relevance.get("candidates")
         selected = relevance.get("selected")
         if isinstance(candidates, list):
-            result["candidates"] = self._verification_bounded_candidates(
-                candidates,
-                selected if isinstance(selected, Mapping) else None,
-                min(int(candidate_limit), 16),
-            )
+            result["candidates"] = [
+                read_task_candidate(row)
+                for row in self._verification_bounded_candidates(
+                    candidates,
+                    selected if isinstance(selected, Mapping) else None,
+                    min(int(candidate_limit), 16),
+                )
+            ]
         return result
 
     @staticmethod
@@ -1298,7 +1321,7 @@ class VerificationMixin(VerificationOwnershipMixin):
     def _decision_evidence_receipt(
         self,
         task: str,
-        action: dict[str, object],
+        action: Mapping[str, object],
         verification: Mapping[str, object],
     ) -> dict[str, object]:
         """Return one compact identity for the repository-owned decision evidence.
@@ -1321,16 +1344,10 @@ class VerificationMixin(VerificationOwnershipMixin):
                     row[key] = str(value[key])
             return row
 
-        ownership = (
-            action.get("ownership_resolution")
-            if isinstance(action.get("ownership_resolution"), Mapping)
-            else {}
-        )
-        owner_path = (
-            ownership.get("owner_path")
-            if isinstance(ownership.get("owner_path"), list)
-            else []
-        )
+        ownership = action.get("ownership_resolution")
+        ownership = ownership if isinstance(ownership, Mapping) else {}
+        owner_path = ownership.get("owner_path")
+        owner_path = owner_path if isinstance(owner_path, list) else []
         normalized_owner_path = [
             {
                 "from": str(edge.get("from") or ""),
@@ -1340,11 +1357,8 @@ class VerificationMixin(VerificationOwnershipMixin):
             for edge in owner_path
             if isinstance(edge, Mapping)
         ]
-        ambiguity = (
-            action.get("ambiguity")
-            if isinstance(action.get("ambiguity"), Mapping)
-            else {}
-        )
+        ambiguity = action.get("ambiguity")
+        ambiguity = ambiguity if isinstance(ambiguity, Mapping) else {}
         payload: dict[str, object] = {
             "schema": "hashmarks.decision-evidence.v1",
             "repository_identity": self._repository_packet_identity(),
@@ -1411,11 +1425,8 @@ class VerificationMixin(VerificationOwnershipMixin):
         )
         if membership is None:
             return None, source_identity, None
-        owner_evidence = (
-            state.action.get("ownership_resolution")
-            if isinstance(state.action.get("ownership_resolution"), Mapping)
-            else None
-        )
+        owner_evidence = state.action.get("ownership_resolution")
+        owner_evidence = owner_evidence if isinstance(owner_evidence, Mapping) else None
         envelope = verification_selection_envelope(
             VerificationSelectionEnvelopeState(
                 repository_identity=self._repository_packet_identity(),
@@ -1439,6 +1450,11 @@ class VerificationMixin(VerificationOwnershipMixin):
         source_identity: str,
         envelope: Mapping[str, object] | None,
     ) -> dict[str, object]:
+        producer = (
+            cast("Mapping[str, object]", envelope.get("producer", {}))
+            if envelope is not None
+            else None
+        )
         return {
             "source_identity": source_identity,
             "verification_membership_identity": (
@@ -1450,8 +1466,8 @@ class VerificationMixin(VerificationOwnershipMixin):
                 envelope.get("envelope_identity") if envelope is not None else None
             ),
             "verification_selection_producer_implementation_identity": (
-                envelope.get("producer", {}).get("implementation_identity")
-                if isinstance(envelope, Mapping)
+                producer.get("implementation_identity")
+                if producer is not None
                 else None
             ),
         }
@@ -1459,7 +1475,9 @@ class VerificationMixin(VerificationOwnershipMixin):
     def _task_decision_verification_plan(
         self,
         verify: Mapping[str, object] | None,
-    ) -> dict[str, object]:
+    ) -> TaskVerificationPlan:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if verify is None:
             return {
                 "schema": "hashmarks.verification-plan.v1",

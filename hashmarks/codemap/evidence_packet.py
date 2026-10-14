@@ -5,7 +5,7 @@ import math
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Literal, cast, overload
 
 from hashmarks.digest import hash_file
 from hashmarks.evidence_context import evidence_context_identity
@@ -32,9 +32,28 @@ from .task_evidence_discrimination import (
 )
 from .task_evidence_retrieval import TaskEvidenceRetrievalMixin
 from .task_evidence_scoped_method import TaskEvidenceScopedMethodMixin
+from .task_evidence_types import SourceReadPending
 
 if TYPE_CHECKING:
     from .engine import CodeMap
+    from .task_evidence_types import (
+        DiscriminationRead,
+        ExplicitTaskTarget,
+        InitialTaskEvidenceEnvelope,
+        RetrievalLocator,
+        SourceReadPendingDraft,
+        TaskActionMap,
+        TaskEvidenceDraft,
+        TaskEvidencePacket,
+        TaskEvidenceProvenance,
+        TaskProvenanceDraft,
+        TaskRetrieval,
+        TaskRetrievalBounds,
+        TaskSourceBudget,
+        TaskSourceEvidence,
+        TaskSourceRange,
+        TaskVerificationPlan,
+    )
 
 
 TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS = (64, 128, 192, 256, 384, 512)
@@ -180,7 +199,7 @@ class TaskEvidencePacketMixin(
             }
         return result
 
-    def _minimum_safe_action_budget(self, action: dict[str, object]) -> int:
+    def _minimum_safe_action_budget(self, action: Mapping[str, object]) -> int:
         """Return exact tokens required by the mandatory action skeleton.
 
         ``work_context`` admits unique edit/verify/contract anchors before any
@@ -239,7 +258,7 @@ class TaskEvidencePacketMixin(
     def _task_action_verification_plan(
         self,
         verify: Mapping[str, object] | None,
-    ) -> dict[str, object]:
+    ) -> TaskVerificationPlan:
         """Project the selected verification evidence into its existing plan contract."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -280,7 +299,7 @@ class TaskEvidencePacketMixin(
 
     def _task_action_brief_from_action(
         self,
-        action: dict[str, object],
+        action: Mapping[str, object],
         *,
         task: str,
         token_budget: int,
@@ -389,8 +408,8 @@ class TaskEvidencePacketMixin(
         symbol: str | None,
         signature: str,
         token_budget: int,
-        pending: Mapping[str, object] | None,
-    ) -> tuple[dict[str, object] | None, dict[str, object] | None]:
+        pending: SourceReadPending | None,
+    ) -> tuple[TaskSourceEvidence | None, SourceReadPending | None]:
         """Return the smallest policy-safe structural fallback for selected evidence."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -415,8 +434,8 @@ class TaskEvidencePacketMixin(
                     "representation": representation,
                     "content": content,
                     "estimated_tokens": estimated_tokens,
-                }, None if pending is None else dict(pending)
-        return None, None if pending is None else dict(pending)
+                }, None if pending is None else pending.copy()
+        return None, None if pending is None else pending.copy()
 
     def _task_evidence_visibility(self, path: str) -> EvidenceVisibility | None:
         """Return current source-disclosure policy for one already-selected path."""
@@ -465,7 +484,7 @@ class TaskEvidencePacketMixin(
         self,
         evidence: _TaskEvidenceRange,
         token_budget: int,
-    ) -> tuple[dict[str, object] | None, dict[str, object]]:
+    ) -> tuple[TaskSourceEvidence | None, SourceReadPendingDraft]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         assert evidence.start is not None and evidence.end is not None
@@ -479,7 +498,7 @@ class TaskEvidencePacketMixin(
         except (OSError, PermissionError, FileNotFoundError):
             body = ""
         body_tokens = estimate_tokens(body) if body else 0
-        common: dict[str, object] = {
+        common: TaskSourceRange = {
             "role": evidence.role,
             "path": evidence.path,
             "symbol": evidence.qualname or evidence.name,
@@ -492,17 +511,19 @@ class TaskEvidencePacketMixin(
                 "content": body,
                 "estimated_tokens": body_tokens,
             }, {}
-        return None, {
+        pending: SourceReadPendingDraft = {
             **common,
             "reason": "exact-source-range-exceeds-start-budget"
             if body
             else "exact-source-range-unavailable",
-            **({"estimated_tokens": body_tokens} if body else {}),
         }
+        if body:
+            pending["estimated_tokens"] = body_tokens
+        return None, pending
 
     def _task_evidence_path_admission(
         self, path: str, role: str
-    ) -> tuple[EvidenceVisibility | None, dict[str, object] | None]:
+    ) -> tuple[EvidenceVisibility | None, SourceReadPending | None]:
         visibility = self._task_evidence_visibility(path)
         if visibility is None:
             return None, {
@@ -520,17 +541,19 @@ class TaskEvidencePacketMixin(
 
     def _task_evidence_source_or_outline(
         self, evidence: _TaskEvidenceRange, token_budget: int
-    ) -> tuple[dict[str, object] | None, dict[str, object] | None]:
+    ) -> tuple[TaskSourceEvidence | None, SourceReadPending | None]:
         item, pending = self._task_evidence_source_range(evidence, token_budget)
         if item is not None:
             return item, None
+        assert "reason" in pending
+        pending_read: SourceReadPending = {**pending, "reason": pending["reason"]}
         return self._task_evidence_outline_item(
             path=evidence.path,
             role=evidence.role,
             symbol=evidence.qualname or evidence.name,
             signature=evidence.signature,
             token_budget=token_budget,
-            pending=pending,
+            pending=pending_read,
         )
 
     def _task_evidence_evidence_item(
@@ -540,7 +563,7 @@ class TaskEvidencePacketMixin(
         role: str,
         token_budget: int,
         task: str = "",
-    ) -> tuple[dict[str, object] | None, dict[str, object] | None]:
+    ) -> tuple[TaskSourceEvidence | None, SourceReadPending | None]:
         """Project one already-selected action row into bounded source evidence.
 
         The action map remains the authority for *which* path matters.  This
@@ -589,19 +612,16 @@ class TaskEvidencePacketMixin(
             )
             if config_item is not None or config_pending is not None:
                 return config_item, config_pending
-            pending = {
+            pending: SourceReadPending = {
                 "role": role,
                 "path": path,
                 "symbol": symbol,
                 "reason": "no-exact-symbol-range",
             }
         else:
-            pending = {
-                "role": role,
-                "path": path,
-                "symbol": symbol,
-                "reason": "source-body-not-authorized",
-            }
+            pending = SourceReadPending(
+                role=role, path=path, symbol=symbol, reason="source-body-not-authorized"
+            )
 
         # Preserve the smallest policy-safe structural evidence when the exact
         # source body cannot be included. The pending exact read stays explicit.
@@ -687,7 +707,7 @@ class TaskEvidencePacketMixin(
         *,
         selection_generation: int,
         verification_stale: bool = False,
-    ) -> dict[str, object]:
+    ) -> TaskProvenanceDraft:
         """Return compact source-revision and freshness evidence for a start packet."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -698,7 +718,7 @@ class TaskEvidencePacketMixin(
             generation, selection_generation, stale, verification_stale
         )
 
-        result: dict[str, object] = {
+        result: TaskProvenanceDraft = {
             "why": self._task_evidence_selection_reason(action, edit),
             "freshness": freshness,
         }
@@ -724,9 +744,9 @@ class TaskEvidencePacketMixin(
 
     def _bind_task_evidence_evidence_context(
         self,
-        provenance: dict[str, object],
+        provenance: TaskProvenanceDraft,
         evidence_receipt: Mapping[str, object],
-    ) -> dict[str, object]:
+    ) -> TaskEvidenceProvenance:
         """Bind compact start evidence to its exact repository/selection context.
 
         The decision-authority receipt already binds repository, task, generation,
@@ -734,28 +754,25 @@ class TaskEvidencePacketMixin(
         existing authority with the selected source revision, explicit freshness
         state and native Hashmarks producer identity.  It adds no new authority.
         """
-        bound = dict(provenance)
-        bound["context_identity"] = evidence_context_identity(
-            evidence_receipt, provenance
-        )
-        return bound
+        return {
+            **provenance,
+            "context_identity": evidence_context_identity(evidence_receipt, provenance),
+        }
 
     @staticmethod
     def _task_evidence_base_result(
         task: str,
-        action: Mapping[str, object],
+        action: TaskActionMap,
         evidence_receipt: Mapping[str, object],
-        verification_plan: Mapping[str, object],
-    ) -> dict[str, object]:
+        verification_plan: TaskVerificationPlan,
+    ) -> TaskEvidenceDraft:
         """Project task evidence into role-separated repository observations."""
         authority = action.get("ownership_authority")
         authority = authority if isinstance(authority, Mapping) else {}
         ambiguity = action.get("ambiguity")
         ambiguity = ambiguity if isinstance(ambiguity, Mapping) else {}
-        candidate = action.get("edit")
-        candidate = candidate if isinstance(candidate, Mapping) else None
-        owner = action.get("admitted_edit")
-        owner = owner if isinstance(owner, Mapping) else None
+        candidate = action["edit"]
+        owner = action["admitted_edit"]
         basis = str(action.get("owner_basis") or "") or None
         explicit_target_basis = (
             str(candidate.get("explicit_target_basis") or "")
@@ -769,7 +786,7 @@ class TaskEvidencePacketMixin(
             "exact-symbol",
             "explicit-test-edit",
         }
-        explicit_target = (
+        explicit_target: ExplicitTaskTarget = (
             {
                 "status": "resolved",
                 "basis": explicit_target_basis,
@@ -784,21 +801,26 @@ class TaskEvidencePacketMixin(
                 "symbol": None,
             }
         )
-        verify = action.get("verify")
-        verify = verify if isinstance(verify, Mapping) else None
-        contract = action.get("contract")
-        contract = contract if isinstance(contract, Mapping) else None
+        verify = action["verify"]
+        contract = action["contract"]
         return {
             "schema": operation_schema("task_evidence"),
             "task": task,
             "evidence_receipt": dict(evidence_receipt),
             "retrieval": {
-                "results": list(
-                    cast(list[dict[str, object]], action.get("canonical") or [])
-                ),
-                "bounds": dict(cast(Mapping[str, object], action.get("bounds") or {})),
+                "results": [
+                    TaskEvidencePacketMixin._task_evidence_retrieval_locator(
+                        row, rank=rank
+                    )
+                    for rank, row in enumerate(action["canonical"], 1)
+                ],
+                "bounds": {
+                    "limit": action["bounds"]["limit"],
+                    "per_role": action["bounds"]["per_role"],
+                },
                 "ordering": "retrieval-relevance-only",
                 "ownership_authority": False,
+                "presentation": "compact-locators-v1",
             },
             "explicit_target": explicit_target,
             "ownership": {
@@ -808,30 +830,26 @@ class TaskEvidencePacketMixin(
                 ),
                 "proof_scope": authority.get("proof_scope"),
                 "proof_scope_complete": bool(authority.get("proof_scope_complete")),
-                "owner": None if owner is None else dict(owner),
-                "candidate": None if candidate is None else dict(candidate),
+                "owner": None if owner is None else owner.copy(),
+                "candidate": None if candidate is None else candidate.copy(),
                 "basis": basis if owner is not None else None,
                 "candidate_basis": explicit_target_basis or basis,
-                "ambiguity": dict(ambiguity),
+                "ambiguity": action["ambiguity"].copy(),
                 "authority": "repository-ownership-only",
                 "source_evidence": None,
                 "next_read": None,
                 "source_budget": None,
             },
             "verification": {
-                "selected": None if verify is None else dict(verify),
-                "relevance": action.get("verification_relevance"),
-                "plan": dict(verification_plan),
+                "selected": None if verify is None else verify.copy(),
+                "relevance": action["verification_relevance"],
+                "plan": verification_plan.copy(),
                 "authority": "repository-verification-evidence-only",
             },
             "related": {
-                "contract": None if contract is None else dict(contract),
-                "inspect": list(
-                    cast(list[dict[str, object]], action.get("inspect") or [])
-                ),
-                "candidates": list(
-                    cast(list[dict[str, object]], action.get("related") or [])
-                ),
+                "contract": None if contract is None else contract.copy(),
+                "inspect": list(action["inspect"]),
+                "candidates": list(action["related"]),
             },
             "consumer_action": "external",
         }
@@ -841,9 +859,9 @@ class TaskEvidencePacketMixin(
         row: Mapping[str, object],
         *,
         rank: int | None = None,
-    ) -> dict[str, object]:
+    ) -> RetrievalLocator:
         """Project one retrieval candidate into a compact non-authoritative locator."""
-        result: dict[str, object] = {"path": str(row.get("path") or "")}
+        result: RetrievalLocator = {"path": str(row.get("path") or "")}
 
         if rank is not None:
             result["rank"] = rank
@@ -872,49 +890,29 @@ class TaskEvidencePacketMixin(
             result["supplement"] = str(supplement)
         return result
 
-    def _task_evidence_compact_retrieval(
-        self,
-        result: dict[str, object],
-    ) -> None:
-        """Compact retrieval presentation without changing ranking or ownership."""
-        retrieval = result.get("retrieval")
-        if not isinstance(retrieval, dict):
-            raise AssertionError("task evidence retrieval projection must be a mapping")
-        current = retrieval.get("results")
-        if not isinstance(current, list):
-            raise AssertionError("task evidence retrieval results must be a list")
-        retrieval["results"] = [
-            self._task_evidence_retrieval_locator(row, rank=rank)
-            for rank, row in enumerate(current, 1)
-            if isinstance(row, Mapping)
-        ]
-        retrieval["presentation"] = "compact-locators-v1"
-
     @staticmethod
     def _task_evidence_compact_evidence(
-        item: Mapping[str, object] | None,
-        pending: Mapping[str, object] | None,
+        item: TaskSourceEvidence | None,
+        pending: SourceReadPending | None,
         *,
         token_budget: int,
-    ) -> tuple[dict[str, object] | None, dict[str, object] | None, dict[str, object]]:
+    ) -> tuple[TaskSourceEvidence | None, SourceReadPending | None, TaskSourceBudget]:
         """Compact one already-selected evidence projection without changing selection."""
         compact_item = None
         used = 0
         complete = False
         if item is not None:
-            compact_item = {
-                key: value for key, value in item.items() if key not in {"role", "path"}
-            }
-            used = int(cast(int, item.get("estimated_tokens") or 0))
+            compact_item = item.copy()
+            compact_item.pop("role", None)
+            compact_item.pop("path", None)
+            used = item["estimated_tokens"]
             complete = item.get("representation") in {
                 "source-range",
                 "config-key-range",
             }
-        compact_pending = (
-            None
-            if pending is None
-            else {key: value for key, value in pending.items() if key != "role"}
-        )
+        compact_pending = None if pending is None else pending.copy()
+        if compact_pending is not None:
+            compact_pending.pop("role", None)
         return (
             compact_item,
             compact_pending,
@@ -949,7 +947,7 @@ class TaskEvidencePacketMixin(
 
     def _task_evidence_attach_provenance(
         self,
-        result: dict[str, object],
+        result: TaskEvidenceDraft,
         action: Mapping[str, object],
         *,
         selection_generation: int,
@@ -964,20 +962,20 @@ class TaskEvidencePacketMixin(
         receipt = result.get("evidence_receipt")
         if not isinstance(receipt, Mapping):
             raise ValueError("task evidence is missing its evidence receipt")
-        provenance = self._bind_task_evidence_evidence_context(
+        bound_provenance = self._bind_task_evidence_evidence_context(
             provenance,
             receipt,
         )
-        result["provenance"] = provenance
+        result["provenance"] = bound_provenance
         result["freshness"] = {
             "state": str(provenance.get("freshness") or "unknown"),
-            "reason": provenance.get("freshness_reason"),
+            "reason": bound_provenance.get("freshness_reason"),
         }
 
     def _task_evidence_discrimination_next_read(
         self,
         action: Mapping[str, object],
-    ) -> dict[str, object] | None:
+    ) -> DiscriminationRead | None:
         """Project one existing ambiguity candidate into a non-authoritative read."""
         selected = select_task_evidence_discrimination_candidate(action)
         if selected is None:
@@ -989,7 +987,7 @@ class TaskEvidencePacketMixin(
             path,
             "ownership-discrimination",
         )
-        result: dict[str, object] = {
+        result: DiscriminationRead = {
             "path": path,
             "reason": "ownership-ambiguity-discrimination",
             "ambiguity_reason": str(ambiguity.get("reason") or "ownership-ambiguous"),
@@ -1026,7 +1024,7 @@ class TaskEvidencePacketMixin(
 
     def _task_evidence_attach_owner_source(
         self,
-        result: dict[str, object],
+        result: TaskEvidenceDraft,
         action: Mapping[str, object],
         *,
         task: str,
@@ -1062,7 +1060,7 @@ class TaskEvidencePacketMixin(
         ownership["source_budget"] = source_budget
 
     def _task_evidence_attach_test_matches(
-        self, result: dict[str, object], task: str
+        self, result: TaskEvidenceDraft, task: str
     ) -> None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -1079,6 +1077,86 @@ class TaskEvidencePacketMixin(
                 ),
             }
 
+    def _task_evidence_finalize_packet(
+        self, draft: TaskEvidenceDraft
+    ) -> TaskEvidencePacket:
+        """Close the required response shape after bounds and provenance are attached."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        assert "provenance" in draft and "freshness" in draft
+        bounds = draft["retrieval"]["bounds"]
+        assert "canonical_completeness" in bounds
+        assert "canonical_truncation" in bounds
+        assert "bound_reasons" in bounds
+        complete_bounds: TaskRetrievalBounds = {
+            **bounds,
+            "canonical_completeness": bounds["canonical_completeness"],
+            "canonical_truncation": bounds["canonical_truncation"],
+            "bound_reasons": bounds["bound_reasons"],
+        }
+        retrieval: TaskRetrieval = {**draft["retrieval"], "bounds": complete_bounds}
+        return {
+            **draft,
+            "retrieval": retrieval,
+            "provenance": draft["provenance"],
+            "freshness": draft["freshness"],
+            "evidence_packet_identity": "sha256:"
+            + self._packet_digest(operation_schema("task_evidence"), draft),
+        }
+
+    @staticmethod
+    def _task_evidence_initial_response(
+        packet: TaskEvidencePacket,
+    ) -> InitialTaskEvidenceEnvelope:
+        """Bind and encode the current initial projection of one complete packet."""
+        from .task_evidence_initial import (
+            encode_initial_packet,
+            initial_packet_identity,
+            initial_task_evidence,
+        )
+
+        initial = initial_task_evidence(packet)
+        initial["evidence_packet_identity"] = initial_packet_identity(initial)
+        envelope = encode_initial_packet(initial)
+        validate_operation_response("task_evidence", envelope, mode="initial")
+        return envelope
+
+    @overload
+    def task_evidence(
+        self,
+        task: str,
+        *,
+        limit: int = TASK_EVIDENCE_DEFAULT_OPTIONS.limit,
+        per_role: int = TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
+        token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
+        supplied_observations: Sequence[Mapping[str, object]] | None = None,
+        result_mode: Literal["default"] = "default",
+    ) -> TaskEvidencePacket: ...
+
+    @overload
+    def task_evidence(
+        self,
+        task: str,
+        *,
+        limit: int = TASK_EVIDENCE_DEFAULT_OPTIONS.limit,
+        per_role: int = TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
+        token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
+        supplied_observations: Sequence[Mapping[str, object]] | None = None,
+        result_mode: Literal["initial"],
+    ) -> InitialTaskEvidenceEnvelope: ...
+
+    @overload
+    def task_evidence(
+        self,
+        task: str,
+        *,
+        limit: int = TASK_EVIDENCE_DEFAULT_OPTIONS.limit,
+        per_role: int = TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
+        token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
+        supplied_observations: Sequence[Mapping[str, object]] | None = None,
+        result_mode: str,
+    ) -> TaskEvidencePacket | InitialTaskEvidenceEnvelope: ...
+
     def task_evidence(
         self,
         task: str,
@@ -1088,7 +1166,7 @@ class TaskEvidencePacketMixin(
         token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
         supplied_observations: Sequence[Mapping[str, object]] | None = None,
         result_mode: str = "default",
-    ) -> dict[str, object]:
+    ) -> TaskEvidencePacket | InitialTaskEvidenceEnvelope:
         """Return role-separated repository evidence for an external consumer."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -1106,9 +1184,7 @@ class TaskEvidencePacketMixin(
                 per_role=per_role,
             )
             selection_generation = self.store.generation()
-            verify_row = action.get("verify")
-            verify_row = verify_row if isinstance(verify_row, Mapping) else None
-            verification_plan = self._task_action_verification_plan(verify_row)
+            verification_plan = self._task_action_verification_plan(action["verify"])
             evidence_receipt = self._decision_evidence_receipt(
                 task, action, verification_plan
             )
@@ -1133,7 +1209,6 @@ class TaskEvidencePacketMixin(
                     "bound_reasons": list(canonical.bound_reasons),
                 }
             )
-            self._task_evidence_compact_retrieval(result)
             self._task_evidence_attach_retrieval_supplements(
                 result,
                 task,
@@ -1166,22 +1241,11 @@ class TaskEvidencePacketMixin(
         self._task_evidence_attach_scip_discovery(
             result, captures, selection_generation=selection_generation
         )
-        result["evidence_packet_identity"] = "sha256:" + self._packet_digest(
-            operation_schema("task_evidence"),
-            result,
-        )
-        validate_operation_response("task_evidence", result)
+        packet = self._task_evidence_finalize_packet(result)
+        validate_operation_response("task_evidence", packet)
         if result_mode == "initial":
-            from .task_evidence_initial import (
-                encode_initial_packet,
-                initial_packet_identity,
-                initial_task_evidence,
-            )
-
-            result = initial_task_evidence(result)
-            result["evidence_packet_identity"] = initial_packet_identity(result)
-            result = encode_initial_packet(result)
-        return validate_operation_response("task_evidence", result, mode=result_mode)
+            return self._task_evidence_initial_response(packet)
+        return packet
 
     @operation_response("task_action_brief")
     @decision_scoped

@@ -37,6 +37,7 @@ def test_verification_plan_rejects_pruned_dependency_test_path(tmp_path: Path) -
         }
         owned_plan = codemap.verification_plan("tests/test_owned.py")
         assert owned_plan["available"] is True
+        assert "runner" in owned_plan
         assert owned_plan["runner"] == "pytest"
 
 
@@ -52,7 +53,9 @@ def test_verification_plan_rejects_context_denied_test_path(tmp_path: Path) -> N
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
         assert rel not in codemap.store.paths()
-        assert codemap.verification_plan(rel)["reason"] == "path-outside-analysis-scope"
+        plan = codemap.verification_plan(rel)
+        assert plan["available"] is False
+        assert plan["reason"] == "path-outside-analysis-scope"
 
 
 def test_pruned_javascript_test_is_rejected_before_source_read(tmp_path: Path) -> None:
@@ -68,6 +71,7 @@ def test_pruned_javascript_test_is_rejected_before_source_read(tmp_path: Path) -
         ):
             plan = codemap.verification_plan(rel)
         assert plan["available"] is False
+        assert "reason" in plan
         assert plan["reason"] == "path-outside-analysis-scope"
 
 
@@ -81,4 +85,5 @@ def test_verification_scope_pruning_is_segment_aware(tmp_path: Path) -> None:
         assert rel in codemap.store.paths()
         plan = codemap.verification_plan(rel)
         assert plan["available"] is True
+        assert "runner" in plan
         assert plan["runner"] == "pytest"

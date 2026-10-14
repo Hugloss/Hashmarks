@@ -11,16 +11,27 @@ import base64
 import binascii
 import json
 import zlib
+from collections.abc import Mapping
 from copy import deepcopy
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from hashmarks.digest import hash_bytes
 from hashmarks.operation_contract import operation_schema, validate_operation_response
 
+from .task_evidence_contract import read_initial_projection
+
+if TYPE_CHECKING:
+    from .task_evidence_types import (
+        CompressedInitialEnvelope,
+        InitialTaskEvidenceEnvelope,
+        InitialTaskEvidenceProjection,
+        StringTableInitialEnvelope,
+    )
+
 _MAX_COMPRESSED_INITIAL_DECODED_BYTES = 1_048_576
 
 
-def initial_packet_identity(packet: dict[str, Any]) -> str:
+def initial_packet_identity(packet: Mapping[str, object]) -> str:
     """Bind the decoded semantic view, independent of its wire encoding."""
     semantic = {
         key: value for key, value in packet.items() if key != "evidence_packet_identity"
@@ -62,11 +73,12 @@ def _encode_strings(value: object, indices: dict[str, str]) -> object:
     return value
 
 
-def encode_initial_packet(packet: dict[str, Any]) -> dict[str, Any]:
+def encode_initial_packet(packet: Mapping[str, Any]) -> InitialTaskEvidenceEnvelope:
     """Losslessly serialize a semantic initial packet using a local string table."""
     headers = {
-        key: packet[key]
-        for key in ("schema", "source_evidence_identity", "evidence_packet_identity")
+        "schema": packet["schema"],
+        "source_evidence_identity": packet["source_evidence_identity"],
+        "evidence_packet_identity": packet["evidence_packet_identity"],
     }
     data = {key: value for key, value in packet.items() if key not in headers}
     strings: set[str] = set()
@@ -74,7 +86,7 @@ def encode_initial_packet(packet: dict[str, Any]) -> dict[str, Any]:
     _collect_strings(data, strings)
     ordered = sorted(strings)
     indices = {value: str(index) for index, value in enumerate(ordered)}
-    table = []
+    table: list[list[int | str]] = []
     previous = ""
     for value in ordered:
         prefix = 0
@@ -86,8 +98,10 @@ def encode_initial_packet(packet: dict[str, Any]) -> dict[str, Any]:
         table.append([prefix, value[prefix:]])
         previous = value
 
-    original = {
-        **headers,
+    original: StringTableInitialEnvelope = {
+        "schema": headers["schema"],
+        "source_evidence_identity": headers["source_evidence_identity"],
+        "evidence_packet_identity": headers["evidence_packet_identity"],
         "encoding": {"kind": "json-string-table.v1", "strings": table},
         "data": _encode_strings(data, indices),
     }
@@ -102,8 +116,10 @@ def encode_initial_packet(packet: dict[str, Any]) -> dict[str, Any]:
     if len(payload) > _MAX_COMPRESSED_INITIAL_DECODED_BYTES:
         return original
     compressed = base64.b64encode(zlib.compress(payload)).decode("ascii")
-    packed = {
-        **headers,
+    packed: CompressedInitialEnvelope = {
+        "schema": headers["schema"],
+        "source_evidence_identity": headers["source_evidence_identity"],
+        "evidence_packet_identity": headers["evidence_packet_identity"],
         "encoding": {
             "kind": "json-string-table.v1+zlib",
             "decoded_bytes": len(payload),
@@ -209,7 +225,7 @@ def _unique_initial_object(items: list[tuple[str, Any]]) -> dict[str, Any]:
     return decoded
 
 
-def decode_initial_packet(packet: dict[str, Any]) -> dict[str, Any]:
+def decode_initial_packet(packet: Mapping[str, Any]) -> dict[str, Any]:
     """Resolve wire references without conflating numeric strings and numbers."""
     if packet.get("schema") != operation_schema("task_evidence", "initial"):
         raise ValueError("unsupported initial packet schema")
@@ -323,7 +339,7 @@ def _encode_candidate_rows(relevance: dict[str, Any]) -> None:
 
 
 def decode_initial_collection(
-    rows: list[object], encoding: dict[str, object]
+    rows: object, encoding: Mapping[str, object]
 ) -> list[dict[str, object]]:
     """Read the explicit lossless table contract without guessing missing fields."""
     columns = encoding.get("columns")
@@ -384,10 +400,10 @@ def _project_verification(
         }
 
 
-def initial_task_evidence(packet: dict[str, Any]) -> dict[str, Any]:
+def initial_task_evidence(packet: Mapping[str, Any]) -> InitialTaskEvidenceProjection:
     """Project existing facts, retaining qualifiers and accounting for detail loss."""
     validate_operation_response("task_evidence", packet)
-    result = deepcopy(packet)
+    result = deepcopy(dict(packet))
     result["schema"] = operation_schema("task_evidence", "initial")
     result["source_evidence_identity"] = result.pop("evidence_packet_identity")
     omissions: dict[str, Any] = {
@@ -446,4 +462,4 @@ def initial_task_evidence(packet: dict[str, Any]) -> dict[str, Any]:
         },
         "negative_evidence_from_omissions": "not-admissible",
     }
-    return result
+    return read_initial_projection(result)

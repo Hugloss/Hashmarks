@@ -34,7 +34,7 @@ from .operation_contract import operation_modes
 from .paths import canonical_host_path
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Mapping
     from pathlib import Path
 
     from mcp.types import CallToolResult
@@ -147,7 +147,7 @@ def _register_json_mirror_tool(
 def _call_surface(
     contract: McpToolContract,
     tool_error: type[Exception],
-    operation: Callable[..., dict[str, object]],
+    operation: Callable[..., Mapping[str, object]],
     /,
     *args: object,
     response_mode: str | None = None,
@@ -162,7 +162,7 @@ def _call_surface(
         validate_presentation(presentation)
         if contract.operation == "repository_intelligence_query":
             kwargs["presentation"] = presentation
-        result = operation(*args, **kwargs)
+        result = dict(operation(*args, **kwargs))
         contract.validate_response(
             result,
             result_mode=response_mode,
