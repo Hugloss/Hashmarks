@@ -7,6 +7,9 @@ from typing import Any
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.change_impact import ChangeImpactOptions
+from hashmarks.codemap.repository_intelligence_query import (
+    RepositoryIntelligenceQueryOptions,
+)
 from hashmarks.codemap.static_python_backend_declarations import (
     StaticPythonBackendDeclarations,
 )
@@ -36,6 +39,15 @@ def _change_impact(codemap: CodeMap, inputs: dict[str, Any]) -> dict[str, object
     return codemap.task_change_impact(**settings, options=options)
 
 
+def _intelligence_query(codemap: CodeMap, inputs: dict[str, Any]) -> dict[str, object]:
+    settings = dict(inputs)
+    surface, task = settings.pop("surface_name"), settings.pop("task")
+    paths = settings.pop("changed_paths", None) or ()
+    return codemap.repository_intelligence_query(
+        surface, task, paths, options=RepositoryIntelligenceQueryOptions(**settings)
+    )
+
+
 def observe_case(codemap: CodeMap, case: Mapping[str, object]) -> dict[str, object]:
     """Dispatch a closed set of read-only product calls, with no grader input."""
     operation = str(case.get("operation") or "")
@@ -49,6 +61,8 @@ def observe_case(codemap: CodeMap, case: Mapping[str, object]) -> dict[str, obje
         "repository_declarations": lambda: _declarations(codemap, inputs),
         "change_impact": lambda: _change_impact(codemap, inputs),
         "post_change": lambda: codemap.task_post_change_delta(**inputs),
+        "dependency_codemap": lambda: codemap.dependency_codemap(**inputs),
+        "repository_intelligence_query": lambda: _intelligence_query(codemap, inputs),
     }
     if operation not in operations:
         raise ValueError(f"unsupported repository evaluation operation: {operation}")

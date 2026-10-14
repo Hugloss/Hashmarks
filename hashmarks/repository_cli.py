@@ -19,7 +19,7 @@ from .codemap.source_line_correspondence import validated_source_lines
 from .codemap.verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 from .errors import RepositoryCliError
 from .evidence_presentation import FORMATS, presentation_response
-from .operation_contract import validate_operation_response
+from .operation_contract import operation_default_mode, validate_operation_response
 from .repository_retry import (
     is_transient_repository_race,
     retry_transient_repository_race,
@@ -98,6 +98,122 @@ def _codemap(args):
     from .codemap import CodeMap
 
     return CodeMap(args.workspace, state_dir=args.state_dir)
+
+
+def _read_observation_request(args, fields: frozenset[str]) -> dict[str, object]:
+    request = _read_json_object(args.input_json, option="--input-json")
+    unexpected = sorted(set(request) - fields)
+    if unexpected:
+        raise RepositoryCliError(f"unknown observation input fields: {unexpected}")
+    return request
+
+
+def _request_mapping(value: object, name: str) -> dict[str, object]:
+    if not isinstance(value, dict):
+        raise RepositoryCliError(f"{name} must be a JSON object")
+    return value
+
+
+def _request_previous(value: object, name: str) -> dict[str, object] | None:
+    return None if value is None else _request_mapping(value, name)
+
+
+def _request_text(value: object, name: str) -> str:
+    if not isinstance(value, str):
+        raise RepositoryCliError(f"{name} must be a string")
+    return value
+
+
+def _request_optional_text(value: object, name: str) -> str | None:
+    return None if value is None else _request_text(value, name)
+
+
+def _request_paths(value: object) -> list[str]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise RepositoryCliError("changed_paths must be a JSON array")
+    return [_request_text(path, "changed_paths member") for path in value]
+
+
+def _request_queries(value: object) -> list[dict[str, object]]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise RepositoryCliError("queries must be a JSON array")
+    return [_request_mapping(row, "query") for row in value]
+
+
+def _dependency_codemap_code(args) -> int:
+    request = _read_observation_request(
+        args, frozenset({"snapshot", "queries", "previous_observation", "result_mode"})
+    )
+    mode = _request_text(
+        request.get("result_mode", operation_default_mode("dependency_codemap")),
+        "result_mode",
+    )
+    snapshot = _request_mapping(request.get("snapshot"), "snapshot")
+    queries = _request_queries(request.get("queries"))
+    previous = _request_previous(
+        request.get("previous_observation"), "previous_observation"
+    )
+    value = _call_codemap(
+        args,
+        lambda codemap: codemap.dependency_codemap(
+            snapshot, queries, previous_observation=previous, result_mode=mode
+        ),
+    )
+    _print_operation(
+        "dependency_codemap", value, mode=mode, presentation=args.presentation
+    )
+    return 0
+
+
+def _repository_intelligence_query_code(args) -> int:
+    from .codemap.repository_intelligence_query import (
+        REPOSITORY_INTELLIGENCE_QUERY_DEFAULT_OPTIONS,
+        RepositoryIntelligenceQueryOptions,
+    )
+
+    request = _read_observation_request(
+        args,
+        frozenset(
+            {
+                "surface_name",
+                "task",
+                "changed_paths",
+                "profile",
+                "member_path",
+                "previous_snapshot",
+            }
+        ),
+    )
+    surface = _request_text(request.get("surface_name"), "surface_name")
+    task = _request_text(request.get("task"), "task")
+    paths = _request_paths(request.get("changed_paths"))
+    options = RepositoryIntelligenceQueryOptions(
+        profile=_request_text(
+            request.get(
+                "profile", REPOSITORY_INTELLIGENCE_QUERY_DEFAULT_OPTIONS.profile
+            ),
+            "profile",
+        ),
+        member_path=_request_optional_text(request.get("member_path"), "member_path"),
+        previous_snapshot=_request_previous(
+            request.get("previous_snapshot"), "previous_snapshot"
+        ),
+        presentation=args.presentation,
+    )
+    value = _call_codemap(
+        args,
+        lambda codemap: codemap.repository_intelligence_query(
+            surface, task, paths, options=options
+        ),
+    )
+    # The canonical query owns its presentation envelope, unlike other operations.
+    native = validate_operation_response("repository_intelligence_query", value)
+    _print(native, compact=args.presentation in {"compact", "text"})
+    return 0
 
 
 def _repository_declarations_code(args) -> int:
@@ -982,6 +1098,7 @@ def add_repository_cli(sub, *, add_common_arguments: Callable[..., None]) -> Non
     _add_task_evidence_cli(sub, add_common_arguments=add_common_arguments)
     _add_change_cli(sub, add_common_arguments=add_common_arguments)
     _add_source_observation_cli(sub, add_common_arguments=add_common_arguments)
+    _add_json_observation_cli(sub, add_common_arguments=add_common_arguments)
     declarations = sub.add_parser(
         "repository-declarations",
         help="observe source declarations in explicitly selected Python backend files",
@@ -998,3 +1115,25 @@ def add_repository_cli(sub, *, add_common_arguments: Callable[..., None]) -> Non
     declarations.set_defaults(
         func=_repository_declarations_code, automatic_update_check=True
     )
+
+
+def _add_json_observation_cli(
+    sub, *, add_common_arguments: Callable[..., None]
+) -> None:
+    for name, handler, description in (
+        (
+            "dependency-codemap",
+            _dependency_codemap_code,
+            "observe caller-supplied dependency evidence",
+        ),
+        (
+            "repository-intelligence-query",
+            _repository_intelligence_query_code,
+            "observe a bounded repository-intelligence surface",
+        ),
+    ):
+        command = sub.add_parser(name, help=description)
+        add_common_arguments(command, inherited=True)
+        _add_evidence_presentation_cli(command)
+        command.add_argument("--input-json", required=True, metavar="FILE")
+        command.set_defaults(func=handler, automatic_update_check=True)

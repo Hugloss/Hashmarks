@@ -1,0 +1,645 @@
+{
+  "grader_file": "grader.json",
+  "schema": "hashmarks.backend-evidence-workflows.v2",
+  "sources": {
+    "aiokafka-fetch-cancellation-after": {
+      "commit": "79c9bf5fe557cd2a70451a1a8709ca64c2b28500",
+      "content_identity": "sha256:78023f358d474d0e3a4a4e470bb3ce8a60bc525b0bfd6fc17289b649498f2886:201",
+      "repository": "aiokafka",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/aio-libs/aiokafka"
+    },
+    "aiokafka-fetch-cancellation-before": {
+      "commit": "c75966458b590c20f00845a77981661e57a53666",
+      "content_identity": "sha256:713aa2d0f888fb081d8978e13b839ec877fc12612685b7b0908bcadaa424aa3c:201",
+      "repository": "aiokafka",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/aio-libs/aiokafka"
+    },
+    "aiokafka-metadata-future-after": {
+      "commit": "608ab2443510c92226de0eb3fc2065f5d1307e12",
+      "content_identity": "sha256:3d302cc98ad33cfe589fa6540f88f790a284772c26acb5357e39b543f82f2521:202",
+      "repository": "aiokafka",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/aio-libs/aiokafka"
+    },
+    "aiokafka-metadata-future-before": {
+      "commit": "4cff9d77014e922c6e458224ed6abbae4fa07c4d",
+      "content_identity": "sha256:0423336a5e22ff9de03c3f366ee05944a6efdeb7f381f5c7bdeaf636a15ffd31:202",
+      "repository": "aiokafka",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/aio-libs/aiokafka"
+    },
+    "aiokafka-sender-node-failure-after": {
+      "commit": "9f9161eb78785683edc7a8821983491221ccd9c6",
+      "content_identity": "sha256:174728c969f32db6f24486c28129cfc16c490f268eb5b9fb2ed45b4fd20d251f:176",
+      "repository": "aiokafka",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/aio-libs/aiokafka"
+    },
+    "aiokafka-sender-node-failure-before": {
+      "commit": "7d0bd255f40d156f7016f70d744738321ba65ebe",
+      "content_identity": "sha256:d5b9a6797f820a6d22b83a598050878fee997144f3ee58a442bce0b196af813e:176",
+      "repository": "aiokafka",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/aio-libs/aiokafka"
+    },
+    "aiokafka-stable-offset-after": {
+      "commit": "7d331e0fe948a022cddeb6f1ea2da94fbeaa39a2",
+      "content_identity": "sha256:199a72d9fb55386b506885c14bebfafde69a43d832b9aa240d46c5f599b24465:179",
+      "repository": "aiokafka",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/aio-libs/aiokafka"
+    },
+    "aiokafka-stable-offset-before": {
+      "commit": "00b099f0caa9009f9774c1c1869bbdf38de6d4bd",
+      "content_identity": "sha256:5dde498649d6cf598a90b0f3bbcab9d5316ded4fc66c1d95b3ecaa1a110d3a0d:178",
+      "repository": "aiokafka",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/aio-libs/aiokafka"
+    },
+    "faststream-concurrent-queue-lifetime-after": {
+      "commit": "af579438de685e7aeed97d02e422b363f983b721",
+      "content_identity": "sha256:a9c686f88787cdeb57d98e33c851eb63fcfb876681751a1d0cdd42664f0d8e80:2231",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/ag2ai/faststream"
+    },
+    "faststream-concurrent-queue-lifetime-before": {
+      "commit": "e5ddad47bd5f6794bf8be1243a84074a131be534",
+      "content_identity": "sha256:97dea8d5d3e9441d9cfb49107d9fa19abbcf004ffaed21f13cf65fcdd0a934d0:2231",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/ag2ai/faststream"
+    },
+    "faststream-middleware-enter-error-after": {
+      "commit": "71bd3234fcd8799f2405c2a23badf6dfd8eb2e32",
+      "content_identity": "sha256:1d1c191c8b9e3265a54c35936345c6b26ecdaa0358fd6213121bf5ce64700a71:2320",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/ag2ai/faststream"
+    },
+    "faststream-middleware-enter-error-before": {
+      "commit": "627c9ce753f9bd4b32056343d00750347ee5c515",
+      "content_identity": "sha256:1d7e334299ff3bb2e4666cf7b0de23ee2533b0e525afc52d5835228abf7175f2:2320",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/ag2ai/faststream"
+    },
+    "faststream-partial-pull-batch-after": {
+      "commit": "3509bd2b16a57918dfe2f4b8f44ae1912a866332",
+      "content_identity": "sha256:084013a1f4addbd8e8ea6a7dbc3bb07ae4be73dcf72ed3087aabe8b65c75a5f8:2286",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/ag2ai/faststream"
+    },
+    "faststream-partial-pull-batch-before": {
+      "commit": "31df8dac071bb47d05537afdf8fa50b36eda6354",
+      "content_identity": "sha256:fbb4698f06e9a43b109b40eccda48982e914194fb5d1e996cdf210bd7b4b7b47:2285",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/ag2ai/faststream"
+    },
+    "faststream-subscriber-stop-after": {
+      "commit": "31df8dac071bb47d05537afdf8fa50b36eda6354",
+      "content_identity": "sha256:fbb4698f06e9a43b109b40eccda48982e914194fb5d1e996cdf210bd7b4b7b47:2285",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/ag2ai/faststream"
+    },
+    "faststream-subscriber-stop-before": {
+      "commit": "2fa58356ad3dde68b667f8496f3cf04afc8ed83b",
+      "content_identity": "sha256:bb538a28cb806cc2e35bc2d4a94eb88e28a5c445ad01bab6a6228b7bca2476bd:2284",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/ag2ai/faststream"
+    },
+    "sqlalchemy-aggregate-strings-after": {
+      "commit": "7e80ddda2a6b820860f8fc1fa8213b85e2819d2b",
+      "content_identity": "sha256:e0ec8b716941649c4379690070fc9de0b93841ac08aa48125f56b80ba49ac978:923",
+      "repository": "sqlalchemy",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/sqlalchemy/sqlalchemy"
+    },
+    "sqlalchemy-aggregate-strings-before": {
+      "commit": "ae11d43079207e159f3ba00f3c0e5188e2ccfe45",
+      "content_identity": "sha256:5c9d8c5648683524d3221cfefed3aa29cf328277e2a2cfa92843fbdc4c7839de:922",
+      "repository": "sqlalchemy",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/sqlalchemy/sqlalchemy"
+    },
+    "sqlalchemy-failed-begin-after": {
+      "commit": "d29277af2b8046e9ac98ea0ddcf254fe2abc758e",
+      "content_identity": "sha256:dbe3e36fcd75721616a05afb9eb79e29cf8da22cd2c9f7ef1c0f80746620eb78:929",
+      "repository": "sqlalchemy",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/sqlalchemy/sqlalchemy"
+    },
+    "sqlalchemy-failed-begin-before": {
+      "commit": "baff8f671c241ef947324d1d1305e6404b7c50af",
+      "content_identity": "sha256:9da100a37b69c3def100f396589a0a996de3574fdd5ea431ad5547d8ba2377cc:928",
+      "repository": "sqlalchemy",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/sqlalchemy/sqlalchemy"
+    },
+    "sqlalchemy-logging-token-reset-after": {
+      "commit": "975ffa7d77ee3bbf5afd470bc93a1bc1d7f88df4",
+      "content_identity": "sha256:340c2f8a1c08796a6c52cdc243502a771c8a96043c2a0af2a57b97f7f8ab8e14:923",
+      "repository": "sqlalchemy",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/sqlalchemy/sqlalchemy"
+    },
+    "sqlalchemy-logging-token-reset-before": {
+      "commit": "ae11d43079207e159f3ba00f3c0e5188e2ccfe45",
+      "content_identity": "sha256:5c9d8c5648683524d3221cfefed3aa29cf328277e2a2cfa92843fbdc4c7839de:922",
+      "repository": "sqlalchemy",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/sqlalchemy/sqlalchemy"
+    },
+    "sqlalchemy-pickle-extra-criteria-after": {
+      "commit": "0be8efc7a100b2713bcae591f55cb53d3800152b",
+      "content_identity": "sha256:09f8d78aef036f22df52323dd004dd8a606853921385c5972dda43290f395cd3:923",
+      "repository": "sqlalchemy",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/sqlalchemy/sqlalchemy"
+    },
+    "sqlalchemy-pickle-extra-criteria-before": {
+      "commit": "482d46a377ce177fc3c553b4dede1f8b6a0951d5",
+      "content_identity": "sha256:12af278e7441dcca2f62a03ba5f1a8ada742713ffbcb2e283a3106d4183479d0:922",
+      "repository": "sqlalchemy",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/sqlalchemy/sqlalchemy"
+    }
+  },
+  "suite": "backend-core-v2",
+  "workflows": [
+    {
+      "after": "aiokafka-fetch-cancellation-after",
+      "before": "aiokafka-fetch-cancellation-before",
+      "capabilities": [
+        1,
+        3,
+        5,
+        6,
+        7,
+        17
+      ],
+      "changed_paths": [
+        "aiokafka/consumer/fetcher.py"
+      ],
+      "explicit_target_task": "Fix cancellation escaping Fetcher._fetch_requests_routine while draining finished fetch tasks.",
+      "id": "aiokafka-fetch-cancellation",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": true,
+          "reason": "frozen source owner and changed-symbol facts"
+        },
+        "owner_top_three": {
+          "eligible": true,
+          "reason": "source-reviewed behavior task without a named owner"
+        }
+      },
+      "native_required": true,
+      "problem_id": "79c9bf5fe557cd2a70451a1a8709ca64c2b28500",
+      "problem_source": "https://github.com/aio-libs/aiokafka/commit/79c9bf5fe557cd2a70451a1a8709ca64c2b28500",
+      "repository": "aiokafka",
+      "task": "Kafka consumer fetch-task cleanup lets cancellation escape while draining already finished or cancelled background tasks.",
+      "transitions": [
+        {
+          "after_path": "aiokafka/consumer/fetcher.py",
+          "before_path": "aiokafka/consumer/fetcher.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "aiokafka-sender-node-failure-after",
+      "before": "aiokafka-sender-node-failure-before",
+      "capabilities": [
+        1,
+        3,
+        5,
+        6,
+        7,
+        17
+      ],
+      "changed_paths": [
+        "aiokafka/producer/sender.py"
+      ],
+      "explicit_target_task": "Fix Sender._find_coordinator after node failure so the coordinator can be rediscovered.",
+      "id": "aiokafka-sender-node-failure",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": true,
+          "reason": "frozen source owner and changed-symbol facts"
+        },
+        "owner_top_three": {
+          "eligible": true,
+          "reason": "source-reviewed behavior task without a named owner"
+        }
+      },
+      "native_required": true,
+      "problem_id": "9f9161eb78785683edc7a8821983491221ccd9c6",
+      "problem_source": "https://github.com/aio-libs/aiokafka/commit/9f9161eb78785683edc7a8821983491221ccd9c6",
+      "repository": "aiokafka",
+      "task": "Kafka transactional producer coordinator discovery must recover after a node becomes unavailable or a request times out.",
+      "transitions": [
+        {
+          "after_path": "aiokafka/producer/sender.py",
+          "before_path": "aiokafka/producer/sender.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "aiokafka-metadata-future-after",
+      "before": "aiokafka-metadata-future-before",
+      "capabilities": [
+        1,
+        3,
+        5,
+        6,
+        7,
+        17
+      ],
+      "changed_paths": [
+        "aiokafka/cluster.py"
+      ],
+      "explicit_target_task": "Fix ClusterMetadata.failed_update completing a request_update future through unsupported methods.",
+      "id": "aiokafka-metadata-future",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": true,
+          "reason": "frozen source owner and changed-symbol facts"
+        },
+        "owner_top_three": {
+          "eligible": true,
+          "reason": "source-reviewed behavior task without a named owner"
+        }
+      },
+      "native_required": true,
+      "problem_id": "608ab2443510c92226de0eb3fc2065f5d1307e12",
+      "problem_source": "https://github.com/aio-libs/aiokafka/commit/608ab2443510c92226de0eb3fc2065f5d1307e12",
+      "repository": "aiokafka",
+      "task": "Kafka metadata update notifications complete an asyncio future using methods that the future does not support.",
+      "transitions": [
+        {
+          "after_path": "aiokafka/cluster.py",
+          "before_path": "aiokafka/cluster.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "aiokafka-stable-offset-after",
+      "before": "aiokafka-stable-offset-before",
+      "capabilities": [
+        1,
+        3,
+        5,
+        6,
+        7,
+        17
+      ],
+      "changed_paths": [
+        "aiokafka/consumer/fetcher.py"
+      ],
+      "explicit_target_task": "Fix Fetcher._proc_fetch_request parsing last_stable_offset for fetch response versions five through ten.",
+      "id": "aiokafka-stable-offset",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": true,
+          "reason": "frozen source owner and changed-symbol facts"
+        },
+        "owner_top_three": {
+          "eligible": true,
+          "reason": "source-reviewed behavior task without a named owner"
+        }
+      },
+      "native_required": true,
+      "problem_id": "7d331e0fe948a022cddeb6f1ea2da94fbeaa39a2",
+      "problem_source": "https://github.com/aio-libs/aiokafka/commit/7d331e0fe948a022cddeb6f1ea2da94fbeaa39a2",
+      "repository": "aiokafka",
+      "task": "Kafka consumer fetch responses from protocol versions five through ten read the last stable offset from the wrong response field.",
+      "transitions": [
+        {
+          "after_path": "aiokafka/consumer/fetcher.py",
+          "before_path": "aiokafka/consumer/fetcher.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "sqlalchemy-failed-begin-after",
+      "before": "sqlalchemy-failed-begin-before",
+      "capabilities": [
+        1,
+        3,
+        5,
+        6,
+        7,
+        17
+      ],
+      "changed_paths": [
+        "lib/sqlalchemy/dialects/postgresql/asyncpg.py"
+      ],
+      "explicit_target_task": "Fix AsyncAdapt_asyncpg_connection._start_transaction retaining a failed BEGIN transaction and masking the original exception during cleanup.",
+      "id": "sqlalchemy-failed-begin",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": true,
+          "reason": "frozen source owner and changed-symbol facts"
+        },
+        "owner_top_three": {
+          "eligible": true,
+          "reason": "source-reviewed behavior task without a named owner"
+        }
+      },
+      "native_required": true,
+      "problem_id": "d29277af2b8046e9ac98ea0ddcf254fe2abc758e",
+      "problem_source": "https://github.com/sqlalchemy/sqlalchemy/commit/d29277af2b8046e9ac98ea0ddcf254fe2abc758e",
+      "repository": "sqlalchemy",
+      "task": "The PostgreSQL async driver adapter retains a transaction whose BEGIN failed, so later cleanup can mask the original failure.",
+      "transitions": [
+        {
+          "after_path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+          "before_path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "sqlalchemy-logging-token-reset-after",
+      "before": "sqlalchemy-logging-token-reset-before",
+      "capabilities": [
+        1,
+        3,
+        5,
+        6,
+        7,
+        17
+      ],
+      "changed_paths": [
+        "lib/sqlalchemy/engine/characteristics.py"
+      ],
+      "explicit_target_task": "Fix LoggingTokenCharacteristic.set_connection_characteristic raising AttributeError when resetting a logging token twice.",
+      "id": "sqlalchemy-logging-token-reset",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": true,
+          "reason": "frozen source owner and changed-symbol facts"
+        },
+        "owner_top_three": {
+          "eligible": true,
+          "reason": "source-reviewed behavior task without a named owner"
+        }
+      },
+      "native_required": true,
+      "problem_id": "975ffa7d77ee3bbf5afd470bc93a1bc1d7f88df4",
+      "problem_source": "https://github.com/sqlalchemy/sqlalchemy/commit/975ffa7d77ee3bbf5afd470bc93a1bc1d7f88df4",
+      "repository": "sqlalchemy",
+      "task": "Resetting a SQL connection logging token twice raises AttributeError instead of clearing its message formatter.",
+      "transitions": [
+        {
+          "after_path": "lib/sqlalchemy/engine/characteristics.py",
+          "before_path": "lib/sqlalchemy/engine/characteristics.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "sqlalchemy-pickle-extra-criteria-after",
+      "before": "sqlalchemy-pickle-extra-criteria-before",
+      "capabilities": [
+        1,
+        3,
+        5,
+        6,
+        7,
+        17
+      ],
+      "changed_paths": [
+        "lib/sqlalchemy/orm/strategies.py"
+      ],
+      "explicit_target_task": "Fix _LazyLoader.create_row_processor reattaching extra criteria after repeated pickle and unpickle operations.",
+      "id": "sqlalchemy-pickle-extra-criteria",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": true,
+          "reason": "frozen source owner and changed-symbol facts"
+        },
+        "owner_top_three": {
+          "eligible": true,
+          "reason": "source-reviewed behavior task without a named owner"
+        }
+      },
+      "native_required": true,
+      "problem_id": "0be8efc7a100b2713bcae591f55cb53d3800152b",
+      "problem_source": "https://github.com/sqlalchemy/sqlalchemy/commit/0be8efc7a100b2713bcae591f55cb53d3800152b",
+      "repository": "sqlalchemy",
+      "task": "Pickling and unpickling a lazy ORM loader repeatedly incorrectly reattaches additional query criteria.",
+      "transitions": [
+        {
+          "after_path": "lib/sqlalchemy/orm/strategies.py",
+          "before_path": "lib/sqlalchemy/orm/strategies.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "sqlalchemy-aggregate-strings-after",
+      "before": "sqlalchemy-aggregate-strings-before",
+      "capabilities": [
+        1,
+        3,
+        5,
+        6,
+        7,
+        17
+      ],
+      "changed_paths": [
+        "lib/sqlalchemy/sql/compiler.py"
+      ],
+      "explicit_target_task": "Fix SQLCompiler.visit_aggregate_strings_func raising TypeError when aggregate_strings is compiled as a string.",
+      "id": "sqlalchemy-aggregate-strings",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": true,
+          "reason": "frozen source owner and changed-symbol facts"
+        },
+        "owner_top_three": {
+          "eligible": true,
+          "reason": "source-reviewed behavior task without a named owner"
+        }
+      },
+      "native_required": true,
+      "problem_id": "7e80ddda2a6b820860f8fc1fa8213b85e2819d2b",
+      "problem_source": "https://github.com/sqlalchemy/sqlalchemy/commit/7e80ddda2a6b820860f8fc1fa8213b85e2819d2b",
+      "repository": "sqlalchemy",
+      "task": "Compiling a string aggregation expression raises TypeError when the dialect does not supply its function name.",
+      "transitions": [
+        {
+          "after_path": "lib/sqlalchemy/sql/compiler.py",
+          "before_path": "lib/sqlalchemy/sql/compiler.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "faststream-middleware-enter-error-after",
+      "before": "faststream-middleware-enter-error-before",
+      "capabilities": [
+        1,
+        3,
+        5,
+        6,
+        7,
+        17
+      ],
+      "changed_paths": [
+        "faststream/_internal/endpoint/subscriber/usecase.py"
+      ],
+      "explicit_target_task": "Fix SubscriberUsecase.process_message failing to exit already entered middleware when later middleware entry raises.",
+      "id": "faststream-middleware-enter-error",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": true,
+          "reason": "frozen source owner and changed-symbol facts"
+        },
+        "owner_top_three": {
+          "eligible": true,
+          "reason": "source-reviewed behavior task without a named owner"
+        }
+      },
+      "native_required": true,
+      "problem_id": "71bd3234fcd8799f2405c2a23badf6dfd8eb2e32",
+      "problem_source": "https://github.com/ag2ai/faststream/commit/71bd3234fcd8799f2405c2a23badf6dfd8eb2e32",
+      "repository": "faststream",
+      "task": "Message processing fails to exit middleware contexts that were already entered when a later middleware entry raises.",
+      "transitions": [
+        {
+          "after_path": "faststream/_internal/endpoint/subscriber/usecase.py",
+          "before_path": "faststream/_internal/endpoint/subscriber/usecase.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "faststream-subscriber-stop-after",
+      "before": "faststream-subscriber-stop-before",
+      "capabilities": [
+        1,
+        3,
+        5,
+        6,
+        7,
+        17
+      ],
+      "changed_paths": [
+        "faststream/_internal/broker/broker.py"
+      ],
+      "explicit_target_task": "Fix BrokerUsecase.stop blocking other subscribers from shutting down when one subscriber stops slowly or raises.",
+      "id": "faststream-subscriber-stop",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": true,
+          "reason": "frozen source owner and changed-symbol facts"
+        },
+        "owner_top_three": {
+          "eligible": true,
+          "reason": "source-reviewed behavior task without a named owner"
+        }
+      },
+      "native_required": true,
+      "problem_id": "31df8dac071bb47d05537afdf8fa50b36eda6354",
+      "problem_source": "https://github.com/ag2ai/faststream/commit/31df8dac071bb47d05537afdf8fa50b36eda6354",
+      "repository": "faststream",
+      "task": "Broker shutdown stops subscribers sequentially, so one slow or failing subscriber prevents other subscribers from closing.",
+      "transitions": [
+        {
+          "after_path": "faststream/_internal/broker/broker.py",
+          "before_path": "faststream/_internal/broker/broker.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "faststream-concurrent-queue-lifetime-after",
+      "before": "faststream-concurrent-queue-lifetime-before",
+      "capabilities": [
+        1,
+        3,
+        5,
+        6,
+        7,
+        17
+      ],
+      "changed_paths": [
+        "faststream/_internal/endpoint/subscriber/mixins.py"
+      ],
+      "explicit_target_task": "Fix ConcurrentMixin.__init__ opening a concurrent subscriber queue before start and leaking it after stop.",
+      "id": "faststream-concurrent-queue-lifetime",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": true,
+          "reason": "frozen source owner and changed-symbol facts"
+        },
+        "owner_top_three": {
+          "eligible": true,
+          "reason": "source-reviewed behavior task without a named owner"
+        }
+      },
+      "native_required": true,
+      "problem_id": "af579438de685e7aeed97d02e422b363f983b721",
+      "problem_source": "https://github.com/ag2ai/faststream/commit/af579438de685e7aeed97d02e422b363f983b721",
+      "repository": "faststream",
+      "task": "Declaring a concurrent message subscriber opens its in-memory queue before startup and leaves queue endpoints open after shutdown.",
+      "transitions": [
+        {
+          "after_path": "faststream/_internal/endpoint/subscriber/mixins.py",
+          "before_path": "faststream/_internal/endpoint/subscriber/mixins.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "faststream-partial-pull-batch-after",
+      "before": "faststream-partial-pull-batch-before",
+      "capabilities": [
+        1,
+        3,
+        5,
+        6,
+        7,
+        17
+      ],
+      "changed_paths": [
+        "faststream/nats/subscriber/usecases/stream_pull_subscriber.py"
+      ],
+      "explicit_target_task": "Fix BatchPullStreamSubscriber._consume_pull discarding partially collected messages while waiting for a full batch.",
+      "id": "faststream-partial-pull-batch",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": true,
+          "reason": "frozen source owner and changed-symbol facts"
+        },
+        "owner_top_three": {
+          "eligible": true,
+          "reason": "source-reviewed behavior task without a named owner"
+        }
+      },
+      "native_required": true,
+      "problem_id": "3509bd2b16a57918dfe2f4b8f44ae1912a866332",
+      "problem_source": "https://github.com/ag2ai/faststream/commit/3509bd2b16a57918dfe2f4b8f44ae1912a866332",
+      "repository": "faststream",
+      "task": "A NATS pull subscriber discards messages already collected in a partial batch while waiting for a full batch.",
+      "transitions": [
+        {
+          "after_path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+          "before_path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+          "kind": "modify"
+        }
+      ]
+    }
+  ]
+}

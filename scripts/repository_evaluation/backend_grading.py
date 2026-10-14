@@ -112,6 +112,72 @@ def witness_identity(row: Mapping[str, Any]) -> tuple[object, ...]:
     return tuple(row[key] for key in WITNESS_CONTEXT)
 
 
+def _binding_selector(row: object) -> tuple[str, str, str | None]:
+    if not isinstance(row, Mapping) or set(row) not in (
+        {"repository", "path"},
+        {"repository", "path", "stage"},
+    ):
+        raise ValueError("backend fact requires repository-qualified source selectors")
+    repository, path, stage = row["repository"], row["path"], row.get("stage")
+    if not isinstance(repository, str) or not repository:
+        raise ValueError("backend source selector requires a repository")
+    _relative_reference(path)
+    if "stage" in row and stage not in {"before", "after"}:
+        raise ValueError("backend source selector has invalid revision stage")
+    return repository, path, stage
+
+
+def _selected_source_bindings(
+    check: Mapping[str, Any], observation: FactObservation
+) -> tuple[list[dict[str, str]], bool]:
+    paths, selectors = check.get("source_paths"), check.get("source_bindings")
+    if paths is not None and selectors is not None:
+        raise ValueError("backend fact cannot mix path and qualified source selectors")
+    if selectors is not None:
+        if not isinstance(selectors, list) or not selectors:
+            raise ValueError("backend fact requires nonempty source selectors")
+        expected = [_binding_selector(row) for row in selectors]
+        if len(set(expected)) != len(expected):
+            raise ValueError("backend fact contains duplicate source selectors")
+        bindings = [
+            dict(row)
+            for row in observation.source_bindings
+            if (row["repository"], row["path"], row.get("stage")) in expected
+        ]
+        observed = {
+            (row["repository"], row["path"], row.get("stage")) for row in bindings
+        }
+        return bindings, observed == set(expected)
+    return _selected_path_bindings(paths, observation)
+
+
+def _selected_path_bindings(
+    paths: object, observation: FactObservation
+) -> tuple[list[dict[str, str]], bool]:
+    if paths is not None and (
+        not isinstance(paths, list)
+        or not paths
+        or any(not isinstance(path, str) or not path for path in paths)
+        or len(set(paths)) != len(paths)
+    ):
+        raise ValueError("backend fact requires distinct source binding paths")
+    bindings = [
+        dict(row)
+        for row in observation.source_bindings
+        if paths is None or row["path"] in paths
+    ]
+    if paths is not None:
+        for path in paths:
+            repositories = {
+                row["repository"] for row in bindings if row["path"] == path
+            }
+            if len(repositories) > 1:
+                raise ValueError("ambiguous source path requires qualified selectors")
+    return bindings, bool(bindings) and (
+        paths is None or set(paths) == {row["path"] for row in bindings}
+    )
+
+
 def grade_fact_observation(
     packet: dict[str, Any], rule: dict[str, Any], observation: FactObservation
 ) -> dict[str, Any]:
@@ -121,22 +187,7 @@ def grade_fact_observation(
     for ordinal, row in enumerate(graded["checks"]):
         state = row["classification"]
         check = rule["checks"][ordinal]
-        paths = check.get("source_paths")
-        if paths is not None and (
-            not isinstance(paths, list)
-            or not paths
-            or any(not isinstance(path, str) or not path for path in paths)
-            or len(set(paths)) != len(paths)
-        ):
-            raise ValueError("backend fact requires distinct source binding paths")
-        bindings = [
-            dict(binding)
-            for binding in observation.source_bindings
-            if paths is None or binding["path"] in paths
-        ]
-        binding_complete = bool(bindings) and (
-            paths is None or set(paths) == {binding["path"] for binding in bindings}
-        )
+        bindings, binding_complete = _selected_source_bindings(check, observation)
         reason = (
             "matched-reviewed-fact"
             if state == "PASS"
@@ -256,6 +307,25 @@ def _packet(response: dict[str, Any]) -> dict[str, Any]:
 
 
 def _authority_safe(packet: dict[str, Any], rule: dict[str, Any]) -> bool | None:
+    return combine_required(
+        [
+            _owner_authority_safe(packet, rule),
+            _optional_fact_gate(packet, rule, "authority_checks"),
+        ]
+    )
+
+
+def _optional_fact_gate(
+    packet: dict[str, Any], rule: dict[str, Any], key: str
+) -> bool | None:
+    if key not in rule:
+        return True  # Legacy grading; capability membership still needs witnesses.
+    return fact_state(
+        grade_facts(key, {"packet": packet}, {"checks": rule[key]})["classification"]
+    )
+
+
+def _owner_authority_safe(packet: dict[str, Any], rule: dict[str, Any]) -> bool | None:
     packet = _packet(packet)
     owner = packet["ownership"]["owner"]
     if owner is None:
@@ -384,7 +454,9 @@ def _gates(
                 *(row["revision"] for row in transport_rows),
             ]
         ),
-        "freshness": stale["passed"],
+        "freshness": combine_required(
+            [stale["passed"], _optional_fact_gate(stale, rule, "freshness_checks")]
+        ),
         "cli": transport_gate("cli"),
         "mcp": transport_gate("mcp"),
         "presentation": combine_required(row["parity"] for row in transport_rows),

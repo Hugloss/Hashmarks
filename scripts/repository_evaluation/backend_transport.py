@@ -7,6 +7,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,11 @@ from hashmarks.mcp_contract import tool_contract
 from hashmarks.mcp_launch import installed_mcp_command
 
 from .common import canonical_sha256
+
+_JSON_CLI_OPERATIONS = {
+    "dependency_codemap": "dependency-codemap",
+    "repository_intelligence_query": "repository-intelligence-query",
+}
 
 
 def _capture(response: dict[str, Any], text: str, *, transport: str) -> dict[str, Any]:
@@ -128,7 +134,29 @@ def _cli_arguments(operation: str, inputs: dict[str, Any]) -> list[str]:
 def capture_cli(
     workspace: Path, state: Path, case: dict[str, Any]
 ) -> list[dict[str, Any]]:
-    args = _cli_arguments(case["operation"], case["inputs"])
+    if case["operation"] not in _JSON_CLI_OPERATIONS:
+        return _cli_captures(workspace, state, case)
+    with tempfile.TemporaryDirectory(prefix="hashmarks-observation-request-") as raw:
+        request = Path(raw) / "input.json"
+        request.write_text(json.dumps(case["inputs"]), encoding="utf-8")
+        return _cli_captures(workspace, state, case, request)
+
+
+def _cli_captures(
+    workspace: Path,
+    state: Path,
+    case: dict[str, Any],
+    request_path: Path | None = None,
+) -> list[dict[str, Any]]:
+    args = (
+        _cli_arguments(case["operation"], case["inputs"])
+        if request_path is None
+        else [
+            _JSON_CLI_OPERATIONS[case["operation"]],
+            "--input-json",
+            str(request_path),
+        ]
+    )
     captures = []
     for presentation in FORMATS:
         completed = subprocess.run(

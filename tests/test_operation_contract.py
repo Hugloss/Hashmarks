@@ -287,10 +287,31 @@ def test_cli_codemap_exposure_is_exhaustively_classified() -> None:
             isinstance(node.func, ast.Name) and node.func.id == "_print_operation"
             for node in printers
         )
-        if not semantic:
+        if not semantic and not _cli_prints_validated_operation(function, printers):
             non_semantic.add(function.name)
 
     assert non_semantic == _CLI_NON_SEMANTIC_CODEMAP_HANDLERS
+
+
+def _cli_prints_validated_operation(
+    function: ast.FunctionDef, printers: list[ast.Call]
+) -> bool:
+    """Canonical query envelopes are already projected before serialization."""
+    validated = {
+        target.id
+        for node in ast.walk(function)
+        if isinstance(node, ast.Assign)
+        and isinstance(node.value, ast.Call)
+        and isinstance(node.value.func, ast.Name)
+        and node.value.func.id == "validate_operation_response"
+        for target in node.targets
+        if isinstance(target, ast.Name)
+    }
+    return any(
+        isinstance(argument, ast.Name) and argument.id in validated
+        for printer in printers
+        for argument in printer.args[:1]
+    )
 
 
 def test_mcp_mode_types_derive_from_operation_contract() -> None:

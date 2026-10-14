@@ -129,6 +129,67 @@ def test_api_revision_workflow_cannot_qualify_missing_transports_or_breadth(
     assert all(row["local_e2e_rating"] is None for row in report["capabilities"])
 
 
+def test_authority_and_freshness_witnesses_are_regraded_from_actual_artifacts(
+    corpus, tmp_path: Path
+) -> None:
+    from scripts.repository_evaluation.backend_regrading import verify_task_summary
+    from scripts.repository_evaluation.backend_witnesses import freshness_fact_witnesses
+
+    suite_path, sources = corpus
+    grader_path = suite_path.parent / "grader.json"
+    grader = json.loads(grader_path.read_text())
+    rule = grader["cases"]["handler"]
+    rule["authority_checks"] = [
+        {
+            "id": "owner-correspondence",
+            "pointer": "/ownership/owner/path",
+            "predicate": "equals",
+            "value": "backend.py",
+            "source_paths": ["backend.py"],
+        }
+    ]
+    rule["freshness_checks"] = [
+        {
+            "id": "stale-cannot-negate",
+            "pointer": "/observations/*/negative_evidence",
+            "predicate": "all_equal",
+            "value": "not-admissible",
+            "source_paths": ["backend.py"],
+        }
+    ]
+    write_json(grader_path, grader)
+    report = run_backend(
+        sources=sources,
+        suite_path=suite_path,
+        output_dir=tmp_path / "output",
+        transports=(),
+    )
+    outcome = report["outcomes"][0]
+    root = tmp_path / "output/handler/observations"
+    workflow = json.loads(suite_path.read_text())["workflows"][0]
+    authority = [w for w in outcome["gate_witnesses"] if w["gate"] == "authority"]
+    assert {(w["stage"], w["profile"]) for w in authority} == {
+        (stage, profile)
+        for stage in ("before", "after")
+        for profile in ("default", "initial")
+    }
+    assert all(w["state"] == "PASS" for w in authority)
+    witness = next(w for w in outcome["gate_witnesses"] if w["gate"] == "freshness")
+    assert witness["state"] == "PASS"
+    assert {b["stage"] for b in witness["source_bindings"]} == {"before", "after"}
+    assert outcome["gates"]["freshness"] is True
+    verify_task_summary(root, workflow, rule, sources, outcome)
+    stale = json.loads((root / "stale.json").read_text())
+    stale["observations"][0]["negative_evidence"] = "admissible"
+    write_json(root / "stale.json", stale)
+    assert freshness_fact_witnesses(sources, root, workflow, rule)[0]["state"] == "FAIL"
+    with pytest.raises(ValueError, match="witnesses differ"):
+        verify_task_summary(root, workflow, rule, sources, outcome)
+    (root / "stale.json").unlink()
+    with pytest.raises(ValueError, match="not a repository file"):
+        freshness_fact_witnesses(sources, root, workflow, rule)
+
+
 def _aggregate_campaign(corpus, root: Path) -> Path:
     from scripts.repository_evaluation.aggregate_backend import CAMPAIGN_SCHEMA
     from scripts.repository_evaluation.backend_matrix import SCHEMA as MATRIX_SCHEMA
@@ -265,6 +326,32 @@ def test_changed_archive_and_oracle_ranges_fail_before_observation(corpus):
     grader["cases"]["handler"]["source_labels"]["before"][0]["sha256"] = "0" * 64
     write_json(grader_path, grader)
     with pytest.raises(ValueError, match="source range changed"):
+        load_corpus(suite_path, sources)
+
+
+@pytest.mark.parametrize(
+    "native_oracles,reason",
+    [
+        ({"before": {}}, "both revision stages"),
+        ({"before": {}, "after": {}}, "target membership"),
+        (
+            {
+                stage: {"backend.py::handler": {"checks": []}}
+                for stage in ("before", "after")
+            },
+            "checks must be nonempty",
+        ),
+    ],
+)
+def test_incomplete_native_oracles_fail_during_source_admission(
+    corpus, native_oracles, reason: str
+) -> None:
+    suite_path, sources = corpus
+    grader_path = suite_path.parent / "grader.json"
+    grader = json.loads(grader_path.read_text())
+    grader["cases"]["handler"]["native_oracles"] = native_oracles
+    write_json(grader_path, grader)
+    with pytest.raises(ValueError, match=reason):
         load_corpus(suite_path, sources)
 
 

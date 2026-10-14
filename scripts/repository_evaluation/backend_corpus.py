@@ -188,6 +188,38 @@ def _check_workflow(
         )
     _check_boundary_inputs(workflow, rule, sources)
     _check_declaration_inputs(workflow, rule, sources)
+    _check_native_oracles(rule)
+
+
+def _check_native_oracles(rule: dict[str, Any]) -> None:
+    if "native_oracles" not in rule:
+        return
+    oracles = rule["native_oracles"]
+    if not isinstance(oracles, dict) or set(oracles) != {"before", "after"}:
+        raise ValueError("backend native oracles require both revision stages")
+    for stage in ("before", "after"):
+        _check_native_stage_oracles(oracles[stage], rule["source_labels"][stage])
+
+
+def _check_native_stage_oracles(oracles: object, labels: list[dict[str, Any]]) -> None:
+    targets = [label["path"] + "::" + label["symbol"] for label in labels]
+    if (
+        not isinstance(oracles, dict)
+        or set(oracles) != set(targets)
+        or len(set(targets)) != len(targets)
+    ):
+        raise ValueError(
+            "backend native oracle target membership differs from source labels"
+        )
+    for oracle in oracles.values():
+        if not isinstance(oracle, dict):
+            raise ValueError("backend native target oracle must be an object")
+        for key in ("checks", "definition_checks"):
+            if key != "checks" and key not in oracle:
+                continue
+            checks = oracle.get(key)
+            if not isinstance(checks, list) or not checks:
+                raise ValueError("backend native oracle checks must be nonempty")
 
 
 def _check_transition(
@@ -211,18 +243,25 @@ def _check_transition(
             raise ValueError(
                 f"backend changed path is unchanged: {transition['before_path']}"
             )
-    if (
-        kind in {"add", "rename"}
-        and confined_path(before_root, transition["after_path"]).exists()
-    ):
-        raise ValueError(
-            "backend added/renamed target already exists before transition"
+    if kind in {"add", "rename"}:
+        _require_absent_endpoint(
+            before_root,
+            transition["after_path"],
+            "backend added/renamed target already exists before transition",
         )
-    if (
-        kind in {"delete", "rename"}
-        and confined_path(after_root, transition["before_path"]).exists()
-    ):
-        raise ValueError("backend deleted/renamed source still exists after transition")
+    if kind in {"delete", "rename"}:
+        _require_absent_endpoint(
+            after_root,
+            transition["before_path"],
+            "backend deleted/renamed source still exists after transition",
+        )
+
+
+def _require_absent_endpoint(root: Path, path: object, reason: str) -> None:
+    if not isinstance(path, str):
+        raise ValueError("backend transition requires a nonnull path endpoint")
+    if confined_path(root, path).exists():
+        raise ValueError(reason)
 
 
 def _check_declaration_inputs(

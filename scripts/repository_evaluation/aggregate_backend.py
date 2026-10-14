@@ -26,7 +26,9 @@ from .backend_native import (
     validate_capture,
     validate_capture_acquisition,
 )
+from .backend_native_witnesses import native_fact_witnesses, native_witness_gate
 from .common import canonical_sha256, load_json, write_json
+from .fact_grading import _json_equal
 from .run_backend import _check_implementation, _verify_artifacts
 
 CAMPAIGN_SCHEMA = "hashmarks.backend-evidence-campaign.v4"
@@ -315,6 +317,15 @@ def _regrade_native_observations(
         )
         for ordinal, prior in enumerate(labels)
     )
+    witnesses = native_fact_witnesses(workflow, rule, inputs[1], observed)
+    if "native_oracles" in rule:
+        gates["reviewed_facts"] = native_witness_gate(witnesses)
+    if not _json_equal(outcome.get("gate_witnesses", []), witnesses):
+        raise ValueError("backend native witnesses differ from artifact proof")
+    if outcome["gates"].keys() != gates.keys():
+        raise ValueError(
+            "backend native gate membership differs from observation proof"
+        )
     if any(
         type(outcome["gates"].get(name)) is not type(value)
         or outcome["gates"].get(name) != value
@@ -466,7 +477,17 @@ def _merge_suite(
                         *specimen["gates"].values(),
                     ]
                 )
-        outcomes.append({**outcome, "id": qualified_id, "gates": gates})
+        witnesses = [
+            {**row, "artifact_scope": scope}
+            for scope, rows in (
+                ("workflow", outcome.get("gate_witnesses", [])),
+                ("native", native.get(workflow["id"], {}).get("gate_witnesses", [])),
+            )
+            for row in rows
+        ]
+        outcomes.append(
+            {**outcome, "id": qualified_id, "gates": gates, "gate_witnesses": witnesses}
+        )
     return {"workflows": workflows, "outcomes": outcomes, "missing": missing}
 
 

@@ -20,7 +20,11 @@ from .backend_gates import combine_required, fact_state, presentation_conformanc
 from .backend_grading import _authority_safe, _gates, _packet
 from .backend_matrix import INITIAL_TOKEN_CEILING
 from .backend_transport import capture_cli, capture_mcp
-from .backend_witnesses import delta_fact_witnesses, stage_fact_witnesses
+from .backend_witnesses import (
+    delta_fact_witnesses,
+    freshness_fact_witnesses,
+    stage_fact_witnesses,
+)
 from .common import canonical_sha256, write_json
 from .fact_grading import grade_facts
 
@@ -352,6 +356,7 @@ def execute_workflow(
             *before["fact_witnesses"],
             *after["fact_witnesses"],
             *delta_fact_witnesses(sources, output, workflow, rule),
+            *freshness_fact_witnesses(sources, output, workflow, rule),
         ],
         "before": before["grade"],
         "after": after["grade"],

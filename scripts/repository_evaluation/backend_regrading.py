@@ -13,7 +13,11 @@ from .backend_corpus import confined_file, confined_path, workflow_changed_paths
 from .backend_declarations import _grade as _declaration_grade
 from .backend_gates import combine_required, presentation_conformance
 from .backend_grading import _gates, component_summary, validate_transport_capture
-from .backend_witnesses import delta_fact_witnesses, stage_fact_witnesses
+from .backend_witnesses import (
+    delta_fact_witnesses,
+    freshness_fact_witnesses,
+    stage_fact_witnesses,
+)
 from .backend_workflows import _invalidated_member, _revision_bound, _transport_grade
 from .fact_grading import _json_equal, grade_facts
 
@@ -101,7 +105,7 @@ def regrade_task_workflow(
         {"checks": rule["delta_checks"]},
     )
     gates = _gates(before, after, _freshness(root, workflow, sources), rule, delta)
-    components = {
+    components: dict[str, dict[str, object]] = {
         family: {stage: None for stage in ("before", "after")}
         for family in ("boundary", "declarations")
     }
@@ -160,6 +164,7 @@ def verify_task_summary(
         )
     ]
     witnesses.extend(delta_fact_witnesses(sources, root, workflow, rule))
+    witnesses.extend(freshness_fact_witnesses(sources, root, workflow, rule))
     if not _json_equal(outcome.get("gate_witnesses"), witnesses):
         raise ValueError("backend workflow witnesses differ from artifact proof")
     if outcome.get("gates", {}).keys() != expected["gates"].keys():

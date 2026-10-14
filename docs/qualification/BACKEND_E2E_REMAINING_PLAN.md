@@ -1,0 +1,199 @@
+# Backend 5/5 remaining implementation
+
+This handoff is Hashmarks development QA. Product code remains a repository
+observer; consumers own reasoning and external execution layers own execution
+and certification. Follow `docs/reference/PRODUCT_BOUNDARY.md`.
+
+The successor definition is
+`benchmarks/repository_evaluation/manifests/backend-campaign-v2/campaign.json`.
+It initially preserves 36 entries, 27 distinct upstream problems and eight
+capability tags from the original campaign. Copying a suite adds no evidence.
+The original campaign remains historical. The active schemas remain workflow
+v2, campaign v4 and matrix v5. Additional capability membership is admitted only
+after source review and executable witness proof.
+
+## Completion contract
+
+Every one of the twenty rows needs at least twelve distinct genuine problems
+across three repositories, independently reviewed positive/adversarial checks,
+and every required witness. Formats, variants and repeated runs do not increase
+breadth. Cross-capability reuse requires separate reviewed semantic evidence.
+
+Owner top-three recall must reach 95%; reviewed frame correspondence and initial
+essential-evidence recall must reach 90% over frozen eligible populations.
+False exact authority, stale promotion and presentation losses are hard failures.
+Initial CLI/MCP compact/text replies at both revisions must fit 4,000 estimated
+tokens, counting actual complete consumer-visible responses. Every deliberately
+invalidated source binding must be detected. Missing proof stays INCOMPLETE;
+known failure dominates missing. Empty populations never pass.
+
+Full configured Ty, Pyright, Ruff, formatting, hygiene, complexity, deterministic
+regressions, heldout evaluation and artifact qualification must pass. Historical
+scoped passes cannot replace these checks.
+
+## Ordered work
+
+### T00: baseline and prerequisites
+
+Record HEAD/worktree state, observer/evaluator identities, lock/configuration
+digests and source admission. Retain old failed/incomplete reports without
+overwriting them. Use new ignored output directories. Prepare source maps with
+exact suite membership, and preflight every selected native producer before any
+capture. Installed tool versions are provenance, not additional product policy.
+Distinguish fresh acquisition from replay.
+
+### T03: independent oracles
+
+Work through existing entries in batches of four. Read pinned diffs, declarations
+and relevant tests without candidate responses. Freeze exact stage labels/ranges,
+owner scope and resolution, verifier relevance, essential initial facts, display
+checks, metric eligibility and capability-specific adversaries. Test additions
+in the after revision must not become before expectations. A separate source-only
+review pass must precede `reviewed: true`; a passing evaluator is not that review.
+
+Each `capability_proofs` entry names `positive_check_ids`,
+`adversarial_check_ids` and `required_witnesses`. Each witness reference includes
+gate, unit ID, stage, profile, surface, format, check ID and positive/adversarial
+role. Missing membership is incomplete even when individual workflow gates pass.
+Declaring `authority_oracles` or `verification_oracles` metadata is insufficient;
+the relevant assertions must be executable checks.
+
+### T04: artifact-bound witnesses and pure regrading
+
+Reuse `FactObservation`, `witness_identity` and `grade_fact_observation`. Existing
+task, boundary, declaration and delta witnesses are the foundation. Complete
+authority, freshness, native, runtime-debugging, dependency, nominated-service
+and economics witnesses one family at a time.
+
+Every witness retains exact artifact bytes/digest, oracle pointer, expected and
+observed fact, context and source revision bindings. Live and retained-artifact
+grading share one semantic owner. Regrading reads bytes and never launches the
+observer or trusts supplied gate verdicts. All referenced capture/index artifacts
+must be checked, including binaries referenced from artifact manifests.
+
+Task `authority_checks` are stage-overridable and apply to default and initial
+observations on every captured surface. Top-level `freshness_checks` grade the
+retained stale observations and bind before/after sources separately. These
+optional additions do not manufacture capability proof for legacy manifests.
+
+Checks may use `source_paths` for one repository or `source_bindings` selectors
+containing repository/path and, for comparison inputs, revision stage. Do not mix
+selector forms. Same relative paths in different repositories require qualified
+selectors. Missing bindings cannot establish PASS; contradicted facts remain
+FAIL even when bindings are missing.
+
+For every family prove actual positive behavior, contradiction, missing artifact,
+changed bytes, wrong binding/context and failure-plus-missing composition.
+
+### T05: aggregate admission
+
+Extend aggregation to admit/regrade all required families and merge their exact
+witness contexts. Account for every expected input as ADMITTED, REJECTED or
+MISSING. Keep valid inputs alongside rejection reasons. Reject duplicates,
+unexpected workflows, source/implementation drift and unsupported claims.
+Native binding cannot satisfy retrieval, debugging or verifier-recall proof.
+
+### T06: genuine transitions and native acquisition
+
+Admit real upstream additions, deletions and explicitly nominated renames across
+Python/TypeScript populations. Independently label unchanged and invalidated
+bindings. Exercise persisted-state reopening and all required native targets
+through API/CLI/official MCP. Preserve source-binding and capture-generation
+freshness as separate dimensions. Never invent a current digest for an absent
+member. Unsupported/ambiguous producer output remains unresolved.
+
+### T07: missing catalogs
+
+Each catalog targets four genuine problems per repository in the initial pool.
+Inspect source history from recorded revisions; pin exact before/after archives;
+write answer-blind public tasks; review semantic facts/adversaries independently;
+freeze accepted membership before measurement. Reject unsupported candidates.
+If a pool is insufficient, retain the shortage and explicitly admit another
+repository. Never fill it with synthetic fixtures or duplicate wording.
+
+| Capability/catalog | Initial repository pool | Required evidence and uncertainty |
+| --- | --- | --- |
+| 2/path | aiokafka, SQLAlchemy, FastStream | Exact direct call endpoints/direction; missing edges explicit |
+| 4/debug | SQLAlchemy, databases, Litestar | Actual failure frames; wrong/stale/foreign correspondence rejected |
+| 8/handler | FastAPI, Litestar, FastStream | Decorators/parameters/branches; dynamic behavior unknown |
+| 9/data | FastAPI, Litestar, FastStream | Nominated components/keys/branches; runtime compatibility unknown |
+| 11/config | FastAPI, Litestar, FastStream | Declared wiring/providers; runtime configuration unresolved |
+| 13/messaging | aiokafka, aio-pika, FastStream | Ack/retry/commit syntax; delivery outcomes unclaimed |
+| 14/transaction | SQLAlchemy, databases, Litestar | Explicit scopes/commit/rollback; success/isolation unclaimed |
+| 15/dependency | Hashmarks, uv-fleet-updater, MinIO Java | Genuine producer evidence/source correspondence; coverage independent |
+| 16/service | doctor-scheduler, doctor-scheduler-core, doctor-scheduler-frontend | Independent endpoints and explicit nomination; no inferred graph |
+| 18/native | aiokafka, SQLAlchemy, FastStream | Reviewed required native facts, actual fresh capture and adversaries |
+| 19/language | Existing Python pools; Fastify, NestJS, Hono | Both languages and neutral contracts; unsupported syntax explicit |
+| 20/economics | aiokafka, SQLAlchemy, FastStream | Comparable task/revision measurements with same-version controls |
+
+For language coverage use six Python and six TypeScript problems by default.
+Reserve one new problem in each of three repositories for final heldout use
+before product repairs. Existing development populations need corresponding
+unseen backend holdout problems before claiming new independent holdout evidence.
+
+### T01/T02/T08: observer repairs and full-population dogfood
+
+Run all reviewed existing entries and new catalogs. Retain each failure before
+repair. Trace missing evidence, false authority, stale binding, presentation loss
+or oversize to its existing owner. Add a minimal neutral regression, repair the
+generic defect, test adjacent adversaries and reacquire both genuine revisions.
+Do not use expected-owner hints, framework exceptions, removed cases or weakened
+bounds. Preserve verifier candidates separately from edit/verification selection.
+Compression must retain admitted facts, alternatives, uncertainty and omissions.
+
+### T09: full typing
+
+Refresh full Ty/Pyright diagnostic inventory. Repair producer types and narrowing
+in bounded groups: evidence/verification/session/query owners, production
+consumers, qualification/economics, other configured scripts/examples/benchmarks,
+then fixtures/assertions. Inspect actual producers before assigning types.
+Correct obsolete callers rather than recreate removed APIs. Run scoped checkers
+and behavior tests per group, then unchanged full configuration. No blanket Any,
+unchecked casts, ignores, exclusions or lowered severity to manufacture green.
+
+### T10: economics, heldout and final artifacts
+
+Profile actual frozen operations rather than substituting action-map timings.
+Use two warmups, nine samples and independent same-version controls. Bind source,
+operation, inputs, bounds, instrumentation and environment. Measure cold build,
+warm recheck, incremental changes, rename/delete, incomplete-generation recovery,
+packet bytes/tokens and index/persistence costs. Validate comparability first;
+missing controls/unstable semantics remain incomplete. A speed win is optional;
+comparable proof and retained correctness are mandatory. Run surface calibration
+before changing persistent lexical representation.
+
+Run the exact four existing heldout archives and the reserved backend holdouts.
+Retain failures. A repaired exposed holdout needs an unseen replacement before
+independent closure. Format before final source freeze. Complete public/native
+acquisition, every deterministic regression batch, one deterministic source ZIP
+with new files/modes, independent-extraction API/CLI/MCP checks, and final-promotion
+rebuild/wheel/sdist qualification. Verify source did not drift during proof.
+
+## Commands and handoff
+
+Acquire suites using `scripts.repository_evaluation.run_backend --suite ...
+--sources-file ... --output-dir NEW`; omit `--transport` for both CLI and MCP.
+Acquire native proof using `run_backend_native` with the same suite/source map,
+`--regenerate --capture-root NEW --output-dir NEW`. Suite summaries can remain
+incomplete because they do not contain all twenty rows; inspect membership and
+gates, then aggregate. Never interpret an exit code alone as semantic proof.
+
+Run `make agent-finish` before focused/expensive checks. Final checks include
+`lock-check`, `ruff-check`, `ruff-format-check`, `source-hygiene`, `lint-debt`,
+`ty-check`, `pyright-check`, `compile`, `map`, dependency/semantic dogfood and
+fresh semantic acquisition. Run every `make dev-check-batch DEV_BATCH=N` in the
+frozen selection (currently 0–15). Resume later batches with `dev-check-tests
+DEV_BATCH_START=N`; partial batches never count and host timeouts are not product
+failures. Do not rerun proven batches solely because a controller window expired.
+
+Aggregate the successor with complete source/report maps using
+`scripts.repository_evaluation.aggregate_backend`. Aggregation reads retained
+proof; it never launches missing work. Complete `make artifact-check` and
+independent source-extraction qualification before final handoff.
+
+Each ticket handoff names input identities, owner, expected behavior, actual
+positive/adversarial proof and remaining failures. Low models can implement
+specified fixtures/plumbing/type repairs; semantic admission, authority and
+cross-repository binding need a separate source-focused review. Preserve unknown
+or incomplete rather than guess. Claim clean 5/5 only with twenty passing rows,
+complete input admission and all configured quality/artifact gates green.

@@ -47,6 +47,7 @@ def evaluator_implementation_identity() -> str:
     inputs = {path.name: path.read_bytes().hex() for path in sorted(root.glob("*.py"))}
     for relative in (
         "scripts/native_evidence_capture.py",
+        "scripts/native_lsp_capture.py",
         "benchmarks/research_receipts.py",
     ):
         inputs[relative] = (root.parents[1] / relative).read_bytes().hex()

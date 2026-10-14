@@ -83,6 +83,31 @@ def test_after_initial_oversize_is_a_hard_gate_independent_of_recall():
     assert gates["initial_evidence"] is True
 
 
+def test_unresolved_owner_does_not_hide_another_false_authority_claim():
+    packet = {"ownership": {"owner": None}, "runtime_compatibility": "established"}
+    rule = {
+        "authority_checks": [
+            {
+                "id": "compatibility-unresolved",
+                "pointer": "/runtime_compatibility",
+                "predicate": "equals",
+                "value": "unknown",
+                "support": "supported",
+            }
+        ]
+    }
+    assert _authority_safe(packet, rule) is False
+    packet.pop("runtime_compatibility")
+    assert _authority_safe(packet, rule) is False
+    rule["authority_checks"][0].pop("support")
+    assert _authority_safe(packet, rule) is None
+
+
+def test_empty_authority_checks_are_not_a_successful_observation():
+    with pytest.raises(ValueError, match="non-empty checks"):
+        _authority_safe({"ownership": {"owner": None}}, {"authority_checks": []})
+
+
 def test_known_after_transport_failure_dominates_missing_before_proof():
     before, after = _stage(), _stage()
     before["mcp"]["parity"] = None

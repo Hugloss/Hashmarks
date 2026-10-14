@@ -9,7 +9,7 @@ from typing import Any
 
 from hashmarks.digest import FILE_DOMAIN, hash_file
 
-from .backend_corpus import confined_file
+from .backend_corpus import confined_file, confined_path, workflow_changed_paths
 from .backend_grading import (
     FactObservation,
     grade_fact_observation,
@@ -70,7 +70,6 @@ def task_fact_witnesses(
         ("default", "", "checks"),
         ("initial", "initial/", "initial_checks"),
     ):
-        checks = rule.get(key)
         scope = f"/cases/{workflow['id']}"
         if key in rule.get(stage, {}):
             scope += "/" + stage
@@ -101,12 +100,7 @@ def task_fact_witnesses(
                     (stage + "/" + relative, contents),
                     bindings,
                 )
-                if checks:
-                    witnesses.extend(
-                        grade_fact_observation(packet, {"checks": checks}, context)[
-                            "witnesses"
-                        ]
-                    )
+                witnesses.extend(_task_check_witnesses(packet, rule, context))
                 display_checks = (
                     rule.get("display_checks", {}).get(profile, {}).get(format)
                 )
@@ -129,6 +123,28 @@ def task_fact_witnesses(
                             observation,
                         )["witnesses"]
                     )
+    return witnesses
+
+
+def _task_check_witnesses(
+    packet: dict[str, Any], rule: dict[str, Any], context: FactObservation
+) -> list[dict[str, Any]]:
+    witnesses = []
+    key = "initial_checks" if context.profile == "initial" else "checks"
+    for gate, check_key in ((context.gate, key), ("authority", "authority_checks")):
+        if check_key not in rule:
+            continue
+        scope = f"/cases/{context.unit_id}"
+        if check_key in rule.get(context.stage, {}):
+            scope += "/" + context.stage
+        observation = replace(
+            context, gate=gate, oracle_pointer=scope + "/" + check_key
+        )
+        witnesses.extend(
+            grade_fact_observation(packet, {"checks": rule[check_key]}, observation)[
+                "witnesses"
+            ]
+        )
     return witnesses
 
 
@@ -179,7 +195,7 @@ def stage_fact_witnesses(
             bindings,
         )
         witnesses.extend(
-            _component_fact_witnesses(
+            captured_fact_witnesses(
                 output,
                 family,
                 oracle,
@@ -189,7 +205,7 @@ def stage_fact_witnesses(
     return witnesses
 
 
-def _component_fact_witnesses(
+def captured_fact_witnesses(
     output: Path,
     family: str,
     rule: dict[str, Any],
@@ -197,7 +213,7 @@ def _component_fact_witnesses(
 ) -> list[dict[str, Any]]:
     witnesses = []
     for surface in ("api", "cli", "mcp"):
-        relative = family + "/" + surface + ".json"
+        relative = (family + "/" if family else "") + surface + ".json"
         contents = confined_file(output, relative).read_bytes()
         decoded = json.loads(contents)
         captures = (
@@ -224,7 +240,7 @@ def _component_fact_witnesses(
             if surface != "api" and format != "none" and display:
                 display_context = replace(
                     captured_context,
-                    gate=family + "_presentation",
+                    gate=context.gate.removesuffix("_facts") + "_presentation",
                     oracle_pointer=context.oracle_pointer.removesuffix("/checks")
                     + "/display_checks/"
                     + format,
@@ -244,18 +260,7 @@ def delta_fact_witnesses(
     rule: dict[str, Any],
 ) -> list[dict[str, Any]]:
     """Bind comparison facts to independently admitted before/after source bytes."""
-    bindings = tuple(
-        {
-            "repository": workflow["repository"],
-            "path": path,
-            "stage": stage,
-            "revision": hash_file(
-                confined_file(sources[workflow[stage]], path), domain=FILE_DOMAIN
-            ).hash,
-        }
-        for stage in ("before", "after")
-        for path in sorted({label["path"] for label in rule["source_labels"][stage]})
-    )
+    bindings = _comparison_source_bindings(sources, workflow, rule)
     contents = confined_file(output, "delta.json").read_bytes()
     context = FactObservation(
         "delta",
@@ -271,3 +276,63 @@ def delta_fact_witnesses(
     return grade_fact_observation(
         json.loads(contents), {"checks": rule["delta_checks"]}, context
     )["witnesses"]
+
+
+def freshness_fact_witnesses(
+    sources: dict[str, Path],
+    output: Path,
+    workflow: dict[str, Any],
+    rule: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Regrade explicit stale checks; prior and present bindings stay separate."""
+    if "freshness_checks" not in rule:
+        return []
+    contents = confined_file(output, "stale.json").read_bytes()
+    context = FactObservation(
+        "freshness",
+        workflow["id"],
+        "stale",
+        None,
+        "api",
+        "none",
+        f"/cases/{workflow['id']}/freshness_checks",
+        ("stale.json", contents),
+        _transition_source_bindings(sources, workflow),
+    )
+    return grade_fact_observation(
+        json.loads(contents), {"checks": rule["freshness_checks"]}, context
+    )["witnesses"]
+
+
+def _transition_source_bindings(
+    sources: dict[str, Path], workflow: dict[str, Any]
+) -> tuple[dict[str, str], ...]:
+    """Bind actual transition endpoints, independently of selected declarations."""
+    return tuple(
+        {
+            "repository": workflow["repository"],
+            "path": path,
+            "stage": stage,
+            "revision": hash_file(member, domain=FILE_DOMAIN).hash,
+        }
+        for stage in ("before", "after")
+        for path in workflow_changed_paths(workflow)
+        if (member := confined_path(sources[workflow[stage]], path)).is_file()
+    )
+
+
+def _comparison_source_bindings(
+    sources: dict[str, Path], workflow: dict[str, Any], rule: dict[str, Any]
+) -> tuple[dict[str, str], ...]:
+    return tuple(
+        {
+            "repository": workflow["repository"],
+            "path": path,
+            "stage": stage,
+            "revision": hash_file(
+                confined_file(sources[workflow[stage]], path), domain=FILE_DOMAIN
+            ).hash,
+        }
+        for stage in ("before", "after")
+        for path in sorted({label["path"] for label in rule["source_labels"][stage]})
+    )

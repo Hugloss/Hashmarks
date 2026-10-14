@@ -146,3 +146,77 @@ def test_comparison_bindings_distinguish_revision_roles_and_reject_duplicates(
         replace(observation, source_bindings=(before, before))
     with pytest.raises(ValueError, match="invalid revision stage"):
         replace(observation, source_bindings=({**before, "stage": "unknown"},))
+
+
+def _qualified_check(selectors):
+    return {
+        "checks": [
+            {
+                "id": "endpoint",
+                "pointer": "/value",
+                "predicate": "equals",
+                "value": 1,
+                "source_bindings": selectors,
+            }
+        ]
+    }
+
+
+def test_same_relative_path_in_another_repository_cannot_bind_a_fact(observation):
+    rule = _qualified_check([{"repository": "peer", "path": "owner.py"}])
+    result = grade_fact_observation({"value": 1}, rule, observation)
+    assert result["gate"] is None
+    assert result["witnesses"][0]["reason"] == "missing-source-binding"
+    assert result["witnesses"][0]["source_bindings"] == []
+
+
+def test_qualified_fact_retains_only_its_repository_endpoint(observation):
+    peer = {"repository": "peer", "path": "owner.py", "revision": "peer-revision"}
+    observation = replace(
+        observation, source_bindings=(*observation.source_bindings, peer)
+    )
+    rule = _qualified_check([{"repository": "peer", "path": "owner.py"}])
+    result = grade_fact_observation({"value": 1}, rule, observation)
+    assert result["gate"] is True
+    assert result["witnesses"][0]["source_bindings"] == [peer]
+    rule["checks"][0].pop("source_bindings")
+    rule["checks"][0]["source_paths"] = ["owner.py"]
+    with pytest.raises(ValueError, match="ambiguous source path"):
+        grade_fact_observation({"value": 1}, rule, observation)
+
+
+def test_qualified_comparison_cannot_substitute_the_other_revision(observation):
+    binding = {**observation.source_bindings[0], "stage": "before"}
+    observation = replace(observation, stage="delta", source_bindings=(binding,))
+    rule = _qualified_check(
+        [{"repository": "repo", "path": "owner.py", "stage": "after"}]
+    )
+    assert grade_fact_observation({"value": 1}, rule, observation)["gate"] is None
+
+
+@pytest.mark.parametrize(
+    "selectors",
+    [
+        [],
+        [{"path": "owner.py"}],
+        [{"repository": "repo", "path": "../owner.py"}],
+        [{"repository": "repo", "path": "owner.py", "stage": None}],
+        [{"repository": "repo", "path": "owner.py"}] * 2,
+    ],
+)
+def test_malformed_qualified_selectors_fail_closed(observation, selectors):
+    with pytest.raises(ValueError):
+        grade_fact_observation({"value": 1}, _qualified_check(selectors), observation)
+
+
+def test_known_fact_failure_survives_missing_qualified_binding(observation):
+    rule = _qualified_check([{"repository": "peer", "path": "owner.py"}])
+    result = grade_fact_observation({"value": 2}, rule, observation)
+    assert result["gate"] is False
+
+
+def test_path_and_qualified_selectors_cannot_be_combined(observation):
+    rule = _qualified_check([{"repository": "repo", "path": "owner.py"}])
+    rule["checks"][0]["source_paths"] = ["owner.py"]
+    with pytest.raises(ValueError, match="cannot mix"):
+        grade_fact_observation({"value": 1}, rule, observation)

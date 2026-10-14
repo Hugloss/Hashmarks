@@ -21,6 +21,7 @@ from hashmarks.evidence_presentation import FORMATS
 
 from .backend_corpus import confined_file
 from .backend_gates import combine_required, presentation_conformance
+from .backend_native_witnesses import native_fact_witnesses, native_witness_gate
 from .backend_transport import capture_cli, capture_mcp
 from .common import canonical_sha256, write_json
 
@@ -603,6 +604,9 @@ def qualify_native_workflow(
         if options.regenerated
         else None
     )
+    witnesses = native_fact_witnesses(workflow, rule, sources, output)
+    if "native_oracles" in rule:
+        gates["reviewed_facts"] = native_witness_gate(witnesses)
     required = [*gates.values(), *([fresh_acquisition] if options.regenerated else [])]
     status = (
         "FAIL" if False in required else "INCOMPLETE" if None in required else "PASS"
@@ -611,6 +615,7 @@ def qualify_native_workflow(
         "id": workflow["id"],
         "status": status,
         "gates": gates,
+        "gate_witnesses": witnesses,
         "fresh_acquisition": fresh_acquisition,
         "acquisition_id": options.acquisition_id,
         "capture_mode": "fresh-this-invocation"

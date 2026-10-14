@@ -521,6 +521,11 @@ still need their complete reviewed membership before all twenty rows can qualify
 
 ## Remaining work before 5/5
 
+The successor definitions and detailed implementation handoff are available in
+[`BACKEND_E2E_REMAINING_PLAN.md`](BACKEND_E2E_REMAINING_PLAN.md). The original
+campaign below remains historical; the successor initially retains its 36
+entries without asserting new independent review or capability qualification.
+
 The following tickets remain the implementation handoff. Complete a ticket's
 named evidence contract before changing its status; a focused pass or additional
 capability tag cannot substitute for its missing proof.
