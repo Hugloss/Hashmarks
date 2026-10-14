@@ -16,6 +16,7 @@ from hashmarks.codemap.static_python_backend_declarations import (
 from hashmarks.codemap.static_python_interface_declarations import (
     StaticPythonInterfaceDeclarations,
 )
+from hashmarks.mcp_surface import _source_context_request
 
 
 def _declarations(codemap: CodeMap, inputs: dict[str, Any]) -> dict[str, object]:
@@ -48,6 +49,24 @@ def _intelligence_query(codemap: CodeMap, inputs: dict[str, Any]) -> dict[str, o
     )
 
 
+def _source_observation(codemap: CodeMap, inputs: dict[str, Any]) -> dict[str, object]:
+    paths = inputs.get("paths")
+    if (
+        set(inputs) - {"paths", "context_lines", "result_mode"}
+        or not isinstance(paths, list)
+        or len(paths) != 1
+        or not isinstance(paths[0], str)
+        or inputs.get("result_mode", "member") != "member"
+    ):
+        raise ValueError("evaluation source observation requires one member")
+    context, lines, anchors = _source_context_request(
+        inputs.get("context_lines", 0), literal=None, result_mode="member"
+    )
+    return codemap.source_observation(
+        paths[0], context_lines=context, lines=lines, anchor_context_lines=anchors
+    )
+
+
 def observe_case(codemap: CodeMap, case: Mapping[str, object]) -> dict[str, object]:
     """Dispatch a closed set of read-only product calls, with no grader input."""
     operation = str(case.get("operation") or "")
@@ -56,7 +75,7 @@ def observe_case(codemap: CodeMap, case: Mapping[str, object]) -> dict[str, obje
     operations = {
         "task_evidence": lambda: codemap.task_evidence(**inputs),
         "structural_locality": lambda: codemap.structural_locality(**inputs),
-        "source_observation": lambda: codemap.source_observation(**inputs),
+        "source_observation": lambda: _source_observation(codemap, inputs),
         "correlate_evidence": lambda: codemap.correlate_evidence(**inputs),
         "repository_declarations": lambda: _declarations(codemap, inputs),
         "change_impact": lambda: _change_impact(codemap, inputs),

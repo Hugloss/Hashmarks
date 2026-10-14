@@ -17,7 +17,7 @@ from .backend_boundary import observe_boundary
 from .backend_corpus import confined_path, workflow_changed_paths
 from .backend_declarations import observe_declarations
 from .backend_gates import combine_required, fact_state, presentation_conformance
-from .backend_grading import _authority_safe, _gates, _packet
+from .backend_grading import _authority_safe, _gates, _packet, display_fact_gate
 from .backend_matrix import INITIAL_TOKEN_CEILING
 from .backend_transport import capture_cli, capture_mcp
 from .backend_witnesses import (
@@ -70,6 +70,17 @@ def _transport_grade(
                     is True,
                 ]
             )
+        parity = combine_required(
+            [
+                parity,
+                display_fact_gate(
+                    response,
+                    rule,
+                    "initial" if initial else "default",
+                    capture["format"],
+                ),
+            ]
+        )
         grades.append(
             {
                 "format": capture["format"],

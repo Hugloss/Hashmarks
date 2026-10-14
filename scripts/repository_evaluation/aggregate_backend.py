@@ -501,7 +501,7 @@ def aggregate_backend(
     """Validate existing receipts and emit an all-capability QA measurement."""
     campaign = _campaign(campaign_path)
     expected = {entry["id"] for entry in campaign["suites"]}
-    inputs = [
+    inputs: list[dict[str, object]] = [
         {
             "suite": key,
             "proof": "selection",
@@ -528,13 +528,30 @@ def aggregate_backend(
                 }
             )
             selection = {}
+        unexpected = set(selection) - {
+            "workflow_report",
+            "workflow_reports",
+            "native_report",
+            "native_reports",
+            "capture_root",
+        }
+        if unexpected:
+            inputs.append(
+                {
+                    "suite": entry["id"],
+                    "proof": "selection",
+                    "state": "REJECTED",
+                    "reason": "unsupported backend report selection fields",
+                    "fields": sorted(unexpected),
+                }
+            )
         reports = {}
         for proof in ("workflow", "native"):
-            rows, evidence = _admit_report_input(
+            rows, evidence = _admit_report_inputs(
                 entry["id"], proof, selection, suite, grader, sources
             )
             reports[proof] = rows
-            inputs.append(evidence)
+            inputs.extend(evidence)
         for key, rows in _merge_suite(
             entry["id"], suite, reports["workflow"], reports["native"], grader
         ).items():
@@ -589,6 +606,98 @@ def aggregate_backend(
 
 def _markdown_cell(value: object) -> str:
     return str(value).replace("|", "\\|").replace("\n", " ")
+
+
+def _report_selections(selection: dict, proof: str) -> list[dict]:
+    singular, plural = proof + "_report", proof + "_reports"
+    if singular in selection and plural in selection:
+        raise ValueError("backend singular and plural reports are mutually exclusive")
+    if proof == "native" and "capture_root" in selection and singular not in selection:
+        raise ValueError("backend capture_root requires a singular native_report")
+    if singular in selection:
+        entries = [{singular: selection[singular]}]
+        if proof == "native":
+            entries[0]["capture_root"] = selection.get("capture_root")
+    elif plural in selection:
+        raw = selection[plural]
+        if not isinstance(raw, list) or not raw:
+            raise ValueError("backend report lists must be nonempty")
+        entries = [{singular: value} for value in raw] if proof == "workflow" else raw
+    else:
+        return []
+    return _validated_report_references(entries, proof)
+
+
+def _validated_report_references(entries: list[dict], proof: str) -> list[dict]:
+    singular = proof + "_report"
+    fields = {singular, "capture_root"} if proof == "native" else {singular}
+    for entry in entries:
+        if (
+            not isinstance(entry, dict)
+            or set(entry) != fields
+            or any(
+                not isinstance(value, str) or not value.strip()
+                for value in entry.values()
+            )
+        ):
+            raise ValueError("backend report references require exact nonempty paths")
+    return entries
+
+
+def _admit_report_inputs(
+    suite_id: str,
+    proof: str,
+    selection: dict,
+    suite: dict,
+    grader: dict,
+    sources: dict[str, Path],
+) -> tuple[dict, list[dict]]:
+    try:
+        entries = _report_selections(selection, proof)
+    except ValueError as error:
+        _, evidence = _admit_report_input(suite_id, proof, {}, suite, grader, sources)
+        evidence.update(state="REJECTED", reason=str(error))
+        return {}, [evidence]
+    if not entries:
+        rows, evidence = _admit_report_input(
+            suite_id, proof, {}, suite, grader, sources
+        )
+        return rows, [evidence]
+    combined, inputs, overlapping = {}, [], set()
+    for entry in entries:
+        rows, evidence = _admit_report_input(
+            suite_id, proof, entry, suite, grader, sources
+        )
+        inputs.append(evidence)
+        for identifier, outcome in rows.items():
+            if identifier in combined or identifier in overlapping:
+                overlapping.add(identifier)
+                combined.pop(identifier, None)
+            else:
+                combined[identifier] = _report_bound_outcome(outcome, evidence)
+    if overlapping:
+        inputs.append(
+            {
+                "suite": suite_id,
+                "proof": proof + "-membership",
+                "state": "REJECTED",
+                "reason": "overlapping backend workflow outcomes",
+                "workflows": sorted(overlapping),
+            }
+        )
+    return combined, inputs
+
+
+def _report_bound_outcome(outcome: dict, evidence: dict) -> dict:
+    namespace = evidence["proof"] + ":sha256:" + evidence["sha256"]
+    return {
+        **outcome,
+        "report_binding": {key: evidence[key] for key in ("proof", "path", "sha256")},
+        "gate_witnesses": [
+            {**witness, "artifact_namespace": namespace}
+            for witness in outcome.get("gate_witnesses", [])
+        ],
+    }
 
 
 def _admit_report_input(

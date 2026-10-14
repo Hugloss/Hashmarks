@@ -86,6 +86,83 @@ membership. Independent display/adversarial/capability review remains pending.
 
 ## Ordered work
 
+### Implementation checkpoint: 2026-10-14, starting at `649b0d9`
+
+The profiling entrypoint's initialization-order failure is repaired. Profiling
+now measures the nominated public operation through the existing closed observer
+dispatcher, preserving legacy action-map cases. Receipts include evaluator
+identity, which profile-shard merging preserves and checks. Source-observation
+cases translate the same member/context inputs used by CLI/MCP through their
+existing context validator rather than passing wire names directly to CodeMap.
+
+Optional `task_source_labels` contain independent before/after task scopes.
+Native nominations still use `source_labels`; both label sets are source-checked.
+All twelve successor model cases now bind their production owner, changed source
+members and reviewed verifier paths as well as their original declaration labels.
+This is source-binding completion, not independent semantic/capability review.
+
+Aggregation accepts bounded `workflow_reports` and `native_reports` lists in
+addition to singular references. Singular/plural forms are exclusive. Native
+list entries retain their own report and capture-root pair; acquisition IDs are
+validated separately. Every input is regraded before union. Overlapping workflow
+outcomes are excluded with an explicit membership rejection; neither ordering
+nor a passing duplicate chooses a winner. Valid other batches remain visible.
+Witness artifact namespaces bind the exact originating report digest.
+
+Independent display checks now contribute to hard transport/presentation gates,
+in addition to mechanical projection conformance. Missing declared format checks
+stay incomplete. Display witnesses refer to the actual top-level or stage-specific
+oracle, independently of where task checks are declared.
+
+The baseline full typing runs at this starting revision report 5,373 Ty
+diagnostics and 5,445 Pyright errors, zero warnings. Their logs are
+`/tmp/hashmarks-plan-ty-current.log` and
+`/tmp/hashmarks-plan-pyright-current.log`; older counts above remain history.
+Eight modified qualification owners pass scoped Ty/Pyright. Scoped proof does
+not close T09. Full pytest collection observed 3,969 nodes before these additions;
+the final candidate needs new collection and exact regression membership.
+
+Current-source API-only acquisition is retained under
+`.hashmarks/backend-e2e/implementation-20261014/api-baseline-01/`.
+It explicitly omits CLI/MCP and cannot establish transport, initial-size,
+capability-proof or final qualification. Completed receipts survive an interrupted
+acquisition; incomplete work never counts as proof.
+
+This acquisition completed all 36 entries. The seven core owner/symbol/verification
+failures remain reproduced. Model misses concern iterable-response verification,
+root-schema verification and the before-revision `sa_type` verifier. Three async
+verification misses remain. The asyncpg class authority failure was independently
+traced to an incorrect wildcard `equals` oracle rather than product escalation:
+several retrieved classes have different source revisions. The corrected oracle
+requires every class authority qualifier and binds the revision to the exact
+source-reviewed file/class. Its genuine CLI/MCP acquisition is retained at
+`async-oracle-public-01`; all facts/authority/freshness/transport/presentation/size
+gates pass. Initial-recall and owner metrics remain unqualified. Maximum initial
+MCP compact/text sizes are 3,500/2,769 tokens across both revisions.
+
+Fresh core native acquisition is split into three disjoint batches of four under
+`native-batch-00`, `native-batch-01` and `native-batch-02`, with separate matching
+capture roots. All twelve specimen outcomes pass. Each batch report correctly
+remains INCOMPLETE for its missing suite membership. `reports-02.json` and
+`aggregate-02` demonstrate admission of all three original acquisition identities
+without replay, a fabricated merged acquisition, or a duplicate workflow winner.
+The aggregate remains FAIL with incomplete input integrity: model/async native
+proof and eleven async public outcomes are missing, and reproduced failures stay
+failed. None of the twenty rows is qualified.
+
+The current focused source ring passes 221 tests. A deterministic source ZIP and
+independent extraction under `source-candidate-01` pass 83 focused tests, import
+origin verification and CLI import/help smoke. Source compilation, lock convergence,
+Ruff/formatting, hygiene and zero-debt/size gates pass. These are bounded candidate
+checks; the ZIP predates this documentation checkpoint update and does not claim
+final artifact closure. Full regression membership and promotion qualification
+remain open.
+
+The twelve missing catalogs, independent capability/display/adversarial review,
+remaining witness families and special metric acquisition/regrading, fresh
+public/native transports, full typing, comparable economics, unseen holdouts and
+exact-artifact final qualification remain open. No 5/5 completion is claimed.
+
 ### T00: baseline and prerequisites
 
 Record HEAD/worktree state, observer/evaluator identities, lock/configuration

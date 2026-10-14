@@ -2699,36 +2699,45 @@
             "authority_check": true,
             "id": "class-declaration-authority",
             "pointer": "/retrieval/results/*/class_declarations/authority",
-            "predicate": "equals",
+            "predicate": "all_equal",
             "value": "indexed-lexical-declarations-only"
           },
           {
             "authority_check": true,
             "id": "class-declaration-ownership_authority",
             "pointer": "/retrieval/results/*/class_declarations/ownership_authority",
-            "predicate": "equals",
+            "predicate": "all_equal",
             "value": false
           },
           {
             "authority_check": true,
             "id": "class-declaration-runtime_members",
             "pointer": "/retrieval/results/*/class_declarations/runtime_members",
-            "predicate": "equals",
+            "predicate": "all_equal",
             "value": "not-established"
           },
           {
             "authority_check": true,
             "id": "class-declaration-negative_evidence_admissible",
             "pointer": "/retrieval/results/*/class_declarations/negative_evidence_admissible",
-            "predicate": "equals",
+            "predicate": "all_equal",
             "value": false
           },
           {
             "authority_check": true,
             "id": "class-declaration-source_revision",
-            "pointer": "/retrieval/results/*/class_declarations/source_revision",
-            "predicate": "equals",
-            "value": "a18ed6cf0e386f2a00f700c371f39e59334c3f9c9f9776c38d6c6c3d7a4d8b4b"
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_scoped_record",
+            "value": {
+              "pointer": "/class_declarations",
+              "record": {
+                "source_revision": "a18ed6cf0e386f2a00f700c371f39e59334c3f9c9f9776c38d6c6c3d7a4d8b4b"
+              },
+              "scope": {
+                "path": "litestar/channels/backends/asyncpg.py",
+                "symbol": "AsyncPgChannelsBackend"
+              }
+            }
           }
         ]
       },
@@ -2790,36 +2799,45 @@
             "authority_check": true,
             "id": "class-declaration-authority",
             "pointer": "/retrieval/results/*/class_declarations/authority",
-            "predicate": "equals",
+            "predicate": "all_equal",
             "value": "indexed-lexical-declarations-only"
           },
           {
             "authority_check": true,
             "id": "class-declaration-ownership_authority",
             "pointer": "/retrieval/results/*/class_declarations/ownership_authority",
-            "predicate": "equals",
+            "predicate": "all_equal",
             "value": false
           },
           {
             "authority_check": true,
             "id": "class-declaration-runtime_members",
             "pointer": "/retrieval/results/*/class_declarations/runtime_members",
-            "predicate": "equals",
+            "predicate": "all_equal",
             "value": "not-established"
           },
           {
             "authority_check": true,
             "id": "class-declaration-negative_evidence_admissible",
             "pointer": "/retrieval/results/*/class_declarations/negative_evidence_admissible",
-            "predicate": "equals",
+            "predicate": "all_equal",
             "value": false
           },
           {
             "authority_check": true,
             "id": "class-declaration-source_revision",
-            "pointer": "/retrieval/results/*/class_declarations/source_revision",
-            "predicate": "equals",
-            "value": "484f62f249f86926ff62af971a1ebf2a9928eb23abfa9259eeb4ff2c31bbcd5c"
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_scoped_record",
+            "value": {
+              "pointer": "/class_declarations",
+              "record": {
+                "source_revision": "484f62f249f86926ff62af971a1ebf2a9928eb23abfa9259eeb4ff2c31bbcd5c"
+              },
+              "scope": {
+                "path": "litestar/channels/backends/asyncpg.py",
+                "symbol": "AsyncPgChannelsBackend"
+              }
+            }
           }
         ]
       },
@@ -3051,6 +3069,9 @@
             "symbol": "AsyncPgChannelsBackend.subscribe"
           }
         }
+      },
+      "qualification_check_basis": {
+        "class_scope": "The pinned source declares AsyncPgChannelsBackend in litestar/channels/backends/asyncpg.py. Revision is qualified on that exact retrieval record; declaration authority invariants apply to every observed class context. This corrects a wildcard equals check that incorrectly required exactly one class result."
       },
       "source_labels": {
         "after": [

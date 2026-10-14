@@ -352,6 +352,38 @@
             "symbol": "ModelWithDefault"
           }
         ]
+      },
+      "task_source_labels": {
+        "after": [
+          {
+            "end_line": 72,
+            "path": "tests/test_jsonable_encoder.py",
+            "sha256": "93ca3fefc43f16425e44e6c5b130e69c583b5aeba884ae9e284a4c92b42b8b12",
+            "start_line": 69,
+            "symbol": "ModelWithDefault"
+          },
+          {
+            "end_line": 366,
+            "path": "fastapi/encoders.py",
+            "sha256": "4cc09230eca6435892f6bc25a2185e214dbedfe994d5103feb63ad269137caad",
+            "start_line": 1
+          }
+        ],
+        "before": [
+          {
+            "end_line": 72,
+            "path": "tests/test_jsonable_encoder.py",
+            "sha256": "93ca3fefc43f16425e44e6c5b130e69c583b5aeba884ae9e284a4c92b42b8b12",
+            "start_line": 69,
+            "symbol": "ModelWithDefault"
+          },
+          {
+            "end_line": 364,
+            "path": "fastapi/encoders.py",
+            "sha256": "9b63869eaf64f7802571de9440cf2bee2c27f9c8ef25da4e291549b9047af13f",
+            "start_line": 1
+          }
+        ]
       }
     },
     "fastapi-iterable-response-options": {
@@ -1184,6 +1216,66 @@
             "symbol": "ModelDefaults"
           }
         ]
+      },
+      "task_source_labels": {
+        "after": [
+          {
+            "end_line": 16,
+            "path": "tests/test_skip_defaults.py",
+            "sha256": "2279686e81ba4b3e6d35cde86922d85c7180dee12e21217881d7316a2cdbaecf",
+            "start_line": 14,
+            "symbol": "Model"
+          },
+          {
+            "end_line": 22,
+            "path": "tests/test_skip_defaults.py",
+            "sha256": "c1ac2cfc7e77640e3fcb08cc9b4f8f701cafd9dbead1884c26c0fff5c24e5d7f",
+            "start_line": 19,
+            "symbol": "ModelSubclass"
+          },
+          {
+            "end_line": 29,
+            "path": "tests/test_skip_defaults.py",
+            "sha256": "1d2fb4b8e66af9c135f4966447dc7742c4cfbd3f77b853d5ba0535e2958c46b7",
+            "start_line": 25,
+            "symbol": "ModelDefaults"
+          },
+          {
+            "end_line": 6404,
+            "path": "fastapi/routing.py",
+            "sha256": "5dbd393970fb29ee95629574dbc5f186d3330b8587735d7e694f55e754a99729",
+            "start_line": 1
+          }
+        ],
+        "before": [
+          {
+            "end_line": 14,
+            "path": "tests/test_skip_defaults.py",
+            "sha256": "2279686e81ba4b3e6d35cde86922d85c7180dee12e21217881d7316a2cdbaecf",
+            "start_line": 12,
+            "symbol": "Model"
+          },
+          {
+            "end_line": 20,
+            "path": "tests/test_skip_defaults.py",
+            "sha256": "c1ac2cfc7e77640e3fcb08cc9b4f8f701cafd9dbead1884c26c0fff5c24e5d7f",
+            "start_line": 17,
+            "symbol": "ModelSubclass"
+          },
+          {
+            "end_line": 27,
+            "path": "tests/test_skip_defaults.py",
+            "sha256": "1d2fb4b8e66af9c135f4966447dc7742c4cfbd3f77b853d5ba0535e2958c46b7",
+            "start_line": 23,
+            "symbol": "ModelDefaults"
+          },
+          {
+            "end_line": 6404,
+            "path": "fastapi/routing.py",
+            "sha256": "e8e5b1c239c33e798f338b0bf207b0b2e6e7d0d6b0ebd3d7769fc8e438011b40",
+            "start_line": 1
+          }
+        ]
       }
     },
     "litestar-notrequired-field-schema": {
@@ -1442,6 +1534,38 @@
             "sha256": "44f1c77f96cba95da3d75485dfb9ea7ba722a8c9f88d540614c740157635ce80",
             "start_line": 137,
             "symbol": "test_v1_constrained_str_with_default_factory_does_not_generate_title.Model"
+          }
+        ]
+      },
+      "task_source_labels": {
+        "after": [
+          {
+            "end_line": 138,
+            "path": "tests/unit/test_plugins/test_pydantic/test_schema_plugin.py",
+            "sha256": "44f1c77f96cba95da3d75485dfb9ea7ba722a8c9f88d540614c740157635ce80",
+            "start_line": 137,
+            "symbol": "test_v1_constrained_str_with_default_factory_does_not_generate_title.Model"
+          },
+          {
+            "end_line": 501,
+            "path": "litestar/plugins/pydantic/utils.py",
+            "sha256": "d1e44bbc22bbe690132a42eea6d937348e97c325fa20f4cfe4e0de3399a11554",
+            "start_line": 1
+          }
+        ],
+        "before": [
+          {
+            "end_line": 138,
+            "path": "tests/unit/test_plugins/test_pydantic/test_schema_plugin.py",
+            "sha256": "44f1c77f96cba95da3d75485dfb9ea7ba722a8c9f88d540614c740157635ce80",
+            "start_line": 137,
+            "symbol": "test_v1_constrained_str_with_default_factory_does_not_generate_title.Model"
+          },
+          {
+            "end_line": 497,
+            "path": "litestar/plugins/pydantic/utils.py",
+            "sha256": "7ac06073b977165ddb157f8869c8de52efe258d6707220dfe9cfeb574658e677",
+            "start_line": 1
           }
         ]
       }
@@ -2034,6 +2158,50 @@
             "symbol": "PydanticPerson"
           }
         ]
+      },
+      "task_source_labels": {
+        "after": [
+          {
+            "end_line": 27,
+            "path": "tests/unit/test_plugins/test_pydantic/models.py",
+            "sha256": "ea0c71f2ef8c2a80af72dbc12d9e65cdcb52ac15714a8ffa5a7a01fc4c6719e4",
+            "start_line": 20,
+            "symbol": "PydanticPerson"
+          },
+          {
+            "end_line": 580,
+            "path": "litestar/typing.py",
+            "sha256": "7d21365a41eb05dc8103ad4c9e57646a2fdd95fce000944a7f2dcbcf429339c9",
+            "start_line": 1
+          },
+          {
+            "end_line": 609,
+            "path": "tests/unit/test_plugins/test_pydantic/test_openapi.py",
+            "sha256": "b202e0ba952e4519f33dde170a8458606ba069a4171e4639fa3272d52cbf7693",
+            "start_line": 1
+          }
+        ],
+        "before": [
+          {
+            "end_line": 27,
+            "path": "tests/unit/test_plugins/test_pydantic/models.py",
+            "sha256": "ea0c71f2ef8c2a80af72dbc12d9e65cdcb52ac15714a8ffa5a7a01fc4c6719e4",
+            "start_line": 20,
+            "symbol": "PydanticPerson"
+          },
+          {
+            "end_line": 580,
+            "path": "litestar/typing.py",
+            "sha256": "464a8c2f24d46ddffd3e28461b508ab2e3cf4abf10143282b18ba25e2d910eeb",
+            "start_line": 1
+          },
+          {
+            "end_line": 609,
+            "path": "tests/unit/test_plugins/test_pydantic/test_openapi.py",
+            "sha256": "c39573419134a9bf3d6a731b75243277f77d692cd660080fe779e0436023414d",
+            "start_line": 1
+          }
+        ]
       }
     },
     "litestar-optional-computed-field": {
@@ -2514,6 +2682,53 @@
             "symbol": "test_field_definition_generation_v2.TestModel"
           }
         ]
+      },
+      "task_source_labels": {
+        "after": [
+          {
+            "declaration_line": 18,
+            "end_line": 19,
+            "path": "tests/unit/test_plugins/test_pydantic/test_computed_optional_field.py",
+            "sha256": "bae467335b3bf30bf649f4a23de5363ebd865598c78c31abefc16a640f2221c1",
+            "start_line": 17,
+            "symbol": "Result.status"
+          },
+          {
+            "end_line": 13,
+            "path": "tests/unit/test_plugins/test_pydantic/test_computed_optional_field.py",
+            "sha256": "b06282ae9ff92fe1e246ee0ac066a0cfc6f7d5ab7a893e27eab261c55ab8d738",
+            "start_line": 11,
+            "symbol": "Status"
+          },
+          {
+            "end_line": 19,
+            "path": "tests/unit/test_plugins/test_pydantic/test_computed_optional_field.py",
+            "sha256": "bb85d162acb63c10a09700739357c9d7331cf646563309d03ff476e1b06845a3",
+            "start_line": 16,
+            "symbol": "Result"
+          },
+          {
+            "end_line": 190,
+            "path": "litestar/plugins/pydantic/dto.py",
+            "sha256": "8eba99b8a046497189a7f4447aae538835b2ca4a5ae7825585a8424c7585bb4b",
+            "start_line": 1
+          }
+        ],
+        "before": [
+          {
+            "end_line": 128,
+            "path": "tests/unit/test_plugins/test_pydantic/test_pydantic_dto_factory.py",
+            "sha256": "d3160f1dc20a057b49f5772446ccf55f8d692c761a244264d3fca14e5ed71bc4",
+            "start_line": 123,
+            "symbol": "test_field_definition_generation_v2.TestModel"
+          },
+          {
+            "end_line": 183,
+            "path": "litestar/plugins/pydantic/dto.py",
+            "sha256": "238e840e1b23695eaa27e30951b84c6eece1f5696eb9c5f0b1c1fd0f1dc157bd",
+            "start_line": 1
+          }
+        ]
       }
     },
     "litestar-optional-nested-dto": {
@@ -2845,6 +3060,45 @@
             "sha256": "d3267f2c1d2fb2219536ce3c8e5e0a969893bd280bd783803b506e4a42d95a05",
             "start_line": 36,
             "symbol": "NestedDC"
+          }
+        ]
+      },
+      "task_source_labels": {
+        "after": [
+          {
+            "end_line": 43,
+            "path": "tests/unit/test_dto/test_factory/test_backends/test_backends.py",
+            "sha256": "11d0e3d81b1fb23ac78a0de00381a0b81f970ac69a6187ef6b0553a2866c27dd",
+            "start_line": 42,
+            "symbol": "OptionalNestedInner"
+          },
+          {
+            "end_line": 49,
+            "path": "tests/unit/test_dto/test_factory/test_backends/test_backends.py",
+            "sha256": "ef1a5eda9aef5d301adc72fb4132d4f61c190ff160e08e5351c74328f92f073d",
+            "start_line": 47,
+            "symbol": "OptionalNestedOuter"
+          },
+          {
+            "end_line": 651,
+            "path": "litestar/dto/_codegen_backend.py",
+            "sha256": "dbefba63bf26144c4f271fecfa0965655b46d415cfc6cd0b2402200fbe9f362e",
+            "start_line": 1
+          }
+        ],
+        "before": [
+          {
+            "end_line": 38,
+            "path": "tests/unit/test_dto/test_factory/test_backends/test_backends.py",
+            "sha256": "d3267f2c1d2fb2219536ce3c8e5e0a969893bd280bd783803b506e4a42d95a05",
+            "start_line": 36,
+            "symbol": "NestedDC"
+          },
+          {
+            "end_line": 647,
+            "path": "litestar/dto/_codegen_backend.py",
+            "sha256": "34f4a3b8c774890d5d6b3892b27d0476bf5221909125704f9df4aa7d15d01f27",
+            "start_line": 1
           }
         ]
       }
@@ -3281,6 +3535,64 @@
             "sha256": "b8e34454b1f1270b2a8609a7d03c8077a1aed93ce2ba9c4e031c033cb31d357a",
             "start_line": 38,
             "symbol": "Model2"
+          }
+        ]
+      },
+      "task_source_labels": {
+        "after": [
+          {
+            "end_line": 367,
+            "path": "tests/unit/test_openapi/test_integration.py",
+            "sha256": "75854013f7ef3e8547e75c965fc9ea1956720b0dc3b61c938fcbee168909c438",
+            "start_line": 366,
+            "symbol": "_SchemaNameChild"
+          },
+          {
+            "end_line": 374,
+            "path": "tests/unit/test_openapi/test_integration.py",
+            "sha256": "6e0d0bc0a7e67f1082518cb68e53e042502fec5d331eff98e967eda3be2658a7",
+            "start_line": 371,
+            "symbol": "_SchemaNamePerson"
+          },
+          {
+            "end_line": 978,
+            "path": "litestar/dto/_backend.py",
+            "sha256": "91ece35ea12c3296ac02736d5bf1f31807fc277767e7ac3661ad70cdbd9db424",
+            "start_line": 1
+          },
+          {
+            "end_line": 285,
+            "path": "tests/unit/test_dto/test_factory/test_backends/test_base_dto.py",
+            "sha256": "d6f96a7b424e4f5d43da9d43f2471fbe79d65910d4ba1e5a87182148b0a73028",
+            "start_line": 1
+          }
+        ],
+        "before": [
+          {
+            "end_line": 34,
+            "path": "tests/unit/test_dto/test_factory/test_backends/test_base_dto.py",
+            "sha256": "bc7ebda7e9cd25651950972bdeb2cffc48e73e3ea3e39a3044dfd57da29d9c47",
+            "start_line": 32,
+            "symbol": "Model"
+          },
+          {
+            "end_line": 40,
+            "path": "tests/unit/test_dto/test_factory/test_backends/test_base_dto.py",
+            "sha256": "b8e34454b1f1270b2a8609a7d03c8077a1aed93ce2ba9c4e031c033cb31d357a",
+            "start_line": 38,
+            "symbol": "Model2"
+          },
+          {
+            "end_line": 969,
+            "path": "litestar/dto/_backend.py",
+            "sha256": "866dd7fe3989693c8206b301f1d27cfac9fdaf3d303b65077f5dc80e31e19034",
+            "start_line": 1
+          },
+          {
+            "end_line": 442,
+            "path": "tests/unit/test_openapi/test_integration.py",
+            "sha256": "953baa74a3225c22aee16fd9f2f39a44249d1d98d14a4bae06aba07b130ee726",
+            "start_line": 1
           }
         ]
       }
@@ -3767,6 +4079,52 @@
             "symbol": "test_discriminator.Model"
           }
         ]
+      },
+      "task_source_labels": {
+        "after": [
+          {
+            "end_line": 58,
+            "path": "tests/test_pydantic/test_field.py",
+            "sha256": "115df9108ec154121881fe20902d6f190b1b21fa93bc09d840af3a4098e2f840",
+            "start_line": 57,
+            "symbol": "test_discriminator_callable.ApplePie"
+          },
+          {
+            "end_line": 61,
+            "path": "tests/test_pydantic/test_field.py",
+            "sha256": "e1f32eefa3746ac2c88fe4e31e33e43a3052fd8c93976a51c6a34ba4318adcb3",
+            "start_line": 60,
+            "symbol": "test_discriminator_callable.PumpkinPie"
+          },
+          {
+            "end_line": 73,
+            "path": "tests/test_pydantic/test_field.py",
+            "sha256": "41bc67ce9b75852a44a892baea5f3e5aa7ff78ff56dd1cda5e6d832fdac69f12",
+            "start_line": 68,
+            "symbol": "test_discriminator_callable.ThanksgivingDinner"
+          },
+          {
+            "end_line": 1052,
+            "path": "sqlmodel/main.py",
+            "sha256": "fb1db3a0f374bdf39d37651060f81c88d3adcd29526fcfb9dc9434ced82859c9",
+            "start_line": 1
+          }
+        ],
+        "before": [
+          {
+            "end_line": 42,
+            "path": "tests/test_pydantic/test_field.py",
+            "sha256": "7656aae5a392b08fe3153613d30206c596e13e0513b75548c48f81cd6eb5afa4",
+            "start_line": 40,
+            "symbol": "test_discriminator.Model"
+          },
+          {
+            "end_line": 1052,
+            "path": "sqlmodel/main.py",
+            "sha256": "58530235c21bee425d46626b385dd4950e50b10c1dfccfd8425229f425e10ecd",
+            "start_line": 1
+          }
+        ]
       }
     },
     "sqlmodel-field-item-bounds": {
@@ -4161,6 +4519,45 @@
             "sha256": "726060dc3f7326d2205fd6ee95821e81949631d12ed5ed6916a5c9f25a311189",
             "start_line": 10,
             "symbol": "test_decimal.Model"
+          }
+        ]
+      },
+      "task_source_labels": {
+        "after": [
+          {
+            "end_line": 66,
+            "path": "tests/test_pydantic/test_field.py",
+            "sha256": "95822d3d3b2901506372532f531f1f99640a22de51c46d13e33c70e137faf1dd",
+            "start_line": 65,
+            "symbol": "test_min_items.Model"
+          },
+          {
+            "end_line": 83,
+            "path": "tests/test_pydantic/test_field.py",
+            "sha256": "cae441cffbeb19933039a18fb8d413ad7d7ff674c6b5a59d2755304eda246005",
+            "start_line": 82,
+            "symbol": "test_max_items.Model"
+          },
+          {
+            "end_line": 1052,
+            "path": "sqlmodel/main.py",
+            "sha256": "58530235c21bee425d46626b385dd4950e50b10c1dfccfd8425229f425e10ecd",
+            "start_line": 1
+          }
+        ],
+        "before": [
+          {
+            "end_line": 11,
+            "path": "tests/test_pydantic/test_field.py",
+            "sha256": "726060dc3f7326d2205fd6ee95821e81949631d12ed5ed6916a5c9f25a311189",
+            "start_line": 10,
+            "symbol": "test_decimal.Model"
+          },
+          {
+            "end_line": 1011,
+            "path": "sqlmodel/main.py",
+            "sha256": "c0a164d7712fa2013b6e7d8379771b15c8c25853c4b7b57c84fc99734022989b",
+            "start_line": 1
           }
         ]
       }
@@ -4765,6 +5162,58 @@
             "symbol": "test_sa_column_args.Hero"
           }
         ]
+      },
+      "task_source_labels": {
+        "after": [
+          {
+            "end_line": 9,
+            "path": "tests/test_field_sa_type.py",
+            "sha256": "c0dd5422b570b6f53943722986d561178a19e0a4b34cee9a3db42642539bb3ae",
+            "start_line": 8,
+            "symbol": "test_sa_type_class.Item"
+          },
+          {
+            "end_line": 18,
+            "path": "tests/test_field_sa_type.py",
+            "sha256": "a3c50c3326c73f38a81634d7da458c5769a363d86e3057de51dff0d039bdf7a9",
+            "start_line": 16,
+            "symbol": "test_sa_type_instance.Item"
+          },
+          {
+            "end_line": 1059,
+            "path": "sqlmodel/main.py",
+            "sha256": "a2706903c0be5d3b0e560a099428617b7eb51e6abfda68a0727fdbb63dcdced0",
+            "start_line": 1
+          },
+          {
+            "end_line": 55,
+            "path": "tests/test_field_sa_args_kwargs.py",
+            "sha256": "75e136f5abe4b8a15ffe583f3264fb83abe81dc577b8e781c6cdc59b823da7dd",
+            "start_line": 1
+          }
+        ],
+        "before": [
+          {
+            "end_line": 8,
+            "path": "tests/test_field_sa_args_kwargs.py",
+            "sha256": "3d0ce2ebaca0ebb2f380776f8f33a9e6e9a4e76ffeaa1dc576a1569ecb35c245",
+            "start_line": 6,
+            "symbol": "test_sa_column_args.Team"
+          },
+          {
+            "end_line": 15,
+            "path": "tests/test_field_sa_args_kwargs.py",
+            "sha256": "d77ce0bbe9fd604076f5e75fbedd69693ddd6d91cc0a746d222dcaf787163710",
+            "start_line": 10,
+            "symbol": "test_sa_column_args.Hero"
+          },
+          {
+            "end_line": 1052,
+            "path": "sqlmodel/main.py",
+            "sha256": "fb1db3a0f374bdf39d37651060f81c88d3adcd29526fcfb9dc9434ced82859c9",
+            "start_line": 1
+          }
+        ]
       }
     },
     "sqlmodel-relationship-declaration-type": {
@@ -5143,6 +5592,26 @@
       ],
       "expected_owner_path": "sqlmodel/main.py",
       "source_labels": {
+        "after": [
+          {
+            "end_line": 810,
+            "path": "sqlmodel/main.py",
+            "sha256": "bacbf150b130f5c1089f596b05e4acc4f05ad90ae52545af94fbef20ac42f7df",
+            "start_line": 804,
+            "symbol": "SQLModel"
+          }
+        ],
+        "before": [
+          {
+            "end_line": 810,
+            "path": "sqlmodel/main.py",
+            "sha256": "d7f1547dc6c4721ae24999cb7da569f173583e4d3d770b934bb1cf061d5a01de",
+            "start_line": 804,
+            "symbol": "SQLModel"
+          }
+        ]
+      },
+      "task_source_labels": {
         "after": [
           {
             "end_line": 810,
@@ -5614,6 +6083,52 @@
             "sha256": "685fd203ecbd4eff82b71fd2d875684f8dbab534d9d6aa931aefbad5cb832ffc",
             "start_line": 77,
             "symbol": "test_inherited_annotated_datetime.Event"
+          }
+        ]
+      },
+      "task_source_labels": {
+        "after": [
+          {
+            "end_line": 77,
+            "path": "tests/test_datetime.py",
+            "sha256": "feb8a5feb53ca652e4a5de60cba1b1eb2383e369d21c0664d8b4c7146bf73ed2",
+            "start_line": 76,
+            "symbol": "test_inherited_annotated_datetime.EventBase"
+          },
+          {
+            "end_line": 80,
+            "path": "tests/test_datetime.py",
+            "sha256": "685fd203ecbd4eff82b71fd2d875684f8dbab534d9d6aa931aefbad5cb832ffc",
+            "start_line": 79,
+            "symbol": "test_inherited_annotated_datetime.Event"
+          },
+          {
+            "end_line": 61,
+            "path": "sqlmodel/sql/sqltypes.py",
+            "sha256": "bb3958c746aa350b869ccb039e982ce8ad81c09300d735820a1040e4be5886a0",
+            "start_line": 1
+          }
+        ],
+        "before": [
+          {
+            "end_line": 75,
+            "path": "tests/test_datetime.py",
+            "sha256": "feb8a5feb53ca652e4a5de60cba1b1eb2383e369d21c0664d8b4c7146bf73ed2",
+            "start_line": 74,
+            "symbol": "test_inherited_annotated_datetime.EventBase"
+          },
+          {
+            "end_line": 78,
+            "path": "tests/test_datetime.py",
+            "sha256": "685fd203ecbd4eff82b71fd2d875684f8dbab534d9d6aa931aefbad5cb832ffc",
+            "start_line": 77,
+            "symbol": "test_inherited_annotated_datetime.Event"
+          },
+          {
+            "end_line": 53,
+            "path": "sqlmodel/sql/sqltypes.py",
+            "sha256": "ce026de39ca1aa4706d91311053daec72461a8c4b9a5b719a4b1ca8f298eee43",
+            "start_line": 1
           }
         ]
       }

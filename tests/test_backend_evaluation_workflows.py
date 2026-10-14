@@ -211,7 +211,7 @@ def _aggregate_campaign(corpus: tuple[Path, dict[str, Path]], root: Path) -> Pat
                     "suite_file": "suite.json",
                     "suite_sha256": canonical_sha256(suite),
                     "grader_sha256": canonical_sha256(grader),
-                    "workflow_ids": ["handler"],
+                    "workflow_ids": [row["id"] for row in suite["workflows"]],
                 }
                 for name in ("good", "other")
             ],
@@ -328,6 +328,158 @@ def test_changed_archive_and_oracle_ranges_fail_before_observation(
     grader_path = suite_path.parent / "grader.json"
     grader = json.loads(grader_path.read_text())
     grader["cases"]["handler"]["source_labels"]["before"][0]["sha256"] = "0" * 64
+    write_json(grader_path, grader)
+    with pytest.raises(ValueError, match="source range changed"):
+        load_corpus(suite_path, sources)
+
+
+@pytest.mark.parametrize("location", ["top", "stage"])
+def test_independent_display_failure_is_a_hard_gate_and_has_exact_oracle_pointers(
+    corpus: tuple[Path, dict[str, Path]], tmp_path: Path, location: str
+) -> None:
+    from hashmarks.evidence_presentation import FORMATS
+    from scripts.repository_evaluation.backend_regrading import verify_task_summary
+    from scripts.repository_evaluation.fact_grading import pointer_values
+
+    suite_path, sources = corpus
+    grader_path = suite_path.parent / "grader.json"
+    grader = json.loads(grader_path.read_text())
+    rule = grader["cases"]["handler"]
+    checks = {
+        profile: {
+            format: [
+                {
+                    "id": "display-coverage",
+                    "pointer": "/coverage",
+                    "predicate": "equals",
+                    "value": "contradicted-coverage",
+                    "support": "supported",
+                }
+            ]
+            for format in FORMATS
+            if format != "none"
+        }
+        for profile in ("default", "initial")
+    }
+    if location == "top":
+        rule["display_checks"] = checks
+    else:
+        for stage in ("before", "after"):
+            rule[stage] = {"display_checks": checks}
+    write_json(grader_path, grader)
+    report = run_backend(
+        sources=sources,
+        suite_path=suite_path,
+        output_dir=tmp_path / "display",
+        transports=("cli",),
+    )
+    outcome = report["outcomes"][0]
+    assert outcome["gates"]["facts"] is True
+    assert outcome["gates"]["cli"] is False
+    assert outcome["gates"]["presentation"] is False
+    witnesses = [
+        row for row in outcome["gate_witnesses"] if row["gate"] == "presentation"
+    ]
+    assert witnesses and all(row["state"] == "FAIL" for row in witnesses)
+    for witness in witnesses:
+        (check,) = pointer_values(grader, witness["oracle_pointer"])
+        assert check["id"] == witness["check_id"]
+    suite, frozen = load_corpus(suite_path, sources)
+    verify_task_summary(
+        tmp_path / "display/handler/observations",
+        suite["workflows"][0],
+        frozen["cases"]["handler"],
+        sources,
+        outcome,
+    )
+
+
+def _extend_task_source_labels(corpus: tuple[Path, dict[str, Path]]) -> dict:
+    suite_path, sources = corpus
+    suite = json.loads(suite_path.read_text())
+    grader_path = suite_path.parent / "grader.json"
+    grader = json.loads(grader_path.read_text())
+    rule = grader["cases"]["handler"]
+    task_labels = {}
+    for stage in ("before", "after"):
+        path = sources[stage] / "models.py"
+        path.write_text("def model():\n    return 'declared'\n")
+        task_labels[stage] = [
+            *rule["source_labels"][stage],
+            {
+                "path": "models.py",
+                "symbol": "model",
+                "start_line": 1,
+                "end_line": 2,
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            },
+        ]
+        suite["sources"][stage]["content_identity"] = repository_content_identity(
+            sources[stage]
+        )
+    rule["task_source_labels"] = task_labels
+    write_json(suite_path, suite)
+    write_json(grader_path, grader)
+    return rule
+
+
+def test_task_source_labels_extend_witnesses_without_expanding_native_targets(
+    corpus: tuple[Path, dict[str, Path]], tmp_path: Path
+) -> None:
+    from scripts.repository_evaluation.backend_native import _capture_inputs
+    from scripts.repository_evaluation.backend_regrading import verify_task_summary
+
+    expected = _extend_task_source_labels(corpus)
+    suite_path, sources = corpus
+    suite, grader = load_corpus(suite_path, sources)
+    rule = grader["cases"]["handler"]
+    workflow = suite["workflows"][0]
+    for stage in ("before", "after"):
+        assert rule["source_labels"][stage] == expected["source_labels"][stage]
+        assert _capture_inputs(workflow, rule, stage) == ("python", ["backend.py"])
+    report = run_backend(
+        sources=sources,
+        suite_path=suite_path,
+        output_dir=tmp_path / "expanded",
+        transports=(),
+    )
+    outcome = report["outcomes"][0]
+    assert outcome["gates"]["facts"] is True
+    for witness in outcome["gate_witnesses"]:
+        assert {row["path"] for row in witness["source_bindings"]} == {
+            "backend.py",
+            "models.py",
+        }
+    verify_task_summary(
+        tmp_path / "expanded/handler/observations", workflow, rule, sources, outcome
+    )
+
+
+@pytest.mark.parametrize(
+    "labels",
+    [None, {"before": []}, {"before": [], "after": []}, {"before": [1], "after": [1]}],
+)
+def test_invalid_task_source_labels_are_rejected_before_observation(
+    corpus: tuple[Path, dict[str, Path]], labels: object
+) -> None:
+    suite_path, sources = corpus
+    grader_path = suite_path.parent / "grader.json"
+    grader = json.loads(grader_path.read_text())
+    grader["cases"]["handler"]["task_source_labels"] = labels
+    write_json(grader_path, grader)
+    with pytest.raises(ValueError, match="task source labels"):
+        load_corpus(suite_path, sources)
+
+
+@pytest.mark.parametrize("field", ["source_labels", "task_source_labels"])
+def test_task_scope_does_not_bypass_native_or_task_source_integrity(
+    corpus: tuple[Path, dict[str, Path]], field: str
+) -> None:
+    _extend_task_source_labels(corpus)
+    suite_path, sources = corpus
+    grader_path = suite_path.parent / "grader.json"
+    grader = json.loads(grader_path.read_text())
+    grader["cases"]["handler"][field]["before"][0]["sha256"] = "0" * 64
     write_json(grader_path, grader)
     with pytest.raises(ValueError, match="source range changed"):
         load_corpus(suite_path, sources)
@@ -805,12 +957,229 @@ def _campaign_for_fixture(suite_path: Path) -> Path:
                     "suite_file": "suite.json",
                     "suite_sha256": canonical_sha256(suite),
                     "grader_sha256": canonical_sha256(grader),
-                    "workflow_ids": ["handler"],
+                    "workflow_ids": [row["id"] for row in suite["workflows"]],
                 }
             ],
         },
     )
     return path
+
+
+def _workflow_batch_reports(
+    corpus: tuple[Path, dict[str, Path]], root: Path
+) -> list[str]:
+    suite_path, sources = corpus
+    suite = json.loads(suite_path.read_text())
+    suite["workflows"].append(
+        {**suite["workflows"][0], "id": "second", "problem_id": "second-problem"}
+    )
+    grader_path = suite_path.parent / "grader.json"
+    grader = json.loads(grader_path.read_text())
+    grader["cases"]["second"] = grader["cases"]["handler"]
+    write_json(suite_path, suite)
+    write_json(grader_path, grader)
+    reports = []
+    for identifier in ("handler", "second"):
+        output = root / identifier
+        run_backend(
+            sources=sources,
+            suite_path=suite_path,
+            output_dir=output,
+            workflow_ids=[identifier],
+            transports=(),
+        )
+        reports.append(str(output / "summary.json"))
+    return reports
+
+
+def test_aggregate_admits_disjoint_bounded_reports_and_preserves_namespaces(
+    corpus: tuple[Path, dict[str, Path]], tmp_path: Path
+) -> None:
+    from scripts.repository_evaluation.aggregate_backend import aggregate_backend
+
+    reports = _workflow_batch_reports(corpus, tmp_path / "batches")
+    report = aggregate_backend(
+        campaign_path=_campaign_for_fixture(corpus[0]),
+        sources=corpus[1],
+        selections={"fixture": {"workflow_reports": reports}},
+        output_dir=tmp_path / "aggregate",
+    )
+    assert report["input_integrity"]["state"] == "PASS"
+    assert report["missing_workflow_reports"] == []
+    assert report["status"] == "INCOMPLETE"
+    inputs = [row for row in report["input_reports"] if row["proof"] == "workflow"]
+    assert len(inputs) == 2 and all(row["state"] == "ADMITTED" for row in inputs)
+    outcomes = report["outcomes"]
+    assert {row["id"] for row in outcomes} == {"fixture/handler", "fixture/second"}
+    for outcome in outcomes:
+        assert outcome["gates"]["facts"] is True
+        binding = outcome["report_binding"]
+        assert (
+            binding["sha256"]
+            == hashlib.sha256(Path(binding["path"]).read_bytes()).hexdigest()
+        )
+        assert {w["artifact_namespace"] for w in outcome["gate_witnesses"]} == {
+            "workflow:sha256:" + binding["sha256"]
+        }
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_aggregate_overlapping_batches_cannot_choose_a_winner(
+    corpus: tuple[Path, dict[str, Path]], tmp_path: Path, reverse: bool
+) -> None:
+    from scripts.repository_evaluation.aggregate_backend import aggregate_backend
+
+    reports = _workflow_batch_reports(corpus, tmp_path / "batches")
+    duplicate = tmp_path / "duplicate"
+    run_backend(
+        sources=corpus[1],
+        suite_path=corpus[0],
+        output_dir=duplicate,
+        workflow_ids=["handler"],
+        transports=(),
+    )
+    reports.append(str(duplicate / "summary.json"))
+    report = aggregate_backend(
+        campaign_path=_campaign_for_fixture(corpus[0]),
+        sources=corpus[1],
+        selections={
+            "fixture": {"workflow_reports": reports[::-1] if reverse else reports}
+        },
+        output_dir=tmp_path / "aggregate",
+    )
+    assert report["status"] == "FAIL"
+    rejected = next(
+        row for row in report["input_reports"] if row["proof"] == "workflow-membership"
+    )
+    assert rejected["state"] == "REJECTED" and rejected["workflows"] == ["handler"]
+    outcomes = {row["id"]: row for row in report["outcomes"]}
+    assert outcomes["fixture/handler"]["gates"].get("facts") is None
+    assert outcomes["fixture/second"]["gates"]["facts"] is True
+
+
+def test_aggregate_bad_batch_preserves_valid_batches(
+    corpus: tuple[Path, dict[str, Path]], tmp_path: Path
+) -> None:
+    from scripts.repository_evaluation.aggregate_backend import aggregate_backend
+
+    reports = _workflow_batch_reports(corpus, tmp_path / "batches")
+    broken = Path(reports[1])
+    summary = json.loads(broken.read_text())
+    summary["outcomes"][0]["gates"]["facts"] = False
+    write_json(broken, summary)
+    report = aggregate_backend(
+        campaign_path=_campaign_for_fixture(corpus[0]),
+        sources=corpus[1],
+        selections={"fixture": {"workflow_reports": reports}},
+        output_dir=tmp_path / "aggregate",
+    )
+    assert report["status"] == "FAIL"
+    inputs = [row for row in report["input_reports"] if row["proof"] == "workflow"]
+    assert [row["state"] for row in inputs] == ["ADMITTED", "REJECTED"]
+    outcomes = {row["id"]: row for row in report["outcomes"]}
+    assert outcomes["fixture/handler"]["gates"]["facts"] is True
+    assert report["missing_workflow_reports"] == ["fixture/second"]
+
+
+@pytest.mark.parametrize(
+    "selection",
+    [
+        {"workflow_reports": []},
+        {"workflow_reports": "report.json"},
+        {"workflow_report": "one.json", "workflow_reports": ["two.json"]},
+        {"native_reports": [{"native_report": "native.json"}]},
+        {"native_reports": ["native.json"]},
+        {"native_reports": [{"native_report": "native.json", "capture_root": False}]},
+        {
+            "native_report": "one.json",
+            "native_reports": [
+                {"native_report": "two.json", "capture_root": "captures"}
+            ],
+        },
+        {
+            "native_reports": [
+                {"native_report": "native.json", "capture_root": "captures"}
+            ],
+            "capture_root": "other",
+        },
+        {"argv": ["execute"]},
+    ],
+)
+def test_aggregate_rejects_ambiguous_or_malformed_batch_selections(
+    corpus: tuple[Path, dict[str, Path]], tmp_path: Path, selection: dict
+) -> None:
+    from scripts.repository_evaluation.aggregate_backend import aggregate_backend
+
+    report = aggregate_backend(
+        campaign_path=_campaign_for_fixture(corpus[0]),
+        sources=corpus[1],
+        selections={"fixture": selection},
+        output_dir=tmp_path / "aggregate",
+    )
+    assert report["status"] == "FAIL"
+    assert report["input_integrity"]["state"] == "FAIL"
+    assert any(row["state"] == "REJECTED" for row in report["input_reports"])
+
+
+def test_native_batches_keep_each_capture_root_and_acquisition_identity(
+    corpus: tuple[Path, dict[str, Path]],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from scripts.repository_evaluation import aggregate_backend as aggregation
+    from scripts.repository_evaluation.common import (
+        canonical_sha256,
+        evaluator_implementation_identity,
+    )
+    from scripts.repository_evaluation.run_backend import _observer_identity
+
+    _workflow_batch_reports(corpus, tmp_path / "batches")
+    suite, grader = load_corpus(*corpus)
+    entries = []
+    observed = []
+    for identifier in ("handler", "second"):
+        path = tmp_path / identifier / "summary.json"
+        write_json(
+            path,
+            {
+                "schema": aggregation.NATIVE_SCHEMA,
+                "identity": {
+                    "suite": canonical_sha256(suite),
+                    "grader": canonical_sha256(grader),
+                    "observer": _observer_identity(),
+                    "evaluator": evaluator_implementation_identity(),
+                    "transports": [],
+                    "regenerate": True,
+                    "acquisition_id": identifier,
+                    "source_identities": {
+                        name: row["content_identity"]
+                        for name, row in suite["sources"].items()
+                    },
+                },
+                "qualification_scope": "explicit-source-binding-and-native-transport-only",
+                "outcomes": [{"id": identifier, "gates": {"before_binding": True}}],
+            },
+        )
+        entries.append(
+            {
+                "native_report": str(path),
+                "capture_root": str(tmp_path / (identifier + "-captures")),
+            }
+        )
+
+    def verify(*args: object, acquisition_id: str | None = None) -> None:
+        observed.append((args[3], acquisition_id))
+
+    monkeypatch.setattr(aggregation, "_verify_native_outcome", verify)
+    outcomes, inputs = aggregation._admit_report_inputs(
+        "fixture", "native", {"native_reports": entries}, suite, grader, corpus[1]
+    )
+    assert set(outcomes) == {"handler", "second"}
+    assert all(row["state"] == "ADMITTED" for row in inputs)
+    assert observed == [
+        ((Path(entry["native_report"]).parent, Path(entry["capture_root"])), identifier)
+        for entry, identifier in zip(entries, ("handler", "second"), strict=True)
+    ]
 
 
 def test_aggregate_reads_current_receipts_without_executing_work(

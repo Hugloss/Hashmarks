@@ -11,6 +11,7 @@ from scripts.repository_evaluation.common import write_json
 from scripts.repository_evaluation.profile_cases import (
     PAIRED_PROFILE_SCHEMA,
     PROFILE_SCHEMA,
+    _profile_bound,
 )
 
 if TYPE_CHECKING:
@@ -23,6 +24,7 @@ def _identity_fields(schema: object) -> list[str]:
         "suite",
         "cases_sha256",
         "producer_implementation_identity",
+        "evaluator_implementation_identity",
         "warmups",
         "shard_count",
     ]
@@ -42,8 +44,15 @@ def _identity_fields(schema: object) -> list[str]:
 def _merged_rows(profiles: list[Mapping[str, object]]) -> list[dict[str, object]]:
     rows = []
     seen = set()
-    for doc in sorted(profiles, key=lambda item: int(item.get("shard_index") or 0)):
-        for row in doc.get("cases", []):
+    for doc in sorted(
+        profiles, key=lambda item: _profile_bound(item.get("shard_index"), 0)
+    ):
+        cases = doc.get("cases", [])
+        if not isinstance(cases, list):
+            raise ValueError("profile cases must be a list")
+        for row in cases:
+            if not isinstance(row, dict):
+                raise ValueError("profile case must be an object")
             case_id = str(row["id"])
             if case_id in seen:
                 raise ValueError("duplicate profile case")
@@ -60,8 +69,8 @@ def merge_profiles(profiles: list[Mapping[str, object]]) -> dict[str, Any]:
     for doc in profiles[1:]:
         if any(doc.get(key) != first.get(key) for key in identity_fields):
             raise ValueError("profile identity mismatch")
-    shard_count = int(first.get("shard_count") or 1)
-    indices = [int(doc.get("shard_index") or 0) for doc in profiles]
+    shard_count = _profile_bound(first.get("shard_count"), 1)
+    indices = [_profile_bound(doc.get("shard_index"), 0) for doc in profiles]
     if len(set(indices)) != len(indices):
         raise ValueError("duplicate profile shard")
     if sorted(indices) != list(range(shard_count)):

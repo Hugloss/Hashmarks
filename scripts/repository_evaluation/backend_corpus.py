@@ -327,12 +327,33 @@ def _check_declaration_revision(
         _check_label(root, label)
 
 
+def task_source_labels(rule: dict[str, Any], stage: str) -> list[dict[str, Any]]:
+    """Task proof may cover more sources without expanding native nominations."""
+    if "task_source_labels" not in rule:
+        return rule["source_labels"][stage]
+    labels = rule["task_source_labels"]
+    if not isinstance(labels, dict) or set(labels) != {"before", "after"}:
+        raise ValueError("backend task source labels require both revision stages")
+    rows = labels[stage]
+    if (
+        not isinstance(rows, list)
+        or not rows
+        or not all(isinstance(label, dict) for label in rows)
+    ):
+        raise ValueError("backend task source labels must be nonempty label lists")
+    return rows
+
+
 def _check_revision_labels(root: Path, rule: dict[str, Any], stage: str) -> None:
-    labels = rule["source_labels"][stage]
-    if not labels:
-        raise ValueError("backend workflow requires source labels for both revisions")
-    for label in labels:
+    native_labels = rule["source_labels"][stage]
+    labels = task_source_labels(rule, stage)
+    for label in native_labels:
         _check_label(root, label)
+    if not native_labels or not labels:
+        raise ValueError("backend workflow requires source labels for both revisions")
+    if "task_source_labels" in rule:
+        for label in labels:
+            _check_label(root, label)
     stage_rule = {**rule, **rule.get(stage, {})}
     oracle = stage_rule.get("owner_oracle")
     if oracle is not None:

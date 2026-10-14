@@ -45,7 +45,7 @@
       ]
     },
     {
-      "grader_sha256": "34a1fba7c3fc05a8bef11ad7ea2de335292fa1e30e0db2371f5fdfe35a31b772",
+      "grader_sha256": "6e320e462a5d3e74badb5fdf497ca5412d82b706148afd70f42f8749f96f08cc",
       "id": "backend-async-v2",
       "suite_file": "suites/async/suite.json",
       "suite_sha256": "6ec16e6257e018058bae1c62fe3890f5ed852219f60e54a1ae24b80551b5abe7",
@@ -65,7 +65,7 @@
       ]
     },
     {
-      "grader_sha256": "32c46f270d27b58cd49eb0057adc5514844cf048aac5e5d4079284cc109ca034",
+      "grader_sha256": "b88b3d23d517531499e40c9225676d296041fac481e7179ad8960aee6eaa8919",
       "id": "backend-model-v2",
       "suite_file": "suites/model/suite.json",
       "suite_sha256": "12d8d84f32a79c29ade5516d2b68416c97af01bde9ddc79896342745253ee238",

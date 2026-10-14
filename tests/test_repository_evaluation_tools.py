@@ -590,6 +590,83 @@ def test_profile_shards_merge_strict_identity_and_complete() -> None:
         merge_profiles([shard(0, "same"), shard(1, "same")])
 
 
+def test_profile_measures_nominated_public_operation_without_action_map_proxy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import hashlib
+
+    from hashmarks.codemap import CodeMap
+    from scripts.repository_evaluation.profile_cases import profile_cases
+
+    repo = tmp_path / "repo"
+    _write(repo, "src/live.py", "def active_target():\n    return 1\n")
+    cases = tmp_path / "cases.json"
+    cases.write_text(
+        json.dumps(
+            {
+                "schema": "hashmarks.repository-evaluation-cases.v1",
+                "suite": "public-profile",
+                "cases": [
+                    {
+                        "id": "member",
+                        "operation": "source_observation",
+                        "inputs": {"paths": ["src/live.py"]},
+                    }
+                ],
+            }
+        )
+    )
+    packets = []
+    original = CodeMap.source_observation
+
+    def observe(codemap: CodeMap, *args: object, **kwargs: object) -> dict:
+        packet = original(codemap, *args, **kwargs)
+        packets.append(packet)
+        return packet
+
+    def disallow_proxy(*_args: object, **_kwargs: object) -> None:
+        pytest.fail("public operation profiling must not substitute action-map timing")
+
+    monkeypatch.setattr(CodeMap, "source_observation", observe)
+    monkeypatch.setattr(CodeMap, "task_action_map", disallow_proxy)
+    result = profile_cases(workspace=repo, cases_path=cases, warmups=1, samples=3)
+    assert len(packets) == 4
+    row = result["cases"][0]
+    assert row["operation"] == "source_observation"
+    assert len(row["samples_ns"]) == 3
+    assert (
+        row["semantic_fingerprint"]
+        == "sha256:"
+        + hashlib.sha256(
+            json.dumps(
+                packets[1], sort_keys=True, separators=(",", ":"), ensure_ascii=False
+            ).encode()
+        ).hexdigest()
+    )
+    assert result["evaluator_implementation_identity"].startswith("sha256:")
+
+
+def test_profile_shard_merge_rejects_evaluator_drift() -> None:
+    from scripts.repository_evaluation.merge_profiles import merge_profiles
+
+    baseline = {
+        "schema": "hashmarks.repository-evaluation-profile.v1",
+        "suite": "source-only",
+        "shard_count": 2,
+        "shard_index": 0,
+        "cases": [{"id": "first"}],
+        "evaluator_implementation_identity": "sha256:first",
+    }
+    candidate = {
+        **baseline,
+        "shard_index": 1,
+        "cases": [{"id": "second"}],
+        "evaluator_implementation_identity": "sha256:second",
+    }
+    with pytest.raises(ValueError, match="profile identity mismatch"):
+        merge_profiles([baseline, candidate])
+
+
 def test_paired_profile_interleaves_semantics_and_fails_closed_on_noise(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

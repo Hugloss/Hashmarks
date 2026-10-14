@@ -10,6 +10,16 @@ materializing a second copy is unnecessary when the content identities match.
 Use a suite-specific source map for acquisition and the complete combined source
 map for aggregation.
 
+The model grader now separates `task_source_labels` from native `source_labels`.
+Task labels cover production and verification members at both revisions without
+silently adding native targets. Validating these bytes does not complete the
+independent semantic or capability review.
+
+Aggregation also accepts disjoint `workflow_reports` lists and `native_reports`
+lists whose entries contain `native_report` and `capture_root`. Do not mix a list
+with the corresponding singular field. Each original report is revalidated;
+overlapping workflow outcomes cause a membership rejection rather than precedence.
+
 The directory version identifies this corpus, not the wire schemas. The current
 workflow, campaign and matrix schemas remain v2, v4 and v5 respectively.
 

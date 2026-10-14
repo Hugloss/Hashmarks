@@ -38,6 +38,68 @@ def test_source_oracle_does_not_conflate_json_types(
     )
 
 
+def test_class_oracle_scopes_revision_but_checks_authority_of_all_class_records() -> (
+    None
+):
+    from scripts.repository_evaluation.fact_grading import grade_facts
+
+    context = {
+        "authority": "indexed-lexical-declarations-only",
+        "ownership_authority": False,
+        "runtime_members": "not-established",
+        "negative_evidence_admissible": False,
+    }
+    rows = [
+        {
+            "path": "backend.py",
+            "symbol": "Backend",
+            "class_declarations": {**context, "source_revision": "backend-revision"},
+        },
+        {
+            "path": "other.py",
+            "symbol": "Other",
+            "class_declarations": {**context, "source_revision": "other-revision"},
+        },
+    ]
+    checks = [
+        {
+            "id": key,
+            "pointer": "/retrieval/results/*/class_declarations/" + key,
+            "predicate": "all_equal",
+            "value": value,
+            "authority_check": True,
+        }
+        for key, value in context.items()
+    ]
+    checks.append(
+        {
+            "id": "target-revision",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_scoped_record",
+            "authority_check": True,
+            "value": {
+                "scope": {"path": "backend.py", "symbol": "Backend"},
+                "pointer": "/class_declarations",
+                "record": {"source_revision": "backend-revision"},
+            },
+        }
+    )
+
+    def grade() -> dict:
+        return grade_facts(
+            "classes", {"packet": {"retrieval": {"results": rows}}}, {"checks": checks}
+        )
+
+    assert grade()["classification"] == "PASS"
+    rows[1]["class_declarations"]["ownership_authority"] = True
+    assert grade()["authority_violations"] == 1
+    rows[1]["class_declarations"]["ownership_authority"] = False
+    rows[0]["class_declarations"]["source_revision"] = "other-revision"
+    assert grade()["classification"] == "OTHER_FAILURE"
+    rows.pop(0)
+    assert grade()["classification"] == "OTHER_FAILURE"
+
+
 def test_native_summary_cannot_qualify_a_definition_without_observation_membership(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -20,15 +20,17 @@ from hashmarks.test_shards import repository_content_identity
 from scripts.repository_evaluation.common import (
     CASES_SCHEMA,
     canonical_sha256,
+    evaluator_implementation_identity,
     load_json,
     write_json,
 )
+from scripts.repository_evaluation.operations import observe_case
+from scripts.repository_evaluation.run_cases import _validate_case_membership
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
 PROFILE_SCHEMA = "hashmarks.repository-evaluation-profile.v1"
-PAIRED_PROFILE_DEFAULT_PROTOCOL = PairedProfileProtocol()
 PAIRED_PROFILE_SCHEMA = "hashmarks.repository-evaluation-paired-profile.v1"
 
 
@@ -39,6 +41,9 @@ class PairedProfileProtocol:
     shard_count: int = 1
     shard_index: int = 0
     max_control_mad_pct: float = 10.0
+
+
+PAIRED_PROFILE_DEFAULT_PROTOCOL = PairedProfileProtocol()
 
 
 def _semantic_fingerprint(action: Mapping[str, object]) -> str:
@@ -59,19 +64,32 @@ def _selected_cases(
     cases = doc.get("cases")
     if not isinstance(cases, list) or not cases:
         raise ValueError("profile requires non-empty cases")
+    _validate_case_membership(cases)
     return [
         case for index, case in enumerate(cases) if index % shard_count == shard_index
     ]
 
 
+def _profile_bound(value: object, default: int) -> int:
+    """Preserve legacy JSON scalar coercion while rejecting non-scalar bounds."""
+    if not value:
+        return default
+    if isinstance(value, (str, int, float)):
+        return int(value)
+    raise TypeError("profile bounds must be JSON scalars convertible to integers")
+
+
 def _run_action(codemap: CodeMap, case: Mapping[str, object]) -> tuple[int, str]:
     started = time.perf_counter_ns()
     with codemap.decision_session():
-        action = codemap.task_action_map(
-            str(case.get("task") or ""),
-            limit=int(case.get("limit") or 20),
-            per_role=int(case.get("per_role") or 3),
-        )
+        if str(case.get("operation") or "task_action_map") == "task_action_map":
+            action = codemap.task_action_map(
+                str(case.get("task") or ""),
+                limit=_profile_bound(case.get("limit"), 20),
+                per_role=_profile_bound(case.get("per_role"), 3),
+            )
+        else:
+            action = observe_case(codemap, case)
     return time.perf_counter_ns() - started, _semantic_fingerprint(action)
 
 
@@ -119,6 +137,7 @@ def profile_cases(
                     {
                         "id": str(case.get("id") or ""),
                         "task": str(case.get("task") or ""),
+                        "operation": str(case.get("operation") or "task_action_map"),
                         "samples_ns": samples_ns,
                         "median_ns": median,
                         "p95_ns": _percentile(samples_ns, 0.95),
@@ -133,6 +152,7 @@ def profile_cases(
         "cases_sha256": "sha256:" + canonical_sha256(doc),
         "repository_identity": repo_identity,
         "producer_implementation_identity": native_producer_implementation_identity(),
+        "evaluator_implementation_identity": evaluator_implementation_identity(),
         "warmups": warmups,
         "samples": samples,
         "shard_count": shard_count,
@@ -174,6 +194,7 @@ def _paired_case_row(
     return {
         "id": str(case.get("id") or ""),
         "task": str(case.get("task") or ""),
+        "operation": str(case.get("operation") or "task_action_map"),
         "paired_gain_pct": deltas,
         "paired_median_gain_pct": median,
         "paired_mad_pct": mad,
@@ -242,6 +263,7 @@ def paired_profile_cases(
         "repository_identity_a": aid,
         "repository_identity_b": bid,
         "producer_implementation_identity": native_producer_implementation_identity(),
+        "evaluator_implementation_identity": evaluator_implementation_identity(),
         "warmups": protocol.warmups,
         "pairs": protocol.pairs,
         "shard_count": protocol.shard_count,

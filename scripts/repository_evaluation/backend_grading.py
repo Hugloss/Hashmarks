@@ -325,6 +325,25 @@ def _optional_fact_gate(
     )
 
 
+def display_fact_gate(
+    response: dict[str, Any], rule: dict[str, Any], profile: str, format: str
+) -> bool | None:
+    """Reviewed display facts supplement mechanical projection conformance."""
+    if format == "none" or "display_checks" not in rule:
+        return True
+    checks = rule["display_checks"].get(profile, {}).get(format)
+    if not checks:
+        return None
+    projection = response.get("presentation")
+    if not isinstance(projection, dict):
+        return None
+    return fact_state(
+        grade_facts("display", {"packet": projection}, {"checks": checks})[
+            "classification"
+        ]
+    )
+
+
 def _owner_authority_safe(packet: dict[str, Any], rule: dict[str, Any]) -> bool | None:
     packet = _packet(packet)
     owner = packet["ownership"]["owner"]

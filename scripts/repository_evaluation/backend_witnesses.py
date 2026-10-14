@@ -9,7 +9,12 @@ from typing import Any
 
 from hashmarks.digest import FILE_DOMAIN, hash_file
 
-from .backend_corpus import confined_file, confined_path, workflow_changed_paths
+from .backend_corpus import (
+    confined_file,
+    confined_path,
+    task_source_labels,
+    workflow_changed_paths,
+)
 from .backend_grading import (
     FactObservation,
     grade_fact_observation,
@@ -25,7 +30,7 @@ def api_fact_witnesses(
     packet: dict[str, Any],
 ) -> list[dict[str, Any]]:
     stage = rule["_stage"]
-    paths = sorted({label["path"] for label in rule["source_labels"][stage]})
+    paths = sorted({label["path"] for label in task_source_labels(rule, stage)})
     bindings = tuple(
         {
             "repository": workflow["repository"],
@@ -56,7 +61,7 @@ def task_fact_witnesses(
 ) -> list[dict[str, Any]]:
     """Retain separate native and display witnesses for every captured context."""
     stage = rule["_stage"]
-    paths = sorted({label["path"] for label in rule["source_labels"][stage]})
+    paths = sorted({label["path"] for label in task_source_labels(rule, stage)})
     bindings = tuple(
         {
             "repository": workflow["repository"],
@@ -105,6 +110,9 @@ def task_fact_witnesses(
                     rule.get("display_checks", {}).get(profile, {}).get(format)
                 )
                 if surface != "api" and format != "none" and display_checks:
+                    display_scope = f"/cases/{workflow['id']}"
+                    if "display_checks" in rule.get(stage, {}):
+                        display_scope += "/" + stage
                     observation = FactObservation(
                         "presentation",
                         workflow["id"],
@@ -112,7 +120,7 @@ def task_fact_witnesses(
                         profile,
                         surface,
                         format,
-                        scope + f"/display_checks/{profile}/{format}",
+                        display_scope + f"/display_checks/{profile}/{format}",
                         (stage + "/" + relative, contents),
                         bindings,
                     )
@@ -334,5 +342,5 @@ def _comparison_source_bindings(
             ).hash,
         }
         for stage in ("before", "after")
-        for path in sorted({label["path"] for label in rule["source_labels"][stage]})
+        for path in sorted({label["path"] for label in task_source_labels(rule, stage)})
     )
