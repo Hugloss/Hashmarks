@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 import pytest
+from contract_assertions import assert_array, assert_object, assert_records
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.structural_locality import structural_locality_delta
@@ -61,7 +62,7 @@ def _scip(root: Path, relations: list[dict[str, object]]) -> Path:
 
 def _relations(codemap: CodeMap) -> dict[str, object]:
     packet = codemap.structural_locality("code.py::Impl", refresh=False)
-    return packet["native_semantic_relationships"]
+    return assert_object(packet["native_semantic_relationships"])
 
 
 def test_scip_relationship_flags_are_direct_and_provenance_bound(
@@ -85,18 +86,21 @@ def test_scip_relationship_flags_are_direct_and_provenance_bound(
         cm.sync()
         cm.import_scip(index)
         packet = cm.structural_locality("code.py::Impl", refresh=False)
-        relations = packet["native_semantic_relationships"]
+        relations = assert_object(packet["native_semantic_relationships"])
         assert relations["authority"] == "scip-producer-claim-only"
         assert relations["producer_bindings"] == ["scip-python:test"]
         assert relations["negative_evidence_admissible"] is False
         assert relations["truncated"] is False
-        assert relations["observation_coverage"]["state"] == (
+        assert assert_object(relations["observation_coverage"])["state"] == (
             "current-bounded-observation"
         )
         assert (
-            relations["observation_coverage"]["negative_evidence_admissible"] is False
+            assert_object(relations["observation_coverage"])[
+                "negative_evidence_admissible"
+            ]
+            is False
         )
-        capability = relations["provider_capabilities"][0]
+        capability = assert_records(relations["provider_capabilities"])[0]
         assert capability["declared_capability_state"] == (
             "not-captured-by-scip-adapter"
         )
@@ -105,54 +109,78 @@ def test_scip_relationship_flags_are_direct_and_provenance_bound(
             "reference",
             "type_definition",
         ]
-        source_revision = relations["source_revision"]
+        source_revision = assert_object(relations["source_revision"])
         assert source_revision["observed_at_import"] == [
             source_revision["observed_current"]
         ]
         assert source_revision["producer_claimed_revision"] is None
         assert source_revision["same_as_current_observation"] is True
         assert source_revision["binding_state"] == "unknown"
-        assert {
-            (row["kind"], row["target_symbol"]) for row in relations["relationships"]
-        } == {
+        relationships = assert_records(relations["relationships"])
+        assert {(row["kind"], row["target_symbol"]) for row in relationships} == {
             ("implementation", _BASE),
             ("reference", _BASE),
             ("type_definition", _BASE),
         }
-        assert all(row["path"] == "code.py" for row in relations["relationships"])
-        assert all(row["line"] == 4 for row in relations["relationships"])
+        assert all(row["path"] == "code.py" for row in relationships)
+        assert all(row["line"] == 4 for row in relationships)
         assert all(
-            row["source_identity"] == packet["source_identity"]
-            for row in relations["relationships"]
+            row["source_identity"] == packet["source_identity"] for row in relationships
         )
         implementation = next(
-            row for row in relations["relationships"] if row["kind"] == "implementation"
+            row for row in relationships if row["kind"] == "implementation"
         )
-        assert implementation["source_revision"]["producer_claimed_revision"] is None
-        assert implementation["source_revision"]["same_as_current_observation"] is True
+        assert (
+            assert_object(implementation["source_revision"])[
+                "producer_claimed_revision"
+            ]
+            is None
+        )
+        assert (
+            assert_object(implementation["source_revision"])[
+                "same_as_current_observation"
+            ]
+            is True
+        )
         resolution = next(
             row
-            for row in relations["target_resolutions"]
+            for row in assert_records(relations["target_resolutions"])
             if row["producer"] == "scip-python:test" and row["target_symbol"] == _BASE
         )
         assert resolution["state"] == "unique-candidate"
-        assert resolution["candidates"][0]["code_map_symbol_ids"] == ["code.py::Base"]
+        assert assert_records(resolution["candidates"])[0]["code_map_symbol_ids"] == [
+            "code.py::Base"
+        ]
         # SCIP implements-claims do not turn into proven call edges.
-        assert not any(row.get("target_text") == _BASE for row in packet["edges"])
+        assert not any(
+            row.get("target_text") == _BASE for row in assert_records(packet["edges"])
+        )
 
+
+def test_scip_relationship_claims_are_excluded_after_source_changes(
+    tmp_path: Path,
+) -> None:
+    _repository(tmp_path)
+    index = _scip(tmp_path, [{"symbol": _BASE, "isImplementation": True}])
+    with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as cm:
+        cm.sync()
+        cm.import_scip(index)
         (tmp_path / "code.py").write_text(
             "class Base:\n    pass\n\nclass Impl(Base):\n    pass\n\n# changed\n",
             encoding="utf-8",
         )
         cm.sync(["code.py"])
         stale = cm.structural_locality("code.py::Impl", refresh=False)
-        stale_relations = stale["native_semantic_relationships"]
+        stale_relations = assert_object(stale["native_semantic_relationships"])
         assert stale_relations["producer_bindings"] == []
         assert stale_relations["relationships"] == []
-        assert stale_relations["observation_coverage"]["state"] == (
+        assert assert_object(stale_relations["observation_coverage"])["state"] == (
             "stale-provider-observation"
         )
-        assert stale_relations["provider_capabilities"][0]["freshness"] == "stale"
+        assert (
+            assert_records(stale_relations["provider_capabilities"])[0]["freshness"]
+            == "stale"
+        )
 
 
 def test_scip_relationship_truncation_and_reimport_replacement(
@@ -168,7 +196,7 @@ def test_scip_relationship_truncation_and_reimport_replacement(
         cm.import_scip(index)
         observed = _relations(cm)
         assert observed["truncated"] is True
-        assert len(observed["relationships"]) == 64
+        assert len(assert_array(observed["relationships"])) == 64
         assert observed["negative_evidence_admissible"] is False
 
         _scip(tmp_path, [])
@@ -199,12 +227,13 @@ def test_scip_relationship_target_reports_ambiguous_candidates(
         cm.sync()
         cm.import_scip(index)
         packet = cm.structural_locality("code.py::Impl")
-    resolution = packet["native_semantic_relationships"]["target_resolutions"][0]
+    relations = assert_object(packet["native_semantic_relationships"])
+    resolution = assert_records(relations["target_resolutions"])[0]
     assert resolution["state"] == "ambiguous-candidates"
     assert {
         symbol_id
-        for candidate in resolution["candidates"]
-        for symbol_id in candidate["code_map_symbol_ids"]
+        for candidate in assert_records(resolution["candidates"])
+        for symbol_id in assert_array(candidate["code_map_symbol_ids"])
     } == {"code.py::Base", "other.py::Base"}
     assert resolution["negative_evidence_admissible"] is False
 
@@ -216,8 +245,11 @@ def test_scip_relationship_packet_explains_missing_provider_observation(
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as cm:
         cm.sync()
         packet = cm.structural_locality("code.py::Impl")
-    relations = packet["native_semantic_relationships"]
-    assert relations["observation_coverage"]["state"] == "no-provider-observation"
+    relations = assert_object(packet["native_semantic_relationships"])
+    assert (
+        assert_object(relations["observation_coverage"])["state"]
+        == "no-provider-observation"
+    )
     assert relations["provider_capabilities"] == []
     assert relations["relationships"] == []
     assert relations["negative_evidence_admissible"] is False
@@ -264,16 +296,18 @@ def test_scip_relation_claim_delta_requires_same_untruncated_producer(
         delta = structural_locality_delta(before, after)
         assert delta["native_relationships_comparable"] is True
         assert any(
-            row[2] == "type_definition" for row in delta["native_relationships_added"]
+            isinstance(row, tuple) and row[2] == "type_definition"
+            for row in assert_array(delta["native_relationships_added"])
         )
         assert any(
-            row[2] == "implementation" for row in delta["native_relationships_removed"]
+            isinstance(row, tuple) and row[2] == "implementation"
+            for row in assert_array(delta["native_relationships_removed"])
         )
         projection = present_repository_evidence(delta, format="structured")
         projected_relations = [
             row
-            for group in projection["groups"]
-            for row in group["findings"]
+            for group in assert_records(projection["groups"])
+            for row in assert_records(group["findings"])
             if row["kind"]
             in {"scip_relationship_claim_added", "scip_relationship_claim_removed"}
         ]
@@ -288,7 +322,9 @@ def test_scip_relation_claim_delta_requires_same_untruncated_producer(
         assert response["result"] == delta
         unprojected_refs = {
             row["source_ref"]
-            for row in response["presentation"]["unprojected_sections"]
+            for row in assert_records(
+                assert_object(response["presentation"])["unprojected_sections"]
+            )
         }
         assert not unprojected_refs & {
             "/native_relationships_comparable",
@@ -299,7 +335,7 @@ def test_scip_relation_claim_delta_requires_same_untruncated_producer(
 
         incomplete = dict(after)
         incomplete["native_semantic_relationships"] = {
-            **after["native_semantic_relationships"],
+            **assert_object(after["native_semantic_relationships"]),
             "truncated": True,
         }
         # Recompute packet identity: malformed or incomplete endpoint may not
@@ -334,9 +370,8 @@ def test_scip_relationship_delta_requires_comparable_exact_endpoints(
         delta = structural_locality_delta(before, after)
         assert delta["comparable"] is False
         assert delta["native_relationships_comparable"] is False
-        assert (
-            "structural-endpoints-incomparable"
-            in (delta["native_relationships_incomparability_reasons"])
+        assert "structural-endpoints-incomparable" in (
+            assert_array(delta["native_relationships_incomparability_reasons"])
         )
         assert delta["native_relationships_added"] == []
         assert delta["native_relationships_removed"] == []

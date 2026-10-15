@@ -85,6 +85,7 @@ def test_task_action_brief_fast_budget_matches_diagnostic_sweep(tmp_path: Path) 
 
 def test_task_action_brief_auto_budget_does_not_call_diagnostic_sweep(
     tmp_path: Path,
+    monkeypatch: MonkeyPatch,
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as c:
@@ -95,24 +96,28 @@ def test_task_action_brief_auto_budget_does_not_call_diagnostic_sweep(
                 "diagnostic sweep must not run on production brief path"
             )
 
+        monkeypatch.setattr(c, "task_decision_brief_budget_sweep", forbidden)
         brief = c.task_action_brief("widget implementation test")
 
     assert brief["status"] == "safe-unknown"
 
 
-def test_task_action_brief_computes_canonical_action_map_once(tmp_path: Path) -> None:
+def test_task_action_brief_computes_canonical_action_map_once(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as c:
         c.sync()
         original = c.task_action_map
         calls = 0
 
-        def counted(*args, **kwargs) -> TaskActionMap:
+        def counted(task: str, *, limit: int = 20, per_role: int = 3) -> TaskActionMap:
             nonlocal calls
             calls += 1
-            return original(*args, **kwargs)
+            return original(task, limit=limit, per_role=per_role)
 
-        c.task_action_map = counted  # type: ignore[method-assign]
+        monkeypatch.setattr(c, "task_action_map", counted)
+
         brief = c.task_action_brief("widget implementation test")
     assert brief["status"] == "safe-unknown"
     assert calls == 1
@@ -151,6 +156,7 @@ def test_rare_ticket_action_brief_uses_exact_index_anchor_without_general_find(
             return original_find(query, limit=limit)
 
         monkeypatch.setattr(c, "find", counted)
+
         brief = c.task_action_brief("For ABC123 change the accepted response")
     assert brief["status"] == "safe-unknown"
     assert brief["edit"] == "src/abc123/engine_b.py"
@@ -374,6 +380,7 @@ def test_task_action_brief_keeps_ambiguous_candidate_out_of_edit_authority(
 
 def test_task_action_brief_consumes_canonical_action_edit(
     tmp_path: Path,
+    monkeypatch: MonkeyPatch,
 ) -> None:
     _repo(tmp_path)
     task = "widget implementation test"
@@ -387,7 +394,7 @@ def test_task_action_brief_consumes_canonical_action_edit(
         assert action["action_edit"]["path"] == "src/engine.py"
 
         action["action_edit"] = None
-        codemap.task_action_map = lambda *args, **kwargs: action  # type: ignore[method-assign]
+        monkeypatch.setattr(codemap, "task_action_map", lambda *args, **kwargs: action)
         brief = codemap.task_action_brief(task, token_budget=256)
 
     assert brief["status"] == "unsafe"
@@ -397,6 +404,7 @@ def test_task_action_brief_consumes_canonical_action_edit(
 
 def test_action_surfaces_consume_canonical_action_discrimination(
     tmp_path: Path,
+    monkeypatch: MonkeyPatch,
 ) -> None:
     _repo(tmp_path)
     task = "widget implementation test"
@@ -414,7 +422,7 @@ def test_action_surfaces_consume_canonical_action_discrimination(
             "needed": True,
             "reason": "missing-verification-evidence",
         }
-        codemap.task_action_map = lambda *args, **kwargs: action  # type: ignore[method-assign]
+        monkeypatch.setattr(codemap, "task_action_map", lambda *args, **kwargs: action)
         brief = codemap.task_action_brief(task, token_budget=256)
         packet = codemap.task_decision_packet(task, token_budget=256)
 

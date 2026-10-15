@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
@@ -93,7 +94,7 @@ def test_execution_receipt_refuses_to_seal_mutation_violation() -> None:
 
 
 def test_counterfactual_mutations_cover_invariant_and_authority_changes() -> None:
-    def evaluate(payload: dict[str, object]) -> str:
+    def evaluate(payload: Mapping[str, object]) -> str:
         mutation = payload.get("repository_mutation")
         if mutation in {
             "replace-owner-definition",

@@ -6,6 +6,7 @@ import time
 from typing import TYPE_CHECKING
 
 import pytest
+from contract_assertions import assert_object, assert_text
 
 from hashmarks import CodeMap
 from hashmarks.codemap.repository_intelligence_query import (
@@ -101,10 +102,10 @@ def test_query_facade_delta_matches_direct_delta(tmp_path: Path) -> None:
         )
     assert query["result"] == direct
     rendered = present_repository_evidence(direct, format="text")
-    assert "member_revision_changed" in rendered["text"]
-    assert "src/owner.py" in rendered["text"]
-    assert not direct["semantic"].get("symbols_added")
-    assert not direct["semantic"].get("symbols_removed")
+    assert "member_revision_changed" in assert_text(rendered["text"])
+    assert "src/owner.py" in assert_text(rendered["text"])
+    assert not assert_object(direct["semantic"]).get("symbols_added")
+    assert not assert_object(direct["semantic"]).get("symbols_removed")
 
 
 def test_query_facade_is_deterministic_and_fails_closed(tmp_path: Path) -> None:

@@ -7,9 +7,9 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
 
 import pytest
+from contract_assertions import assert_object, assert_text
 
 from hashmarks.adapters import uv_lock_dependency_observation
 from hashmarks.codemap import CodeMap
@@ -28,7 +28,7 @@ def observation_inputs(
     root.mkdir()
     (root / "backend.py").write_text("def handler():\n    return 1\n")
     fixture = Path(__file__).parent / "fixtures/dependency_dogfood/uv/v1/uv.lock"
-    cases = [
+    cases: list[dict[str, object]] = [
         {
             "operation": "dependency_codemap",
             "inputs": {
@@ -61,7 +61,7 @@ def _assert_captures(
     }
     for capture in captures:
         validate_transport_capture(capture)
-        response = capture["response"]
+        response = assert_object(capture["response"])
         if operation == "repository_intelligence_query":
             assert response["schema"] == operation_schema(operation)
             assert response["result"] == packet["result"]
@@ -71,9 +71,9 @@ def _assert_captures(
             native = response.get("result", response)
             assert native == packet
         if capture["format"] != "none":
-            assert validate_evidence_presentation(native, response["presentation"])[
-                "valid"
-            ]
+            assert validate_evidence_presentation(
+                assert_object(native), assert_object(response["presentation"])
+            )["valid"]
         else:
             assert "presentation" not in response
 
@@ -85,7 +85,9 @@ def test_cli_json_observations_keep_canonical_evidence_in_every_format(
 ) -> None:
     root, state, cases, packets = observation_inputs
     for case, packet in zip(cases, packets, strict=True):
-        _assert_captures(capture_cli(root, state, case), packet, case["operation"])
+        _assert_captures(
+            capture_cli(root, state, case), packet, assert_text(case["operation"])
+        )
 
 
 @pytest.mark.host_mcp_sdk
@@ -96,7 +98,9 @@ def test_official_mcp_matches_json_cli_observation_contract(
 ) -> None:
     root, state, cases, packets = observation_inputs
     for case, packet in zip(cases, packets, strict=True):
-        _assert_captures(capture_mcp(root, state, case), packet, case["operation"])
+        _assert_captures(
+            capture_mcp(root, state, case), packet, assert_text(case["operation"])
+        )
 
 
 @pytest.mark.parametrize(

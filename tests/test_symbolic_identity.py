@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from contract_assertions import assert_array, assert_object, assert_records
+
 from hashmarks.symbolic_identity import symbolic_nomination_record, symbolic_task_terms
 
 
@@ -48,10 +50,13 @@ def test_decision_packet_exposes_nomination_without_ranking_authority(
             limit=20,
         )
 
-    nomination = packet["symbolic_nomination"]
-    assert "normalize_widget" in nomination["terms"]
+    nomination = assert_object(packet["symbolic_nomination"])
+    assert "normalize_widget" in assert_array(nomination["terms"])
     assert nomination["status"] in {"resolved", "ambiguous"}
-    assert any(row["name"] == "normalize_widget" for row in nomination["candidates"])
+    assert any(
+        row["name"] == "normalize_widget"
+        for row in assert_records(nomination["candidates"])
+    )
     assert nomination["authority"] == "nomination-only"
     assert nomination["ranking_effect"] == "none"
     assert packet["ranking_effect"] == "none"
