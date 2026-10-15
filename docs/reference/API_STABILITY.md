@@ -45,6 +45,15 @@ Development material under `scripts/agent_evaluation/`, `benchmarks/agent_evalua
 
 ## Pre-1.0 contract evolution
 
+Existing findings, structural-locality and resolved-owner task-evidence surfaces
+may carry the additive `resource_lifecycle` observation documented in
+[Filesystem lifecycle evidence](FILESYSTEM_LIFECYCLE_EVIDENCE.md). Its nested
+`hashmarks.python-filesystem-lifecycle-observation.v1` schema is accepted by
+`validate_repository_intelligence_evidence()`. Source-reference relationships,
+runtime identity, freshness, semantic coverage, lexical guards and external
+claims remain separate; validation never establishes protection or exploitability.
+An envelope without this optional family means evidence was not supplied.
+
 For the `0.x` series:
 
 - Hashmarks carries one current documented Python/CLI surface; names outside the supported contract are removed rather than kept as compatibility aliases.

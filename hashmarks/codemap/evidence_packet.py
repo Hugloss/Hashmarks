@@ -1213,6 +1213,7 @@ class TaskEvidencePacketMixin(
                 task,
                 limit=limit,
             )
+            self._task_evidence_attach_lifecycle(result, action)
 
         self._task_evidence_attach_owner_source(
             result,
@@ -1245,6 +1246,23 @@ class TaskEvidencePacketMixin(
         if result_mode == "initial":
             return self._task_evidence_initial_response(packet)
         return packet
+
+    def _task_evidence_attach_lifecycle(
+        self, result: TaskEvidenceDraft, action: TaskActionMap
+    ) -> None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        from .ownership.filesystem_lifecycle import FilesystemLifecycleAnalyzer
+
+        if result["ownership"].get("status") != "resolved":
+            return
+        owner = action.get("edit")
+        if not isinstance(owner, dict) or not owner.get("path"):
+            return
+        path = str(owner["path"])
+        if path.endswith(".py"):
+            packet = FilesystemLifecycleAnalyzer(self).analyze([path])
+            result["related"]["resource_lifecycle"] = packet
 
     @operation_response("task_action_brief")
     @decision_scoped

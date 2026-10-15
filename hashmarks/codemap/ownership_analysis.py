@@ -12,6 +12,10 @@ from .decision_session import decision_scoped
 from .ownership.cache_invalidation import CacheInvalidationAnalyzer
 from .ownership.cache_ownership import CacheOwnershipAnalyzer
 from .ownership.concurrency_risk import ConcurrencyRiskAnalyzer
+from .ownership.filesystem_lifecycle import (
+    FilesystemLifecycleAnalyzer,
+    lifecycle_findings,
+)
 from .ownership.import_ownership import ImportOwnershipAnalyzer
 
 if TYPE_CHECKING:
@@ -178,12 +182,14 @@ class OwnershipAnalysisMixin:
             ),
         ]
         findings = [self._adjudicate_repository_finding(item) for item in findings]
+        lifecycle = FilesystemLifecycleAnalyzer(self).analyze(paths)
+        findings.extend(lifecycle_findings(lifecycle))
         severity_order = {"warning": 0, "advisory": 1}
         findings.sort(
             key=lambda item: (
                 severity_order.get(str(item["severity"]), 9),
                 str(item["path"]),
-                int(item["line"]),
+                int(str(item["line"])),
                 str(item["code"]),
             )
         )
@@ -213,6 +219,7 @@ class OwnershipAnalysisMixin:
                 "concurrency_risk": dict(concurrency_result["summary"]),
             },
             "findings": findings,
+            "resource_lifecycle": lifecycle,
             "boundary": (
                 "repository-evidence projection only; no execution, remediation, "
                 "admission, certification, or agent authority"

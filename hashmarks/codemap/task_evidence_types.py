@@ -337,6 +337,7 @@ class TaskRelatedEvidence(TypedDict):
     contract: TaskCandidate | None
     inspect: list[TaskCandidate]
     candidates: list[TaskCandidate]
+    resource_lifecycle: NotRequired[Mapping[str, object]]
 
 
 class TaskFreshness(TypedDict):

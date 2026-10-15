@@ -731,6 +731,7 @@ def _locality(
     ref: tuple[object, ...],
     ctx: Mapping[str, object],
 ) -> None:
+    _lifecycle(p, packet, ref, ctx)
     p.field(
         packet,
         "native_semantic_relationships",
@@ -1188,6 +1189,34 @@ def _findings(
     ctx: Mapping[str, object],
 ) -> None:
     p.field(packet, "findings", "diagnostic", ref, ctx, assertion="producer_claim")
+    _lifecycle(p, packet, ref, ctx)
+
+
+def _lifecycle(
+    p: _Projection,
+    packet: Mapping[str, object],
+    ref: tuple[object, ...],
+    ctx: Mapping[str, object],
+) -> None:
+    p.nested(packet, "resource_lifecycle", ref, ctx)
+
+
+def _lifecycle_packet(
+    p: _Projection,
+    packet: Mapping[str, object],
+    ref: tuple[object, ...],
+    ctx: Mapping[str, object],
+) -> None:
+    from .codemap.filesystem_lifecycle_contract import validate_lifecycle_observation
+
+    validate_lifecycle_observation(packet)
+    p.field(packet, "coverage", "qualification", ref, ctx, shape="record")
+    p.field(packet, "accounting", "evidence_measurement", ref, ctx, shape="record")
+    p.field(packet, "unresolved", "qualification", ref, ctx, assertion="producer_claim")
+    p.field(
+        packet, "observations", "relationship", ref, ctx, assertion="producer_claim"
+    )
+    p.field(packet, "operations", "source", ref, ctx, assertion="producer_claim")
 
 
 def _structural_comparison(
@@ -1286,7 +1315,10 @@ def _projectors() -> dict[str, Any]:
         VERIFICATION_EXPLANATION_SCHEMA,
     )
 
+    from .codemap.filesystem_lifecycle_contract import SCHEMA as LIFECYCLE_SCHEMA
+
     return {
+        LIFECYCLE_SCHEMA: _lifecycle_packet,
         REPOSITORY_SNAPSHOT_SCHEMA: _snapshot,
         REPOSITORY_DELTA_SCHEMA: _delta,
         DIAGNOSTIC_DELTA_SCHEMA: _diagnostic,

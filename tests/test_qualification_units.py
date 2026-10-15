@@ -3,6 +3,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from contract_assertions import assert_array, assert_records, assert_text
 
 from hashmarks.qualification_units import (
     COVERAGE_SCHEMA,
@@ -15,7 +16,11 @@ from hashmarks.qualification_units import (
     validate_external_qualification_coverage,
     validate_native_qualification_handoff,
 )
-from hashmarks.test_shards import _nodeids, node_membership_identity
+from hashmarks.test_shards import (
+    PROCESS_SENSITIVE_NODEIDS,
+    _nodeids,
+    node_membership_identity,
+)
 
 
 def _root() -> Path:
@@ -54,9 +59,15 @@ def test_owner_units_exactly_partition_repository_test_membership(
 def test_special_classifications_are_singleton_external_units(
     repository_qualification_plan: dict[str, object],
 ) -> None:
-    units = tuple(repository_qualification_plan["units"])
+    units = assert_records(repository_qualification_plan["units"])
     special = [unit for unit in units if unit["kind"] != "release-correctness"]
-    assert len([unit for unit in special if unit["kind"] == "process-sensitive"]) == 1
+    assert {
+        assert_text(nodeid)
+        for unit in special
+        if unit["kind"] == "process-sensitive"
+        for nodeid in assert_array(unit["nodeids"])
+    } == set(PROCESS_SENSITIVE_NODEIDS)
+    assert all(len(assert_array(unit["nodeids"])) == 1 for unit in special)
     assert len([unit for unit in special if unit["kind"] == "empirical-benchmark"]) == 6
     assert all(unit["preferred_granularity"] == "singleton" for unit in special)
     assert all(unit["execution_authority"] == "external" for unit in special)

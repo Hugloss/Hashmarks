@@ -188,6 +188,9 @@ def project_task(
         ("related", "relationship"),
     ):
         p.field(packet, key, family, ref, ctx, shape="record")
+    related = packet.get("related")
+    if isinstance(related, Mapping):
+        p.nested(related, "resource_lifecycle", (*ref, "related"), ctx)
 
 
 def compact_initial_relationships(result: dict[str, Any]) -> None:

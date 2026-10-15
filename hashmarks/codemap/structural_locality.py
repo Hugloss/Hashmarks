@@ -19,6 +19,7 @@ from hashmarks.producer_identity import native_producer_implementation_identity
 from hashmarks.python_ast_cache import read_python_ast
 
 from .model import EvidenceVisibility
+from .ownership.filesystem_lifecycle import locality_lifecycle
 
 if TYPE_CHECKING:
     from .engine import CodeMap
@@ -268,7 +269,7 @@ class StructuralLocalityMixin:
                 source_path, targets[0]
             )
             if unresolved:
-                return None, candidate_ids, True, True
+                return None, candidate_ids, True
             owner_paths = set(owners)
             owned = [
                 row for row in candidates if str(row.get("path") or "") in owner_paths
@@ -1357,6 +1358,9 @@ class StructuralLocalityMixin:
         # Preserve unavailable and stale provider coverage without making it a
         # repository-negative relationship claim.
         semantic.update(self._scip_direct_relationships(target_row, target_node))
+        semantic["resource_lifecycle"] = locality_lifecycle(
+            self, ordered_nodes, max_depth, call_limit_per_symbol, ref_limit_per_symbol
+        )
         return {**semantic, "evidence_identity": _identity(semantic)}
 
 

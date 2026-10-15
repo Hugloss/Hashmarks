@@ -432,6 +432,12 @@ def _packet_roles(row: dict[str, object], path: str) -> None:
     for key in ("inspect", "candidates"):
         for locator in _records(related.get(key), f"{path}.related.{key}"):
             _locator(locator, f"{path}.related.{key}")
+    if "resource_lifecycle" in related:
+        from .filesystem_lifecycle_contract import validate_lifecycle_observation
+
+        validate_lifecycle_observation(
+            _record(related["resource_lifecycle"], f"{path}.related.resource_lifecycle")
+        )
     explicit = _record(row.get("explicit_target"), f"{path}.explicit_target")
     _field(explicit, "status", str, f"{path}.explicit_target")
     for key in ("basis", "path", "symbol"):

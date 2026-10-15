@@ -290,7 +290,7 @@ MCP_TOOL_CONTRACTS = (
     McpToolContract(
         "repository_findings",
         (
-            "Read existing repository import, cache-ownership, and concurrency "
+            "Read repository import, cache-ownership, concurrency and qualified filesystem check/use "
             "findings without starting analysis tools or choosing repairs."
         ),
         "repository_findings",

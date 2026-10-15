@@ -12,6 +12,7 @@ This is the single catalog for the current maintained documentation in `docs/`.
 - [`reference/ARCHITECTURE.md`](reference/ARCHITECTURE.md) — architecture and authority model.
 - [`reference/API_STABILITY.md`](reference/API_STABILITY.md) — supported Python/CLI surface and pre-1.0 compatibility policy.
 - [`reference/EVIDENCE_CORRELATION.md`](reference/EVIDENCE_CORRELATION.md) — bounded external-observation correlation and authority limits.
+- [`reference/FILESYSTEM_LIFECYCLE_EVIDENCE.md`](reference/FILESYSTEM_LIFECYCLE_EVIDENCE.md) — qualified Python filesystem checks, source-reference flow, protection syntax and uncertainty.
 - [`reference/DEPENDENCY_EVIDENCE.md`](reference/DEPENDENCY_EVIDENCE.md) — producer-neutral dependency evidence, adapter boundaries, semantic authorities, and coverage rules.
 - [`reference/INVARIANTS.md`](reference/INVARIANTS.md) — normative correctness, freshness, and authority guarantees.
 - [`reference/OBSERVER_DELTA.md`](reference/OBSERVER_DELTA.md) — observer/delta ownership and change semantics.
@@ -38,6 +39,7 @@ This is the single catalog for the current maintained documentation in `docs/`.
 
 ## Plans
 
+- [`plans/HASHMARKS_TOCTOU_EVIDENCE_DISCOVERY_PLAN.md`](plans/HASHMARKS_TOCTOU_EVIDENCE_DISCOVERY_PLAN.md) — filesystem check/use implementation and required native/reference/external qualification.
 - [`plans/COMPETITOR_EVIDENCE_CONSOLIDATED.md`](plans/COMPETITOR_EVIDENCE_CONSOLIDATED.md) — single-PR admission and implementation checklist for competitor-inspired repository evidence.
 - [`plans/COMPETITOR_EVIDENCE_FOLLOWUP.md`](plans/COMPETITOR_EVIDENCE_FOLLOWUP.md) — post-#415 checkpoint boundaries, opt-in static handler syntax and deferred provider/measurement work.
 

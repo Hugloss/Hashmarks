@@ -17,6 +17,12 @@ from .codemap.diagnostic_source_revision import (
     normalize_source_revision_claims,
     validated_diagnostic_source_revision_evidence,
 )
+from .codemap.filesystem_lifecycle_contract import (
+    SCHEMA as LIFECYCLE_SCHEMA,
+)
+from .codemap.filesystem_lifecycle_contract import (
+    validate_lifecycle_observation,
+)
 from .codemap.repository_delta import EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA
 from .codemap.semantic_relationship_delta import validate_relationship_delta
 from .codemap.semantic_relationship_model import (
@@ -41,6 +47,7 @@ _OWNERSHIP_RELATION_SCHEMA = operation_schema("ownership_relation_graph")
 _TASK_ACTION_MAP_SCHEMA = operation_schema("task_action_map")
 
 _CURRENT_EVIDENCE_KINDS: dict[str, str] = {
+    LIFECYCLE_SCHEMA: "filesystem-lifecycle-observation",
     RELATIONSHIP_OBSERVATION_SCHEMA: "semantic-relationship-observation",
     RELATIONSHIP_DELTA_SCHEMA: "semantic-relationship-delta",
     _DECISION_PACKET_SCHEMA: "decision",
@@ -468,7 +475,32 @@ def _semantic_relationship_evidence(
         return {}
 
 
+def _lifecycle_evidence(
+    payload: Mapping[str, object], reasons: list[str]
+) -> dict[str, object]:
+    try:
+        packet = validate_lifecycle_observation(payload)
+    except (TypeError, ValueError, KeyError):
+        reasons.append("invalid-filesystem-lifecycle-evidence")
+        return {}
+    return {
+        "repository_identity": packet["repository_identity"],
+        "codemap_generation": packet["generation"],
+        "stale": packet["stale"],
+        "source_revisions": packet["source_revisions"],
+        "projection_coverage": "projection-only",
+        "unprojected_sections": [
+            "/operations",
+            "/observations",
+            "/unresolved",
+            "/coverage",
+            "/accounting",
+        ],
+    }
+
+
 _VALIDATORS = {
+    LIFECYCLE_SCHEMA: _lifecycle_evidence,
     RELATIONSHIP_OBSERVATION_SCHEMA: _semantic_relationship_evidence,
     RELATIONSHIP_DELTA_SCHEMA: _semantic_relationship_evidence,
     _DECISION_PACKET_SCHEMA: _decision_packet,
