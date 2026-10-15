@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from contract_assertions import assert_array, assert_number, assert_object, assert_text
+
 from hashmarks.codemap import CodeMap
 
 if TYPE_CHECKING:
@@ -20,21 +22,23 @@ def test_decision_packet_discriminates_unproven_ranked_candidate(
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         packet = codemap.task_decision_packet("Adapter implementation test", limit=20)
-    assert packet["edit"]["path"] == "src/adapter.py"
-    assert packet["verify"]["path"] == "tests/test_adapter.py"
-    assert packet["discrimination"]["needed"] is True
-    assert packet["discrimination"]["reason"] == "ownership-unresolved"
-    assert packet["ownership_authority"]["owner_resolved"] is False
-    metrics = packet["decision_metrics"]
+    assert assert_object(packet["edit"])["path"] == "src/adapter.py"
+    assert assert_object(packet["verify"])["path"] == "tests/test_adapter.py"
+    discrimination = assert_object(packet["discrimination"])
+    assert discrimination["needed"] is True
+    assert discrimination["reason"] == "ownership-unresolved"
+    assert assert_object(packet["ownership_authority"])["owner_resolved"] is False
+    metrics = assert_object(packet["decision_metrics"])
     assert metrics["schema"] == "hashmarks.task-decision-metrics.v1"
-    assert set(metrics["seconds"]) == {
+    seconds = assert_object(metrics["seconds"])
+    assert set(seconds) == {
         "action_map",
         "work_context",
         "verification_plan",
         "packet_assembly",
         "total",
     }
-    assert all(value >= 0 for value in metrics["seconds"].values())
+    assert all(assert_number(value) >= 0 for value in seconds.values())
 
 
 def test_decision_packet_requires_discrimination_when_no_supported_owner_exists(
@@ -46,8 +50,9 @@ def test_decision_packet_requires_discrimination_when_no_supported_owner_exists(
         codemap.sync()
         packet = codemap.task_decision_packet("widget test verification", limit=20)
     assert packet["edit"] is None
-    assert packet["discrimination"]["needed"] is True
-    assert packet["discrimination"]["reason"] == "no-supported-owner-candidate"
+    discrimination = assert_object(packet["discrimination"])
+    assert discrimination["needed"] is True
+    assert discrimination["reason"] == "no-supported-owner-candidate"
 
 
 def test_structural_candidate_without_authority_requires_discrimination(
@@ -72,10 +77,11 @@ def test_structural_candidate_without_authority_requires_discrimination(
         packet = codemap.task_decision_packet(
             "Fix widget accepted response to '-new'", limit=20
         )
-    assert packet["edit"]["path"] == "src/engine.py"
-    assert packet["ownership_authority"]["owner_resolved"] is False
-    assert packet["discrimination"]["needed"] is True
-    assert packet["discrimination"]["reason"] == "ownership-unresolved"
+    assert assert_object(packet["edit"])["path"] == "src/engine.py"
+    assert assert_object(packet["ownership_authority"])["owner_resolved"] is False
+    discrimination = assert_object(packet["discrimination"])
+    assert discrimination["needed"] is True
+    assert discrimination["reason"] == "ownership-unresolved"
 
 
 def test_decision_packet_build_guard_overrides_action_discrimination(
@@ -115,29 +121,32 @@ def test_decision_packet_exposes_provenance_bound_verification_selection(
         codemap.sync()
         packet = codemap.task_decision_packet("Adapter implementation test", limit=20)
 
-    membership = packet["verification_membership"]
-    envelope = packet["verification_selection_envelope"]
+    membership = assert_object(packet["verification_membership"])
+    envelope = assert_object(packet["verification_selection_envelope"])
     assert membership["member_count"] == 1
-    assert membership["members"][0]["path"] == "tests/test_adapter.py"
-    assert membership["membership_identity"].startswith("sha256:")
     assert (
-        envelope["selection"]["membership_identity"]
+        assert_object(assert_array(membership["members"])[0])["path"]
+        == "tests/test_adapter.py"
+    )
+    assert assert_text(membership["membership_identity"]).startswith("sha256:")
+    assert (
+        assert_object(envelope["selection"])["membership_identity"]
         == membership["membership_identity"]
     )
     assert (
-        envelope["repository"]["repository_identity"]
-        == packet["identity"]["repository_identity"]
+        assert_object(envelope["repository"])["repository_identity"]
+        == assert_object(packet["identity"])["repository_identity"]
     )
     assert (
-        envelope["repository"]["source_identity"]
-        == packet["identity"]["source_identity"]
+        assert_object(envelope["repository"])["source_identity"]
+        == assert_object(packet["identity"])["source_identity"]
     )
     assert (
-        packet["identity"]["verification_membership_identity"]
+        assert_object(packet["identity"])["verification_membership_identity"]
         == membership["membership_identity"]
     )
     assert (
-        packet["identity"]["verification_selection_envelope_identity"]
+        assert_object(packet["identity"])["verification_selection_envelope_identity"]
         == envelope["envelope_identity"]
     )
 
@@ -162,16 +171,22 @@ def test_repeated_stable_query_reproduces_selection_identities(tmp_path: Path) -
 
     for packet in (second, third):
         assert (
-            packet["identity"]["verification_membership_identity"]
-            == first["identity"]["verification_membership_identity"]
+            assert_object(packet["identity"])["verification_membership_identity"]
+            == assert_object(first["identity"])["verification_membership_identity"]
         )
         assert (
-            packet["identity"]["verification_selection_envelope_identity"]
-            == first["identity"]["verification_selection_envelope_identity"]
+            assert_object(packet["identity"])[
+                "verification_selection_envelope_identity"
+            ]
+            == assert_object(first["identity"])[
+                "verification_selection_envelope_identity"
+            ]
         )
         assert (
-            packet["downstream_verification_contract"]["provenance_hash"]
-            == first["downstream_verification_contract"]["provenance_hash"]
+            assert_object(packet["downstream_verification_contract"])["provenance_hash"]
+            == assert_object(first["downstream_verification_contract"])[
+                "provenance_hash"
+            ]
         )
 
 
@@ -188,7 +203,7 @@ def test_decision_packet_is_observation_not_consumer_decision(tmp_path: Path) ->
 
     assert packet["authority"] == "repository-observation-only"
     assert packet["consumer_action"] == "external"
-    assert packet["discrimination"]["interpretation"] == (
+    assert assert_object(packet["discrimination"])["interpretation"] == (
         "evidence-discrimination-only"
     )
 
@@ -218,10 +233,11 @@ def test_decision_packet_preserves_explicit_owner_with_named_dependency(
         codemap.sync()
         packet = codemap.task_decision_packet(task, limit=20, token_budget=256)
 
-    assert packet["edit"]["path"] == "src/publish.py"
-    assert packet["ambiguity"]["ambiguous"] is False
-    assert packet["discrimination"]["needed"] is False
-    assert packet["discrimination"]["reason"] == "resolved"
+    assert assert_object(packet["edit"])["path"] == "src/publish.py"
+    assert assert_object(packet["ambiguity"])["ambiguous"] is False
+    discrimination = assert_object(packet["discrimination"])
+    assert discrimination["needed"] is False
+    assert discrimination["reason"] == "resolved"
 
 
 def test_leading_dependency_context_does_not_steal_explicit_edit_owner(
@@ -251,12 +267,14 @@ def test_leading_dependency_context_does_not_steal_explicit_edit_owner(
         action = codemap.task_action_map(task, limit=20, per_role=3)
         packet = codemap.task_decision_packet(task, limit=20, token_budget=256)
 
+    assert action["edit"] is not None
     assert action["edit"]["path"] == "src/publish.py"
     assert action["ownership_authority"]["owner_resolved"] is True
+    assert action["admitted_edit"] is not None
     assert action["admitted_edit"]["path"] == "src/publish.py"
-    assert packet["edit"]["path"] == "src/publish.py"
-    assert packet["candidate"]["path"] == "src/publish.py"
-    assert packet["discrimination"]["needed"] is False
+    assert assert_object(packet["edit"])["path"] == "src/publish.py"
+    assert assert_object(packet["candidate"])["path"] == "src/publish.py"
+    assert assert_object(packet["discrimination"])["needed"] is False
 
 
 def test_decision_packet_consumes_canonical_action_edit(tmp_path: Path) -> None:
@@ -275,13 +293,16 @@ def test_decision_packet_consumes_canonical_action_edit(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         action = codemap.task_action_map(task)
+        assert action["edit"] is not None
         assert action["edit"]["path"] == "src/engine.py"
+        assert action["action_edit"] is not None
         assert action["action_edit"]["path"] == "src/engine.py"
+        assert action["admitted_edit"] is not None
         assert action["admitted_edit"]["path"] == "src/engine.py"
 
         action["action_edit"] = None
         codemap.task_action_map = lambda *args, **kwargs: action  # type: ignore[method-assign]
         packet = codemap.task_decision_packet(task, token_budget=256)
 
-    assert packet["candidate"]["path"] == "src/engine.py"
+    assert assert_object(packet["candidate"])["path"] == "src/engine.py"
     assert packet["edit"] is None

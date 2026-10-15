@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from contract_assertions import assert_array, assert_records, assert_text
 
 from hashmarks.python_ast_cache import ast_cache_info, clear_ast_cache
 from hashmarks.test_shards import ISOLATED_NODEIDS, plan, select
@@ -24,14 +25,18 @@ def test_plan_is_deterministic_complete_and_non_overlapping(tmp_path: Path) -> N
     first = plan(tmp_path, 2)
     second = plan(tmp_path, 2)
     assert first == second
-    nodes = [n for row in first["shards"] for n in row["nodeids"]]
+    nodes = [
+        assert_text(n)
+        for row in assert_records(first["shards"])
+        for n in assert_array(row["nodeids"])
+    ]
     assert sorted(nodes) == [
         "tests/test_a.py::test_one",
         "tests/test_a.py::test_two",
         "tests/test_b.py::TestGroup::test_three",
     ]
     assert len(nodes) == len(set(nodes))
-    assert first["plan_identity"].startswith("sha256:")
+    assert assert_text(first["plan_identity"]).startswith("sha256:")
 
 
 def test_selector_returns_only_requested_shard(tmp_path: Path) -> None:
@@ -56,7 +61,9 @@ def test_process_sensitive_nodes_are_isolated(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     payload = plan(tmp_path, 2)
-    isolated = [row for row in payload["shards"] if row["isolated_process"]]
+    isolated = [
+        row for row in assert_records(payload["shards"]) if row["isolated_process"]
+    ]
     assert len(isolated) == 1
     assert isolated[0]["nodeids"] == [
         "tests/test_codemap_watcher.py::test_codemap_watcher_keeps_map_hot_without_identity_daemon"
@@ -66,14 +73,20 @@ def test_process_sensitive_nodes_are_isolated(tmp_path: Path) -> None:
 def test_real_repository_isolated_nodes_have_exact_singleton_membership() -> None:
     root = Path(__file__).resolve().parents[1]
     payload = plan(root, 64)
-    shards = payload["shards"]
-    membership = [nodeid for shard in shards for nodeid in shard["nodeids"]]
+    shards = assert_records(payload["shards"])
+    membership = [
+        nodeid for shard in shards for nodeid in assert_array(shard["nodeids"])
+    ]
     assert len(membership) == len(set(membership)) == payload["test_node_count"]
     assert all(
-        len(shard["nodeids"]) == 1 for shard in shards if shard["isolated_process"]
+        len(assert_array(shard["nodeids"])) == 1
+        for shard in shards
+        if shard["isolated_process"]
     )
     assert {
-        shard["nodeids"][0] for shard in shards if shard["isolated_process"]
+        assert_array(shard["nodeids"])[0]
+        for shard in shards
+        if shard["isolated_process"]
     } == set(ISOLATED_NODEIDS)
 
 
@@ -103,10 +116,12 @@ def test_expensive_benchmark_nodes_are_always_singleton_shards(tmp_path: Path) -
         encoding="utf-8",
     )
     payload = plan(tmp_path, 6)
-    isolated = [row for row in payload["shards"] if row["isolated_process"]]
+    isolated = [
+        row for row in assert_records(payload["shards"]) if row["isolated_process"]
+    ]
     assert len(isolated) == 5
-    assert all(len(row["nodeids"]) == 1 for row in isolated)
-    isolated_nodes = {row["nodeids"][0] for row in isolated}
+    assert all(len(assert_array(row["nodeids"])) == 1 for row in isolated)
+    isolated_nodes = {assert_array(row["nodeids"])[0] for row in isolated}
     assert (
         "tests/test_agent_metrics_suite.py::test_ordinary_metrics_contract"
         not in isolated_nodes
@@ -126,13 +141,14 @@ def test_expensive_benchmark_nodes_never_mix_with_ordinary_nodes(
         encoding="utf-8",
     )
     payload = plan(tmp_path, 3)
-    for row in payload["shards"]:
+    for row in assert_records(payload["shards"]):
         if row["isolated_process"]:
-            assert len(row["nodeids"]) == 1
+            assert len(assert_array(row["nodeids"])) == 1
         else:
             assert all(
-                "blind_worker_ab" not in node and "worker_behavior_ab" not in node
-                for node in row["nodeids"]
+                "blind_worker_ab" not in assert_text(node)
+                and "worker_behavior_ab" not in assert_text(node)
+                for node in assert_array(row["nodeids"])
             )
 
 

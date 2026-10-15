@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
+
+from contract_assertions import assert_object, is_available_plan
 
 from hashmarks.codemap import CodeMap
+from hashmarks.python_ast_cache import PythonAstSnapshot
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -46,9 +49,11 @@ def test_verification_relevance_recovers_local_test_outside_canonical_top20(
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         action = codemap.task_action_map(task, limit=20)
+        verify = action["verify"]
+        assert verify is not None
         plan = codemap.verification_plan(
-            action["verify"]["path"],
-            symbol=action["verify"].get("verification_test_symbol"),
+            verify["path"],
+            symbol=verify.get("verification_test_symbol"),
         )
 
     relevance = action["verification_relevance"]
@@ -65,12 +70,12 @@ def test_verification_relevance_recovers_local_test_outside_canonical_top20(
         relevance["selected"]["selection_reason"]
         == "unique-exact-reference-plus-namespace-locality"
     )
-    assert action["verify"]["path"] == expected
     assert action["verify"] is not None
+    assert action["verify"]["path"] == expected
     assert "verification_test_symbol" in action["verify"]
     assert action["verify"]["verification_test_symbol"] == "test_contract"
     assert action["discovery_effect"] == "bounded-verification-reference-projection"
-    assert "argv" in plan
+    assert is_available_plan(plan)
     assert plan["argv"][-1] == f"{expected}::test_contract"
 
 
@@ -92,6 +97,7 @@ def test_verification_relevance_preserves_canonical_choice_when_reference_eviden
     relevance = action["verification_relevance"]
     assert relevance["selection_changed"] is False
     assert "current_canonical_verify" in relevance
+    assert action["verify"] is not None
     assert action["verify"]["path"] == relevance["current_canonical_verify"]
     assert relevance["selection_reason"] == "canonical-verification"
     assert action["discovery_effect"] == "none"
@@ -153,12 +159,13 @@ def test_unique_indirect_active_verifier_overrides_stale_direct_legacy_decoys(
 
     assert action["edit"] is not None
     assert action["edit"]["path"] == "src/case/engine.py"
+    assert action["verify"] is not None
     assert action["verify"]["path"] == "tests/contract/test_public_contract.py"
     assert (
         action["verification_relevance"]["selection_reason"]
         == "unique-bounded-indirect-reference-plus-namespace-locality"
     )
-    assert packet["discrimination"]["needed"] is False
+    assert assert_object(packet["discrimination"])["needed"] is False
 
 
 def test_reexported_active_symbol_keeps_exact_owner_identity(tmp_path: Path) -> None:
@@ -190,6 +197,7 @@ def test_reexported_active_symbol_keeps_exact_owner_identity(tmp_path: Path) -> 
         )
     assert action["edit"] is not None
     assert action["edit"]["path"] == "src/case/engine.py"
+    assert action["verify"] is not None
     assert action["verify"]["path"] == "tests/contract/test_public_contract.py"
 
 
@@ -211,6 +219,7 @@ def test_aliased_import_preserves_underlying_owner_identity(tmp_path: Path) -> N
         )
     assert action["edit"] is not None
     assert action["edit"]["path"] == "src/case/engine.py"
+    assert action["verify"] is not None
     assert action["verify"]["path"] == "tests/test_contract.py"
 
 
@@ -270,6 +279,7 @@ def test_two_hop_reexport_keeps_unique_underlying_owner_identity(
         )
     assert action["edit"] is not None
     assert action["edit"]["path"] == "src/case/engine.py"
+    assert action["verify"] is not None
     assert action["verify"]["path"] == "tests/contract/test_public_contract.py"
 
 
@@ -309,6 +319,7 @@ def test_two_hop_alias_chain_keeps_unique_underlying_owner_identity(
         )
     assert action["edit"] is not None
     assert action["edit"]["path"] == "src/case/engine.py"
+    assert action["verify"] is not None
     assert action["verify"]["path"] == "tests/contract/test_public_contract.py"
 
 
@@ -341,6 +352,7 @@ def test_star_reexport_keeps_name_scoped_unique_owner_identity(tmp_path: Path) -
         )
     assert action["edit"] is not None
     assert action["edit"]["path"] == "src/case/engine.py"
+    assert action["verify"] is not None
     assert action["verify"]["path"] == "tests/contract/test_public_contract.py"
 
 
@@ -387,7 +399,7 @@ def test_same_symbol_across_multiple_live_packages_fails_closed(
         "multiple-exact-identifier-edit-owners",
         "multiple-task-local-structural-owners",
     }
-    assert packet["discrimination"]["needed"] is True
+    assert assert_object(packet["discrimination"])["needed"] is True
 
 
 def test_reexport_chain_beyond_bound_fails_closed_instead_of_stale_verifier(
@@ -431,7 +443,7 @@ def test_reexport_chain_beyond_bound_fails_closed_instead_of_stale_verifier(
     assert "qualified_identity_ambiguous" in action["verification_relevance"]
     assert action["verification_relevance"]["qualified_identity_ambiguous"] is True
     assert action["ambiguity"]["reason"] == "unresolved-qualified-import-identity"
-    assert packet["discrimination"]["needed"] is True
+    assert assert_object(packet["discrimination"])["needed"] is True
 
 
 def test_multiple_star_reexports_do_not_invent_unique_owner(tmp_path: Path) -> None:
@@ -601,10 +613,18 @@ def test_verification_reference_projection_reads_each_candidate_snapshot_once(
     calls = 0
     original = verification_module.read_python_ast
 
-    def counted(path: str, *args: object, **kwargs: object) -> object:
+    def counted(
+        path: str | Path,
+        *,
+        encoding: str = "utf-8",
+        errors: str = "strict",
+        max_attempts: int = 3,
+    ) -> PythonAstSnapshot:
         nonlocal calls
         calls += 1
-        return original(path, *args, **kwargs)
+        return original(
+            path, encoding=encoding, errors=errors, max_attempts=max_attempts
+        )
 
     monkeypatch.setattr(verification_module, "read_python_ast", counted)
     with CodeMap(tmp_path) as codemap:

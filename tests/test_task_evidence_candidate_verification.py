@@ -3,9 +3,14 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, cast
+
+from contract_assertions import assert_array, assert_object, assert_records
 
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.task_evidence_contract import (
+    read_initial_projection,
+    read_task_candidate,
+)
 from hashmarks.codemap.task_evidence_initial import (
     decode_initial_collection,
     decode_initial_packet,
@@ -34,20 +39,21 @@ def test_candidate_disclosure_preserves_ambiguity_and_verification_selection(
     task = "Inspect update_metadata behavior"
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        action = cast("dict[str, Any]", codemap.task_action_map(task))
-        packet = cast("dict[str, Any]", codemap.task_evidence(task))
-        initial = decode_initial_packet(
-            cast("dict[str, Any]", codemap.task_evidence(task, result_mode="initial"))
+        action = codemap.task_action_map(task)
+        packet = codemap.task_evidence(task)
+        initial = read_initial_projection(
+            decode_initial_packet(codemap.task_evidence(task, result_mode="initial"))
         )
     assert packet["ownership"]["owner"] is None
     assert packet["ownership"]["ambiguity"]["ambiguous"] is True
     for observed in (packet, initial):
         relevance = observed["verification"]["relevance"]
-        candidates = relevance["candidates"]
+        candidate_rows: object = relevance["candidates"]
         if "candidates_encoding" in relevance:
-            candidates = decode_initial_collection(
-                candidates, relevance["candidates_encoding"]
+            candidate_rows = decode_initial_collection(
+                candidate_rows, assert_object(relevance["candidates_encoding"])
             )
+        candidates = [read_task_candidate(row) for row in assert_array(candidate_rows)]
         by_path = {row["path"]: row for row in candidates}
         assert {"tests/test_original.py", "tests/test_alternate.py"} <= by_path.keys()
         for path, source in (
@@ -56,20 +62,23 @@ def test_candidate_disclosure_preserves_ambiguity_and_verification_selection(
         ):
             row = by_path[path]
             assert (
-                row["test_revision"]
+                row.get("test_revision")
                 == hash_file(tmp_path / path, domain=FILE_DOMAIN).hash
             )
-            assert row["verification_selection_authority"] is False
-            assert row["negative_evidence_admissible"] is False
-            assert row["edit_relationship"] == "unestablished"
+            assert row.get("verification_selection_authority") is False
+            assert row.get("negative_evidence_admissible") is False
+            assert row.get("edit_relationship") == "unestablished"
             assert any(
                 basis["path"] == source
                 and basis["symbol"] == "Worker"
                 and basis["ownership_authority"] is False
-                for basis in row["source_candidate_basis"]
+                for basis in assert_records(row.get("source_candidate_basis"))
             )
         assert relevance["selection_changed"] is False
+        assert observed["verification"]["selected"] is not None
+        assert action["verify"] is not None
         assert observed["verification"]["selected"]["path"] == action["verify"]["path"]
+        assert "candidate_disclosure" in relevance
         assert (
             relevance["candidate_disclosure"]["negative_evidence_admissible"] is False
         )
@@ -84,12 +93,10 @@ def test_candidate_disclosure_never_promotes_stale_test_revision(
         codemap.sync()
         codemap.task_evidence("Inspect update_metadata behavior")
         path.write_text("def test_different_surface():\n    assert True\n")
-        packet = cast(
-            "dict[str, Any]", codemap.task_evidence("Inspect update_metadata behavior")
-        )
+        packet = codemap.task_evidence("Inspect update_metadata behavior")
     for row in packet["verification"]["relevance"]["candidates"]:
         if row["path"] == "tests/test_original.py" and "test_revision" in row:
-            assert row["test_revision"] == hash_file(path, domain=FILE_DOMAIN).hash
+            assert row.get("test_revision") == hash_file(path, domain=FILE_DOMAIN).hash
 
 
 def test_source_identifier_scout_keeps_late_test_body_without_claiming_reference(
@@ -115,16 +122,17 @@ def test_source_identifier_scout_keeps_late_test_body_without_claiming_reference
         )
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        packet = cast(
-            "dict[str, Any]", codemap.task_evidence("Inspect metadata token behavior")
-        )
+        packet = codemap.task_evidence("Inspect metadata token behavior")
     assert packet["ownership"]["owner"] is None
     candidate = next(
         row
         for row in packet["verification"]["relevance"]["candidates"]
         if row["path"] == "tests/test_neutral.py"
     )
-    assert candidate["subject_term_matches"] >= 2
+    term_matches = candidate.get("subject_term_matches")
+    assert isinstance(term_matches, int)
+    assert term_matches >= 2
+    assert "direct_reference" in candidate
     assert candidate["direct_reference"] is False
-    assert candidate["verification_selection_authority"] is False
-    assert candidate["edit_relationship"] == "unestablished"
+    assert candidate.get("verification_selection_authority") is False
+    assert candidate.get("edit_relationship") == "unestablished"

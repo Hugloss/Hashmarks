@@ -129,7 +129,7 @@ def test_task_evidence_defaults_have_one_owner(
 
     surface = HashmarksMcpSurface(str(tmp_path), state_dir=str(tmp_path / "state"))
     real_map = surface._map
-    surface._map = _Map()
+    monkeypatch.setattr(surface, "_map", _Map())
     try:
         surface.post_change(
             "inspect widget",

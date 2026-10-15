@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from contract_assertions import assert_records
+
 from hashmarks.codemap import CodeMap
 from hashmarks.evidence_presentation import present_repository_evidence
 
@@ -211,6 +213,7 @@ def test_post_change_zero_scip_observation_becomes_unavailable_not_absent(
         delta = codemap.task_post_change_delta(
             _TASK, ["src/engine.py"], previous_evidence=previous
         )
+    assert "semantic_relationships" in delta
     evidence: Any = delta["semantic_relationships"]
     assert (
         evidence["before"]["observation_state"]
@@ -287,6 +290,7 @@ def test_scip_observed_zero_claims_is_not_missing_provider_evidence(
     assert observed["ownership"]["basis"] == missing["ownership"]["basis"]
     assert observed["verification"]["selected"] == missing["verification"]["selected"]
     assert observed["verification"]["plan"] == missing["verification"]["plan"]
+    assert "semantic_relationships" in observed
     discovery = observed["semantic_relationships"]
     assert discovery["observation_state"] == "definition-observed-no-direct-claims"
     assert discovery["observed_relationship_count"] == 0
@@ -304,8 +308,8 @@ def test_scip_observed_zero_claims_is_not_missing_provider_evidence(
     rendered = present_repository_evidence(observed, format="structured")
     rows = [
         row
-        for group in rendered["groups"]
-        for row in group["findings"]
+        for group in assert_records(rendered["groups"])
+        for row in assert_records(group["findings"])
         if row["kind"] == "scip_semantic_discovery"
     ]
     assert len(rows) == 1
@@ -321,8 +325,10 @@ def test_scip_empty_observation_invalidated_after_source_edit(
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
         codemap.import_scip(index)
+        observed = codemap.task_evidence(_TASK)
+        assert "semantic_relationships" in observed
         assert (
-            codemap.task_evidence(_TASK)["semantic_relationships"]["observation_state"]
+            observed["semantic_relationships"]["observation_state"]
             == "definition-observed-no-direct-claims"
         )
 

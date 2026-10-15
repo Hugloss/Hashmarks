@@ -1,11 +1,17 @@
 import json
 from pathlib import Path
-from typing import Any
 
 import pytest
+from contract_assertions import is_available_plan
 
 from hashmarks import cli
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.task_evidence_types import (
+    TaskActionMap,
+    TaskEvidencePacket,
+    TaskOwnership,
+    TaskVerification,
+)
 
 
 def _semantic_repo(root: Path) -> None:
@@ -25,13 +31,13 @@ def _semantic_repo(root: Path) -> None:
     )
 
 
-def _ownership(packet: dict[str, object]) -> dict[str, object]:
+def _ownership(packet: TaskEvidencePacket) -> TaskOwnership:
     value = packet.get("ownership")
     assert isinstance(value, dict)
     return value
 
 
-def _verification(packet: dict[str, object]) -> dict[str, object]:
+def _verification(packet: TaskEvidencePacket) -> TaskVerification:
     value = packet.get("verification")
     assert isinstance(value, dict)
     return value
@@ -57,16 +63,22 @@ def test_task_evidence_supplies_exact_owner_source_and_verification(
     assert start["schema"] == "hashmarks.task-evidence.v5"
     assert "status" not in start
     assert ownership["status"] == "resolved"
+    assert ownership["owner"] is not None
     assert ownership["owner"]["path"] == "src/engine.py"
-    assert verification["plan"]["argv"] == [
+    plan = verification["plan"]
+    assert is_available_plan(plan)
+    assert plan["argv"] == [
         "python",
         "-m",
         "pytest",
         "-q",
         "tests/test_engine.py::test_normalize_widget_semantics",
     ]
+    assert verification["selected"] is not None
     assert verification["selected"]["path"] == "tests/test_engine.py"
+    assert ownership["source_budget"] is not None
     assert ownership["source_budget"]["complete"] is True
+    assert ownership["source_evidence"] is not None
     assert ownership["source_evidence"]["representation"] == "source-range"
     assert "len(value)" in ownership["source_evidence"]["content"]
     assert "'length': 3" not in json.dumps(start, sort_keys=True)
@@ -83,7 +95,9 @@ def test_task_evidence_never_emits_partial_source_when_exact_range_exceeds_budge
 
     ownership = _ownership(start)
     assert ownership["status"] == "resolved"
+    assert ownership["source_budget"] is not None
     assert ownership["source_budget"]["complete"] is False
+    assert ownership["next_read"] is not None
     assert ownership["next_read"]["reason"] == "exact-source-range-exceeds-start-budget"
     assert (
         ownership["source_evidence"] is None
@@ -104,7 +118,9 @@ def test_task_evidence_respects_outline_only_policy(tmp_path: Path) -> None:
     assert ownership["source_evidence"]
     assert ownership["source_evidence"]["representation"] in {"signature", "outline"}
     assert "len(value)" not in json.dumps(start, sort_keys=True)
+    assert ownership["next_read"] is not None
     assert ownership["next_read"]["reason"] == "source-body-not-authorized"
+    assert ownership["source_budget"] is not None
     assert ownership["source_budget"]["complete"] is False
 
 
@@ -135,7 +151,7 @@ def test_task_evidence_computes_action_map_once(tmp_path: Path) -> None:
         original = codemap.task_action_map
         calls = 0
 
-        def counted(*args, **kwargs) -> dict[str, object]:
+        def counted(*args, **kwargs) -> TaskActionMap:
             nonlocal calls
             calls += 1
             return original(*args, **kwargs)
@@ -259,9 +275,13 @@ def test_task_evidence_keeps_typescript_test_path_when_runner_is_project_scoped(
     ownership = _ownership(start)
     verification = _verification(start)
     assert ownership["status"] == "resolved"
+    assert ownership["candidate"] is not None
     assert ownership["candidate"]["path"] == "src/engine.ts"
     assert ownership["owner"] is None
-    assert verification["plan"]["argv"] == ["tsc", "--noEmit", "-p", "tsconfig.json"]
+    plan = verification["plan"]
+    assert is_available_plan(plan)
+    assert plan["argv"] == ["tsc", "--noEmit", "-p", "tsconfig.json"]
+    assert verification["selected"] is not None
     assert verification["selected"]["path"] == "tests/cobalt.test.ts"
     encoded = json.dumps(start, sort_keys=True)
     assert "throw new Error" not in encoded

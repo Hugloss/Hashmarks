@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 from hashmarks import CodeMap
 from hashmarks.codemap.model import SearchHit
@@ -36,7 +37,7 @@ def test_identical_task_action_requests_reuse_one_session_composition(
         calls = 0
         original = codemap.find_task
 
-        def counted(*args, **kwargs) -> list[SearchHit]:
+        def counted(*args, **kwargs) -> Sequence[SearchHit]:
             nonlocal calls
             calls += 1
             return original(*args, **kwargs)
@@ -63,7 +64,7 @@ def test_task_action_reuse_key_includes_task_limit_and_per_role(
         calls = 0
         original = codemap.find_task
 
-        def counted(*args, **kwargs) -> list[SearchHit]:
+        def counted(*args, **kwargs) -> Sequence[SearchHit]:
             nonlocal calls
             calls += 1
             return original(*args, **kwargs)
@@ -107,7 +108,7 @@ def test_task_action_cache_is_not_reused_across_decision_sessions(
         calls = 0
         original = codemap.find_task
 
-        def counted(*args, **kwargs) -> list[SearchHit]:
+        def counted(*args, **kwargs) -> Sequence[SearchHit]:
             nonlocal calls
             calls += 1
             return original(*args, **kwargs)
