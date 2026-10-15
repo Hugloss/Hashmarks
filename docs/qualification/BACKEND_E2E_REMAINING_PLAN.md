@@ -163,6 +163,73 @@ remaining witness families and special metric acquisition/regrading, fresh
 public/native transports, full typing, comparable economics, unseen holdouts and
 exact-artifact final qualification remain open. No 5/5 completion is claimed.
 
+### Implementation checkpoint: 2026-10-15, starting at `650e8f0`
+
+Two generic verification defects are repaired in the existing relevance owner.
+First, reverse-reference discovery could displace an already retrieved test from
+the bounded candidate reply. Candidate disclosure now interleaves the existing
+reference and task-retrieval orders after verifier selection. Selection, exact
+reference claims and total candidate membership retain their existing owners.
+Second, verification discarded two-letter identifier components that the shared
+task tokenizer retains. Components such as `db` in `db_type` now remain visible
+as lexical task evidence; lexical overlap does not establish a reference.
+
+The neutral regressions reproduce both defects with the previous behavior.
+They check bounded disclosure, unchanged selected verification, the complete
+candidate count, initial-packet preservation and the absence of manufactured
+references. The focused verification/initial-packet/CLI/service ring passes
+58 tests. Both modified Python owners pass scoped Ty and Pyright. Ruff,
+formatting, hygiene, complexity/file-size preflight and source compilation pass.
+
+Current genuine CLI/MCP acquisition is retained under
+`.hashmarks/backend-e2e/implementation-20261015/model-disclosure-public-02/`.
+Litestar root-schema and SQLModel `sa_type` workflows pass their current facts,
+freshness, revision, transport, presentation and initial-size gates at both
+revisions. The selected Litestar verifier remains the backend test; its nested
+schema regression is now also disclosed as a candidate. Compact/text initial
+replies peak at 3,320 tokens for Litestar and 2,187 for SQLModel. The FastAPI
+iterable-response verifier miss remains failed at both revisions. Its task has
+not been rewritten and its expected verifier has not been waived. Independent
+authority/initial-recall/capability checks remain incomplete for these cases.
+
+The temporary native-tool installation was absent. Pinned development producers
+were restored under `/tmp`; the official SCIP decoder archive was checked against
+its release metadata digest before use. Fresh model-native acquisition now covers
+all twelve specimens, in four disjoint reports `model-native-live-01` through
+`model-native-live-04`, with matching `model-native-captures-*` roots. All twelve
+specimen outcomes pass. Each report correctly remains incomplete for unselected
+suite membership and retains its own acquisition identity. This proof covers
+nominated native source bindings and transports, not task sufficiency or runtime
+model validation.
+
+Public model membership is also complete across `model-disclosure-public-02`
+and `model-public-batch-01` through `model-public-batch-03`. Eleven workflows
+have no failed current gates; FastAPI iterable-response remains failed.
+`model-reports-01.json` selects these four reports and the four native reports.
+`model-aggregate-01` independently regrades and ADMITs all eight inputs, with
+their original artifact namespaces and acquisition identities. It remains FAIL:
+the known FastAPI miss survives, authority/capability proof remains incomplete,
+and current core/async inputs are not supplied. No historical report is relabelled
+as current. All twelve model workflows meet the compact/text initial-size limit;
+the full population maximum is 3,320 estimated tokens.
+
+The pinned four-repository heldout corpus completes all 24 cases. Twenty pass
+their expected classification; four Hashmarks cases fail: `paths-under`,
+`sync-remove-stale` and `prune-discovery` are WRONG_AMBIGUOUS, and
+`mcp-task-evidence` is OVER_AMBIGUOUS. A fresh comparison from an independent
+extraction of starting commit `650e8f0` produces the same four failures. Both runs
+retain zero FALSE_SAFE_EDIT, FALSE_UNIQUE and WRONG_VERIFIER classifications.
+These failures predate this repair and remain required work; the heldout gate is
+not green. Evidence is in `heldout-01` and `heldout-baseline-01`.
+
+The starting revision's full configured runs report 3,479 Ty diagnostics and
+3,484 Pyright errors (zero warnings), retained in `typecheck-baseline.log` and
+`pyright-baseline.log` under the same output root. Scoped passes do not close T09.
+The twelve missing catalogs, independent oracles and required witness membership,
+remaining witness families, fresh full campaign, economics, unseen backend
+holdouts, deterministic regressions and final artifacts remain open. No row is
+claimed as qualified at 5/5.
+
 ### T00: baseline and prerequisites
 
 Record HEAD/worktree state, observer/evaluator identities, lock/configuration

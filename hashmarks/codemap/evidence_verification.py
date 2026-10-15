@@ -243,10 +243,10 @@ class VerificationMixin(VerificationOwnershipMixin):
             for part in Path(edit_path).parent.parts
             if part.casefold() not in generic_parts
         }
+        # Use the shared identifier vocabulary: two-letter components such as
+        # ``db`` in ``db_type`` are evidence, just as they are in task retrieval.
         task_terms = {
-            term
-            for term in _query_terms(task)
-            if len(term) >= 3 and term not in _TASK_STOPWORDS
+            term for term in _query_terms(task) if term not in _TASK_STOPWORDS
         }
         canonical_rank, candidate_paths = self._verification_candidate_seeds(
             rows, current_path
@@ -1079,6 +1079,29 @@ class VerificationMixin(VerificationOwnershipMixin):
         )
 
     @staticmethod
+    def _verification_disclosure_order(
+        candidates: Sequence[dict[str, object]],
+    ) -> list[dict[str, object]]:
+        """Retain task retrieval alongside reference discovery in bounded replies.
+
+        A module-wide reverse-reference search can fill every returned slot with
+        smoke tests and hide an already retrieved behavior-specific test. Merge
+        the two existing orders for disclosure only; selection and reference
+        qualification have already finished and are not re-decided here.
+        """
+        task_candidates = sorted(
+            (row for row in candidates if isinstance(row.get("canonical_rank"), int)),
+            key=lambda row: cast("int", row["canonical_rank"]),
+        )
+        ordered: dict[str, dict[str, object]] = {}
+        for index, row in enumerate(candidates):
+            ordered.setdefault(str(row["path"]), row)
+            if index < len(task_candidates):
+                task_row = task_candidates[index]
+                ordered.setdefault(str(task_row["path"]), task_row)
+        return list(ordered.values())
+
+    @staticmethod
     def _verification_bounded_candidates(
         candidates: Sequence[Mapping[str, object]],
         selected: Mapping[str, object] | None,
@@ -1230,6 +1253,7 @@ class VerificationMixin(VerificationOwnershipMixin):
         # already selected verification surface or any exact reference claim.
         candidates.extend(self._verification_lexical_candidates(state))
         candidates.sort(key=self._verification_candidate_score, reverse=True)
+        candidates = self._verification_disclosure_order(candidates)
         return {
             **self._verification_relevance_result(
                 state, candidates, selected, reason, limit
