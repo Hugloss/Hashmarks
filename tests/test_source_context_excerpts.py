@@ -8,8 +8,16 @@ from __future__ import annotations
 
 from copy import deepcopy
 from pathlib import Path
+from typing import cast
 
 import pytest
+from contract_assertions import (
+    assert_array,
+    assert_number,
+    assert_object,
+    assert_records,
+    assert_text,
+)
 
 from hashmarks import CodeMap
 from hashmarks.evidence_presentation import present_repository_evidence
@@ -32,30 +40,37 @@ def test_context_is_opt_in_and_does_not_change_location_identity(
             "sample.py", literal="needle", context_lines=1
         )
     assert legacy == explicit_zero
-    assert "context_lines" not in legacy["limits"]
-    assert "context_excerpt" not in legacy["occurrences"][0]
-    assert contextual["limits"]["context_lines"] == 1
-    assert (
-        contextual["occurrences"][0]["evidence_identity"]
-        == (legacy["occurrences"][0]["evidence_identity"])
+    assert "context_lines" not in assert_object(legacy["limits"])
+    assert "context_excerpt" not in assert_object(
+        assert_array(legacy["occurrences"])[0]
     )
-    assert contextual["occurrences"][0]["column"] == legacy["occurrences"][0]["column"]
+    assert assert_object(contextual["limits"])["context_lines"] == 1
+    assert (
+        assert_object(assert_array(contextual["occurrences"])[0])["evidence_identity"]
+        == (assert_object(assert_array(legacy["occurrences"])[0])["evidence_identity"])
+    )
+    assert (
+        assert_object(assert_array(contextual["occurrences"])[0])["column"]
+        == assert_object(assert_array(legacy["occurrences"])[0])["column"]
+    )
     assert contextual["observation_identity"] != legacy["observation_identity"]
-    excerpt = contextual["occurrences"][0]["context_excerpt"]
-    assert [(row["line"], row["role"]) for row in excerpt] == [
+    excerpt = assert_object(assert_array(contextual["occurrences"])[0])[
+        "context_excerpt"
+    ]
+    assert [(row["line"], row["role"]) for row in assert_records(excerpt)] == [
         (1, "context"),
         (2, "match"),
         (3, "context"),
     ]
-    assert [row["text"] for row in excerpt] == [
+    assert [row["text"] for row in assert_records(excerpt)] == [
         "def f():",
         "    value = 'needle'",
         "    return value",
     ]
-    assert all(row["start_column"] == 1 for row in excerpt)
+    assert all(row["start_column"] == 1 for row in assert_records(excerpt))
     assert all(
         row["truncated_left"] is False and row["truncated_right"] is False
-        for row in excerpt
+        for row in assert_records(excerpt)
     )
 
 
@@ -72,17 +87,21 @@ def test_long_physical_lines_clip_without_losing_match_or_unicode_columns(
         packet = codemap.source_observation(
             "example.py", literal="needle", context_lines=1
         )
-    hit = packet["occurrences"][0]
-    assert hit["column"] == 2001  # Unicode codepoints, not UTF-8 bytes
-    rows = hit["context_excerpt"]
-    assert len(rows) == 3
-    match = rows[1]
-    assert match["start_column"] > 1
-    assert match["truncated_left"] is True
-    assert match["truncated_right"] is True
-    assert len(match["text"]) <= 320
-    assert "needle" in match["text"]
-    assert match["text"].index("needle") + match["start_column"] == hit["column"]
+    hit = assert_array(packet["occurrences"])[0]
+    assert assert_object(hit)["column"] == 2001  # Unicode codepoints, not UTF-8 bytes
+    rows = assert_object(hit)["context_excerpt"]
+    assert len(assert_array(rows)) == 3
+    match = assert_array(rows)[1]
+    assert assert_number(assert_object(match)["start_column"]) > 1
+    assert assert_object(match)["truncated_left"] is True
+    assert assert_object(match)["truncated_right"] is True
+    assert len(assert_text(assert_object(match)["text"])) <= 320
+    assert "needle" in assert_text(assert_object(match)["text"])
+    assert (
+        assert_text(assert_object(match)["text"]).index("needle")
+        + assert_number(assert_object(match)["start_column"])
+        == assert_object(hit)["column"]
+    )
     assert packet["observed_match_count"] == 1
     assert packet["completeness"] == "complete"
 
@@ -94,15 +113,25 @@ def test_crlf_boundary_and_first_last_lines_do_not_invent_extra_lines(
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         packet = codemap.source_observation("a.py", literal="needle", context_lines=1)
-    first, last = packet["occurrences"]
-    assert [x["line"] for x in first["context_excerpt"]] == [1, 2]
-    assert [x["line"] for x in last["context_excerpt"]] == [2, 3]
-    assert first["context_excerpt"][0]["text"] == "needle"
-    assert last["context_excerpt"][-1]["text"] == "needle"
+    first, last = assert_array(packet["occurrences"])
+    assert [
+        x["line"] for x in assert_records(assert_object(first)["context_excerpt"])
+    ] == [1, 2]
+    assert [
+        x["line"] for x in assert_records(assert_object(last)["context_excerpt"])
+    ] == [2, 3]
+    assert (
+        assert_object(assert_array(assert_object(first)["context_excerpt"])[0])["text"]
+        == "needle"
+    )
+    assert (
+        assert_object(assert_array(assert_object(last)["context_excerpt"])[-1])["text"]
+        == "needle"
+    )
     assert all(
-        not row["text"].endswith("\r")
+        not assert_text(row["text"]).endswith("\r")
         for hit in (first, last)
-        for row in hit["context_excerpt"]
+        for row in assert_records(assert_object(hit)["context_excerpt"])
     )
 
 
@@ -120,13 +149,18 @@ def test_scoped_context_reuses_member_admission_and_preserves_native_counts(
     assert original["observed_match_count"] == contextual["observed_match_count"] == 2
     assert original["source_coverage"] == contextual["source_coverage"]
     assert original["negative_evidence"] == contextual["negative_evidence"]
-    assert "context_lines" not in original["limits"]
-    assert contextual["limits"]["context_lines"] == 1
-    assert [row["path"] for row in contextual["occurrences"]] == ["a.py", "b.py"]
-    assert all("context_excerpt" in row for row in contextual["occurrences"])
-    assert [row["evidence_identity"] for row in contextual["occurrences"]] == [
-        row["evidence_identity"] for row in original["occurrences"]
+    assert "context_lines" not in assert_object(original["limits"])
+    assert assert_object(contextual["limits"])["context_lines"] == 1
+    assert [row["path"] for row in assert_records(contextual["occurrences"])] == [
+        "a.py",
+        "b.py",
     ]
+    assert all(
+        "context_excerpt" in row for row in assert_records(contextual["occurrences"])
+    )
+    assert [
+        row["evidence_identity"] for row in assert_records(contextual["occurrences"])
+    ] == [row["evidence_identity"] for row in assert_records(original["occurrences"])]
 
 
 def test_context_never_escapes_denied_oversized_or_unreconciled_members(
@@ -162,13 +196,13 @@ def test_invalid_context_fails_before_source_observation(
             codemap.source_observation(
                 "sample.py",
                 literal="needle",
-                context_lines=bad,  # type: ignore[arg-type]
+                context_lines=cast(int, bad),  # type: ignore[arg-type]
             )
         with pytest.raises(ValueError, match="context_lines"):
             codemap.scoped_source_occurrences(
                 ["sample.py"],
                 "needle",
-                context_lines=bad,  # type: ignore[arg-type]
+                context_lines=cast(int, bad),  # type: ignore[arg-type]
             )
 
 
@@ -189,7 +223,16 @@ def test_source_line_keywords_remain_supported_but_typos_fail_early(
         )
     assert observed["requested_lines"] == [1]
     assert observed["line_coverage"] == "complete"
-    assert observed["occurrences"][0]["context_excerpt"][0]["role"] == "match"
+    assert (
+        assert_object(
+            assert_array(
+                assert_object(assert_array(observed["occurrences"])[0])[
+                    "context_excerpt"
+                ]
+            )[0]
+        )["role"]
+        == "match"
+    )
 
 
 def test_context_requires_literal_and_does_not_read_file_for_preview(
@@ -215,23 +258,50 @@ def test_mcp_context_is_bounded_and_structured_projection_keeps_source_pointer(
         scope = surface.source_observation(
             ["a.py"], literal="needle", context_lines=1, result_mode="scope"
         )
-        assert raw["occurrences"][0]["context_excerpt"][1]["text"] == "needle"
-        assert scope["occurrences"][0]["context_excerpt"][1]["text"] == "needle"
+        assert (
+            assert_object(
+                assert_array(
+                    assert_object(assert_array(raw["occurrences"])[0])[
+                        "context_excerpt"
+                    ]
+                )[1]
+            )["text"]
+            == "needle"
+        )
+        assert (
+            assert_object(
+                assert_array(
+                    assert_object(assert_array(scope["occurrences"])[0])[
+                        "context_excerpt"
+                    ]
+                )[1]
+            )["text"]
+            == "needle"
+        )
         original = deepcopy(raw)
         projected = present_repository_evidence(raw, format="compact")
-        source = next(g for g in projected["groups"] if g["family"] == "source")
+        source = next(
+            g for g in assert_records(projected["groups"]) if g["family"] == "source"
+        )
         occurrence = next(
-            row for row in source["findings"] if row["kind"] == "occurrences"
+            row
+            for row in assert_records(source["findings"])
+            if row["kind"] == "occurrences"
         )
         assert occurrence["source_refs"] == ["/occurrences/0"]
-        assert occurrence["details"]["context_excerpt"][1]["role"] == "match"
+        assert (
+            assert_object(
+                assert_array(assert_object(occurrence["details"])["context_excerpt"])[1]
+            )["role"]
+            == "match"
+        )
         assert raw == original
         for bad in (2, -1, True, "1"):
             with pytest.raises(McpSurfaceError, match="context_lines"):
                 surface.source_observation(
                     ["a.py"],
                     literal="needle",
-                    context_lines=bad,  # type: ignore[arg-type]
+                    context_lines=cast(int, bad),  # type: ignore[arg-type]
                 )
         with pytest.raises(McpSurfaceError, match="requires a literal"):
             surface.source_observation(["a.py"], context_lines=1)

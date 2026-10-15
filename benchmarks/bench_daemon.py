@@ -9,7 +9,7 @@ import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 from hashmarks._command_output import log_command_output
 from hashmarks.client import IdentityClient
@@ -78,13 +78,22 @@ def _identity_request(
     return lambda: client.input_root(["src"]), 0.0
 
 
+class _IdentityMeasurements(TypedDict):
+    hot_times: list[float]
+    cold_s: float
+    edit_s: float
+    cold: dict[str, object]
+    last: dict[str, object]
+    edited: dict[str, object]
+
+
 def _measure_identities(
     root: Path,
     paths: list[str],
     daemon: IdentityDaemon,
     request_root: Callable[[], dict],
     hot_requests: int,
-) -> dict:
+) -> _IdentityMeasurements:
     cold, cold_s = timed(request_root)
     hot_times: list[float] = []
     last = cold
@@ -115,11 +124,12 @@ def _measure_identities(
 def _result(
     args: argparse.Namespace,
     root: Path,
-    measurements: dict[str, object],
+    measurements: _IdentityMeasurements,
     registration_s: float,
     status: dict[str, object],
 ) -> dict[str, object]:
     hot_times = measurements["hot_times"]
+    assert isinstance(hot_times, list)
     return {
         "files": args.files,
         "files_per_dir": args.files_per_dir,

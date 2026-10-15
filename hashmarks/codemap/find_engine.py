@@ -57,7 +57,11 @@ def _optional_str(value: object) -> str | None:
 
 
 def _optional_int(value: object) -> int | None:
-    return None if value is None else int(value)
+    if value is None:
+        return None
+    if not isinstance(value, (int, float, str, bytes, bytearray)):
+        raise TypeError("indexed integer must be a scalar")
+    return int(value)
 
 
 def _find_claim_scope(intent: str) -> str:
@@ -248,7 +252,7 @@ class FindEngineMixin:
         match_by_path: dict[str, int] = {}
         for row in lexical_files:
             path = str(row["path"])
-            matches = int(row.get("matches", 0) or 0)
+            matches = int(cast(int, row.get("matches", 0) or 0))
             match_by_path[path] = matches
             coverage = min(1.0, float(matches) / float(term_count))
             candidates[(path, "", "file")] = {
@@ -318,7 +322,7 @@ class FindEngineMixin:
             bound = max(50, ctx.limit * 4)
             if len(ctx.terms) > 8:
                 ctx.bound_reasons.add("find-path-term-limit")
-            rows = self.store.path_candidates(ctx.terms[:8], limit=bound)
+            rows = self.store.path_candidates(list(ctx.terms[:8]), limit=bound)
             if len(rows) >= bound:
                 ctx.bound_reasons.add("find-path-candidate-limit")
             for row in rows:
@@ -429,7 +433,9 @@ class FindEngineMixin:
         seed_rows = self._find_symbol_seed_rows(candidates, bridge_rows)
         seed_rows.sort(
             key=lambda row: (
-                -self._score(ctx.query, row, tokens=ctx.terms, raw_query=ctx.raw_query)
+                -self._score(
+                    ctx.query, row, tokens=list(ctx.terms), raw_query=ctx.raw_query
+                )
             )
         )
         seed_limit = 12 if ctx.route.intent.value == "relationship" else 8
@@ -521,7 +527,9 @@ class FindEngineMixin:
         seeds = self._find_exact_semantic_seeds(candidates, set(ctx.terms))
         seeds.sort(
             key=lambda row: (
-                -self._score(ctx.query, row, tokens=ctx.terms, raw_query=ctx.raw_query)
+                -self._score(
+                    ctx.query, row, tokens=list(ctx.terms), raw_query=ctx.raw_query
+                )
             )
         )
         seed_limit = (
@@ -602,10 +610,10 @@ class FindEngineMixin:
             self = cast("CodeMap", self)
         score = self._score(
             ctx.query,
-            row,
+            dict(row),
             ranks=None,
             recent=recent,
-            tokens=ctx.terms,
+            tokens=list(ctx.terms),
             raw_query=ctx.raw_query,
         )
         if score <= 0:

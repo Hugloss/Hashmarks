@@ -228,6 +228,7 @@ def normalize_lsp_captures(value: object) -> list[dict[str, Any]]:
     ):
         raise ValueError("supplied_observations must contain at most 32 LSP captures")
     captures = portable_copy(value)
+    assert isinstance(captures, list)
     return [_normalize_capture(capture) for capture in captures]
 
 

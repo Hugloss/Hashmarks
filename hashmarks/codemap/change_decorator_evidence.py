@@ -158,6 +158,7 @@ def _handler_body_context(
         }
     try:
         observed = _handler_body_syntax(node)
+        assert isinstance(observed, dict)
     except (ValueError, RecursionError):
         return {
             "state": "unresolved",
@@ -166,7 +167,9 @@ def _handler_body_context(
             "negative_evidence_admissible": False,
         }
     returns = observed["literal_dictionary_returns"]
+    assert isinstance(returns, list)
     accesses = observed["literal_subscript_accesses"]
+    assert isinstance(accesses, list)
     return {
         "state": "bounded-direct-handler-body-syntax",
         "authority": observed["authority"],

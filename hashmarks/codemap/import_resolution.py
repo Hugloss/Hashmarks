@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 class _OwnerWalk:
     """Request-local re-export traversal with one ambiguity owner."""
 
-    resolver: ImportResolutionMixin
+    resolver: CodeMap
     leaves: set[str] = field(default_factory=set)
     visited: set[tuple[str, str]] = field(default_factory=set)
     unresolved: bool = False
@@ -31,11 +31,12 @@ class _OwnerWalk:
     def _binding_targets(
         self, facade_path: str, exported_name: str
     ) -> list[str] | None:
-        symbols = self.resolver._session_symbols_for_path(facade_path)
+        resolver = self.resolver
+        symbols = resolver._session_symbols_for_path(facade_path)
         has_local_symbol = any(
             str(symbol.get("name") or "") == exported_name for symbol in symbols
         )
-        kind, binding_targets = self.resolver._python_export_binding(
+        kind, binding_targets = resolver._python_export_binding(
             facade_path, exported_name
         )
         if kind == "local":
@@ -44,12 +45,12 @@ class _OwnerWalk:
         targets = (
             binding_targets
             if kind in {"reexport", "ambiguous"}
-            else self.resolver._python_reexport_targets(facade_path, exported_name)
+            else resolver._python_reexport_targets(facade_path, exported_name)
         )
         if kind == "star" and (
             not binding_targets
             or any(
-                self.resolver._python_star_export_authority(
+                resolver._python_star_export_authority(
                     facade_path, target, exported_name
                 )
                 is not True
@@ -64,9 +65,10 @@ class _OwnerWalk:
 
     def _edge_targets(self, facade_path: str, exported_name: str) -> list[str]:
         # Compact edges from Python nested scopes cannot prove a re-export.
+        resolver = self.resolver
         return [
             str(edge.get("target") or "")
-            for edge in self.resolver.store.edges_from(facade_path)
+            for edge in resolver.store.edges_from(facade_path)
             if str(edge.get("kind") or "") == "import"
             and str(edge.get("target_short") or "") == exported_name
             and str(edge.get("target") or "")
@@ -74,7 +76,8 @@ class _OwnerWalk:
 
     def _follow_target(self, facade_path: str, target: str, depth: int) -> bool:
         nested_name = target.lstrip(".").rsplit(".", 1)[-1]
-        owners = self.resolver._resolve_import_paths(facade_path, target)[:20]
+        resolver = self.resolver
+        owners = resolver._resolve_import_paths(facade_path, target)[:20]
         if len(owners) > 1:
             self.unresolved = True
         progress = False
@@ -82,7 +85,7 @@ class _OwnerWalk:
             if owner == facade_path:
                 continue
             progress = True
-            symbols = self.resolver._session_symbols_for_path(owner)
+            symbols = resolver._session_symbols_for_path(owner)
             if any(str(symbol.get("name") or "") == nested_name for symbol in symbols):
                 self.leaves.add(owner)
             else:

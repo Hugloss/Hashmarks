@@ -9,7 +9,7 @@ import time
 import tracemalloc
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import TypedDict, cast
 from unittest.mock import patch
 
 from hashmarks import CodeMap
@@ -105,13 +105,22 @@ def _adapt_material(
     )
 
 
+class _RealStateData(TypedDict):
+    snapshot: dict[str, object]
+    artifact_bytes: int
+    snapshot_bytes: int
+    adapter_semantics: str
+    adapter_latency: dict[str, int]
+    adapter_peak_tracemalloc_bytes: int
+
+
 def _real_state_data(
     fixture_root: Path,
     producer: str,
     state: str,
     *,
     iterations: int,
-) -> dict[str, object]:
+) -> _RealStateData:
     material = _producer_material(fixture_root, producer, state)
     expected = _adapt_material(producer, material)
     latency, peak, last = _measure_calls(
@@ -121,11 +130,14 @@ def _real_state_data(
     if last != expected:
         raise RuntimeError("real producer adapter output changed across repeated calls")
     producer_metadata = expected["producer"]
+    assert isinstance(producer_metadata, dict)
+    adapter_semantics = producer_metadata["adapter_semantics"]
+    assert isinstance(adapter_semantics, str)
     return {
         "snapshot": expected,
         "artifact_bytes": sum(len(value) for value in material.values()),
         "snapshot_bytes": _json_bytes(expected),
-        "adapter_semantics": producer_metadata["adapter_semantics"],
+        "adapter_semantics": adapter_semantics,
         "adapter_latency": latency,
         "adapter_peak_tracemalloc_bytes": peak,
     }
@@ -164,7 +176,7 @@ def _measure_real_transition(
     codemap: CodeMap,
     state_dir: Path,
     producer: str,
-    states: dict[str, dict[str, object]],
+    states: dict[str, _RealStateData],
     transition: tuple[str, str],
     iterations: int,
 ) -> dict[str, object]:
@@ -216,7 +228,8 @@ def _measure_real_transition(
         ),
         "operations": operations,
         "repository_reobservation_calls": sum(
-            int(row["repository_reobservation_calls"]) for row in operations.values()
+            cast(int, row["repository_reobservation_calls"])
+            for row in operations.values()
         ),
         "persistent_state_growth_bytes": state_bytes_after - state_bytes_before,
         "producer": producer,
@@ -224,7 +237,7 @@ def _measure_real_transition(
 
 
 def _real_state_receipt(
-    states: dict[str, dict[str, object]],
+    states: dict[str, _RealStateData],
 ) -> dict[str, dict[str, object]]:
     return {
         state: {key: value for key, value in row.items() if key != "snapshot"}
@@ -471,10 +484,10 @@ def _explicit_operation_metrics(
     repository_observation_calls = 0
     original_observer = codemap._repository_member_observation
 
-    def counted_observer(*args: object, **kwargs: object) -> object:
+    def counted_observer(relpath: str, *, include_bytes: bool = False) -> object:
         nonlocal repository_observation_calls
         repository_observation_calls += 1
-        return original_observer(*args, **kwargs)
+        return original_observer(relpath, include_bytes=include_bytes)
 
     with patch.object(
         codemap,
@@ -540,7 +553,8 @@ def _receipt(
         "serialized_size": _storage_economics(packets, baselines),
         "operations": operations,
         "repository_reobservation_calls": sum(
-            int(row["repository_reobservation_calls"]) for row in operations.values()
+            cast(int, row["repository_reobservation_calls"])
+            for row in operations.values()
         ),
         "persistent_state_bytes": {
             "before": before_state_bytes,

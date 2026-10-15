@@ -3,9 +3,15 @@ from __future__ import annotations
 import csv
 import hashlib
 from pathlib import Path
-from typing import Any
 
 import pytest
+from contract_assertions import (
+    assert_array,
+    assert_number,
+    assert_object,
+    assert_records,
+    assert_text,
+)
 from pytest import MonkeyPatch
 
 import scripts.agent_evaluation.splunk_csv_dogfood as splunk_csv_dogfood
@@ -54,11 +60,22 @@ def test_splunk_csv_dogfood_binds_artifact_hash_and_parse_to_same_snapshot(
 
     report = collect(source)
 
-    assert report["source"]["artifact_identity"] == expected_sha
-    assert report["bundle"]["provenance"]["source_artifact_identity"] == expected_sha
-    assert report["bundle"]["anchors"][0]["module"] == "tasks.before"
+    assert assert_object(report["source"])["artifact_identity"] == expected_sha
+    assert (
+        assert_object(assert_object(report["bundle"])["provenance"])[
+            "source_artifact_identity"
+        ]
+        == expected_sha
+    )
+    assert (
+        assert_object(assert_array(assert_object(report["bundle"])["anchors"])[0])[
+            "module"
+        ]
+        == "tasks.before"
+    )
     assert "tasks.after" not in {
-        anchor.get("module") for anchor in report["bundle"]["anchors"]
+        anchor.get("module")
+        for anchor in assert_records(assert_object(report["bundle"])["anchors"])
     }
     assert snapshots
     assert snapshots[0] != source
@@ -78,10 +95,15 @@ def test_splunk_csv_dogfood_accepts_strict_valid_raw_above_runtime_csv_limit(
 
     assert source.stat().st_size > csv.field_size_limit()
     report = collect(source)
-    assert report["summary"]["events"] == 1
-    assert report["summary"]["csv_strict_valid"] == 1
-    assert report["summary"]["record_framing_state"] == "native-csv"
-    assert report["bundle"]["anchors"][0]["module"] == "tasks.worker"
+    assert assert_object(report["summary"])["events"] == 1
+    assert assert_object(report["summary"])["csv_strict_valid"] == 1
+    assert assert_object(report["summary"])["record_framing_state"] == "native-csv"
+    assert (
+        assert_object(assert_array(assert_object(report["bundle"])["anchors"])[0])[
+            "module"
+        ]
+        == "tasks.worker"
+    )
 
 
 def test_splunk_csv_dogfood_restores_runtime_csv_field_limit(tmp_path: Path) -> None:
@@ -114,14 +136,21 @@ def test_splunk_csv_dogfood_accepts_utf8_bom_as_transport_marker(
     bom_report = collect(bom)
 
     assert (
-        plain_report["source"]["artifact_identity"]
-        != (bom_report["source"]["artifact_identity"])
+        assert_object(plain_report["source"])["artifact_identity"]
+        != (assert_object(bom_report["source"])["artifact_identity"])
     )
     assert plain_report["summary"] == bom_report["summary"]
-    assert plain_report["bundle"]["bundle_id"] == bom_report["bundle"]["bundle_id"]
     assert (
-        plain_report["bundle"]["provenance"]["evidence_projection_identity"]
-        == bom_report["bundle"]["provenance"]["evidence_projection_identity"]
+        assert_object(plain_report["bundle"])["bundle_id"]
+        == assert_object(bom_report["bundle"])["bundle_id"]
+    )
+    assert (
+        assert_object(assert_object(plain_report["bundle"])["provenance"])[
+            "evidence_projection_identity"
+        ]
+        == assert_object(assert_object(bom_report["bundle"])["provenance"])[
+            "evidence_projection_identity"
+        ]
     )
 
 
@@ -135,8 +164,8 @@ def test_splunk_csv_dogfood_accepts_equivalent_header_quoting(tmp_path: Path) ->
     )
 
     report = collect(source)
-    assert report["summary"]["events"] == 1
-    assert report["summary"]["csv_strict_valid"] == 1
+    assert assert_object(report["summary"])["events"] == 1
+    assert assert_object(report["summary"])["csv_strict_valid"] == 1
 
 
 def test_splunk_csv_dogfood_keeps_header_schema_exact(tmp_path: Path) -> None:
@@ -163,10 +192,15 @@ def test_splunk_csv_dogfood_accepts_unquoted_serial_record_start(
     )
 
     report = collect(source)
-    assert report["summary"]["events"] == 1
-    assert report["summary"]["strict_valid"] == 1
-    assert report["summary"]["malformed"] == 0
-    assert report["bundle"]["anchors"][0]["module"] == "tasks.worker"
+    assert assert_object(report["summary"])["events"] == 1
+    assert assert_object(report["summary"])["strict_valid"] == 1
+    assert assert_object(report["summary"])["malformed"] == 0
+    assert (
+        assert_object(assert_array(assert_object(report["bundle"])["anchors"])[0])[
+            "module"
+        ]
+        == "tasks.worker"
+    )
 
 
 def test_splunk_csv_dogfood_native_framing_ignores_full_row_like_raw_continuation(
@@ -185,12 +219,22 @@ def test_splunk_csv_dogfood_native_framing_ignores_full_row_like_raw_continuatio
     )
 
     report = collect(source)
-    assert report["summary"]["events"] == 2
-    assert report["summary"]["csv_strict_valid"] == 2
-    assert report["summary"]["malformed"] == 0
-    assert report["summary"]["record_framing_state"] == "native-csv"
-    assert report["bundle"]["provenance"]["record_framing_state"] == "native-csv"
-    assert report["bundle"]["anchors"][0]["module"] == "tasks.worker"
+    assert assert_object(report["summary"])["events"] == 2
+    assert assert_object(report["summary"])["csv_strict_valid"] == 2
+    assert assert_object(report["summary"])["malformed"] == 0
+    assert assert_object(report["summary"])["record_framing_state"] == "native-csv"
+    assert (
+        assert_object(assert_object(report["bundle"])["provenance"])[
+            "record_framing_state"
+        ]
+        == "native-csv"
+    )
+    assert (
+        assert_object(assert_array(assert_object(report["bundle"])["anchors"])[0])[
+            "module"
+        ]
+        == "tasks.worker"
+    )
 
 
 def test_splunk_csv_dogfood_falls_back_only_for_damaged_csv_framing(
@@ -205,12 +249,14 @@ def test_splunk_csv_dogfood_falls_back_only_for_damaged_csv_framing(
     )
 
     report = collect(source)
-    assert report["summary"]["events"] == 1
-    assert report["summary"]["recovered"] == 1
-    assert report["summary"]["record_framing_state"] == "recovery-heuristic"
-    assert report["bundle"]["provenance"]["record_framing_state"] == (
-        "recovery-heuristic"
+    assert assert_object(report["summary"])["events"] == 1
+    assert assert_object(report["summary"])["recovered"] == 1
+    assert (
+        assert_object(report["summary"])["record_framing_state"] == "recovery-heuristic"
     )
+    assert assert_object(assert_object(report["bundle"])["provenance"])[
+        "record_framing_state"
+    ] == ("recovery-heuristic")
 
 
 def test_splunk_csv_dogfood_does_not_split_record_like_raw_continuation(
@@ -226,8 +272,8 @@ def test_splunk_csv_dogfood_does_not_split_record_like_raw_continuation(
     )
 
     report = collect(source)
-    assert report["summary"]["events"] == 1
-    assert report["summary"]["malformed"] == 1
+    assert assert_object(report["summary"])["events"] == 1
+    assert assert_object(report["summary"])["malformed"] == 1
 
 
 def test_splunk_csv_dogfood_recovers_invalid_raw_without_hiding_parser_state(
@@ -248,18 +294,18 @@ def test_splunk_csv_dogfood_recovers_invalid_raw_without_hiding_parser_state(
 
     report = collect(source)
     summary = report["summary"]
-    assert summary["events"] == 3
-    assert summary["strict_valid"] == 1
-    assert summary["recovered"] == 2
-    assert summary["malformed"] == 0
-    assert summary["widened"] == 1
+    assert assert_object(summary)["events"] == 3
+    assert assert_object(summary)["strict_valid"] == 1
+    assert assert_object(summary)["recovered"] == 2
+    assert assert_object(summary)["malformed"] == 0
+    assert assert_object(summary)["widened"] == 1
 
     bundle = report["bundle"]
-    assert bundle["completeness"] == "unknown"
-    assert bundle["truncation"] == "unknown"
+    assert assert_object(bundle)["completeness"] == "unknown"
+    assert assert_object(bundle)["truncation"] == "unknown"
     modules = {
-        anchor["module"]: anchor["metadata"]["observed_count"]
-        for anchor in bundle["anchors"]
+        anchor["module"]: assert_object(anchor["metadata"])["observed_count"]
+        for anchor in assert_records(assert_object(bundle)["anchors"])
     }
     assert modules == {
         "api.kafka_consumer": 1,
@@ -282,21 +328,21 @@ def test_splunk_csv_dogfood_does_not_confuse_csv_validity_with_payload_validity(
 
     report = collect(source)
     summary = report["summary"]
-    assert summary["events"] == 2
-    assert summary["strict_valid"] == 2
-    assert summary["csv_strict_valid"] == 2
-    assert summary["csv_recovered"] == 0
-    assert summary["csv_malformed"] == 0
-    assert summary["producer_payload_validation_state"] == "not-assessed"
+    assert assert_object(summary)["events"] == 2
+    assert assert_object(summary)["strict_valid"] == 2
+    assert assert_object(summary)["csv_strict_valid"] == 2
+    assert assert_object(summary)["csv_recovered"] == 0
+    assert assert_object(summary)["csv_malformed"] == 0
+    assert assert_object(summary)["producer_payload_validation_state"] == "not-assessed"
 
-    provenance = report["bundle"]["provenance"]
-    assert provenance["csv_parsing"] == {
+    provenance = assert_object(report["bundle"])["provenance"]
+    assert assert_object(provenance)["csv_parsing"] == {
         "strict_valid_count": 2,
         "recovered_count": 0,
         "malformed_count": 0,
         "widened_count": 0,
     }
-    assert provenance["producer_payload_validation"] == {
+    assert assert_object(provenance)["producer_payload_validation"] == {
         "state": "not-assessed",
     }
 
@@ -315,22 +361,26 @@ def test_splunk_csv_dogfood_accounts_for_locator_free_events(tmp_path: Path) -> 
 
     report = collect(source)
     summary = report["summary"]
-    assert summary["parsed_events"] == 3
-    assert summary["events_with_extracted_locator"] == 1
-    assert summary["events_without_extracted_locator"] == 2
+    assert assert_object(summary)["parsed_events"] == 3
+    assert assert_object(summary)["events_with_extracted_locator"] == 1
+    assert assert_object(summary)["events_without_extracted_locator"] == 2
     assert (
-        summary["events_with_extracted_locator"]
-        + summary["events_without_extracted_locator"]
-        == summary["parsed_events"]
+        assert_number(assert_object(summary)["events_with_extracted_locator"])
+        + assert_number(assert_object(summary)["events_without_extracted_locator"])
+        == assert_object(summary)["parsed_events"]
     )
-    assert summary["module_locator_occurrences"] == 1
-    assert summary["traceback_locator_occurrences"] == 0
-    assert summary["locator_occurrences"] == 1
-    assert summary["unique_module_anchors_observed"] == 1
-    assert summary["unique_anchors_observed"] == 1
-    sample_ids = report["bundle"]["provenance"]["unlocated_sample_event_ids"]
-    assert len(sample_ids) == 2
-    assert all(value.startswith("event:") for value in sample_ids)
+    assert assert_object(summary)["module_locator_occurrences"] == 1
+    assert assert_object(summary)["traceback_locator_occurrences"] == 0
+    assert assert_object(summary)["locator_occurrences"] == 1
+    assert assert_object(summary)["unique_module_anchors_observed"] == 1
+    assert assert_object(summary)["unique_anchors_observed"] == 1
+    sample_ids = assert_object(assert_object(report["bundle"])["provenance"])[
+        "unlocated_sample_event_ids"
+    ]
+    assert len(assert_array(sample_ids)) == 2
+    assert all(
+        assert_text(value).startswith("event:") for value in assert_array(sample_ids)
+    )
 
 
 def test_splunk_csv_dogfood_rejects_invalid_module_locator_without_repair(
@@ -345,11 +395,11 @@ def test_splunk_csv_dogfood_rejects_invalid_module_locator_without_repair(
 
     report = collect(source)
     summary = report["summary"]
-    assert summary["parsed_events"] == 1
-    assert summary["module_locator_occurrences"] == 0
-    assert summary["events_with_extracted_locator"] == 0
-    assert summary["events_without_extracted_locator"] == 1
-    assert report["bundle"]["anchors"] == []
+    assert assert_object(summary)["parsed_events"] == 1
+    assert assert_object(summary)["module_locator_occurrences"] == 0
+    assert assert_object(summary)["events_with_extracted_locator"] == 0
+    assert assert_object(summary)["events_without_extracted_locator"] == 1
+    assert assert_object(report["bundle"])["anchors"] == []
 
 
 def test_splunk_csv_dogfood_rejects_locator_beyond_core_module_bound(
@@ -364,9 +414,9 @@ def test_splunk_csv_dogfood_rejects_locator_beyond_core_module_bound(
     )
 
     report = collect(source)
-    assert report["summary"]["module_locator_occurrences"] == 0
-    assert report["summary"]["events_without_extracted_locator"] == 1
-    assert report["bundle"]["anchors"] == []
+    assert assert_object(report["summary"])["module_locator_occurrences"] == 0
+    assert assert_object(report["summary"])["events_without_extracted_locator"] == 1
+    assert assert_object(report["bundle"])["anchors"] == []
 
 
 def test_splunk_csv_dogfood_rejects_invalid_traceback_locator_without_repair(
@@ -382,9 +432,9 @@ def test_splunk_csv_dogfood_rejects_invalid_traceback_locator_without_repair(
     )
 
     report = collect(source)
-    assert report["summary"]["traceback_locator_occurrences"] == 0
-    assert report["summary"]["events_without_extracted_locator"] == 1
-    assert report["bundle"]["anchors"] == []
+    assert assert_object(report["summary"])["traceback_locator_occurrences"] == 0
+    assert assert_object(report["summary"])["events_without_extracted_locator"] == 1
+    assert assert_object(report["bundle"])["anchors"] == []
 
 
 def test_splunk_csv_dogfood_does_not_strip_invalid_module_suffix(
@@ -398,9 +448,9 @@ def test_splunk_csv_dogfood_does_not_strip_invalid_module_suffix(
     )
 
     report = collect(source)
-    assert report["summary"]["module_locator_occurrences"] == 0
-    assert report["summary"]["events_without_extracted_locator"] == 1
-    assert report["bundle"]["anchors"] == []
+    assert assert_object(report["summary"])["module_locator_occurrences"] == 0
+    assert assert_object(report["summary"])["events_without_extracted_locator"] == 1
+    assert assert_object(report["bundle"])["anchors"] == []
 
 
 def test_splunk_csv_dogfood_does_not_salvage_module_prefix_before_slash(
@@ -414,9 +464,9 @@ def test_splunk_csv_dogfood_does_not_salvage_module_prefix_before_slash(
     )
 
     report = collect(source)
-    assert report["summary"]["module_locator_occurrences"] == 0
-    assert report["summary"]["events_without_extracted_locator"] == 1
-    assert report["bundle"]["anchors"] == []
+    assert assert_object(report["summary"])["module_locator_occurrences"] == 0
+    assert assert_object(report["summary"])["events_without_extracted_locator"] == 1
+    assert assert_object(report["bundle"])["anchors"] == []
 
 
 def test_splunk_csv_dogfood_counts_multiple_locator_types_once_per_event(
@@ -432,15 +482,15 @@ def test_splunk_csv_dogfood_counts_multiple_locator_types_once_per_event(
 
     report = collect(source)
     summary = report["summary"]
-    assert summary["parsed_events"] == 1
-    assert summary["events_with_extracted_locator"] == 1
-    assert summary["events_without_extracted_locator"] == 0
-    assert summary["module_locator_occurrences"] == 1
-    assert summary["traceback_locator_occurrences"] == 1
-    assert summary["locator_occurrences"] == 2
-    assert summary["unique_module_anchors_observed"] == 1
-    assert summary["unique_traceback_anchors_observed"] == 1
-    assert summary["unique_anchors_observed"] == 2
+    assert assert_object(summary)["parsed_events"] == 1
+    assert assert_object(summary)["events_with_extracted_locator"] == 1
+    assert assert_object(summary)["events_without_extracted_locator"] == 0
+    assert assert_object(summary)["module_locator_occurrences"] == 1
+    assert assert_object(summary)["traceback_locator_occurrences"] == 1
+    assert assert_object(summary)["locator_occurrences"] == 2
+    assert assert_object(summary)["unique_module_anchors_observed"] == 1
+    assert assert_object(summary)["unique_traceback_anchors_observed"] == 1
+    assert assert_object(summary)["unique_anchors_observed"] == 2
 
 
 def test_splunk_csv_dogfood_bounds_unlocated_event_samples(tmp_path: Path) -> None:
@@ -455,10 +505,12 @@ def test_splunk_csv_dogfood_bounds_unlocated_event_samples(tmp_path: Path) -> No
     _write(source, "".join(rows))
 
     report = collect(source)
-    assert report["summary"]["events_without_extracted_locator"] == 5
-    sample_ids = report["bundle"]["provenance"]["unlocated_sample_event_ids"]
-    assert len(sample_ids) == 3
-    assert len(set(sample_ids)) == 3
+    assert assert_object(report["summary"])["events_without_extracted_locator"] == 5
+    sample_ids = assert_object(assert_object(report["bundle"])["provenance"])[
+        "unlocated_sample_event_ids"
+    ]
+    assert len(assert_array(sample_ids)) == 3
+    assert len(set(assert_array(sample_ids))) == 3
 
 
 def test_splunk_csv_dogfood_separates_artifact_occurrence_and_observation_identity(
@@ -480,29 +532,34 @@ def test_splunk_csv_dogfood_separates_artifact_occurrence_and_observation_identi
     quoted_report = collect(quoted)
     unquoted_report = collect(unquoted)
     assert (
-        quoted_report["source"]["artifact_identity"]
-        != (unquoted_report["source"]["artifact_identity"])
+        assert_object(quoted_report["source"])["artifact_identity"]
+        != (assert_object(unquoted_report["source"])["artifact_identity"])
     )
     assert (
-        quoted_report["bundle"]["bundle_id"] == unquoted_report["bundle"]["bundle_id"]
+        assert_object(quoted_report["bundle"])["bundle_id"]
+        == assert_object(unquoted_report["bundle"])["bundle_id"]
     )
-    quoted_metadata = quoted_report["bundle"]["anchors"][0]["metadata"]
-    unquoted_metadata = unquoted_report["bundle"]["anchors"][0]["metadata"]
+    quoted_metadata = assert_object(
+        assert_array(assert_object(quoted_report["bundle"])["anchors"])[0]
+    )["metadata"]
+    unquoted_metadata = assert_object(
+        assert_array(assert_object(unquoted_report["bundle"])["anchors"])[0]
+    )["metadata"]
     assert (
-        quoted_metadata["sample_occurrence_ids"]
-        != (unquoted_metadata["sample_occurrence_ids"])
-    )
-    assert (
-        quoted_metadata["sample_event_ids"]
-        == (quoted_metadata["sample_occurrence_ids"])
-    )
-    assert (
-        unquoted_metadata["sample_event_ids"]
-        == (unquoted_metadata["sample_occurrence_ids"])
+        assert_object(quoted_metadata)["sample_occurrence_ids"]
+        != (assert_object(unquoted_metadata)["sample_occurrence_ids"])
     )
     assert (
-        quoted_metadata["sample_observation_identities"]
-        == (unquoted_metadata["sample_observation_identities"])
+        assert_object(quoted_metadata)["sample_event_ids"]
+        == (assert_object(quoted_metadata)["sample_occurrence_ids"])
+    )
+    assert (
+        assert_object(unquoted_metadata)["sample_event_ids"]
+        == (assert_object(unquoted_metadata)["sample_occurrence_ids"])
+    )
+    assert (
+        assert_object(quoted_metadata)["sample_observation_identities"]
+        == (assert_object(unquoted_metadata)["sample_observation_identities"])
     )
 
 
@@ -527,23 +584,38 @@ def test_splunk_csv_dogfood_projection_identity_is_order_independent(
     first_report = collect(first)
     reversed_report = collect(reversed_source)
     assert (
-        first_report["source"]["artifact_identity"]
-        != (reversed_report["source"]["artifact_identity"])
+        assert_object(first_report["source"])["artifact_identity"]
+        != (assert_object(reversed_report["source"])["artifact_identity"])
     )
-    assert first_report["bundle"]["bundle_id"] == reversed_report["bundle"]["bundle_id"]
     assert (
-        first_report["bundle"]["provenance"]["evidence_projection_identity"]
-        == (reversed_report["bundle"]["provenance"]["evidence_projection_identity"])
+        assert_object(first_report["bundle"])["bundle_id"]
+        == assert_object(reversed_report["bundle"])["bundle_id"]
+    )
+    assert (
+        assert_object(assert_object(first_report["bundle"])["provenance"])[
+            "evidence_projection_identity"
+        ]
+        == (
+            assert_object(assert_object(reversed_report["bundle"])["provenance"])[
+                "evidence_projection_identity"
+            ]
+        )
     )
     first_observations = {
         identity
-        for anchor in first_report["bundle"]["anchors"]
-        for identity in anchor["metadata"]["sample_observation_identities"]
+        for anchor in assert_records(assert_object(first_report["bundle"])["anchors"])
+        for identity in assert_array(
+            assert_object(anchor["metadata"])["sample_observation_identities"]
+        )
     }
     reversed_observations = {
         identity
-        for anchor in reversed_report["bundle"]["anchors"]
-        for identity in anchor["metadata"]["sample_observation_identities"]
+        for anchor in assert_records(
+            assert_object(reversed_report["bundle"])["anchors"]
+        )
+        for identity in assert_array(
+            assert_object(anchor["metadata"])["sample_observation_identities"]
+        )
     }
     assert first_observations == reversed_observations
 
@@ -560,11 +632,15 @@ def test_splunk_csv_dogfood_repeated_observation_keeps_distinct_occurrences(
         '"[host]","idx","[server]","INFO name=utils.kafka same"\n',
     )
 
-    metadata = collect(source)["bundle"]["anchors"][0]["metadata"]
-    assert metadata["observed_count"] == 2
-    assert len(metadata["sample_occurrence_ids"]) == 2
-    assert len(set(metadata["sample_occurrence_ids"])) == 2
-    assert len(metadata["sample_observation_identities"]) == 1
+    metadata = assert_object(
+        assert_array(assert_object(collect(source)["bundle"])["anchors"])[0]
+    )["metadata"]
+    assert assert_object(metadata)["observed_count"] == 2
+    assert len(assert_array(assert_object(metadata)["sample_occurrence_ids"])) == 2
+    assert len(set(assert_array(assert_object(metadata)["sample_occurrence_ids"]))) == 2
+    assert (
+        len(assert_array(assert_object(metadata)["sample_observation_identities"])) == 1
+    )
 
 
 def test_splunk_csv_dogfood_orders_scope_by_instant_across_offsets(
@@ -580,19 +656,21 @@ def test_splunk_csv_dogfood_orders_scope_by_instant_across_offsets(
     )
 
     report = collect(source)
-    scope = report["bundle"]["scope"]
-    assert scope["time_start"] == "2026-10-25T02:30:00.000+0200"
-    assert scope["time_end"] == "2026-10-25T02:15:00.000+0100"
-    assert scope["time_ordering_state"] == "instant-aware"
-    assert scope["timestamp_parse_failure_count"] == 0
-    assert report["summary"]["time_ordering_state"] == "instant-aware"
-    assert report["summary"]["timestamp_parse_failure_count"] == 0
+    scope = assert_object(report["bundle"])["scope"]
+    assert assert_object(scope)["time_start"] == "2026-10-25T02:30:00.000+0200"
+    assert assert_object(scope)["time_end"] == "2026-10-25T02:15:00.000+0100"
+    assert assert_object(scope)["time_ordering_state"] == "instant-aware"
+    assert assert_object(scope)["timestamp_parse_failure_count"] == 0
+    assert assert_object(report["summary"])["time_ordering_state"] == "instant-aware"
+    assert assert_object(report["summary"])["timestamp_parse_failure_count"] == 0
 
-    metadata = report["bundle"]["anchors"][0]["metadata"]
-    assert metadata["first_time"] == "2026-10-25T02:30:00.000+0200"
-    assert metadata["last_time"] == "2026-10-25T02:15:00.000+0100"
-    assert metadata["time_ordering_state"] == "instant-aware"
-    assert metadata["timestamp_parse_failure_count"] == 0
+    metadata = assert_object(
+        assert_array(assert_object(report["bundle"])["anchors"])[0]
+    )["metadata"]
+    assert assert_object(metadata)["first_time"] == "2026-10-25T02:30:00.000+0200"
+    assert assert_object(metadata)["last_time"] == "2026-10-25T02:15:00.000+0100"
+    assert assert_object(metadata)["time_ordering_state"] == "instant-aware"
+    assert assert_object(metadata)["timestamp_parse_failure_count"] == 0
 
 
 def test_splunk_csv_dogfood_marks_unparseable_timestamp_ordering_fallback(
@@ -608,14 +686,16 @@ def test_splunk_csv_dogfood_marks_unparseable_timestamp_ordering_fallback(
     )
 
     report = collect(source)
-    scope = report["bundle"]["scope"]
-    assert scope["time_ordering_state"] == "lexical-fallback"
-    assert scope["timestamp_parse_failure_count"] == 1
-    assert report["summary"]["time_ordering_state"] == "lexical-fallback"
-    assert report["summary"]["timestamp_parse_failure_count"] == 1
-    metadata = report["bundle"]["anchors"][0]["metadata"]
-    assert metadata["time_ordering_state"] == "lexical-fallback"
-    assert metadata["timestamp_parse_failure_count"] == 1
+    scope = assert_object(report["bundle"])["scope"]
+    assert assert_object(scope)["time_ordering_state"] == "lexical-fallback"
+    assert assert_object(scope)["timestamp_parse_failure_count"] == 1
+    assert assert_object(report["summary"])["time_ordering_state"] == "lexical-fallback"
+    assert assert_object(report["summary"])["timestamp_parse_failure_count"] == 1
+    metadata = assert_object(
+        assert_array(assert_object(report["bundle"])["anchors"])[0]
+    )["metadata"]
+    assert assert_object(metadata)["time_ordering_state"] == "lexical-fallback"
+    assert assert_object(metadata)["timestamp_parse_failure_count"] == 1
 
 
 def test_splunk_csv_dogfood_preserves_bounded_opaque_context_per_anchor(
@@ -636,15 +716,18 @@ def test_splunk_csv_dogfood_preserves_bounded_opaque_context_per_anchor(
     )
 
     report = collect(source)
-    assert report["summary"]["unique_module_anchors_observed"] == 1
-    anchor = report["bundle"]["anchors"][0]
-    assert anchor["metadata"]["observed_count"] == 3
-    context = anchor["metadata"]["runtime_context"]
-    assert context["handling_ident_values"] == ["[DOCUMENT_A]", "[DOCUMENT_B]"]
-    assert context["handling_ident_values_truncated"] is False
-    assert context["commit_values"] == ["[REV_A]", "[REV_B]"]
-    assert context["commit_values_truncated"] is False
-    assert context["values_truncated"] is False
+    assert assert_object(report["summary"])["unique_module_anchors_observed"] == 1
+    anchor = assert_array(assert_object(report["bundle"])["anchors"])[0]
+    assert assert_object(assert_object(anchor)["metadata"])["observed_count"] == 3
+    context = assert_object(assert_object(anchor)["metadata"])["runtime_context"]
+    assert assert_object(context)["handling_ident_values"] == [
+        "[DOCUMENT_A]",
+        "[DOCUMENT_B]",
+    ]
+    assert assert_object(context)["handling_ident_values_truncated"] is False
+    assert assert_object(context)["commit_values"] == ["[REV_A]", "[REV_B]"]
+    assert assert_object(context)["commit_values_truncated"] is False
+    assert assert_object(context)["values_truncated"] is False
 
 
 def test_splunk_csv_dogfood_preserves_runtime_placement_scope(tmp_path: Path) -> None:
@@ -657,10 +740,10 @@ def test_splunk_csv_dogfood_preserves_runtime_placement_scope(tmp_path: Path) ->
         '"[host-b]","idx","[server-b]","INFO name=tasks.worker"\n',
     )
 
-    scope = collect(source)["bundle"]["scope"]
-    assert scope["hosts"] == ["[host-a]", "[host-b]"]
-    assert scope["splunk_servers"] == ["[server-a]", "[server-b]"]
-    assert scope["scope_values_truncated"] is False
+    scope = assert_object(collect(source)["bundle"])["scope"]
+    assert assert_object(scope)["hosts"] == ["[host-a]", "[host-b]"]
+    assert assert_object(scope)["splunk_servers"] == ["[server-a]", "[server-b]"]
+    assert assert_object(scope)["scope_values_truncated"] is False
 
 
 def test_splunk_csv_dogfood_scope_truncation_is_order_independent(
@@ -681,17 +764,30 @@ def test_splunk_csv_dogfood_scope_truncation_is_order_independent(
     forward_report = collect(forward)
     reverse_report = collect(reverse)
 
-    assert forward_report["bundle"]["scope"] == reverse_report["bundle"]["scope"]
-    assert forward_report["bundle"]["scope"]["scope_values_truncated"] is True
-    assert forward_report["bundle"]["truncation"] == "truncated"
-    assert forward_report["summary"]["scope_values_truncated"] is True
-    assert forward_report["summary"]["projection_truncated"] is True
     assert (
-        forward_report["bundle"]["bundle_id"] == reverse_report["bundle"]["bundle_id"]
+        assert_object(forward_report["bundle"])["scope"]
+        == assert_object(reverse_report["bundle"])["scope"]
     )
     assert (
-        forward_report["bundle"]["provenance"]["evidence_projection_identity"]
-        == reverse_report["bundle"]["provenance"]["evidence_projection_identity"]
+        assert_object(assert_object(forward_report["bundle"])["scope"])[
+            "scope_values_truncated"
+        ]
+        is True
+    )
+    assert assert_object(forward_report["bundle"])["truncation"] == "truncated"
+    assert assert_object(forward_report["summary"])["scope_values_truncated"] is True
+    assert assert_object(forward_report["summary"])["projection_truncated"] is True
+    assert (
+        assert_object(forward_report["bundle"])["bundle_id"]
+        == assert_object(reverse_report["bundle"])["bundle_id"]
+    )
+    assert (
+        assert_object(assert_object(forward_report["bundle"])["provenance"])[
+            "evidence_projection_identity"
+        ]
+        == assert_object(assert_object(reverse_report["bundle"])["provenance"])[
+            "evidence_projection_identity"
+        ]
     )
 
 
@@ -713,21 +809,26 @@ def test_splunk_csv_dogfood_context_truncation_is_order_independent(
 
     forward_report = collect(forward)
     reverse_report = collect(reverse)
-    forward_context = forward_report["bundle"]["anchors"][0]["metadata"][
-        "runtime_context"
-    ]
-    reverse_context = reverse_report["bundle"]["anchors"][0]["metadata"][
-        "runtime_context"
-    ]
+    forward_context = assert_object(
+        assert_object(
+            assert_array(assert_object(forward_report["bundle"])["anchors"])[0]
+        )["metadata"]
+    )["runtime_context"]
+    reverse_context = assert_object(
+        assert_object(
+            assert_array(assert_object(reverse_report["bundle"])["anchors"])[0]
+        )["metadata"]
+    )["runtime_context"]
 
     assert forward_context == reverse_context
-    assert forward_context["handling_ident_values_truncated"] is True
-    assert forward_context["commit_values_truncated"] is True
-    assert forward_report["bundle"]["truncation"] == "truncated"
-    assert forward_report["summary"]["context_values_truncated"] is True
-    assert forward_report["summary"]["projection_truncated"] is True
+    assert assert_object(forward_context)["handling_ident_values_truncated"] is True
+    assert assert_object(forward_context)["commit_values_truncated"] is True
+    assert assert_object(forward_report["bundle"])["truncation"] == "truncated"
+    assert assert_object(forward_report["summary"])["context_values_truncated"] is True
+    assert assert_object(forward_report["summary"])["projection_truncated"] is True
     assert (
-        forward_report["bundle"]["bundle_id"] == reverse_report["bundle"]["bundle_id"]
+        assert_object(forward_report["bundle"])["bundle_id"]
+        == assert_object(reverse_report["bundle"])["bundle_id"]
     )
 
 
@@ -746,15 +847,15 @@ def test_splunk_csv_dogfood_bounds_context_without_splitting_anchor(
     _write(source, "".join(rows))
 
     report = collect(source)
-    assert report["summary"]["unique_module_anchors_observed"] == 1
-    anchor = report["bundle"]["anchors"][0]
-    assert anchor["metadata"]["observed_count"] == 10
-    context = anchor["metadata"]["runtime_context"]
-    assert len(context["handling_ident_values"]) == 8
-    assert context["handling_ident_values_truncated"] is True
-    assert len(context["commit_values"]) == 8
-    assert context["commit_values_truncated"] is True
-    assert context["values_truncated"] is True
+    assert assert_object(report["summary"])["unique_module_anchors_observed"] == 1
+    anchor = assert_array(assert_object(report["bundle"])["anchors"])[0]
+    assert assert_object(assert_object(anchor)["metadata"])["observed_count"] == 10
+    context = assert_object(assert_object(anchor)["metadata"])["runtime_context"]
+    assert len(assert_array(assert_object(context)["handling_ident_values"])) == 8
+    assert assert_object(context)["handling_ident_values_truncated"] is True
+    assert len(assert_array(assert_object(context)["commit_values"])) == 8
+    assert assert_object(context)["commit_values_truncated"] is True
+    assert assert_object(context)["values_truncated"] is True
 
 
 def test_splunk_csv_dogfood_fits_oversized_scope_to_core_budget(
@@ -770,12 +871,12 @@ def test_splunk_csv_dogfood_fits_oversized_scope_to_core_budget(
     )
 
     report = collect(source)
-    scope = report["bundle"]["scope"]
-    assert oversized_source not in scope["sources"]
-    assert scope["scope_values_truncated"] is True
-    assert report["summary"]["scope_values_truncated"] is True
-    assert report["summary"]["projection_truncated"] is True
-    assert report["bundle"]["truncation"] == "truncated"
+    scope = assert_object(report["bundle"])["scope"]
+    assert oversized_source not in assert_array(assert_object(scope)["sources"])
+    assert assert_object(scope)["scope_values_truncated"] is True
+    assert assert_object(report["summary"])["scope_values_truncated"] is True
+    assert assert_object(report["summary"])["projection_truncated"] is True
+    assert assert_object(report["bundle"])["truncation"] == "truncated"
 
     workspace = tmp_path / "repo"
     (workspace / "tasks").mkdir(parents=True)
@@ -801,16 +902,20 @@ def test_splunk_csv_dogfood_fits_oversized_context_to_core_budget(
     )
 
     report = collect(source)
-    metadata = report["bundle"]["anchors"][0]["metadata"]
-    runtime_context = metadata["runtime_context"]
-    assert oversized_context not in runtime_context["handling_ident_values"]
-    assert runtime_context["handling_ident_values_truncated"] is True
-    assert runtime_context["values_truncated"] is True
-    assert metadata["metadata_values_truncated"] is True
-    assert report["summary"]["context_values_truncated"] is True
-    assert report["summary"]["metadata_values_truncated"] is True
-    assert report["summary"]["projection_truncated"] is True
-    assert report["bundle"]["truncation"] == "truncated"
+    metadata = assert_object(
+        assert_array(assert_object(report["bundle"])["anchors"])[0]
+    )["metadata"]
+    runtime_context = assert_object(metadata)["runtime_context"]
+    assert oversized_context not in assert_array(
+        assert_object(runtime_context)["handling_ident_values"]
+    )
+    assert assert_object(runtime_context)["handling_ident_values_truncated"] is True
+    assert assert_object(runtime_context)["values_truncated"] is True
+    assert assert_object(metadata)["metadata_values_truncated"] is True
+    assert assert_object(report["summary"])["context_values_truncated"] is True
+    assert assert_object(report["summary"])["metadata_values_truncated"] is True
+    assert assert_object(report["summary"])["projection_truncated"] is True
+    assert assert_object(report["bundle"])["truncation"] == "truncated"
 
     workspace = tmp_path / "repo"
     (workspace / "tasks").mkdir(parents=True)
@@ -839,11 +944,11 @@ def test_splunk_csv_dogfood_fits_total_metadata_request_budget(
 
     report = collect(source)
 
-    assert report["summary"]["anchors_observed"] == 60
-    assert report["summary"]["anchors_emitted"] < 60
-    assert report["summary"]["anchors_truncated"] is True
-    assert report["summary"]["projection_truncated"] is True
-    assert report["bundle"]["truncation"] == "truncated"
+    assert assert_object(report["summary"])["anchors_observed"] == 60
+    assert assert_number(assert_object(report["summary"])["anchors_emitted"]) < 60
+    assert assert_object(report["summary"])["anchors_truncated"] is True
+    assert assert_object(report["summary"])["projection_truncated"] is True
+    assert assert_object(report["bundle"])["truncation"] == "truncated"
     assert evidence_request_budget_fits([report["bundle"]])
 
 
@@ -864,11 +969,14 @@ def test_splunk_csv_dogfood_fits_encoded_request_budget(
 
     report = collect(source)
 
-    assert report["summary"]["traceback_anchors_observed"] == 160
-    assert report["summary"]["traceback_anchors_emitted"] < 160
-    assert report["summary"]["anchors_truncated"] is True
-    assert report["summary"]["projection_truncated"] is True
-    assert report["bundle"]["truncation"] == "truncated"
+    assert assert_object(report["summary"])["traceback_anchors_observed"] == 160
+    assert (
+        assert_number(assert_object(report["summary"])["traceback_anchors_emitted"])
+        < 160
+    )
+    assert assert_object(report["summary"])["anchors_truncated"] is True
+    assert assert_object(report["summary"])["projection_truncated"] is True
+    assert assert_object(report["bundle"])["truncation"] == "truncated"
     assert evidence_request_budget_fits([report["bundle"]])
 
 
@@ -884,11 +992,11 @@ def test_splunk_csv_dogfood_nontruncated_projection_remains_unknown(
     )
 
     report = collect(source)
-    assert report["bundle"]["truncation"] == "unknown"
-    assert report["summary"]["anchors_truncated"] is False
-    assert report["summary"]["scope_values_truncated"] is False
-    assert report["summary"]["context_values_truncated"] is False
-    assert report["summary"]["projection_truncated"] is False
+    assert assert_object(report["bundle"])["truncation"] == "unknown"
+    assert assert_object(report["summary"])["anchors_truncated"] is False
+    assert assert_object(report["summary"])["scope_values_truncated"] is False
+    assert assert_object(report["summary"])["context_values_truncated"] is False
+    assert assert_object(report["summary"])["projection_truncated"] is False
 
 
 def test_splunk_csv_dogfood_preserves_multiline_record_and_exact_source_identity(
@@ -904,10 +1012,15 @@ def test_splunk_csv_dogfood_preserves_multiline_record_and_exact_source_identity
 
     report = collect(source)
     expected = "sha256:" + hashlib.sha256(source.read_bytes()).hexdigest()
-    assert report["source"]["sha256"] == expected
-    assert report["summary"]["events"] == 1
-    assert report["summary"]["physical_lines"] == 3
-    assert report["bundle"]["anchors"][0]["module"] == "tasks.ner"
+    assert assert_object(report["source"])["sha256"] == expected
+    assert assert_object(report["summary"])["events"] == 1
+    assert assert_object(report["summary"])["physical_lines"] == 3
+    assert (
+        assert_object(assert_array(assert_object(report["bundle"])["anchors"])[0])[
+            "module"
+        ]
+        == "tasks.ner"
+    )
 
 
 def test_splunk_csv_dogfood_never_uses_repeated_serial_as_event_identity(
@@ -923,11 +1036,16 @@ def test_splunk_csv_dogfood_never_uses_repeated_serial_as_event_identity(
     )
 
     report = collect(source)
-    metadata = report["bundle"]["anchors"][0]["metadata"]
-    assert metadata["observed_count"] == 2
-    assert len(metadata["sample_event_ids"]) == 2
-    assert len(set(metadata["sample_event_ids"])) == 2
-    assert all(value.startswith("event:") for value in metadata["sample_event_ids"])
+    metadata = assert_object(
+        assert_array(assert_object(report["bundle"])["anchors"])[0]
+    )["metadata"]
+    assert assert_object(metadata)["observed_count"] == 2
+    assert len(assert_array(assert_object(metadata)["sample_event_ids"])) == 2
+    assert len(set(assert_array(assert_object(metadata)["sample_event_ids"]))) == 2
+    assert all(
+        assert_text(value).startswith("event:")
+        for value in assert_array(assert_object(metadata)["sample_event_ids"])
+    )
 
 
 def test_splunk_csv_dogfood_bounds_module_anchor_projection(tmp_path: Path) -> None:
@@ -942,10 +1060,10 @@ def test_splunk_csv_dogfood_bounds_module_anchor_projection(tmp_path: Path) -> N
     _write(source, "".join(rows))
 
     report = collect(source, max_anchors=5)
-    assert report["summary"]["module_anchors_observed"] == 20
-    assert report["summary"]["module_anchors_emitted"] == 5
-    assert report["summary"]["anchors_truncated"] is True
-    assert report["bundle"]["truncation"] == "truncated"
+    assert assert_object(report["summary"])["module_anchors_observed"] == 20
+    assert assert_object(report["summary"])["module_anchors_emitted"] == 5
+    assert assert_object(report["summary"])["anchors_truncated"] is True
+    assert assert_object(report["bundle"])["truncation"] == "truncated"
 
 
 def test_splunk_csv_dogfood_correlates_through_existing_repository_owner(
@@ -986,15 +1104,18 @@ def test_splunk_csv_dogfood_prioritizes_traceback_path_line_symbol_anchor(
     )
 
     report = collect(source, max_anchors=1)
-    assert report["summary"]["traceback_anchors_observed"] == 1
-    assert report["summary"]["traceback_anchors_emitted"] == 1
-    assert report["summary"]["module_anchors_observed"] == 1
-    assert report["summary"]["module_anchors_emitted"] == 0
-    anchor = report["bundle"]["anchors"][0]
-    assert anchor["path"] == "/app/src/utils/__init__.py"
-    assert anchor["line"] == 280
-    assert anchor["symbol"] == "process_output_data"
-    assert anchor["metadata"]["kind"] == "python-traceback-frame"
+    assert assert_object(report["summary"])["traceback_anchors_observed"] == 1
+    assert assert_object(report["summary"])["traceback_anchors_emitted"] == 1
+    assert assert_object(report["summary"])["module_anchors_observed"] == 1
+    assert assert_object(report["summary"])["module_anchors_emitted"] == 0
+    anchor = assert_array(assert_object(report["bundle"])["anchors"])[0]
+    assert assert_object(anchor)["path"] == "/app/src/utils/__init__.py"
+    assert assert_object(anchor)["line"] == 280
+    assert assert_object(anchor)["symbol"] == "process_output_data"
+    assert (
+        assert_object(assert_object(anchor)["metadata"])["kind"]
+        == "python-traceback-frame"
+    )
 
 
 def test_splunk_csv_dogfood_anchor_ids_do_not_collide_for_distinct_tracebacks(
@@ -1011,10 +1132,12 @@ def test_splunk_csv_dogfood_anchor_ids_do_not_collide_for_distinct_tracebacks(
     )
 
     report = collect(source)
-    anchors = report["bundle"]["anchors"]
-    assert len(anchors) == 2
-    assert len({anchor["anchor_id"] for anchor in anchors}) == 2
-    assert all(len(str(anchor["anchor_id"])) <= 512 for anchor in anchors)
+    anchors = assert_object(report["bundle"])["anchors"]
+    assert len(assert_array(anchors)) == 2
+    assert len({anchor["anchor_id"] for anchor in assert_records(anchors)}) == 2
+    assert all(
+        len(str(anchor["anchor_id"])) <= 512 for anchor in assert_records(anchors)
+    )
 
 
 def test_splunk_csv_dogfood_module_anchor_id_stays_within_core_bound(
@@ -1029,9 +1152,9 @@ def test_splunk_csv_dogfood_module_anchor_id_stays_within_core_bound(
     )
 
     report = collect(source)
-    anchor = report["bundle"]["anchors"][0]
-    assert anchor["module"] == module
-    assert len(str(anchor["anchor_id"])) <= 512
+    anchor = assert_array(assert_object(report["bundle"])["anchors"])[0]
+    assert assert_object(anchor)["module"] == module
+    assert len(str(assert_object(anchor)["anchor_id"])) <= 512
 
 
 def test_splunk_csv_dogfood_traceback_anchor_id_stays_within_core_bound(
@@ -1048,9 +1171,9 @@ def test_splunk_csv_dogfood_traceback_anchor_id_stays_within_core_bound(
     )
 
     report = collect(source)
-    anchor = report["bundle"]["anchors"][0]
-    assert anchor["path"] == path
-    assert len(str(anchor["anchor_id"])) <= 512
+    anchor = assert_array(assert_object(report["bundle"])["anchors"])[0]
+    assert assert_object(anchor)["path"] == path
+    assert len(str(assert_object(anchor)["anchor_id"])) <= 512
 
 
 def test_splunk_csv_dogfood_preserves_syntaxerror_path_line_without_symbol(
@@ -1069,12 +1192,12 @@ def test_splunk_csv_dogfood_preserves_syntaxerror_path_line_without_symbol(
 
     report = collect(source)
     summary = report["summary"]
-    assert summary["traceback_locator_occurrences"] == 1
-    assert summary["unique_traceback_anchors_observed"] == 1
-    anchor = report["bundle"]["anchors"][0]
-    assert anchor["path"] == "/app/src/bad.py"
-    assert anchor["line"] == 17
-    assert "symbol" not in anchor
+    assert assert_object(summary)["traceback_locator_occurrences"] == 1
+    assert assert_object(summary)["unique_traceback_anchors_observed"] == 1
+    anchor = assert_array(assert_object(report["bundle"])["anchors"])[0]
+    assert assert_object(anchor)["path"] == "/app/src/bad.py"
+    assert assert_object(anchor)["line"] == 17
+    assert "symbol" not in assert_object(anchor)
 
 
 def test_splunk_csv_dogfood_distinguishes_symbol_less_and_symbol_frames(
@@ -1094,15 +1217,15 @@ def test_splunk_csv_dogfood_distinguishes_symbol_less_and_symbol_frames(
     )
 
     report = collect(source)
-    assert report["summary"]["traceback_locator_occurrences"] == 2
-    assert report["summary"]["unique_traceback_anchors_observed"] == 2
+    assert assert_object(report["summary"])["traceback_locator_occurrences"] == 2
+    assert assert_object(report["summary"])["unique_traceback_anchors_observed"] == 2
     locators = {
         (
             anchor["path"],
             anchor["line"],
             anchor.get("symbol"),
         )
-        for anchor in report["bundle"]["anchors"]
+        for anchor in assert_records(assert_object(report["bundle"])["anchors"])
     }
     assert locators == {
         ("/app/src/main.py", 9, None),
@@ -1122,9 +1245,9 @@ def test_splunk_csv_dogfood_does_not_treat_nonframe_suffix_as_syntaxerror(
     )
 
     report = collect(source)
-    assert report["summary"]["traceback_locator_occurrences"] == 0
-    assert report["summary"]["events_without_extracted_locator"] == 1
-    assert report["bundle"]["anchors"] == []
+    assert assert_object(report["summary"])["traceback_locator_occurrences"] == 0
+    assert assert_object(report["summary"])["events_without_extracted_locator"] == 1
+    assert assert_object(report["bundle"])["anchors"] == []
 
 
 def test_splunk_csv_dogfood_preserves_pseudo_traceback_symbols(
@@ -1142,11 +1265,11 @@ def test_splunk_csv_dogfood_preserves_pseudo_traceback_symbols(
 
     report = collect(source)
     summary = report["summary"]
-    assert summary["traceback_locator_occurrences"] == 2
-    assert summary["unique_traceback_anchors_observed"] == 2
+    assert assert_object(summary)["traceback_locator_occurrences"] == 2
+    assert assert_object(summary)["unique_traceback_anchors_observed"] == 2
     anchors = {
         (anchor["path"], anchor["line"], anchor["symbol"])
-        for anchor in report["bundle"]["anchors"]
+        for anchor in assert_records(assert_object(report["bundle"])["anchors"])
     }
     assert anchors == {
         ("/app/src/main.py", 9, "<module>"),
@@ -1168,12 +1291,12 @@ def test_splunk_csv_dogfood_preserves_comma_in_quoted_traceback_path(
 
     report = collect(source)
     summary = report["summary"]
-    assert summary["traceback_locator_occurrences"] == 1
-    assert summary["unique_traceback_anchors_observed"] == 1
-    anchor = report["bundle"]["anchors"][0]
-    assert anchor["path"] == "/app/src/parser,legacy.py"
-    assert anchor["line"] == 17
-    assert anchor["symbol"] == "parse_result"
+    assert assert_object(summary)["traceback_locator_occurrences"] == 1
+    assert assert_object(summary)["unique_traceback_anchors_observed"] == 1
+    anchor = assert_array(assert_object(report["bundle"])["anchors"])[0]
+    assert assert_object(anchor)["path"] == "/app/src/parser,legacy.py"
+    assert assert_object(anchor)["line"] == 17
+    assert assert_object(anchor)["symbol"] == "parse_result"
 
 
 def test_splunk_csv_dogfood_preserves_all_traceback_frames_in_one_event(
@@ -1191,15 +1314,15 @@ def test_splunk_csv_dogfood_preserves_all_traceback_frames_in_one_event(
 
     report = collect(source)
     summary = report["summary"]
-    assert summary["events"] == 1
-    assert summary["events_with_extracted_locator"] == 1
-    assert summary["traceback_locator_occurrences"] == 2
-    assert summary["unique_traceback_anchors_observed"] == 2
-    assert summary["unique_anchors_observed"] == 2
+    assert assert_object(summary)["events"] == 1
+    assert assert_object(summary)["events_with_extracted_locator"] == 1
+    assert assert_object(summary)["traceback_locator_occurrences"] == 2
+    assert assert_object(summary)["unique_traceback_anchors_observed"] == 2
+    assert assert_object(summary)["unique_anchors_observed"] == 2
 
     anchors = {
         (anchor["path"], anchor["line"], anchor["symbol"])
-        for anchor in report["bundle"]["anchors"]
+        for anchor in assert_records(assert_object(report["bundle"])["anchors"])
     }
     assert anchors == {
         ("/app/src/api/worker.py", 14, "handle"),
@@ -1221,11 +1344,11 @@ def test_splunk_csv_dogfood_counts_repeated_traceback_frame_occurrences(
 
     report = collect(source)
     summary = report["summary"]
-    assert summary["events"] == 1
-    assert summary["traceback_locator_occurrences"] == 2
-    assert summary["unique_traceback_anchors_observed"] == 1
-    anchor = report["bundle"]["anchors"][0]
-    assert anchor["metadata"]["observed_count"] == 2
+    assert assert_object(summary)["events"] == 1
+    assert assert_object(summary)["traceback_locator_occurrences"] == 2
+    assert assert_object(summary)["unique_traceback_anchors_observed"] == 1
+    anchor = assert_array(assert_object(report["bundle"])["anchors"])[0]
+    assert assert_object(assert_object(anchor)["metadata"])["observed_count"] == 2
 
 
 def test_splunk_csv_dogfood_correlates_traceback_with_explicit_path_mapping(
@@ -1256,9 +1379,19 @@ def test_splunk_csv_dogfood_correlates_traceback_with_explicit_path_mapping(
         ],
     )
     assert result["resolution_states"] == {"resolved-unique": 1}
-    anchor = result["packet"]["bundles"][0]["anchors"][0]
-    assert anchor["resolution"]["repository_path"] == "utils/__init__.py"
-    assert anchor["resolution"]["path_origin"] == "explicit-path-mapping"
+    anchor = assert_array(
+        assert_object(assert_array(assert_object(result["packet"])["bundles"])[0])[
+            "anchors"
+        ]
+    )[0]
+    assert (
+        assert_object(assert_object(anchor)["resolution"])["repository_path"]
+        == "utils/__init__.py"
+    )
+    assert (
+        assert_object(assert_object(anchor)["resolution"])["path_origin"]
+        == "explicit-path-mapping"
+    )
 
 
 def test_splunk_csv_dogfood_counts_final_physical_line_without_newline(
@@ -1272,8 +1405,8 @@ def test_splunk_csv_dogfood_counts_final_physical_line_without_newline(
     )
 
     report = collect(source)
-    assert report["summary"]["events"] == 1
-    assert report["summary"]["physical_lines"] == 2
+    assert assert_object(report["summary"])["events"] == 1
+    assert assert_object(report["summary"])["physical_lines"] == 2
 
 
 def test_splunk_csv_dogfood_recovery_quote_does_not_enter_opaque_context(
@@ -1288,13 +1421,17 @@ def test_splunk_csv_dogfood_recovery_quote_does_not_enter_opaque_context(
     )
 
     report = collect(source)
-    assert report["summary"]["recovered"] == 1
-    anchor = report["bundle"]["anchors"][0]
-    context = anchor["metadata"]["runtime_context"]
-    assert context["handling_ident_values"] == ["[DOC]"]
-    assert context["commit_values"] == ["[REV]"]
-    assert '"' not in context["handling_ident_values"][0]
-    assert '"' not in context["commit_values"][0]
+    assert assert_object(report["summary"])["recovered"] == 1
+    anchor = assert_array(assert_object(report["bundle"])["anchors"])[0]
+    context = assert_object(assert_object(anchor)["metadata"])["runtime_context"]
+    assert assert_object(context)["handling_ident_values"] == ["[DOC]"]
+    assert assert_object(context)["commit_values"] == ["[REV]"]
+    assert '"' not in assert_text(
+        assert_array(assert_object(context)["handling_ident_values"])[0]
+    )
+    assert '"' not in assert_text(
+        assert_array(assert_object(context)["commit_values"])[0]
+    )
 
 
 def test_splunk_csv_dogfood_recovers_traceback_after_quote_damage(
@@ -1309,9 +1446,9 @@ def test_splunk_csv_dogfood_recovers_traceback_after_quote_damage(
     )
 
     report = collect(source)
-    assert report["summary"]["recovered"] == 1
-    assert report["summary"]["widened"] == 1
-    anchor = report["bundle"]["anchors"][0]
-    assert anchor["path"] == "/app/src/utils/__init__.py"
-    assert anchor["line"] == 280
-    assert anchor["symbol"] == "process_output_data"
+    assert assert_object(report["summary"])["recovered"] == 1
+    assert assert_object(report["summary"])["widened"] == 1
+    anchor = assert_array(assert_object(report["bundle"])["anchors"])[0]
+    assert assert_object(anchor)["path"] == "/app/src/utils/__init__.py"
+    assert assert_object(anchor)["line"] == 280
+    assert assert_object(anchor)["symbol"] == "process_output_data"

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from . import dependency_resolution_contract as _contract
 from .dependency_resolution_evidence import (
@@ -12,6 +12,9 @@ from .dependency_resolution_evidence import (
     _identity,
     _objects,
 )
+
+if TYPE_CHECKING:
+    from .engine import CodeMap
 
 
 class DependencyResolutionDerivationMixin:
@@ -25,6 +28,8 @@ class DependencyResolutionDerivationMixin:
         self,
         observation: Mapping[str, object],
     ) -> dict[str, object]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         self._require_qualified_dependency_observation_v3(observation)
 
         producer = cast("Mapping[str, object]", observation["producer"])

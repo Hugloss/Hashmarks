@@ -284,7 +284,7 @@ class V(ast.NodeVisitor):
 
     def _scan_with(
         self,
-        stmt: ast.stmt,
+        stmt: ast.With | ast.AsyncWith,
         guards: frozenset[str],
         branches: tuple[tuple[int, object], ...],
     ) -> list[_Event]:
@@ -301,7 +301,7 @@ class V(ast.NodeVisitor):
 
     def _scan_if(
         self,
-        stmt: ast.stmt,
+        stmt: ast.If,
         guards: frozenset[str],
         branches: tuple[tuple[int, object], ...],
     ) -> list[_Event]:
@@ -314,7 +314,7 @@ class V(ast.NodeVisitor):
 
     def _scan_loop(
         self,
-        stmt: ast.stmt,
+        stmt: ast.For | ast.AsyncFor | ast.While,
         guards: frozenset[str],
         branches: tuple[tuple[int, object], ...],
     ) -> list[_Event]:
@@ -327,7 +327,7 @@ class V(ast.NodeVisitor):
 
     def _scan_try(
         self,
-        stmt: ast.stmt,
+        stmt: ast.Try,
         guards: frozenset[str],
         branches: tuple[tuple[int, object], ...],
     ) -> list[_Event]:
@@ -340,7 +340,7 @@ class V(ast.NodeVisitor):
 
     def _scan_match(
         self,
-        stmt: ast.stmt,
+        stmt: ast.Match,
         guards: frozenset[str],
         branches: tuple[tuple[int, object], ...],
     ) -> list[_Event]:
@@ -400,7 +400,7 @@ class V(ast.NodeVisitor):
 
     def _risk_for_read(
         self,
-        node: ast.AST,
+        node: ast.FunctionDef | ast.AsyncFunctionDef,
         calls: list[_Event],
         index: int,
         fresh_local_owners: frozenset[str],

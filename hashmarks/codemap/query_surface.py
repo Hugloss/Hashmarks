@@ -108,6 +108,8 @@ class QuerySurfaceMixin:
         tokens: list[str],
         context_lines: int,
     ) -> dict[str, object] | None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         path = str(candidate["path"])
         visibility = EvidenceVisibility(str(candidate["evidence_visibility"]))
         if visibility is not EvidenceVisibility.SOURCE:
@@ -121,7 +123,9 @@ class QuerySurfaceMixin:
             )
         except OSError:
             return None
-        line_no = int(candidate["line"])
+        line_value = candidate["line"]
+        assert isinstance(line_value, int)
+        line_no = line_value
         if line_no < 1 or line_no > len(lines):
             return None
         line = lines[line_no - 1]
@@ -204,6 +208,8 @@ class QuerySurfaceMixin:
         self,
         query: str,
     ) -> list[dict[str, object]]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if "::" in query:
             raw_path, qualname = query.split("::", 1)
             path = normalize_relative_path(raw_path, allow_root=False)
@@ -227,6 +233,8 @@ class QuerySurfaceMixin:
         query: str,
         row: dict[str, object],
     ) -> tuple[str, str, dict[str, object], str]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         path = str(row["path"])
         qualname = str(row["qualname"])
         self._ensure_path_current(path)
@@ -378,6 +386,8 @@ class QuerySurfaceMixin:
         }
 
     def _affected_roots(self, query: str) -> set[str]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         roots = self._query_paths(query)
         if roots:
             return roots
@@ -401,6 +411,8 @@ class QuerySurfaceMixin:
         *,
         max_depth: int,
     ) -> tuple[list[list[str]], set[str]]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         levels = self._python_reverse_levels(roots, max_depth=max_depth)
         if levels is not None:
             seen = set(roots)
@@ -409,6 +421,7 @@ class QuerySurfaceMixin:
             return levels, seen
 
         reverse = self._reverse_file_graph()
+
         seen = set(roots)
         frontier = set(roots)
         resolved: list[list[str]] = []
@@ -479,6 +492,8 @@ class QuerySurfaceMixin:
         *,
         seed_limit: int,
     ) -> tuple[list[str], str]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         try:
             rel = normalize_relative_path(query, allow_root=False)
         except ValueError:
@@ -515,7 +530,7 @@ class QuerySurfaceMixin:
             chain: list[dict[str, object]] = []
             for order, path in enumerate(applicable):
                 row = indexed_authority[path]
-                entry = {
+                entry: dict[str, object] = {
                     "path": path,
                     "scope": _instruction_scope(path),
                     "specificity": _instruction_specificity(path),
@@ -540,7 +555,7 @@ class QuerySurfaceMixin:
         ordered = sorted(
             merged.values(),
             key=lambda row: (
-                int(row["specificity"]),
+                cast(int, row["specificity"]),
                 0 if row["kind"] == "agents" else 1,
                 str(row["path"]),
             ),
@@ -613,6 +628,8 @@ class QuerySurfaceMixin:
         *,
         limit_per_surface: int,
     ) -> dict[str, object]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         adjacency_limit = max(12, limit_per_surface * 2)
         exact_path_roots = self._query_paths(query)
         if len(exact_path_roots) == 1 and exact_path_roots == roots:
@@ -659,8 +676,11 @@ class QuerySurfaceMixin:
         if limit_per_surface < 1:
             raise ValueError("limit_per_surface must be >= 1")
         value = self.affected(query, max_depth=max_depth)
-        roots = {str(path) for path in value["roots"]}
-        levels = [list(map(str, level)) for level in value["levels"]]
+        root_values, level_values = value["roots"], value["levels"]
+        assert isinstance(root_values, list) and isinstance(level_values, list)
+        assert all(isinstance(level, list) for level in level_values)
+        roots = {str(path) for path in root_values}
+        levels = [list(map(str, level)) for level in level_values]
         depth_by_path = self._change_impact_depths(roots, levels)
         accumulator = _ChangeImpactAccumulator(roots, limit_per_surface)
 
@@ -679,7 +699,9 @@ class QuerySurfaceMixin:
             roots,
             limit_per_surface=limit_per_surface,
         )
-        for row in adjacency["adjacent"]:
+        adjacent = adjacency["adjacent"]
+        assert isinstance(adjacent, list)
+        for row in adjacent:
             if not isinstance(row, dict):
                 continue
             accumulator.add(
@@ -704,6 +726,6 @@ class QuerySurfaceMixin:
                 "limit_per_surface": limit_per_surface,
                 "adjacency_max_hops": 1,
             },
-            "evidence": value["evidence"] + "; plus bounded task graph adjacency",
+            "evidence": str(value["evidence"]) + "; plus bounded task graph adjacency",
             "authority": "advisory-navigation-only",
         }

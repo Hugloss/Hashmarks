@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import replace
 from typing import Any, cast
 
 import pytest
+from contract_assertions import assert_array, assert_object
 
 from hashmarks import __version__
 from hashmarks.verification_selection import (
@@ -205,8 +207,9 @@ def test_downstream_contract_is_compact_and_execution_layout_independent() -> No
     assert contract["hashmarks_identity"] == f"hashmarks:{__version__}"
     assert (
         contract["producer_implementation_identity"]
-        == envelope["producer"]["implementation_identity"]
+        == assert_object(envelope["producer"])["implementation_identity"]
     )
+
     assert contract["selected_membership_identity"] == membership["membership_identity"]
     assert contract["envelope_identity"] == envelope["envelope_identity"]
     assert contract["contract_identity"].startswith("sha256:")
@@ -248,7 +251,7 @@ def test_membership_validator_rejects_tampered_member_id_even_when_outer_members
     tampered["members"][0]["member_id"] = "sha256:" + "f" * 64
     result = validate_verification_membership(tampered)
     assert result["valid"] is False
-    assert "member-payload-identity-mismatch" in result["reasons"]
+    assert "member-payload-identity-mismatch" in assert_array(result["reasons"])
 
 
 def test_generation_domain_and_identity_types_fail_closed() -> None:
@@ -257,18 +260,17 @@ def test_generation_domain_and_identity_types_fail_closed() -> None:
     membership = verification_membership([verification_member("tests/test_a.py")])
 
     def state(**changes) -> VerificationSelectionEnvelopeState:
-        values = {
-            "repository_identity": "git-tree:abc",
-            "source_identity": "sha256:" + "1" * 64,
-            "codemap_generation": 1,
-            "identity_generation": 1,
-            "stale": False,
-            "membership": membership,
-            "owner_evidence": {},
-            "evidence_hashes": {},
-        }
-        values.update(changes)
-        return VerificationSelectionEnvelopeState(**cast(Any, values))
+        original = VerificationSelectionEnvelopeState(
+            repository_identity="git-tree:abc",
+            source_identity="sha256:" + "1" * 64,
+            codemap_generation=1,
+            identity_generation=1,
+            stale=False,
+            membership=membership,
+            owner_evidence={},
+            evidence_hashes={},
+        )
+        return replace(original, **changes)
 
     for field, value in (
         ("codemap_generation", True),
@@ -401,7 +403,7 @@ def test_envelope_rejects_coerced_evidence_hash_before_identity_formation() -> N
                 stale=False,
                 membership=membership,
                 owner_evidence={},
-                evidence_hashes=cast(Any, {"ownership": True}),
+                evidence_hashes={"ownership": cast(str, True)},
             )
         )
 

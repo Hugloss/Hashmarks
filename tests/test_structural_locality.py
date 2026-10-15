@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from contract_assertions import assert_array, assert_object, assert_records
+
 from hashmarks.codemap import CodeMap, structural_locality_delta
 
 
@@ -64,17 +66,17 @@ def test_authority():
 
     assert packet_without_refresh["nodes"] == packet["nodes"]
     assert packet_without_refresh["dimensions"] == packet["dimensions"]
-    assert packet_without_refresh["freshness"]["state"] == "unknown"
+    assert assert_object(packet_without_refresh["freshness"])["state"] == "unknown"
     assert packet["schema"] == "hashmarks.structural-locality.v1"
-    assert packet["freshness"]["state"] == "current"
-    assert packet["freshness"]["basis"] == "explicit-sync"
+    assert assert_object(packet["freshness"])["state"] == "current"
+    assert assert_object(packet["freshness"])["basis"] == "explicit-sync"
     assert packet["claims"] == {
         "refactor_recommendation": False,
         "semantic_responsibility_inferred": False,
         "ambiguous_calls_promoted_to_exact": False,
         "execution_authority": False,
     }
-    nodes = {row["symbol_id"]: row for row in packet["nodes"]}
+    nodes = {row["symbol_id"]: row for row in assert_records(packet["nodes"])}
     assert set(nodes) == {
         "pkg/core.py::authority",
         "pkg/core.py::wrapper",
@@ -84,13 +86,18 @@ def test_authority():
     assert nodes["pkg/core.py::wrapper"]["forwarding_only"] is True
     assert nodes["pkg/core.py::wrapper"]["exact_caller_count"] == 1
     assert nodes["pkg/core.py::helper"]["exact_caller_count"] == 1
-    assert packet["dimensions"]["file_count"] == 1
-    assert packet["dimensions"]["max_navigation_depth"] == 2
-    assert packet["dimensions"]["forwarding_only_symbol_count"] == 1
-    assert packet["dimensions"]["unresolved_call_count"] == 0
-    assert packet["dimensions"]["external_or_unindexed_call_count"] == 1
-    assert packet["external_or_unindexed_calls"][0]["target_text"] == "ValueError"
-    assert "tests/test_core.py" in packet["verification_paths"]
+    assert assert_object(packet["dimensions"])["file_count"] == 1
+    assert assert_object(packet["dimensions"])["max_navigation_depth"] == 2
+    assert assert_object(packet["dimensions"])["forwarding_only_symbol_count"] == 1
+    assert assert_object(packet["dimensions"])["unresolved_call_count"] == 0
+    assert assert_object(packet["dimensions"])["external_or_unindexed_call_count"] == 1
+    assert (
+        assert_object(assert_array(packet["external_or_unindexed_calls"])[0])[
+            "target_text"
+        ]
+        == "ValueError"
+    )
+    assert "tests/test_core.py" in assert_array(packet["verification_paths"])
     assert str(packet["provider_implementation_identity"]).startswith("sha256:")
     assert str(packet["repository_identity"]).startswith("sha256:")
     assert str(packet["source_identity"]).startswith("sha256:")
@@ -121,16 +128,16 @@ def authority(value):
             max_depth=3,
         )
 
-    nodes = {row["symbol_id"] for row in packet["nodes"]}
+    nodes = {row["symbol_id"] for row in assert_records(packet["nodes"])}
     assert nodes == {"pkg/core.py::authority"}
-    unresolved = packet["unresolved_calls"]
+    unresolved = assert_records(packet["unresolved_calls"])
     assert any(row.get("target_text") == "helper" for row in unresolved)
     helper_row = next(row for row in unresolved if row.get("target_text") == "helper")
     assert helper_row["candidate_symbol_ids"] == [
         "pkg/a.py::helper",
         "pkg/b.py::helper",
     ]
-    assert packet["claims"]["ambiguous_calls_promoted_to_exact"] is False
+    assert assert_object(packet["claims"])["ambiguous_calls_promoted_to_exact"] is False
 
 
 def test_structural_locality_delta_reports_facts_without_policy(tmp_path: Path) -> None:
@@ -175,7 +182,7 @@ def authority(value):
     assert delta["incomparability_reasons"] == []
     assert delta["introduced_symbol_ids"] == ["pkg/core.py::helper"]
     assert delta["removed_symbol_ids"] == []
-    assert delta["dimension_delta"]["symbol_count"] == 1
+    assert assert_object(delta["dimension_delta"])["symbol_count"] == 1
     assert delta["claims"] == {
         "architectural_improvement": False,
         "refactor_recommendation": False,
@@ -219,10 +226,12 @@ def authority(client, value):
             max_depth=2,
         )
 
-    assert [row["symbol_id"] for row in packet["nodes"]] == ["pkg/core.py::authority"]
-    assert packet["dimensions"]["unresolved_call_count"] == 0
-    assert packet["dimensions"]["external_or_unindexed_call_count"] == 1
-    row = packet["external_or_unindexed_calls"][0]
+    assert [row["symbol_id"] for row in assert_records(packet["nodes"])] == [
+        "pkg/core.py::authority"
+    ]
+    assert assert_object(packet["dimensions"])["unresolved_call_count"] == 0
+    assert assert_object(packet["dimensions"])["external_or_unindexed_call_count"] == 1
+    row = assert_object(assert_array(packet["external_or_unindexed_calls"])[0])
     assert row["target_text"] == "client.helper"
     assert row["candidate_symbol_ids"] == ["pkg/core.py::helper"]
 
@@ -252,8 +261,8 @@ def authority():
     with _codemap(tmp_path) as codemap:
         packet = codemap.structural_locality("pkg/core.py::authority")
 
-    assert packet["dimensions"]["unresolved_call_count"] == 1
-    unresolved = packet["unresolved_calls"][0]
+    assert assert_object(packet["dimensions"])["unresolved_call_count"] == 1
+    unresolved = assert_object(assert_array(packet["unresolved_calls"])[0])
     assert unresolved["target_text"] == "Local.helper"
     assert unresolved["candidate_symbol_ids"] == ["pkg/core.py::Other.helper"]
 
@@ -281,10 +290,12 @@ def authority(helper, value):
             max_depth=2,
         )
 
-    assert [row["symbol_id"] for row in packet["nodes"]] == ["pkg/core.py::authority"]
-    assert packet["dimensions"]["unresolved_call_count"] == 0
-    assert packet["dimensions"]["external_or_unindexed_call_count"] == 1
-    row = packet["external_or_unindexed_calls"][0]
+    assert [row["symbol_id"] for row in assert_records(packet["nodes"])] == [
+        "pkg/core.py::authority"
+    ]
+    assert assert_object(packet["dimensions"])["unresolved_call_count"] == 0
+    assert assert_object(packet["dimensions"])["external_or_unindexed_call_count"] == 1
+    row = assert_object(assert_array(packet["external_or_unindexed_calls"])[0])
     assert row["target_text"] == "helper"
     assert row["candidate_symbol_ids"] == ["pkg/core.py::helper"]
 
@@ -303,7 +314,7 @@ def test_structural_locality_delta_rejects_tampered_packet_identity(
     delta = structural_locality_delta(before, tampered)
 
     assert delta["comparable"] is False
-    assert "after-evidence-identity" in delta["incomparability_reasons"]
+    assert "after-evidence-identity" in assert_array(delta["incomparability_reasons"])
 
 
 def test_structural_locality_exact_callers_are_positive_reuse_evidence(
@@ -328,14 +339,16 @@ def test_structural_locality_exact_callers_are_positive_reuse_evidence(
             max_depth=0,
         )
 
-    target = packet["nodes"][0]
+    target = assert_object(assert_array(packet["nodes"])[0])
     assert target["symbol_id"] == "pkg/shared.py::helper"
     assert target["exact_caller_count"] == 2
-    assert {(row["path"], row["source"]) for row in target["exact_callers"]} == {
+    assert {
+        (row["path"], row["source"]) for row in assert_records(target["exact_callers"])
+    } == {
         ("pkg/a.py", "use_a"),
         ("pkg/b.py", "use_b"),
     }
-    assert packet["dimensions"]["target_exact_caller_count"] == 2
+    assert assert_object(packet["dimensions"])["target_exact_caller_count"] == 2
 
 
 def test_structural_locality_resolves_unshadowed_local_class_method(
@@ -363,11 +376,11 @@ def authority(value):
             max_depth=2,
         )
 
-    assert {row["symbol_id"] for row in packet["nodes"]} == {
+    assert {row["symbol_id"] for row in assert_records(packet["nodes"])} == {
         "pkg/core.py::authority",
         "pkg/core.py::Worker.helper",
     }
-    assert packet["dimensions"]["unresolved_call_count"] == 0
+    assert assert_object(packet["dimensions"])["unresolved_call_count"] == 0
 
 
 def test_structural_locality_does_not_resolve_shadowed_qualified_call(
@@ -395,10 +408,12 @@ def authority(Worker, value):
             max_depth=2,
         )
 
-    assert [row["symbol_id"] for row in packet["nodes"]] == ["pkg/core.py::authority"]
-    assert packet["dimensions"]["unresolved_call_count"] == 0
-    assert packet["dimensions"]["external_or_unindexed_call_count"] == 1
-    row = packet["external_or_unindexed_calls"][0]
+    assert [row["symbol_id"] for row in assert_records(packet["nodes"])] == [
+        "pkg/core.py::authority"
+    ]
+    assert assert_object(packet["dimensions"])["unresolved_call_count"] == 0
+    assert assert_object(packet["dimensions"])["external_or_unindexed_call_count"] == 1
+    row = assert_object(assert_array(packet["external_or_unindexed_calls"])[0])
     assert row["target_text"] == "Worker.helper"
     assert row["candidate_symbol_ids"] == ["pkg/core.py::Worker.helper"]
 
@@ -443,10 +458,12 @@ def authority(gaps, payload, seen, observations_path):
             max_depth=2,
         )
 
-    assert [row["symbol_id"] for row in packet["nodes"]] == ["pkg/core.py::authority"]
-    assert packet["dimensions"]["unresolved_call_count"] == 0
-    assert packet["dimensions"]["external_or_unindexed_call_count"] == 4
-    external = packet["external_or_unindexed_calls"]
+    assert [row["symbol_id"] for row in assert_records(packet["nodes"])] == [
+        "pkg/core.py::authority"
+    ]
+    assert assert_object(packet["dimensions"])["unresolved_call_count"] == 0
+    assert assert_object(packet["dimensions"])["external_or_unindexed_call_count"] == 4
+    external = assert_records(packet["external_or_unindexed_calls"])
     assert [row["target_text"] for row in external] == [
         "gaps.append",
         "payload.get",
@@ -480,10 +497,10 @@ def test_structural_locality_imported_data_method_is_external_not_repository_amb
             max_depth=2,
         )
 
-    assert packet["dimensions"]["unresolved_call_count"] == 0
+    assert assert_object(packet["dimensions"])["unresolved_call_count"] == 0
     assert any(
         row["target_text"] == "CONTROLS.items"
-        for row in packet["external_or_unindexed_calls"]
+        for row in assert_records(packet["external_or_unindexed_calls"])
     )
 
 
@@ -513,11 +530,11 @@ def test_structural_locality_imported_class_alias_resolves_exact_member(
             max_depth=2,
         )
 
-    assert {row["symbol_id"] for row in packet["nodes"]} == {
+    assert {row["symbol_id"] for row in assert_records(packet["nodes"])} == {
         "pkg/core.py::authority",
         "pkg/worker.py::Worker.helper",
     }
-    assert packet["dimensions"]["unresolved_call_count"] == 0
+    assert assert_object(packet["dimensions"])["unresolved_call_count"] == 0
 
 
 def test_structural_locality_resolves_exact_self_method_and_caller(
@@ -542,21 +559,22 @@ class Worker:
             "pkg/core.py::Worker.authority",
             max_depth=2,
         )
+
         helper = codemap.structural_locality(
             "pkg/core.py::Worker._normalize",
             max_depth=0,
         )
 
-    assert {row["symbol_id"] for row in packet["nodes"]} == {
+    assert {row["symbol_id"] for row in assert_records(packet["nodes"])} == {
         "pkg/core.py::Worker.authority",
         "pkg/core.py::Worker._normalize",
     }
-    assert packet["dimensions"]["unresolved_call_count"] == 0
-    target = helper["nodes"][0]
+    assert assert_object(packet["dimensions"])["unresolved_call_count"] == 0
+    target = assert_object(assert_array(helper["nodes"])[0])
     assert target["exact_caller_count"] == 1
-    assert {(row["path"], row["source"]) for row in target["exact_callers"]} == {
-        ("pkg/core.py", "Worker.authority")
-    }
+    assert {
+        (row["path"], row["source"]) for row in assert_records(target["exact_callers"])
+    } == {("pkg/core.py", "Worker.authority")}
 
 
 def test_structural_locality_resolves_exact_cls_method(
@@ -584,11 +602,11 @@ class Worker:
             max_depth=2,
         )
 
-    assert {row["symbol_id"] for row in packet["nodes"]} == {
+    assert {row["symbol_id"] for row in assert_records(packet["nodes"])} == {
         "pkg/core.py::Worker.build",
         "pkg/core.py::Worker._normalize",
     }
-    assert packet["dimensions"]["unresolved_call_count"] == 0
+    assert assert_object(packet["dimensions"])["unresolved_call_count"] == 0
 
 
 def test_structural_locality_resolves_unambiguous_inherited_self_method(
@@ -622,21 +640,22 @@ class Worker(Base):
             "pkg/core.py::Worker.authority",
             max_depth=2,
         )
+
         helper = codemap.structural_locality(
             "pkg/base.py::Base._normalize",
             max_depth=0,
         )
 
-    assert {row["symbol_id"] for row in packet["nodes"]} == {
+    assert {row["symbol_id"] for row in assert_records(packet["nodes"])} == {
         "pkg/core.py::Worker.authority",
         "pkg/base.py::Base._normalize",
     }
-    assert packet["dimensions"]["unresolved_call_count"] == 0
-    target = helper["nodes"][0]
+    assert assert_object(packet["dimensions"])["unresolved_call_count"] == 0
+    target = assert_object(assert_array(helper["nodes"])[0])
     assert target["exact_caller_count"] == 1
-    assert {(row["path"], row["source"]) for row in target["exact_callers"]} == {
-        ("pkg/core.py", "Worker.authority")
-    }
+    assert {
+        (row["path"], row["source"]) for row in assert_records(target["exact_callers"])
+    } == {("pkg/core.py", "Worker.authority")}
 
 
 def test_structural_locality_keeps_ambiguous_inherited_self_method_unresolved(
@@ -669,11 +688,11 @@ class Worker(First, Second):
             max_depth=2,
         )
 
-    assert [row["symbol_id"] for row in packet["nodes"]] == [
+    assert [row["symbol_id"] for row in assert_records(packet["nodes"])] == [
         "pkg/core.py::Worker.authority"
     ]
-    assert packet["dimensions"]["unresolved_call_count"] == 1
-    unresolved = packet["unresolved_calls"][0]
+    assert assert_object(packet["dimensions"])["unresolved_call_count"] == 1
+    unresolved = assert_object(assert_array(packet["unresolved_calls"])[0])
     assert unresolved["target_text"] == "self.helper"
     assert unresolved["candidate_symbol_ids"] == [
         "pkg/core.py::First.helper",
@@ -706,11 +725,11 @@ class Worker(Base):
             "pkg/core.py::Worker.authority", max_depth=2
         )
 
-    assert {row["symbol_id"] for row in packet["nodes"]} == {
+    assert {row["symbol_id"] for row in assert_records(packet["nodes"])} == {
         "pkg/core.py::Worker.authority",
         "pkg/core.py::Worker.helper",
     }
-    assert packet["dimensions"]["unresolved_call_count"] == 0
+    assert assert_object(packet["dimensions"])["unresolved_call_count"] == 0
 
 
 def test_structural_locality_resolves_unique_multiple_inheritance_owner(
@@ -741,11 +760,11 @@ class Worker(First, Second):
             "pkg/core.py::Worker.authority", max_depth=2
         )
 
-    assert {row["symbol_id"] for row in packet["nodes"]} == {
+    assert {row["symbol_id"] for row in assert_records(packet["nodes"])} == {
         "pkg/core.py::Worker.authority",
         "pkg/core.py::First.helper",
     }
-    assert packet["dimensions"]["unresolved_call_count"] == 0
+    assert assert_object(packet["dimensions"])["unresolved_call_count"] == 0
 
 
 def test_structural_locality_keeps_external_base_member_unresolved(
@@ -770,11 +789,14 @@ class Worker(ExternalBase):
             "pkg/core.py::Worker.authority", max_depth=2
         )
 
-    assert [row["symbol_id"] for row in packet["nodes"]] == [
+    assert [row["symbol_id"] for row in assert_records(packet["nodes"])] == [
         "pkg/core.py::Worker.authority"
     ]
-    assert packet["dimensions"]["unresolved_call_count"] == 1
-    assert packet["unresolved_calls"][0]["target_text"] == "self.helper"
+    assert assert_object(packet["dimensions"])["unresolved_call_count"] == 1
+    assert (
+        assert_object(assert_array(packet["unresolved_calls"])[0])["target_text"]
+        == "self.helper"
+    )
 
 
 def test_structural_locality_mixed_known_unknown_bases_fail_closed(
@@ -804,10 +826,10 @@ class Worker(KnownBase, ExternalBase):
             "pkg/core.py::Worker.authority", max_depth=2
         )
 
-    assert [row["symbol_id"] for row in packet["nodes"]] == [
+    assert [row["symbol_id"] for row in assert_records(packet["nodes"])] == [
         "pkg/core.py::Worker.authority"
     ]
-    assert packet["dimensions"]["unresolved_call_count"] == 1
-    unresolved = packet["unresolved_calls"][0]
+    assert assert_object(packet["dimensions"])["unresolved_call_count"] == 1
+    unresolved = assert_object(assert_array(packet["unresolved_calls"])[0])
     assert unresolved["target_text"] == "self.helper"
     assert unresolved["candidate_symbol_ids"] == ["pkg/core.py::KnownBase.helper"]

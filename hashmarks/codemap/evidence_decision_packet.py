@@ -129,8 +129,12 @@ class DecisionPacketMixin:
         return {
             "needed": needed,
             "reason": reason,
-            "candidates": self._decision_packet_candidates(action, candidate, verify),
-            "ambiguity": ambiguity if bool(ambiguity.get("ambiguous")) else None,
+            "candidates": self._decision_packet_candidates(
+                action, cast(Mapping[str, object] | None, candidate), verify
+            ),
+            "ambiguity": ambiguity
+            if bool(cast(Mapping[str, object], ambiguity).get("ambiguous"))
+            else None,
             "candidate_scope": "repository-evidence-only",
             "interpretation": "evidence-discrimination-only",
             "consumer_action": "external",
@@ -177,7 +181,7 @@ class DecisionPacketMixin:
                 _VerificationSelectionState(
                     generation=generation,
                     identity_generation=identity_generation,
-                    stale=stale,
+                    stale=cast(bool, stale),
                     verify=verify,
                     action=action,
                     verification_digest=verification_digest,
@@ -289,7 +293,7 @@ class DecisionPacketMixin:
             "verification_membership": verification_membership,
             "verification_selection_envelope": selection_envelope,
             "downstream_verification_contract": self._downstream_verification_contract(
-                selection_envelope
+                cast(Mapping[str, object] | None, selection_envelope)
             ),
             "evidence_surfaces": {
                 "edit": None

@@ -5,7 +5,7 @@ import os
 import shutil
 import subprocess
 import tomllib
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -753,9 +753,12 @@ class DeclaredProjectLinksProvider(ProjectGraphProvider):
     def _shared_projects(
         index: int, projects: object, warnings: list[str]
     ) -> tuple[str, ...]:
-        valid_list = isinstance(projects, list) and all(
-            isinstance(item, str) and item.strip() for item in projects
-        )
+        if not isinstance(projects, list):
+            warnings.append(
+                f"shared_input[{index}] projects must be a non-empty string list"
+            )
+            return ()
+        valid_list = all(isinstance(item, str) and item.strip() for item in projects)
         if not valid_list:
             warnings.append(
                 f"shared_input[{index}] projects must be a non-empty string list"

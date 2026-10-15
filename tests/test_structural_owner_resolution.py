@@ -1,5 +1,7 @@
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
+
+from contract_assertions import assert_array, assert_object, assert_present, assert_text
 
 from hashmarks.codemap import CodeMap
 
@@ -35,7 +37,9 @@ def test_structural_owner_follows_active_test_route_engine_chain(
         action = codemap.task_action_map(
             "Fix ember accepted response behavior owner", limit=20
         )
+    assert action["verify"] is not None
     assert action["verify"]["path"] == "tests/case/test_behavior.py"
+    assert action["edit"] is not None
     assert action["edit"]["path"] == "src/case/engine.py"
     assert action["ownership_resolution"] is not None
     assert "depth" in action["ownership_resolution"]
@@ -57,6 +61,7 @@ def test_structural_owner_does_not_choose_unreachable_duplicate_legacy_symbol(
         action = codemap.task_action_map(
             "Fix ember accepted response behavior owner", limit=20
         )
+    assert action["edit"] is not None
     assert action["edit"]["path"] != "src/case/legacy.py"
 
 
@@ -68,17 +73,18 @@ def test_projected_file_owner_does_not_claim_an_unrelated_first_symbol(
     engine.write_text("def unrelated_helper():\n    return 0\n\n" + engine.read_text())
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        action = cast(
-            "dict[str, Any]",
-            codemap.task_action_map(
-                "Fix ember accepted response behavior owner", limit=3
-            ),
+        action = codemap.task_action_map(
+            "Fix ember accepted response behavior owner", limit=3
         )
-    assert action["edit"]["path"] == "src/case/engine.py"
-    assert action["edit"]["structural_projection"] is True
-    assert action["edit"]["qualname"] is None
-    assert action["edit"]["start_line"] is None
-    assert action["ownership_resolution"]["authority_admissible"] is False
+    edit = assert_present(action["edit"])
+    assert "qualname" in edit and "start_line" in edit
+    assert edit["path"] == "src/case/engine.py"
+    assert edit.get("structural_projection") is True
+    assert edit["qualname"] is None
+    assert edit["start_line"] is None
+    resolution = assert_present(action["ownership_resolution"])
+    assert "authority_admissible" in resolution
+    assert resolution["authority_admissible"] is False
 
 
 def test_incomplete_structural_candidate_does_not_displace_named_source(
@@ -101,17 +107,19 @@ def test_incomplete_structural_candidate_does_not_displace_named_source(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        packet = cast(
-            "dict[str, Any]",
-            codemap.task_evidence(
-                "Fix Metadata.failed_update completing a request_update future through unsupported methods."
-            ),
+        packet = codemap.task_evidence(
+            "Fix Metadata.failed_update completing a request_update future through unsupported methods."
         )
-    assert packet["ownership"]["candidate"]["path"] == "src/owner.py"
-    assert packet["ownership"]["candidate"]["qualname"] == "Metadata.failed_update"
+    candidate = assert_present(packet["ownership"]["candidate"])
+    assert "qualname" in candidate
+    assert candidate["path"] == "src/owner.py"
+    assert candidate["qualname"] == "Metadata.failed_update"
     assert packet["ownership"]["owner"] is None
     assert packet["ownership"]["ambiguity"]["ambiguous"] is True
-    assert packet["verification"]["selected"]["path"] == "tests/test_owner.py"
+    assert (
+        assert_present(packet["verification"]["selected"])["path"]
+        == "tests/test_owner.py"
+    )
 
 
 def test_explicit_policy_task_keeps_configuration_authority(tmp_path: Path) -> None:
@@ -123,6 +131,7 @@ def test_explicit_policy_task_keeps_configuration_authority(tmp_path: Path) -> N
             "Change ember policy config for accepted response", limit=20
         )
     assert action["ownership_resolution"] is None
+    assert action["edit"] is not None
     assert action["edit"]["path"] == "src/case/policy.toml"
 
 
@@ -141,7 +150,9 @@ def test_contract_named_verification_surface_never_overrides_structural_edit_own
             "Repair ember behavior and identify its contract verification outside default tests",
             limit=20,
         )
+    assert action["verify"] is not None
     assert action["verify"]["path"] == "checks/case/test_contract.py"
+    assert action["edit"] is not None
     assert action["edit"]["path"] == "src/case/engine.py"
     assert action["edit"]["path"] != action["verify"]["path"]
 
@@ -208,8 +219,8 @@ def test_decision_brief_carries_compact_owner_path(tmp_path: Path) -> None:
         brief = codemap.task_decision_brief(
             "Fix ember accepted response behavior owner"
         )
-    assert brief["edit"]["path"] == "src/case/engine.py"
-    assert brief["owner_path"][-1] == {
+    assert assert_object(brief["edit"])["path"] == "src/case/engine.py"
+    assert assert_array(brief["owner_path"])[-1] == {
         "from": "src/case/route.py",
         "to": "src/case/engine.py",
         "relation": "imports",
@@ -260,7 +271,9 @@ def test_unique_third_hop_call_delegation_refines_owner(tmp_path: Path) -> None:
             "Change the frosted meadow accepted response from old to new and verify it"
         )
         assert brief["edit"] == "src/case/engine.ts"
-        assert "service.ts --imports--> src/case/engine.ts" in brief["owner_path"]
+        assert "service.ts --imports--> src/case/engine.ts" in assert_text(
+            brief["owner_path"]
+        )
         graph = codemap.ownership_relation_graph(
             "frosted meadow accepted response", "tests/frosted.test.ts", max_depth=3
         )

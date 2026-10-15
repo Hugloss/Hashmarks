@@ -5,6 +5,7 @@ import fnmatch
 import hashlib
 import json
 import os
+import sqlite3
 import time
 import tomllib
 from bisect import bisect_left
@@ -12,6 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.digest import Digest
 from hashmarks.file_store import UnstableFileError
 from hashmarks.paths import normalize_relative_path
 
@@ -648,7 +650,6 @@ class IndexingLifecycleMixin:
                     if row is not None:
                         self.artifacts.delete(str(row["artifact_key"]))
             return self.store.delete_paths(to_remove)
-
         discovered_paths = tuple(sorted({item.rel for item in discovered}))
         stale_rows: set[str] = set()
         for rel in _minimal_path_prefixes(requested_paths):
@@ -680,11 +681,12 @@ class IndexingLifecycleMixin:
             current = self.store.file_row(str(row["path"]))
             if current is None:
                 continue
+            cur = current
             files_payload[str(row["path"])] = {
-                "file_digest": str(current["file_digest"]),
-                "artifact_key": str(current["artifact_key"]),
-                "language": str(current["language"]),
-                "evidence_visibility": str(current["evidence_visibility"]),
+                "file_digest": str(cur["file_digest"]),
+                "artifact_key": str(cur["artifact_key"]),
+                "language": str(cur["language"]),
+                "evidence_visibility": str(cur["evidence_visibility"]),
             }
         payload = {
             "schema": "hashmarks.codemap-base-snapshot.v1",
@@ -918,12 +920,12 @@ class IndexingLifecycleMixin:
 
     def _sync_file_digest(
         self,
-        item: _DiscoveredFile,
         *,
+        item: _DiscoveredFile,
         warnings: list[str],
         state: _SyncIndexState,
-        digest: str | None = None,
-    ) -> str | None:
+        digest: Digest | None = None,
+    ) -> Digest | None:
         self = cast("CodeMap", self)
         if digest is not None:
             return digest
@@ -938,7 +940,9 @@ class IndexingLifecycleMixin:
             state.skipped += 1
             return None
 
-    def _sync_reuse_state(self, rel: str, row: object) -> _FileReuseState:
+    def _sync_reuse_state(
+        self, rel: str, row: sqlite3.Row | tuple[str, str, str, str, bool] | None
+    ) -> _FileReuseState:
         self = cast("CodeMap", self)
         if isinstance(row, tuple):
             digest, artifact, visibility, module, has_derived = row
@@ -1000,14 +1004,14 @@ class IndexingLifecycleMixin:
         item: _DiscoveredFile,
         warnings: list[str],
         state: _SyncIndexState,
-        digest: str | None = None,
-        row: object | None = None,
+        digest: Digest | None = None,
+        row: sqlite3.Row | tuple[str, str, str, str, bool] | None = None,
         module_name: str,
     ) -> None:
         """Reuse or parse one already-discovered repository file and persist its evidence."""
         self = cast("CodeMap", self)
         digest = self._sync_file_digest(
-            item,
+            item=item,
             warnings=warnings,
             state=state,
             digest=digest,
@@ -1093,7 +1097,7 @@ class IndexingLifecycleMixin:
         # bounded SQLite batches rather than issuing one lookup per file on warm
         # reconciliation.  A problematic batch falls back to the established
         # per-file path so one unstable/unreadable file cannot poison its peers.
-        digests: dict[str, object] = {}
+        digests: dict[str, Digest] = {}
         digest_batch_size = 500
         for start in range(0, len(candidates), digest_batch_size):
             batch = candidates[start : start + digest_batch_size]

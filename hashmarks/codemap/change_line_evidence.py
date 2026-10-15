@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import ast
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from hashmarks.paths import normalize_relative_path
 from hashmarks.python_ast_cache import read_python_ast
@@ -90,7 +90,13 @@ def _checked_line_bounds(start: object, end: object) -> tuple[int, int]:
     return start, end
 
 
-def _admit_span(raw: object, allowed: set[str]) -> dict[str, Any]:
+class ChangedLineSpan(TypedDict):
+    path: str
+    start_line: int
+    end_line: int
+
+
+def _admit_span(raw: object, allowed: set[str]) -> ChangedLineSpan:
     if not isinstance(raw, Mapping) or set(raw) != {"path", "start_line", "end_line"}:
         raise ValueError("changed line span requires path/start_line/end_line")
     if not isinstance(raw["path"], str):
@@ -105,13 +111,13 @@ def _admit_span(raw: object, allowed: set[str]) -> dict[str, Any]:
 def normalize_changed_line_spans(
     spans: object,
     changed_paths: Sequence[str],
-) -> tuple[dict[str, Any], ...]:
+) -> tuple[ChangedLineSpan, ...]:
     """Fail before refresh on untrusted range shapes and out-of-scope members."""
     if spans is None:
         return ()
     if not isinstance(spans, list) or len(spans) > MAX_CHANGED_SPANS:
         raise ValueError("changed_line_spans must be a list of at most 16 ranges")
-    selected: list[dict[str, Any]] = []
+    selected: list[ChangedLineSpan] = []
     seen: set[tuple[str, int, int]] = set()
     for raw in spans:
         span = _admit_span(raw, set(changed_paths))
@@ -144,7 +150,8 @@ def _unavailable(
 def _direct_symbol(
     row: Mapping[str, object], span: Mapping[str, Any]
 ) -> dict[str, object]:
-    start, end = int(row["start_line"]), int(row["end_line"])
+    start, end = row["start_line"], row["end_line"]
+    assert isinstance(start, int) and isinstance(end, int)
     subject = f"{span['path']}::{row['qualname']}"
     return {
         "subject": subject,

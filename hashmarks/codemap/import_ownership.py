@@ -10,7 +10,7 @@ from __future__ import annotations
 import ast
 from dataclasses import dataclass
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -92,7 +92,10 @@ def _collect_path_parts(
         )
     elif isinstance(value, (ast.List, ast.Tuple)):
         result = _sequence_path_parts(
-            value.elts, bound=bound, resolving=resolving, depth=depth
+            cast(list[ast.AST], value.elts),
+            bound=bound,
+            resolving=resolving,
+            depth=depth,
         )
     elif isinstance(value, ast.Call):
         result = _sequence_path_parts(

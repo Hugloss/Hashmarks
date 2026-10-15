@@ -1,11 +1,13 @@
 import json
 from pathlib import Path
-from typing import Any
 
 import pytest
+from contract_assertions import assert_array, assert_object, assert_text
 from pytest import MonkeyPatch
 
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.model import SearchHit
+from hashmarks.codemap.task_evidence_types import TaskActionMap
 
 
 def _repo(root: Path) -> None:
@@ -72,8 +74,10 @@ def test_task_action_brief_fast_budget_matches_diagnostic_sweep(tmp_path: Path) 
         auto = c.task_action_brief(
             "widget implementation test", candidate_budgets=[1, 32, 64, 96, 128]
         )
+        budget = sweep["smallest_safe_budget"]
+        assert isinstance(budget, int)
         expected = c.task_action_brief(
-            "widget implementation test", token_budget=sweep["smallest_safe_budget"]
+            "widget implementation test", token_budget=budget
         )
     assert sweep["smallest_safe_budget"] is not None
     assert auto == expected
@@ -92,6 +96,7 @@ def test_task_action_brief_auto_budget_does_not_call_diagnostic_sweep(
             )
 
         brief = c.task_action_brief("widget implementation test")
+
     assert brief["status"] == "safe-unknown"
 
 
@@ -102,7 +107,7 @@ def test_task_action_brief_computes_canonical_action_map_once(tmp_path: Path) ->
         original = c.task_action_map
         calls = 0
 
-        def counted(*args, **kwargs) -> object:
+        def counted(*args, **kwargs) -> TaskActionMap:
             nonlocal calls
             calls += 1
             return original(*args, **kwargs)
@@ -115,6 +120,7 @@ def test_task_action_brief_computes_canonical_action_map_once(tmp_path: Path) ->
 
 def test_rare_ticket_action_brief_uses_exact_index_anchor_without_general_find(
     tmp_path: Path,
+    monkeypatch: MonkeyPatch,
 ) -> None:
     (tmp_path / "src" / "abc123").mkdir(parents=True)
     (tmp_path / "tests").mkdir()
@@ -140,11 +146,11 @@ def test_rare_ticket_action_brief_uses_exact_index_anchor_without_general_find(
         original_find = c.find
         queries: list[str] = []
 
-        def counted(query: str, *, limit: int = 20) -> object:
+        def counted(query: str, *, limit: int = 20) -> tuple[SearchHit, ...]:
             queries.append(query)
             return original_find(query, limit=limit)
 
-        c.find = counted  # type: ignore[method-assign]
+        monkeypatch.setattr(c, "find", counted)
         brief = c.task_action_brief("For ABC123 change the accepted response")
     assert brief["status"] == "safe-unknown"
     assert brief["edit"] == "src/abc123/engine_b.py"
@@ -210,7 +216,9 @@ def test_multi_term_task_local_island_beats_large_generic_vocabulary(
         )
         assert brief["status"] == "safe-unknown"
         assert brief["edit"] == "src/case/engine.py"
-        assert brief["verify"][-1].startswith("tests/test_case.py")
+        assert assert_text(assert_array(brief["verify"])[-1]).startswith(
+            "tests/test_case.py"
+        )
     finally:
         codemap.close()
 
@@ -324,15 +332,17 @@ def test_non_ambiguous_action_edit_remains_separate_from_repository_owner_proof(
         action = codemap.task_action_map(task, limit=20)
         packet = codemap.task_decision_packet(task, limit=20, token_budget=256)
 
+    assert action["edit"] is not None
     assert action["edit"]["path"] == "src/adapter.py"
     assert action["ownership_authority"]["owner_resolved"] is False
     assert action["admitted_edit"] is None
+    assert action["action_edit"] is not None
     assert action["action_edit"]["path"] == "src/adapter.py"
 
-    assert packet["candidate"]["path"] == "src/adapter.py"
-    assert packet["edit"]["path"] == "src/adapter.py"
-    assert packet["ownership_authority"]["owner_resolved"] is False
-    assert packet["discrimination"]["reason"] == "ownership-unresolved"
+    assert assert_object(packet["candidate"])["path"] == "src/adapter.py"
+    assert assert_object(packet["edit"])["path"] == "src/adapter.py"
+    assert assert_object(packet["ownership_authority"])["owner_resolved"] is False
+    assert assert_object(packet["discrimination"])["reason"] == "ownership-unresolved"
 
 
 def test_task_action_brief_keeps_ambiguous_candidate_out_of_edit_authority(
@@ -352,6 +362,7 @@ def test_task_action_brief_keeps_ambiguous_candidate_out_of_edit_authority(
         action = codemap.task_action_map("Fix publish_result")
         brief = codemap.task_action_brief("Fix publish_result", token_budget=256)
 
+    assert action["edit"] is not None
     assert action["edit"]["path"] in {"src/a.py", "src/b.py"}
     assert action["ownership_authority"]["owner_resolved"] is False
     assert action["admitted_edit"] is None
@@ -370,7 +381,9 @@ def test_task_action_brief_consumes_canonical_action_edit(
         codemap.sync()
         action = codemap.task_action_map(task)
         assert action["ambiguity"]["ambiguous"] is False
+        assert action["edit"] is not None
         assert action["edit"]["path"] == "src/engine.py"
+        assert action["action_edit"] is not None
         assert action["action_edit"]["path"] == "src/engine.py"
 
         action["action_edit"] = None
@@ -406,8 +419,11 @@ def test_action_surfaces_consume_canonical_action_discrimination(
         packet = codemap.task_decision_packet(task, token_budget=256)
 
     assert brief["discrimination"] == "missing-verification-evidence"
-    assert packet["discrimination"]["needed"] is True
-    assert packet["discrimination"]["reason"] == "missing-verification-evidence"
+    assert assert_object(packet["discrimination"])["needed"] is True
+    assert (
+        assert_object(packet["discrimination"])["reason"]
+        == "missing-verification-evidence"
+    )
 
 
 def test_task_action_brief_receipt_is_assembled_inside_decision_session(

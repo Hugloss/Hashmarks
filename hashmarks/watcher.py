@@ -456,7 +456,7 @@ def create_default_watcher(
     debounce_seconds: float = 0.05,
     change_tracker: ChangeTracker | None = None,
     exclude_relative_paths: Iterable[str | Path] = (),
-) -> _BatchedWatcherBase:
+) -> NativeLinuxBatchWatcher | WatchdogBatchWatcher:
     """Create the fastest safe watcher available without mandatory extras.
 
     Linux/WSL uses native inotify and needs no third-party package. Other

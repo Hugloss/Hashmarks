@@ -131,10 +131,11 @@ def test_base_snapshot_requires_current_parser_provider_identity(
     with CodeMap(repo) as codemap:
         codemap.range_provider = _range_provider("v1")
         codemap.sync()
-        before = {
-            path: str(codemap.store.file_row(path)["artifact_key"])
-            for path in ("a.py", "b.py")
-        }
+        before = {}
+        for path in ("a.py", "b.py"):
+            row = codemap.store.file_row(path)
+            assert row is not None
+            before[path] = str(row["artifact_key"])
 
     with CodeMap(repo) as codemap:
         codemap.range_provider = (

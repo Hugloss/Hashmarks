@@ -10,7 +10,7 @@ import subprocess
 import threading
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol
+from typing import IO, TYPE_CHECKING, Protocol
 from urllib.parse import unquote, urlparse
 
 from hashmarks.paths import canonical_host_path, normalize_relative_path
@@ -113,7 +113,7 @@ class _JsonRpcProcess:
             return
 
     @staticmethod
-    def _message_length(stream: Any) -> int | None:
+    def _message_length(stream: IO[bytes]) -> int | None:
         length: int | None = None
         while True:
             raw = stream.readline()
@@ -127,7 +127,7 @@ class _JsonRpcProcess:
                 length = int(value.strip())
 
     @staticmethod
-    def _read_message(stream: Any, length: int) -> dict | None:
+    def _read_message(stream: IO[bytes], length: int) -> dict | None:
         payload = stream.read(length)
         if len(payload) != length:
             return None

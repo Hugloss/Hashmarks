@@ -49,7 +49,9 @@ def test_task_evidence_exposes_compact_selection_source_revision_and_unknown_fre
         start = codemap.task_evidence(_task(), token_budget=512)
 
     with CodeMap(tmp_path) as codemap:
-        expected = str(codemap.store.file_row("src/engine.py")["file_digest"])
+        row = codemap.store.file_row("src/engine.py")
+        assert row is not None
+        expected = str(row["file_digest"])
     provenance = start["provenance"]
     assert _ownership(start)["basis"] in {"exact-symbol", "unique-exact-symbol"}
     assert provenance["why"] == "canonical-edit-role"

@@ -8,12 +8,23 @@ from __future__ import annotations
 
 import ast
 from collections.abc import Sequence
+from typing import TypedDict
 
 MAX_HANDLER_PARAMETERS = 16
 MAX_ANNOTATION_CHARS = 192
 MAX_DEFAULT_KEYWORDS = 8
 MAX_ANNOTATED_METADATA = 4
 MAX_DIRECT_NAME_CHARS = 128
+
+
+class HandlerParameter(TypedDict):
+    name: str
+    kind: str
+    start_line: int
+    end_line: int
+    annotation: dict[str, object]
+    annotated_metadata: dict[str, object]
+    default: dict[str, object]
 
 
 def _annotation(node: ast.expr | None) -> dict[str, object]:
@@ -125,7 +136,7 @@ def _metadata(annotation: ast.expr | None) -> dict[str, object]:
     }
 
 
-def _parameter(node: ast.arg, kind: str, default: ast.expr | None) -> dict[str, object]:
+def _parameter(node: ast.arg, kind: str, default: ast.expr | None) -> HandlerParameter:
     if len(node.arg) > MAX_DIRECT_NAME_CHARS:
         raise ValueError("handler parameter name exceeds identifier bound")
     return {
@@ -146,7 +157,7 @@ def _parameter(node: ast.arg, kind: str, default: ast.expr | None) -> dict[str, 
 
 def _all_parameters(
     declaration: ast.FunctionDef | ast.AsyncFunctionDef,
-) -> list[dict[str, object]]:
+) -> list[HandlerParameter]:
     args = declaration.args
     count = (
         len(args.posonlyargs)
@@ -160,7 +171,7 @@ def _all_parameters(
     positional = [*args.posonlyargs, *args.args]
     padding = len(positional) - len(args.defaults)
     defaults: list[ast.expr | None] = [None] * padding + list(args.defaults)
-    records: list[dict[str, object]] = []
+    records: list[HandlerParameter] = []
     for index, (arg, default) in enumerate(zip(positional, defaults, strict=True)):
         kind = (
             "positional-only"

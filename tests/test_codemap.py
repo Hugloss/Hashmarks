@@ -386,7 +386,9 @@ def test_optional_precision_provider_changes_artifact_namespace(tmp_path: Path) 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.range_provider = FakeProvider()
         first = codemap.sync()
-        key = str(codemap.store.file_row("src/auth.py")["artifact_key"])
+        row = codemap.store.file_row("src/auth.py")
+        assert row is not None
+        key = str(row["artifact_key"])
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as plain:
         plain.range_provider = type(
             "Off",
@@ -398,7 +400,9 @@ def test_optional_precision_provider_changes_artifact_namespace(tmp_path: Path) 
             },
         )()
         second = plain.sync()
-        plain_key = str(plain.store.file_row("src/auth.py")["artifact_key"])
+        plain_row = plain.store.file_row("src/auth.py")
+        assert plain_row is not None
+        plain_key = str(plain_row["artifact_key"])
     assert first.parsed_artifacts == 3
     assert second.parsed_artifacts == 3
     assert key != plain_key

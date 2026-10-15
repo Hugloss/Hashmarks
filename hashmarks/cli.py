@@ -8,7 +8,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any, TextIO
+from typing import TextIO
 
 from hashmarks._command_output import log_command_output
 
@@ -402,7 +402,7 @@ def _add_common_arguments(
     )
 
 
-def _add_daemon_cli(sub: object) -> None:
+def _add_daemon_cli(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     version = sub.add_parser("version")
     version.set_defaults(func=_version, automatic_update_check=False)
 
@@ -424,7 +424,7 @@ def _add_daemon_cli(sub: object) -> None:
     stop.set_defaults(func=_daemon_stop)
 
 
-def _add_identity_cli(sub: object) -> None:
+def _add_identity_cli(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     snapshot = sub.add_parser("snapshot")
     _add_common_arguments(snapshot, inherited=True)
     _add_mode_argument(snapshot)

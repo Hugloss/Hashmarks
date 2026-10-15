@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from typing import Any
 
     from .engine import CodeMap
+    from .project_graph import ProjectEdge, ProjectNode
 
 
 class EvidenceGraphMixin:
@@ -312,9 +313,9 @@ class EvidenceGraphMixin:
     def _admit_project_graph(
         self,
         provider_name: str,
-        nodes: tuple[object, ...],
-        edges: tuple[object, ...],
-    ) -> tuple[tuple[object, ...], tuple[object, ...], int, int]:
+        nodes: tuple[ProjectNode, ...],
+        edges: tuple[ProjectEdge, ...],
+    ) -> tuple[tuple[ProjectNode, ...], tuple[ProjectEdge, ...], int, int]:
         admitted_nodes = tuple(
             node for node in nodes if self._project_node_admitted(node)
         )

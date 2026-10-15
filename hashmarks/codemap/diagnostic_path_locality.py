@@ -7,7 +7,8 @@ complete change scope, diagnostic resolution, or verification authority.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
+from typing import cast
 
 from hashmarks.paths import normalize_relative_path
 
@@ -29,7 +30,7 @@ def indexed_diagnostic_rows(
     }
 
 
-def normalize_reported_changed_paths(changed_paths: Sequence[str]) -> list[str]:
+def normalize_reported_changed_paths(changed_paths: object) -> list[str]:
     if (
         isinstance(changed_paths, (str, bytes))
         or not isinstance(changed_paths, Sequence)
@@ -101,8 +102,12 @@ def diagnostic_path_locality(
     """
     normalized = normalize_reported_changed_paths(changed_paths)
     changed = set(normalized)
-    qualified_added = set(qualification["qualified_added_identities"])
-    qualified_removed = set(qualification["qualified_removed_identities"])
+    qualified_added = set(
+        cast(Iterable[str], qualification["qualified_added_identities"])
+    )
+    qualified_removed = set(
+        cast(Iterable[str], qualification["qualified_removed_identities"])
+    )
     rows = [
         *_locality_rows(
             change_kind="added",

@@ -9,7 +9,7 @@ import threading
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, Protocol, TypedDict, cast
 
 from hashmarks.paths import canonical_host_path
 from hashmarks.sqlite_boundary import configure_sqlite_connection, sqlite_transaction
@@ -25,7 +25,30 @@ from .model import (
 from .store_queries import WorkspaceMapQueryMixin
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable
+    from collections.abc import Callable, Generator, Iterable, Mapping, Sequence
+
+    from .project_graph import ProjectEdge, ProjectNode
+    from .typescript_resolver import NativeFileEdge
+
+
+class _NativeFileEdge(Protocol):
+    @property
+    def source(self) -> str: ...
+
+    @property
+    def target(self) -> str: ...
+
+    @property
+    def kind(self) -> str: ...
+
+    @property
+    def confidence(self) -> str: ...
+
+    @property
+    def producer(self) -> str: ...
+
+    @property
+    def specifier(self) -> str | None: ...
 
 
 class RepositoryIndexEconomics(TypedDict):
@@ -168,6 +191,7 @@ def git_overlay_paths(
 
 def _symbol_from(value: dict[str, object]) -> SymbolRecord:
     lines = value.get("lines") or [1, 1]
+    assert isinstance(lines, list)
     return SymbolRecord(
         name=str(value["name"]),
         qualname=str(value["qualname"]),
@@ -175,8 +199,8 @@ def _symbol_from(value: dict[str, object]) -> SymbolRecord:
         signature=str(value["signature"]),
         start_line=int(lines[0]),
         end_line=int(lines[1]),
-        signature_tokens=int(value.get("signature_tokens", 0)),
-        body_tokens=int(value.get("body_tokens", 0)),
+        signature_tokens=int(cast(int, value.get("signature_tokens", 0))),
+        body_tokens=int(cast(int, value.get("body_tokens", 0))),
         parent=None if value.get("parent") is None else str(value["parent"]),
     )
 
@@ -186,7 +210,7 @@ def _edge_from(value: dict[str, object]) -> EdgeRecord:
         source=None if value.get("source") is None else str(value["source"]),
         kind=str(value["kind"]),
         target=str(value["target"]),
-        line=None if value.get("line") is None else int(value["line"]),
+        line=None if value.get("line") is None else int(cast(int, value["line"])),
         confidence=str(value.get("confidence", "static")),
     )
 
@@ -766,7 +790,7 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
             with sqlite_transaction(self._db, begin="BEGIN IMMEDIATE"):
                 return bump_locked()
 
-    def file_row(self, path: str) -> object:
+    def file_row(self, path: str) -> sqlite3.Row | None:
         self._count_read("file_row")
         with self._lock:
             return self._db.execute(
@@ -993,7 +1017,7 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         return len(values)
 
     def replace_native_file_edges(
-        self, producer_prefix: str, edges: list[object]
+        self, producer_prefix: str, edges: Sequence[_NativeFileEdge]
     ) -> None:
         def replace_locked() -> None:
             self._db.execute(
@@ -1038,7 +1062,10 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         return [dict(row) for row in rows]
 
     def replace_native_occurrences(
-        self, producer: str, definitions: list[object], edges: list[object]
+        self,
+        producer: str,
+        definitions: Sequence[Mapping[str, object]],
+        edges: Sequence[Mapping[str, object]],
     ) -> None:
         def replace_locked() -> None:
             self._db.execute(
@@ -1052,8 +1079,8 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                         row["path"],
                         row["symbol"],
                         row["display_name"],
-                        int(row["line"]),
-                        int(row["end_line"]),
+                        int(cast(int, row["line"])),
+                        int(cast(int, row["end_line"])),
                         producer,
                         row.get("relationships_json", "[]"),
                         int(bool(row.get("relationships_truncated", False))),
@@ -1069,7 +1096,7 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                         row.get("source"),
                         row["target_symbol"],
                         row["target_name"],
-                        int(row["line"]),
+                        int(cast(int, row["line"])),
                         producer,
                         json.dumps(
                             row["occurrence_metadata"],
@@ -1210,7 +1237,7 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         return [self._native_reference_value(row) for row in rows]
 
     def replace_project_graph(
-        self, producer: str, nodes: list[object], edges: list[object]
+        self, producer: str, nodes: Sequence[ProjectNode], edges: Sequence[ProjectEdge]
     ) -> None:
         def replace_locked() -> None:
             self._db.execute("DELETE FROM project_edge WHERE producer=?", (producer,))

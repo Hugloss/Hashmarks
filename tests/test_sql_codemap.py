@@ -15,6 +15,7 @@ def test_sql_is_indexed_as_editable_source_evidence(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as c:
         c.sync()
         action = c.task_action_map("Change ember_731 SQL label")
+    assert action["edit"] is not None
     assert action["edit"]["path"] == "queries/ember_731.sql"
 
 
