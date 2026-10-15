@@ -66,6 +66,7 @@ class _VerificationRelevanceState:
     reference_indexes: dict[str, _VerificationReferenceIndex | None] = field(
         default_factory=dict
     )
+    unresolved_method_receiver_paths: set[str] = field(default_factory=set)
 
 
 @dataclass(frozen=True)
@@ -75,6 +76,8 @@ class _VerificationReferenceIndex:
     reachable_names: frozenset[str]
     reachable_attributes: frozenset[str]
     reachable_attribute_chains: frozenset[str]
+    bound_names: frozenset[str]
+    star_import: bool
 
 
 class _VerificationReferenceIndexVisitor(ast.NodeVisitor):
@@ -85,6 +88,23 @@ class _VerificationReferenceIndexVisitor(ast.NodeVisitor):
         self.reachable_names: set[str] = set()
         self.reachable_attributes: set[str] = set()
         self.reachable_attribute_chains: set[str] = set()
+        self.bound_names: set[str] = set()
+        self.star_import = False
+
+    def visit(self, node: ast.AST) -> None:
+        match node:
+            case (
+                ast.FunctionDef(name=name)
+                | ast.AsyncFunctionDef(name=name)
+                | ast.ClassDef(name=name)
+                | ast.arg(arg=name)
+                | ast.ExceptHandler(name=name)
+                | ast.MatchAs(name=name)
+                | ast.MatchStar(name=name)
+                | ast.MatchMapping(rest=name)
+            ) if name is not None:
+                self.bound_names.add(name)
+        super().visit(node)
 
     @staticmethod
     def _guard_kind(test: ast.expr) -> str | None:
@@ -106,6 +126,8 @@ class _VerificationReferenceIndexVisitor(ast.NodeVisitor):
             self.visit(child)
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+        if self.guard is None and any(alias.name == "*" for alias in node.names):
+            self.star_import = True
         self.bindings.extend(
             (alias.name, alias.asname or alias.name, self.guard) for alias in node.names
         )
@@ -145,6 +167,8 @@ class _VerificationReferenceIndexVisitor(ast.NodeVisitor):
     def visit_Name(self, node: ast.Name) -> None:
         if self.guard is None and isinstance(node.ctx, ast.Load):
             self.reachable_names.add(node.id)
+        elif isinstance(node.ctx, (ast.Store, ast.Del)):
+            self.bound_names.add(node.id)
 
     def visit_Attribute(self, node: ast.Attribute) -> None:
         if self.guard is None and isinstance(node.ctx, ast.Load):
@@ -152,6 +176,10 @@ class _VerificationReferenceIndexVisitor(ast.NodeVisitor):
             chain = self._attribute_chain(node)
             if chain:
                 self.reachable_attribute_chains.add(chain)
+        elif isinstance(node.ctx, (ast.Store, ast.Del)):
+            chain = self._attribute_chain(node)
+            if chain:
+                self.bound_names.add(chain.split(".", 1)[0])
         self.generic_visit(node)
 
 
@@ -175,6 +203,8 @@ def _verification_reference_index(
         reachable_names=frozenset(visitor.reachable_names),
         reachable_attributes=frozenset(visitor.reachable_attributes),
         reachable_attribute_chains=frozenset(visitor.reachable_attribute_chains),
+        bound_names=frozenset(visitor.bound_names),
+        star_import=visitor.star_import,
     )
 
 
@@ -324,10 +354,11 @@ class VerificationMixin(VerificationOwnershipMixin):
         symbol_names: list[str],
         row: Mapping[str, object],
     ) -> None:
-        for key in ("name", "qualname"):
-            value = str(row.get(key) or "")
-            if value and value not in symbol_names:
-                symbol_names.append(value)
+        # refs_many already reads by short name. Retain the selected declaration's
+        # scope while qualifying those candidates instead of deciding it again.
+        value = str(row.get("qualname") or row.get("name") or "")
+        if value and value not in symbol_names:
+            symbol_names.append(value)
 
     @staticmethod
     def _verification_ref_visible(ref: Mapping[str, object]) -> bool:
@@ -501,6 +532,43 @@ class VerificationMixin(VerificationOwnershipMixin):
                 return True
         return False if resolved_alias else None
 
+    def _verification_member_reference_owner_match(
+        self,
+        state: _VerificationRelevanceState,
+        ref_path: str,
+        target: str,
+        symbol: str,
+    ) -> bool | None:
+        """Qualify an explicit imported member; instance receivers stay unknown."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        index = self._verification_reference_index_for_path(state, ref_path)
+        if index is None or target not in index.reachable_attribute_chains:
+            return None
+        alias, suffix = target.split(".", 1)
+        if alias in index.bound_names or index.star_import:
+            return None
+        targets = {
+            imported
+            for imported, bound, guard in index.module_bindings
+            if guard is None and bound == alias
+        }
+        if len(targets) != 1:
+            return None
+        imported = next(iter(targets))
+        tail = imported.removeprefix(alias + ".")
+        if imported.startswith(alias + ".") and suffix.startswith(tail + "."):
+            suffix = suffix.removeprefix(tail + ".")
+        qualified = self._python_relative_module_candidate(
+            ref_path, imported + "." + suffix
+        )
+        owners = self._verification_resolved_import_paths(state, ref_path, qualified)
+        if not owners:
+            return None
+        if state.edit_path not in owners:
+            return False
+        return True if qualified.endswith("." + symbol) else None
+
     def _verification_collect_direct_symbol_refs(
         self,
         state: _VerificationRelevanceState,
@@ -516,6 +584,19 @@ class VerificationMixin(VerificationOwnershipMixin):
             if not path or not self._verification_ref_visible(ref):
                 continue
             short_match = str(ref.get("target_short") or "") == short
+            if "." in symbol and path.endswith(".py"):
+                member = self._verification_member_reference_owner_match(
+                    state, path, str(ref.get("target") or ""), symbol
+                )
+                if member is None:
+                    state.unresolved_method_receiver_paths.add(path)
+                if short_match and member is True:
+                    state.refs_by_path.setdefault(path, set()).add(short)
+                    if RepositoryDomain.SOURCE in classify_repository_path(path):
+                        state.source_ref_paths.add(path)
+                if RepositoryDomain.TEST in classify_repository_path(path):
+                    state.candidate_paths.add(path)
+                continue
             alias_owner_match = (
                 self._verification_module_alias_reference_owner_match(
                     state, path, str(ref.get("target") or "")
@@ -643,10 +724,9 @@ class VerificationMixin(VerificationOwnershipMixin):
             if len(symbol_rows) > 16:
                 state.search_bound_reasons.add("indirect-symbol-limit")
             for via_symbol in symbol_rows[:16]:
-                for key in ("name", "qualname"):
-                    symbol = str(via_symbol.get(key) or "")
-                    if symbol:
-                        result.append((via_path, symbol, symbol.rsplit(".", 1)[-1]))
+                symbol = str(via_symbol.get("qualname") or via_symbol.get("name") or "")
+                if symbol:
+                    result.append((via_path, symbol, symbol.rsplit(".", 1)[-1]))
         return result
 
     def _verification_collect_indirect_references(
@@ -670,11 +750,11 @@ class VerificationMixin(VerificationOwnershipMixin):
             if len(refs) > 256:
                 state.search_bound_reasons.add("indirect-reverse-ref-limit")
             self._verification_collect_indirect_symbol_refs(
-                state, via_path, short, refs[:256]
+                state, via_path, symbol, refs[:256]
             )
             if symbol in test_ref_sets:
                 self._verification_collect_indirect_symbol_refs(
-                    state, via_path, short, test_ref_sets[symbol]
+                    state, via_path, symbol, test_ref_sets[symbol]
                 )
 
     def _verification_test_ref_supplements(
@@ -707,7 +787,7 @@ class VerificationMixin(VerificationOwnershipMixin):
         self,
         state: _VerificationRelevanceState,
         via_path: str,
-        short: str,
+        symbol: str,
         refs: Sequence[Mapping[str, object]],
     ) -> None:
         # The second reference has the same import/alias identity obligations
@@ -722,7 +802,7 @@ class VerificationMixin(VerificationOwnershipMixin):
             refs_by_path={},
             source_ref_paths=set(),
         )
-        self._verification_collect_direct_symbol_refs(endpoint, short, refs)
+        self._verification_collect_direct_symbol_refs(endpoint, symbol, refs)
         state.candidate_paths.update(endpoint.candidate_paths)
         for path, symbols in endpoint.refs_by_path.items():
             state.indirect_refs_by_path.setdefault(path, set()).update(symbols)
@@ -839,6 +919,11 @@ class VerificationMixin(VerificationOwnershipMixin):
         reference = self._verification_reference_strength(
             path, direct_symbols, state=state
         )
+        if not direct_symbols and path in state.unresolved_method_receiver_paths:
+            reference = {
+                "syntactic_reference": True,
+                "reference_strength": "unresolved-method-receiver",
+            }
         direct_reference = reference.get("reference_strength") == "reachable-symbol-use"
         return {
             "path": path,
@@ -1152,8 +1237,8 @@ class VerificationMixin(VerificationOwnershipMixin):
                 {**selected_row, "selection_reason": selection_reason}
             )
         )
-        identity_ambiguous = bool(state.unresolved_import_identity_paths) and not bool(
-            state.refs_by_path
+        identity_ambiguous = bool(
+            state.unresolved_import_identity_paths or state.unresolved_method_receiver_paths
         )
         search_complete = not state.search_bound_reasons
         if selected is not None:
@@ -1191,6 +1276,8 @@ class VerificationMixin(VerificationOwnershipMixin):
                 if identity_ambiguous
                 else []
             ),
+            "unresolved_method_receiver_paths": sorted(state.unresolved_method_receiver_paths)[:limit],
+            "unresolved_method_receiver_omitted_paths": max(0, len(state.unresolved_method_receiver_paths) - limit),
             "bounds": {
                 "returned_candidates": limit,
                 "reverse_refs_per_symbol": 1024,
@@ -1240,8 +1327,8 @@ class VerificationMixin(VerificationOwnershipMixin):
         self._verification_collect_direct_references(state, symbol_names)
         self._verification_collect_indirect_references(state)
         candidates = self._verification_candidates(state)
-        identity_ambiguous = bool(state.unresolved_import_identity_paths) and not bool(
-            state.refs_by_path
+        identity_ambiguous = bool(
+            state.unresolved_import_identity_paths or state.unresolved_method_receiver_paths
         )
         selected, reason = self._verification_select_candidate(
             candidates,

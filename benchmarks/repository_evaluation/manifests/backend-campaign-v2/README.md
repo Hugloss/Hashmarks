@@ -4,11 +4,17 @@ This successor preserves the existing 36 pinned catalog entries and their source
 labels while their independent oracles and witness membership are completed.
 The original campaign and its manifests remain unchanged historical definitions.
 
-The three suite IDs are `backend-core-v2`, `backend-model-v2` and
+The original three suite IDs are `backend-core-v2`, `backend-model-v2` and
 `backend-async-v2`. Their source IDs still refer to the original exact archives;
 materializing a second copy is unnecessary when the content identities match.
 Use a suite-specific source map for acquisition and the complete combined source
 map for aggregation.
+
+`backend-messaging-v2` adds thirteen distinct upstream changes across aiokafka,
+aio-pika and FastStream. Its 26 source archives are new nominations, not variants
+of the original workflows. See [the messaging source review](suites/messaging/README.md).
+The campaign now declares 49 entries; semantic review, executable witness
+membership and observed results still govern qualification.
 
 The model grader now separates `task_source_labels` from native `source_labels`.
 Task labels cover production and verification members at both revisions without

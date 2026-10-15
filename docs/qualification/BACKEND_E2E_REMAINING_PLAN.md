@@ -6,8 +6,9 @@ and certification. Follow `docs/reference/PRODUCT_BOUNDARY.md`.
 
 The successor definition is
 `benchmarks/repository_evaluation/manifests/backend-campaign-v2/campaign.json`.
-It initially preserves 36 entries, 27 distinct upstream problems and eight
-capability tags from the original campaign. Copying a suite adds no evidence.
+It began with 36 entries, 27 distinct upstream problems and eight
+capability tags from the original campaign. The messaging intake extends this
+to 49 entries and 40 distinct upstream problems. Copying a suite adds no evidence.
 The original campaign remains historical. The active schemas remain workflow
 v2, campaign v4 and matrix v5. Additional capability membership is admitted only
 after source review and executable witness proof.
@@ -230,6 +231,81 @@ remaining witness families, fresh full campaign, economics, unseen backend
 holdouts, deterministic regressions and final artifacts remain open. No row is
 claimed as qualified at 5/5.
 
+### Messaging checkpoint: 2026-10-15, base `dfe9ea2`
+
+The branch advanced through the prior verification repair and a separate
+filesystem-evidence change. Both were preserved. Earlier reports remain bound
+to their recorded observer/evaluator bytes and are not current qualification of
+this later candidate.
+
+The first missing catalog is now admitted at
+`benchmarks/repository_evaluation/manifests/backend-campaign-v2/suites/messaging/`:
+thirteen distinct genuine changes across aiokafka (four), aio-pika (four) and
+FastStream (five). Twenty-six exact before/after archives pass source admission.
+Method ranges, call lines, raw range hashes, definition lines and stage-correct
+verifier sources are frozen independently of product responses. Method ownership
+oracles use declaration ranges; native nominations retain their original scopes,
+including coroutine decorators. The additional producer case preserves all
+consumer cases and supplies actual publication evidence.
+
+The suite requires fresh native acquisition and declares 2,286 exact positive/
+adversarial boundary witness contexts. Its capability review remains explicitly
+false. Existing checks prove literal calls/arguments, revisions and conservative
+authority. They do not yet qualify all answer-bearing conditions, branch returns,
+tuple selection, display facts or initial evidence sufficiency. The catalog README
+names these remaining semantic assertions. Do not promote review because a run
+passes the narrower checks. Three source-only holdouts are reserved separately;
+their exact task/oracle admission is still pending.
+
+Genuine baseline acquisition reproduced missing boolean keyword and positional
+identifier facts. The existing `function_boundary_syntax` owner now exposes
+bounded argument syntax, explicit expansion, omitted counts, literal values and
+unknown expression/binding states. It never resolves or executes the callee.
+Neutral regressions cover bounds, hidden expansion, oversized/nonfinite values,
+unsupported expressions and actual CLI/official MCP formats. A further real CLI
+wire probe reproduced JavaScript integer precision loss. Integer values now use
+declared decimal-text encoding; the same Node decoder preserves the exact value.
+The focused ring passes 72 tests; the expanded CLI/MCP precision fixture passes
+separately. Both modified Python owners pass scoped Ty/Pyright and full Ruff.
+
+Current post-repair public acquisition is in `messaging-public-precision-01`
+through `-04` under `.hashmarks/backend-e2e/implementation-20261015/`. All thirteen
+boundary check sets pass at both revisions. Eleven workflows pass their current
+fact/transport gates. Two remain failed: `faststream-ack-cancellation` misses its
+verifier at both revisions; `faststream-batch-nack` misses the before verifier.
+Four additional top-three ordering failures remain visible: aiokafka commit
+refresh, aio-pika nack scope, aio-pika iterator channel close and FastStream ack
+error. They must not be hidden by changing the frozen population or oracle.
+Every initial compact/text reply fits 4,000 tokens; the maximum is 3,606.
+
+Fresh native acquisition after the precision repair covers all thirteen
+specimens in `messaging-native-precision-01` through `-04`, with matching
+`messaging-native-precision-captures-*` roots. All specimen outcomes pass. The
+temporary tool prefix disappeared during work; pinned producers were restored
+to ignored `.hashmarks/qualification-tools` storage, with the official decoder
+checksum verified. The prerequisite failure is retained separately and never
+counted as a native specimen failure or a completed capture.
+
+`messaging-intake/precision-reports.json` selects the four public reports and
+four original capture/report pairs. `messaging-aggregate-precision-01` regrades
+and ADMITs all eight inputs, with zero rejections. It remains FAIL with incomplete
+input integrity: the three verification misses remain failed, capability review
+is incomplete, and current core/model/async inputs are not supplied. All 5,133
+public witnesses retain their exact context and source/artifact bindings. The
+first aggregate correctly rejected file-byte digests where canonical JSON
+digests were required; the references were corrected without changing oracles,
+captured bytes or admission rules. Earlier pre-precision reports remain history.
+
+The latest full typing run still fails: 3,476 Ty diagnostics and 3,480 Pyright
+errors, zero warnings. Logs are in `messaging-intake/full-ty.log` and
+`messaging-intake/full-pyright.log`; scoped checks do not close T09. Eleven entire
+catalogs remain missing (2, 4, 8, 9, 11, 14, 15, 16, 18, 19 and 20). Messaging
+still needs full semantic/display review, the verification/ordering repairs and
+final qualification. Runtime, dependency, service, language and economics witness
+families, the remaining independent reviews, complete current campaign inputs,
+unseen holdouts, deterministic regressions, typing and final artifacts remain
+required. No capability is claimed at 5/5.
+
 ### T00: baseline and prerequisites
 
 Record HEAD/worktree state, observer/evaluator identities, lock/configuration
@@ -300,6 +376,10 @@ freshness as separate dimensions. Never invent a current digest for an absent
 member. Unsupported/ambiguous producer output remains unresolved.
 
 ### T07: missing catalogs
+
+The messaging source catalog now exists with thirteen problems across three
+repositories. Its incomplete qualification is detailed above. The other eleven
+catalogs still require genuine source intake.
 
 Each catalog targets four genuine problems per repository in the initial pool.
 Inspect source history from recorded revisions; pin exact before/after archives;

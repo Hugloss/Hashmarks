@@ -8,11 +8,14 @@ calls, or establishes task, message, transaction or execution ownership.
 from __future__ import annotations
 
 import ast
+import math
 from collections.abc import Mapping, Sequence
 from typing import Any
 
 MAX_BOUNDARY_FUNCTIONS = 4
 MAX_BOUNDARY_SITES = 32
+MAX_BOUNDARY_ARGUMENTS = 8
+MAX_BOUNDARY_LITERAL_CHARS = 128
 
 
 def _identifier(node: ast.expr) -> str | None:
@@ -28,6 +31,93 @@ def _identifier(node: ast.expr) -> str | None:
 
 def _callee(node: ast.expr) -> str | None:
     return _identifier(node.func) if isinstance(node, ast.Call) else None
+
+
+def _argument_value(node: ast.expr) -> dict[str, object]:
+    identifier = _identifier(node)
+    if identifier is not None:
+        return {"state": "identifier-syntax", "identifier": identifier}
+    if not isinstance(node, ast.Constant):
+        return {
+            "state": "expression-unestablished",
+            "expression_kind": type(node).__name__,
+        }
+    value = node.value
+    kinds = {
+        type(None): "none",
+        bool: "bool",
+        str: "string",
+        int: "integer",
+        float: "float",
+    }
+    kind = kinds.get(type(value))
+    if kind is None:
+        return {"state": "unsupported-literal", "kind": type(value).__name__}
+    over_bound = (
+        isinstance(value, str)
+        and len(value) > MAX_BOUNDARY_LITERAL_CHARS
+        or type(value) is int
+        and value.bit_length() > 256
+        or isinstance(value, float)
+        and not math.isfinite(value)
+    )
+    if over_bound:
+        return {"state": "literal-over-bound", "kind": kind}
+    if type(value) is int:
+        # JSON consumers may decode numbers as binary64. Keep the exact Python
+        # literal without asking a transport to preserve arbitrary precision.
+        return {
+            "state": "literal-syntax",
+            "kind": kind,
+            "value": str(value),
+            "encoding": "decimal-text",
+        }
+    return {"state": "literal-syntax", "kind": kind, "value": value}
+
+
+def _keyword_argument(node: ast.keyword) -> dict[str, object]:
+    name = node.arg
+    over_bound = name is not None and len(name) > 256
+    return {
+        "name": None if over_bound else name,
+        "name_state": "over-bound"
+        if over_bound
+        else "mapping-expansion"
+        if name is None
+        else "literal",
+        "expansion": name is None,
+        "value": _argument_value(node.value),
+    }
+
+
+def _call_arguments(node: ast.Call) -> dict[str, object]:
+    """Describe source arguments without evaluating values or binding a call."""
+    positional = [
+        {
+            "position": position,
+            "expansion": isinstance(argument, ast.Starred),
+            "value": _argument_value(
+                argument.value if isinstance(argument, ast.Starred) else argument
+            ),
+        }
+        for position, argument in enumerate(node.args[:MAX_BOUNDARY_ARGUMENTS])
+    ]
+    keywords = [
+        _keyword_argument(argument)
+        for argument in node.keywords[:MAX_BOUNDARY_ARGUMENTS]
+    ]
+    omitted_positional = max(0, len(node.args) - len(positional))
+    omitted_keywords = max(0, len(node.keywords) - len(keywords))
+    return {
+        "positional": positional,
+        "keywords": keywords,
+        "omitted_positional_count": omitted_positional,
+        "omitted_keyword_count": omitted_keywords,
+        "truncation": "truncated"
+        if omitted_positional or omitted_keywords
+        else "complete",
+        "runtime_binding": "not-established",
+    }
 
 
 class _BoundarySites(ast.NodeVisitor):
@@ -97,6 +187,11 @@ class _BoundarySites(ast.NodeVisitor):
                 isinstance(arg, ast.Starred) for arg in node.args
             )
             or any(keyword.arg is None for keyword in node.keywords),
+            **(
+                {"argument_syntax": _call_arguments(node)}
+                if node.args or node.keywords
+                else {}
+            ),
         )
         self.generic_visit(node)
 
@@ -225,6 +320,9 @@ def observe_function_boundaries(
         "bounds": {
             "functions": MAX_BOUNDARY_FUNCTIONS,
             "sites_per_function": MAX_BOUNDARY_SITES,
+            "positional_arguments_per_call": MAX_BOUNDARY_ARGUMENTS,
+            "keyword_arguments_per_call": MAX_BOUNDARY_ARGUMENTS,
+            "literal_chars": MAX_BOUNDARY_LITERAL_CHARS,
         },
         "authority": "direct-static-syntax-only",
         "callee_resolution": "not-established",

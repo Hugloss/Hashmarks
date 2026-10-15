@@ -83,6 +83,27 @@
         "sqlmodel-field-sa-type",
         "sqlmodel-field-item-bounds"
       ]
+    },
+    {
+      "grader_sha256": "9fe2e462e407b5940c62af9890d038a61261ae029b3e6888fded316908f15ea4",
+      "id": "backend-messaging-v2",
+      "suite_file": "suites/messaging/suite.json",
+      "suite_sha256": "a0b8f4b1d1df18b425a6dc9d5c612bf6741a91fc65e822c0472e81f3b066c421",
+      "workflow_ids": [
+        "aiokafka-commit-unknown-member",
+        "aiokafka-commit-timeout",
+        "aiokafka-commit-refresh-order",
+        "aiokafka-join-autocommit-error",
+        "aio-pika-processing-channel-close",
+        "aio-pika-iterator-cleanup-timeout",
+        "aio-pika-iterator-nack-scope",
+        "aio-pika-iterator-channel-close",
+        "faststream-ack-cancellation",
+        "faststream-batch-nack",
+        "faststream-ack-error",
+        "faststream-consumer-commit-failure",
+        "faststream-empty-batch-publisher"
+      ]
     }
   ]
 }
