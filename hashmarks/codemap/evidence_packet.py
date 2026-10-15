@@ -767,8 +767,7 @@ class TaskEvidencePacketMixin(
         verification_plan: TaskVerificationPlan,
     ) -> TaskEvidenceDraft:
         """Project task evidence into role-separated repository observations."""
-        authority = action.get("ownership_authority")
-        authority = authority if isinstance(authority, Mapping) else {}
+        authority = action["ownership_authority"]
         ambiguity = action.get("ambiguity")
         ambiguity = ambiguity if isinstance(ambiguity, Mapping) else {}
         candidate = action["edit"]

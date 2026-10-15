@@ -35,6 +35,8 @@ def check_task_evidence_types(codemap: CodeMap, mode: str) -> None:
     action = codemap.task_action_map("change owner")
     assert_type(action, TaskActionMap)
     assert_type(action["ownership_authority"]["owner_resolved"], bool)
+    assert_type(action["ownership_authority"]["evidence_state"]["proven"], bool)
+    assert_type(action["ownership_authority"]["proof_scope"], str | None)
     assert_type(action["edit"], TaskCandidate | None)
 
     packet = codemap.task_evidence("change owner")

@@ -25,7 +25,10 @@ from hashmarks.codemap.task_evidence_contract import (
     read_task_action_map,
     read_task_evidence,
 )
-from hashmarks.codemap.task_evidence_initial import decode_initial_packet
+from hashmarks.codemap.task_evidence_initial import (
+    decode_initial_packet,
+    encode_initial_packet,
+)
 from hashmarks.codemap.task_evidence_types import (
     InitialTaskEvidenceEnvelope,
     TaskActionMap,
@@ -120,6 +123,12 @@ def test_readers_preserve_json_values_and_extension_evidence(
             "action",
             read_task_action_map,
             ("ownership_decision_trace", "evidence_state", "proven"),
+            "true",
+        ),
+        (
+            "action",
+            read_task_action_map,
+            ("ownership_authority", "evidence_state", "proven"),
             "true",
         ),
         ("action", read_task_action_map, ("edit", "start_line"), False),
@@ -388,3 +397,17 @@ def test_polyglot_owner_proof_requires_the_exact_import_hop(
         )
         is False
     )
+
+
+@pytest.mark.parametrize(
+    "field", ["schema", "source_evidence_identity", "evidence_packet_identity"]
+)
+def test_initial_encoder_rejects_non_string_headers(field: str) -> None:
+    raw: dict[str, object] = {
+        "schema": "hashmarks.task-evidence-initial.v2",
+        "source_evidence_identity": "sha256:source",
+        "evidence_packet_identity": "sha256:initial",
+    }
+    raw[field] = False
+    with pytest.raises(ValueError, match=f"initial packet header: {field}"):
+        encode_initial_packet(raw)

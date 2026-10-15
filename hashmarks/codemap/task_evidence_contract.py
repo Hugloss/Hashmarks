@@ -533,8 +533,7 @@ def _authority(value: object, path: str) -> None:
     )
     for key in ("resolved_owner", "candidate_owner", "proof_scope"):
         _nullable(row, key, str, path)
-    if "evidence_state" not in row:
-        raise RuntimeError(f"invalid {path}.evidence_state: missing field")
+    _ownership_evidence_state(row.get("evidence_state"), f"{path}.evidence_state")
 
 
 def _trace(value: object, path: str) -> None:
@@ -553,27 +552,12 @@ def _trace(value: object, path: str) -> None:
     ambiguity = _record(row.get("ambiguity"), f"{path}.ambiguity")
     _field(ambiguity, "ambiguous", bool, f"{path}.ambiguity")
     _field(ambiguity, "reason", str, f"{path}.ambiguity")
-    flags = _record(
-        row.get("evidence_state"), f"{path}.evidence_state", OwnershipEvidenceState
-    )
-    _fields(
-        flags,
-        f"{path}.evidence_state",
-        bool,
-        (
-            "retrieved",
-            "inferred",
-            "structural",
-            "structural_resolution",
-            "explicit_basis",
-            "canonical_selection",
-            "owner_eligible",
-            "proof_scope_complete",
-            "ambiguity_cleared",
-            "admissible",
-            "proven",
-        ),
-    )
+    _ownership_evidence_state(row.get("evidence_state"), f"{path}.evidence_state")
+
+
+def _ownership_evidence_state(value: object, path: str) -> None:
+    flags = _record(value, path, OwnershipEvidenceState)
+    _fields(flags, path, bool, tuple(OwnershipEvidenceState.__required_keys__))
 
 
 def _trace_candidates(row: dict[str, object], path: str) -> None:

@@ -23,6 +23,7 @@ from .task_evidence_contract import read_initial_projection
 if TYPE_CHECKING:
     from .task_evidence_types import (
         CompressedInitialEnvelope,
+        InitialEnvelopeHeaders,
         InitialTaskEvidenceEnvelope,
         InitialTaskEvidenceProjection,
         StringTableInitialEnvelope,
@@ -73,13 +74,22 @@ def _encode_strings(value: object, indices: dict[str, str]) -> object:
     return value
 
 
-def encode_initial_packet(packet: Mapping[str, Any]) -> InitialTaskEvidenceEnvelope:
+def _initial_header(packet: Mapping[str, object], key: str) -> str:
+    value = packet.get(key)
+    if not isinstance(value, str):
+        raise ValueError(f"invalid initial packet header: {key}")
+    return value
+
+
+def encode_initial_packet(packet: Mapping[str, object]) -> InitialTaskEvidenceEnvelope:
     """Losslessly serialize a semantic initial packet using a local string table."""
-    headers = {
-        "schema": packet["schema"],
-        "source_evidence_identity": packet["source_evidence_identity"],
-        "evidence_packet_identity": packet["evidence_packet_identity"],
+    headers: InitialEnvelopeHeaders = {
+        "schema": _initial_header(packet, "schema"),
+        "source_evidence_identity": _initial_header(packet, "source_evidence_identity"),
+        "evidence_packet_identity": _initial_header(packet, "evidence_packet_identity"),
     }
+    if headers["schema"] != operation_schema("task_evidence", "initial"):
+        raise ValueError("unsupported initial packet schema")
     data = {key: value for key, value in packet.items() if key not in headers}
     strings: set[str] = set()
 

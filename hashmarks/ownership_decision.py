@@ -26,9 +26,9 @@ class OwnershipAuthority(TypedDict):
     consumer_action: str
     proof_complete: bool
     authority_proof_identity: str
-    proof_scope: object
+    proof_scope: str | None
     proof_scope_complete: bool
-    evidence_state: object
+    evidence_state: OwnershipEvidenceState
 
 
 class OwnershipEvidenceState(TypedDict):
@@ -347,12 +347,11 @@ def bounded_presentation_contract(
 
 
 def ownership_authority_contract(
-    trace: Mapping[str, object],
+    trace: OwnershipDecisionTrace,
 ) -> OwnershipAuthority:
     status = str(trace.get("status") or "unresolved")
     selected_path = _trace_selected_path(trace)
-    evidence_state = trace.get("evidence_state")
-    evidence_state = evidence_state if isinstance(evidence_state, Mapping) else {}
+    evidence_state = trace["evidence_state"]
     safe = (
         status == "resolved"
         and bool(selected_path)
@@ -370,10 +369,10 @@ def ownership_authority_contract(
         "authority": "repository-ownership-only",
         "consumer_action": "external",
         "proof_complete": safe,
-        "proof_scope": trace.get("proof_scope"),
+        "proof_scope": trace["proof_scope"],
         "proof_scope_complete": bool(trace.get("proof_scope_complete")),
         "authority_proof_identity": proof_identity,
-        "evidence_state": trace.get("evidence_state"),
+        "evidence_state": evidence_state,
     }
 
 

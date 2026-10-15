@@ -216,6 +216,7 @@ def dependency_capture(
 
 def assert_projection(native: object, operation: str, mode: str = "default") -> None:
     """Check exact selected evidence and explicit exclusions across all encodings."""
+    assert isinstance(native, dict)
     for format in FORMATS:
         response: dict[str, object] = presentation_response(
             operation, native, format=format, result_mode=mode

@@ -299,7 +299,7 @@ class DiscriminationRead(RetrievalLocator):
 class TaskOwnershipFields(TypedDict):
     status: str
     authority_proof_identity: str
-    proof_scope: object
+    proof_scope: str | None
     proof_scope_complete: bool
     owner: TaskCandidate | None
     candidate: TaskCandidate | None
