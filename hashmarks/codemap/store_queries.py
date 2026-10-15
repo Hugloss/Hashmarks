@@ -496,7 +496,7 @@ class WorkspaceMapQueryMixin:
         return total, {str(row["token"]): int(row["documents"]) for row in rows}
 
     def lexical_file_candidates(
-        self, tokens: list[str], limit: int = 100
+        self, tokens: list[str], limit: int = 100, *, paths: Iterable[str] | None = None
     ) -> list[dict]:
         if TYPE_CHECKING:
             self = cast("WorkspaceMapStore", self)
@@ -505,11 +505,15 @@ class WorkspaceMapQueryMixin:
             return []
         self._count_read("lexical_file_candidates")
         placeholders = ",".join("?" for _ in unique)
+        scope = "" if paths is None else " AND path IN (SELECT value FROM json_each(?))"
+        parameters = [*unique]
+        if paths is not None:
+            parameters.append(json.dumps(sorted(set(paths))))
         with self._lock:
             rows = self._db.execute(
                 f"""WITH matched AS (
                     SELECT token,path FROM lexical
-                    WHERE token IN ({placeholders})
+                    WHERE token IN ({placeholders}){scope}
                     GROUP BY token,path
                 ), ranked AS (
                     SELECT path,COUNT(*) AS matches FROM matched
@@ -520,7 +524,7 @@ class WorkspaceMapQueryMixin:
                 SELECT ranked.path,f.language,f.evidence_visibility,f.full_tokens,f.outline,ranked.matches
                 FROM ranked JOIN file_map f ON f.path=ranked.path
                 ORDER BY ranked.matches DESC,ranked.path""",
-                (*unique, limit),
+                (*parameters, limit),
             ).fetchall()
         return [dict(row) for row in rows]
 

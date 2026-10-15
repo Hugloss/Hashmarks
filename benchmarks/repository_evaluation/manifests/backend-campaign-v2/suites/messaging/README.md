@@ -38,6 +38,25 @@ bind production files and stage-correct verifier sources. Newly added test files
 are never expected at the before revision. Native capture observes only nominated
 production members; imports do not admit dependency implementations.
 
+The batch-nack before verifier was corrected after reviewing the pinned source.
+`TestConsume.test_nack` in `tests/brokers/confluent/test_consume.py:201` awaits
+`msg.nack()` and asserts commit was not called. The seek regression
+`TestTestclient.test_message_nack_seek` at `test_test_client.py:32` exists only
+after the change. Exact method ranges and hashes now bind both nominations in
+`task_source_labels`; the original before test-client file remains as context.
+This qualifies relevant existing test evidence, not batch correctness or test
+sufficiency. Original failed acquisitions and the original grader are retained
+under the verification-identity checkpoint. Native nominations are unchanged.
+
+The cancellation before verifier was also corrected from generic shared consume
+coverage to the existing Kafka acknowledgement-policy regression.
+`TestAckPolicy.test_commit_called_in_middleware_on_error` (173–211) raises an
+ordinary handler error under ACK/REJECT_ON_ERROR and asserts commit was awaited.
+The after-only cancellation/redelivery test (18–62) remains required. Exact
+method ranges and hashes bind both stages. The before test is relevant ordinary
+error coverage, not evidence that cancellation was already covered; original
+oracles and failed reports remain retained.
+
 Capability membership is 13. The suite requires fresh native acquisition and
 declares 2,286 exact boundary witness contexts across revisions, surfaces and
 formats. Source binding, declaration, literal/argument facts and conservative

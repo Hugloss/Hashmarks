@@ -744,21 +744,26 @@ class DecisionSessionMixin:
         return value
 
     def _session_lexical_file_candidates(
-        self, terms: Sequence[str], *, limit: int
+        self, terms: Sequence[str], *, limit: int, paths: Sequence[str] | None = None
     ) -> list[dict[str, object]]:
         # Cache by the store's true semantic identity, not caller token order.
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         normalized = tuple(sorted({str(term).lower() for term in terms if term}))
+        scope = None if paths is None else tuple(sorted(set(paths)))
         if self._decision_session_depth <= 0:
-            return self.store.lexical_file_candidates(list(normalized), limit=limit)
+            return self.store.lexical_file_candidates(
+                list(normalized), limit=limit, paths=scope
+            )
         generation = int(self._decision_session_generation or self.store.generation())
-        key = (generation, normalized, int(limit))
+        key = (generation, normalized, int(limit), scope)
         cached = self._decision_candidates_cache.get(key)
         if cached is not None:
             self._decision_session_stats["candidates_hit"] += 1
             return cached
         self._decision_session_stats["candidates_miss"] += 1
-        value = self.store.lexical_file_candidates(list(normalized), limit=limit)
+        value = self.store.lexical_file_candidates(
+            list(normalized), limit=limit, paths=scope
+        )
         self._decision_candidates_cache[key] = value
         return value

@@ -8,7 +8,9 @@ The successor definition is
 `benchmarks/repository_evaluation/manifests/backend-campaign-v2/campaign.json`.
 It began with 36 entries, 27 distinct upstream problems and eight
 capability tags from the original campaign. The messaging intake extends this
-to 49 entries and 40 distinct upstream problems. Copying a suite adds no evidence.
+to 49 entries and 40 distinct upstream problems. Transaction/persistence intake
+extends it to 61 entries and 51 distinct problems across five suites. Copying a
+suite adds no evidence.
 The original campaign remains historical. The active schemas remain workflow
 v2, campaign v4 and matrix v5. Additional capability membership is admitted only
 after source review and executable witness proof.
@@ -306,6 +308,188 @@ families, the remaining independent reviews, complete current campaign inputs,
 unseen holdouts, deterministic regressions, typing and final artifacts remain
 required. No capability is claimed at 5/5.
 
+### Verification identity checkpoint: 2026-10-15, base `4de9225`
+
+Genuine messaging observations exposed a hard authority defect that the earlier
+authority-label checks did not detect. A reverse-reference row for `message.nack()`
+could become a direct reference to Confluent's `KafkaMessage.nack` solely from
+the leaf name. Kafka, Redis and other receiver identities were not established.
+The same defect reproduced for a module function: `client.emit()` could become
+an exact reference to an unrelated `alpha.emit`. Earlier authority-gate passes
+therefore prove their recorded checks only; they do not close semantic authority.
+
+The repair preserves the selected declaration's qualified name through direct
+and bounded indirect lookup. An explicit imported member needs its declared
+module and member scope; arbitrary, constructed, shadowed or conflicting receivers
+remain unresolved candidates. Module-function use needs a qualified import/name
+or module-attribute reference. An unused import plus an unrelated same-named
+attribute cannot establish use. Indirect attribute proof is kept separate from
+the direct endpoint. Any unresolved reference identity prevents qualified absence
+or unique-verifier promotion even when another verifier has positive evidence.
+
+`verification_reference_syntax.py` owns the immutable AST syntax projection.
+Responsibility classification: EXTRACT RESPONSIBILITY under
+`docs/maintainers/RESPONSIBILITY_REFACTORING.md`. The measured correctness risk
+was file-level/short-name identity being promoted to exact member authority.
+CodeMap keeps repository reads, cached AST acquisition, freshness, import
+resolution and selection; the syntax module has only standard-library inputs
+and the same process-local snapshot cache key. This introduces no persisted
+identity, type inference, execution or second repository authority.
+
+The initial focused ring passes 54 tests, including positive imported members and
+functions, unknown/foreign receivers, rebinding, conflicting aliases, unused
+imports and indirect-proof isolation. Nine CLI/service/official-MCP argument
+regressions also pass. Scoped Ty/Pyright and `agent-preflight` pass. Logs are in
+`.hashmarks/backend-e2e/verification-identity-20261015/`. These passes do not replace
+full configured typing, the complete regression selection or current campaign
+acquisition. Reports from before this repair remain historical.
+
+The broader ring first exposed a false ambiguity for an explicit facade-local
+override. Unresolved test-binding accounting now stays scoped to test candidates;
+the canonical import resolver continues to own source-local override identity.
+That regression passes after repair.
+
+The production-heavy lexical loss below was then reproduced and repaired. The
+existing store query accepts an optional exact path scope and applies it before
+ranking/limit; decision-session cache identity includes that scope and
+distinguishes an empty scope from an unrestricted one. Verification supplies
+canonically classified test paths, observed once per request. Tests retain weak
+candidate authority. A neutral fixture with 80 stronger production matches now
+exposes its existing test and excludes production `src/test_cancellation.py`.
+The combined correctness/authority/selection/contract/native-LSP/session ring
+passes 183 tests. All seven modified production owners and the three modified
+test owners pass scoped Ty/Pyright. Full-project checks remain open.
+
+`genuine-after-public-01` completes both frozen workflows at the earlier repair
+identity. Both after-verifier checks pass; both before checks fail. Authority,
+freshness, revision, owner top-three and initial-size checks pass their recorded
+assertions. Overall facts, initial evidence and transport/presentation gates
+remain failed. The later facade and lexical repairs change observer identity;
+`genuine-after-public-02` reacquires the same unchanged two-workflow population.
+
+That acquisition completes at observer
+`sha256:81556595b4030c5e05283df34f0799a79bafd59bacfbff58c811efb631b17c9e`.
+Its two after-verifier checks pass and both original before expectations fail.
+All sixteen initial CLI/MCP compact/text responses fit the limit; the maximum
+is 3,586 tokens. These are current observations for the original oracle, not a
+passing complete campaign.
+
+Source review then corrects only the batch-nack before verifier to
+`tests/brokers/confluent/test_consume.py::TestConsume.test_nack` (201–234), and
+adds an exact after regression binding (32–53). The grader records the source
+reason and limitation. Native nominations and capability review are unchanged.
+The campaign's canonical grader reference is updated. Original grader/campaign
+bytes, source review hashes and both failed acquisitions remain under
+`oracle-review-01`. New acquisition uses `genuine-corrected-oracle-public-01`;
+old reports must not be relabelled to this new grader identity. The corrected
+batch-nack acquisition completes with all ten current workflow gates passing at
+both revisions, 381 retained witnesses, and real CLI/MCP capture. Its summary is
+still INCOMPLETE because the other workflows, capability review and complete
+campaign evidence are not present. This does not promote capability 13 to 5/5.
+The grading regression ring passes 81 tests. Full configured typing was rerun and still
+reports 3,476 Ty diagnostics and 3,480 Pyright errors, zero warnings.
+
+`source-candidate-02/source.zip` includes the new syntax owner and preserves
+source modes. An independent extraction imports its own Hashmarks and passes
+273 tests, including the authority, native-LSP, session, grading, CLI/service and
+official-MCP rings. The ZIP is a bounded development candidate, not final
+promotion proof. This paragraph updates documentation after that snapshot;
+production, test and grader bytes remain identical. Re-prove the complete final
+artifact only after the remaining implementation and qualification work.
+
+Next steps, in order:
+
+1. Preserve the completed `genuine-corrected-oracle-public-01` acquisition and
+   inspect its exact witness/source/format contexts when composing the next
+   current campaign report. The other twelve messaging workflows still need
+   current acquisition under the corrected grader. Cancellation-before remains
+   a failed original oracle and needs its own source
+   review; do not change it based solely on the currently selected middleware test.
+2. Extend independently source-bound authority checks beyond domain-label
+   strings. A foreign receiver must never be asserted as a direct correspondence
+   to the selected member. Unknown receivers must remain unknown in API, CLI,
+   MCP and initial compact/text projections. Bind each assertion to the exact
+   candidate record, declaration scope and revision; a matching path alone is
+   insufficient. Retain a pre-repair failure and reacquire after the repair.
+3. Preserve the completed batch-nack source review and exact before/after hashes.
+   The before test supplies relevant existing negative-acknowledgement coverage;
+   it does not prove tuple/batch seek behavior. Keep the after seek regression
+   and its asserted behavior. Apply this source-first review to other before-test
+   nominations before treating all remaining misses as product retrieval defects.
+4. Qualify the scoped verifier-retrieval repair on genuine sources. Preserve the
+   neutral production-fanout and scope-cache regressions. Keep visibility and
+   completeness independent and preserve candidate-only authority. Re-run the
+   cancellation workflow and compare initial candidates, omissions, token counts
+   and edit identity. Investigate any remaining miss at its generic owner;
+   never introduce a broker/framework name exception or change the selected edit
+   to improve test retrieval. Source-candidate disclosure may carry a positive
+   reference to another explicitly named declaration in `source_candidate_basis`
+   while `edit_relationship` remains unestablished. Do not reinterpret that as
+   direct correspondence to the selected edit owner or erase its admitted basis.
+5. Reacquire the reviewed messaging population only after these semantic owners
+   are frozen. Recheck all required source/display/adversarial assertions before
+   admitting capability review. Then continue T03–T10, including the eleven
+   missing catalogs. This checkpoint qualifies no capability at 5/5.
+
+### Corpus and typing checkpoint: 2026-10-15, observer unchanged
+
+Pinned-source review corrects cancellation-before to
+`tests/brokers/kafka/test_ack_policy.py::TestAckPolicy.test_commit_called_in_middleware_on_error`
+(173–211): the existing ordinary-error test explicitly asserts commit under
+ACK/REJECT_ON_ERROR. The after-only cancellation/redelivery regression is bound
+separately (18–62). The distinction is preserved; before coverage is not called
+cancellation coverage. Original grader/campaign bytes and source hashes are in
+`.hashmarks/backend-e2e/qualification-20261015/cancellation-oracle-review/`.
+
+Full fresh messaging public acquisition completes all thirteen workflows under
+the corrected oracle. Every fact, authority, freshness, revision, initial-size,
+CLI/MCP and presentation gate passes its recorded checks. Four owner top-three
+failures remain: aiokafka commit refresh, aio-pika nack scope, aio-pika channel
+close and FastStream ack error. Do not discard them or turn exact target intent
+into established edit ownership. The returned explicit target can be resolved
+while retrieval buries its exact declaration below weaker file/doc/test hits;
+investigate projection ordering independently of ownership authority.
+
+Fresh native acquisition also completes all thirteen messaging specimens and
+all twelve newly admitted transaction specimens. Both native reports are PASS
+with no missing workflows. These are explicit source/native binding and transport
+proof, not runtime success or complete capability review. Public messaging,
+native reports and captures are under `qualification-20261015/{messaging-public,
+messaging-native,messaging-native-captures,transaction-native,transaction-native-captures}`.
+
+The new `suites/transaction/` catalog contains twelve distinct genuine changes,
+four each from SQLAlchemy, databases and Litestar, over twenty-four exact Git
+archives. Source admission passes. Declarations, direct call lines and exact
+before/after test ranges were frozen from source/diffs before measurement.
+The suite declares 2,043 exact positive/adversarial boundary witness contexts and
+requires fresh native acquisition. Existing and new tests have separate stage
+bindings; missing dedicated regressions and mocked-session limits are explicit.
+The existing failed-BEGIN problem has independent transaction assertions here;
+reuse does not create another distinct global problem. Source-only holdouts are
+reserved separately in the catalog README.
+
+All capability-14 review flags remain false. Conditions, assignment/cleanup
+state, helper bodies, release scopes, essential initial display facts and any
+required runtime witnesses still need independent executable proof. A helper
+name does not establish a commit or an execution path. The public transaction run
+is active, retaining a receipt after each completed workflow. A slow observation
+is not a failed test or a stopped process. Resume/poll that same live handle;
+do not restart or edit observer/evaluator inputs while acquisition is live.
+The source map has 104 admitted source IDs. Current campaign aggregation must
+preserve missing current core/model/async public/native inputs and the unfinished
+transaction public population.
+
+Typing work adds checked object/record/scalar narrowing to the existing native
+LSP tests; it adds no unchecked casts, ignores, Any or configuration exclusions.
+All 33 native-LSP regressions pass, and that file passes Ty/Pyright. Full configured
+typing decreases from 3,476/3,480 to 3,406 Ty diagnostics and 3,410 Pyright errors,
+zero warnings. The backend grading/workflow regression ring passes 150 tests.
+Full typing and full deterministic regression membership remain open.
+
+Ten entire catalogs remain missing: 2, 4, 8, 9, 11, 15, 16, 18, 19 and 20.
+Messaging and transaction breadth do not complete their independent semantic
+reviews or final qualification. No capability is promoted to 5/5 here.
+
 ### T00: baseline and prerequisites
 
 Record HEAD/worktree state, observer/evaluator identities, lock/configuration
@@ -377,9 +561,10 @@ member. Unsupported/ambiguous producer output remains unresolved.
 
 ### T07: missing catalogs
 
-The messaging source catalog now exists with thirteen problems across three
-repositories. Its incomplete qualification is detailed above. The other eleven
-catalogs still require genuine source intake.
+The messaging source catalog has thirteen problems across three repositories;
+the transaction/persistence catalog has twelve across three. Their incomplete
+qualification is detailed above. The other ten catalogs still require genuine
+source intake.
 
 Each catalog targets four genuine problems per repository in the initial pool.
 Inspect source history from recorded revisions; pin exact before/after archives;

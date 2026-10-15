@@ -254,11 +254,21 @@ def _relevance(value: object, path: str) -> None:
         ("selection_changed", "secret_knowledge_used"),
         ("negative_evidence_admissible", "qualified_identity_ambiguous"),
     )
-    _fields(row, path, int, (), ("candidate_count",))
+    _fields(
+        row,
+        path,
+        int,
+        (),
+        ("candidate_count", "unresolved_reference_identity_omitted_paths"),
+    )
     _nullable_locator(row, "selected", path)
     for locator in _records(row.get("candidates"), f"{path}.candidates"):
         _locator(locator, f"{path}.candidates")
-    for key in ("search_bound_reasons", "unresolved_import_identity_paths"):
+    for key in (
+        "search_bound_reasons",
+        "unresolved_import_identity_paths",
+        "unresolved_reference_identity_paths",
+    ):
         if key in row:
             _strings(row[key], f"{path}.{key}")
     _relevance_extensions(row, path)

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from contract_assertions import assert_records
+
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.task_evidence_contract import read_initial_projection
 from hashmarks.codemap.task_evidence_initial import (
@@ -115,4 +117,38 @@ def test_short_identifier_components_remain_verification_task_evidence(
     assert "db" in rows["tests/test_field_db_options.py"].get("task_anchor_terms", [])
     assert "db" not in rows["tests/test_field_fd_options.py"].get(
         "task_anchor_terms", []
+    )
+
+
+def test_production_lexical_fanout_cannot_hide_the_test_observation_scope(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "src/engine.py").write_text("def process(): return None\n")
+    for index in range(80):
+        (tmp_path / f"src/worker_{index:02}.py").write_text(
+            "# Inspect cancellation scope cleanup in src engine py\n"
+            "def observe(): return None\n"
+        )
+    (tmp_path / "src/test_cancellation.py").write_text(
+        "# production module, not a test surface\n"
+        "def cancellation_scope_cleanup(): return None\n"
+    )
+    expected = "tests/test_cancellation.py"
+    (tmp_path / expected).write_text("def test_cancellation(client): client.close()\n")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.task_evidence(
+            "Inspect cancellation scope cleanup in src/engine.py"
+        )
+    relevance = packet["verification"]["relevance"]
+    assert "task_matches" in relevance
+    matches = assert_records(relevance["task_matches"].get("matches"))
+    assert [row["path"] for row in matches] == [expected]
+    row = next(row for row in relevance["candidates"] if row["path"] == expected)
+    assert row.get("direct_reference") is False
+    assert row.get("indirect_reference") is False
+    assert all(
+        row["path"] != "src/test_cancellation.py" for row in relevance["candidates"]
     )

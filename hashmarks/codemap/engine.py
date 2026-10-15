@@ -268,7 +268,8 @@ class CodeMap(
             tuple[int, tuple[str, ...]], tuple[int, dict[str, int]]
         ] = {}
         self._decision_candidates_cache: dict[
-            tuple[int, tuple[str, ...], int], list[dict[str, object]]
+            tuple[int, tuple[str, ...], int, tuple[str, ...] | None],
+            list[dict[str, object]],
         ] = {}
         self._decision_repository_identity_cache: tuple[int, str] | None = None
         # Complete repository-intelligence snapshots are expensive compositions of

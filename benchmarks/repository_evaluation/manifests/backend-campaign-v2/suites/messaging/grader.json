@@ -3975,9 +3975,9 @@
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
             "source_paths": [
-              "tests/brokers/base/consume.py"
+              "tests/brokers/kafka/test_ack_policy.py"
             ],
-            "value": "tests/brokers/base/consume.py"
+            "value": "tests/brokers/kafka/test_ack_policy.py"
           }
         ],
         "initial_checks": [
@@ -3995,9 +3995,9 @@
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
             "source_paths": [
-              "tests/brokers/base/consume.py"
+              "tests/brokers/kafka/test_ack_policy.py"
             ],
-            "value": "tests/brokers/base/consume.py"
+            "value": "tests/brokers/kafka/test_ack_policy.py"
           }
         ],
         "owner_oracle": {
@@ -4265,7 +4265,7 @@
           }
         }
       },
-      "review_basis": "The patch adds an explicit asyncio.CancelledError case. New Kafka cancellation tests and shared consume coverage distinguish cancellation from normal message completion.",
+      "review_basis": "The patch adds an explicit asyncio.CancelledError case. New Kafka cancellation tests and shared consume coverage distinguish cancellation from normal message completion. Before-stage source review nominates TestAckPolicy.test_commit_called_in_middleware_on_error: it includes ACK and REJECT_ON_ERROR, raises a handler Exception and asserts commit was awaited. This is existing ordinary-error acknowledgement coverage, not cancellation/redelivery proof. The original shared consume file remains context. The after test starts an interrupted handler, restarts the broker and asserts the payload is redelivered. Exact test ranges bind both stages; runtime outcomes remain outside observer authority.",
       "source_labels": {
         "after": [
           {
@@ -4317,6 +4317,14 @@
             "sha256": "091cfc0290d4d92549c9e82d608465b2014abd07de053762b18d340003ad163e",
             "start_line": 80,
             "symbol": "_AcknowledgementMiddleware.__aexit__"
+          },
+          {
+            "declaration_line": 18,
+            "end_line": 62,
+            "path": "tests/brokers/kafka/test_cancellation.py",
+            "sha256": "7c7b8faf4ff899362ca294053317b2cba49d14996db3b4c1989575d1ad41088a",
+            "start_line": 18,
+            "symbol": "TestKafkaCancellation.test_graceful_shutdown_redelivers_interrupted_message"
           }
         ],
         "before": [
@@ -4347,6 +4355,14 @@
             "sha256": "183f8bf0084d0bde241a6f558891161ef6d4ec92dca729dba45069b3f9ca0372",
             "start_line": 79,
             "symbol": "_AcknowledgementMiddleware.__aexit__"
+          },
+          {
+            "declaration_line": 173,
+            "end_line": 211,
+            "path": "tests/brokers/kafka/test_ack_policy.py",
+            "sha256": "6055547b4921f9024d4f7c9a35fd1c8313d796218627eca7b70024e19f1abb85",
+            "start_line": 173,
+            "symbol": "TestAckPolicy.test_commit_called_in_middleware_on_error"
           }
         ]
       }
@@ -4949,9 +4965,9 @@
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
             "source_paths": [
-              "tests/brokers/confluent/test_test_client.py"
+              "tests/brokers/confluent/test_consume.py"
             ],
-            "value": "tests/brokers/confluent/test_test_client.py"
+            "value": "tests/brokers/confluent/test_consume.py"
           }
         ],
         "initial_checks": [
@@ -4969,9 +4985,9 @@
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
             "source_paths": [
-              "tests/brokers/confluent/test_test_client.py"
+              "tests/brokers/confluent/test_consume.py"
             ],
-            "value": "tests/brokers/confluent/test_test_client.py"
+            "value": "tests/brokers/confluent/test_consume.py"
           }
         ],
         "owner_oracle": {
@@ -5199,7 +5215,7 @@
           }
         }
       },
-      "review_basis": "The new test_message_nack_seek asserts seek is called through the test consumer. The source now chooses the first tuple member before obtaining topic/partition/offset. Runtime broker delivery is not certified.",
+      "review_basis": "The new test_message_nack_seek asserts seek is called through the test consumer. The source now chooses the first tuple member before obtaining topic/partition/offset. Runtime broker delivery is not certified. Before-stage verifier review: TestConsume.test_nack explicitly awaits msg.nack() and asserts commit was not called; it is relevant existing negative-acknowledgement coverage, not proof of batch seek correctness. The seek regression exists only after the change. The original before test_test_client.py nomination had no nack/seek test and is preserved in oracle-review-01/original-grader.json with the original failed acquisitions.",
       "source_labels": {
         "after": [
           {
@@ -5251,6 +5267,14 @@
             "sha256": "790aa7fa3ec095702a955ac3b15793094762368245f933de4632cb28a8089868",
             "start_line": 59,
             "symbol": "KafkaMessage.nack"
+          },
+          {
+            "declaration_line": 32,
+            "end_line": 53,
+            "path": "tests/brokers/confluent/test_test_client.py",
+            "sha256": "438718491137065b6fc4c4748a70eeb3f6f67d7935b2633a181f8232ac9d4053",
+            "start_line": 32,
+            "symbol": "TestTestclient.test_message_nack_seek"
           }
         ],
         "before": [
@@ -5281,6 +5305,14 @@
             "sha256": "bd209d5a05ef377cd0d21854e96849998bf14dcbeb25bc4f3f56f8eb81809e6a",
             "start_line": 56,
             "symbol": "KafkaMessage.nack"
+          },
+          {
+            "declaration_line": 201,
+            "end_line": 234,
+            "path": "tests/brokers/confluent/test_consume.py",
+            "sha256": "fde55617f59e5a1652e282fcb9c23647cf8110af8719811239899a53368fda24",
+            "start_line": 201,
+            "symbol": "TestConsume.test_nack"
           }
         ]
       }

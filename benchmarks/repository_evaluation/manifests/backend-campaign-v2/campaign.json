@@ -85,7 +85,7 @@
       ]
     },
     {
-      "grader_sha256": "9fe2e462e407b5940c62af9890d038a61261ae029b3e6888fded316908f15ea4",
+      "grader_sha256": "22b0de55dfb86b323152fb789dd8414b1dc6be39c13b7b9baacfc24af79d9188",
       "id": "backend-messaging-v2",
       "suite_file": "suites/messaging/suite.json",
       "suite_sha256": "a0b8f4b1d1df18b425a6dc9d5c612bf6741a91fc65e822c0472e81f3b066c421",
@@ -103,6 +103,26 @@
         "faststream-ack-error",
         "faststream-consumer-commit-failure",
         "faststream-empty-batch-publisher"
+      ]
+    },
+    {
+      "grader_sha256": "ce9e9cddd2491067dba46e0bf93ce3cba1623a40140e2961d63110718a7f50b9",
+      "id": "backend-transaction-v2",
+      "suite_file": "suites/transaction/suite.json",
+      "suite_sha256": "fc609593bc6cc4728679e3042962358f7c1581f48cccbc2c1a43d0f6848f107c",
+      "workflow_ids": [
+        "sqlalchemy-failed-begin-state",
+        "sqlalchemy-bulk-begin-flushing",
+        "sqlalchemy-prepare-failure-rollback",
+        "sqlalchemy-prepared-commit-xid",
+        "databases-transaction-context-isolation",
+        "databases-commit-clears-backend",
+        "databases-acquire-cancellation-counter",
+        "databases-disconnect-local-state",
+        "litestar-update-session-merge",
+        "litestar-update-fetched-values",
+        "litestar-repository-auto-commit",
+        "litestar-delete-many-chunking"
       ]
     }
   ]

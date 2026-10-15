@@ -14,9 +14,7 @@ def _repository(root: Path, verifier: str) -> None:
         "class Message:\n    def nack(self): return 'alpha'\n"
         "class Other:\n    def nack(self): return 'other'\n"
     )
-    (root / "beta.py").write_text(
-        "class Message:\n    def nack(self): return 'beta'\n"
-    )
+    (root / "beta.py").write_text("class Message:\n    def nack(self): return 'beta'\n")
     (root / "tests").mkdir()
     (root / "tests/test_delivery.py").write_text(verifier)
 
@@ -44,7 +42,9 @@ def test_unqualified_or_conflicting_method_receiver_is_not_direct_evidence(
         codemap.sync()
         relevance = codemap.verification_relevance("Inspect Message.nack in alpha.py")
     candidate = next(
-        row for row in relevance["candidates"] if row["path"] == "tests/test_delivery.py"
+        row
+        for row in relevance["candidates"]
+        if row["path"] == "tests/test_delivery.py"
     )
     assert candidate.get("direct_reference") is False
     assert candidate.get("indirect_reference") is False
@@ -69,7 +69,9 @@ def test_explicit_import_and_member_scope_qualify_the_static_reference(
         codemap.sync()
         relevance = codemap.verification_relevance("Inspect Message.nack in alpha.py")
     candidate = next(
-        row for row in relevance["candidates"] if row["path"] == "tests/test_delivery.py"
+        row
+        for row in relevance["candidates"]
+        if row["path"] == "tests/test_delivery.py"
     )
     assert candidate.get("direct_reference") is True
     assert candidate.get("reference_symbols") == ["nack"]
@@ -92,3 +94,98 @@ def test_unknown_method_receivers_cannot_make_a_known_verifier_unique(
     assert relevance.get("negative_evidence_admissible") is False
     assert relevance.get("qualified_identity_ambiguous") is True
     assert "unique" not in relevance["selection_reason"]
+
+
+@pytest.mark.parametrize(
+    "verifier",
+    [
+        "def test_delivery(client):\n    client.emit()\n",
+        "from alpha import emit\ndef test_delivery(client):\n    client.emit()\n",
+        "from alpha import emit\ndef test_delivery(emit):\n    emit()\n",
+        "from alpha import emit as actual\ndef test_delivery(actual):\n    actual()\n",
+        "import alpha as repository\nfrom beta import Other as repository\n"
+        "def test_delivery():\n    repository.emit()\n",
+        "import alpha as repository\ndef test_delivery():\n    repository.Other.emit()\n",
+    ],
+)
+def test_instance_method_spelling_does_not_reference_an_unrelated_module_function(
+    tmp_path: Path,
+    verifier: str,
+) -> None:
+    (tmp_path / "alpha.py").write_text(
+        "def emit(): return 'alpha'\nclass Other:\n    def emit(): return 'other'\n"
+    )
+    (tmp_path / "beta.py").write_text("class Other:\n    def emit(): return 'beta'\n")
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/test_delivery.py").write_text(verifier)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        relevance = codemap._verification_relevance(
+            "Inspect emit in alpha.py",
+            edit={"path": "alpha.py", "name": "emit", "qualname": "emit"},
+            current_verify=None,
+            rows=[],
+        )
+    candidate = next(
+        row
+        for row in relevance["candidates"]
+        if row["path"] == "tests/test_delivery.py"
+    )
+    assert candidate.get("direct_reference") is False
+    assert candidate.get("indirect_reference") is False
+    assert relevance.get("negative_evidence_admissible") is False
+
+
+@pytest.mark.parametrize(
+    "binding, call",
+    [
+        ("from alpha import emit as actual", "actual()"),
+        ("import alpha as repository", "repository.emit()"),
+    ],
+)
+def test_explicit_module_function_reference_retains_its_authority(
+    tmp_path: Path,
+    binding: str,
+    call: str,
+) -> None:
+    (tmp_path / "alpha.py").write_text("def emit(): return 'alpha'\n")
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/test_delivery.py").write_text(
+        f"{binding}\ndef test_delivery():\n    {call}\n"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        relevance = codemap.verification_relevance("Inspect emit in alpha.py")
+    candidate = next(
+        row
+        for row in relevance["candidates"]
+        if row["path"] == "tests/test_delivery.py"
+    )
+    assert candidate.get("direct_reference") is True
+    assert candidate.get("reference_symbols") == ["emit"]
+
+
+def test_indirect_member_proof_cannot_strengthen_an_unused_direct_import(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "alpha.py").write_text("def emit(): return 'alpha'\n")
+    (tmp_path / "beta.py").write_text(
+        "from alpha import emit as imported\n"
+        "class Other:\n    def emit(): return 'other'\n"
+    )
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/test_delivery.py").write_text(
+        "from alpha import emit\nimport beta\n"
+        "def test_delivery():\n    beta.Other.emit()\n"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        relevance = codemap.verification_relevance("Inspect emit in alpha.py")
+    candidate = next(
+        row
+        for row in relevance["candidates"]
+        if row["path"] == "tests/test_delivery.py"
+    )
+    assert candidate.get("direct_reference") is False
+    assert candidate.get("indirect_reference") is True
+    assert candidate.get("reference_strength") == "reachable-import"
