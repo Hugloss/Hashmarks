@@ -125,17 +125,20 @@ def test_official_mcp_selected_declarations_keep_bindings_in_every_format(
     _assert_captures(capture_mcp(tmp_path, state, _request()), packet, tmp_path)
 
 
-@pytest.mark.host_mcp_sdk
+@pytest.mark.parametrize(
+    "transport", ["cli", pytest.param("mcp", marks=pytest.mark.host_mcp_sdk)]
+)
 def test_public_transports_reject_invalidated_source_before_refresh(
     tmp_path: Path,
+    transport: str,
 ) -> None:
     state, _ = _source(tmp_path)
     (tmp_path / "backend.py").write_text(
         "class Payload(BaseModel):\n    current: str\n"
     )
-    for capture in (capture_cli, capture_mcp):
-        with pytest.raises(ValueError, match="input changed"):
-            capture(tmp_path, state, _request())
+    capture = capture_cli if transport == "cli" else capture_mcp
+    with pytest.raises(ValueError, match="input changed"):
+        capture(tmp_path, state, _request())
 
 
 def test_discovery_rejects_mixed_claims_and_source_options_in_claim_mode(

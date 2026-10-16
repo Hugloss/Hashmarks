@@ -186,8 +186,9 @@ def test_integer_literal_preserves_precision_in_wire_safe_decimal_text(
     }
 
 
-@pytest.mark.host_mcp_sdk
-@pytest.mark.parametrize("transport", ["cli", "mcp"])
+@pytest.mark.parametrize(
+    "transport", ["cli", pytest.param("mcp", marks=pytest.mark.host_mcp_sdk)]
+)
 def test_public_transports_preserve_literal_arguments_and_unknown_binding(
     tmp_path: Path, transport: str
 ) -> None:

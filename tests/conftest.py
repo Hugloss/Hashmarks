@@ -110,7 +110,7 @@ def repository_qualification_handoff(repository_qualification_plan: object) -> o
     return _native_qualification_handoff_from_plan(repository_qualification_plan)
 
 
-def _constrained_host_capabilities() -> dict[str, bool]:
+def _host_capabilities() -> dict[str, bool]:
     import importlib.util
     import os
 
@@ -123,12 +123,11 @@ def _constrained_host_capabilities() -> dict[str, bool]:
 
 
 def pytest_collection_modifyitems(config: object, items: list[object]) -> None:
-    """Make constrained-host capability absence explicit without weakening normal tests."""
+    """Qualify optional SDK tests and the additional constrained-host exclusions."""
     import os
 
-    if os.environ.get("HASHMARKS_CONSTRAINED_HOST") != "1":
-        return
-    capabilities = _constrained_host_capabilities()
+    constrained = os.environ.get("HASHMARKS_CONSTRAINED_HOST") == "1"
+    capabilities = _host_capabilities()
     mandatory_skip = {
         "certification": "native/release authority is excluded from hosted diagnostics",
         "host_dns": "external DNS/network is excluded from hosted diagnostics",
@@ -137,12 +136,18 @@ def pytest_collection_modifyitems(config: object, items: list[object]) -> None:
     }
     for item in items:
         for marker, reason in mandatory_skip.items():
-            if item.get_closest_marker(marker) is not None:
+            if constrained and item.get_closest_marker(marker) is not None:
                 item.add_marker(pytest.mark.skip(reason=reason))
         for marker, available in capabilities.items():
-            if not available and item.get_closest_marker(marker) is not None:
+            if (
+                not available
+                and (constrained or marker == "host_mcp_sdk")
+                and item.get_closest_marker(marker) is not None
+            ):
                 item.add_marker(
                     pytest.mark.skip(
                         reason=f"constrained host lacks capability: {marker}"
+                        if constrained
+                        else "optional official MCP SDK unavailable"
                     )
                 )

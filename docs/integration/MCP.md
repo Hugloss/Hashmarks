@@ -19,7 +19,11 @@ The Python compatibility CI matrix also checks the locked test-only environment
 without the MCP extra. Transport tests must collect in that environment:
 annotation-only SDK imports stay under `TYPE_CHECKING`, and MCP runtime imports
 remain local to SDK-dependent tests. Those tests report explicit skips when the
-SDK is unavailable; the MCP-enabled qualification runs exercise them. A no-extra
+SDK is unavailable in both normal and constrained test runs: `host_mcp_sdk`
+marks are qualified by the shared pytest capability check. Mixed transport tests
+mark only their MCP parameter, keeping CLI cases runnable without the SDK.
+An installed SDK still runs its marked tests and exposes transport failures.
+The MCP-enabled qualification runs exercise them. A no-extra
 test result does not qualify the SDK transport.
 
 For OpenCode end users, register Hashmarks from the repository OpenCode should analyze:

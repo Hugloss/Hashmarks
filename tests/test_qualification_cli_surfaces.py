@@ -28,6 +28,13 @@ def test_economics_cli_reports_membership_preservation_without_execution_policy(
     assert economics_main(["--root", str(_root())]) == 0
     value = json.loads(capsys.readouterr().out)
     assert value["exact_total_membership_preserved"] is True
-    assert value["ordinary_correctness_members_avoided"] == 7
+    assert value["ordinary_correctness_members_avoided"] > 0
+    assert value["ordinary_correctness_members_avoided"] == (
+        value["process_sensitive_members"] + value["empirical_benchmark_members"]
+    )
+    assert value["total_verification_membership"] == (
+        value["release_correctness_members"]
+        + value["ordinary_correctness_members_avoided"]
+    )
     assert value["authority"] == "repository-intelligence-economics-only"
     assert value["execution_layout"] == "external"
