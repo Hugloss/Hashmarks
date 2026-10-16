@@ -47,6 +47,7 @@ This is the single catalog for the current maintained documentation in `docs/`.
 ## Qualification
 
 - [`qualification/DIAGNOSTIC_CORRESPONDENCE.md`](qualification/DIAGNOSTIC_CORRESPONDENCE.md) — standalone HM-OBS-01..09 implementation, local fixture replay, contract changes and comparable read economics.
+- [`qualification/OPTIONAL_MCP_TESTS.md`](qualification/OPTIONAL_MCP_TESTS.md) — SDK-absent CI execution, preserved CLI coverage, SDK-present checks and inventory-independent economics assertions.
 
 - [`qualification/AGENT_EVIDENCE_FORMATS.md`](qualification/AGENT_EVIDENCE_FORMATS.md) — paired evidence-presentation export and external agent grading.
 - [`qualification/BACKEND_E2E.md`](qualification/BACKEND_E2E.md) — genuine backend revision workflows, source oracles and all-capability qualification accounting.

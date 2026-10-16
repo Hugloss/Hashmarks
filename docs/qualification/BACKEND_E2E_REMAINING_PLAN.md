@@ -472,12 +472,15 @@ All capability-14 review flags remain false. Conditions, assignment/cleanup
 state, helper bodies, release scopes, essential initial display facts and any
 required runtime witnesses still need independent executable proof. A helper
 name does not establish a commit or an execution path. The public transaction run
-is active, retaining a receipt after each completed workflow. A slow observation
-is not a failed test or a stopped process. Resume/poll that same live handle;
-do not restart or edit observer/evaluator inputs while acquisition is live.
-The source map has 104 admitted source IDs. Current campaign aggregation must
-preserve missing current core/model/async public/native inputs and the unfinished
-transaction public population.
+completed all twelve workflows and its summary is FAIL. The prepared-transaction
+workflow misses its engine verifier at both revisions and exceeds the initial
+MCP compact bound after the change (4,121 tokens). Two Litestar cases miss the
+bigint repository verifier at both revisions. Six owner top-three failures and
+two additional initial-evidence failures remain in that historical population.
+Keep the exact report under `qualification-20261015/transaction-public`; it is
+bound to its original observer, not the later repairs below. The source map has
+104 admitted source IDs. Campaign aggregation must preserve missing current
+core/model/async public/native inputs and every retained failure.
 
 Typing work adds checked object/record/scalar narrowing to the existing native
 LSP tests; it adds no unchecked casts, ignores, Any or configuration exclusions.
@@ -489,6 +492,89 @@ Full typing and full deterministic regression membership remain open.
 Ten entire catalogs remain missing: 2, 4, 8, 9, 11, 15, 16, 18, 19 and 20.
 Messaging and transaction breadth do not complete their independent semantic
 reviews or final qualification. No capability is promoted to 5/5 here.
+
+### Retrieval and verification checkpoint: 2026-10-16, base `50cdc10`
+
+Two generic disclosure defects are repaired using existing repository indexes.
+An exact qualified declaration named in the task now precedes weaker retrieval
+matches, including at limits one and three. A supplied literal path confines
+that disclosure to the requested file. Duplicate declarations remain visible
+and unresolved; changing disclosure order does not establish edit ownership.
+Canonical/supplement omissions remain accounted for and denied declarations
+remain hidden. Neutral regressions exercise API/default/initial responses and
+the actual CLI and official MCP across all presentation formats.
+
+Candidate-only verifier discovery now includes source modules in the test
+domain as bounded intermediates. For example, a test-model module references a
+source class and a test imports that module's helper. Each admitted intermediate
+has a current member revision, and the candidate retains its exact intermediate
+path/revision. Direct reference evidence ranks before indirect evidence, which
+ranks before lexical matches. A sixteen-module bound is explicit. Hidden,
+stale or wrong-owner modules cannot provide the claimed source relationship.
+This extends disclosure around unresolved source candidates only: selected
+verification, edit ownership, execution and negative-evidence authority do not
+change. Candidates still state `edit_relationship: unestablished` and
+`verification_selection_authority: false`.
+
+The frozen observer for the combined repairs is
+`sha256:7dc0bebebb6cf5cfe7d3363f25e374fd24706599c4bc523984fb42553de91014`;
+the evaluator remains
+`sha256:0cbbd67136969bfebb591d219333d0b652ebc9dffe30668e960a08015c0767de`.
+Outputs are under `.hashmarks/backend-e2e/explicit-retrieval-20261016/`.
+`transaction-helper-public-01` completes fetched-value and auto-commit cases
+through API/CLI/official MCP at both revisions. Both pass all ten recorded
+workflow gates and expose `test_repo_bigint.py`; initial compact/text responses
+peak at 3,469 tokens. `transaction-helper-native-01` regenerates both native
+specimens, with every binding/definition/stale-reopen/transport gate passing.
+These subset summaries correctly remain INCOMPLETE for missing suite members;
+they do not qualify capability 14 or independently review its semantics.
+
+The earlier ordering-only observer
+`sha256:1ea8dba5badf81508c822829fb449b1336015877dd7e21144c38f8d8a40fae8b`
+passes all ten gates for the four original messaging owner-top-three failures
+under `genuine-after`, with fresh native specimens under `native-after`.
+Initial compact/text responses peak at 3,306 tokens. The combined candidate's
+four-case messaging reacquisition under `ordering-with-helper-public-01` also
+passes all ten gates for every case, with initial compact/text responses peaking
+at 3,333 tokens. Both public acquisitions are now expanded to their full original
+suite populations, reusing only matching completed receipts. Until those runs
+finish, inspect terminal per-workflow receipts rather than the earlier subset
+summary; do not count in-flight observations as completed evidence.
+
+`verification-ring-helpers-01.log` records 114 passing focused regressions;
+`explicit-transport-helpers-01.log` records ten passing disclosure/transport
+tests with no skips. Both modified production owners and their new tests pass
+scoped Ty/Pyright. Checked object/array/scalar assertions also repair the
+handler-body regression file without casts, ignores or weaker assertions; all
+seven handler tests pass and both scoped type checkers report zero errors.
+Formatting, full Ruff, hygiene, zero complexity debt and file-size gates pass.
+Full configured typing remains red: `full-ty-helpers.log` reports 3,366 diagnostics
+and `full-pyright-helpers.log` reports 3,374 errors, zero warnings. The preceding
+measurement was 3,401/3,406. Scoped passes do not close T09.
+
+Actual pinned-source failure acquisition adds two SQLAlchemy problems and
+27 retained frames under `runtime-captures`. Logging-token reset changes from
+AttributeError to a successful query. Aggregate-strings changes from TypeError
+to CompileError; the latter is still a failure, not a successful repair.
+`runtime-correspondence/regraded.json` retains a strict runtime-function grade
+of 24/27: two comprehension frames map to their containing source declaration,
+and one canonical symbol includes a line disambiguator. Do not relabel these
+as exact runtime callable identities. `runtime-correspondence-bound` separately
+proves current source containment, matching qualified member bytes and rejection
+of deliberately invalidated member revisions for all 27 frames. That is narrow
+API location/revision proof over two problems in one repository. Public transport,
+independent runtime identity review and the twelve-problem debugging catalog
+remain INCOMPLETE. The original exploratory summary joined anchors by position;
+use the retained anchor-ID regrade, never that summary as correspondence proof.
+
+Next execute the remaining current suite populations without weakening their
+oracles, then complete T03–T10 below. The prepared-transaction verifier remains
+an open retrieval problem. A later size probe at both revisions is below 4,000,
+but intervening branch changes prevent attributing that difference to the
+ordering patch. Ten catalogs, independent capability/display/adversarial review,
+required witness families, full typing, exact deterministic regression membership,
+unseen holdouts and final artifact qualification remain open. No 5/5 completion
+or saturation is claimed.
 
 ### T00: baseline and prerequisites
 

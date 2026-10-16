@@ -11,6 +11,7 @@ from .task_evidence_contract import read_task_candidate
 
 if TYPE_CHECKING:
     from .engine import CodeMap
+    from .evidence_verification import _VerificationRelevanceState
     from .task_evidence_types import TaskEvidenceDraft
 
 
@@ -315,6 +316,8 @@ class TaskEvidenceScopedMethodMixin:
         names: list[str] = []
         codemap._append_verification_symbol_names(names, subject)
         codemap._verification_collect_direct_references(state, names)
+        test_modules = codemap._task_evidence_test_module_references(state)
+        state.source_ref_paths.update(test_modules)
         codemap._verification_collect_indirect_references(state)
         candidates = codemap._verification_candidates(state)
         candidates.extend(codemap._verification_lexical_candidates(state))
@@ -337,14 +340,20 @@ class TaskEvidenceScopedMethodMixin:
         }
         result = []
         for candidate in candidates[: VERIFICATION_RELEVANCE_DEFAULTS.candidate_limit]:
-            test_path = str(candidate["path"])
-            test_member = codemap._session_file_row(test_path)
+            test_member = codemap._session_file_row(str(candidate["path"]))
             if (
                 test_member is None
-                or not codemap._indexed_path_current(test_path)
-                or not codemap._task_evidence_declaration_visible(test_path)
+                or not codemap._indexed_path_current(str(candidate["path"]))
+                or not codemap._task_evidence_declaration_visible(
+                    str(candidate["path"])
+                )
             ):
                 continue
+            test_module_revisions = {
+                name: test_modules[name]
+                for name in state.indirect_via_paths.get(str(candidate["path"]), ())
+                if name in test_modules
+            }
             result.append(
                 {
                     **candidate,
@@ -360,6 +369,11 @@ class TaskEvidenceScopedMethodMixin:
                             "indirect_via_paths": candidate.get(
                                 "indirect_via_paths", []
                             ),
+                            **(
+                                {"test_module_revisions": test_module_revisions}
+                                if test_module_revisions
+                                else {}
+                            ),
                         }
                     ],
                     "test_revision": test_member["file_digest"],
@@ -368,7 +382,35 @@ class TaskEvidenceScopedMethodMixin:
                     "negative_evidence_admissible": False,
                 }
             )
-        return result if codemap._indexed_path_current(path) else []
+        return (
+            result
+            if codemap._indexed_path_current(path)
+            and all(codemap._indexed_path_current(name) for name in test_modules)
+            else []
+        )
+
+    def _task_evidence_test_module_references(
+        self, state: _VerificationRelevanceState
+    ) -> dict[str, str]:
+        """Bound test-owned source observations for candidate disclosure only."""
+        from .repository_domains import RepositoryDomain, classify_repository_path
+
+        codemap = cast("CodeMap", self)
+        paths = sorted(
+            path
+            for path in state.refs_by_path
+            if RepositoryDomain.SOURCE in classify_repository_path(path)
+        )
+        if len(paths) > 16:
+            state.search_bound_reasons.add("source-candidate-test-module-limit")
+        result = {}
+        for path in paths[:16]:
+            member = codemap._session_file_row(path)
+            if member is not None and codemap._indexed_path_current(path):
+                result[path] = str(member["file_digest"])
+            else:
+                state.search_bound_reasons.add("source-candidate-test-module-stale")
+        return result
 
     def _task_evidence_candidate_verifier_score(
         self, row: Mapping[str, object]
@@ -377,10 +419,9 @@ class TaskEvidenceScopedMethodMixin:
         codemap = cast("CodeMap", self)
         score = codemap._verification_candidate_score(row)
         return (
-            int(bool(row.get("direct_reference"))),
+            score[0],
             score[1],
             cast("int", row.get("subject_term_matches", 0)),
-            int(bool(row.get("indirect_reference"))),
             *score[2:],
         )
 

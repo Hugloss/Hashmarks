@@ -16,6 +16,15 @@ if TYPE_CHECKING:
 
 class TaskEvidenceRetrievalMixin:
     @staticmethod
+    def _task_evidence_requested_locator_key(
+        row: Mapping[str, object],
+    ) -> tuple[str, str]:
+        return (
+            str(row.get("path") or ""),
+            str(row.get("symbol") or row.get("qualname") or row.get("name") or ""),
+        )
+
+    @staticmethod
     def _task_evidence_retrieval_query(task: str) -> str:
         """Exclude a separate output-format sentence from retrieval vocabulary."""
         directive = re.search(
@@ -320,6 +329,23 @@ class TaskEvidenceRetrievalMixin:
         exact, exact_complete = self._task_action_qualified_identifier_index_evidence(
             exact_terms, set(), canonical_rank=len(current) + 1
         )
+        explicit = result["explicit_target"]
+        literal_path = explicit["path"] if explicit["basis"] == "literal-path" else None
+        exact = [
+            row for row in exact if not literal_path or row.get("path") == literal_path
+        ]
+        requested_keys = {
+            self._task_evidence_requested_locator_key(row) for row in exact
+        }
+        # Qualifying an explicit locator changes disclosure order only. Preserve
+        # all matching identities when the request has multiple declarations;
+        # neither ordering nor the return bound establishes a unique owner.
+        current = sorted(
+            current,
+            key=lambda row: (
+                self._task_evidence_requested_locator_key(row) not in requested_keys
+            ),
+        )
         existing_keys = {
             (str(row.get("path") or ""), str(row.get("symbol") or "")) for row in rows
         }
@@ -332,7 +358,7 @@ class TaskEvidenceRetrievalMixin:
             )
             not in existing_keys
         ]
-        exact_bound = min(2, max(0, limit - 3))
+        exact_bound = min(2, limit)
         supplements = [
             {**row, "retrieval_supplement": "exact-qualified-identifier"}
             for row in exact[:exact_bound]
@@ -368,6 +394,14 @@ class TaskEvidenceRetrievalMixin:
                 )
                 else "canonical-then-bounded-natural-language"
             )
+        if requested_keys:
+            retrieval["results"] = sorted(
+                retrieval["results"],
+                key=lambda row: (
+                    self._task_evidence_requested_locator_key(row) not in requested_keys
+                ),
+            )
+            retrieval["ordering"] = "requested-identifiers-then-retrieval-relevance"
         self._task_evidence_attach_class_declarations(result)
         self._task_evidence_attach_enclosing_functions(result)
         self._task_evidence_attach_candidate_verifiers(result, task)
