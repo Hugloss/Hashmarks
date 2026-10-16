@@ -13,8 +13,18 @@ map for aggregation.
 `backend-messaging-v2` adds thirteen distinct upstream changes across aiokafka,
 aio-pika and FastStream. Its 26 source archives are new nominations, not variants
 of the original workflows. See [the messaging source review](suites/messaging/README.md).
-The campaign now declares 49 entries; semantic review, executable witness
-membership and observed results still govern qualification.
+`backend-transaction-v2` adds twelve transaction/persistence workflows across
+SQLAlchemy, databases and Litestar; one problem overlaps the original corpus.
+See [the transaction source review](suites/transaction/README.md).
+
+`backend-language-v2` pairs six existing Python problems with six new TypeScript
+problems across Fastify, Hono and NestJS. See
+[the language source review](suites/language/README.md). Declaration-only
+TypeScript contracts are distinguished from runtime implementations.
+
+The campaign declares 73 entries representing 57 distinct upstream problems
+across six suites. Reuse adds no distinct problem. Semantic review, executable
+witness membership and observed results still govern qualification.
 
 The model grader now separates `task_source_labels` from native `source_labels`.
 Task labels cover production and verification members at both revisions without

@@ -1092,6 +1092,8 @@ class VerificationMixin(VerificationOwnershipMixin):
     @staticmethod
     def _verification_disclosure_order(
         candidates: Sequence[dict[str, object]],
+        *,
+        task_candidates: Sequence[dict[str, object]] | None = None,
     ) -> list[dict[str, object]]:
         """Retain task retrieval alongside reference discovery in bounded replies.
 
@@ -1100,15 +1102,23 @@ class VerificationMixin(VerificationOwnershipMixin):
         the two existing orders for disclosure only; selection and reference
         qualification have already finished and are not re-decided here.
         """
-        task_candidates = sorted(
-            (row for row in candidates if isinstance(row.get("canonical_rank"), int)),
-            key=lambda row: cast("int", row["canonical_rank"]),
+        task_order = (
+            list(task_candidates)
+            if task_candidates is not None
+            else sorted(
+                (
+                    row
+                    for row in candidates
+                    if isinstance(row.get("canonical_rank"), int)
+                ),
+                key=lambda row: cast("int", row["canonical_rank"]),
+            )
         )
         ordered: dict[str, dict[str, object]] = {}
         for index, row in enumerate(candidates):
             ordered.setdefault(str(row["path"]), row)
-            if index < len(task_candidates):
-                task_row = task_candidates[index]
+            if index < len(task_order):
+                task_row = task_order[index]
                 ordered.setdefault(str(task_row["path"]), task_row)
         return list(ordered.values())
 

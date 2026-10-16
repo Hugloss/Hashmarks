@@ -428,16 +428,13 @@ class TaskEvidenceScopedMethodMixin:
     def _task_evidence_attach_candidate_verifiers(
         self, packet: TaskEvidenceDraft, task: str
     ) -> None:
-        """Disclose test candidates without altering unresolved edit/verify selection."""
+        """Disclose source-bound test candidates without altering edit/verify selection."""
         from .repository_domains import RepositoryDomain, classify_repository_path
         from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 
         codemap = cast("CodeMap", self)
-        ownership = packet["ownership"]
         retrieval = packet["retrieval"]
         verification = packet["verification"]
-        if not isinstance(ownership, dict) or ownership.get("owner") is not None:
-            return
         if not isinstance(retrieval, dict) or not isinstance(verification, dict):
             return
         relevance = verification.get("relevance")
@@ -484,6 +481,12 @@ class TaskEvidenceScopedMethodMixin:
             by_path.values(),
             key=codemap._task_evidence_candidate_verifier_score,
             reverse=True,
+        )
+        ordered = codemap._verification_disclosure_order(
+            ordered,
+            task_candidates=[
+                by_path[str(row["path"])] for row in relevance.get("candidates", [])
+            ],
         )
         limit = VERIFICATION_RELEVANCE_DEFAULTS.candidate_limit
         relevance["candidates"] = [

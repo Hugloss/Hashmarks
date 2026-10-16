@@ -8,7 +8,10 @@ import pytest
 from contract_assertions import assert_object
 
 from hashmarks.codemap import CodeMap
-from hashmarks.codemap.task_evidence_contract import read_initial_projection
+from hashmarks.codemap.task_evidence_contract import (
+    read_initial_projection,
+    read_task_evidence,
+)
 from hashmarks.codemap.task_evidence_initial import decode_initial_packet
 from scripts.repository_evaluation.backend_transport import capture_cli, capture_mcp
 
@@ -121,6 +124,49 @@ def test_denied_requested_target_is_not_disclosed_by_ordering(tmp_path: Path) ->
         packet = codemap.task_evidence(_TASK)
     assert all(row["path"] != "transport.py" for row in packet["retrieval"]["results"])
     assert packet["ownership"]["owner"] is None
+
+
+@pytest.mark.parametrize("result_mode", ["default", "initial"])
+def test_literal_path_precedes_same_named_methods_without_unique_ownership(
+    tmp_path: Path, result_mode: str
+) -> None:
+    (tmp_path / "repository").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "repository/z_async.py").write_text(
+        "class BatchRepository:\n"
+        "    async def delete_many(self, values): return values\n"
+    )
+    for index in range(12):
+        (tmp_path / f"repository/other_{index:02}.py").write_text(
+            f"class OtherRepository{index}:\n"
+            "    def delete_many(self, values): return values\n"
+        )
+        (tmp_path / f"tests/test_get_session_data_async_{index:02}.py").write_text(
+            "# declared chunk sizing persistence batches data repository\n"
+            "def get_session_data_async(repository): return repository.delete_many([])\n"
+        )
+    task = (
+        "Inspect declared chunk sizing for delete_many persistence batches "
+        "in BatchRepository. Source: repository/z_async.py"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(task)
+        packet = codemap.task_evidence(task, result_mode=result_mode)
+    observed = (
+        read_initial_projection(decode_initial_packet(packet))
+        if result_mode == "initial"
+        else read_task_evidence(packet)
+    )
+    assert observed["explicit_target"]["path"] == "repository/z_async.py"
+    assert observed["retrieval"]["results"][0]["path"] == "repository/z_async.py"
+    assert observed["retrieval"]["ownership_authority"] is False
+    assert observed["ownership"]["owner"] is None
+    assert action["admitted_edit"] is None
+    assert (
+        observed["ownership"]["authority_proof_identity"]
+        == action["ownership_authority"]["authority_proof_identity"]
+    )
 
 
 def _check_initial_transport(root: Path, transport: str, ambiguous: bool) -> None:

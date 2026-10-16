@@ -9,8 +9,11 @@ The successor definition is
 It began with 36 entries, 27 distinct upstream problems and eight
 capability tags from the original campaign. The messaging intake extends this
 to 49 entries and 40 distinct upstream problems. Transaction/persistence intake
-extends it to 61 entries and 51 distinct problems across five suites. Copying a
-suite adds no evidence.
+extends it to 61 entries and 51 distinct problems across five suites. Language
+intake adds twelve entries, six new upstream problems and three new repositories:
+the current campaign has 73 entries and 57 distinct problems across six suites.
+Its language catalog has six Python and six TypeScript cases over twenty-four
+source trees. Copying a suite or reusing a problem adds no distinct evidence.
 The original campaign remains historical. The active schemas remain workflow
 v2, campaign v4 and matrix v5. Additional capability membership is admitted only
 after source review and executable witness proof.
@@ -526,8 +529,9 @@ through API/CLI/official MCP at both revisions. Both pass all ten recorded
 workflow gates and expose `test_repo_bigint.py`; initial compact/text responses
 peak at 3,469 tokens. `transaction-helper-native-01` regenerates both native
 specimens, with every binding/definition/stale-reopen/transport gate passing.
-These subset summaries correctly remain INCOMPLETE for missing suite members;
-they do not qualify capability 14 or independently review its semantics.
+The native subset summary correctly remains INCOMPLETE for missing suite members.
+The public report was subsequently expanded, as recorded below. Neither report
+qualifies capability 14 or independently reviews its semantics.
 
 The earlier ordering-only observer
 `sha256:1ea8dba5badf81508c822829fb449b1336015877dd7e21144c38f8d8a40fae8b`
@@ -536,10 +540,14 @@ under `genuine-after`, with fresh native specimens under `native-after`.
 Initial compact/text responses peak at 3,306 tokens. The combined candidate's
 four-case messaging reacquisition under `ordering-with-helper-public-01` also
 passes all ten gates for every case, with initial compact/text responses peaking
-at 3,333 tokens. Both public acquisitions are now expanded to their full original
-suite populations, reusing only matching completed receipts. Until those runs
-finish, inspect terminal per-workflow receipts rather than the earlier subset
-summary; do not count in-flight observations as completed evidence.
+at 3,333 tokens. Both public acquisitions then completed their full original
+suite populations, reusing only matching completed receipts. Messaging completes
+thirteen cases, eleven passing every recorded gate; cancellation and batch-nack
+lose their reviewed verifiers. Transactions complete twelve cases, ten passing
+every gate; prepared-commit misses its verifier and delete-many misses owner
+top-three/initial evidence. Both summaries are FAIL. Authority, freshness,
+revision and initial-size gates pass throughout both populations; maximum
+initial compact/text replies are 3,462 and 3,833 tokens respectively.
 
 `verification-ring-helpers-01.log` records 114 passing focused regressions;
 `explicit-transport-helpers-01.log` records ten passing disclosure/transport
@@ -575,6 +583,125 @@ ordering patch. Ten catalogs, independent capability/display/adversarial review,
 required witness families, full typing, exact deterministic regression membership,
 unseen holdouts and final artifact qualification remain open. No 5/5 completion
 or saturation is claimed.
+
+### Disclosure interaction checkpoint: 2026-10-16, base `02fdbd5`
+
+The prior checkpoint's work was committed externally as `02fdbd5`; that commit
+did not change its measured observer bytes. The full-population failures expose
+two further generic disclosure interactions, each reproduced before repair in
+neutral repositories:
+
+- Candidate enrichment stopped when an edit owner was established. The same
+  non-authoritative source/test evidence is useful for established and unresolved
+  owners. Removing that early return leaves edit and verification selection
+  unchanged. The cancellation workflow then passes all ten public gates, and
+  prepared-commit retrieves its engine verifier in the API-only iteration.
+- Source-reference enrichment re-sorted the bounded task candidates and could
+  displace an already observed behavior test with broad module-reference tests.
+  It now reuses the existing verification disclosure owner to interleave the
+  original task order and the source-reference order. Population/omission counts,
+  independent selection and unresolved reference identity remain unchanged.
+
+Literal-path disclosure also preserves an already resolved file locator ahead
+of same-named methods from other files when the task has no qualified method.
+The same order supplies the bounded natural-language candidate paths. This is
+source disclosure only; ambiguous ownership stays ambiguous. Qualified method
+requests retain their more specific ordering.
+
+The repaired observer is
+`sha256:ac5a2520f4a3589b2b0a13a0103dddf429d5a20213dc0eb6c6948a3f2f70454a`.
+The evaluator/oracles remain unchanged. `verification-ring-fanout-01.log`
+records 116 passing focused regressions, `explicit-fanout-transport-01.log`
+records twelve passing API/CLI/official-MCP disclosure tests without skips, and
+`adjacent-literal-01.log` records 134 passing adjacent/boundary tests. All three
+modified production owners and both test files pass scoped Ty/Pyright.
+`preflight-fanout-01.log` passes full Ruff, formatting, hygiene, complexity and
+file-size checks. Full typing remains open under its preceding measurement.
+
+Fresh public checks of both messaging failures and both transaction failures
+complete under `fanout-messaging-public-01` and `fanout-transaction-public-01`.
+Both transaction cases pass all ten gates. Messaging then completes all thirteen
+cases, every recorded workflow gate passing, with initial compact/text replies
+peaking at 3,453 tokens. Fresh native acquisition passes all thirteen messaging
+and all twelve transaction specimens under `fanout-*-native-01`, with matching
+capture roots and no missing workflows. Transaction public membership still has
+ten missing cases for this observer. The partial aggregate admits all four
+reports without rejection and remains INCOMPLETE for missing populations/proof.
+These reports bind `ac5a2520…`, before the subsequent optimization below.
+
+The bounded source candidate at `source-candidate-helpers-01/source.zip` contains
+1,106 members, including untracked tests and preserved modes, with SHA-256
+`e305d0704fab6237322b6ab3551293494f1e6bf3d9ddb9b3ab4aa0139db5e649`.
+Its independent extraction proves import origin and exact observer identity,
+and passes 164 focused tests including actual CLI/MCP and native-LSP regressions.
+That artifact binds the earlier `7dc0bebe…` observer, not this subsequent repair.
+Do not describe it as current final artifact qualification.
+
+### AST economics and language intake: 2026-10-16
+
+The genuine prepared-commit query reveals repeated full-module AST walks in
+filesystem-lifecycle call resolution. One instrumented initial query performs
+422 local-binding lookups and spends about 34 seconds in lifecycle analysis.
+The classification is KEEP COHESIVE: this is syntax acceleration in the existing
+AST snapshot and structural-locality owners, without a responsibility extraction.
+`PythonAstSnapshot` now lazily indexes function declarations by name. The index
+belongs to that exact stable-read snapshot, retains duplicate/nested/async
+declarations and has no separate cache lifetime or repository authority.
+Structural locality reuses it while preserving its conservative short-name
+ambiguity rule and local-binding checks.
+
+The optimized observer is
+`sha256:567428497fbb6fbbb96268b435a99975c103b4c4040ebe890fa35dd9a5d9e379`.
+The 77-test AST/locality/lifecycle ring passes, including same-size rewrite and
+duplicate-declaration regressions. The AST owner and new tests pass Ty/Pyright.
+Structural-locality's 24 pre-existing typing diagnostics remain open; scoped
+success elsewhere does not imply that owner or full project typing is green.
+
+Nine-sample measurements of the same initial operation report median 7.82s
+before and 2.80s after; the independent before-version repeat reports 7.32s.
+Both same-version nine-pair controls are ADMITTED with stable semantics. The
+strict whole-packet fingerprint differs because producer-bound context and
+derived packet identities change. Retained decoded comparisons show all other
+initial facts equal; full packets differ only in context/packet identity and
+the lifecycle producer identity/derived observation identity. Both contexts
+validate through their existing owner against their own frozen implementation.
+Do not weaken or relabel the strict comparison as WIN. This is one measured
+operation, not complete capability-20 economics qualification.
+
+Measurements and packet differences are under `prepared-*` and `ast-index-*`
+in the same output root. `source-before-ast-optimization/source.zip` freezes
+the prior `ac5a2520…` bytes (SHA-256
+`6c75f78896313e97c5ccc2a477d33d52b141f934aa8ede63577423b61e334759`),
+including the future AST-index probes that intentionally fail on that version.
+The before repeat runs from its independent extraction with checked import
+origin. Its first attempt lacked the normal writable cache environment and is
+an environment-incomplete run; `prepared-profile-before-repeat-02` is the
+completed repeat. Current full messaging and transaction public acquisition is
+under `ast-index-*-public-01`; native and artifact proof must also bind these
+optimized bytes before claiming current qualification.
+
+Typing repairs narrow the handler-input and native runner/witness tests without
+casts, ignores or added Any. Their two focused rings each pass thirteen tests;
+all three files pass Ty/Pyright. The last full measurement before the AST
+optimization reports 3,316 Ty diagnostics and 3,324 Pyright errors. The AST
+cache's previously undefined Any return annotation is also repaired using its
+native return type; full typing must be refreshed before reporting a new count.
+
+The language catalog now admits twelve distinct workflows across six repositories:
+six retained Python problems and six newly pinned TypeScript problems from
+Fastify, Hono and Nest. Independent TypeScript-parser ranges and exact source/test
+bytes were frozen before any Hashmarks measurement of those cases. Fastify's
+cases are TypeScript declarations, not TypeScript runtime implementations.
+One Nest case includes a genuine added integration-test file. All capability-19
+review flags remain false; executable language parity, full witness membership,
+semantic/display review, fresh native/public proof and heldouts remain open.
+See `suites/language/README.md` for exact commits, scope and three reserved
+unseen TypeScript holdouts. Source admission alone never qualifies capability 19.
+
+Nine entire catalogs remain missing: 2, 4, 8, 9, 11, 15, 16, 18 and 20.
+Independent oracles, missing witness families, current complete populations,
+full typing, deterministic regressions, unseen holdouts and final artifact
+qualification remain required. No capability is claimed at 5/5.
 
 ### T00: baseline and prerequisites
 
@@ -648,9 +775,10 @@ member. Unsupported/ambiguous producer output remains unresolved.
 ### T07: missing catalogs
 
 The messaging source catalog has thirteen problems across three repositories;
-the transaction/persistence catalog has twelve across three. Their incomplete
-qualification is detailed above. The other ten catalogs still require genuine
-source intake.
+the transaction/persistence catalog has twelve across three. The language
+catalog has twelve across six, balanced between Python and TypeScript.
+Their incomplete qualification is detailed above. The other nine catalogs
+still require genuine source intake.
 
 Each catalog targets four genuine problems per repository in the initial pool.
 Inspect source history from recorded revisions; pin exact before/after archives;

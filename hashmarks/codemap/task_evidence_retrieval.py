@@ -219,6 +219,10 @@ class TaskEvidenceRetrievalMixin:
             end_line=optional_line("end_line"),
             evidence_visibility=visibility,
         ).as_dict()
+        # SearchHit's public wire shape uses `lines`; retrieval locators consume
+        # explicit endpoints. Retain both when adapting an indexed declaration.
+        row["start_line"] = optional_line("start_line")
+        row["end_line"] = optional_line("end_line")
         row["retrieval_supplement"] = "bounded-natural-language"
         row["score_basis"] = "natural-identifier-phrase-relevance"
         return row
@@ -321,22 +325,20 @@ class TaskEvidenceRetrievalMixin:
         # A structural file/class owner is not a reason to hide an explicitly
         # named declaration. Reuse exact identity resolution for locators only;
         # these rows never change the independently selected edit/test owner.
-        exact_terms = tuple(
-            term
-            for term in self._task_action_exact_identifier_terms(task)
-            if "." in term
-        )
-        exact, exact_complete = self._task_action_qualified_identifier_index_evidence(
-            exact_terms, set(), canonical_rank=len(current) + 1
-        )
         explicit = result["explicit_target"]
         literal_path = explicit["path"] if explicit["basis"] == "literal-path" else None
-        exact = [
-            row for row in exact if not literal_path or row.get("path") == literal_path
-        ]
+        exact, exact_complete, exact_terms = self._task_evidence_requested_identifiers(
+            task, literal_path, canonical_rank=len(current) + 1
+        )
         requested_keys = {
             self._task_evidence_requested_locator_key(row) for row in exact
         }
+        if not requested_keys and literal_path:
+            requested_keys.update(
+                self._task_evidence_requested_locator_key(row)
+                for row in rows
+                if row.get("path") == literal_path
+            )
         # Qualifying an explicit locator changes disclosure order only. Preserve
         # all matching identities when the request has multiple declarations;
         # neither ordering nor the return bound establishes a unique owner.
@@ -360,16 +362,21 @@ class TaskEvidenceRetrievalMixin:
         ]
         exact_bound = min(2, limit)
         supplements = [
-            {**row, "retrieval_supplement": "exact-qualified-identifier"}
+            {
+                **row,
+                "retrieval_supplement": row.get(
+                    "retrieval_supplement", "exact-qualified-identifier"
+                ),
+            }
             for row in exact[:exact_bound]
         ]
         natural = self._task_evidence_natural_retrieval_supplements(
             task,
-            [*rows, *supplements],
+            [*current, *supplements],
             limit=limit,
         )
         supplements.extend(natural[: 2 - len(supplements)])
-        if exact_terms:
+        if exact_terms or literal_path:
             retrieval["exact_identifier_supplements"] = {
                 "observed": len(exact),
                 "returned": min(len(exact), exact_bound),
@@ -405,3 +412,79 @@ class TaskEvidenceRetrievalMixin:
         self._task_evidence_attach_class_declarations(result)
         self._task_evidence_attach_enclosing_functions(result)
         self._task_evidence_attach_candidate_verifiers(result, task)
+
+    def _task_evidence_requested_identifiers(
+        self,
+        task: str,
+        literal_path: str | None,
+        *,
+        canonical_rank: int,
+    ) -> tuple[list[dict[str, object]], bool, tuple[str, ...]]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        terms = tuple(
+            term
+            for term in self._task_action_exact_identifier_terms(task)
+            if "." in term
+        )
+        exact, complete = self._task_action_qualified_identifier_index_evidence(
+            terms, set(), canonical_rank=canonical_rank
+        )
+        if literal_path is None:
+            return exact, complete, terms
+        exact = [row for row in exact if row.get("path") == literal_path]
+        known = {self._task_evidence_requested_locator_key(row) for row in exact}
+        exact.extend(
+            row
+            for row in self._task_evidence_literal_identifier_supplements(
+                task, literal_path
+            )
+            if self._task_evidence_requested_locator_key(row) not in known
+        )
+        return exact, complete, terms
+
+    def _task_evidence_literal_identifier_supplements(
+        self, task: str, path: str
+    ) -> list[dict[str, object]]:
+        """Disclose literal name matches within the caller's file, never owners."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        if not self._task_evidence_declaration_visible(
+            path
+        ) or not self._indexed_path_current(path):
+            return []
+        # Retain common identifiers and private-member syntax for disclosure.
+        # The action owner keeps its stricter rules for ownership admission.
+        terms = {
+            term.lower()
+            for term in re.findall(
+                r"[A-Za-z_$][\w$]*(?:\.#?[A-Za-z_$][\w$]*)*",
+                task.replace(path, " "),
+            )
+        }
+        symbols = [
+            symbol
+            for symbol in self._session_symbols_for_path(path)
+            if terms.intersection(
+                str(symbol.get(key) or "").lower() for key in ("name", "qualname")
+            )
+        ]
+        symbols.sort(
+            key=lambda symbol: (
+                str(symbol.get("qualname") or "").lower() not in terms,
+                line if isinstance(line := symbol.get("start_line"), int) else 0,
+                str(symbol.get("qualname") or ""),
+            )
+        )
+        visibility = self._task_evidence_visibility(path)
+        assert visibility is not None
+        return [
+            {
+                **self._task_evidence_supplement_row(
+                    path, symbol, score=0, visibility=visibility
+                ),
+                "retrieval_supplement": "literal-identifier-in-requested-file",
+                "score_basis": "literal-identifier-in-requested-file",
+            }
+            for symbol in symbols
+        ]

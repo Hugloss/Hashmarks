@@ -115,3 +115,77 @@ def test_fixture_module_cannot_supply_an_unqualified_reference(
                 )
     assert packet["verification"]["selected"] == action["verify"]
     assert packet["ownership"]["owner"] == action["admitted_edit"]
+
+
+def test_established_edit_owner_keeps_reference_backed_test_candidates(
+    tmp_path: Path,
+) -> None:
+    _repository(tmp_path)
+    (tmp_path / "tests/models.py").write_text(
+        "from service import RepositoryBase\n"
+        "class FixtureRepository(RepositoryBase): pass\n"
+        "def persist_request(repository): return FixtureRepository()\n"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(_TASK)
+        packet = codemap.task_evidence(_TASK)
+    assert action["admitted_edit"] is not None
+    assert packet["ownership"]["owner"] == action["admitted_edit"]
+    assert packet["verification"]["selected"] == action["verify"]
+    candidate = next(
+        row
+        for row in packet["verification"]["relevance"]["candidates"]
+        if row["path"] == "tests/test_zzz_flow.py"
+    )
+    assert candidate.get("verification_selection_authority") is False
+    assert candidate.get("edit_relationship") == "unestablished"
+
+
+def test_source_reference_fanout_preserves_the_observed_behavior_test(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "service.py").write_text(
+        "class Stream:\n    def nack(self): return None\n"
+    )
+    (tmp_path / "tests").mkdir()
+    expected = "tests/test_consume.py"
+    (tmp_path / expected).write_text(
+        "def test_batch_nack_seek(message): message.nack()\n"
+    )
+    (tmp_path / "tests/test_message_batch_nack_seek.py").write_text(
+        "from service import Stream\n"
+        "def test_message_batch_nack_seek(): Stream.nack(None)\n"
+    )
+    for index in range(12):
+        (tmp_path / f"helper_{index:02}.py").write_text(
+            f"from service import Stream\ndef make_{index}(): return Stream()\n"
+        )
+        (tmp_path / f"tests/test_smoke_{index:02}.py").write_text(
+            f"from helper_{index:02} import make_{index}\n"
+            f"def test_smoke(): make_{index}()\n"
+        )
+    task = "Inspect the message source for a batch nack seek in Stream.nack. Source: service.py"
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(task)
+        packet = codemap.task_evidence(task)
+    assert any(
+        row["path"] == expected
+        for row in action["verification_relevance"]["candidates"]
+    )
+    assert action["verify"] is not None and action["verify"]["path"] != expected
+    assert any(
+        row.get("candidate_origin") == "indexed-source-candidate-disclosure"
+        and row.get("indirect_reference") is True
+        for row in packet["verification"]["relevance"]["candidates"]
+    )
+    candidate = next(
+        row
+        for row in packet["verification"]["relevance"]["candidates"]
+        if row["path"] == expected
+    )
+    assert candidate.get("direct_reference") is False
+    assert candidate.get("indirect_reference") is False
+    assert packet["ownership"]["owner"] == action["admitted_edit"]
+    assert packet["verification"]["selected"] == action["verify"]

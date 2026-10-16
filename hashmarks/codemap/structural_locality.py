@@ -222,16 +222,11 @@ class StructuralLocalityMixin:
         if not path.endswith(".py") or not source or not name:
             return False
         try:
-            tree = read_python_ast(self.workspace / path, errors="replace").tree
+            snapshot = read_python_ast(self.workspace / path, errors="replace")
         except (OSError, SyntaxError, UnicodeError, ValueError):
             return True
         function_name = source.rsplit(".", 1)[-1]
-        matching = [
-            node
-            for node in ast.walk(tree)
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-            and node.name == function_name
-        ]
+        matching = snapshot.function_definitions_by_name.get(function_name, ())
         if len(matching) != 1:
             return True
         function = matching[0]

@@ -124,6 +124,26 @@
         "litestar-repository-auto-commit",
         "litestar-delete-many-chunking"
       ]
+    },
+    {
+      "grader_sha256": "63b074001905835ca42a2e55a194e4c8c222c9d9aaec3eb8ed08510072eb6342",
+      "id": "backend-language-v2",
+      "suite_file": "suites/language/suite.json",
+      "suite_sha256": "c1cd54d9b27f914007bb067c61e8a1ba18a11e88190a4d9828ac57e17cd7d65f",
+      "workflow_ids": [
+        "aiokafka-commit-timeout",
+        "aiokafka-commit-refresh-order",
+        "faststream-ack-cancellation",
+        "faststream-batch-nack",
+        "sqlalchemy-logging-token-reset",
+        "sqlalchemy-aggregate-strings",
+        "fastify-route-hook-this",
+        "fastify-http2-false",
+        "hono-some-response",
+        "hono-cached-body-media-type",
+        "nest-param-promise",
+        "nest-redirect-result"
+      ]
     }
   ]
 }

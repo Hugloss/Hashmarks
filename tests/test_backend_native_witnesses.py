@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import TypeAlias
 
 import pytest
 
@@ -14,21 +15,32 @@ from scripts.repository_evaluation.backend_native_witnesses import (
 from scripts.repository_evaluation.backend_transport import _capture
 from scripts.repository_evaluation.common import write_json
 
+NativeObservations: TypeAlias = tuple[
+    dict[str, object], dict[str, object], dict[str, Path], Path
+]
+
 
 @pytest.fixture
 def native_observations(
     tmp_path: Path,
-) -> tuple[dict[str, Any], dict[str, Any], dict[str, Path], Path]:
+) -> NativeObservations:
     output = tmp_path / "observations"
-    sources = {}
-    workflow = {"id": "handler", "repository": "repo", "before": "old", "after": "new"}
-    rule = {"source_labels": {}, "native_oracles": {}}
+    sources: dict[str, Path] = {}
+    workflow: dict[str, object] = {
+        "id": "handler",
+        "repository": "repo",
+        "before": "old",
+        "after": "new",
+    }
+    labels: dict[str, list[dict[str, str]]] = {}
+    oracles: dict[str, dict[str, object]] = {}
+    rule: dict[str, object] = {"source_labels": labels, "native_oracles": oracles}
     for stage, name, value in (("before", "old", 1), ("after", "new", 2)):
         source = tmp_path / name
         source.mkdir()
         (source / "backend.py").write_text(f"def handler():\n    return {value}\n")
         sources[name] = source
-        rule["source_labels"][stage] = [{"path": "backend.py", "symbol": "handler"}]
+        labels[stage] = [{"path": "backend.py", "symbol": "handler"}]
         packet = {
             "target": "backend.py::handler",
             "negative_evidence_admissible": False,
@@ -47,7 +59,7 @@ def native_observations(
         write_json(
             output / stage / "definition-token.json", {"unique_definition_token": True}
         )
-        rule["native_oracles"][stage] = {
+        oracles[stage] = {
             "backend.py::handler": {
                 "checks": [
                     {
@@ -73,7 +85,7 @@ def native_observations(
 
 
 def test_native_facts_retain_source_stage_target_and_actual_artifact(
-    native_observations: tuple[dict[str, Any], dict[str, Any], dict[str, Path], Path],
+    native_observations: NativeObservations,
 ) -> None:
     witnesses = native_fact_witnesses(*native_observations)
     assert native_witness_gate(witnesses) is True
@@ -103,7 +115,7 @@ def test_native_facts_retain_source_stage_target_and_actual_artifact(
 
 
 def test_wrong_native_endpoint_cannot_hide_behind_other_passing_targets(
-    native_observations: tuple[dict[str, Any], dict[str, Any], dict[str, Path], Path],
+    native_observations: NativeObservations,
 ) -> None:
     workflow, rule, sources, output = native_observations
     write_json(output / "after/api.json", {"target": "other.py::handler"})
@@ -114,7 +126,7 @@ def test_wrong_native_endpoint_cannot_hide_behind_other_passing_targets(
 
 
 def test_missing_native_artifact_cannot_preserve_a_fact_pass(
-    native_observations: tuple[dict[str, Any], dict[str, Any], dict[str, Path], Path],
+    native_observations: NativeObservations,
 ) -> None:
     native_observations[3].joinpath("after/api.json").unlink()
     with pytest.raises(ValueError, match="not a repository file"):
@@ -123,7 +135,7 @@ def test_missing_native_artifact_cannot_preserve_a_fact_pass(
 
 
 def test_definition_boolean_cannot_be_replaced_with_an_integer(
-    native_observations: tuple[dict[str, Any], dict[str, Any], dict[str, Path], Path],
+    native_observations: NativeObservations,
 ) -> None:
     write_json(
         native_observations[3] / "after/definition-token.json",

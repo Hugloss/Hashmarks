@@ -364,7 +364,16 @@ def _owner_authority_safe(packet: dict[str, Any], rule: dict[str, Any]) -> bool 
         if oracle["scope"] == "file"
         else ("path", "qualname", "start_line", "end_line")
     )
-    return all(owner.get(key) == oracle["candidates"][0][key] for key in fields)
+    # A coarse file locator does not assert the finer symbol facts. Missing
+    # precision remains incomplete; any contradictory fact still fails.
+    return combine_required(
+        [
+            None
+            if owner.get(key) is None
+            else owner[key] == oracle["candidates"][0][key]
+            for key in fields
+        ]
+    )
 
 
 def _declaration_locators(row: Mapping[str, Any]) -> list[dict[str, Any]]:

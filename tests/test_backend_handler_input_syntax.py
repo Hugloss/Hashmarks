@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from contract_assertions import assert_object, assert_records
 
 from hashmarks.codemap import ChangeImpactOptions, CodeMap
 from hashmarks.codemap.handler_input_syntax import MAX_HANDLER_PARAMETERS
@@ -27,9 +29,17 @@ def _write(root: Path, content: str) -> None:
 
 
 def _input(result: dict[str, object]) -> dict[str, object]:
-    return result["changed_line_evidence"]["observations"][0]["decorator_associations"][
-        "associations"
-    ][0]["handler_input_context"]
+    evidence = assert_object(result["changed_line_evidence"])
+    observation = assert_records(evidence["observations"])[0]
+    decorators = assert_object(observation["decorator_associations"])
+    association = assert_records(decorators["associations"])[0]
+    return assert_object(association["handler_input_context"])
+
+
+def _declaration_value(result: dict[str, object]) -> dict[str, object]:
+    declarations = assert_object(result["declarations"])
+    group = assert_records(declarations["groups"])[0]
+    return assert_object(assert_records(group["declarations"])[0]["value"])
 
 
 def _change(cm: CodeMap) -> dict[str, object]:
@@ -74,8 +84,8 @@ def test_shared_input_oracle_and_default_declaration_identity(tmp_path: Path) ->
         explicit = _provider(cm, enabled=True)
         changed = _change(cm)
         plain = cm.task_change_impact(TASK, [PATH])
-    base_value = default["declarations"]["groups"][0]["declarations"][0]["value"]
-    with_input = explicit["declarations"]["groups"][0]["declarations"][0]["value"]
+    base_value = _declaration_value(default)
+    with_input = _declaration_value(explicit)
     assert "static_input_syntax" not in base_value
     assert with_input["static_input_syntax"] == _input(changed)
     assert "changed_line_evidence" not in plain
@@ -91,7 +101,7 @@ def test_shared_input_oracle_and_default_declaration_identity(tmp_path: Path) ->
     assert input_syntax["cross_artifact_correspondence"] == "unresolved"
     assert input_syntax["dependency_resolution"] == "not-established"
     assert input_syntax["negative_evidence_admissible"] is False
-    params = input_syntax["parameters"]
+    params = assert_records(input_syntax["parameters"])
     assert [p["name"] for p in params] == ["payload", "actor", "limit", "token"]
     assert [p["kind"] for p in params] == [
         "positional-or-keyword",
@@ -99,20 +109,32 @@ def test_shared_input_oracle_and_default_declaration_identity(tmp_path: Path) ->
         "keyword-only",
         "keyword-only",
     ]
-    assert params[0]["annotation"]["text"] == "Payload"
-    assert params[1]["annotation"]["text"] == "Annotated[str, Depends(authorize)]"
-    meta = params[1]["annotated_metadata"]
+    assert assert_object(params[0]["annotation"])["text"] == "Payload"
+    assert (
+        assert_object(params[1]["annotation"])["text"]
+        == "Annotated[str, Depends(authorize)]"
+    )
+    meta = assert_object(params[1]["annotated_metadata"])
     assert meta["state"] == "direct-annotated-metadata-syntax"
-    assert meta["sites"][0]["callee"] == {"state": "name-syntax", "name": "Depends"}
-    assert meta["sites"][0]["first_argument_reference"] == {
+    assert assert_records(meta["sites"])[0]["callee"] == {
+        "state": "name-syntax",
+        "name": "Depends",
+    }
+    assert assert_records(meta["sites"])[0]["first_argument_reference"] == {
         "state": "name-syntax",
         "name": "authorize",
     }
-    assert params[2]["default"]["callee"] == {"state": "name-syntax", "name": "Query"}
-    assert params[2]["default"]["keyword_names"] == ["ge"]
-    assert params[3]["default"]["callee"] == {"state": "name-syntax", "name": "Header"}
-    assert params[3]["default"]["keyword_names"] == ["default"]
-    assert input_syntax["return_annotation"]["text"] == "dict[str, int]"
+    assert assert_object(params[2]["default"])["callee"] == {
+        "state": "name-syntax",
+        "name": "Query",
+    }
+    assert assert_object(params[2]["default"])["keyword_names"] == ["ge"]
+    assert assert_object(params[3]["default"])["callee"] == {
+        "state": "name-syntax",
+        "name": "Header",
+    }
+    assert assert_object(params[3]["default"])["keyword_names"] == ["default"]
+    assert assert_object(input_syntax["return_annotation"])["text"] == "dict[str, int]"
     assert (
         validate_evidence_presentation(
             changed,
@@ -133,7 +155,7 @@ def test_positional_defaults_and_keyword_kinds_are_not_inferred(tmp_path: Path) 
     with CodeMap(tmp_path) as cm:
         cm.sync()
         result = _input(_change(cm))
-    params = result["parameters"]
+    params = assert_records(result["parameters"])
     assert [x["kind"] for x in params] == [
         "positional-only",
         "positional-or-keyword",
@@ -141,15 +163,15 @@ def test_positional_defaults_and_keyword_kinds_are_not_inferred(tmp_path: Path) 
         "keyword-only",
         "variadic-keyword",
     ]
-    assert [x["default"]["state"] for x in params] == [
+    assert [assert_object(x["default"])["state"] for x in params] == [
         "not-supplied",
         "literal-kind-only",
         "not-supplied",
         "literal-kind-only",
         "not-supplied",
     ]
-    assert params[1]["default"]["kind"] == "integer"
-    assert params[3]["default"]["kind"] == "bool"
+    assert assert_object(params[1]["default"])["kind"] == "integer"
+    assert assert_object(params[3]["default"])["kind"] == "bool"
     assert result["negative_evidence_admissible"] is False
 
 
@@ -167,13 +189,14 @@ def test_default_literals_never_disclose_values_and_dynamic_stays_unknown(
     with CodeMap(tmp_path) as cm:
         cm.sync()
         result = _input(_change(cm))
-    assert result["parameters"][0]["default"] == {
+    params = assert_records(result["parameters"])
+    assert params[0]["default"] == {
         "state": "literal-kind-only",
         "kind": "string",
     }
-    assert result["parameters"][1]["default"] == {"state": "dynamic-or-unsupported"}
-    assert result["parameters"][2]["default"]["state"] == "direct-call-syntax"
-    assert result["parameters"][2]["default"]["has_argument_expansion"] is True
+    assert params[1]["default"] == {"state": "dynamic-or-unsupported"}
+    assert assert_object(params[2]["default"])["state"] == "direct-call-syntax"
+    assert assert_object(params[2]["default"])["has_argument_expansion"] is True
     assert "UNIQUE_SECRET_VALUE" not in str(result)
 
 
@@ -188,13 +211,13 @@ def test_annotated_unknown_metadata_keeps_scope_unresolved(tmp_path: Path) -> No
     with CodeMap(tmp_path) as cm:
         cm.sync()
         result = _input(_change(cm))
-    sites = result["parameters"][0]["annotated_metadata"]
+    sites = assert_object(assert_records(result["parameters"])[0]["annotated_metadata"])
     assert sites["observed_count"] == 5
     assert sites["omitted_count"] == 1
-    assert sites["sites"][0]["first_argument_reference"]["state"] == (
-        "dynamic-or-unsupported"
-    )
-    assert sites["sites"][1]["state"] == "dynamic-or-unsupported"
+    assert assert_object(assert_records(sites["sites"])[0]["first_argument_reference"])[
+        "state"
+    ] == ("dynamic-or-unsupported")
+    assert assert_records(sites["sites"])[1]["state"] == "dynamic-or-unsupported"
     assert sites["dependency_resolution"] == "not-established"
 
 
@@ -219,8 +242,9 @@ def test_overbound_signature_fails_selected_provider_but_not_change_impact(
 @pytest.mark.parametrize("flag", [None, 1, "true", [], {}])
 def test_strict_opt_in_flag_rejected_before_source_reads(flag: object) -> None:
     with pytest.raises(ValueError, match="include_input_contract_syntax"):
-        StaticPythonInterfaceDeclarations(
-            paths=(PATH,), include_input_contract_syntax=flag
+        replace(
+            StaticPythonInterfaceDeclarations(paths=(PATH,)),
+            include_input_contract_syntax=flag,
         )
 
 
@@ -244,7 +268,9 @@ def test_source_visibility_prevents_signature_literal_disclosure(
     with CodeMap(tmp_path) as cm:
         cm.sync()
         result = _change(cm)
-    row = result["changed_line_evidence"]["observations"][0]
+    row = assert_records(
+        assert_object(result["changed_line_evidence"])["observations"]
+    )[0]
     assert row["state"] == "unresolved"
     assert "Annotated[str" not in str(row)
 
@@ -260,6 +286,7 @@ def test_mcp_full_packet_includes_input_syntax_without_new_tool(tmp_path: Path) 
         )
     finally:
         surface.close()
-    assert _input(packet)["parameters"][1]["annotated_metadata"]["state"] == (
+    parameters = assert_records(_input(packet)["parameters"])
+    assert assert_object(parameters[1]["annotated_metadata"])["state"] == (
         "direct-annotated-metadata-syntax"
     )

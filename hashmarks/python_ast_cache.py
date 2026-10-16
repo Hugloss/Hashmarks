@@ -2,9 +2,15 @@ from __future__ import annotations
 
 import ast
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass
-from functools import lru_cache
+from functools import cached_property, lru_cache
 from pathlib import Path
+from types import MappingProxyType
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from functools import _CacheInfo
 
 _FileIdentity = tuple[int, int, int, int, int]
 
@@ -18,6 +24,23 @@ class PythonAstSnapshot:
     source: str
     tree: ast.Module
     identity: _FileIdentity
+
+    @cached_property
+    def function_definitions_by_name(
+        self,
+    ) -> Mapping[str, tuple[ast.FunctionDef | ast.AsyncFunctionDef, ...]]:
+        """Index declarations once in this snapshot, preserving duplicate names.
+
+        This is syntax acceleration only. Callers still own scope qualification,
+        ambiguity and repository freshness; the index is not symbol authority.
+        """
+        definitions: dict[str, list[ast.FunctionDef | ast.AsyncFunctionDef]] = {}
+        for node in ast.walk(self.tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                definitions.setdefault(node.name, []).append(node)
+        return MappingProxyType(
+            {name: tuple(nodes) for name, nodes in definitions.items()}
+        )
 
 
 def _metadata(path: Path) -> _FileIdentity:
@@ -74,7 +97,7 @@ def read_python_ast(
     raise UnstablePythonSourceError(f"could not read stable Python source: {candidate}")
 
 
-def ast_cache_info() -> Any:
+def ast_cache_info() -> _CacheInfo:
     return _cached_snapshot.cache_info()
 
 
