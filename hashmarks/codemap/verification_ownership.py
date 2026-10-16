@@ -257,6 +257,7 @@ class VerificationOwnershipMixin:
                     "truncation",
                     "negative_evidence_admissible",
                     "qualified_identity_ambiguous",
+                    "verifier_identity_ambiguous",
                     "candidate_count",
                     "bounds",
                     "search_bound_reasons",

@@ -166,6 +166,7 @@ class VerificationRelevanceFields(TypedDict):
     search_bound_reasons: NotRequired[list[str]]
     current_canonical_verify: NotRequired[str | None]
     qualified_identity_ambiguous: NotRequired[bool]
+    verifier_identity_ambiguous: NotRequired[bool]
     unresolved_import_identity_paths: NotRequired[list[str]]
     unresolved_reference_identity_paths: NotRequired[list[str]]
     unresolved_reference_identity_omitted_paths: NotRequired[int]

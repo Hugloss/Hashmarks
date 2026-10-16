@@ -39,6 +39,21 @@ For natural-language tasks, `retrieval.results` may end with at most two `retrie
 
 `CodeMap.verification_ownership_graph()` and `hashmarks map verification-ownership` expose existing edit-authority links and bounded verifier candidates through `hashmarks.verification-ownership.v2`. `verification_qualification` retains the underlying relevance observation's authority, completeness, truncation, candidate count and bounds when supplied. Summary `unowned` and `ambiguous` values may be `null` when their observation scope is unknown or incomplete. Empty returned candidates alone cannot establish absence; a hidden, observed second candidate cannot disappear from ambiguity merely because the displayed candidate limit is smaller. These summaries describe repository observations, not verification sufficiency or execution permission.
 
+Verification relevance distinguishes aggregate reference uncertainty
+(`qualified_identity_ambiguous`) from unresolved identity in observed test
+references/imports (`verifier_identity_ambiguous`). The latter is an additive,
+optional boolean, qualified before output bounds and preserved in task evidence,
+initial projections and `verification_qualification`. Integers are not booleans at
+the JSON boundary. A missing scoped qualifier retains the aggregate ambiguity
+veto in task-owner projection.
+
+An unresolved production receiver call remains disclosed and prevents qualified
+verification absence or uniqueness; it does not by itself veto an independently
+established edit owner. Unresolved verifier identity still requires owner
+discrimination. Aggregate uncertainty continues to prevent verification evidence
+from being promoted into decisive owner discrimination. Neither field proves a
+dynamic receiver's type, test sufficiency or execution outcome.
+
 Importable implementation submodules under `hashmarks.*` are **not automatically public** merely because Python allows importing them. Internal helpers, storage classes, parsers, adapters, and mixins may change without compatibility guarantees unless a current public document explicitly promotes them into the contract.
 
 Development material under `scripts/agent_evaluation/`, `benchmarks/agent_evaluation/`, and `tests/` is measurement/evidence infrastructure, not installed product API.

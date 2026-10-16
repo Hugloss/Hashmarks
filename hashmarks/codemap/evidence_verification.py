@@ -71,8 +71,22 @@ class _VerificationRelevanceState:
         default_factory=dict
     )
     unresolved_reference_identity_paths: set[str] = field(default_factory=set)
+    unresolved_verifier_identity_paths: set[str] = field(default_factory=set)
     qualified_attribute_refs: dict[str, set[str]] = field(default_factory=dict)
     lexical_test_paths: tuple[str, ...] | None = None
+
+    def record_unresolved_reference(self, path: str) -> None:
+        """Keep caller uncertainty separate from uncertainty in verifier identity."""
+        self.unresolved_reference_identity_paths.add(path)
+        if RepositoryDomain.TEST in classify_repository_path(path):
+            self.unresolved_verifier_identity_paths.add(path)
+
+    @property
+    def verifier_identity_ambiguous(self) -> bool:
+        return bool(
+            self.unresolved_import_identity_paths
+            or self.unresolved_verifier_identity_paths
+        )
 
 
 class VerificationMixin(VerificationOwnershipMixin):
@@ -359,7 +373,7 @@ class VerificationMixin(VerificationOwnershipMixin):
                         )
                     )
                 ):
-                    state.unresolved_reference_identity_paths.add(ref_path)
+                    state.record_unresolved_reference(ref_path)
         return exact_import_paths, import_resolution_available
 
     def _verification_reference_index_for_path(
@@ -455,18 +469,18 @@ class VerificationMixin(VerificationOwnershipMixin):
                 state, path, target, symbol
             )
             if member is None:
-                state.unresolved_reference_identity_paths.add(path)
+                state.record_unresolved_reference(path)
             return member is True
         alias_owner = self._verification_module_alias_reference_owner_match(
             state, path, target, symbol
         )
         if path.endswith(".py") and "." in target and str(ref.get("kind")) != "import":
             if alias_owner is None:
-                state.unresolved_reference_identity_paths.add(path)
+                state.record_unresolved_reference(path)
             return alias_owner is True
         exact_import_paths, resolution_available = imports
         if path.endswith(".py") and not resolution_available:
-            state.unresolved_reference_identity_paths.add(path)
+            state.record_unresolved_reference(path)
             return False
         return (
             alias_owner
@@ -1184,6 +1198,7 @@ class VerificationMixin(VerificationOwnershipMixin):
             ),
             "current_canonical_verify": state.current_path or None,
             "qualified_identity_ambiguous": identity_ambiguous,
+            "verifier_identity_ambiguous": state.verifier_identity_ambiguous,
             "unresolved_import_identity_paths": (
                 sorted(state.unresolved_import_identity_paths)[:limit]
                 if identity_ambiguous

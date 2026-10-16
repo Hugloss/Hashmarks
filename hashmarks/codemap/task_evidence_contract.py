@@ -252,7 +252,11 @@ def _relevance(value: object, path: str) -> None:
         path,
         bool,
         ("selection_changed", "secret_knowledge_used"),
-        ("negative_evidence_admissible", "qualified_identity_ambiguous"),
+        (
+            "negative_evidence_admissible",
+            "qualified_identity_ambiguous",
+            "verifier_identity_ambiguous",
+        ),
     )
     _fields(
         row,

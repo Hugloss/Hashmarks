@@ -133,6 +133,30 @@ def test_readers_preserve_json_values_and_extension_evidence(
         ),
         ("action", read_task_action_map, ("edit", "start_line"), False),
         (
+            "action",
+            read_task_action_map,
+            ("verification_relevance", "verifier_identity_ambiguous"),
+            1,
+        ),
+        (
+            "action",
+            read_task_action_map,
+            ("verification_relevance", "verifier_identity_ambiguous"),
+            0,
+        ),
+        (
+            "packet",
+            read_task_evidence,
+            ("verification", "relevance", "verifier_identity_ambiguous"),
+            "true",
+        ),
+        (
+            "packet",
+            read_task_evidence,
+            ("verification", "relevance", "verifier_identity_ambiguous"),
+            1.0,
+        ),
+        (
             "packet",
             read_task_evidence,
             ("ownership", "source_budget", "complete"),

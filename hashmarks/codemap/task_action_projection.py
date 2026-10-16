@@ -958,8 +958,14 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         )
         multi_structural_owner_ambiguity = len(task_local_structural_owners) > 1
         competing = self._task_action_competing_rows(choices.edit, context.rows)
-        verification_identity_ambiguity = bool(
-            choices.verification_relevance.get("qualified_identity_ambiguous")
+        # Unqualified production callers cannot veto an independently observed
+        # owner. Keep the aggregate check below when verification discriminates
+        # owners: unresolved callers still prevent proof of verifier uniqueness.
+        verifier_identity_ambiguity = bool(
+            choices.verification_relevance.get(
+                "verifier_identity_ambiguous",
+                choices.verification_relevance.get("qualified_identity_ambiguous"),
+            )
         )
         (
             exact_identifier_ambiguity,
@@ -969,7 +975,12 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             context,
             selection,
             choices,
-            (multi_structural_owner_ambiguity, verification_identity_ambiguity),
+            (
+                multi_structural_owner_ambiguity,
+                bool(
+                    choices.verification_relevance.get("qualified_identity_ambiguous")
+                ),
+            ),
         )
         weak_contract_anchor_ambiguity = self._task_action_weak_contract_ambiguity(
             context,
@@ -1006,7 +1017,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                 exact_search_incomplete,
                 multi_structural_owner_ambiguity,
                 structural_search_incomplete,
-                verification_identity_ambiguity,
+                verifier_identity_ambiguity,
             ),
         )
         return {
@@ -1029,7 +1040,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                     ),
                     (
                         "unresolved-qualified-import-identity",
-                        verification_identity_ambiguity,
+                        verifier_identity_ambiguity,
                     ),
                     (
                         "multiple-exact-identifier-edit-owners",
