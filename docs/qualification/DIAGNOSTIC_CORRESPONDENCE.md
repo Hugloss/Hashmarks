@@ -1,10 +1,13 @@
 # Standalone diagnostic-to-repository correspondence qualification
 
-This receipt covers the Hashmarks-only HM-OBS-01..09 implementation. The starting
-commit is `e36eb3944b3f4501d60225e8a68574e10b13c986`; the candidate is the local
-working tree, not a published release or a merged/reviewed PR. Source identities,
-JUnit hashes, exact selections and environment receipts live in `dist/hm-obs/`.
-That directory is disposable qualification output, excluded from source control.
+This receipt covers the Hashmarks-only HM-OBS-01..09 implementation and its
+subsequent ownership/optional-MCP repairs. The original implementation started at
+`e36eb3944b3f4501d60225e8a68574e10b13c986`. The latest repair starts at
+`8101105e83fddfe8bfc05bb5bc652d12df703112`; its qualification is recorded in the
+final section and `dist/task-owner/closure/qualification.json`. This is source
+qualification, not a published release or a merged/reviewed PR. The original
+`dist/hm-obs/` receipts and archives remain historical. These directories are
+disposable qualification output, excluded from source control.
 The frozen fixture, replay driver and regression tests are committed-source
 artifacts and can regenerate evidence without another repository or service.
 
@@ -106,7 +109,7 @@ The current repair receipt supersedes that count; current validation is recorded
 below. `qualification.json` records exact test IDs rather than summing overlapping runs. JUnit files preserve failed attempts as well as
 corrected reruns; they are never silently relabeled PASS.
 
-Named development batch 6 selected shards 24..27 of the repository's 64-shard
+The historical development batch 6 selected shards 24..27 of the repository's 64-shard
 plan. On the supported host: shard 24 passed 84, shard 25 passed 62, shard 26
 passed 64 and failed one, shard 27 passed 76. The failure is
 `test_task_evidence_v5.py::test_natural_language_prefix_path_owner_does_not_drift_to_query_neighbor`.
@@ -164,7 +167,7 @@ foreign API deletion or external owner prerequisite. Publication, code review an
 merge have not been performed by this local implementation receipt.
 
 
-## Review repairs and current candidate
+## Historical HM-OBS review repairs
 
 A subsequent review reproduced three gaps missed by the initial regression set.
 The additional implementation closes them under the same repository-observer scope:
@@ -184,9 +187,9 @@ coercion. The Python parser cache signature advances to v6 because relative
 No persistent schema or alias registry is introduced; existing indexing invalidation
 rebuilds outdated derived parse artifacts.
 
-Current raw receipts are under `dist/hm-obs/repairs/`; the top-level
-`qualification.json` and `source-artifact.json` identify the current candidate.
-The handoff evidence ZIP preserves the original baseline, current JUnit, exact
+Historical raw receipts are under `dist/hm-obs/repairs/`; that directory's top-level
+`qualification.json` and `source-artifact.json` identify the earlier candidate.
+Its handoff evidence ZIP preserves the original baseline, earlier JUnit, exact
 selection/environment, source manifest, golden packets and comparable economics.
 Keep that ZIP with a PR/CI artifact or other immutable handoff; ignored `dist/`
 output will not accompany an ordinary Git commit. Previous receipts are historical,
@@ -214,7 +217,7 @@ convergence onto the existing Python binding owner, not a file-size extraction.
 The static filesystem consumer now uses canonical module-import bindings; its
 obsolete `_module_imports` parser has no remaining callers and was removed.
 
-The current expanded regression selection passed **1,159 tests**, with zero
+The earlier expanded regression selection passed **1,159 tests**, with zero
 failures, errors or skips. It covers the original 147-test baseline plus the
 additional JSON, declaration, import, parser/cache, filesystem observer, CLI/MCP
 and correspondence suites. An independent source extraction passed the same selection, including the
@@ -223,7 +226,7 @@ the final ZIP receives a focused extraction check; production, test and
 configuration bytes match the full-run artifact. Both source manifests and
 JUnit records are preserved.
 
-Development batch 6 remains **NOT_GREEN**: shards 24 and 25 passed 81 and 78;
+On that earlier candidate, development batch 6 was **NOT_GREEN**: shards 24 and 25 passed 81 and 78;
 shard 26 passed 76 and failed the existing natural-language task-owner case;
 shard 27 passed 71. The unchanged base reproduces that same failure. The earlier
 filesystem observation regression was repaired, and the owning suite passes.
@@ -243,3 +246,75 @@ vectors and all five owner/call/verifier checks passing, with identical exact
 binding evidence. Raw latency remains reported without a general speedup claim.
 `repairs/economics-comparison.json` records the final measurement; none of these
 results certifies external diagnostic truth or runtime state.
+
+## Task-owner and optional-MCP closure
+
+This source repair starts at `8101105e83fddfe8bfc05bb5bc652d12df703112`.
+The final working-tree inputs and exact invocations are identified by
+`dist/task-owner/closure/source-manifest.json` and `commands.json`;
+`qualification.json` records environment, test identities and outcomes. These
+receipts supersede the historical `NOT_GREEN` batch status above for this repair.
+The old source archives and their 1,159-test qualification remain historical;
+they do not qualify the new source. No release or full-suite execution is claimed.
+
+Three local reproductions drove the changes:
+
+- An unresolved production receiver cleared a conflict between two existing edit
+  candidates. `_task_action_multi_identifier_edit_ambiguity` now evaluates that
+  conflict independently; `_task_action_identifier_ambiguity` uses aggregate
+  verification uncertainty only when qualifying decisive verification evidence.
+- An unproven retrieval selection exposed `resolved` ownership with no admitted
+  owner and attached candidate source. `ownership_authority_contract` now reports
+  `unresolved` for that state, preserving the selection trace and candidate.
+  `_task_evidence_attach_owner_source` consumes only the admitted owner. Its source
+  projection helper accepts a read-only mapping rather than requiring a mutable
+  dictionary. The existing scoped uncertainty dataclass and boolean validation
+  remain the owners; no additional resolver, cache or authority model is added.
+- Python CI intentionally installs only the locked test group. An annotation-only
+  `ClientSession` import made the entire native transport module fail collection
+  without optional MCP. That import now lives under `TYPE_CHECKING`; guarded
+  runtime imports remain inside the SDK tests. The existing non-MCP matrix,
+  dependency declarations and `uv.lock` are unchanged. A subprocess regression
+  makes MCP unavailable even on an SDK-equipped developer host and collects the
+  real transport module.
+
+The new regressions failed before repair (six failures, 23 passes), then passed.
+An expanded run exposed an old TypeScript assertion requiring `resolved` together
+with `owner=None`; it now requires unresolved ownership while preserving its
+project-scoped runner and verifier-path checks. Config range/provenance tests also
+relied on source attributed to an unadmitted candidate. Their range-specific cases
+now name the fixture file explicitly and retain the original TOML/JSON/YAML,
+ambiguity, syntax and budget assertions. A separate unchanged natural-language
+request proves that its ranked config candidate remains unadmitted and supplies
+no owner source. These are contract corrections, not new heuristic proof rules.
+
+| Final selection | Result | Evidence |
+| --- | --- | --- |
+| Expanded owner, authority, transport and original repaired cases | 261 passed, zero failures/errors/skips | `focused-final.xml` |
+| Remaining task-action/task-evidence/agent-start suites | 104 passed, zero failures/errors/skips; disjoint test IDs from the focused ring | `additional-owners.xml` |
+| Development batch 6, zero-based shards 24..27 of 64 | 81 + 62 + 80 + 67 = **290 passed**, zero failures/skips | `batch6-final.txt`, `batch-selection.json` |
+| Test-only Python 3.11.15 and 3.14.7 without MCP | Full collection succeeds; each transport-module execution passes 6 CLI tests and explicitly skips 5 SDK tests | `collect-no-mcp-*-final.txt`, `transport-no-mcp-*.xml` |
+| SDK-present native transport module, included in the 261-test ring | All 11 tests passed, including real SDK/stdio paths | `focused-final.xml` test identities |
+| Source hygiene, format, Ruff and complexity/size gate | PASS | `preflight-final.txt` |
+| Focused ty and Pyright, production owners and typed regressions | PASS; not a full-project typing claim | `ty-final.txt`, `pyright-final.txt`, `commands.json` |
+
+The two disjoint focused selections establish **365 distinct passing tests**.
+Batch results are reported separately rather than added to that count. The
+SDK-absent skips do not qualify MCP functionality; SDK-present evidence is
+separate. These tests replay repository-owned captured fixtures and fictional
+claims, not an external runtime certification or a fresh live producer capture.
+The Python 3.14 result uses the locally available 3.14.7 interpreter, not the
+3.14.8 interpreter named in the original CI failure.
+
+The receipt preserves failed attempts, including the initial SDK-absent offline
+bootstrap with missing cached wheels and the config/status expectation failures.
+Frozen online materialization into `/tmp` supplied the missing locked test wheels;
+it did not rewrite dependency intent or resolution. Historical restricted-host
+socket failures are not relabeled product failures or qualified passes.
+
+Reproduce with writable `XDG_CACHE_HOME` and `UV_CACHE_DIR` as above. The exact
+focused selections, no-extra collection/transport commands, native host mode and
+named-batch invocation are in `commands.json`. Keep
+`task-owner-closure-evidence.zip` and its SHA-256 sidecar with the PR/CI evidence;
+ignored `dist/` output is not included in an ordinary source commit. No new
+performance improvement or independent source-archive requalification is claimed.

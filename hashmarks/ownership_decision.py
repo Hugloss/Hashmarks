@@ -358,6 +358,11 @@ def ownership_authority_contract(
         and bool(evidence_state.get("proven"))
     )
     reason = "unique-owner-established" if safe else _trace_unresolved_reason(trace)
+    # A resolved retrieval selection is not necessarily proven ownership.
+    # Keep its trace intact while qualifying this authority projection.
+    if status == "resolved" and not safe:
+        status = "unresolved"
+        reason = "ownership-unresolved"
     proof_identity = authority_proof_identity(trace)
     return {
         "schema": AUTHORITY_SCHEMA,

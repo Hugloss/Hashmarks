@@ -558,7 +558,7 @@ class TaskEvidencePacketMixin(
 
     def _task_evidence_evidence_item(
         self,
-        row: dict[str, object],
+        row: Mapping[str, object],
         *,
         role: str,
         token_budget: int,
@@ -1032,7 +1032,7 @@ class TaskEvidencePacketMixin(
         ownership = result["ownership"]
         if not isinstance(ownership, dict):
             raise AssertionError("task evidence ownership projection must be a mapping")
-        owner_row = action.get("edit")
+        owner_row = ownership.get("owner")
         item = pending = None
         if (
             ownership.get("status") == "resolved"

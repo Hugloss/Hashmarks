@@ -8,10 +8,9 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
-from mcp import ClientSession
 from native_evidence_support import (
     TASK,
     assert_hover_capture,
@@ -30,6 +29,9 @@ from scripts.agent_evaluation.agent_evidence_format_study import (
     emit_trials,
     summarize_grades,
 )
+
+if TYPE_CHECKING:
+    from mcp import ClientSession
 
 
 def _cli_stdout(root: Path, state: Path, *command: str) -> bytes:

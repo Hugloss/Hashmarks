@@ -274,10 +274,12 @@ def test_task_evidence_keeps_typescript_test_path_when_runner_is_project_scoped(
         )
     ownership = _ownership(start)
     verification = _verification(start)
-    assert ownership["status"] == "resolved"
+    assert ownership["status"] == "unresolved"
     assert ownership["candidate"] is not None
     assert ownership["candidate"]["path"] == "src/engine.ts"
     assert ownership["owner"] is None
+    assert ownership["proof_scope_complete"] is False
+    assert ownership["source_evidence"] is None
     plan = verification["plan"]
     assert is_available_plan(plan)
     assert plan["argv"] == ["tsc", "--noEmit", "-p", "tsconfig.json"]

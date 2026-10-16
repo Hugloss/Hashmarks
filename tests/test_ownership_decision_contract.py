@@ -159,6 +159,8 @@ def test_ranked_canonical_candidate_without_positive_proof_fails_closed() -> Non
     assert trace["evidence_state"]["canonical_selection"] is True
     assert trace["evidence_state"]["admissible"] is False
     assert trace["evidence_state"]["proven"] is False
+    assert authority["status"] == "unresolved"
+    assert authority["reason"] == "ownership-unresolved"
     assert authority["owner_resolved"] is False
     assert authority["resolved_owner"] is None
     assert authority["candidate_owner"] == "src/owner.py"

@@ -54,6 +54,16 @@ discrimination. Aggregate uncertainty continues to prevent verification evidence
 from being promoted into decisive owner discrimination. Neither field proves a
 dynamic receiver's type, test sufficiency or execution outcome.
 
+Selection traces and ownership authority qualify different facts. A trace may
+describe a resolved retrieval selection while its ownership proof remains
+incomplete. In that case the authority and task-evidence ownership status are
+`unresolved`, `owner_resolved` is false, and the candidate remains visible.
+`resolved` ownership requires the admitted owner and completed proof; only that
+owner supplies ownership source evidence. Competing-owner ambiguity is evaluated
+independently of verification uncertainty, so an unresolved production call cannot
+clear an existing conflict. Verification candidates and project-scoped test
+commands remain available even when edit ownership is unresolved.
+
 Importable implementation submodules under `hashmarks.*` are **not automatically public** merely because Python allows importing them. Internal helpers, storage classes, parsers, adapters, and mixins may change without compatibility guarantees unless a current public document explicitly promotes them into the contract.
 
 Development material under `scripts/agent_evaluation/`, `benchmarks/agent_evaluation/`, and `tests/` is measurement/evidence infrastructure, not installed product API.

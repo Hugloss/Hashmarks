@@ -1442,14 +1442,12 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         structural_owner: Mapping[str, object] | None,
         decisive_qualified_verification: bool,
         explicit_surface_selected: bool,
-        competing_ambiguity_flags: Sequence[bool],
     ) -> bool:
         return bool(
             len(identifier_edit_paths) > 1
             and structural_owner is None
             and not decisive_qualified_verification
             and not explicit_surface_selected
-            and not any(competing_ambiguity_flags)
         )
 
     @staticmethod

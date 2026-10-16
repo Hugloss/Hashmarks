@@ -15,6 +15,13 @@ The installer downloads the matching executable and SHA-256 asset from GitHub Re
 
 Source contributors should not replace the locked development environment with the standalone binary. Use `uv sync --frozen --extra mcp --group test` when developing or qualifying Hashmarks itself.
 
+The Python compatibility CI matrix also checks the locked test-only environment
+without the MCP extra. Transport tests must collect in that environment:
+annotation-only SDK imports stay under `TYPE_CHECKING`, and MCP runtime imports
+remain local to SDK-dependent tests. Those tests report explicit skips when the
+SDK is unavailable; the MCP-enabled qualification runs exercise them. A no-extra
+test result does not qualify the SDK transport.
+
 For OpenCode end users, register Hashmarks from the repository OpenCode should analyze:
 
 ```bash

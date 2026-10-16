@@ -144,9 +144,12 @@ def test_config_projection_provenance_stays_post_selection(tmp_path: Path) -> No
 
     tasks = json.loads(public.read_text(encoding="utf-8"))["tasks"]
     task = next(row for row in tasks if row["id"] == "hard-004")
+    # This test qualifies source projection/provenance after explicit selection;
+    # the natural-language ranking alone does not establish config ownership.
+    policy = next(repo.glob("src/*/policy.toml")).relative_to(repo).as_posix()
     with CodeMap(repo) as codemap:
         codemap.sync()
-        start = codemap.task_evidence(task["query"], token_budget=512)
+        start = codemap.task_evidence(f"{task['query']} in {policy}", token_budget=512)
 
     assert _ownership(start)["candidate"]["path"].endswith("policy.toml")
     assert _ownership(start)["source_evidence"]["representation"] == "config-key-range"

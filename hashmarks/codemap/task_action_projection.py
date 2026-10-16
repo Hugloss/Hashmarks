@@ -794,14 +794,9 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         context: _TaskActionMapContext,
         selection: _TaskActionSelectionState,
         choices: _TaskActionProjectionChoices,
-        ambiguity_flags: tuple[bool, bool],
     ) -> tuple[bool, bool, bool]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        (
-            multi_structural_owner_ambiguity,
-            verification_identity_ambiguity,
-        ) = ambiguity_flags
         identifier_edit_candidates = self._task_action_identifier_edit_candidates(
             context.rows,
             context.failed,
@@ -823,7 +818,9 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         decisive_qualified_verification = (
             self._task_action_decisive_qualified_verification(
                 choices.verification_relevance,
-                verification_identity_ambiguity,
+                bool(
+                    choices.verification_relevance.get("qualified_identity_ambiguous")
+                ),
             )
         )
         explicit_identifier_surface = bool(
@@ -847,7 +844,6 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                 selection.structural_owner,
                 decisive_qualified_verification,
                 explicit_identifier_surface,
-                ambiguity_flags,
             )
         )
         return (
@@ -975,12 +971,6 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             context,
             selection,
             choices,
-            (
-                multi_structural_owner_ambiguity,
-                bool(
-                    choices.verification_relevance.get("qualified_identity_ambiguous")
-                ),
-            ),
         )
         weak_contract_anchor_ambiguity = self._task_action_weak_contract_ambiguity(
             context,

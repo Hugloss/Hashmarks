@@ -39,7 +39,7 @@ def _ownership(start: dict[str, object]) -> dict[str, object]:
 
 def test_toml_key_range_replaces_symbol_less_next_read(tmp_path: Path) -> None:
     _repo(tmp_path, "policy.toml", "mode='active'\nfeature='ember'\n")
-    start = _start(tmp_path, "Change ember policy config accepted response mode")
+    start = _start(tmp_path, "Change ember mode in src/case/policy.toml")
     assert _ownership(start)["candidate"]["path"] == "src/case/policy.toml"
     assert _ownership(start)["source_evidence"] == {
         "symbol": "mode",
@@ -64,7 +64,7 @@ def test_toml_section_range_is_bounded_to_named_section(tmp_path: Path) -> None:
         "policy.toml",
         "global='keep'\n\n[response]\nmode='active'\nfeature='ember'\n\n[other]\nmode='legacy'\n",
     )
-    start = _start(tmp_path, "Inspect the response section in the ember policy config")
+    start = _start(tmp_path, "Inspect the response section in src/case/policy.toml")
     evidence = _ownership(start)["source_evidence"]
     assert evidence["representation"] == "config-key-range"
     assert evidence["config"] == {
@@ -80,7 +80,7 @@ def test_toml_section_range_is_bounded_to_named_section(tmp_path: Path) -> None:
 
 def test_json_key_range_uses_valid_json_and_one_key_line(tmp_path: Path) -> None:
     _repo(tmp_path, "policy.json", '{\n  "mode": "active",\n  "feature": "ember"\n}\n')
-    start = _start(tmp_path, "Change ember policy config accepted response mode")
+    start = _start(tmp_path, "Change ember mode in src/case/policy.json")
     evidence = _ownership(start)["source_evidence"]
     assert evidence["representation"] == "config-key-range"
     assert evidence["lines"] == [2, 2]
@@ -97,7 +97,7 @@ def test_json_nested_value_range_ignores_brackets_inside_strings(
         '{\n  "response": {\n    "note": "brace } and bracket ]",\n'
         '    "modes": [\n      "active"\n    ]\n  },\n  "other": true\n}\n',
     )
-    start = _start(tmp_path, "Inspect the ember response config")
+    start = _start(tmp_path, "Inspect the response config in src/case/policy.json")
     evidence = _ownership(start)["source_evidence"]
     assert evidence["config"]["name"] == "response"
     assert evidence["lines"] == [2, 7]
@@ -110,7 +110,7 @@ def test_yaml_nested_key_range_uses_task_supported_path(tmp_path: Path) -> None:
         "policy.yaml",
         "response:\n  mode: active\n  feature: ember\nother:\n  mode: legacy\n",
     )
-    start = _start(tmp_path, "Change ember response mode in the policy config")
+    start = _start(tmp_path, "Change ember response mode in src/case/policy.yaml")
     evidence = _ownership(start)["source_evidence"]
     assert evidence["representation"] == "config-key-range"
     assert evidence["config"] == {
@@ -129,7 +129,7 @@ def test_ambiguous_yaml_key_fails_closed_instead_of_guessing(tmp_path: Path) -> 
         "policy.yaml",
         "primary:\n  mode: active\nsecondary:\n  mode: legacy\n",
     )
-    start = _start(tmp_path, "Change ember policy config mode")
+    start = _start(tmp_path, "Change ember config mode in src/case/policy.yaml")
     assert _ownership(start)["candidate"]["path"] == "src/case/policy.yaml"
     assert _ownership(start)["source_evidence"] is None
     assert _ownership(start)["next_read"]["reason"] == "ambiguous-task-local-config-key"
@@ -144,7 +144,7 @@ def test_config_range_over_budget_is_not_clipped(tmp_path: Path) -> None:
         "mode='this-is-a-long-active-policy-value'\nfeature='ember'\n",
     )
     start = _start(
-        tmp_path, "Change ember policy config accepted response mode", token_budget=1
+        tmp_path, "Change ember mode in src/case/policy.toml", token_budget=1
     )
     assert _ownership(start)["source_evidence"] is None
     assert (
@@ -157,6 +157,19 @@ def test_config_range_over_budget_is_not_clipped(tmp_path: Path) -> None:
 
 def test_invalid_json_config_does_not_project_source(tmp_path: Path) -> None:
     _repo(tmp_path, "policy.json", '{\n  "mode": "active",\n}\n')
-    start = _start(tmp_path, "Change ember policy config accepted response mode")
+    start = _start(tmp_path, "Change ember mode in src/case/policy.json")
     assert _ownership(start)["source_evidence"] is None
     assert _ownership(start)["next_read"]["reason"] == "invalid-config-syntax"
+
+
+def test_ranked_config_candidate_does_not_supply_owner_source(tmp_path: Path) -> None:
+    _repo(tmp_path, "policy.json", '{"mode": "active", "feature": "ember"}\n')
+    start = _start(tmp_path, "Change ember policy config accepted response mode")
+    ownership = _ownership(start)
+    candidate = ownership["candidate"]
+    assert isinstance(candidate, dict)
+    assert candidate["path"] == "src/case/policy.json"
+    assert ownership["status"] == "unresolved"
+    assert ownership["owner"] is None
+    assert ownership["proof_scope_complete"] is False
+    assert ownership["source_evidence"] is None
