@@ -588,6 +588,7 @@ def _diagnostic(
     for key, kind in (
         ("added", "diagnostic_added"),
         ("removed", "diagnostic_missing_after"),
+        ("changed_claims", "diagnostic_claim_metadata_changed"),
     ):
         p.field(
             value,

@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Mapping, Sequence
+from copy import deepcopy
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.file_store import UnstableFileError
 from hashmarks.operation_contract import operation_schema
 from hashmarks.paths import normalize_relative_path
 
@@ -20,6 +23,15 @@ _MAX_EVIDENCE_PER_BINDING = 256
 _MAX_DEPENDENCIES_PER_BINDING = 512
 _MAX_UNIQUE_PATHS = 2048
 _MAX_RELATIONSHIPS_PER_PATH = 1000
+
+
+def _binding_member_stamp(path: Path) -> tuple[int, ...] | None:
+    """Request-local reuse check only; member digests remain content authority."""
+    try:
+        stat = path.stat()
+    except OSError:
+        return None
+    return (stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +60,8 @@ class _BindingObservationRequest:
     include_relationships: bool
     seen: set[str] = field(default_factory=set)
     unique_paths: set[str] = field(default_factory=set)
+    observations: dict[EvidenceSpan, dict[str, object]] = field(default_factory=dict)
+    stamps: dict[str, tuple[int, ...]] = field(default_factory=dict)
 
 
 class RepositoryEvidenceBindingsMixin:
@@ -171,6 +185,40 @@ class RepositoryEvidenceBindingsMixin:
             "member_state": member["state"],
         }
 
+    def _observe_reference_once(
+        self, ref: EvidenceReference, request: _BindingObservationRequest
+    ) -> dict[str, object]:
+        self = cast("CodeMap", self)
+        if not isinstance(ref, EvidenceSpan):
+            return self._observe_reference(ref)
+        source = self._repository_member_source(ref.path)
+        if isinstance(source, dict):
+            return self._observe_reference(ref)
+        stamp = _binding_member_stamp(source.path)
+        if ref.path in request.stamps and stamp != request.stamps[ref.path]:
+            raise UnstableFileError(
+                f"binding source changed during observation: {ref.path}"
+            )
+        cached = request.observations.get(ref)
+        if (
+            cached is not None
+            and cached.get("member_revision") == source.indexed_revision
+        ):
+            return deepcopy(cached)
+        observed = self._observe_reference(ref)
+        if stamp is not None and observed.get("state") == "known-present":
+            request.stamps[ref.path] = stamp
+            request.observations[ref] = deepcopy(observed)
+        return observed
+
+    def _validate_binding_snapshot(self, request: _BindingObservationRequest) -> None:
+        self = cast("CodeMap", self)
+        for path, stamp in request.stamps.items():
+            if _binding_member_stamp(self.workspace / path) != stamp:
+                raise UnstableFileError(
+                    f"binding source changed during observation: {path}"
+                )
+
     @staticmethod
     def _reference_definition(ref: EvidenceReference) -> dict[str, object]:
         if isinstance(ref, EvidenceSpan):
@@ -271,7 +319,7 @@ class RepositoryEvidenceBindingsMixin:
             raise ValueError(f"duplicate binding_id: {binding_id}")
         request.seen.add(binding_id)
         references = self._binding_references(raw_binding.get("evidence"))
-        evidence = [self._observe_reference(ref) for ref in references]
+        evidence = [self._observe_reference_once(ref, request) for ref in references]
         declared_dependencies = sorted(
             {
                 normalize_relative_path(path, allow_root=False)
@@ -385,6 +433,7 @@ class RepositoryEvidenceBindingsMixin:
         for raw_binding in bindings:
             assert isinstance(raw_binding, Mapping)
             rows.append(self._observe_binding(raw_binding, request))
+        self._validate_binding_snapshot(request)
         rows.sort(key=lambda row: str(row["binding_id"]))
         payload: dict[str, object] = {
             "schema": operation_schema("repository_evidence", "observation"),

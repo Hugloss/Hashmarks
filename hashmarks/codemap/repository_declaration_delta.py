@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping
+
+from hashmarks.json_value import CanonicalJsonValue
 
 
 def _group_rows(packet: Mapping[str, object]) -> list[Mapping[str, object]]:
@@ -22,22 +23,12 @@ def _declarations(group: Mapping[str, object]) -> dict[str, Mapping[str, object]
     return {str(row["declaration_id"]): row for row in rows if isinstance(row, Mapping)}
 
 
-def _canonical(value: object) -> str:
-    return json.dumps(
-        value,
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
-        allow_nan=False,
-    )
-
-
 def _different(left: object, right: object) -> bool:
-    return _canonical(left) != _canonical(right)
+    return CanonicalJsonValue(left) != CanonicalJsonValue(right)
 
 
-def _value_signature(row: Mapping[str, object]) -> str:
-    return _canonical(_value_projection(row))
+def _value_signature(row: Mapping[str, object]) -> CanonicalJsonValue:
+    return CanonicalJsonValue(_value_projection(row))
 
 
 def _changed_declaration_ids(
@@ -231,7 +222,7 @@ def _semantic_declaration_delta(
         if change is not None:
             changed.append(change)
 
-    delta = {
+    delta: dict[str, object] = {
         "added": sorted(after_ids - before_ids),
         "removed": sorted(before_ids - after_ids),
         "ambiguous": ambiguous,

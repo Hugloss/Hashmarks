@@ -215,6 +215,11 @@ def diagnostic_source_revision_evidence(
     """
     if diagnostic.get("schema") != EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA:
         raise ValueError("unsupported diagnostic observation schema")
+    # Import at the call boundary: normalization depends on revision primitives,
+    # while this projection must reuse its canonical endpoint admission.
+    from .diagnostic_observation import validated_diagnostic_endpoint
+
+    validated_diagnostic_endpoint(diagnostic)
     if len(source_observations) > _MAX_MEMBERS:
         raise ValueError("source_observations exceeds 32 members")
     claims = diagnostic.get("source_revisions")

@@ -167,9 +167,7 @@ class FilesystemLifecycleAnalyzer:
         if mutated:
             self._failure(path, "source-visible-api-rebinding")
         kind, targets = self.codemap._python_export_binding(path, root)
-        if kind == "unknown":
-            targets = self._module_imports(module.snapshot.tree, root)
-        elif kind != "reexport":
+        if kind not in {"module", "reexport"}:
             return None
         if len(targets) != 1 or mutated:
             return None
@@ -193,16 +191,6 @@ class FilesystemLifecycleAnalyzer:
                 if node.args and dotted(node.args[0]) == root:
                     return True
         return False
-
-    @staticmethod
-    def _module_imports(tree: ast.Module, root: str) -> list[str]:
-        return [
-            alias.name if alias.asname else alias.name.split(".")[0]
-            for node in tree.body
-            if isinstance(node, ast.Import)
-            for alias in node.names
-            if (alias.asname or alias.name.split(".")[0]) == root
-        ]
 
     def _reexport_api(
         self, path: str, target: str, seen: set[tuple[str, str]]

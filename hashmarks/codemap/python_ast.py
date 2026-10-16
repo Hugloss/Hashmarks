@@ -14,6 +14,7 @@ from .model import (
     ParsedArtifact,
     SymbolRecord,
 )
+from .python_exports import python_import_target
 
 
 def estimate_tokens(text: str) -> int:
@@ -193,9 +194,8 @@ class _Collector(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
-        prefix = "." * int(node.level) + (node.module or "")
         for alias in node.names:
-            target = f"{prefix}.{alias.name}" if prefix else alias.name
+            target = python_import_target(node, alias.name)
             self.edges.append(
                 EdgeRecord(self.current, "import", target, int(node.lineno))
             )

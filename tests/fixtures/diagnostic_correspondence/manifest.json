@@ -1,0 +1,29 @@
+{
+  "files": {
+    "app/__init__.py": "from .service import handle_request\n",
+    "app/config.py": "def load_config():\n    return 'configured'\n",
+    "app/service.py": "from .config import load_config as read_config\n\ndef handle_request():\n    return read_config()\n",
+    "app/api.py": "from . import handle_request as handler\n\ndef dispatch():\n    return handler()\n",
+    "app/unrelated.py": "def handle_request():\n    return 'unrelated'\n",
+    "app/encoded.py": "def café():\r\n    return 'å'\r\n",
+    "tests/test_service.py": "from app import handle_request\n\ndef test_service():\n    assert handle_request() == 'configured'\n",
+    "tests/test_unrelated.py": "from app.unrelated import handle_request\n\ndef test_unrelated():\n    assert handle_request() == 'unrelated'\n",
+    "pyproject.toml": "[project]\nname = 'diagnostic-fixture'\nversion = '0.1.0'\nrequires-python = '>=3.11'\ndependencies = ['local-dep==1.0.0']\n",
+    "uv.lock": "version = 1\nrevision = 3\nrequires-python = '>=3.11'\n\n[[package]]\nname = 'diagnostic-fixture'\nversion = '0.1.0'\nsource = { virtual = '.' }\ndependencies = [{ name = 'local-dep' }]\n\n[[package]]\nname = 'local-dep'\nversion = '1.0.0'\nsource = { directory = 'vendor/local_dep' }\n"
+  },
+  "cases": [
+    {"name": "exact", "anchor": {"anchor_id": "exact", "path": "app/service.py", "line": 4}, "resolution": "resolved-unique", "source_equivalence": "unknown"},
+    {"name": "ambiguous", "anchor": {"anchor_id": "ambiguous", "symbol": "handle_request"}, "resolution": "resolved-ambiguous", "source_equivalence": "unknown"},
+    {"name": "missing", "anchor": {"anchor_id": "missing", "path": "app/missing.py"}, "resolution": "unresolved", "source_equivalence": "unknown"},
+    {"name": "encoded", "anchor": {"anchor_id": "encoded", "path": "app/encoded.py", "line": 2}, "resolution": "resolved-unique", "source_equivalence": "unknown"},
+    {"name": "wrong-path", "anchor": {"anchor_id": "wrong-path", "path": "../outside.py"}, "reject": true},
+    {"name": "unlocated", "anchor": {"anchor_id": "unlocated", "metadata": {"message": "fictional failure"}}, "reject": true}
+  ],
+  "expected_owner": "app/service.py",
+  "expected_verifier": "tests/test_service.py",
+  "expected_call_targets": ["app/service.py::handle_request", "app/config.py::load_config"],
+  "expected_indirect_call_targets": ["app/api.py::dispatch", "app/service.py::handle_request", "app/config.py::load_config"],
+  "locality_target": "app/service.py::handle_request",
+  "indirect_target": "app/api.py::dispatch",
+  "task": "Change app/service.py handle_request and verify its test"
+}

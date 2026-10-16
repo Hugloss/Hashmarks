@@ -10,7 +10,9 @@ import re
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass
+from typing import cast
 
+from hashmarks.json_value import CanonicalJsonValue
 from hashmarks.operation_contract import operation_schema
 from hashmarks.paths import normalize_relative_path
 
@@ -35,6 +37,79 @@ from .diagnostic_source_revision import (
 from .source_line_correspondence import diagnostic_line_correspondence
 
 DIAGNOSTIC_DELTA_SCHEMA = operation_schema("evidence_comparison", "diagnostics")
+DIAGNOSTIC_ENDPOINT_MAX_BYTES = 524_288
+MAX_DIAGNOSTICS = 256
+MAX_DIAGNOSTIC_STRING = 8_192
+_OUTCOMES = frozenset(
+    {
+        "pass",
+        "fail",
+        "not-run",
+        "blocked-environment",
+        "blocked-supply",
+        "blocked-permission",
+        "invalid-baseline",
+        "stale",
+    }
+)
+
+
+def _diagnostic_json_size(value: object) -> int:
+    raw = CanonicalJsonValue(value, name="diagnostic evidence").encoded
+    if len(raw) > DIAGNOSTIC_ENDPOINT_MAX_BYTES:
+        raise ValueError("diagnostic evidence exceeds encoded byte limit")
+    return len(raw)
+
+
+def _diagnostic_text(value: object, field: str, *, required: bool = False) -> None:
+    if value is None and not required:
+        return
+    if not isinstance(value, str) or len(value) > MAX_DIAGNOSTIC_STRING:
+        raise ValueError(f"diagnostic {field} must be a bounded string")
+    if required and not value.strip():
+        raise ValueError(f"diagnostic {field} must be nonempty")
+
+
+def _diagnostic_header(packet: Mapping[str, object]) -> None:
+    for field in ("producer", "repository_identity"):
+        _diagnostic_text(packet.get(field), field, required=True)
+    _diagnostic_text(packet.get("environment_identity"), "environment_identity")
+    generation = packet.get("codemap_generation")
+    if type(generation) is not int or generation < 0:
+        raise ValueError("diagnostic codemap_generation must be a nonnegative integer")
+    if (
+        not isinstance(packet.get("outcome"), str)
+        or packet.get("outcome") not in _OUTCOMES
+    ):
+        raise ValueError("unsupported external observation outcome")
+    if (
+        packet.get("authority") != "observation-only"
+        or packet.get("execution_effect") != "none"
+    ):
+        raise ValueError("diagnostic evidence must preserve observation-only authority")
+    collection = packet.get("collection")
+    if collection is not None and (
+        not isinstance(collection, Mapping)
+        or not isinstance(collection.get("state"), str)
+        or collection.get("state") not in COLLECTION_STATES
+        or collection.get("authority") != "producer-claimed"
+    ):
+        raise ValueError("invalid producer-claimed diagnostic collection")
+
+
+def _diagnostic_rows(value: object) -> Sequence[Mapping[str, object]]:
+    if not isinstance(value, (list, tuple)) or len(value) > MAX_DIAGNOSTICS:
+        raise ValueError("diagnostics must contain at most 256 rows")
+    for row in value:
+        if not isinstance(row, Mapping):
+            raise ValueError("diagnostics must contain objects")
+        for field in ("tool", "rule", "path", "symbol", "message"):
+            _diagnostic_text(row.get(field), field)
+        for field in ("line", "column"):
+            location = row.get(field)
+            if location is not None and (type(location) is not int or location < 1):
+                raise ValueError(f"diagnostic {field} must be a positive integer")
+    return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,19 +132,12 @@ def external_diagnostic_observation(  # noqa: PLR0913 - additive producer fields
     collection_by_path: Mapping[str, str] | None = None,
 ) -> dict[str, object]:
     """Normalize externally produced diagnostics without executing the tool."""
-    allowed_outcomes = {
-        "pass",
-        "fail",
-        "not-run",
-        "blocked-environment",
-        "blocked-supply",
-        "blocked-permission",
-        "invalid-baseline",
-        "stale",
-    }
-    if outcome not in allowed_outcomes:
+    if not isinstance(outcome, str) or outcome not in _OUTCOMES:
         raise ValueError("unsupported external observation outcome")
-    if collection_state is not None and collection_state not in COLLECTION_STATES:
+    if collection_state is not None and (
+        not isinstance(collection_state, str)
+        or collection_state not in COLLECTION_STATES
+    ):
         raise ValueError("unsupported diagnostic collection state")
     revisions = normalize_source_revision_claims(source_revisions, scope_paths)
     member_claims = diagnostic_member_claims(
@@ -89,16 +157,18 @@ def external_diagnostic_observation(  # noqa: PLR0913 - additive producer fields
         }
     )
     rows = []
-    for raw in diagnostics:
-        row = dict(raw)
+    admitted_rows = _diagnostic_rows(diagnostics)
+    _diagnostic_json_size(admitted_rows)
+    for raw in admitted_rows:
+        row = cast("dict[str, object]", CanonicalJsonValue(dict(raw)).to_value())
         row["identity"] = diagnostic_identity(row)
         rows.append(row)
     rows.sort(key=lambda row: str(row["identity"]))
-    return {
+    packet = {
         "schema": EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA,
         "producer": producer,
         "repository_identity": binding.repository_identity,
-        "codemap_generation": int(binding.codemap_generation),
+        "codemap_generation": binding.codemap_generation,
         "environment_identity": environment_identity,
         "scope_paths": sorted(_revision_scope(scope_paths)),
         **({"source_revisions": revisions} if revisions is not None else {}),
@@ -114,6 +184,8 @@ def external_diagnostic_observation(  # noqa: PLR0913 - additive producer fields
         "authority": "observation-only",
         "execution_effect": "none",
     }
+    validated_diagnostic_endpoint(packet)
+    return packet
 
 
 def _possible_diagnostic_relocations(
@@ -279,9 +351,15 @@ def validated_diagnostic_endpoint(
 ) -> dict[str, Mapping[str, object]]:
     if packet.get("schema") != EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA:
         raise ValueError("expected external diagnostic observation schema")
+    _diagnostic_json_size(packet)
+    _diagnostic_header(packet)
     diagnostic_endpoint_claims(packet)
-    rows = packet.get("diagnostics")
-    if not isinstance(rows, list) or packet.get("diagnostic_count") != len(rows):
+    if not isinstance(packet.get("diagnostics"), list):
+        raise ValueError("serialized diagnostics must be a list")
+    rows = _diagnostic_rows(packet.get("diagnostics"))
+    if type(packet.get("diagnostic_count")) is not int or packet.get(
+        "diagnostic_count"
+    ) != len(rows):
         raise ValueError("diagnostic_count must account for all diagnostic rows")
     indexed: dict[str, Mapping[str, object]] = {}
     for row in rows:
@@ -289,7 +367,12 @@ def validated_diagnostic_endpoint(
             row
         ):
             raise ValueError("diagnostic identity mismatch")
-        indexed[str(row["identity"])] = row
+        identity = str(row["identity"])
+        if identity in indexed and CanonicalJsonValue(
+            indexed[identity]
+        ) != CanonicalJsonValue(row):
+            raise ValueError("conflicting diagnostic rows share one fact identity")
+        indexed[identity] = row
     return indexed
 
 
@@ -321,8 +404,7 @@ def diagnostic_observation_delta(  # noqa: PLR0913 - explicit optional endpoint 
     possible_relocations = _possible_diagnostic_relocations(
         before, after, removed, added
     )
-    if (before_source is None) != (after_source is None):
-        raise ValueError("source correspondence requires both endpoint observations")
+    _validate_source_pair(before_source, after_source)
     source_correspondence = (
         diagnostic_line_correspondence(
             candidates=possible_relocations,
@@ -391,11 +473,27 @@ def diagnostic_observation_delta(  # noqa: PLR0913 - explicit optional endpoint 
             "after": after.get("collection"),
         },
         "diagnostics": {
+            "occurrence_counts": {
+                "before": before["diagnostic_count"],
+                "after": after["diagnostic_count"],
+                "authority": "producer-claimed",
+            },
             "before_count": len(old),
             "after_count": len(new),
             "added": added,
             "removed": removed,
             "unchanged_count": len(old_ids & new_ids),
+            "changed_claims": [
+                {
+                    "identity": identity,
+                    "before": deepcopy(old[identity]),
+                    "after": deepcopy(new[identity]),
+                    "authority": "producer-claimed",
+                }
+                for identity in sorted(old_ids & new_ids)
+                if CanonicalJsonValue(old[identity])
+                != CanonicalJsonValue(new[identity])
+            ],
             "added_in_changed_scope": added_in_changed_scope,
             "path_locality": path_locality,
             "possible_relocations": possible_relocations,
@@ -415,6 +513,17 @@ def diagnostic_observation_delta(  # noqa: PLR0913 - explicit optional endpoint 
     }
 
 
+def _validate_source_pair(before: object, after: object) -> None:
+    if before is None and after is None:
+        return
+    if not isinstance(before, Mapping) or not isinstance(after, Mapping):
+        raise ValueError(
+            "source correspondence requires both endpoint observations as objects"
+        )
+    _diagnostic_json_size(before)
+    _diagnostic_json_size(after)
+
+
 def _delta_claim_axes(
     payload: Mapping[str, object], endpoint: str
 ) -> dict[str, object]:
@@ -427,7 +536,8 @@ def _delta_claim_axes(
         ):
             raise ValueError(f"diagnostic delta {field} must preserve claim authority")
         if type(axis.get("changed")) is not bool or axis["changed"] != (
-            axis.get("before") != axis.get("after")
+            CanonicalJsonValue(axis.get("before"))
+            != CanonicalJsonValue(axis.get("after"))
         ):
             raise ValueError(
                 f"diagnostic delta {field} change flag contradicts endpoints"
@@ -464,6 +574,9 @@ def _delta_endpoint_claims(
         if not isinstance(axis, Mapping):
             raise ValueError(f"diagnostic delta {field} must retain both endpoints")
         packet[key] = axis.get(endpoint)
+    _diagnostic_header(
+        {**packet, "authority": "observation-only", "execution_effect": "none"}
+    )
     return {**packet, **diagnostic_endpoint_claims(packet)}
 
 
@@ -586,6 +699,61 @@ def _diagnostic_projection_accounting(
     return omitted
 
 
+def _validate_occurrence_counts(
+    occurrences: object,
+    old: Mapping[str, object],
+    new: Mapping[str, object],
+) -> None:
+    if occurrences is None:
+        return
+    if (
+        not isinstance(occurrences, Mapping)
+        or occurrences.get("authority") != "producer-claimed"
+    ):
+        raise ValueError(
+            "diagnostic occurrence counts must preserve producer authority"
+        )
+    for side, indexed in (("before", old), ("after", new)):
+        count = occurrences.get(side)
+        if type(count) is not int or not len(indexed) <= count <= MAX_DIAGNOSTICS:
+            raise ValueError("diagnostic occurrence count contradicts unique facts")
+
+
+def _validate_claim_change(row: Mapping[str, object], common: set[str]) -> str:
+    identity = row.get("identity")
+    if (
+        not isinstance(identity, str)
+        or identity not in common
+        or row.get("authority") != "producer-claimed"
+    ):
+        raise ValueError(
+            "diagnostic claim change must retain an unchanged fact identity"
+        )
+    for side in ("before", "after"):
+        value = row.get(side)
+        if not isinstance(value, Mapping) or value.get("identity") != identity:
+            raise ValueError("diagnostic claim change requires both original rows")
+        _diagnostic_rows([value])
+        _diagnostic_json_size(value)
+        if diagnostic_identity(value) != identity:
+            raise ValueError("diagnostic claim change alters fact identity")
+    if CanonicalJsonValue(row["before"]) == CanonicalJsonValue(row["after"]):
+        raise ValueError("diagnostic claim change must differ")
+    return identity
+
+
+def _validate_claim_changes(value: object, common: set[str]) -> None:
+    if (
+        not isinstance(value, list)
+        or len(value) > MAX_DIAGNOSTICS
+        or any(not isinstance(row, Mapping) for row in value)
+    ):
+        raise ValueError("diagnostic claim changes must be bounded objects")
+    identities = [_validate_claim_change(row, common) for row in value]
+    if identities != sorted(set(identities)):
+        raise ValueError("diagnostic claim changes must have unique sorted identities")
+
+
 def validated_diagnostic_delta(payload: Mapping[str, object]) -> dict[str, object]:
     """Re-prove the optional per-path projection against its retained raw facts."""
     value = payload.get("diagnostics")
@@ -603,6 +771,8 @@ def validated_diagnostic_delta(payload: Mapping[str, object]) -> dict[str, objec
         _path_identity_index(rows, "after_identities"),
     )
     _validate_delta_conservation(value, old, new)
+    _validate_occurrence_counts(value.get("occurrence_counts"), old, new)
+    _validate_claim_changes(value.get("changed_claims", []), set(old) & set(new))
     expected_qualification = _diagnostic_claim_qualification(
         before, after, value["added"], value["removed"]
     )
@@ -648,6 +818,16 @@ def validated_diagnostic_delta(payload: Mapping[str, object]) -> dict[str, objec
         "diagnostic_path_locality": deepcopy(expected_path_locality),
         "diagnostic_change_set": deepcopy(change_set),
         "diagnostic_scope_paths": deepcopy(payload["scope_paths"]),
+        **(
+            {"diagnostic_changed_claims": deepcopy(value["changed_claims"])}
+            if "changed_claims" in value
+            else {}
+        ),
+        **(
+            {"diagnostic_occurrence_counts": deepcopy(value["occurrence_counts"])}
+            if "occurrence_counts" in value
+            else {}
+        ),
         **{
             field: deepcopy(payload[field])
             for field in ("source_revisions", "source_provenance", "collection_by_path")

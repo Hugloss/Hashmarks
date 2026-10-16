@@ -339,3 +339,14 @@ CodeMap observation and use the existing
 both original and fresh native packets. When the original native packet has
 not been retained, its opaque identity alone cannot reconstruct that proof.
 Do not promote a descriptor's old freshness to current evidence.
+
+## Repeated exact spans in one request
+
+Distinct opaque consumer bindings to the same exact member/line span reuse one
+qualified stable byte capture within that request. Each binding still receives
+independent output data and the original member revision. Repository admission
+and indexed revision are checked before reuse; device/inode/size/mtime/ctime are
+request-local mutation guards, never content identities. A changed stamp during
+reuse or the final request check raises `UnstableFileError` rather than returning
+a clean mixed snapshot. No observation cache survives the request. Unknown,
+unsupported and denied evidence gains no additional authority through reuse.

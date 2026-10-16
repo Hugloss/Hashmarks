@@ -1023,11 +1023,6 @@ class RepositoryDeltaMixin(ScopedSourceLiteralsMixin):
             )
         return self._scoped_source_result(batch)
 
-    @staticmethod
-    def _diagnostic_identity(row: Mapping[str, object]) -> str:
-        """Canonical diagnostic identity independent of aggregate count/order."""
-        return diagnostic_identity(row)
-
     diagnostic_source_revision_evidence = staticmethod(
         diagnostic_source_revision_evidence
     )
@@ -1112,6 +1107,8 @@ class RepositoryDeltaMixin(ScopedSourceLiteralsMixin):
             "change_set_completeness": completeness,
             "intersection": intersection,
             "authority": "observation-freshness-only",
+            "freshness_scope": "repository-correspondence-only",
+            "producer_freshness": "unknown",
             "execution_effect": "none",
         }
 

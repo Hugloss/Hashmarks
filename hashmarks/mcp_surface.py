@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, Literal, TypeVar, overload
 from . import repository_retry
 from .codemap import ChangeImpactOptions, CodeMap
 from .codemap.change_impact import CHANGE_IMPACT_DEFAULT_REQUEST
+from .codemap.diagnostic_observation import DIAGNOSTIC_ENDPOINT_MAX_BYTES
 from .codemap.evidence_correlation import (
     CORRELATION_PACKET_MAX_BYTES,
     CORRELATION_REQUEST_MAX_BYTES,
@@ -208,6 +209,30 @@ def _bounded_json(value: _T, *, name: str, maximum: int, expected_type: type) ->
     if len(encoded) > maximum:
         raise McpSurfaceError(f"{name} exceeds {maximum} encoded bytes")
     return value
+
+
+def _diagnostic_source_options(
+    result_mode: str,
+    before_source: dict[str, Any] | None,
+    after_source: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if before_source is None and after_source is None:
+        return {}
+    if result_mode != "diagnostics":
+        raise McpSurfaceError("source observations require diagnostics mode")
+    if before_source is None or after_source is None:
+        raise McpSurfaceError(
+            "source correspondence requires both endpoint observations"
+        )
+    return {
+        name: _bounded_json(
+            value, name=name, maximum=DIAGNOSTIC_ENDPOINT_MAX_BYTES, expected_type=dict
+        )
+        for name, value in (
+            ("before_source", before_source),
+            ("after_source", after_source),
+        )
+    }
 
 
 def _dependency_codemap_request(
@@ -779,6 +804,8 @@ class HashmarksMcpSurface:
         changed_paths: list[str] | None = None,
         change_set_complete: bool = False,
         relationship_evidence: dict[str, Any] | None = None,
+        before_source: dict[str, Any] | None = None,
+        after_source: dict[str, Any] | None = None,
     ) -> dict[str, object]:
         """Transport two explicit packets to their existing native comparison owner."""
         if result_mode not in (
@@ -791,9 +818,20 @@ class HashmarksMcpSurface:
                 "result_mode must be one of: structural, bindings, diagnostics, relationships"
             )
         before = _bounded_json(
-            before, name="before", maximum=524_288, expected_type=dict
+            before,
+            name="before",
+            maximum=DIAGNOSTIC_ENDPOINT_MAX_BYTES,
+            expected_type=dict,
         )
-        after = _bounded_json(after, name="after", maximum=524_288, expected_type=dict)
+        after = _bounded_json(
+            after,
+            name="after",
+            maximum=DIAGNOSTIC_ENDPOINT_MAX_BYTES,
+            expected_type=dict,
+        )
+        source_options = _diagnostic_source_options(
+            result_mode, before_source, after_source
+        )
         if result_mode != "diagnostics" and changed_paths:
             raise McpSurfaceError("changed_paths is only valid for diagnostics mode")
         if type(change_set_complete) is not bool:
@@ -823,6 +861,7 @@ class HashmarksMcpSurface:
                     result_mode=result_mode,
                     changed_paths=paths,
                     diagnostic_options={
+                        **source_options,
                         "change_set_complete": change_set_complete,
                         "relationship_evidence": relationship_evidence,
                     },

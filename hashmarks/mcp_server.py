@@ -400,6 +400,8 @@ def _register_evidence_comparison_tool(
         changed_paths: list[str] | None = None,
         change_set_complete: bool = False,
         relationship_evidence: dict[str, Any] | None = None,
+        before_source: dict[str, Any] | None = None,
+        after_source: dict[str, Any] | None = None,
         presentation: _Presentation = "none",
     ) -> dict[str, object]:
         return _call_surface(
@@ -413,6 +415,8 @@ def _register_evidence_comparison_tool(
             changed_paths=changed_paths,
             change_set_complete=change_set_complete,
             relationship_evidence=relationship_evidence,
+            before_source=before_source,
+            after_source=after_source,
             presentation=presentation,
         )
 

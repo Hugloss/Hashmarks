@@ -506,3 +506,14 @@ for the captured protocol shapes and claim/completeness restrictions.
 Pure native-to-presentation conformance and portable evidence binding
 reacquisition are public Python helpers over existing native packets, not
 new MCP operations. Host-model delivery receipts remain outside the server.
+
+### Paired source evidence in diagnostic comparison
+
+The existing `evidence_comparison` tool in `result_mode="diagnostics"` accepts
+optional `before_source` and `after_source` packets together. These are the same
+source observations accepted by Python `diagnostic_observation_delta`, with the
+same core validation and 524,288-byte per-packet ceiling. Supplying only one, or
+supplying source packets in another comparison mode, fails early. No additional
+tool, source scanner or execution service is introduced. Source correspondence
+and diagnostic metadata differences remain repository evidence and producer
+claims respectively; presentation does not strengthen their authority.

@@ -120,7 +120,7 @@ def test_reexport_hop_boundary(tmp_path: Path, hops: int) -> None:
         ("Public = 1", ("local", [])),
         ("other = Public = 1", ("local", [])),
         ("Public: int", ("local", [])),
-        ("Public, other = pair", ("unknown", [])),
+        ("Public, other = pair", ("local", [])),
         ("obj.Public = 1", ("unknown", [])),
         ("from .impl import Internal as Public", ("reexport", [".impl.Internal"])),
         ("from .impl import Public as Other", ("unknown", [])),
@@ -133,7 +133,7 @@ def test_reexport_hop_boundary(tmp_path: Path, hops: int) -> None:
             "from .a import Public\nPublic = 1\nfrom .b import Public",
             ("ambiguous", [".a.Public", ".b.Public"]),
         ),
-        ("if True:\n    from .impl import Public", ("unknown", [])),
+        ("if True:\n    from .impl import Public", ("ambiguous", [])),
     ],
 )
 def test_top_level_export_binding_authority(

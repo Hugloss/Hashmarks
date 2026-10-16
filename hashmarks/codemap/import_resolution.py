@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import ast
 import posixpath
+from collections import deque
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
@@ -11,6 +13,8 @@ from hashmarks.python_ast_cache import read_python_ast
 from .python_exports import (
     AllExportStatus,
     python_export_binding,
+    python_export_is_declaration,
+    python_import_alias_targets,
     python_reexport_targets,
     static_all_exports,
 )
@@ -25,13 +29,18 @@ class _OwnerWalk:
 
     resolver: CodeMap
     leaves: set[str] = field(default_factory=set)
+    symbol_leaves: set[tuple[str, str]] = field(default_factory=set)
     visited: set[tuple[str, str]] = field(default_factory=set)
     unresolved: bool = False
+    symbol_unresolved: bool = False
 
     def _binding_targets(
         self, facade_path: str, exported_name: str
     ) -> list[str] | None:
         resolver = self.resolver
+        decision = resolver.policy.decide(facade_path)
+        if not decision.index or decision.evidence_visibility.value != "source":
+            self.symbol_unresolved = True
         symbols = resolver._session_symbols_for_path(facade_path)
         has_local_symbol = any(
             str(symbol.get("name") or "") == exported_name for symbol in symbols
@@ -39,8 +48,10 @@ class _OwnerWalk:
         kind, binding_targets = resolver._python_export_binding(
             facade_path, exported_name
         )
-        if kind == "local":
+        if kind in {"local", "module"}:
             self.leaves.add(facade_path)
+            if resolver._python_export_is_declaration(facade_path, exported_name):
+                self.symbol_leaves.add((facade_path, exported_name))
             return None
         targets = (
             binding_targets
@@ -85,11 +96,7 @@ class _OwnerWalk:
             if owner == facade_path:
                 continue
             progress = True
-            symbols = resolver._session_symbols_for_path(owner)
-            if any(str(symbol.get("name") or "") == nested_name for symbol in symbols):
-                self.leaves.add(owner)
-            else:
-                self.visit(owner, nested_name, depth + 1)
+            self.visit(owner, nested_name, depth + 1)
         return progress
 
     def visit(self, facade_path: str, exported_name: str, depth: int) -> None:
@@ -113,8 +120,156 @@ class _OwnerWalk:
             self.unresolved = True
 
 
+@dataclass
+class _CallReferenceSearch:
+    """Bounded request-local reverse nomination over the existing edge index."""
+
+    resolver: CodeMap
+    target: tuple[str, str]
+    remaining: int
+    frontier: deque[tuple[str, int]]
+    visited: set[str] = field(default_factory=set)
+    imports: set[tuple[str, str]] = field(default_factory=set)
+    rows: list[dict[str, object]] = field(default_factory=list)
+    complete: bool = True
+
+    def _aliases(self, path: str, name: str, depth: int) -> None:
+        if (path, name) in self.imports:
+            return
+        self.imports.add((path, name))
+        aliases, complete = self.resolver._python_reverse_import_aliases(
+            path, name, self.target
+        )
+        self.complete &= complete
+        for alias in aliases:
+            if alias in self.visited:
+                continue
+            if depth >= 8:
+                self.complete = False
+            else:
+                self.frontier.append((alias, depth + 1))
+
+    def _read(self, name: str, depth: int) -> None:
+        refs = self.resolver.store.refs(name, limit=min(1024, self.remaining + 1))
+        if len(refs) >= self.remaining or len(refs) == 1024:
+            self.complete = False
+        selected = refs[: self.remaining]
+        self.remaining -= len(selected)
+        for row in selected:
+            path = str(row["path"])
+            if str(row.get("evidence_visibility")) != "source":
+                self.complete = False
+                continue
+            if row.get("kind") == "call":
+                self.rows.append(dict(row))
+            elif row.get("kind") == "import":
+                self._aliases(path, name, depth)
+
+    def run(self) -> tuple[list[dict[str, object]], bool]:
+        while self.frontier and self.remaining:
+            name, depth = self.frontier.popleft()
+            if name not in self.visited:
+                self.visited.add(name)
+                self._read(name, depth)
+        if self.frontier:
+            self.complete = False
+        return self.rows, self.complete
+
+
 class ImportResolutionMixin:
     """Own repository import/re-export identity resolution for CodeMap evidence."""
+
+    def _python_call_reference_candidates(
+        self, row: Mapping[str, object], limit: int
+    ) -> tuple[list[dict[str, object]], bool]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        if not str(row["path"]).endswith(".py"):
+            refs = [dict(ref) for ref in self.store.refs(str(row["name"]), limit=limit)]
+            return refs, len(refs) < limit
+        search = _CallReferenceSearch(
+            self,
+            (str(row["path"]), str(row["qualname"])),
+            limit,
+            deque([(str(row["name"]), 0)]),
+        )
+        return search.run()
+
+    def _python_reverse_import_aliases(
+        self, path: str, name: str, target: tuple[str, str]
+    ) -> tuple[list[str], bool]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        decision = self.policy.decide(path)
+        if (
+            not path.endswith(".py")
+            or not decision.index
+            or decision.evidence_visibility.value != "source"
+        ):
+            return [], False
+        try:
+            tree = read_python_ast(self.workspace / path).tree
+        except (OSError, UnicodeError, SyntaxError, ValueError):
+            return [], False
+        candidates = python_import_alias_targets(tree, name)
+        complete = len(candidates) <= 16
+        aliases = []
+        for alias, imported in candidates[:16]:
+            symbols, unresolved = self._resolve_import_symbol_evidence(path, imported)
+            if unresolved:
+                complete = False
+            if symbols == [target] and not unresolved:
+                if self._python_export_binding(path, alias) == ("reexport", [imported]):
+                    aliases.append(alias)
+        return sorted(set(aliases)), complete
+
+    def _python_imported_call_name(self, source_path: str, called_name: str) -> str:
+        """Nominate the declared imported spelling; this alone proves no owner."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        kind, targets = self._python_export_binding(source_path, called_name)
+        if kind == "reexport" and len(targets) == 1:
+            symbols, unresolved = self._resolve_import_symbol_evidence(
+                source_path, targets[0]
+            )
+            if not unresolved and len(symbols) == 1:
+                return symbols[0][1]
+        return called_name
+
+    def _python_export_is_declaration(self, path: str, name: str) -> bool:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        decision = self.policy.decide(path)
+        if not decision.index or decision.evidence_visibility.value != "source":
+            return False
+        try:
+            tree = read_python_ast(self.workspace / path).tree
+        except (OSError, UnicodeError, SyntaxError, ValueError):
+            return False
+        return python_export_is_declaration(tree, name)
+
+    def _resolve_import_symbol_evidence(
+        self, source_path: str, target: str
+    ) -> tuple[list[tuple[str, str]], bool]:
+        """Expose exact declaration leaves from the existing bounded import walk."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        paths = self._resolve_import_paths(source_path, target)
+        walk = _OwnerWalk(self)
+        if len(paths) > 1 or self._python_import_identity_ambiguous(
+            source_path, target
+        ):
+            walk.unresolved = True
+        name = target.lstrip(".").rsplit(".", 1)[-1]
+        for path in paths[:20]:
+            walk.visit(path, name, 0)
+        return sorted(walk.symbol_leaves), (
+            walk.unresolved
+            or walk.symbol_unresolved
+            or len(paths) > 20
+            or len(walk.symbol_leaves) > 1
+            or (bool(paths) and not walk.symbol_leaves)
+        )
 
     def _python_reexport_targets(
         self, facade_path: str, exported_name: str

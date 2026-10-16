@@ -78,6 +78,22 @@ class _VerificationRelevanceState:
 class VerificationMixin(VerificationOwnershipMixin):
     """Repository-owned verification relevance, ownership, plan, and selection semantics."""
 
+    def _locality_verification_paths(
+        self, target: Mapping[str, object], node: Mapping[str, object]
+    ) -> list[str]:
+        """Add qualified indexed test callers to existing bounded impact evidence."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        affected = cast(
+            "Sequence[str]",
+            self.tests(str(target["path"]), max_depth=3).get("tests", []),
+        )
+        callers = cast("Sequence[Mapping[str, object]]", node["exact_callers"])
+        direct = {
+            str(row["path"]) for row in callers if self._is_test_path(str(row["path"]))
+        }
+        return sorted(set(map(str, affected)) | direct)
+
     @staticmethod
     def _verification_without_edit_owner(current_path: str) -> VerificationRelevance:
         selected: TaskCandidate | None = None

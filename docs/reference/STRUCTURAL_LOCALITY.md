@@ -391,3 +391,34 @@ a call expression or infer any missing calls. Legacy relationship packets
 without the optional `call_site_source` remain valid, while claims that
 present it must pass the native non-strengthening validator, even if packet
 hashes have been recomputed.
+
+## Imported call spelling and verification correspondence
+
+Plain Python call candidates may use the declared name reached through the
+existing bounded import/re-export resolver, including `as` aliases and
+`from . import name`. Candidate nomination alone proves no relationship: exact
+repository declaration identity, source visibility, shadowing, ambiguity, cycles
+and the eight-hop bound still qualify resolution. Later assignments do not leave
+an earlier function declaration authoritative. Renamed facade chains retain the
+actual declaration's path and qualified name.
+
+The verification projection composes existing impact-test evidence with already
+qualified test callers of the selected symbol. It preserves the selected edit
+owner, the existing bounds and alternatives; it neither executes tests nor claims
+that any verifier is sufficient.
+
+
+Reverse caller discovery follows explicit import aliases and re-exports through
+the existing reference index and the same forward identity qualifier. It reads
+cached ASTs only for admitted candidate files. The reference limit bounds the
+aggregate candidate search across aliases, and the eight-hop import limit still
+applies. A truncated, hidden or unresolved search cannot report complete caller
+coverage. There is no whole-tree fallback or persistent alias graph.
+
+The syntax owner distinguishes declarations from later assignments (including
+unpacking and augmented assignment), ordinary imports, deletion and conditional
+writes. Unsupported or conditional rebinding preserves uncertainty. Annotation-only
+statements preserve an existing declaration; locals inside unrelated nested scopes
+do not overwrite module exports. Class/member qualification uses the same ordered
+binding analysis. Indexing and qualification share relative-import target spelling;
+the Python parser cache version changes so prior derived import artifacts rebuild.

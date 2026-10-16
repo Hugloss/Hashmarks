@@ -39,11 +39,14 @@ This is the single catalog for the current maintained documentation in `docs/`.
 
 ## Plans
 
+- [`plans/HM_OBS_REPOSITORY_EVIDENCE_OWNER_CENSUS.md`](plans/HM_OBS_REPOSITORY_EVIDENCE_OWNER_CENSUS.md) — diagnostic-to-repository canonical owners, focused baseline, local regressions and standalone follow-on bundles.
 - [`plans/HASHMARKS_TOCTOU_EVIDENCE_DISCOVERY_PLAN.md`](plans/HASHMARKS_TOCTOU_EVIDENCE_DISCOVERY_PLAN.md) — filesystem check/use implementation and required native/reference/external qualification.
 - [`plans/COMPETITOR_EVIDENCE_CONSOLIDATED.md`](plans/COMPETITOR_EVIDENCE_CONSOLIDATED.md) — single-PR admission and implementation checklist for competitor-inspired repository evidence.
 - [`plans/COMPETITOR_EVIDENCE_FOLLOWUP.md`](plans/COMPETITOR_EVIDENCE_FOLLOWUP.md) — post-#415 checkpoint boundaries, opt-in static handler syntax and deferred provider/measurement work.
 
 ## Qualification
+
+- [`qualification/DIAGNOSTIC_CORRESPONDENCE.md`](qualification/DIAGNOSTIC_CORRESPONDENCE.md) — standalone HM-OBS-01..09 implementation, local fixture replay, contract changes and comparable read economics.
 
 - [`qualification/AGENT_EVIDENCE_FORMATS.md`](qualification/AGENT_EVIDENCE_FORMATS.md) — paired evidence-presentation export and external agent grading.
 - [`qualification/BACKEND_E2E.md`](qualification/BACKEND_E2E.md) — genuine backend revision workflows, source oracles and all-capability qualification accounting.

@@ -439,11 +439,20 @@ def _observation_freshness(
     completeness = payload.get("change_set_completeness")
     if completeness not in ("caller-claimed-complete", "unknown"):
         reasons.append("invalid-change-set-completeness")
+    if payload.get("producer_freshness", "unknown") != "unknown":
+        reasons.append("producer-freshness-not-established")
+    if (
+        payload.get("freshness_scope", "repository-correspondence-only")
+        != "repository-correspondence-only"
+    ):
+        reasons.append("invalid-freshness-scope")
     return {
         "freshness_state": state,
         "stale": None if state == "unknown" else state != "current",
         "change_set_completeness": completeness,
         "freshness_reason": payload.get("reason"),
+        "freshness_scope": "repository-correspondence-only",
+        "producer_freshness": "unknown",
     }
 
 
@@ -598,10 +607,14 @@ def validate_repository_intelligence_evidence(
                     "diagnostic_path_locality",
                     "diagnostic_change_set",
                     "diagnostic_scope_paths",
+                    "diagnostic_occurrence_counts",
+                    "diagnostic_changed_claims",
                     "source_revision_rows",
                     "source_revision_coverage",
                     "change_set_completeness",
                     "freshness_reason",
+                    "freshness_scope",
+                    "producer_freshness",
                     "semantic_relationship_observations",
                     "semantic_relationship_coverage",
                     "semantic_relationship_deltas",

@@ -213,7 +213,14 @@ For uniquely declared correspondence:
 - two or more normalized values differ => \`differing\`;
 - any unresolved/ambiguous provider value => \`ambiguous\`.
 
-Equality is canonical JSON equality over the provider-normalized value. Core does not add version-range, alias, compatibility, language, or organization-specific equivalence rules.
+Equality is canonical JSON equality over the provider-normalized value.
+The internal immutable `CanonicalJsonValue` owner is shared with diagnostics:
+`true`, `1` and `1.0` remain distinct; tuple input normalizes to an array; object
+ordering is insignificant. Objects require string keys, and unsupported values,
+cycles and non-finite numbers reject before comparison. Domain-specific evidence
+bounds, semantic identities and authority remain owned by declarations. Core does
+not add version-range, alias, compatibility, language, or organization-specific
+equivalence rules.
 
 No majority rule exists. Two declarations agreeing and one differing does not make the majority authoritative.
 
