@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any, Never
 
 import pytest
 
@@ -136,7 +137,7 @@ def test_bad_spans_fail_before_sync(tmp_path: Path, spans: object) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as cm:
 
-        def forbidden_sync(*args, **kwargs):
+        def forbidden_sync(*args: object, **kwargs: object) -> Never:
             raise AssertionError("work before range admission")
 
         cm.sync = forbidden_sync  # type: ignore[method-assign]
@@ -361,7 +362,7 @@ def test_backend_python_decorator_parse_bound_is_explicit() -> None:
     )
 
     class _NoIndex:
-        def symbols_overlapping_lines(self, *args, **kwargs):
+        def symbols_overlapping_lines(self, *args: object, **kwargs: object) -> Never:
             raise AssertionError("index work before input-size admission")
 
     evidence = observe_python_decorator_associations(

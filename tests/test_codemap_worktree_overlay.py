@@ -41,8 +41,10 @@ def _repo(tmp_path: Path) -> Path:
     return repo
 
 
-def test_clean_base_sync_publishes_shared_snapshot(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+def test_clean_base_sync_publishes_shared_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch: pytest.MonkeyPatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
     repo = _repo(tmp_path)
     with CodeMap(repo) as codemap:
         result = codemap.sync()
@@ -54,9 +56,9 @@ def test_clean_base_sync_publishes_shared_snapshot(tmp_path: Path, monkeypatch) 
 
 
 def test_sibling_worktree_reuses_clean_base_snapshot_and_keeps_dirty_overlay_local(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch: pytest.MonkeyPatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
     repo = _repo(tmp_path)
     with CodeMap(repo) as codemap:
         first = codemap.sync()
@@ -89,9 +91,9 @@ def test_sibling_worktree_reuses_clean_base_snapshot_and_keeps_dirty_overlay_loc
 
 
 def test_assume_unchanged_path_must_match_snapshot_bytes_before_reuse(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch: pytest.MonkeyPatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
     repo = _repo(tmp_path)
     with CodeMap(repo) as codemap:
         codemap.sync()
@@ -122,17 +124,18 @@ def _range_provider(version: str) -> TreeSitterRangeProvider:
 
 @pytest.mark.parametrize("next_provider", ["unavailable", "v2"])
 def test_base_snapshot_requires_current_parser_provider_identity(
-    tmp_path: Path, monkeypatch, next_provider: str
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, next_provider: str
 ) -> None:
-    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch: pytest.MonkeyPatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
     repo = _repo(tmp_path)
     with CodeMap(repo) as codemap:
         codemap.range_provider = _range_provider("v1")
         codemap.sync()
-        before = {
-            path: str(codemap.store.file_row(path)["artifact_key"])
-            for path in ("a.py", "b.py")
-        }
+        before = {}
+        for path in ("a.py", "b.py"):
+            row = codemap.store.file_row(path)
+            assert row is not None
+            before[path] = str(row["artifact_key"])
 
     with CodeMap(repo) as codemap:
         codemap.range_provider = (
@@ -155,9 +158,9 @@ def test_base_snapshot_requires_current_parser_provider_identity(
 
 
 def test_base_snapshot_reprojects_current_python_module_identity(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch: pytest.MonkeyPatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
     repo = tmp_path / "repo"
     repo.mkdir()
     subprocess.run(["git", "init", "-q", str(repo)], check=True)

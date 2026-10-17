@@ -40,7 +40,7 @@ def _run_json(argv: list[str], *, cwd: Path) -> dict:
         ) from exc
 
 
-def _timed(fn):
+def _timed(fn: Callable[[], object]) -> Callable[[], object]:
     started = time.perf_counter()
     value = fn()
     return value, time.perf_counter() - started

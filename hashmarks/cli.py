@@ -8,6 +8,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import TextIO
 
 from hashmarks._command_output import log_command_output
 
@@ -42,7 +43,7 @@ from .release_update import (
 logger = logging.getLogger(__name__)
 
 
-def _version(args) -> int:
+def _version(args: argparse.Namespace) -> int:
     del args
     _print({"version": __version__})
     return 0
@@ -52,17 +53,17 @@ def _workspace(value: str) -> Path:
     return canonical_host_path(value)
 
 
-def _client(args) -> IdentityClient:
+def _client(args: argparse.Namespace) -> IdentityClient:
     return IdentityClient(
         args.workspace, state_dir=args.state_dir, timeout=args.timeout
     )
 
 
-def _print(value) -> None:
+def _print(value: object) -> None:
     log_command_output(logger, json.dumps(value, indent=2, sort_keys=True))
 
 
-def _text(*values: object, file=None) -> None:
+def _text(*values: object, file: TextIO | None = None) -> None:
     for value in values:
         log_command_output(logger, value, file=file)
 
@@ -127,7 +128,7 @@ def _delegate_selected_standalone_upgrade(command: str) -> None:
     delegate_standalone_upgrade(command)
 
 
-def _upgrade(args) -> int:
+def _upgrade(args: argparse.Namespace) -> int:
     del args
     release = fetch_latest_release(__version__, timeout=5.0)
     if not release.update_available:
@@ -198,7 +199,7 @@ def _daemon_serve_command(workspace: Path, state: Path) -> list[str]:
     return command
 
 
-def _daemon_start(args) -> int:
+def _daemon_start(args: argparse.Namespace) -> int:
     client = _client(args)
     try:
         status = client.status()
@@ -244,25 +245,25 @@ def _daemon_start(args) -> int:
     raise SystemExit(f"daemon did not become ready; see {log_path}")
 
 
-def _daemon_serve(args) -> int:
+def _daemon_serve(args: argparse.Namespace) -> int:
     daemon = IdentityDaemon(args.workspace, state_dir=args.state_dir)
     daemon.serve_forever()
     return 0
 
 
-def _daemon_status(args) -> int:
+def _daemon_status(args: argparse.Namespace) -> int:
     value = _client(args).status()
     _print(value)
     return 0
 
 
-def _daemon_stop(args) -> int:
+def _daemon_stop(args: argparse.Namespace) -> int:
     value = _client(args).stop()
     _print(value)
     return 0
 
 
-def _snapshot(args) -> int:
+def _snapshot(args: argparse.Namespace) -> int:
     with RepositoryIdentity(
         args.workspace,
         state_dir=args.state_dir,
@@ -274,7 +275,7 @@ def _snapshot(args) -> int:
     return 0
 
 
-def _stats(args) -> int:
+def _stats(args: argparse.Namespace) -> int:
     with RepositoryIdentity(
         args.workspace,
         state_dir=args.state_dir,
@@ -286,7 +287,7 @@ def _stats(args) -> int:
     return 0
 
 
-def _doctor(args) -> int:
+def _doctor(args: argparse.Namespace) -> int:
     with RepositoryIdentity(
         args.workspace,
         state_dir=args.state_dir,
@@ -310,7 +311,7 @@ def _doctor(args) -> int:
     return 0
 
 
-def _mcp(args) -> int:
+def _mcp(args: argparse.Namespace) -> int:
     from .mcp_server import run_stdio
 
     run_stdio(
@@ -333,7 +334,7 @@ def _installed_hashmarks_executable() -> Path:
     return canonical_host_path(resolved)
 
 
-def _install(args) -> int:
+def _install(args: argparse.Namespace) -> int:
     if not args.opencode:
         raise UserFacingError("choose a host to register, for example --opencode")
     opencode = shutil.which("opencode")
@@ -401,7 +402,7 @@ def _add_common_arguments(
     )
 
 
-def _add_daemon_cli(sub) -> None:
+def _add_daemon_cli(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     version = sub.add_parser("version")
     version.set_defaults(func=_version, automatic_update_check=False)
 
@@ -423,7 +424,7 @@ def _add_daemon_cli(sub) -> None:
     stop.set_defaults(func=_daemon_stop)
 
 
-def _add_identity_cli(sub) -> None:
+def _add_identity_cli(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     snapshot = sub.add_parser("snapshot")
     _add_common_arguments(snapshot, inherited=True)
     _add_mode_argument(snapshot)

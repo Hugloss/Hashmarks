@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 from hashmarks import CodeMap
+from hashmarks.codemap.model import SearchHit
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from pytest import MonkeyPatch
 
 
 def _repo(root: Path) -> str:
@@ -25,7 +29,7 @@ def _repo(root: Path) -> str:
 
 def test_identical_task_action_requests_reuse_one_session_composition(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: MonkeyPatch,
 ) -> None:
     task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
@@ -33,7 +37,7 @@ def test_identical_task_action_requests_reuse_one_session_composition(
         calls = 0
         original = codemap.find_task
 
-        def counted(*args, **kwargs):
+        def counted(*args, **kwargs) -> Sequence[SearchHit]:
             nonlocal calls
             calls += 1
             return original(*args, **kwargs)
@@ -52,7 +56,7 @@ def test_identical_task_action_requests_reuse_one_session_composition(
 
 def test_task_action_reuse_key_includes_task_limit_and_per_role(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: MonkeyPatch,
 ) -> None:
     task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
@@ -60,7 +64,7 @@ def test_task_action_reuse_key_includes_task_limit_and_per_role(
         calls = 0
         original = codemap.find_task
 
-        def counted(*args, **kwargs):
+        def counted(*args, **kwargs) -> Sequence[SearchHit]:
             nonlocal calls
             calls += 1
             return original(*args, **kwargs)
@@ -96,7 +100,7 @@ def test_cached_task_action_isolated_from_caller_mutation(tmp_path: Path) -> Non
 
 def test_task_action_cache_is_not_reused_across_decision_sessions(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: MonkeyPatch,
 ) -> None:
     task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
@@ -104,7 +108,7 @@ def test_task_action_cache_is_not_reused_across_decision_sessions(
         calls = 0
         original = codemap.find_task
 
-        def counted(*args, **kwargs):
+        def counted(*args, **kwargs) -> Sequence[SearchHit]:
             nonlocal calls
             calls += 1
             return original(*args, **kwargs)

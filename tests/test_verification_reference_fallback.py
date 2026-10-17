@@ -75,7 +75,7 @@ def test_exact_verification_import_requires_resolved_owner_path(tmp_path: Path) 
 def test_verification_locality_replaces_unrelated_canonical_without_reference_proof() -> (
     None
 ):
-    selected = {
+    selected: dict[str, object] = {
         "path": "backend/tests/unit/repository_tooling/test_test_batch_receipts.py",
         "direct_reference": False,
         "indirect_reference": False,
@@ -84,7 +84,7 @@ def test_verification_locality_replaces_unrelated_canonical_without_reference_pr
         "canonical_rank": 7,
         "runner_available": True,
     }
-    local = {
+    local: dict[str, object] = {
         "path": "backend/tests/unit/integrations/test_fleet_plan_attempt_authority.py",
         "direct_reference": False,
         "indirect_reference": False,
@@ -103,7 +103,7 @@ def test_verification_locality_replaces_unrelated_canonical_without_reference_pr
 
 
 def test_verification_locality_never_overrides_reference_evidence() -> None:
-    selected = {
+    selected: dict[str, object] = {
         "path": "tests/test_exact_owner.py",
         "direct_reference": True,
         "indirect_reference": False,
@@ -112,7 +112,7 @@ def test_verification_locality_never_overrides_reference_evidence() -> None:
         "canonical_rank": 9,
         "runner_available": True,
     }
-    local = {
+    local: dict[str, object] = {
         "path": "pkg/tests/test_local_words.py",
         "direct_reference": False,
         "indirect_reference": False,

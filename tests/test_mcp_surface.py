@@ -4,7 +4,9 @@ import inspect
 import json
 import sys
 import types
+from collections.abc import Callable
 from pathlib import Path
+from typing import Never, NoReturn
 
 import pytest
 
@@ -117,7 +119,10 @@ def test_mcp_surface_rejects_unbounded_or_empty_inputs(tmp_path: Path) -> None:
             surface.find("flare041", limit=51)
         with pytest.raises(McpSurfaceError, match="changed_paths exceeds"):
             surface.change_impact("task", [f"p{i}.py" for i in range(257)])
-        huge = {"schema": "hashmarks.task-evidence.v5", "payload": "x" * 300_000}
+        huge: dict[str, object] = {
+            "schema": "hashmarks.task-evidence.v5",
+            "payload": "x" * 300_000,
+        }
         with pytest.raises(McpSurfaceError, match="encoded bytes"):
             surface.post_change("task", ["src/feature.py"], huge)
         with pytest.raises((ValueError, McpSurfaceError)):
@@ -465,7 +470,7 @@ def test_mcp_surface_classifies_exhausted_transient_race(
         str(_repo(tmp_path)), state_dir=str(tmp_path / "state")
     )
 
-    def exhausted(_operation):
+    def exhausted(_operation: Callable[..., object]) -> Never:
         raise RuntimeError("CodeMap generation changed during decision session")
 
     monkeypatch.setattr(mcp_surface, "retry_transient_repository_race", exhausted)
@@ -523,7 +528,7 @@ def test_mcp_surface_read_centralizes_gate_and_retry(
     )
     calls: list[object] = []
 
-    def fake_retry(operation):
+    def fake_retry(operation: Callable[..., object]) -> str:
         calls.append(operation)
         return "fresh"
 
@@ -539,10 +544,10 @@ def test_mcp_server_boundary_translates_only_surface_errors() -> None:
     class FakeToolError(Exception):
         pass
 
-    def invalid() -> None:
+    def invalid() -> NoReturn:
         raise McpSurfaceError("invalid query")
 
-    def broken() -> None:
+    def broken() -> NoReturn:
         raise RuntimeError("implementation bug")
 
     with pytest.raises(FakeToolError, match="invalid query") as translated:
@@ -613,8 +618,10 @@ def test_mcp_server_registers_exact_small_read_only_tool_catalog(
             self.description = kwargs.get("description")
             self.instructions = kwargs.get("instructions")
 
-        def tool(self, **metadata):
-            def decorate(fn):
+        def tool(
+            self, **metadata: object
+        ) -> Callable[[Callable[..., object]], Callable[..., object]]:
+            def decorate(fn: Callable[..., object]) -> Callable[..., object]:
                 registered.append({"fn": fn, **metadata})
                 return fn
 
@@ -633,7 +640,10 @@ def test_mcp_server_registers_exact_small_read_only_tool_catalog(
     types_module = types.ModuleType("mcp.types")
     server_module.MCPServer = FakeMCPServer
     exceptions_module.ToolError = FakeToolError
-    types_module.ToolAnnotations = FakeToolAnnotations
+    types_module.ToolAnnotations, types_module.CallToolResult = (
+        FakeToolAnnotations,
+        object,
+    )
     monkeypatch.setitem(sys.modules, "mcp", mcp_module)
     monkeypatch.setitem(sys.modules, "mcp.server", server_module)
     monkeypatch.setitem(sys.modules, "mcp.server.mcpserver", mcpserver_module)
@@ -719,8 +729,10 @@ def test_mcp_server_rejects_mode_specific_response_schema_drift(
         def __init__(self, _name: str, **_kwargs):
             pass
 
-        def tool(self, **metadata):
-            def decorate(fn):
+        def tool(
+            self, **metadata: object
+        ) -> Callable[[Callable[..., object]], Callable[..., object]]:
+            def decorate(fn: Callable[..., object]) -> Callable[..., object]:
                 registered.append({"fn": fn, **metadata})
                 return fn
 
@@ -736,7 +748,10 @@ def test_mcp_server_rejects_mode_specific_response_schema_drift(
     types_module = types.ModuleType("mcp.types")
     server_module.MCPServer = FakeMCPServer
     exceptions_module.ToolError = FakeToolError
-    types_module.ToolAnnotations = FakeToolAnnotations
+    types_module.ToolAnnotations, types_module.CallToolResult = (
+        FakeToolAnnotations,
+        object,
+    )
     monkeypatch.setitem(sys.modules, "mcp", mcp_module)
     monkeypatch.setitem(sys.modules, "mcp.server", server_module)
     monkeypatch.setitem(sys.modules, "mcp.server.mcpserver", mcpserver_module)
@@ -781,8 +796,10 @@ def test_mcp_server_construction_does_not_scan_or_build_repository(
             self.description = kwargs.get("description")
             self.instructions = kwargs.get("instructions")
 
-        def tool(self, **metadata):
-            def decorate(fn):
+        def tool(
+            self, **metadata: object
+        ) -> Callable[[Callable[..., object]], Callable[..., object]]:
+            def decorate(fn: Callable[..., object]) -> Callable[..., object]:
                 registered.append(str(metadata["name"]))
                 return fn
 
@@ -798,7 +815,10 @@ def test_mcp_server_construction_does_not_scan_or_build_repository(
     types_module = types.ModuleType("mcp.types")
     server_module.MCPServer = FakeMCPServer
     exceptions_module.ToolError = FakeToolError
-    types_module.ToolAnnotations = FakeToolAnnotations
+    types_module.ToolAnnotations, types_module.CallToolResult = (
+        FakeToolAnnotations,
+        object,
+    )
     monkeypatch.setitem(sys.modules, "mcp", mcp_module)
     monkeypatch.setitem(sys.modules, "mcp.server", server_module)
     monkeypatch.setitem(sys.modules, "mcp.server.mcpserver", mcpserver_module)

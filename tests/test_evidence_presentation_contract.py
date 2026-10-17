@@ -4,9 +4,10 @@ import asyncio
 import copy
 import importlib.util
 import json
+from collections.abc import Callable
 from itertools import product
 from pathlib import Path
-from typing import Any
+from typing import Any, Never
 
 import pytest
 
@@ -20,6 +21,9 @@ from hashmarks.codemap.repository_intelligence_query import (
     RepositoryIntelligenceQueryOptions,
 )
 from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
+from hashmarks.codemap.static_python_backend_declarations import (
+    StaticPythonBackendDeclarations,
+)
 from hashmarks.codemap.structural_locality import structural_locality_delta
 from hashmarks.evidence_presentation import (
     FORMATS,
@@ -28,6 +32,7 @@ from hashmarks.evidence_presentation import (
 )
 from hashmarks.mcp_contract import (
     MCP_TOOL_CONTRACTS,
+    McpToolContract,
     contract_from_tool_models,
     tool_contract,
 )
@@ -37,7 +42,7 @@ from hashmarks.operation_contract import operation_schema
 _MCP_AVAILABLE = importlib.util.find_spec("mcp") is not None
 
 
-def _findings(projection: dict[str, Any]) -> list[dict[str, Any]]:
+def _findings(projection: dict[str, object]) -> list[dict[str, object]]:
     return [row for group in projection["groups"] for row in group["findings"]]
 
 
@@ -66,7 +71,7 @@ def _fixture_diagnostic_delta(paths: list[str]) -> dict[str, object]:
 @pytest.fixture(scope="module")
 def native_packets(
     tmp_path_factory: pytest.TempPathFactory,
-) -> list[tuple[str, str, dict[str, Any]]]:
+) -> list[tuple[str, str, dict[str, object]]]:
     root = tmp_path_factory.mktemp("presentation")
     (root / "src").mkdir()
     (root / "tests").mkdir()
@@ -153,6 +158,11 @@ def native_packets(
             ("repository_context", "default", codemap.orient()),
             ("find", "default", codemap.find_packet("widget")),
             ("task_evidence", "default", previous),
+            (
+                "task_evidence",
+                "initial",
+                codemap.task_evidence(task, result_mode="initial"),
+            ),
             ("change_impact", "default", codemap.task_change_impact(task, paths)),
             ("correlate_evidence", "default", codemap.correlate_evidence([bundle])),
             (
@@ -171,6 +181,15 @@ def native_packets(
                 codemap.dependency_resolution_delta(observation, observation),
             ),
             ("repository_declarations", "observation", declarations),
+            (
+                "repository_declarations",
+                "discovery",
+                codemap.repository_declarations_operation(
+                    [],
+                    result_mode="discovery",
+                    providers=(StaticPythonBackendDeclarations(paths=(paths[0],)),),
+                ),
+            ),
             (
                 "repository_declarations",
                 "explain",
@@ -279,7 +298,8 @@ def native_packets(
 
 
 def test_every_native_mode_is_preserved_and_projected_without_reads(
-    native_packets, monkeypatch: pytest.MonkeyPatch
+    native_packets: list[tuple[str, str, dict[str, object]]],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     assert {
         (contract.operation, mode)
@@ -287,7 +307,7 @@ def test_every_native_mode_is_preserved_and_projected_without_reads(
         for mode in contract.response_modes
     } <= {(operation, mode) for operation, mode, _packet in native_packets}
 
-    def no_read(*_args, **_kwargs):
+    def no_read(*_args: object, **_kwargs: object) -> Never:
         raise AssertionError("presentation must not read repository files")
 
     monkeypatch.setattr(Path, "read_bytes", no_read)
@@ -295,7 +315,7 @@ def test_every_native_mode_is_preserved_and_projected_without_reads(
     for operation, mode, native in native_packets:
         before = copy.deepcopy(native)
         for format in FORMATS:
-            response: dict[str, Any] = presentation_response(
+            response: dict[str, object] = presentation_response(
                 operation, native, format=format, result_mode=mode
             )
             tool_contract(operation).validate_response(
@@ -315,16 +335,32 @@ def test_every_native_mode_is_preserved_and_projected_without_reads(
 
 
 def test_source_refs_point_to_exact_records_and_details_are_independent(
-    native_packets,
+    native_packets: list[tuple[str, str, dict[str, object]]],
 ) -> None:
     for operation, _mode, native in native_packets:
         source = (
             native["result"] if operation == "repository_intelligence_query" else native
         )
-        projected: dict[str, Any] = present_repository_evidence(
+        projected: dict[str, object] = present_repository_evidence(
             source, format="structured"
         )
         for row in _findings(projected):
+            if projected.get("reference_space") == "decoded-initial-data":
+                from scripts.repository_evaluation.fact_grading import pointer_values
+
+                values = pointer_values(source, row["source_refs"][0])
+                assert len(values) == 1
+                value = values[0]
+                # Initial locators explicitly retain display fields. Check each
+                # field against the decoded source record, including typed
+                # collection decoding, rather than following wire-table keys.
+                if isinstance(row["details"], dict):
+                    assert all(
+                        value[key] == item for key, item in row["details"].items()
+                    )
+                else:
+                    assert row["details"] == value
+                continue
             value = source
             pointer = row["source_refs"][0]
             for part in pointer.split("/")[1:] if pointer else ():
@@ -360,7 +396,7 @@ def test_revision_edges_claims_and_text_keep_semantic_details() -> None:
         "changes": [{"path": ["paths", "a.py", "revision"], "value": "new-revision"}],
         "completeness": {"scope": "bounded"},
     }
-    projected: dict[str, Any] = present_repository_evidence(delta, format="text")
+    projected: dict[str, object] = present_repository_evidence(delta, format="text")
     assert any(row["kind"] == "member_revision_changed" for row in _findings(projected))
     for expected in (
         '"target":"os"',
@@ -386,7 +422,7 @@ def test_revision_edges_claims_and_text_keep_semantic_details() -> None:
             }
         ],
     }
-    claim: dict[str, Any] = present_repository_evidence(dependency, format="text")
+    claim: dict[str, object] = present_repository_evidence(dependency, format="text")
     assert all(row["assertion"] == "producer_claim" for row in _findings(claim))
     assert claim["source_evidence_identity"] is None
     assert claim["source_identities"]["before_observation_identity"] == "old"
@@ -403,7 +439,7 @@ def test_projection_bounds_cannot_create_negative_evidence() -> None:
         "future_section": ["unprojected"],
     }
     for format, selected in (("structured", 48), ("compact", 5), ("text", 5)):
-        result: dict[str, Any] = present_repository_evidence(packet, format=format)
+        result: dict[str, object] = present_repository_evidence(packet, format=format)
         group = result["groups"][0]
         assert len(group["findings"]) == selected
         assert group["omitted_from_presentation"] == 60 - selected
@@ -422,7 +458,7 @@ def test_projection_bounds_cannot_create_negative_evidence() -> None:
         present_repository_evidence(
             {"schema": operation_schema("find"), "results": [None]}
         )
-    empty: dict[str, Any] = present_repository_evidence(
+    empty: dict[str, object] = present_repository_evidence(
         {"schema": operation_schema("find"), "results": []}, format="text"
     )
     assert "No displayed findings in this projection" in empty["text"]
@@ -431,7 +467,7 @@ def test_projection_bounds_cannot_create_negative_evidence() -> None:
 def test_mcp_rejects_invalid_presentation_before_producer_and_wrapper_drift() -> None:
     calls = []
 
-    def producer():
+    def producer() -> dict[str, object]:
         calls.append(True)
         return {"schema": operation_schema("find"), "results": []}
 
@@ -440,7 +476,7 @@ def test_mcp_rejects_invalid_presentation_before_producer_and_wrapper_drift() ->
             tool_contract("find"), ValueError, producer, presentation="invalid"
         )
     assert not calls
-    response: dict[str, Any] = _call_surface(
+    response: dict[str, object] = _call_surface(
         tool_contract("find"), ValueError, producer, presentation="compact"
     )
     assert calls == [True]
@@ -469,10 +505,10 @@ def test_mcp_rejects_invalid_presentation_before_producer_and_wrapper_drift() ->
 @pytest.mark.host_mcp_sdk
 @pytest.mark.skipif(not _MCP_AVAILABLE, reason="MCP extra is not installed")
 def test_actual_sdk_advertises_all_format_selectors(tmp_path: Path) -> None:
-    server: Any = build_server(tmp_path, state_dir=tmp_path / "state")
+    server: object = build_server(tmp_path, state_dir=tmp_path / "state")
     try:
         tools = asyncio.run(server.list_tools())
-        manifest: dict[str, Any] = contract_from_tool_models("test", tuple(tools))
+        manifest: dict[str, object] = contract_from_tool_models("test", tuple(tools))
         assert len(manifest["tools"]) == 14
         for tool, contract in zip(tools, MCP_TOOL_CONTRACTS, strict=True):
             field = tool.input_schema["properties"]["presentation"]
@@ -488,7 +524,14 @@ def test_service_transports_presentation_and_rejects_older_service(
     captured = {}
 
     class Map:
-        def repository_intelligence_query(self, _surface, _task, _paths, *, options):
+        def repository_intelligence_query(
+            self,
+            _surface: str,
+            _task: str,
+            _paths: list[str],
+            *,
+            options: RepositoryIntelligenceQueryOptions,
+        ) -> dict[str, object]:
             captured["options"] = options
             return {
                 "schema": operation_schema("repository_intelligence_query"),
@@ -535,14 +578,16 @@ def test_service_transports_presentation_and_rejects_older_service(
 @pytest.mark.host_mcp_sdk
 @pytest.mark.skipif(not _MCP_AVAILABLE, reason="MCP extra is not installed")
 def test_sdk_calls_all_tools_with_native_defaults_and_optional_formats(
-    native_packets, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    native_packets: list[tuple[str, str, dict[str, object]]],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from hashmarks.codemap.repository_intelligence_query import (
         repository_query_response,
     )
 
     packets = {(operation, mode): packet for operation, mode, packet in native_packets}
-    server: Any = build_server(tmp_path, state_dir=tmp_path / "state")
+    server: object = build_server(tmp_path, state_dir=tmp_path / "state")
     arguments = {
         "repository_context": {},
         "find": {"query": "widget"},
@@ -568,8 +613,8 @@ def test_sdk_calls_all_tools_with_native_defaults_and_optional_formats(
         "evidence_comparison": {"before": {}, "after": {}},
     }
 
-    def frozen_producer(contract):
-        def response(*_args, **kwargs):
+    def frozen_producer(contract: McpToolContract) -> Callable[..., object]:
+        def response(*_args: object, **kwargs: object) -> object:
             native = packets[
                 contract.operation,
                 kwargs.get("result_mode", contract.default_response_mode),
@@ -589,7 +634,7 @@ def test_sdk_calls_all_tools_with_native_defaults_and_optional_formats(
             server._hashmarks_surface, contract.name, frozen_producer(contract)
         )
 
-    async def exercise():
+    async def exercise() -> None:
         for contract in MCP_TOOL_CONTRACTS:
             default = await server.call_tool(contract.name, arguments[contract.name])
             native = packets[contract.operation, contract.default_response_mode]
@@ -608,20 +653,28 @@ def test_sdk_calls_all_tools_with_native_defaults_and_optional_formats(
                     ),
                 }
                 called = await server.call_tool(contract.name, request)
-                contract.validate_response(
-                    called.structured_content, result_mode=mode, presentation=format
-                )
-                assert called.structured_content == presentation_response(
-                    contract.operation,
-                    packets[contract.operation, mode],
-                    format=format,
-                    result_mode=mode,
+                _assert_mode_delivery(
+                    contract, called, packets[contract.operation, mode], mode, format
                 )
 
     try:
         asyncio.run(exercise())
     finally:
         server._hashmarks_surface.close()
+
+
+def _assert_task_json_mirror(operation: str, reply: object) -> None:
+    if operation != "task_evidence":
+        return
+    texts = [part.text for part in reply.content if part.type == "text"]
+    assert texts == [
+        json.dumps(
+            reply.structured_content,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        )
+    ]
 
 
 def test_diagnostic_detail_and_json_pointer_escaping_preserve_native_values() -> None:
@@ -643,7 +696,7 @@ def test_diagnostic_detail_and_json_pointer_escaping_preserve_native_values() ->
         "collection_after": {"completeness": "incomplete"},
         "diagnostics": {"removed": [record]},
     }
-    result: dict[str, Any] = present_repository_evidence(diagnostic, format="text")
+    result: dict[str, object] = present_repository_evidence(diagnostic, format="text")
     finding = _findings(result)[0]
     assert finding["details"] == record
     assert finding["assertion"] == "producer_claim"
@@ -654,7 +707,7 @@ def test_diagnostic_detail_and_json_pointer_escaping_preserve_native_values() ->
         "schema": "hashmarks.repository-intelligence-snapshot.v1",
         "paths": {"a~/b.py": {"member_state": "unknown", "revision": "exact-revision"}},
     }
-    projection: dict[str, Any] = present_repository_evidence(snapshot)
+    projection: dict[str, object] = present_repository_evidence(snapshot)
     rows = _findings(projection)
     assert rows[0]["source_refs"] == ["/paths/a~0~1b.py/revision"]
     assert rows[1]["details"] == "unknown"
@@ -675,7 +728,7 @@ def test_omitted_record_qualifications_remain_visible_outside_display_bounds() -
             for i in range(10)
         ],
     }
-    projected: dict[str, Any] = present_repository_evidence(packet, format="compact")
+    projected: dict[str, object] = present_repository_evidence(packet, format="compact")
     assert projected["groups"][0]["omitted_from_presentation"] == 5
     omitted = next(
         context
@@ -687,3 +740,42 @@ def test_omitted_record_qualifications_remain_visible_outside_display_bounds() -
     row = _findings(projected)[0]
     assert row["source_context"]["freshness"] == "unknown"
     assert row["source_context"]["record_qualification"]["state"] == "observed"
+
+
+def _assert_initial_delivery(
+    called: object, native: dict[str, object], format: str
+) -> None:
+    assert called.structured_content == native
+    text = called.content[0].text
+    if format == "none":
+        assert "structuredContent" in text
+    else:
+        projected = present_repository_evidence(native, format=format)
+        assert (text if format == "text" else json.loads(text)) == (
+            projected["text"] if format == "text" else projected
+        )
+
+
+def _assert_mode_delivery(
+    contract: McpToolContract,
+    called: object,
+    native: dict[str, object],
+    mode: str,
+    format: str,
+) -> None:
+    initial = contract.operation == "task_evidence" and mode == "initial"
+    contract.validate_response(
+        called.structured_content,
+        result_mode=mode,
+        presentation="none" if initial else format,
+    )
+    if initial:
+        _assert_initial_delivery(called, native, format)
+    else:
+        assert called.structured_content == presentation_response(
+            contract.operation,
+            native,
+            format=format,
+            result_mode=mode,
+        )
+        _assert_task_json_mirror(contract.operation, called)

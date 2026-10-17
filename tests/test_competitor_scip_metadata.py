@@ -42,7 +42,7 @@ def _index(
     }
 
 
-def _single(index: dict):
+def _single(index: dict) -> Any:
     producer, rows = parse_scip_json(index)
     assert producer == "fixture:1"
     assert len(rows) == 1

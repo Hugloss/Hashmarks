@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from pathlib import Path
+
+import pytest
+from contract_assertions import assert_array, assert_object, assert_records, assert_text
 
 from hashmarks.codemap import CodeMap
 from scripts.agent_evaluation.metrics_fresh_multi_repo import materialize_fixture
 
 
-def _cases(root: Path):
+def _cases(root: Path) -> Iterator[tuple[Path, dict[str, object]]]:
     for _name, repo, corpus in materialize_fixture(root):
-        payload = json.loads(corpus.read_text(encoding="utf-8"))
-        for task in payload["tasks"]:
+        payload = assert_object(json.loads(corpus.read_text(encoding="utf-8")))
+        for task in assert_records(payload["tasks"]):
             yield repo, task
 
 
@@ -20,10 +24,13 @@ def test_canonical_fixture_preserves_expected_top_file(tmp_path: Path) -> None:
     for repo, task in _cases(tmp_path / "fixture"):
         with CodeMap(repo) as codemap:
             codemap.sync()
-            results = codemap.find(task["query"], limit=5)
+            results = codemap.find(assert_text(task["query"]), limit=5)
         checked += 1
         paths = [str(row.path) for row in results]
-        if not any(expected in paths for expected in task["expected_files"]):
+        expected_files = [
+            assert_text(path) for path in assert_array(task["expected_files"])
+        ]
+        if not any(expected in paths for expected in expected_files):
             misses.append(
                 f"{task['id']}: expected={task['expected_files']} got={paths}"
             )

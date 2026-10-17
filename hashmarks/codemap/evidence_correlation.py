@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
@@ -282,6 +282,8 @@ def _positive_line(value: object) -> int | None:
     if isinstance(value, bool):
         raise ValueError("line must be a positive integer")
     try:
+        if not isinstance(value, (str, int, float, bytes, bytearray)):
+            raise TypeError("line must be a scalar")
         line = int(value)
     except (TypeError, ValueError) as exc:
         raise ValueError("line must be a positive integer") from exc
@@ -472,10 +474,10 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin):
             anchor_id=_bounded_identifier(
                 raw_anchor.get("anchor_id"), label="anchor_id"
             ),
-            path=claimed_path,
-            line=line,
-            symbol=symbol,
-            module=module,
+            path=cast(str | None, claimed_path),
+            line=cast(int | None, line),
+            symbol=cast(str | None, symbol),
+            module=cast(str | None, module),
             metadata=metadata_dict,
             metadata_bytes=metadata_bytes,
             member_revision=_member_revision(raw_anchor.get("member_revision")),
@@ -488,6 +490,8 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin):
         *,
         mappings: Sequence[Mapping[str, str]],
     ) -> _Resolution:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if claims.path is None:
             return self._resolve_pathless_anchor(claims)
         repository_path, path_origin = self._map_external_path(claims.path, mappings)
@@ -731,7 +735,9 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin):
         containing = tuple(
             row
             for row in rows
-            if int(row.get("start_line") or 0) <= line <= int(row.get("end_line") or 0)
+            if int(cast(int, row.get("start_line") or 0))
+            <= line
+            <= int(cast(int, row.get("end_line") or 0))
         )
         if len(containing) == 1:
             return _Resolution(
@@ -823,8 +829,8 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin):
             "name": str(row.get("name") or ""),
             "qualname": str(row.get("qualname") or ""),
             "kind": str(row.get("kind") or ""),
-            "start_line": int(row.get("start_line") or 0),
-            "end_line": int(row.get("end_line") or 0),
+            "start_line": int(cast(int, row.get("start_line") or 0)),
+            "end_line": int(cast(int, row.get("end_line") or 0)),
         }
 
     @staticmethod
@@ -891,8 +897,8 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin):
     def _symbol_reference(row: Mapping[str, object]) -> dict[str, object]:
         return {
             "path": str(row["path"]),
-            "start_line": int(row["start_line"]),
-            "end_line": int(row["end_line"]),
+            "start_line": int(cast(int, row["start_line"])),
+            "end_line": int(cast(int, row["end_line"])),
         }
 
     def _prepare_anchor(
@@ -1252,7 +1258,7 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin):
     def _bundle_definition(
         bundle: Mapping[str, object],
     ) -> dict[str, object]:
-        anchors = bundle.get("anchors", [])
+        anchors = cast(Iterable[object], bundle.get("anchors", []))
         return {
             "bundle_id": bundle.get("bundle_id"),
             "producer": bundle.get("producer", {}),

@@ -20,7 +20,7 @@ def _load(path: str) -> dict[str, Any]:
     return value
 
 
-def _seconds(value: Any, prefix: tuple[str, ...] = ()) -> dict[str, float]:
+def _seconds(value: object, prefix: tuple[str, ...] = ()) -> dict[str, float]:
     out: dict[str, float] = {}
     if isinstance(value, dict):
         for key, child in value.items():

@@ -1,0 +1,274 @@
+{
+  "schema": "hashmarks.backend-runtime-failure-oracles.v1",
+  "source_suite": "suite.json",
+  "scope": "Two genuine upstream failure specimens, selected innermost repository frame, exact source and indexed declaration correspondence. Not a broad debugging qualification or causal diagnosis.",
+  "cases": {
+    "sqlalchemy-logging-token-reset": {
+      "before": {
+        "source": "sqlalchemy-logging-token-reset-before",
+        "line": 145,
+        "source_label": {
+          "path": "lib/sqlalchemy/engine/characteristics.py",
+          "symbol": "LoggingTokenCharacteristic.set_connection_characteristic",
+          "start_line": 135,
+          "end_line": 145,
+          "sha256": "f23c689b9ea0ca125387df581f7b40bb3092b6c84462c64b1133e16a12ec2a70"
+        },
+        "capture_checks": [
+          {
+            "id": "exception-type",
+            "pointer": "/exception/type",
+            "predicate": "equals",
+            "value": "builtins.AttributeError"
+          },
+          {
+            "id": "actual-source-frame",
+            "pointer": "/frames/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "lib/sqlalchemy/engine/characteristics.py",
+              "line": 145,
+              "qualname": "LoggingTokenCharacteristic.set_connection_characteristic",
+              "source_revision": "2b72f554f02dd0bc647674dfcc096844ec517427a7c428e7c66470505c9db606"
+            }
+          }
+        ],
+        "source_checks": [
+          {
+            "id": "exact-member-revision",
+            "pointer": "/member/member_revision",
+            "predicate": "equals",
+            "value": "2b72f554f02dd0bc647674dfcc096844ec517427a7c428e7c66470505c9db606",
+            "authority_check": true
+          },
+          {
+            "id": "exact-source-line",
+            "pointer": "/line_anchors/*",
+            "predicate": "includes_record",
+            "value": {
+              "line": 145,
+              "path": "lib/sqlalchemy/engine/characteristics.py",
+              "member_revision": "2b72f554f02dd0bc647674dfcc096844ec517427a7c428e7c66470505c9db606",
+              "state": "observed",
+              "line_sha256": "02db24e7d10fba5198525106e2bd42b518fd99af9510282d04f135f077ea5231"
+            }
+          }
+        ],
+        "symbol_checks": [
+          {
+            "id": "exact-frame-declaration",
+            "pointer": "/nodes/*",
+            "predicate": "includes_record",
+            "value": {
+              "symbol_id": "lib/sqlalchemy/engine/characteristics.py::LoggingTokenCharacteristic.set_connection_characteristic",
+              "path": "lib/sqlalchemy/engine/characteristics.py",
+              "qualname": "LoggingTokenCharacteristic.set_connection_characteristic",
+              "lines": [
+                135,
+                145
+              ]
+            }
+          }
+        ]
+      },
+      "after": {
+        "source": "sqlalchemy-logging-token-reset-after",
+        "line": 145,
+        "source_label": {
+          "path": "lib/sqlalchemy/engine/characteristics.py",
+          "symbol": "LoggingTokenCharacteristic.set_connection_characteristic",
+          "start_line": 135,
+          "end_line": 145,
+          "sha256": "bfc5332ec1b9c0bc3fc20113ea197c226feeffc465ce7aedaf1a6da35a132a90"
+        },
+        "capture_checks": [
+          {
+            "id": "exception-type",
+            "pointer": "/exception",
+            "predicate": "equals",
+            "value": null
+          },
+          {
+            "id": "connection-usable",
+            "pointer": "/value/select_value",
+            "predicate": "equals",
+            "value": 1
+          }
+        ],
+        "source_checks": [
+          {
+            "id": "exact-member-revision",
+            "pointer": "/member/member_revision",
+            "predicate": "equals",
+            "value": "0d12825ad53deb0d1276ad5f7b4640502e830b657ae5c6acb6a3f472e471fee8",
+            "authority_check": true
+          },
+          {
+            "id": "exact-source-line",
+            "pointer": "/line_anchors/*",
+            "predicate": "includes_record",
+            "value": {
+              "line": 145,
+              "path": "lib/sqlalchemy/engine/characteristics.py",
+              "member_revision": "0d12825ad53deb0d1276ad5f7b4640502e830b657ae5c6acb6a3f472e471fee8",
+              "state": "observed",
+              "line_sha256": "e0562a1231c9484b2dee54dee6bca685f4a7fcf27a869a3711e2b7ff6171593b"
+            }
+          }
+        ],
+        "symbol_checks": [
+          {
+            "id": "exact-frame-declaration",
+            "pointer": "/nodes/*",
+            "predicate": "includes_record",
+            "value": {
+              "symbol_id": "lib/sqlalchemy/engine/characteristics.py::LoggingTokenCharacteristic.set_connection_characteristic",
+              "path": "lib/sqlalchemy/engine/characteristics.py",
+              "qualname": "LoggingTokenCharacteristic.set_connection_characteristic",
+              "lines": [
+                135,
+                145
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "sqlalchemy-aggregate-strings": {
+      "before": {
+        "source": "sqlalchemy-aggregate-strings-before",
+        "line": 3198,
+        "source_label": {
+          "path": "lib/sqlalchemy/sql/compiler.py",
+          "symbol": "SQLCompiler.visit_function",
+          "start_line": 3180,
+          "end_line": 3228,
+          "sha256": "377cbda93adc7cc005532d7475ea1f6cb095a8cfde0b9378e72b930d23a272b6"
+        },
+        "capture_checks": [
+          {
+            "id": "exception-type",
+            "pointer": "/exception/type",
+            "predicate": "equals",
+            "value": "builtins.TypeError"
+          },
+          {
+            "id": "actual-source-frame",
+            "pointer": "/frames/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "lib/sqlalchemy/sql/compiler.py",
+              "line": 3198,
+              "qualname": "SQLCompiler.visit_function",
+              "source_revision": "d314c252d3a2bbe4db74ed247cc625bf4f6f78cb422ceb1aa52b781c7baccfcd"
+            }
+          }
+        ],
+        "source_checks": [
+          {
+            "id": "exact-member-revision",
+            "pointer": "/member/member_revision",
+            "predicate": "equals",
+            "value": "d314c252d3a2bbe4db74ed247cc625bf4f6f78cb422ceb1aa52b781c7baccfcd",
+            "authority_check": true
+          },
+          {
+            "id": "exact-source-line",
+            "pointer": "/line_anchors/*",
+            "predicate": "includes_record",
+            "value": {
+              "line": 3198,
+              "path": "lib/sqlalchemy/sql/compiler.py",
+              "member_revision": "d314c252d3a2bbe4db74ed247cc625bf4f6f78cb422ceb1aa52b781c7baccfcd",
+              "state": "observed",
+              "line_sha256": "1028a74f51b8e23f5daa37a6bb8b0281f95589ebd674a29ea5dd58b579b6e137"
+            }
+          }
+        ],
+        "symbol_checks": [
+          {
+            "id": "exact-frame-declaration",
+            "pointer": "/nodes/*",
+            "predicate": "includes_record",
+            "value": {
+              "symbol_id": "lib/sqlalchemy/sql/compiler.py::SQLCompiler.visit_function",
+              "path": "lib/sqlalchemy/sql/compiler.py",
+              "qualname": "SQLCompiler.visit_function",
+              "lines": [
+                3180,
+                3228
+              ]
+            }
+          }
+        ]
+      },
+      "after": {
+        "source": "sqlalchemy-aggregate-strings-after",
+        "line": 3148,
+        "source_label": {
+          "path": "lib/sqlalchemy/sql/compiler.py",
+          "symbol": "SQLCompiler.visit_aggregate_strings_func",
+          "start_line": 3139,
+          "end_line": 3174,
+          "sha256": "644092820439ff821e884f9848b69da59805f280946122d2cef928500677bcb6"
+        },
+        "capture_checks": [
+          {
+            "id": "exception-type",
+            "pointer": "/exception/type",
+            "predicate": "equals",
+            "value": "sqlalchemy.exc.CompileError"
+          },
+          {
+            "id": "actual-source-frame",
+            "pointer": "/frames/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "lib/sqlalchemy/sql/compiler.py",
+              "line": 3148,
+              "qualname": "SQLCompiler.visit_aggregate_strings_func",
+              "source_revision": "1d54cc1313339c7908b28c280377df9c17826f9a2e53f9fe90049287438a30cf"
+            }
+          }
+        ],
+        "source_checks": [
+          {
+            "id": "exact-member-revision",
+            "pointer": "/member/member_revision",
+            "predicate": "equals",
+            "value": "1d54cc1313339c7908b28c280377df9c17826f9a2e53f9fe90049287438a30cf",
+            "authority_check": true
+          },
+          {
+            "id": "exact-source-line",
+            "pointer": "/line_anchors/*",
+            "predicate": "includes_record",
+            "value": {
+              "line": 3148,
+              "path": "lib/sqlalchemy/sql/compiler.py",
+              "member_revision": "1d54cc1313339c7908b28c280377df9c17826f9a2e53f9fe90049287438a30cf",
+              "state": "observed",
+              "line_sha256": "87d083ebc5335b6f80a567d7a64fd625994a7a7f862e16116668930ceb28156d"
+            }
+          }
+        ],
+        "symbol_checks": [
+          {
+            "id": "exact-frame-declaration",
+            "pointer": "/nodes/*",
+            "predicate": "includes_record",
+            "value": {
+              "symbol_id": "lib/sqlalchemy/sql/compiler.py::SQLCompiler.visit_aggregate_strings_func",
+              "path": "lib/sqlalchemy/sql/compiler.py",
+              "qualname": "SQLCompiler.visit_aggregate_strings_func",
+              "lines": [
+                3139,
+                3174
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}

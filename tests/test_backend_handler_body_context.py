@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from contract_assertions import assert_array, assert_object, assert_records, assert_text
+
 from hashmarks.codemap import ChangeImpactOptions, CodeMap
 from hashmarks.codemap.static_python_interface_declarations import (
     StaticPythonInterfaceDeclarations,
@@ -27,10 +29,14 @@ def _change(cm: CodeMap) -> dict[str, object]:
     )
 
 
+def _observation(result: dict[str, object]) -> dict[str, object]:
+    evidence = assert_object(result["changed_line_evidence"])
+    return assert_records(evidence["observations"])[0]
+
+
 def _association(result: dict[str, object]) -> dict[str, object]:
-    return result["changed_line_evidence"]["observations"][0]["decorator_associations"][
-        "associations"
-    ][0]
+    decorators = assert_object(_observation(result)["decorator_associations"])
+    return assert_records(decorators["associations"])[0]
 
 
 def test_body_context_reuses_existing_provider_oracle_and_exact_index(
@@ -57,14 +63,14 @@ def test_body_context_reuses_existing_provider_oracle_and_exact_index(
     assert "changed_line_evidence" not in plain
     assert augmented["changed"] == plain["changed"]
     assert augmented["surfaces"] == plain["surfaces"]
-    assert augmented["changed_line_evidence"]["observations"][0]["symbols"] == []
+    assert _observation(augmented)["symbols"] == []
     association = _association(augmented)
     assert association["subject"] == "service.py::handler"
     assert association["indexed_declaration_signature"] == {
         "state": "indexed-declaration",
         "value": "async def handler(payload: dict[str, int])",
     }
-    body = association["handler_body_context"]
+    body = assert_object(association["handler_body_context"])
     assert body["state"] == "bounded-direct-handler-body-syntax"
     assert body["authority"] == "direct-static-syntax-only"
     assert body["declaration_syntax"] == "async"
@@ -72,9 +78,10 @@ def test_body_context_reuses_existing_provider_oracle_and_exact_index(
     assert body["runtime_response_shape"] == "unknown"
     assert body["cross_artifact_correspondence"] == "unresolved"
     assert body["negative_evidence_admissible"] is False
-    expected = provider["declarations"]["groups"][0]["declarations"][0]["value"][
-        "static_body_syntax"
-    ]
+    declarations = assert_object(provider["declarations"])
+    group = assert_records(declarations["groups"])[0]
+    declaration = assert_records(group["declarations"])[0]
+    expected = assert_object(assert_object(declaration["value"])["static_body_syntax"])
     assert body["literal_dictionary_returns"] == expected["literal_dictionary_returns"]
     assert body["literal_subscript_accesses"] == expected["literal_subscript_accesses"]
     assert body["return_sites_observed"] == 1
@@ -100,7 +107,7 @@ def test_body_context_excludes_nested_scopes_and_preserves_dynamic_returns(
     )
     with CodeMap(tmp_path) as cm:
         cm.sync()
-        body = _association(_change(cm))["handler_body_context"]
+        body = assert_object(_association(_change(cm))["handler_body_context"])
     assert body["literal_dictionary_returns"] == [
         {
             "line": 5,
@@ -125,13 +132,13 @@ def test_body_context_bounded_sites_and_explicit_omission(
     (tmp_path / PATH).write_text(source, encoding="utf-8")
     with CodeMap(tmp_path) as cm:
         cm.sync()
-        body = _association(_change(cm))["handler_body_context"]
+        body = assert_object(_association(_change(cm))["handler_body_context"])
     assert body["state"] == "bounded-direct-handler-body-syntax"
     assert body["return_sites_observed"] == 13
-    assert len(body["literal_dictionary_returns"]) == 8
+    assert len(assert_array(body["literal_dictionary_returns"])) == 8
     assert body["return_sites_omitted"] == 5
     assert body["subscript_sites_observed"] == 12
-    assert len(body["literal_subscript_accesses"]) == 8
+    assert len(assert_array(body["literal_subscript_accesses"])) == 8
     assert body["subscript_sites_omitted"] == 4
     assert body["negative_evidence_admissible"] is False
 
@@ -148,7 +155,7 @@ def test_body_site_overflow_degrades_locally_without_dropping_handler(
         cm.sync()
         association = _association(_change(cm))
     assert association["subject"] == "service.py::handler"
-    assert association["decorator_context"]["state"] == (
+    assert assert_object(association["decorator_context"])["state"] == (
         "bounded-current-python-ast-decorator-syntax"
     )
     assert association["handler_body_context"] == {
@@ -170,8 +177,9 @@ def test_decorated_class_does_not_become_a_function_response_oracle(
         cm.sync()
         association = _association(_change(cm))
     assert association["subject"] == "service.py::Handler"
-    assert association["handler_body_context"]["state"] == "not-a-function-declaration"
-    assert association["handler_body_context"]["negative_evidence_admissible"] is False
+    body = assert_object(association["handler_body_context"])
+    assert body["state"] == "not-a-function-declaration"
+    assert body["negative_evidence_admissible"] is False
 
 
 def test_handler_body_literals_never_exposed_under_restricted_visibility(
@@ -193,8 +201,13 @@ def test_handler_body_literals_never_exposed_under_restricted_visibility(
     assert "secret_return_key" not in json.dumps(impact)
     assert "secret_access_key" not in json.dumps(impact)
     assert "/private" not in json.dumps(impact)
-    observation = impact["changed_line_evidence"]["observations"][0]
-    assert observation.get("decorator_associations", {}).get("associations", []) == []
+    observation = _observation(impact)
+    assert (
+        assert_object(observation.get("decorator_associations", {})).get(
+            "associations", []
+        )
+        == []
+    )
 
 
 def test_mcp_handler_body_observation_tracks_current_source_revision(
@@ -209,7 +222,9 @@ def test_mcp_handler_body_observation_tracks_current_source_revision(
     )
     surface = HashmarksMcpSurface(str(tmp_path))
     try:
-        spans = [{"path": PATH, "start_line": 1, "end_line": 1}]
+        spans: list[dict[str, object]] = [
+            {"path": PATH, "start_line": 1, "end_line": 1}
+        ]
         before = surface.change_impact(TASK, [PATH], changed_line_spans=spans)
         replay = surface.change_impact(TASK, [PATH], changed_line_spans=spans)
         source.write_text(
@@ -223,15 +238,15 @@ def test_mcp_handler_body_observation_tracks_current_source_revision(
         surface.close()
 
     def observed_key(packet: dict[str, object]) -> str:
-        return _association(packet)["handler_body_context"][
-            "literal_dictionary_returns"
-        ][0]["literal_keys_in_source_order"][0]
+        body = assert_object(_association(packet)["handler_body_context"])
+        returned = assert_records(body["literal_dictionary_returns"])[0]
+        return assert_text(assert_array(returned["literal_keys_in_source_order"])[0])
 
     assert observed_key(before) == "before"
     assert observed_key(replay) == "before"
     assert observed_key(after) == "after"
     assert before["changed_line_evidence"] == replay["changed_line_evidence"]
     assert (
-        before["changed_line_evidence"]["observations"][0]["member_revision"]
-        != after["changed_line_evidence"]["observations"][0]["member_revision"]
+        _observation(before)["member_revision"]
+        != _observation(after)["member_revision"]
     )

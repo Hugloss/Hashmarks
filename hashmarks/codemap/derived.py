@@ -13,7 +13,7 @@ DERIVED_NODE_SCHEMA = "hashmarks.codemap-derived-node.v1"
 PRODUCER = "hashmarks.codemap-derived.v1"
 
 
-def _identity(domain: str, value: Any) -> str:
+def _identity(domain: str, value: object) -> str:
     payload = json.dumps(
         value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
     ).encode("utf-8")

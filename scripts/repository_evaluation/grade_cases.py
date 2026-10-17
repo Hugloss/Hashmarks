@@ -16,6 +16,7 @@ from scripts.repository_evaluation.common import (
     load_json,
     write_json,
 )
+from scripts.repository_evaluation.fact_grading import grade_facts
 
 
 def _classification(
@@ -77,6 +78,8 @@ def _grade_case(
     case_id: str, item: Mapping[str, object], rule: Mapping[str, object]
 ) -> dict[str, object]:
     result = item.get("result")
+    if isinstance(result, Mapping) and "checks" in rule:
+        return grade_facts(case_id, result, rule)
     action = result.get("action") if isinstance(result, Mapping) else None
     if not isinstance(action, Mapping):
         raise ValueError(f"missing task action result for {case_id}")
@@ -164,6 +167,10 @@ def grade_run(
         if not isinstance(item, Mapping):
             raise ValueError("repository evaluation run case must be an object")
         case_id = str(item.get("id") or "")
+        if not case_id or case_id in seen:
+            raise ValueError(
+                f"duplicate or empty repository evaluation result: {case_id}"
+            )
         rule = expected.get(case_id)
         if not isinstance(rule, Mapping):
             raise ValueError(f"missing repository evaluation grader rule for {case_id}")
@@ -185,7 +192,9 @@ def grade_run(
         "timing_comparable": run.get("timing_comparable"),
         "counters": counters,
         "missing_cases": missing,
-        "complete": not missing and counters.get("OTHER_FAILURE", 0) == 0,
+        "complete": not missing
+        and counters.get("INCOMPLETE", 0) == 0
+        and counters.get("OTHER_FAILURE", 0) == 0,
         "cases": rows,
         "authority": "grader-only",
     }

@@ -18,9 +18,10 @@ from .project_impact_codec import compact_project_impact
 from .repository_domains import RepositoryDomain, classify_repository_path
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Mapping, Sequence
 
     from .engine import CodeMap
+    from .ownership_relation_types import OwnershipPathHop
 
 
 @dataclass(frozen=True)
@@ -316,7 +317,7 @@ class ChangeImpactMixin:
                         cast("Sequence[object]", refreshed.get("warnings") or ())
                     ),
                 },
-                int(refreshed["generation"]),
+                int(cast("int | str", refreshed["generation"])),
             )
         return None, None
 
@@ -356,7 +357,7 @@ class ChangeImpactMixin:
         return state
 
     def _change_impact_owner_cache_key(
-        self, task: str, action: dict[str, object]
+        self, task: str, action: Mapping[str, object]
     ) -> tuple[int, str, int, int] | None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -377,7 +378,9 @@ class ChangeImpactMixin:
         generation = int(self._decision_session_generation or self.store.generation())
         return generation, task, limit, per_role
 
-    def _same_package_go_owner(self, verify_path: str, visible) -> str | None:
+    def _same_package_go_owner(
+        self, verify_path: str, visible: Callable[[str], bool]
+    ) -> str | None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         parent = Path(verify_path).parent
@@ -392,8 +395,12 @@ class ChangeImpactMixin:
         return siblings[0] if len(siblings) == 1 else None
 
     def _reconstruct_change_impact_owner_edges(
-        self, task: str, edit_path: str, verify_path: str, visible
-    ) -> list[dict[str, object]] | None:
+        self,
+        task: str,
+        edit_path: str,
+        verify_path: str,
+        visible: Callable[[str], bool],
+    ) -> list[OwnershipPathHop] | None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         starts = [verify_path]
@@ -436,7 +443,11 @@ class ChangeImpactMixin:
                 relations[(source, target)] = str(edge.get("relation") or "related")
         return chain, relations
 
-    def _change_impact_owner_chain(self, task: str, action: dict[str, object], visible):
+    def _change_impact_owner_chain(
+        self, task: str, action: Mapping[str, object], visible: Callable[[str], bool]
+    ) -> tuple[
+        str, dict[str, object] | None, str, list[str], dict[tuple[str, str], str]
+    ]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         cache_key = self._change_impact_owner_cache_key(task, action)
@@ -519,7 +530,7 @@ class ChangeImpactMixin:
         }
         for key in ("runner", "scope", "confidence"):
             if key in plan:
-                verification_meta[key] = plan[key]
+                verification_meta[key] = plan.get(key)
         state.add(
             _ImpactCandidate(
                 verify_path,

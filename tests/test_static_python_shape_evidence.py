@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
+from contract_assertions import assert_object
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.repository_declaration_provider import (
@@ -244,7 +245,12 @@ def test_site_limit_fails_before_provider_publication(tmp_path: Path) -> None:
                     )
                 ]
             )
-        assert cm.discover_repository_declarations([])["declarations"]["groups"] == []
+        assert (
+            assert_object(cm.discover_repository_declarations([])["declarations"])[
+                "groups"
+            ]
+            == []
+        )
 
 
 @pytest.mark.parametrize("kind", ["returns", "reads"])
@@ -354,5 +360,5 @@ def test_shape_opt_in_requires_boolean(bad: object) -> None:
     with pytest.raises(ValueError, match="boolean"):
         StaticPythonInterfaceDeclarations(
             paths=("service.py",),
-            include_literal_shape_syntax=bad,  # type: ignore[arg-type]
+            include_literal_shape_syntax=cast(bool, bad),  # type: ignore[arg-type]
         )

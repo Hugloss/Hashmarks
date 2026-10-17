@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 SCHEMA = "hashmarks.internal-agent-ledger.v1"
 
 
-def _sha(x):
+def _sha(x: object) -> str:
     return (
         "sha256:"
         + hashlib.sha256(
@@ -28,16 +28,16 @@ def _sha(x):
     )
 
 
-def _load(p: Path):
+def _load(p: Path) -> dict[str, object]:
     return json.loads(p.read_text()) if p.exists() else {"schema": SCHEMA, "events": []}
 
 
-def _save(p: Path, o):
+def _save(p: Path, o: object) -> None:
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(o, indent=2, sort_keys=True) + "\n")
 
 
-def _event(state, kind, **kw):
+def _event(state: dict[str, object], kind: str, **kw: object) -> None:
     state["events"].append(
         {
             "seq": len(state["events"]) + 1,
@@ -318,7 +318,7 @@ def _verify(a: argparse.Namespace, state: dict, repo: Path) -> None:
     raise SystemExit(result.returncode)
 
 
-def main():
+def main() -> None:
     a = _parse_args()
     st = _load(a.state)
     if a.cmd == "init":

@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from contract_assertions import assert_records
 
 from hashmarks.codemap import CodeMap
 from hashmarks.mcp_surface import HashmarksMcpSurface
@@ -67,7 +68,9 @@ def test_real_owner_and_verifier_converge_across_bounds_and_mcp(
         evidence = codemap.task_evidence(task, limit=20, token_budget=64)
         brief = codemap.task_action_brief(task, limit=20, token_budget=64)
 
+    assert wide["admitted_edit"] is not None
     assert wide["admitted_edit"]["path"] == owner
+    assert wide["verify"] is not None
     assert wide["verify"]["path"] == verifier
     assert narrow["ownership_authority"]["resolved_owner"] == owner
     proof = wide["ownership_authority"]["authority_proof_identity"]
@@ -81,6 +84,7 @@ def test_real_owner_and_verifier_converge_across_bounds_and_mcp(
     finally:
         surface.close()
     assert mcp["ownership"]["authority_proof_identity"] == proof
+    assert mcp["ownership"]["owner"] is not None
     assert mcp["ownership"]["owner"]["path"] == owner
 
 
@@ -203,10 +207,14 @@ def test_exact_owner_uses_its_own_importing_test_as_verifier(
             f"Change src.decoy.{symbol} implementation and verify it", limit=20
         )
 
+    assert active["admitted_edit"] is not None
     assert active["admitted_edit"]["path"] == f"src/{owner_name}"
+    assert active["verify"] is not None
     assert active["verify"]["path"].startswith("tests/")
     assert active["verify"]["path"] != decoy_test
+    assert decoy["admitted_edit"] is not None
     assert decoy["admitted_edit"]["path"].startswith("src/decoy.")
+    assert decoy["verify"] is not None
     assert decoy["verify"]["path"] == decoy_test
 
 
@@ -225,7 +233,9 @@ def test_typescript_generic_function_is_an_exact_owner(tmp_path: Path) -> None:
         codemap.sync()
         action = codemap.task_action_map("Fix withRefreshOutcome", limit=1)
 
+    assert action["admitted_edit"] is not None
     assert action["admitted_edit"]["path"] == "src/result.ts"
+    assert "name" in action["admitted_edit"]
     assert action["admitted_edit"]["name"] == "withRefreshOutcome"
 
 
@@ -246,7 +256,9 @@ def test_typescript_overload_signatures_share_the_implementation_owner(
         codemap.sync()
         action = codemap.task_action_map("Fix encodePayload", limit=1)
 
+    assert action["admitted_edit"] is not None
     assert action["admitted_edit"]["path"] == "src/encoding.ts"
+    assert "name" in action["admitted_edit"]
     assert action["admitted_edit"]["name"] == "encodePayload"
 
 
@@ -268,6 +280,13 @@ def test_typescript_overload_does_not_cross_a_scope_boundary(tmp_path: Path) -> 
         action = codemap.task_action_map("Fix encodePayload", limit=1)
 
     assert (
-        len([row for row in outline["symbols"] if row["name"] == "encodePayload"]) == 2
+        len(
+            [
+                row
+                for row in assert_records(outline["symbols"])
+                if row["name"] == "encodePayload"
+            ]
+        )
+        == 2
     )
     assert action["admitted_edit"] is None

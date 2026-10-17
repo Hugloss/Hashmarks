@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import re
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -195,7 +196,7 @@ def test_mcp_contract_identity_binds_wire_schema_and_server_version() -> None:
     ],
 )
 def test_mcp_contract_rejects_independent_catalog_drift(
-    mutation,
+    mutation: Callable[[object], object],
     message: str,
 ) -> None:
     observation = _observation()
@@ -235,7 +236,7 @@ def test_mcp_contract_rejects_independent_catalog_drift(
 )
 def test_mcp_contract_rejects_native_result_mode_schema_drift(
     name: str,
-    mutation,
+    mutation: Callable[[object], object],
     message: str,
 ) -> None:
     observation = _observation()

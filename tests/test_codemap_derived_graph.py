@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+
+import pytest
 
 from hashmarks.codemap import CodeMap
 
@@ -9,7 +11,7 @@ if TYPE_CHECKING:
 
 
 def test_sync_persists_dependency_tracked_derived_surfaces(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
     ws = tmp_path / "repo"
@@ -33,7 +35,7 @@ def test_sync_persists_dependency_tracked_derived_surfaces(
 
 
 def test_body_only_change_can_preserve_symbol_surface_identity(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
     ws = tmp_path / "repo"
@@ -55,7 +57,7 @@ def test_body_only_change_can_preserve_symbol_surface_identity(
 
 
 def test_signature_change_changes_symbol_and_outline_surfaces(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
     ws = tmp_path / "repo"
@@ -72,7 +74,9 @@ def test_signature_change_changes_symbol_and_outline_surfaces(
     assert before["outline_surface"]["identity"] != after["outline_surface"]["identity"]
 
 
-def test_deleted_file_removes_derived_nodes(tmp_path: Path, monkeypatch) -> None:
+def test_deleted_file_removes_derived_nodes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
     ws = tmp_path / "repo"
     ws.mkdir()
@@ -87,7 +91,7 @@ def test_deleted_file_removes_derived_nodes(tmp_path: Path, monkeypatch) -> None
 
 
 def test_body_only_change_reports_semantic_invalidation_shields(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
     ws = tmp_path / "repo"
@@ -104,7 +108,7 @@ def test_body_only_change_reports_semantic_invalidation_shields(
 
 
 def test_signature_change_does_not_shield_symbol_surface(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
     ws = tmp_path / "repo"
@@ -122,7 +126,7 @@ def test_signature_change_does_not_shield_symbol_surface(
 
 
 def test_shielding_never_skips_line_level_storage_refresh(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
     ws = tmp_path / "repo"
@@ -143,7 +147,7 @@ def test_shielding_never_skips_line_level_storage_refresh(
 
 
 def test_change_impact_projects_reachable_files_into_repository_surfaces(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
     ws = tmp_path / "repo"
@@ -173,7 +177,7 @@ def test_change_impact_projects_reachable_files_into_repository_surfaces(
 
 
 def test_change_impact_is_bounded_and_does_not_change_task_retrieval(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
     ws = tmp_path / "repo"
@@ -193,7 +197,7 @@ def test_change_impact_is_bounded_and_does_not_change_task_retrieval(
 
 
 def test_derived_graph_revalidates_exact_path_after_unsignaled_rewrite(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
     ws = tmp_path / "repo"
@@ -214,7 +218,7 @@ def test_derived_graph_revalidates_exact_path_after_unsignaled_rewrite(
 
 
 def test_derived_graph_obeys_live_context_policy_before_exposing_nodes(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
     ws = tmp_path / "repo"

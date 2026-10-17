@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, cast
 
 from .change_impact import ChangeImpactOptions
@@ -94,7 +95,7 @@ class ChangeIntelligenceMixin:
         ownership_projection = None
         if isinstance(ownership, dict):
             ownership_projection = {
-                key: ownership[key]
+                key: ownership.get(key)
                 for key in ("selected", "via", "owner_path")
                 if key in ownership
             }
@@ -132,7 +133,7 @@ class ChangeIntelligenceMixin:
                 "state": freshness_state(stale),
                 "generation_bound": True,
             },
-            "bounds": dict(impact.get("bounds") or {}),
+            "bounds": dict(cast(Mapping[str, object], impact.get("bounds") or {})),
             "completeness": "not-claimed",
             "authority": "repository-intelligence-only",
             "execution_effect": "none",

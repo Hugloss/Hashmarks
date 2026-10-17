@@ -30,7 +30,7 @@ def test_codemap_cannot_import_dependency_adapters() -> None:
                 )
                 modules = [module, *(f"{module}.{alias.name}" for alias in node.names)]
             else:
-                modules = []
+                continue
             if any(
                 module == "hashmarks.adapters"
                 or module.startswith("hashmarks.adapters.")
@@ -75,6 +75,7 @@ def test_repository_member_observation_has_one_semantic_owner() -> None:
                 and node.name == "_repository_member_observation"
             ):
                 definitions.append(f"{path.name}:{node.lineno}")
+
     assert len(definitions) == 1
     assert definitions[0].startswith("repository_delta.py:")
 

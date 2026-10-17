@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping, Sequence
+from typing import cast
+
+from hashmarks.json_value import CanonicalJsonValue
 
 MAX_GROUPS = 128
 MAX_DECLARATIONS = 256
@@ -38,31 +40,11 @@ COVERAGE_KEYS = frozenset(
 
 
 def json_value(value: object, *, name: str) -> object:
-    try:
-        encoded = json.dumps(
-            value,
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=False,
-            allow_nan=False,
-        )
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{name} must contain JSON-compatible values") from exc
-    return json.loads(encoded)
+    return CanonicalJsonValue(value, name=name).to_value()
 
 
 def encoded_json_bytes(value: object, *, name: str) -> int:
-    try:
-        payload = json.dumps(
-            value,
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=False,
-            allow_nan=False,
-        ).encode("utf-8")
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{name} must contain JSON-compatible values") from exc
-    return len(payload)
+    return len(CanonicalJsonValue(value, name=name).encoded)
 
 
 def mapping(value: object, *, name: str) -> Mapping[str, object]:
@@ -174,16 +156,7 @@ def _normalized_ambiguous_value(
     if len(candidates) < 2:
         raise ValueError("ambiguous declaration requires at least two candidate values")
     normalized = [json_value(value, name="candidate value") for value in candidates]
-    by_identity = {
-        json.dumps(
-            value,
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=False,
-            allow_nan=False,
-        ): value
-        for value in normalized
-    }
+    by_identity = {CanonicalJsonValue(value).encoded: value for value in normalized}
     if len(by_identity) < 2:
         raise ValueError(
             "ambiguous declaration requires at least two distinct candidate values"
@@ -287,16 +260,10 @@ def comparison(
             "distinct_values": values,
         }
 
-    by_json: dict[str, object] = {}
+    by_json: dict[bytes, object] = {}
     for row in declarations:
         value = row["value"]
-        key = json.dumps(
-            value,
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=False,
-            allow_nan=False,
-        )
+        key = CanonicalJsonValue(value).encoded
         by_json.setdefault(key, value)
     distinct = [by_json[key] for key in sorted(by_json)]
     return {
@@ -309,7 +276,9 @@ def absence(
     declarations: Sequence[Mapping[str, object]],
     coverage: Mapping[str, object],
 ) -> dict[str, object]:
-    expected = set(coverage.get("expected_declaration_ids") or [])
+    expected = set(
+        cast("Sequence[str]", coverage.get("expected_declaration_ids") or [])
+    )
     present = {
         str(row["declaration_id"])
         for row in declarations

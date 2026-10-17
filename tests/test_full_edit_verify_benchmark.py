@@ -1,10 +1,12 @@
 from pathlib import Path
 
+import pytest
+
 from scripts.agent_evaluation import full_edit_verify_benchmark as benchmark
 
 
 def test_run_lane_measures_first_edit_and_controlled_recovery(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     base = tmp_path / "base"
     base.mkdir()

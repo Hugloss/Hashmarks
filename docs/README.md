@@ -12,6 +12,7 @@ This is the single catalog for the current maintained documentation in `docs/`.
 - [`reference/ARCHITECTURE.md`](reference/ARCHITECTURE.md) — architecture and authority model.
 - [`reference/API_STABILITY.md`](reference/API_STABILITY.md) — supported Python/CLI surface and pre-1.0 compatibility policy.
 - [`reference/EVIDENCE_CORRELATION.md`](reference/EVIDENCE_CORRELATION.md) — bounded external-observation correlation and authority limits.
+- [`reference/FILESYSTEM_LIFECYCLE_EVIDENCE.md`](reference/FILESYSTEM_LIFECYCLE_EVIDENCE.md) — qualified Python filesystem checks, source-reference flow, protection syntax and uncertainty.
 - [`reference/DEPENDENCY_EVIDENCE.md`](reference/DEPENDENCY_EVIDENCE.md) — producer-neutral dependency evidence, adapter boundaries, semantic authorities, and coverage rules.
 - [`reference/INVARIANTS.md`](reference/INVARIANTS.md) — normative correctness, freshness, and authority guarantees.
 - [`reference/OBSERVER_DELTA.md`](reference/OBSERVER_DELTA.md) — observer/delta ownership and change semantics.
@@ -38,12 +39,20 @@ This is the single catalog for the current maintained documentation in `docs/`.
 
 ## Plans
 
+- [`plans/HM_OBS_REPOSITORY_EVIDENCE_OWNER_CENSUS.md`](plans/HM_OBS_REPOSITORY_EVIDENCE_OWNER_CENSUS.md) — diagnostic-to-repository canonical owners, focused baseline, local regressions and standalone follow-on bundles.
+- [`plans/HASHMARKS_TOCTOU_EVIDENCE_DISCOVERY_PLAN.md`](plans/HASHMARKS_TOCTOU_EVIDENCE_DISCOVERY_PLAN.md) — filesystem check/use implementation and required native/reference/external qualification.
 - [`plans/COMPETITOR_EVIDENCE_CONSOLIDATED.md`](plans/COMPETITOR_EVIDENCE_CONSOLIDATED.md) — single-PR admission and implementation checklist for competitor-inspired repository evidence.
 - [`plans/COMPETITOR_EVIDENCE_FOLLOWUP.md`](plans/COMPETITOR_EVIDENCE_FOLLOWUP.md) — post-#415 checkpoint boundaries, opt-in static handler syntax and deferred provider/measurement work.
 
 ## Qualification
 
+- [`qualification/DIAGNOSTIC_CORRESPONDENCE.md`](qualification/DIAGNOSTIC_CORRESPONDENCE.md) — standalone HM-OBS-01..09 implementation, local fixture replay, contract changes and comparable read economics.
+- [`qualification/OPTIONAL_MCP_TESTS.md`](qualification/OPTIONAL_MCP_TESTS.md) — SDK-absent CI execution, preserved CLI coverage, SDK-present checks and inventory-independent economics assertions.
+
 - [`qualification/AGENT_EVIDENCE_FORMATS.md`](qualification/AGENT_EVIDENCE_FORMATS.md) — paired evidence-presentation export and external agent grading.
+- [`qualification/BACKEND_E2E.md`](qualification/BACKEND_E2E.md) — genuine backend revision workflows, source oracles and all-capability qualification accounting.
+- [`qualification/BACKEND_E2E_CAMPAIGN.md`](qualification/BACKEND_E2E_CAMPAIGN.md) — frozen capability membership, current measurements and remaining backend qualification work.
+- [`qualification/BACKEND_E2E_REMAINING_PLAN.md`](qualification/BACKEND_E2E_REMAINING_PLAN.md) — remaining plan for backend E2E qualification.
 - [`qualification/REPOSITORY_QUALITY.md`](qualification/REPOSITORY_QUALITY.md) — repository-quality qualification semantics.
 - [`qualification/TEST_RUNTIME_ECONOMICS.md`](qualification/TEST_RUNTIME_ECONOMICS.md) — test-proof scope and runtime-economics guidance.
 

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import pytest
+
 from hashmarks import CodeMap
 
 if TYPE_CHECKING:
@@ -21,7 +23,7 @@ def _repo(root: Path) -> None:
 
 
 def test_exact_ownership_import_paths_reuses_exact_request_in_one_session(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
@@ -29,7 +31,7 @@ def test_exact_ownership_import_paths_reuses_exact_request_in_one_session(
         calls = 0
         original = codemap._resolve_import_owner_evidence
 
-        def counted(source_path: str, target: str):
+        def counted(source_path: str, target: str) -> list[str]:
             nonlocal calls
             calls += 1
             return original(source_path, target)
@@ -47,7 +49,7 @@ def test_exact_ownership_import_paths_reuses_exact_request_in_one_session(
 
 
 def test_ownership_import_path_cache_key_includes_source_and_target(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
@@ -55,7 +57,7 @@ def test_ownership_import_path_cache_key_includes_source_and_target(
         calls = 0
         original = codemap._resolve_import_owner_evidence
 
-        def counted(source_path: str, target: str):
+        def counted(source_path: str, target: str) -> list[str]:
             nonlocal calls
             calls += 1
             return original(source_path, target)
@@ -104,7 +106,7 @@ def test_exact_ownership_import_paths_preserves_direct_and_missing_module_eviden
 
 
 def test_ownership_import_path_cache_is_not_reused_across_sessions(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
@@ -112,7 +114,7 @@ def test_ownership_import_path_cache_is_not_reused_across_sessions(
         calls = 0
         original = codemap._resolve_import_owner_evidence
 
-        def counted(source_path: str, target: str):
+        def counted(source_path: str, target: str) -> list[str]:
             nonlocal calls
             calls += 1
             return original(source_path, target)
@@ -127,7 +129,7 @@ def test_ownership_import_path_cache_is_not_reused_across_sessions(
 
 
 def test_public_ownership_graph_batches_repeated_exact_module_probes_without_changing_evidence(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     package = tmp_path / "pkg"
     package.mkdir()

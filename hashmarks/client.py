@@ -167,7 +167,7 @@ class IdentityClient:
         self.timeout = timeout
         self._compatibility_validated = False
 
-    def request(self, op: str, **payload: Any) -> dict[str, Any]:
+    def request(self, op: str, **payload: object) -> dict[str, Any]:
         message = {"protocol": _PROTOCOL_VERSION, "op": op, **payload}
         raw = (
             json.dumps(message, separators=(",", ":"), sort_keys=True) + "\n"

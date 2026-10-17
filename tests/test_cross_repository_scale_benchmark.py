@@ -6,7 +6,7 @@ import pytest
 from scripts.score_cross_repository_scale import generate, run
 
 
-def test_scale_generator_separates_public_and_secret(tmp_path: Path):
+def test_scale_generator_separates_public_and_secret(tmp_path: Path) -> None:
     base = tmp_path / "repos"
     public = tmp_path / "public.json"
     secret = tmp_path / "secret.json"
@@ -23,7 +23,7 @@ def test_scale_generator_separates_public_and_secret(tmp_path: Path):
 
 def test_scale_measurement_exposes_provenance_limit_without_hiding_project_recall(
     tmp_path: Path,
-):
+) -> None:
     base = tmp_path / "repos"
     public = tmp_path / "public.json"
     secret = tmp_path / "secret.json"

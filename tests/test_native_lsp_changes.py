@@ -5,12 +5,19 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from typing import Any
 
 import pytest
+from contract_assertions import (
+    assert_array,
+    assert_number,
+    assert_object,
+    assert_records,
+    assert_text,
+)
 from native_evidence_support import (
     assert_hover_capture,
     assert_hover_presentation,
+    assert_lsp_transcript,
     assert_projection,
     import_native_scip,
     lsp_capture,
@@ -26,17 +33,19 @@ from hashmarks.digest import FILE_DOMAIN, hash_bytes
 from hashmarks.evidence_presentation import FORMATS, present_repository_evidence
 
 
-def observe(cm: CodeMap, root: Path, source: Path, name: str) -> Any:
+def observe(cm: CodeMap, root: Path, source: Path, name: str) -> dict[str, object]:
     row = next(
         row
         for row in json.loads((source / "captures.json").read_text())
         if row["name"] == name
     )
     try:
-        return cm.structural_locality(
-            row["subject"],
-            result_mode="relationships",
-            supplied_observations=[lsp_capture(root, source, name)],
+        return assert_object(
+            cm.structural_locality(
+                row["subject"],
+                result_mode="relationships",
+                supplied_observations=[lsp_capture(root, source, name)],
+            )
         )
     except ValueError as exc:
         raise AssertionError(
@@ -44,16 +53,18 @@ def observe(cm: CodeMap, root: Path, source: Path, name: str) -> Any:
         ) from exc
 
 
-def lsp_row(packet: Any) -> Any:
+def lsp_row(packet: dict[str, object]) -> dict[str, object]:
     return next(
         row
-        for row in packet["observations"]
-        if row["producer"].endswith("langserver")
-        or row["producer"] == "typescript-language-server"
+        for row in assert_records(packet["observations"])
+        if assert_text(row["producer"]).endswith("langserver")
+        or assert_text(row["producer"]) == "typescript-language-server"
     )
 
 
-def _assert_hover_formats(packet: Any, capture: Any) -> None:
+def _assert_hover_formats(
+    packet: dict[str, object], capture: dict[str, object]
+) -> None:
     for format in FORMATS:
         if format != "none":
             assert_hover_presentation(
@@ -94,6 +105,7 @@ def test_native_lsp_raw_capture_integrity_and_uri_only_replay(
             == revision
         )
     originals = json.loads((source / "captures.json").read_text())
+    assert_lsp_transcript(source, metadata, originals)
     for row in originals:
         replay = lsp_capture(tmp_path, source, row["name"])
         # Undo only admitted URI replacements; all other captured fields are exact.
@@ -103,6 +115,27 @@ def test_native_lsp_raw_capture_integrity_and_uri_only_replay(
                 (tmp_path / path).as_uri(), metadata["original_root_uri"] + "/" + path
             )
         assert json.loads(restored) == row["capture"]
+
+
+@pytest.mark.parametrize(
+    "field", ["text", "document_version", "document_lifetime", "response"]
+)
+def test_native_lsp_transcript_rejects_altered_capture(
+    field: str, native_lsp_corpus: Path
+) -> None:
+    source = native_lsp_corpus / "python" / "hover"
+    metadata = json.loads((source / "capture.json").read_text())
+    captures = json.loads((source / "captures.json").read_text())
+    capture = next(row["capture"] for row in captures if row["name"] == "hover-buffer")
+    document = assert_object(assert_object(capture["documents"])["src/source.py"])
+    if field == "text":
+        document["text"] = (source / "src/source.py").read_text(encoding="utf-8")
+    elif field == "response":
+        assert_object(capture["response"])["result"] = None
+    else:
+        assert_object(document["provenance"])[field] = "altered"
+    with pytest.raises(AssertionError):
+        assert_lsp_transcript(source, metadata, captures)
 
 
 @pytest.mark.parametrize(
@@ -121,8 +154,11 @@ def test_native_hover_accepts_exact_protocol_responses_without_edges(
         packet = observe(cm, root, source, name)
     row = assert_hover_capture(packet, capture)
     assert row["freshness"] == "current"
-    assert row["source_bindings"][0]["state"] == "matching"
-    assert row["capability"]["request_id"] == capture["request"]["id"]
+    assert assert_records(row["source_bindings"])[0]["state"] == "matching"
+    assert (
+        assert_object(row["capability"])["request_id"]
+        == assert_object(capture["request"])["id"]
+    )
     assert_projection(packet, "structural_locality", "relationships")
     _assert_hover_formats(packet, capture)
 
@@ -142,7 +178,7 @@ def test_native_hover_unsaved_buffer_and_document_reopen_preserve_authority(
         unsaved = observe(cm, root, source, "hover-buffer")
         changed = assert_hover_capture(unsaved, changed_capture)
         assert changed["freshness"] == "unknown"
-        assert changed["source_bindings"][0]["state"] == "different"
+        assert assert_records(changed["source_bindings"])[0]["state"] == "different"
         unqualified = semantic_relationship_delta(before, unsaved)
         assert unqualified["comparable"] is False
         assert (
@@ -155,10 +191,14 @@ def test_native_hover_unsaved_buffer_and_document_reopen_preserve_authority(
         reopened_capture = lsp_capture(root, source, "hover-reopened")
         reopened_row = assert_hover_capture(reopened, reopened_capture)
         assert reopened_row["freshness"] == "current"
-        assert reopened_row["source_bindings"][0]["state"] == "matching"
+        assert assert_records(reopened_row["source_bindings"])[0]["state"] == "matching"
         assert (
-            reopened_row["source_bindings"][0]["provenance"]["document_lifetime"]
-            != old["source_bindings"][0]["provenance"]["document_lifetime"]
+            assert_object(
+                assert_records(reopened_row["source_bindings"])[0]["provenance"]
+            )["document_lifetime"]
+            != assert_object(assert_records(old["source_bindings"])[0]["provenance"])[
+                "document_lifetime"
+            ]
         )
         _assert_hover_formats(reopened, reopened_capture)
 
@@ -178,41 +218,57 @@ def test_native_hover_save_delta_and_codemap_reopen_do_not_replay(
 
         # Save the exact text the real server observed; neither capture is edited.
         (root / "src/source.py").write_text(
-            changed_capture["documents"]["src/source.py"]["text"], encoding="utf-8"
+            assert_text(
+                assert_object(
+                    assert_object(changed_capture["documents"])["src/source.py"]
+                )["text"]
+            ),
+            encoding="utf-8",
         )
         cm.sync()
         after = observe(cm, root, source, "hover-buffer")
         saved = assert_hover_capture(after, changed_capture)
         assert saved["freshness"] == "current"
-        assert saved["source_bindings"][0]["state"] == "matching"
+        assert assert_records(saved["source_bindings"])[0]["state"] == "matching"
         stale = observe(cm, root, source, "hover-disk")
         assert assert_hover_capture(stale, old_capture)["freshness"] == "unknown"
         delta = semantic_relationship_delta(before, after)
         assert delta["comparable"] is True
-        (change,) = delta["producer_deltas"]
-        assert change["capability"]["changed"] is True
+        (change,) = assert_records(delta["producer_deltas"])
+        assert assert_object(change["capability"])["changed"] is True
         assert (
-            change["capability"]["before"]["hover_observation"]
-            == (old["capability"]["hover_observation"])
+            assert_object(assert_object(change["capability"])["before"])[
+                "hover_observation"
+            ]
+            == (assert_object(old["capability"])["hover_observation"])
         )
         assert (
-            change["capability"]["after"]["hover_observation"]
-            == (saved["capability"]["hover_observation"])
+            assert_object(assert_object(change["capability"])["after"])[
+                "hover_observation"
+            ]
+            == (assert_object(saved["capability"])["hover_observation"])
         )
-        assert change["facts"]["added"] == change["facts"]["removed"] == []
         assert (
-            change["observed_claim_set_changes"]["repository_absence_inferred"] is False
+            assert_object(change["facts"])["added"]
+            == assert_object(change["facts"])["removed"]
+            == []
+        )
+        assert (
+            assert_object(change["observed_claim_set_changes"])[
+                "repository_absence_inferred"
+            ]
+            is False
         )
         assert_projection(delta, "evidence_comparison", "relationships")
         _assert_hover_formats(after, changed_capture)
     with CodeMap(root, state_dir=state) as cm:
         cm.sync()
-        current: Any = cm.structural_locality(
+        current = cm.structural_locality(
             "src/source.py::target", result_mode="relationships"
         )
     assert all(
-        row["producer"] != changed_capture["producer"]
-        for row in current["observations"]
+        assert_text(row["producer"]) != assert_text(changed_capture["producer"])
+        for row in assert_records(current["observations"])
     )
 
 
@@ -228,22 +284,28 @@ def test_native_lsp_cross_file_call_identity_direction_and_ranges(
     with CodeMap(root) as cm:
         cm.sync()
         packet = observe(cm, root, source, name)
-    (claim,) = lsp_row(packet)["claims"]
-    assert claim["basis"]["direction"] == direction
+    (claim,) = assert_records(lsp_row(packet)["claims"])
+    assert assert_object(claim["basis"])["direction"] == direction
     assert (
-        claim["source"]["resolution"]["candidates"][0]["symbol_id"]
+        assert_records(
+            assert_object(assert_object(claim["source"])["resolution"])["candidates"]
+        )[0]["symbol_id"]
         == "src/caller.py::caller"
     )
     assert (
-        claim["target"]["resolution"]["candidates"][0]["symbol_id"]
+        assert_records(
+            assert_object(assert_object(claim["target"])["resolution"])["candidates"]
+        )[0]["symbol_id"]
         == "src/callee.py::target"
     )
-    assert claim["basis"]["fromRanges"] == [
+    assert assert_object(claim["basis"])["fromRanges"] == [
         {"start": {"line": 4, "character": 11}, "end": {"line": 4, "character": 17}}
     ]
     assert (
-        claim["basis"]["captured_location"]["fromRanges"]
-        == lsp_capture(root, source, name)["response"]["result"][0]["fromRanges"]
+        assert_object(assert_object(claim["basis"])["captured_location"])["fromRanges"]
+        == assert_records(
+            assert_object(lsp_capture(root, source, name)["response"])["result"]
+        )[0]["fromRanges"]
     )
     assert packet["negative_evidence_admissible"] is False
     validate_relationship_observation(packet)
@@ -263,15 +325,35 @@ def test_native_lsp_body_query_and_duplicate_names_do_not_qualify_selected_subje
             ("duplicate-definition", "src/other.py::target"),
         ]:
             packet = observe(cm, root, source, name)
-            (claim,) = lsp_row(packet)["claims"]
-            assert claim["source"]["resolution"]["state"] == "unresolved"
-            assert claim["source"]["source_binding"]["state"] == "matching"
-            assert claim["source"]["locator"]["start"] == {"line": 4, "character": 11}
+            (claim,) = assert_records(lsp_row(packet)["claims"])
             assert (
-                claim["target"]["resolution"]["candidates"][0]["symbol_id"] == expected
+                assert_object(assert_object(claim["source"])["resolution"])["state"]
+                == "unresolved"
             )
-            assert packet["producer_correspondence"]["unresolved_claims"] == 1
-            assert packet["producer_correspondence"]["pairs"] == []
+            assert (
+                assert_object(assert_object(claim["source"])["source_binding"])["state"]
+                == "matching"
+            )
+            assert assert_object(assert_object(claim["source"])["locator"])[
+                "start"
+            ] == {"line": 4, "character": 11}
+            assert (
+                assert_records(
+                    assert_object(assert_object(claim["target"])["resolution"])[
+                        "candidates"
+                    ]
+                )[0]["symbol_id"]
+                == expected
+            )
+            assert (
+                assert_number(
+                    assert_object(packet["producer_correspondence"])[
+                        "unresolved_claims"
+                    ]
+                )
+                == 1
+            )
+            assert assert_object(packet["producer_correspondence"])["pairs"] == []
             validate_relationship_observation(packet)
 
 
@@ -287,16 +369,28 @@ def test_native_lsp_references_preserve_declaration_scope_and_unresolved_uses(
         packet = observe(
             cm, root, source, "references-" + str(include_declaration).lower()
         )
-    claims = lsp_row(packet)["claims"]
+    claims = assert_records(lsp_row(packet)["claims"])
     assert len(claims) == expected
-    assert all(claim["basis"]["direction"] == "result-to-query" for claim in claims)
     assert all(
-        claim["target"]["resolution"]["state"] == "unique-candidate" for claim in claims
+        assert_object(claim["basis"])["direction"] == "result-to-query"
+        for claim in claims
+    )
+    assert all(
+        assert_object(assert_object(claim["target"])["resolution"])["state"]
+        == "unique-candidate"
+        for claim in claims
     )
     assert sum(
-        claim["source"]["resolution"]["state"] == "unique-candidate" for claim in claims
+        assert_object(assert_object(claim["source"])["resolution"])["state"]
+        == "unique-candidate"
+        for claim in claims
     ) == int(include_declaration)
-    assert packet["producer_correspondence"]["unresolved_claims"] == 2
+    assert (
+        assert_number(
+            assert_object(packet["producer_correspondence"])["unresolved_claims"]
+        )
+        == 2
+    )
 
 
 def test_native_lsp_buffer_lifetime_never_strengthens_disk_correspondence(
@@ -309,16 +403,37 @@ def test_native_lsp_buffer_lifetime_never_strengthens_disk_correspondence(
         cm.sync()
         changed = observe(cm, root, source, "open-buffer")
         reopened = observe(cm, root, source, "reopened-buffer")
-    (old,) = lsp_row(changed)["claims"]
-    (new,) = lsp_row(reopened)["claims"]
-    assert old["source"]["source_binding"]["state"] == "different"
-    assert old["source"]["resolution"]["state"] == "unresolved"
-    assert changed["producer_correspondence"]["unresolved_claims"] == 1
-    assert new["source"]["source_binding"]["state"] == "matching"
-    assert new["source"]["resolution"]["state"] == "unique-candidate"
+    (old,) = assert_records(lsp_row(changed)["claims"])
+    (new,) = assert_records(lsp_row(reopened)["claims"])
     assert (
-        old["source"]["source_binding"]["provenance"]["document_lifetime"]
-        != new["source"]["source_binding"]["provenance"]["document_lifetime"]
+        assert_object(assert_object(old["source"])["source_binding"])["state"]
+        == "different"
+    )
+    assert (
+        assert_object(assert_object(old["source"])["resolution"])["state"]
+        == "unresolved"
+    )
+    assert (
+        assert_number(
+            assert_object(changed["producer_correspondence"])["unresolved_claims"]
+        )
+        == 1
+    )
+    assert (
+        assert_object(assert_object(new["source"])["source_binding"])["state"]
+        == "matching"
+    )
+    assert (
+        assert_object(assert_object(new["source"])["resolution"])["state"]
+        == "unique-candidate"
+    )
+    assert (
+        assert_object(
+            assert_object(assert_object(old["source"])["source_binding"])["provenance"]
+        )["document_lifetime"]
+        != assert_object(
+            assert_object(assert_object(new["source"])["source_binding"])["provenance"]
+        )["document_lifetime"]
     )
 
 
@@ -335,7 +450,11 @@ def test_native_lsp_disk_edit_rename_delete_and_reopen_do_not_replay(
         (root / "src/callee.py").write_text("def target():\n    return 55\n")
         stale = observe(cm, root, source, "incoming")
         assert (
-            lsp_row(stale)["claims"][0]["target"]["source_binding"]["state"]
+            assert_object(
+                assert_object(assert_records(lsp_row(stale)["claims"])[0]["target"])[
+                    "source_binding"
+                ]
+            )["state"]
             == "different"
         )
         moved_source = native_lsp_corpus / "python" / "moved"
@@ -345,19 +464,25 @@ def test_native_lsp_disk_edit_rename_delete_and_reopen_do_not_replay(
         cm.sync()
         moved = observe(cm, root, moved_source, "incoming")
         assert (
-            lsp_row(moved)["claims"][0]["target"]["resolution"]["candidates"][0][
-                "symbol_id"
-            ]
+            assert_records(
+                assert_object(
+                    assert_object(
+                        assert_records(lsp_row(moved)["claims"])[0]["target"]
+                    )["resolution"]
+                )["candidates"]
+            )[0]["symbol_id"]
             == "src/renamed.py::target"
         )
         (root / "src/caller.py").unlink()
         deleted = observe(cm, root, moved_source, "incoming")
-        assert lsp_row(deleted)["claims"] == []
-        assert lsp_row(deleted)["accounting"]["denied_or_unadmitted"] == 1
+        assert assert_records(lsp_row(deleted)["claims"]) == []
+        assert (
+            assert_object(lsp_row(deleted)["accounting"])["denied_or_unadmitted"] == 1
+        )
         assert (
             next(
                 binding
-                for binding in lsp_row(deleted)["source_bindings"]
+                for binding in assert_records(lsp_row(deleted)["source_bindings"])
                 if binding["path"] == "src/caller.py"
             )["state"]
             == "unknown"
@@ -368,17 +493,21 @@ def test_native_lsp_disk_edit_rename_delete_and_reopen_do_not_replay(
         with CodeMap(root, state_dir=directory) as cm:
             cm.sync()
             current = observe(cm, root, source, "incoming")
-            assert (
-                current["producer_correspondence"] == before["producer_correspondence"]
+            assert assert_object(current["producer_correspondence"]) == assert_object(
+                before["producer_correspondence"]
             )
             assert (
-                observe(cm, root, source, "prepare-target")["observations"][0]["claims"]
+                assert_records(
+                    assert_records(
+                        observe(cm, root, source, "prepare-target")["observations"]
+                    )[0]["claims"]
+                )
                 == []
             )
             without = cm.structural_locality(
                 "src/callee.py::target", result_mode="relationships"
             )
-            assert without["observations"] == []
+            assert assert_records(without["observations"]) == []
 
 
 @pytest.mark.parametrize("state,line", [("before", 3), ("moved", 5), ("after", 3)])
@@ -398,22 +527,40 @@ def test_native_only_typescript_method_accepts_genuine_lsp_without_lexical_promo
         packet = observe(cm, root, source, "method-definition")
         with pytest.raises(KeyError):
             cm.structural_locality("src/engine.ts::normalize")
-    (claim,) = lsp_row(packet)["claims"]
-    assert claim["source"]["locator"]["start"] == {"line": line, "character": 4}
-    assert claim["source"]["resolution"]["state"] == "unresolved"
-    assert claim["source"]["key"]["supplied_subject"] == "src/engine.ts::normalize"
+    (claim,) = assert_records(lsp_row(packet)["claims"])
+    assert assert_object(assert_object(claim["source"])["locator"])["start"] == {
+        "line": line,
+        "character": 4,
+    }
     assert (
-        claim["basis"]["captured_location"]["range"]
-        == lsp_capture(root, source, "method-definition")["response"]["result"][0][
-            "range"
-        ]
+        assert_object(assert_object(claim["source"])["resolution"])["state"]
+        == "unresolved"
     )
-    assert {row["producer"] for row in packet["observations"]} == {
+    assert (
+        assert_object(assert_object(claim["source"])["key"])["supplied_subject"]
+        == "src/engine.ts::normalize"
+    )
+    assert (
+        assert_object(assert_object(claim["basis"])["captured_location"])["range"]
+        == assert_records(
+            assert_object(lsp_capture(root, source, "method-definition")["response"])[
+                "result"
+            ]
+        )[0]["range"]
+    )
+    assert {
+        assert_text(row["producer"]) for row in assert_records(packet["observations"])
+    } == {
         "scip-typescript:0.4.0",
         "typescript-language-server",
     }
-    assert packet["producer_correspondence"]["pairs"] == []
-    assert packet["producer_correspondence"]["unresolved_claims"] >= 1
+    assert assert_object(packet["producer_correspondence"])["pairs"] == []
+    assert (
+        assert_number(
+            assert_object(packet["producer_correspondence"])["unresolved_claims"]
+        )
+        >= 1
+    )
     validate_relationship_observation(packet)
     assert_projection(packet, "structural_locality", "relationships")
 
@@ -432,26 +579,28 @@ def test_genuine_scip_lsp_claims_preserve_unknown_encoding_and_independent_claim
                 "src/engine.ts::normalize", result_mode="relationships"
             )
         packet = observe(cm, root, source, "implementations")
-    assert len(lsp_row(packet)["claims"]) == 2
+    assert len(assert_records(lsp_row(packet)["claims"])) == 2
     scip = next(
         row
-        for row in packet["observations"]
-        if row["producer"].startswith("scip-typescript:")
+        for row in assert_records(packet["observations"])
+        if assert_text(row["producer"]).startswith("scip-typescript:")
     )
-    assert len(scip["claims"]) == 2
+    assert len(assert_records(scip["claims"])) == 2
     assert all(
-        claim["source"]["locator"]["position_encoding"] == "unknown"
-        for claim in scip["claims"]
-    )
-    assert all(
-        claim["source"]["resolution"]["state"] == "unresolved"
-        for claim in scip["claims"]
+        assert_object(assert_object(claim["source"])["locator"])["position_encoding"]
+        == "unknown"
+        for claim in assert_records(scip["claims"])
     )
     assert all(
-        claim["basis"]["direction"] == "result-to-query"
-        for claim in lsp_row(packet)["claims"]
+        assert_object(assert_object(claim["source"])["resolution"])["state"]
+        == "unresolved"
+        for claim in assert_records(scip["claims"])
     )
-    assert packet["producer_correspondence"]["pairs"] == []
+    assert all(
+        assert_object(claim["basis"])["direction"] == "result-to-query"
+        for claim in assert_records(lsp_row(packet)["claims"])
+    )
+    assert assert_object(packet["producer_correspondence"])["pairs"] == []
     assert packet["negative_evidence_admissible"] is False
 
 
@@ -475,26 +624,48 @@ def test_native_typescript_navigation_preserves_scope_and_external_call(
         packet = observe(cm, root, source, name)
         prepared = observe(cm, root, source, "prepare-method")
     row = lsp_row(packet)
-    assert len(row["claims"]) == count
+    assert len(assert_records(row["claims"])) == count
     assert row["negative_evidence_admissible"] is False
-    assert lsp_row(prepared)["claims"] == []
-    (item,) = lsp_capture(root, source, "prepare-method")["response"]["result"]
-    assert lsp_row(prepared)["capability"]["prepared_candidates"][0]["item"] == item
+    assert assert_records(lsp_row(prepared)["claims"]) == []
+    (item,) = assert_records(
+        assert_object(lsp_capture(root, source, "prepare-method")["response"])["result"]
+    )
+    assert (
+        assert_records(
+            assert_object(lsp_row(prepared)["capability"])["prepared_candidates"]
+        )[0]["item"]
+        == item
+    )
     if name in ("incoming", "outgoing"):
-        assert lsp_capture(root, source, name)["request"]["params"]["item"] == item
+        assert (
+            assert_object(
+                assert_object(lsp_capture(root, source, name)["request"])["params"]
+            )["item"]
+            == item
+        )
     if name == "outgoing":
-        (claim,) = row["claims"]
-        assert claim["basis"]["direction"] == "query-to-result"
-        assert claim["target"]["resolution"]["state"] == "outside-repository"
-        (raw,) = lsp_capture(root, source, name)["response"]["result"]
-        assert claim["target"]["locator"]["uri"] == raw["to"]["uri"]
-        assert claim["basis"]["fromRanges"] == raw["fromRanges"]
+        (claim,) = assert_records(row["claims"])
+        assert assert_object(claim["basis"])["direction"] == "query-to-result"
+        assert (
+            assert_object(assert_object(claim["target"])["resolution"])["state"]
+            == "outside-repository"
+        )
+        (raw,) = assert_records(
+            assert_object(lsp_capture(root, source, name)["response"])["result"]
+        )
+        assert (
+            assert_object(assert_object(claim["target"])["locator"])["uri"]
+            == assert_object(raw["to"])["uri"]
+        )
+        assert assert_object(claim["basis"])["fromRanges"] == raw["fromRanges"]
     elif name.startswith("references"):
         assert all(
-            claim["basis"]["direction"] == "result-to-query" for claim in row["claims"]
+            assert_object(claim["basis"])["direction"] == "result-to-query"
+            for claim in assert_records(row["claims"])
         )
         assert all(
-            claim["target"]["resolution"]["state"] == "unresolved"
-            for claim in row["claims"]
+            assert_object(assert_object(claim["target"])["resolution"])["state"]
+            == "unresolved"
+            for claim in assert_records(row["claims"])
         )
     validate_relationship_observation(packet)

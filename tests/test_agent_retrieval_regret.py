@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 _MODULE = __import__("scripts.agent_evaluation.metrics_agent_regret", fromlist=["*"])
 
 
-def _load():
+def _load() -> object:
     return _MODULE
 
 

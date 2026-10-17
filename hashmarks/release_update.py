@@ -66,7 +66,7 @@ def _request(url: str) -> Request:
     )
 
 
-def _read_bounded_response(response, *, limit: int) -> bytes:
+def _read_bounded_response(response: Any, *, limit: int) -> bytes:
     payload = response.read(limit + 1)
     if len(payload) > limit:
         raise ReleaseCheckError("release response exceeded the bounded size")

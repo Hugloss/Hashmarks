@@ -40,6 +40,8 @@ def test_exact_qualified_identifier_is_not_displaced_by_test_structural_walk(
         action = codemap.task_action_map("optimize WorkspaceMapStore.paths_under")
 
     assert action["edit"]["path"] == "pkg/repository_index_store.py"
+    assert action["edit"] is not None
+    assert "qualname" in action["edit"]
     assert action["edit"]["qualname"] == "WorkspaceMapStore.paths_under"
     assert action["ambiguity"]["ambiguous"] is False
     assert action["ownership_resolution"] is None
@@ -72,6 +74,8 @@ def test_exact_method_identifier_is_not_displaced_by_import_continuation(
         action = codemap.task_action_map("optimize _sync_remove_stale_paths")
 
     assert action["edit"]["path"] == "pkg/indexing_lifecycle.py"
+    assert action["edit"] is not None
+    assert "qualname" in action["edit"]
     assert (
         action["edit"]["qualname"] == "IndexingLifecycleMixin._sync_remove_stale_paths"
     )
@@ -123,6 +127,8 @@ def test_generic_task_keeps_structural_owner_resolution(tmp_path: Path) -> None:
         action = codemap.task_action_map("Fix ember accepted response behavior owner")
 
     assert action["edit"]["path"] == "src/case/engine.py"
+    assert action["ownership_resolution"] is not None
+    assert "path" in action["ownership_resolution"]
     assert action["ownership_resolution"]["path"] == "src/case/engine.py"
     assert action["ambiguity"]["ambiguous"] is False
 
@@ -202,6 +208,8 @@ def test_comment_only_lexical_match_cannot_override_active_exact_symbol(
         action = codemap.task_action_map("optimize active_target")
 
     assert action["edit"]["path"] == "src/live.py"
+    assert action["edit"] is not None
+    assert "qualname" in action["edit"]
     assert action["edit"]["qualname"] == "active_target"
     assert action["ambiguity"]["ambiguous"] is False
 
@@ -238,8 +246,12 @@ def test_test_shaped_source_can_recover_edit_authority_from_exact_production_imp
         action = codemap.task_action_map("fix runtime_probe")
 
     assert action["edit"]["path"] == "pkg/test_support.py"
+    assert action["edit"] is not None
+    assert "qualname" in action["edit"]
     assert action["edit"]["qualname"] == "runtime_probe"
+    assert "reference_backed_source_projection" in action["edit"]
     assert action["edit"]["reference_backed_source_projection"] is True
+    assert "reference_backed_source_path" in action["edit"]
     assert action["edit"]["reference_backed_source_path"] == "pkg/consumer.py"
     assert action["ambiguity"]["ambiguous"] is False
     assert action["ownership_authority"]["owner_resolved"] is True
@@ -275,7 +287,10 @@ def test_literal_path_constrains_exact_method_within_that_file(tmp_path: Path) -
         action = codemap.task_action_map("fix src/store.py Store.paths_under")
 
     assert action["edit"]["path"] == "src/store.py"
+    assert action["edit"] is not None
+    assert "qualname" in action["edit"]
     assert action["edit"]["qualname"] == "Store.paths_under"
+    assert "exact_identifier_projection" in action["edit"]
     assert action["edit"]["exact_identifier_projection"] is True
     assert action["ambiguity"]["ambiguous"] is False
     assert action["ownership_authority"]["owner_resolved"] is True
@@ -299,8 +314,13 @@ def test_unique_exact_callable_can_discriminate_competing_verification_rows(
         action = codemap.task_action_map("fix target_impl verification behavior")
 
     assert action["edit"]["path"] == "src/generic.py"
+    assert action["edit"] is not None
+    assert "qualname" in action["edit"]
     assert action["edit"]["qualname"] == "target_impl"
+    assert "canonical_rank" in action["edit"]
+    assert action["edit"]["canonical_rank"] is not None
     assert action["edit"]["canonical_rank"] > 2
+    assert "exact_identifier_projection" in action["edit"]
     assert action["edit"]["exact_identifier_projection"] is True
     assert action["ownership_resolution"] is None
     assert action["ambiguity"]["ambiguous"] is False
@@ -400,3 +420,91 @@ def test_plain_identifier_index_preserves_duplicate_owner_ambiguity(
     assert action["ambiguity"]["ambiguous"] is True
     assert action["ambiguity"]["reason"] == "multiple-exact-identifier-edit-owners"
     assert action["ownership_authority"]["owner_resolved"] is False
+
+
+def test_sentence_ending_period_preserves_explicit_path_target(tmp_path: Path) -> None:
+    _write(tmp_path, "src/worker.py", "def transform_schema(): return 1\n")
+    _write(tmp_path, "src/decoy.py", "def default_factory(): return 2\n")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.task_evidence("Fix default_factory schema in src/worker.py.")
+    assert packet["explicit_target"]["status"] == "resolved"
+    assert packet["explicit_target"]["path"] == "src/worker.py"
+    assert packet["explicit_target"]["basis"] == "literal-path"
+    assert packet["ownership"]["candidate"]["path"] == "src/worker.py"
+
+
+def test_exact_filename_with_period_is_not_rebound_to_prefix(tmp_path: Path) -> None:
+    _write(tmp_path, "src/worker.py", "def prefix(): return 1\n")
+    _write(tmp_path, "src/worker.py.", "exact filename content\n")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.task_evidence("Inspect src/worker.py.")
+    assert packet["explicit_target"]["path"] != "src/worker.py"
+
+
+def test_denied_literal_filename_does_not_admit_punctuation_fallback(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "src/worker.py", "def prefix(): return 1\n")
+    (tmp_path / ".hashmarks-context.toml").write_text(
+        '[[rule]]\npattern = "src/worker.py."\nvisibility = "deny"\n'
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.task_evidence("Inspect src/worker.py.")
+    assert packet["explicit_target"]["path"] != "src/worker.py"
+
+
+def test_literal_file_does_not_promote_retrieved_helper_to_symbol_owner(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "src/worker.py",
+        "def schema_metadata(): return 1\ndef encode_payload(): return 2\n",
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.task_evidence("Fix schema metadata in src/worker.py")
+    assert packet["ownership"]["candidate"]["path"] == "src/worker.py"
+    assert packet["explicit_target"]["basis"] == "literal-path"
+    assert packet["explicit_target"]["symbol"] is None
+    assert packet["ownership"]["candidate"] is not None
+    assert "qualname" in packet["ownership"]["candidate"]
+    assert packet["ownership"]["candidate"]["qualname"] is None
+    assert "start_line" in packet["ownership"]["candidate"]
+    assert packet["ownership"]["candidate"]["start_line"] is None
+
+
+def test_file_task_generic_options_does_not_establish_options_method(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "src/routes.py",
+        "class Router:\n    def options(self): pass\n    def response(self): pass\n",
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.task_evidence("Fix response model options in src/routes.py.")
+    assert packet["explicit_target"]["path"] == "src/routes.py"
+    assert packet["explicit_target"]["symbol"] is None
+    assert packet["ownership"]["candidate"] is not None
+    assert "qualname" in packet["ownership"]["candidate"]
+    assert packet["ownership"]["candidate"]["qualname"] is None
+
+
+def test_qualified_lowercase_method_can_refine_literal_file_target(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "src/routes.py",
+        "class Router:\n    def options(self): pass\n    def response(self): pass\n",
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.task_evidence("Fix Router.options in src/routes.py.")
+    assert packet["explicit_target"]["path"] == "src/routes.py"
+    assert packet["explicit_target"]["symbol"] == "Router.options"

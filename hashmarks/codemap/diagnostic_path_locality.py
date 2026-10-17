@@ -7,7 +7,8 @@ complete change scope, diagnostic resolution, or verification authority.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
+from typing import cast
 
 from hashmarks.paths import normalize_relative_path
 
@@ -15,21 +16,7 @@ DIAGNOSTIC_PATH_LOCALITY_SCHEMA = "hashmarks.diagnostic-path-locality.v1"
 _MAX_REPORTED_CHANGED_PATHS = 256
 
 
-def indexed_diagnostic_rows(
-    packet: Mapping[str, object],
-) -> dict[str, Mapping[str, object]]:
-    """Reuse canonical delta's existing row-indexing semantics."""
-    rows = packet.get("diagnostics")
-    if not isinstance(rows, list):
-        return {}
-    return {
-        str(row["identity"]): row
-        for row in rows
-        if isinstance(row, Mapping) and row.get("identity")
-    }
-
-
-def normalize_reported_changed_paths(changed_paths: Sequence[str]) -> list[str]:
+def normalize_reported_changed_paths(changed_paths: object) -> list[str]:
     if (
         isinstance(changed_paths, (str, bytes))
         or not isinstance(changed_paths, Sequence)
@@ -101,8 +88,12 @@ def diagnostic_path_locality(
     """
     normalized = normalize_reported_changed_paths(changed_paths)
     changed = set(normalized)
-    qualified_added = set(qualification["qualified_added_identities"])
-    qualified_removed = set(qualification["qualified_removed_identities"])
+    qualified_added = set(
+        cast(Iterable[str], qualification["qualified_added_identities"])
+    )
+    qualified_removed = set(
+        cast(Iterable[str], qualification["qualified_removed_identities"])
+    )
     rows = [
         *_locality_rows(
             change_kind="added",

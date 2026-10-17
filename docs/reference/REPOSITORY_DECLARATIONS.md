@@ -23,6 +23,28 @@ configuration value or source-of-truth precedence rule. Consequently such
 groups remain unresolved and incomplete until an independent qualified
 provider directly attests a correspondence.
 
+Recognized model-base syntax is observed inside nested functions and
+conditionals as well as at module scope. `include_class_fields=True` additionally
+observes ordinary annotated classes under `python-annotated-class-syntax`, with
+direct field origins and base expressions. Inherited fields, runtime field roles
+and validation remain explicitly unestablished or unknown.
+
+Selected backend-source discovery is available through the existing public
+operation with `result_mode="discovery"`. MCP callers supply `groups=[]` and
+`python_backend_paths=["service.py"]`, optionally `include_class_fields=True`.
+The CLI equivalent is:
+
+```sh
+hashmarks repository-declarations --python-backend-path service.py --include-class-fields
+```
+
+Both return the complete discovery wrapper: current provider-input revisions,
+provenance, bounds and nested declaration evidence. A prior discovery wrapper
+may be supplied as `previous_observation` (CLI `--previous-observation FILE`)
+for factual delta comparison. Current providers alone own current observations;
+the older wrapper cannot restore unselected declarations. Mixing caller-supplied
+groups with discovery, or source selection with observation/explain, is rejected.
+
 See [Explicit Python interface syntax evidence](STATIC_INTERFACE_EVIDENCE.md)
 for the selected-file API and B20–B24 boundaries.
 
@@ -191,7 +213,14 @@ For uniquely declared correspondence:
 - two or more normalized values differ => \`differing\`;
 - any unresolved/ambiguous provider value => \`ambiguous\`.
 
-Equality is canonical JSON equality over the provider-normalized value. Core does not add version-range, alias, compatibility, language, or organization-specific equivalence rules.
+Equality is canonical JSON equality over the provider-normalized value.
+The internal immutable `CanonicalJsonValue` owner is shared with diagnostics:
+`true`, `1` and `1.0` remain distinct; tuple input normalizes to an array; object
+ordering is insignificant. Objects require string keys, and unsupported values,
+cycles and non-finite numbers reject before comparison. Domain-specific evidence
+bounds, semantic identities and authority remain owned by declarations. Core does
+not add version-range, alias, compatibility, language, or organization-specific
+equivalence rules.
 
 No majority rule exists. Two declarations agreeing and one differing does not make the majority authoritative.
 
@@ -593,6 +622,9 @@ provenance/input/enumeration changes are reported separately from nested
 declaration/repository change.
 
 The MCP server does **not** execute arbitrary Python declaration providers.
+Its discovery mode selects the built-in read-only backend syntax observer over
+caller-nominated repository paths. Source is parsed without importing the
+observed module or running its framework/runtime code.
 External producer adapters may run in their own integration boundary and pass
 normalized groups to the existing read-only \`repository_declarations\` MCP tool.
 This preserves the MCP execution boundary while reusing the same qualification

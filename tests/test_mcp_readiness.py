@@ -83,7 +83,7 @@ def test_native_server_advertises_selected_query_surface_enum(
 
 
 def test_mcp_readiness_projects_contract_and_launch(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -103,7 +103,9 @@ def test_mcp_readiness_projects_contract_and_launch(
         },
     )
 
-    async def observed(*_args, **_kwargs):
+    async def observed(
+        *_args: object, **_kwargs: object
+    ) -> tuple[tuple[str, ...], tuple[str, ...]]:
         return MCP_TOOL_NAMES, QUERY_SURFACES
 
     monkeypatch.setattr(readiness, "_observed_projection", observed)
@@ -147,7 +149,7 @@ def test_mcp_readiness_projects_contract_and_launch(
 
 
 def test_doctor_mcp_is_opt_in_and_machine_readable(
-    tmp_path: Path, monkeypatch, capsys
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     class Identity:
         def __init__(self, *_args, **_kwargs) -> None:
@@ -192,7 +194,7 @@ def test_doctor_mcp_is_opt_in_and_machine_readable(
 
 
 def test_mcp_readiness_qualifies_explicit_tool_projection(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -212,7 +214,9 @@ def test_mcp_readiness_qualifies_explicit_tool_projection(
         lambda *_args, **_kwargs: canonical,
     )
 
-    async def observed(*_args, **_kwargs):
+    async def observed(
+        *_args: object, **_kwargs: object
+    ) -> tuple[tuple[str, ...], None]:
         return ("task_evidence",), None
 
     monkeypatch.setattr(readiness, "_observed_projection", observed)
@@ -235,7 +239,7 @@ def test_mcp_readiness_qualifies_explicit_tool_projection(
 
 
 def test_mcp_readiness_qualifies_query_surface_projection(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -255,7 +259,9 @@ def test_mcp_readiness_qualifies_query_surface_projection(
         lambda *_args, **_kwargs: canonical,
     )
 
-    async def observed(*_args, **_kwargs):
+    async def observed(
+        *_args: object, **_kwargs: object
+    ) -> tuple[tuple[str, ...], tuple[str, ...]]:
         return ("repository_intelligence_query",), ("verification-explanation",)
 
     monkeypatch.setattr(readiness, "_observed_projection", observed)
@@ -285,7 +291,7 @@ def test_mcp_readiness_qualifies_query_surface_projection(
 
 
 def test_mcp_readiness_fails_closed_on_query_surface_observation_drift(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -305,7 +311,9 @@ def test_mcp_readiness_fails_closed_on_query_surface_observation_drift(
         lambda *_args, **_kwargs: canonical,
     )
 
-    async def observed(*_args, **_kwargs):
+    async def observed(
+        *_args: object, **_kwargs: object
+    ) -> tuple[tuple[str, ...], tuple[str, ...]]:
         return ("repository_intelligence_query",), ("freshness",)
 
     monkeypatch.setattr(readiness, "_observed_projection", observed)
@@ -323,7 +331,7 @@ def test_mcp_readiness_fails_closed_on_query_surface_observation_drift(
 
 
 def test_mcp_readiness_checks_default_query_surface_schema(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -343,7 +351,9 @@ def test_mcp_readiness_checks_default_query_surface_schema(
         lambda *_args, **_kwargs: canonical,
     )
 
-    async def observed(*_args, **_kwargs):
+    async def observed(
+        *_args: object, **_kwargs: object
+    ) -> tuple[tuple[str, ...], tuple[str, ...]]:
         return MCP_TOOL_NAMES, ("freshness",)
 
     monkeypatch.setattr(readiness, "_observed_projection", observed)

@@ -85,7 +85,7 @@ def test_invalid_jsonl_fails_with_line_number(tmp_path: Path) -> None:
         load_jsonl(p)
 
 
-def _bundle(lane: str, task: str):
+def _bundle(lane: str, task: str) -> dict[str, object]:
     return {
         "schema": "hashmarks.agent-experiment-bundle.v1",
         "lane": {"name": lane},
@@ -160,7 +160,7 @@ def test_coverage_ledger_can_certify_exact_matrix() -> None:
     require_complete_coverage(ledger)
 
 
-def _trace_bundle(lane: str, task: str, tokens: int, wall: float):
+def _trace_bundle(lane: str, task: str, tokens: int, wall: float) -> dict[str, object]:
     return {
         "schema": "hashmarks.agent-experiment-bundle.v1",
         "lane": {"name": lane},
@@ -235,7 +235,9 @@ def test_report_emits_verified_cost_and_pareto_without_answer_key() -> None:
     assert "expected_files" not in text and "expected_symbols" not in text
 
 
-def _cert_bundle(lane: str, task: str, trace_identity: str, native_identity: str):
+def _cert_bundle(
+    lane: str, task: str, trace_identity: str, native_identity: str
+) -> dict[str, object]:
     return {
         "schema": "hashmarks.agent-experiment-bundle.v1",
         "lane": {"name": lane},

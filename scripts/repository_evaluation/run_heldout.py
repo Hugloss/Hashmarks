@@ -66,7 +66,11 @@ def _check_source_labels(
 
 
 def _run_repository(
-    name: str, definition: dict[str, Any], source: Path, output_dir: Path
+    name: str,
+    definition: dict[str, Any],
+    source: Path,
+    output_dir: Path,
+    manifest_dir: Path,
 ) -> tuple[dict[str, Any], list[dict[str, str]], list[dict[str, str]]]:
     actual_identity = repository_content_identity(source)
     if actual_identity != definition["content_identity"]:
@@ -74,7 +78,6 @@ def _run_repository(
             f"{name}: source identity mismatch; expected "
             f"{definition['content_identity']}, got {actual_identity}"
         )
-    manifest_dir = SUITE_PATH.parent
     cases_path = manifest_dir / definition["cases_file"]
     cases = load_json(cases_path, schema=CASES_SCHEMA)
     grader = load_json(manifest_dir / definition["grader_file"], schema=GRADER_SCHEMA)
@@ -121,8 +124,10 @@ def _classify_report(
     return failures, shadows
 
 
-def run_heldout(*, sources: dict[str, Path], output_dir: Path) -> dict[str, Any]:
-    suite = load_json(SUITE_PATH, schema=SUITE_SCHEMA)
+def run_heldout(
+    *, sources: dict[str, Path], output_dir: Path, suite_path: Path = SUITE_PATH
+) -> dict[str, Any]:
+    suite = load_json(suite_path, schema=SUITE_SCHEMA)
     repositories = suite["repositories"]
     if set(sources) != set(repositories):
         raise ValueError(
@@ -135,7 +140,7 @@ def run_heldout(*, sources: dict[str, Path], output_dir: Path) -> dict[str, Any]
     language_counts: Counter[str] = Counter()
     for name, definition in repositories.items():
         metadata, failures, shadows = _run_repository(
-            name, definition, sources[name], output_dir
+            name, definition, sources[name], output_dir, suite_path.parent
         )
         reports[name] = metadata
         qualification_failures.extend(failures)
@@ -145,8 +150,7 @@ def run_heldout(*, sources: dict[str, Path], output_dir: Path) -> dict[str, Any]
     summary = {
         "schema": REPORT_SCHEMA,
         "suite": suite["suite"],
-        "complete": language_counts == {"python": 12, "typescript": 12}
-        and not shadow_outcomes,
+        "complete": bool(reports) and not shadow_outcomes,
         "qualification_case_count": sum(language_counts.values())
         - len(shadow_outcomes),
         "qualification_passed": not qualification_failures,
@@ -164,9 +168,12 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", action="append", required=True, default=[])
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--suite", type=Path, default=SUITE_PATH)
     args = parser.parse_args()
     summary = run_heldout(
-        sources=_sources(args.source), output_dir=args.output_dir.resolve()
+        sources=_sources(args.source),
+        output_dir=args.output_dir.resolve(),
+        suite_path=args.suite.resolve(),
     )
     return 0 if summary["complete"] and summary["qualification_passed"] else 1
 

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from hashmarks.codemap import CodeMap
 
 _SYMBOL_LIMIT = 64
@@ -21,7 +23,9 @@ def _codemap(root: Path) -> CodeMap:
     )
 
 
-def _install_hidden_same_name_candidate(codemap: CodeMap, monkeypatch) -> None:
+def _install_hidden_same_name_candidate(
+    codemap: CodeMap, monkeypatch: pytest.MonkeyPatch
+) -> None:
     original = codemap.store.visible_symbol_candidates
     actual = [dict(row) for row in original("helper", limit=10)]
     assert len(actual) >= 2
@@ -37,7 +41,7 @@ def _install_hidden_same_name_candidate(codemap: CodeMap, monkeypatch) -> None:
     probe = [first, *noise, hidden]
     assert len(probe) == _SYMBOL_LIMIT + 1
 
-    def symbols_named(name: str, *, limit: int):
+    def symbols_named(name: str, *, limit: int) -> list[dict[str, object]]:
         if name == "helper" and limit == _SYMBOL_LIMIT + 1:
             return probe[:limit]
         return original(name, limit=limit)
@@ -47,7 +51,7 @@ def _install_hidden_same_name_candidate(codemap: CodeMap, monkeypatch) -> None:
 
 def test_structural_locality_bound_cannot_manufacture_unique_call_target(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _write(tmp_path, "pkg/__init__.py", "")
     _write(
@@ -142,7 +146,7 @@ def authority(value):
 
 def test_structural_locality_bound_cannot_prove_qualified_root_absence(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _write(tmp_path, "pkg/__init__.py", "")
     _write(
@@ -184,7 +188,7 @@ def authority(value):
         probe = [*noise, worker]
         assert len(probe) == _SYMBOL_LIMIT + 1
 
-        def symbols_named(name: str, *, limit: int):
+        def symbols_named(name: str, *, limit: int) -> list[dict[str, object]]:
             if name == "Worker" and limit == _SYMBOL_LIMIT + 1:
                 return probe[:limit]
             return original(name, limit=limit)

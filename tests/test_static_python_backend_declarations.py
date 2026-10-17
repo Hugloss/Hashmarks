@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -224,7 +225,7 @@ def test_provider_has_no_ambient_discovery_without_explicit_selection(
     _write(tmp_path, "import os\nsecret = os.getenv('ONLY_IF_SELECTED')\n")
     with CodeMap(tmp_path) as cm:
         cm.sync()
-        packet = cm.discover_repository_declarations([])
+        packet = cast("dict", cm.discover_repository_declarations([]))
     assert packet["declarations"]["groups"] == []
 
 
@@ -272,3 +273,178 @@ def test_environment_keyword_default_is_syntax_not_missing_or_resolved(
     assert value["direct_assignment_names"] == ["setting"]
     assert "hidden" not in str(value)
     assert value["runtime_env_read"] == "not-established"
+
+
+def test_nested_model_classes_keep_distinct_source_origins(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        "def first():\n"
+        "    class Model(BaseModel):\n"
+        "        value: str = Field(default_factory=str)\n"
+        "async def second():\n"
+        "    if condition:\n"
+        "        class Model(library.BaseModel):\n"
+        "            value: int\n",
+    )
+    packet = _observe(
+        tmp_path,
+        StaticPythonBackendDeclarations(paths=(PATH,), include_environment_reads=False),
+    )
+    groups = _groups(packet)["python-model-class-syntax"]
+    assert [group["scope"]["class_line"] for group in groups] == [2, 6]
+    assert len({group["group_id"] for group in groups}) == 2
+    assert [_value(group)["fields"][0]["line"] for group in groups] == [3, 7]
+    assert _value(groups[0])["fields"][0]["default"]["keyword_names"] == [
+        "default_factory"
+    ]
+    for group in groups:
+        declaration = group["declarations"][0]
+        assert declaration["evidence_state"] == "known-present"
+        assert group["absence"]["state"] == "unknown"
+        assert _value(group)["model_identity"] == "not-established"
+        assert _value(group)["runtime_binding"] == "not-established"
+
+
+def test_opt_in_class_fields_do_not_infer_inheritance_or_runtime_model(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "class Parent:\n"
+        "    inherited: str\n"
+        "def factory():\n"
+        "    class Child(Parent):\n"
+        "        direct: int = Field(discriminator=select)\n"
+        "        class Nested:\n"
+        "            unrelated: bool\n"
+        "        def method(self):\n"
+        "            local: float\n",
+    )
+    provider = StaticPythonBackendDeclarations(
+        paths=(PATH,),
+        include_model_fields=False,
+        include_environment_reads=False,
+        include_class_fields=True,
+    )
+    packet = _observe(tmp_path, provider)
+    groups = _groups(packet)["python-annotated-class-syntax"]
+    assert [_value(group)["class_name_syntax"] for group in groups] == [
+        "Parent",
+        "Child",
+        "Nested",
+    ]
+    child = _value(groups[1])
+    assert [field["name"] for field in child["fields"]] == ["direct"]
+    assert child["base_expressions"][0]["text"] == "Parent"
+    assert child["class_identity"] == "not-established"
+    assert child["inherited_fields"] == "not-established"
+    assert child["runtime_field_roles"] == "unknown"
+    assert child["negative_evidence_admissible"] is False
+    assert "model_identity" not in child
+    assert child["fields"][0]["runtime_validation"] == "not-established"
+    assert packet["providers"][0]["provenance"]["class_fields"] is True
+
+
+def test_nested_class_bound_fails_instead_of_claiming_complete_scope(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "def factory():\n"
+        + "".join(f"    class Model_{i}(BaseModel): pass\n" for i in range(65)),
+    )
+    with pytest.raises(RepositoryDeclarationProviderError, match="group bound"):
+        _observe(tmp_path, StaticPythonBackendDeclarations(paths=(PATH,)))
+
+
+def test_generic_class_reopen_rejects_stale_source_and_does_not_replay(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "class Payload(Parent):\n    old: int\n")
+    state = tmp_path / "state"
+    provider = StaticPythonBackendDeclarations(
+        paths=(PATH,), include_class_fields=True, include_environment_reads=False
+    )
+    with CodeMap(tmp_path, state_dir=state) as cm:
+        cm.sync()
+        before = cm.discover_repository_declarations([provider])
+    _write(tmp_path, "class Payload(Parent):\n    current: str\n")
+    with CodeMap(tmp_path, state_dir=state) as cm:
+        with pytest.raises(RepositoryDeclarationProviderError, match="input changed"):
+            cm.discover_repository_declarations([provider], previous_observation=before)
+        cm.sync([PATH])
+        after = cast(
+            "dict",
+            cm.discover_repository_declarations(
+                [provider], previous_observation=before
+            ),
+        )
+        omitted = cast(
+            "dict", cm.discover_repository_declarations([], previous_observation=before)
+        )
+        current = cast("dict", cm.discover_repository_declarations([provider]))
+    assert before["observation_identity"] != after["observation_identity"]
+    assert after["observation_identity"] == current["observation_identity"]
+    assert omitted["declarations"]["groups"] == []
+    value = _value(_groups(current)["python-annotated-class-syntax"][0])
+    assert [field["name"] for field in value["fields"]] == ["current"]
+    assert value["inherited_fields"] == "not-established"
+
+
+def test_decorated_method_annotation_is_direct_syntax_not_a_runtime_field(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "class Result(BaseModel):\n"
+        "    @arbitrary.computed\n"
+        "    @configure(secret='DO_NOT_COPY')\n"
+        "    def status(self) -> Optional[Status]:\n"
+        "        @nested\n"
+        "        def hidden() -> int: return 1\n"
+        "        return None\n"
+        "    class Nested:\n"
+        "        @property\n"
+        "        def nested_status(self) -> str: return 'x'\n",
+    )
+    value = _value(
+        _groups(_observe(tmp_path, StaticPythonBackendDeclarations(paths=(PATH,))))[
+            "python-model-class-syntax"
+        ][0]
+    )
+    assert value["fields"] == []
+    methods = value["annotated_decorated_methods"]
+    assert [method["name"] for method in methods] == ["status"]
+    assert methods[0]["return_annotation"] == {
+        "state": "direct-annotation-syntax",
+        "text": "Optional[Status]",
+        "start_line": 4,
+        "end_line": 4,
+    }
+    assert methods[0]["decorators"][0]["callee"] == {
+        "state": "member-syntax",
+        "receiver": "arbitrary",
+        "name": "computed",
+    }
+    assert methods[0]["decorators"][1]["call_arguments"]["keyword_names"] == ["secret"]
+    assert methods[0]["runtime_field_role"] == "unknown"
+    assert methods[0]["runtime_binding"] == "not-established"
+    assert "DO_NOT_COPY" not in str(value)
+    assert value["negative_evidence_admissible"] is False
+
+
+def test_decorated_method_syntax_bounds_fail_closed(tmp_path: Path) -> None:
+    from hashmarks.codemap.static_python_backend_declarations import (
+        MAX_ANNOTATED_DECORATED_METHODS,
+    )
+
+    _write(
+        tmp_path,
+        "class Result(BaseModel):\n"
+        + "".join(
+            f"    @property\n    def field_{i}(self) -> int: return {i}\n"
+            for i in range(MAX_ANNOTATED_DECORATED_METHODS + 1)
+        ),
+    )
+    with pytest.raises(RepositoryDeclarationProviderError):
+        _observe(tmp_path, StaticPythonBackendDeclarations(paths=(PATH,)))

@@ -37,6 +37,7 @@ from hashmarks.operation_contract import (
     require_registered_operation,
     validate_operation_response,
 )
+from hashmarks.python_ast_cache import read_python_ast
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -47,7 +48,10 @@ _EXPECTED = {
     },
     "repository_context": {"default": "hashmarks.repository-capsule.v1"},
     "find": {"default": "hashmarks.find.v2"},
-    "task_evidence": {"default": "hashmarks.task-evidence.v5"},
+    "task_evidence": {
+        "default": "hashmarks.task-evidence.v5",
+        "initial": "hashmarks.task-evidence-initial.v2",
+    },
     "change_impact": {"default": "hashmarks.task-change-impact.v1"},
     "correlate_evidence": {"default": "hashmarks.evidence-correlation.v2"},
     "dependency_codemap": {
@@ -58,6 +62,7 @@ _EXPECTED = {
     "repository_declarations": {
         "observation": "hashmarks.repository-declarations.v1",
         "explain": "hashmarks.repository-declaration-explain.v1",
+        "discovery": "hashmarks.repository-declaration-discovery.v1",
     },
     "post_change": {"default": "hashmarks.task-post-change-delta.v2"},
     "source_observation": {
@@ -219,8 +224,7 @@ def test_public_surfaces_do_not_mint_versioned_semantic_schemas() -> None:
 
 
 def test_cli_operation_projection_names_are_registered_literals() -> None:
-    source = (ROOT / "hashmarks" / "repository_cli.py").read_text(encoding="utf-8")
-    tree = ast.parse(source)
+    tree = read_python_ast(ROOT / "hashmarks" / "repository_cli.py").tree
     projected: list[str] = []
     for node in ast.walk(tree):
         if not (
@@ -283,10 +287,31 @@ def test_cli_codemap_exposure_is_exhaustively_classified() -> None:
             isinstance(node.func, ast.Name) and node.func.id == "_print_operation"
             for node in printers
         )
-        if not semantic:
+        if not semantic and not _cli_prints_validated_operation(function, printers):
             non_semantic.add(function.name)
 
     assert non_semantic == _CLI_NON_SEMANTIC_CODEMAP_HANDLERS
+
+
+def _cli_prints_validated_operation(
+    function: ast.FunctionDef, printers: list[ast.Call]
+) -> bool:
+    """Canonical query envelopes are already projected before serialization."""
+    validated = {
+        target.id
+        for node in ast.walk(function)
+        if isinstance(node, ast.Assign)
+        and isinstance(node.value, ast.Call)
+        and isinstance(node.value.func, ast.Name)
+        and node.value.func.id == "validate_operation_response"
+        for target in node.targets
+        if isinstance(target, ast.Name)
+    }
+    return any(
+        isinstance(argument, ast.Name) and argument.id in validated
+        for printer in printers
+        for argument in printer.args[:1]
+    )
 
 
 def test_mcp_mode_types_derive_from_operation_contract() -> None:
@@ -356,7 +381,6 @@ def test_operation_modes_fail_closed() -> None:
 _FIXED_MODE_CORE_BOUNDARIES = {
     "repository_context": ("hashmarks/codemap/repository_context.py", "orient"),
     "find": ("hashmarks/codemap/find_engine.py", "find_packet"),
-    "task_evidence": ("hashmarks/codemap/evidence_packet.py", "task_evidence"),
     "change_impact": ("hashmarks/codemap/change_impact.py", "task_change_impact"),
     "correlate_evidence": (
         "hashmarks/codemap/evidence_correlation.py",
@@ -385,7 +409,7 @@ _FIXED_MODE_CORE_BOUNDARIES = {
         "concurrency_risk_findings",
     ),
     "verification_ownership": (
-        "hashmarks/codemap/evidence_verification.py",
+        "hashmarks/codemap/verification_ownership.py",
         "verification_ownership_graph",
     ),
     "repository_ownership": (
@@ -669,18 +693,25 @@ def test_core_operation_dispatchers_consume_canonical_mode_admission() -> None:
 
 
 class _DependencyOperationHarness(DependencyResolutionEvidenceMixin):
-    def dependency_resolution_evidence(self, _snapshot):
+    def dependency_resolution_evidence(self, _snapshot: object) -> dict[str, object]:
         return {"schema": "fixture"}
 
-    def dependency_resolution_explain(self, _observation):
+    def dependency_resolution_explain(self, _observation: object) -> dict[str, object]:
         return {"schema": "hashmarks.wrong.v1"}
 
-    def dependency_resolution_delta(self, _before, _after):
+    def dependency_resolution_delta(
+        self, _before: object, _after: object
+    ) -> dict[str, object]:
         return {"schema": operation_schema("dependency_codemap", "compare")}
 
 
 class _DeclarationOperationHarness(RepositoryDeclarationsMixin):
-    def repository_declarations(self, _groups, *, previous_observation=None):
+    def repository_declarations(
+        self,
+        _groups: list[dict[str, object]],
+        *,
+        previous_observation: object | None = None,
+    ) -> dict[str, object]:
         del previous_observation
         return {
             "schema": operation_schema(
@@ -689,7 +720,7 @@ class _DeclarationOperationHarness(RepositoryDeclarationsMixin):
             )
         }
 
-    def repository_declaration_explain(self, _packet):
+    def repository_declaration_explain(self, _packet: object) -> dict[str, object]:
         return {"schema": "hashmarks.wrong.v1"}
 
 

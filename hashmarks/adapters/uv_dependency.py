@@ -4,6 +4,7 @@ import hashlib
 import json
 import tomllib
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 
 _SCHEMA = "hashmarks.dependency-resolution.v3"
 _ADAPTER_SEMANTICS = "hashmarks.uv-dependency-adapter.v1"
@@ -37,10 +38,26 @@ def _marker_list(document: Mapping[str, object], field: str) -> list[str]:
     return markers
 
 
+@dataclass(frozen=True)
+class _LockPackage:
+    name: str
+    version: str
+    source: str
+    node_id: str
+    raw: Mapping[str, object]
+
+    @property
+    def is_root(self) -> bool:
+        source = self.raw.get("source")
+        return isinstance(source, Mapping) and any(
+            source.get(kind) == "." for kind in ("virtual", "editable", "directory")
+        )
+
+
 def _dependency_target(
     dependency: Mapping[str, object],
-    packages_by_name: Mapping[str, list[dict[str, object]]],
-) -> dict[str, object]:
+    packages_by_name: Mapping[str, list[_LockPackage]],
+) -> _LockPackage:
     raw_name = dependency.get("name")
     if not isinstance(raw_name, str):
         raise ValueError("uv lock dependency name must be a string")
@@ -53,11 +70,11 @@ def _dependency_target(
         raise ValueError("uv lock dependency version must be a string")
     version = (raw_version or "").strip()
     if version:
-        candidates = [row for row in candidates if row["version"] == version]
+        candidates = [row for row in candidates if row.version == version]
     source_raw = dependency.get("source")
     if source_raw is not None:
         source = _source(source_raw)
-        candidates = [row for row in candidates if row["source"] == source]
+        candidates = [row for row in candidates if row.source == source]
     if len(candidates) != 1:
         raise ValueError(
             f"uv lock dependency target must resolve uniquely: {name} "
@@ -107,8 +124,8 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
         raise ValueError("uv lock must contain at least one package")
 
     source_id = "uv:lock"
-    packages: list[dict[str, object]] = []
-    packages_by_name: dict[str, list[dict[str, object]]] = {}
+    packages: list[_LockPackage] = []
+    packages_by_name: dict[str, list[_LockPackage]] = {}
     for raw in raw_packages:
         if not isinstance(raw, Mapping):
             raise ValueError("uv lock package must be an object")
@@ -133,29 +150,21 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
             raise ValueError(
                 f"uv lock package has ambiguous local source identity: {name}"
             )
-        row = {
-            "name": name,
-            "version": version,
-            "source": source,
-            "node_id": _node_id(name, version, source),
-            "raw": raw,
-        }
+        row = _LockPackage(
+            name=name,
+            version=version,
+            source=source,
+            node_id=_node_id(name, version, source),
+            raw=raw,
+        )
         packages.append(row)
         packages_by_name.setdefault(name, []).append(row)
 
-    node_ids = [str(row["node_id"]) for row in packages]
+    node_ids = [str(row.node_id) for row in packages]
     if len(node_ids) != len(set(node_ids)):
         raise ValueError("uv lock contains duplicate package selection identity")
 
-    roots = [
-        row
-        for row in packages
-        if isinstance(row["raw"].get("source"), Mapping)
-        and any(
-            str(row["raw"]["source"].get(kind) or "") == "."
-            for kind in ("virtual", "editable", "directory")
-        )
-    ]
+    roots = [row for row in packages if row.is_root]
     if not roots:
         raise ValueError(
             "uv.lock alone does not identify a project root; "
@@ -164,7 +173,7 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
 
     relationships: list[dict[str, object]] = []
     for row in packages:
-        raw = row["raw"]
+        raw = row.raw
         dependency_groups = [("", raw.get("dependencies", []))]
         for field, prefix in (
             ("optional-dependencies", "extra"),
@@ -172,18 +181,18 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
         ):
             groups = raw.get(field, {})
             if not isinstance(groups, Mapping):
-                raise ValueError(f"uv lock {field} must be a table: {row['name']}")
+                raise ValueError(f"uv lock {field} must be a table: {row.name}")
             for group, dependencies in groups.items():
                 if not isinstance(group, str) or not group or group != group.strip():
                     raise ValueError(f"uv lock {field} group name is invalid")
                 dependency_groups.append((f"{prefix}:{group}", dependencies))
         for effective_scope, dependencies in dependency_groups:
             if not isinstance(dependencies, list):
-                raise ValueError(f"uv lock dependencies must be a list: {row['name']}")
+                raise ValueError(f"uv lock dependencies must be a list: {row.name}")
             for dependency in dependencies:
                 if not isinstance(dependency, Mapping):
                     raise ValueError(
-                        f"uv lock dependency must be an object: {row['name']}"
+                        f"uv lock dependency must be an object: {row.name}"
                     )
                 target = _dependency_target(dependency, packages_by_name)
                 raw_marker = dependency.get("marker")
@@ -191,8 +200,8 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                     raise ValueError("uv lock dependency marker must be a string")
                 relationships.append(
                     {
-                        "source": row["node_id"],
-                        "target": target["node_id"],
+                        "source": row.node_id,
+                        "target": target.node_id,
                         "kind": "dependency",
                         "context": _CONTEXT,
                         "effective_scope": effective_scope,
@@ -201,11 +210,11 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                     }
                 )
 
-    root_ids = {str(row["node_id"]) for row in roots}
+    root_ids = {str(row.node_id) for row in roots}
     components: dict[str, dict[str, object]] = {}
     for row in packages:
-        component_id = str(row["name"])
-        component = {
+        component_id = str(row.name)
+        component: dict[str, object] = {
             "component_id": component_id,
             "name": component_id,
             "ecosystem": "pypi",
@@ -215,10 +224,10 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
             raise ValueError(f"conflicting uv component identity: {component_id}")
     selections = [
         {
-            "node_id": row["node_id"],
-            "component_id": row["name"],
-            "version": row["version"],
-            "source": row["source"],
+            "node_id": row.node_id,
+            "component_id": row.name,
+            "version": row.version,
+            "source": row.source,
             "marker": "",
             "contexts": [_CONTEXT],
             "evidence_sources": [source_id],
@@ -227,12 +236,12 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
     ]
     inventory = [
         {
-            "node_id": row["node_id"],
+            "node_id": row.node_id,
             "context": _CONTEXT,
             "evidence_sources": [source_id],
         }
         for row in packages
-        if str(row["node_id"]) not in root_ids
+        if str(row.node_id) not in root_ids
     ]
     producer_digest = _digest(lock)
     evidence_sources = [
@@ -277,7 +286,7 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
         "roots": sorted(
             (
                 {
-                    "node_id": row["node_id"],
+                    "node_id": row.node_id,
                     "context": _CONTEXT,
                     "evidence_sources": [source_id],
                 }
@@ -286,7 +295,9 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
             key=lambda row: str(row["node_id"]),
         ),
         "evidence_sources": evidence_sources,
-        "components": sorted(components.values(), key=lambda row: row["component_id"]),
+        "components": sorted(
+            components.values(), key=lambda row: str(row["component_id"])
+        ),
         "selections": sorted(selections, key=lambda row: str(row["node_id"])),
         "inventory": sorted(inventory, key=lambda row: str(row["node_id"])),
         "relationships": sorted(

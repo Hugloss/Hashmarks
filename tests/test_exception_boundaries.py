@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from hashmarks import cli, repository_cli, repository_retry
 from hashmarks.errors import RepositoryCliError
+
+if TYPE_CHECKING:
+    import types
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -42,7 +46,12 @@ def test_repository_cli_boundary_translates_only_expected_request_errors(
         def __enter__(self):
             return self
 
-        def __exit__(self, exc_type, exc, tb):
+        def __exit__(
+            self,
+            exc_type: type[BaseException] | None,
+            exc: BaseException | None,
+            tb: types.TracebackType | None,
+        ) -> bool | None:
             return False
 
     monkeypatch.setattr(repository_cli, "_codemap", lambda args: FakeCodeMap())
@@ -66,14 +75,19 @@ def test_repository_cli_boundary_retries_known_transient_races_once_centrally(
         def __enter__(self):
             return self
 
-        def __exit__(self, exc_type, exc, tb):
+        def __exit__(
+            self,
+            exc_type: type[BaseException] | None,
+            exc: BaseException | None,
+            tb: types.TracebackType | None,
+        ) -> bool | None:
             return False
 
     monkeypatch.setattr(repository_cli, "_codemap", lambda args: FakeCodeMap())
     monkeypatch.setattr(repository_retry.time, "sleep", lambda _delay: None)
     calls = 0
 
-    def operation(codemap):
+    def operation(codemap: FakeCodeMap) -> str:
         nonlocal calls
         calls += 1
         if calls < 3:
@@ -93,7 +107,12 @@ def test_repository_cli_boundary_translates_exhausted_transient_race(
         def __enter__(self):
             return self
 
-        def __exit__(self, exc_type, exc, tb):
+        def __exit__(
+            self,
+            exc_type: type[BaseException] | None,
+            exc: BaseException | None,
+            tb: types.TracebackType | None,
+        ) -> bool | None:
             return False
 
     monkeypatch.setattr(repository_cli, "_codemap", lambda args: FakeCodeMap())
@@ -122,12 +141,12 @@ def test_mcp_and_cli_share_one_repository_retry_owner() -> None:
 def test_top_level_cli_translates_user_facing_error_once(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fail(args) -> int:
+    def fail(args: list[str]) -> int:
         raise RepositoryCliError("caller-visible failure")
 
     original = cli._add_daemon_cli
 
-    def add_one(sub) -> None:
+    def add_one(sub: object) -> None:
         parser = sub.add_parser("boundary-test")
         parser.set_defaults(func=fail)
 

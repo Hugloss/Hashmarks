@@ -29,7 +29,14 @@ SCHEMA = "hashmarks.bm25-constrained-economics.v1"
 FAMILY = "hashmarks-constrained-bm25-a"
 
 
-def _task_report(cm, idx, task, secret, *, limit: int) -> dict[str, object]:
+def _task_report(
+    cm: object,
+    idx: int,
+    task: dict[str, object],
+    secret: dict[str, object],
+    *,
+    limit: int,
+) -> dict[str, object]:
     query = task["query"]
     expected = set(secret.get("expected_files") or ())
     entry = cm.task_entry_points(query, limit=limit)
@@ -147,7 +154,7 @@ def collect(root: Path, limit: int = 20) -> dict[str, object]:
     }
 
 
-def main():
+def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--root", type=Path, required=True)
     p.add_argument("--output", type=Path)

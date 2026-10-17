@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import threading
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -47,14 +48,14 @@ class _PublicationHarness:
         original_a_begin = self.writer_a._sync_begin_build
         original_b_begin = self.writer_b._sync_begin_build
 
-        def block_a(*args, **kwargs):
+        def block_a(*args: object, **kwargs: object) -> object:
             value = original_a_begin(*args, **kwargs)
             self.a_entered.set()
             if not self.a_release.wait(timeout=5):
                 raise TimeoutError("test did not release first CodeMap writer")
             return value
 
-        def observe_b(*args, **kwargs):
+        def observe_b(*args: object, **kwargs: object) -> object:
             self.b_entered.set()
             return original_b_begin(*args, **kwargs)
 
@@ -64,7 +65,7 @@ class _PublicationHarness:
     def install_staged_finalize_hook(self, monkeypatch: pytest.MonkeyPatch) -> None:
         original_finalize = self.writer_a._sync_finalize_identity
 
-        def block_before_publication(*args, **kwargs):
+        def block_before_publication(*args: object, **kwargs: object) -> object:
             self.staged.set()
             if not self.a_release.wait(timeout=5):
                 raise TimeoutError("test did not release staged CodeMap publication")
@@ -184,7 +185,7 @@ def test_public_symbol_fails_instead_of_mixing_committed_generations(
     writer_finished = threading.Event()
     original_symbol = harness.reader.store.symbol
 
-    def block_after_symbol_read(query: str):
+    def block_after_symbol_read(query: str) -> list[dict[str, object]]:
         rows = original_symbol(query)
         if query == "before_owner":
             evidence_read.set()
@@ -244,7 +245,7 @@ class _LazyRefreshHarness:
     def install_staged_row_hook(self, monkeypatch: pytest.MonkeyPatch) -> None:
         original_set_file = self.reader.store.set_file
 
-        def block_after_staged_row(*args, **kwargs):
+        def block_after_staged_row(*args: object, **kwargs: object) -> object:
             value = original_set_file(*args, **kwargs)
             self.staged.set()
             if not self.release.wait(timeout=5):

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import pytest
+
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.model import SearchHit
 from hashmarks.codemap.task_retrieval import _TaskRetrievalResult
@@ -109,7 +111,7 @@ def test_internal_task_retrieval_cap_cannot_prove_entry_point_absence(
 
 
 def test_task_entry_points_reuses_one_retrieval_composition(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _write_source_and_test(tmp_path)
     with CodeMap(tmp_path) as codemap:
@@ -117,7 +119,7 @@ def test_task_entry_points_reuses_one_retrieval_composition(
         calls = []
         original = codemap._task_find_sequences
 
-        def tracked(task, limit):
+        def tracked(task: str, limit: int) -> _TaskRetrievalResult:
             calls.append((task, limit, codemap.store.generation()))
             return original(task, limit)
 
@@ -134,7 +136,7 @@ def test_task_entry_points_reuses_one_retrieval_composition(
 
 
 def test_stale_cached_task_hit_invalidates_retrieval_completeness(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _write_source_and_test(tmp_path)
     with CodeMap(tmp_path) as codemap:
@@ -209,7 +211,7 @@ def test_omitted_identifier_input_limit_invalidates_task_entry_absence(
 
 
 def test_role_presentation_limit_cannot_hide_competing_anchor(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()

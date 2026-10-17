@@ -100,7 +100,7 @@ def shared_python_ast_propagation_audit(
     }
 
 
-def _run_query(codemap, query: str, task: str, limit: int) -> object:
+def _run_query(codemap: Any, query: str, task: str, limit: int) -> object:
     if query == "find_task":
         return codemap.find_task(task, limit=limit)
     if query == "task_action_map":
@@ -237,7 +237,7 @@ def _delta_stats(
 
 
 def _related_query_session(
-    codemap,
+    codemap: Any,
     task: str,
     limit: int,
 ) -> tuple[object, dict[str, object], dict[str, object], dict[str, dict[str, int]]]:
@@ -358,7 +358,7 @@ def related_query_reuse_receipt(
 
 
 def _profile_limit(
-    codemap,
+    codemap: Any,
     task: str,
     limit: int,
 ) -> dict[str, object]:

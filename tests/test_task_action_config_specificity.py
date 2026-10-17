@@ -95,4 +95,5 @@ def test_locally_admitted_config_siblings_have_scoring_evidence(tmp_path: Path) 
     edit = result["edit"]
     assert isinstance(edit, dict)
     assert edit["path"] == "service/a.toml"
+    assert "locality_projection" in edit
     assert edit["locality_projection"] is True

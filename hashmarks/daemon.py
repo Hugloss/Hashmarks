@@ -117,7 +117,7 @@ class IdentityDaemon:
         self._request_count = 0
 
     @staticmethod
-    def _write_response(stream, response: dict[str, Any]) -> None:
+    def _write_response(stream: object, response: dict[str, object]) -> None:
         stream.write(
             (json.dumps(response, separators=(",", ":"), sort_keys=True) + "\n").encode(
                 "utf-8"

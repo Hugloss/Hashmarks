@@ -53,7 +53,7 @@ class Risk:
     guarded: bool
     confidence: str
 
-    def as_dict(self):
+    def as_dict(self) -> dict[str, object]:
         return {
             "path": self.path,
             "function": self.function,
@@ -252,7 +252,7 @@ def _scoped_state_owners(tree: ast.Module) -> frozenset[str]:
 class V(ast.NodeVisitor):
     def __init__(
         self,
-        path,
+        path: str,
         os_aliases: frozenset[str] = frozenset({"os"}),
         scoped_state_owners: frozenset[str] = frozenset(),
     ):
@@ -282,7 +282,12 @@ class V(ast.NodeVisitor):
             for line, n, leaf, owner in c.calls
         ]
 
-    def _scan_with(self, stmt, guards, branches):
+    def _scan_with(
+        self,
+        stmt: ast.With | ast.AsyncWith,
+        guards: frozenset[str],
+        branches: tuple[tuple[int, object], ...],
+    ) -> list[_Event]:
         events = []
         for item in stmt.items:
             events.extend(self._events_from_node(item.context_expr, guards, branches))
@@ -294,7 +299,12 @@ class V(ast.NodeVisitor):
         events.extend(self._scan_block(stmt.body, frozenset(inner), branches))
         return events
 
-    def _scan_if(self, stmt, guards, branches):
+    def _scan_if(
+        self,
+        stmt: ast.If,
+        guards: frozenset[str],
+        branches: tuple[tuple[int, object], ...],
+    ) -> list[_Event]:
         branch_id = id(stmt)
         return [
             *self._events_from_node(stmt.test, guards, branches),
@@ -302,7 +312,12 @@ class V(ast.NodeVisitor):
             *self._scan_block(stmt.orelse, guards, branches + ((branch_id, 1),)),
         ]
 
-    def _scan_loop(self, stmt, guards, branches):
+    def _scan_loop(
+        self,
+        stmt: ast.For | ast.AsyncFor | ast.While,
+        guards: frozenset[str],
+        branches: tuple[tuple[int, object], ...],
+    ) -> list[_Event]:
         probe = stmt.iter if isinstance(stmt, (ast.For, ast.AsyncFor)) else stmt.test
         return [
             *self._events_from_node(probe, guards, branches),
@@ -310,7 +325,12 @@ class V(ast.NodeVisitor):
             *self._scan_block(stmt.orelse, guards, branches),
         ]
 
-    def _scan_try(self, stmt, guards, branches):
+    def _scan_try(
+        self,
+        stmt: ast.Try,
+        guards: frozenset[str],
+        branches: tuple[tuple[int, object], ...],
+    ) -> list[_Event]:
         events = self._scan_block(stmt.body, guards, branches)
         for handler in stmt.handlers:
             events.extend(self._scan_block(handler.body, guards, branches))
@@ -318,7 +338,12 @@ class V(ast.NodeVisitor):
         events.extend(self._scan_block(stmt.finalbody, guards, branches))
         return events
 
-    def _scan_match(self, stmt, guards, branches):
+    def _scan_match(
+        self,
+        stmt: ast.Match,
+        guards: frozenset[str],
+        branches: tuple[tuple[int, object], ...],
+    ) -> list[_Event]:
         events = self._events_from_node(stmt.subject, guards, branches)
         match_id = id(stmt)
         for index, case in enumerate(stmt.cases):
@@ -327,7 +352,12 @@ class V(ast.NodeVisitor):
             )
         return events
 
-    def _scan_statement(self, stmt, guards, branches):
+    def _scan_statement(
+        self,
+        stmt: ast.stmt,
+        guards: frozenset[str],
+        branches: tuple[tuple[int, object], ...],
+    ) -> list[_Event]:
         if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             events = []
         elif isinstance(stmt, (ast.With, ast.AsyncWith)):
@@ -357,7 +387,9 @@ class V(ast.NodeVisitor):
         return events
 
     @staticmethod
-    def _first_compatible_write(calls, start, owner):
+    def _first_compatible_write(
+        calls: list[_Event], start: int, owner: str
+    ) -> _Event | None:
         read = calls[start]
         for write in calls[start + 1 :]:
             if write.leaf not in _WRITE_NAMES or write.owner != owner:
@@ -366,7 +398,13 @@ class V(ast.NodeVisitor):
                 return write
         return None
 
-    def _risk_for_read(self, node, calls, index, fresh_local_owners: frozenset[str]):
+    def _risk_for_read(
+        self,
+        node: ast.FunctionDef | ast.AsyncFunctionDef,
+        calls: list[_Event],
+        index: int,
+        fresh_local_owners: frozenset[str],
+    ) -> Risk | None:
         read = calls[index]
         if read.leaf not in _READ_NAMES:
             return None
@@ -391,7 +429,7 @@ class V(ast.NodeVisitor):
             "high" if guarded else "medium",
         )
 
-    def _fn(self, node):
+    def _fn(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
         calls = self._scan_block(node.body)
         fresh_local_owners = _fresh_local_owners(node)
         for index in range(len(calls)):
@@ -400,13 +438,13 @@ class V(ast.NodeVisitor):
                 self.r.append(risk)
                 return
 
-    def visit_FunctionDef(self, node):
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         self._fn(node)
         for stmt in node.body:
             if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
                 self.visit(stmt)
 
-    def visit_AsyncFunctionDef(self, node):
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
         self._fn(node)
         for stmt in node.body:
             if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
@@ -426,7 +464,7 @@ def _os_aliases(tree: ast.Module) -> frozenset[str]:
 
 def analyze_python_concurrency_risk(
     *, path: str, source: str, tree: ast.Module | None = None
-):
+) -> tuple[Risk, ...]:
     if tree is None:
         try:
             tree = ast.parse(source)

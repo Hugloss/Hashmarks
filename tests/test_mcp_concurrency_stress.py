@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from scripts import mcp_concurrency_stress
 from scripts.mcp_concurrency_stress import _failure_details, _summary
 
@@ -47,7 +49,7 @@ def test_stress_failure_details_are_bounded() -> None:
 
 
 def test_stress_writes_full_receipt_before_reporting_failed_calls(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     round_result = {
         "round": 1,

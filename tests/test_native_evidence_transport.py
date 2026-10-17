@@ -8,7 +8,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from native_evidence_support import (
@@ -29,6 +29,9 @@ from scripts.agent_evaluation.agent_evidence_format_study import (
     emit_trials,
     summarize_grades,
 )
+
+if TYPE_CHECKING:
+    from mcp import ClientSession
 
 
 def _cli_stdout(root: Path, state: Path, *command: str) -> bytes:
@@ -52,11 +55,11 @@ def _cli_stdout(root: Path, state: Path, *command: str) -> bytes:
     return result.stdout
 
 
-def _cli(root: Path, state: Path, *command: str) -> Any:
+def _cli(root: Path, state: Path, *command: str) -> dict[str, object]:
     return json.loads(_cli_stdout(root, state, *command))
 
 
-def _transport_capture(trial: Any, text: str) -> dict[str, Any]:
+def _transport_capture(trial: dict[str, object], text: str) -> dict[str, object]:
     return {
         "case_id": trial["case_id"],
         "model": "transport-fixture",
@@ -197,7 +200,7 @@ def test_real_cli_unicode_delta_has_independently_measured_export_and_host_bytes
 
 
 def _assert_consumer_encodings(
-    packet: Any, trials: Any, expected_export: bytes
+    packet: dict[str, object], trials: list[dict[str, object]], expected_export: bytes
 ) -> None:
     for escaped in (False, True):
         text = json.dumps(packet, ensure_ascii=escaped, indent=2) + "\n"
@@ -222,7 +225,7 @@ def _assert_consumer_encodings(
     assert missing["capture_audit"]["observed_captures"] == 0
 
 
-def _assert_study_encodings(manifest: Any) -> None:
+def _assert_study_encodings(manifest: dict[str, object]) -> None:
     for axis in ("production-response", "encoding-only"):
         for trial in emit_trials(manifest, axis=axis):
             response = trial["tool_response"]
@@ -362,7 +365,9 @@ def test_native_lsp_cli_stdout_keeps_unproven_body_query(
         assert native["producer_correspondence"]["unresolved_claims"] == 1
 
 
-def _assert_hover_response(response: Any, capture: Any, format: str) -> Any:
+def _assert_hover_response(
+    response: dict[str, object], capture: dict[str, object], format: str
+) -> dict[str, object]:
     native = response if format == "none" else response["result"]
     assert assert_hover_capture(native, capture)["freshness"] == "current"
     if format != "none":
@@ -370,7 +375,12 @@ def _assert_hover_response(response: Any, capture: Any, format: str) -> Any:
     return native
 
 
-def _assert_hover_delta(response: Any, before: Any, after: Any, format: str) -> None:
+def _assert_hover_delta(
+    response: dict[str, object],
+    before: dict[str, object],
+    after: dict[str, object],
+    format: str,
+) -> None:
     delta = response if format == "none" else response["result"]
     assert delta["before"] == before
     assert delta["after"] == after
@@ -625,7 +635,9 @@ def test_native_mcp_stdio_lsp_and_dependency_comparison_keep_semantic_facts(
     asyncio.run(exercise())
 
 
-async def _literal_wire_reply(session: Any, arguments: dict[str, Any]) -> Any:
+async def _literal_wire_reply(
+    session: ClientSession, arguments: dict[str, object]
+) -> dict[str, object]:
     reply = await session.call_tool("source_observation", arguments)
     assert reply.is_error is not True
     (text,) = [part.text for part in reply.content if part.type == "text"]
@@ -633,7 +645,7 @@ async def _literal_wire_reply(session: Any, arguments: dict[str, Any]) -> Any:
     return reply.structured_content
 
 
-def _assert_literal_wire_schema(tool: Any) -> None:
+def _assert_literal_wire_schema(tool: object) -> None:
     properties = tool.input_schema["properties"]
     assert len(properties) == 6
     assert properties["result_mode"]["enum"] == ["member", "scope", "literals"]
@@ -652,7 +664,9 @@ def _assert_literal_wire_schema(tool: Any) -> None:
     assert "repository-wide absence" in tool.description
 
 
-def _assert_literal_wire_packet(response: Any, format: str) -> Any:
+def _assert_literal_wire_packet(
+    response: dict[str, object], format: str
+) -> dict[str, object]:
     native = response if format == "none" else response["result"]
     assert native["exact_match_count"] == 4
     assert len(native["occurrences"]) == 2

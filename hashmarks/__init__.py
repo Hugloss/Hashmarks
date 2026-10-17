@@ -5,6 +5,8 @@ repository-intelligence primitives. Agent workflow, execution, result caching,
 and certification belong to external consumers and execution systems.
 """
 
+from typing import TYPE_CHECKING, Any
+
 from ._version import __version__
 from .digest import Digest, hash_bytes, hash_file
 from .graph import IdentityCycleError, IdentityGraph
@@ -26,6 +28,32 @@ from .specs import (
     patterns_from_inputs,
     validate_input_values,
 )
+
+if TYPE_CHECKING:
+    from .codemap import (
+        CodeMap as CodeMap,
+    )
+    from .codemap import (
+        RepositoryDeclarationProvider as RepositoryDeclarationProvider,
+    )
+    from .codemap import (
+        RepositoryDeclarationProviderContext as RepositoryDeclarationProviderContext,
+    )
+    from .codemap import (
+        RepositoryDeclarationProviderError as RepositoryDeclarationProviderError,
+    )
+    from .codemap import (
+        RepositoryDeclarationProviderResult as RepositoryDeclarationProviderResult,
+    )
+    from .consumer_conformance import (
+        validate_native_consumer_bundle as validate_native_consumer_bundle,
+    )
+    from .producer_identity import (
+        native_producer_implementation_identity as native_producer_implementation_identity,
+    )
+    from .repository_intelligence_validation import (
+        validate_repository_intelligence_evidence as validate_repository_intelligence_evidence,
+    )
 
 __all__ = [
     "__version__",
@@ -62,7 +90,7 @@ __all__ = [
 ]
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> object:
     """Lazily expose CodeMap APIs without loading the analysis graph eagerly."""
     if name == "CodeMap":
         from .codemap import CodeMap

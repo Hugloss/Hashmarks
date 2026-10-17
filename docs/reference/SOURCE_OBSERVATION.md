@@ -667,3 +667,62 @@ Unicode/CRLF source shape, shifted diagnostics, ambiguous same-message diagnosti
 and invalid collection states.
 
 Runtime/benchmark scores are separate from the repository evidence contract.
+
+## Diagnostic envelope admission and comparison bounds (HM-OBS)
+
+The existing `external_diagnostic_observation` constructor, endpoint comparison,
+source-revision comparison and public validation share the diagnostic endpoint
+validator. Diagnostic input remains producer-claimed, observation-only, with
+`execution_effect="none"`. Admission is bounded to 256 diagnostic occurrences,
+32 declared scope paths and 524,288 UTF-8 JSON bytes per endpoint. Known diagnostic
+text fields and scope paths have an 8,192-character ceiling. Generation is an
+exact nonnegative integer; supplied line/column coordinates are positive integers
+and booleans are not coordinates. JSON must be finite and serializable.
+
+Scope paths use canonical repository-relative normalization. An invalid or absent
+location on a diagnostic remains an unlocated producer claim; it does not acquire
+a repository path or become evidence of absence. Unknown producer fields remain
+bounded JSON claims, not repository authority. Constructor output owns a deep
+copy of caller input. Serialized endpoints use a JSON diagnostics array.
+
+Exact duplicate rows are permitted: fact comparison remains a set comparison by
+canonical diagnostic identity. Two differing rows claiming the same fact identity
+within one endpoint are rejected rather than silently choosing an order-dependent
+winner. Additive `diagnostics.occurrence_counts` preserves before/after occurrence
+counts separately from unique fact counts. Additive `diagnostics.changed_claims`
+preserves changed metadata for unchanged fact identities, with original before
+and after rows explicitly producer-claimed. These changes do not imply repository
+edits, external causation, or resolution. Public normalization preserves both
+fields; older v1 delta packets without them remain accepted.
+
+Diagnostic comparison accepts `before_source` and `after_source` together or
+neither. Each source packet has the same 524,288-byte transport ceiling and is
+qualified by the existing source correspondence owner. Unique exact physical
+line bytes may prove a moved line without columns when both claims omit columns;
+a single missing column or conflicting columns remains unresolved. This does not
+prove symbol equivalence or producer execution.
+
+Repository freshness is explicitly scoped as `repository-correspondence-only`;
+`producer_freshness` remains `unknown`. A current CodeMap generation, matching
+member digest, exact line, or complete repository scope cannot upgrade producer
+capture time, runtime freshness, authenticity, completeness or health.
+
+
+### Shared JSON value semantics
+
+Diagnostic rows and repository declaration values use the internal immutable
+`CanonicalJsonValue` representation. Every construction validates input and
+stores canonical JSON bytes; equality/hash never compare raw Python containers.
+Boolean `true`, integer `1` and float `1.0` are distinct, including inside nested
+metadata. Object key ordering is insignificant and array ordering is significant.
+Python tuples normalize to arrays, so JSON transport cannot invent a claim change.
+Decoded values are detached from both the caller's input and the stored value.
+
+Only string object keys are accepted. Numeric/boolean keys, key-coercion
+collisions, unsupported objects, cycles and non-finite numbers reject with
+`ValueError`. Existing evidence owners retain their payload and cardinality bounds;
+the shared value representation introduces no repository or policy authority.
+Valid JSON v1 payloads and diagnostic fact identities retain their meaning.
+Conflicting same-fact rows reject even when their metadata is Python-equal
+(`true` versus `1`); a change between those values is preserved in `changed_claims`.
+Retained delta endpoint headers must satisfy the original scalar/header contract.

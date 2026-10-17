@@ -8,16 +8,19 @@ from typing import TYPE_CHECKING, cast
 from hashmarks.symbolic_identity import symbolic_nomination_record, symbolic_task_terms
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
     from .engine import CodeMap
+    from .model import SearchHit
 
 
 class WorkContextMixin:
     def _mandatory_work_context_items(
         self,
-        action: dict[str, object],
+        action: Mapping[str, object],
     ) -> tuple[list[dict[str, object]], set[str]]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         mandatory: list[dict[str, object]] = []
         seen: set[str] = set()
         by_path: dict[str, dict[str, object]] = {}
@@ -43,10 +46,12 @@ class WorkContextMixin:
 
     def _optional_work_context_items(
         self,
-        action: dict[str, object],
+        action: Mapping[str, object],
         *,
         seen: set[str],
     ) -> list[dict[str, object]]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         optional: list[dict[str, object]] = []
         for key, role in (("related", "related"), ("inspect", "inspect")):
             rows = action.get(key)
@@ -73,7 +78,7 @@ class WorkContextMixin:
         selected: list[dict[str, object]] = []
         used = 0
         for item in mandatory:
-            cost = int(item["estimated_tokens"])
+            cost = int(cast("int | str", item["estimated_tokens"]))
             if used + cost <= token_budget:
                 selected.append(item)
                 used += cost
@@ -81,13 +86,14 @@ class WorkContextMixin:
 
     @staticmethod
     def _work_context_role_state(
-        action: dict[str, object],
+        action: Mapping[str, object],
         selected: list[dict[str, object]],
     ) -> tuple[dict[str, bool], list[str], list[str]]:
         roles = ("edit", "verify", "contract")
         role_coverage = {
             role: any(
-                role in (item.get("covered_roles") or [item["role"]])
+                role
+                in cast("Sequence[object]", item.get("covered_roles") or [item["role"]])
                 for item in selected
             )
             for role in roles
@@ -105,7 +111,7 @@ class WorkContextMixin:
         token_budget: int,
     ) -> int:
         for item in optional:
-            cost = int(item["estimated_tokens"])
+            cost = int(cast("int | str", item["estimated_tokens"]))
             if used + cost > token_budget:
                 continue
             selected.append(item)
@@ -147,7 +153,7 @@ class WorkContextMixin:
 
     def work_context(
         self,
-        action: dict[str, object],
+        action: Mapping[str, object],
         *,
         token_budget: int = 512,
     ) -> dict[str, object]:
@@ -201,7 +207,7 @@ class WorkContextMixin:
 
     def work_context_budget_sweep(
         self,
-        action: dict[str, object],
+        action: Mapping[str, object],
         *,
         budgets: Sequence[int] = (128, 192, 256, 384, 512),
     ) -> dict[str, object]:
@@ -216,23 +222,29 @@ class WorkContextMixin:
             packet = self.work_context(action, token_budget=budget)
             mandatory = {
                 (str(item["role"]), str(item["path"]))
-                for item in packet["items"]
+                for item in cast("Sequence[Mapping[str, object]]", packet["items"])
                 if bool(item["mandatory"])
             }
             if not previous_mandatory.issubset(mandatory):
                 monotonic = False
             previous_mandatory = mandatory
-            metrics = dict(packet["evidence_metrics"])
+            metrics = dict(cast("Mapping[str, object]", packet["evidence_metrics"]))
             rows.append(
                 {
                     "budget": budget,
                     "safe": bool(packet["safe"]),
-                    "estimated_tokens": int(packet["estimated_tokens"]),
-                    "role_coverage": dict(packet["role_coverage"]),
+                    "estimated_tokens": int(
+                        cast("int | str", packet["estimated_tokens"])
+                    ),
+                    "role_coverage": dict(
+                        cast("Mapping[str, object]", packet["role_coverage"])
+                    ),
                     **metrics,
                 }
             )
-        safe_budgets = [int(row["budget"]) for row in rows if bool(row["safe"])]
+        safe_budgets = [
+            int(cast("int | str", row["budget"])) for row in rows if bool(row["safe"])
+        ]
         return {
             "schema": "hashmarks.work-context-budget-sweep.v1",
             "rows": rows,
@@ -262,6 +274,8 @@ class WorkContextMixin:
         limit: int,
         replay: int,
     ) -> dict[str, object]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         hits = self.find_task(task, limit=limit)
         rows = [
             {
@@ -401,6 +415,8 @@ class WorkContextMixin:
         view_fetch: int,
         selected_paths: set[str],
     ) -> tuple[dict[str, list[dict[str, object]]], dict[str, float], str | None]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         contributions: dict[str, list[dict[str, object]]] = {}
         totals: dict[str, float] = {}
         base_first: str | None = None
@@ -497,7 +513,7 @@ class WorkContextMixin:
 
     def _retrieval_explanation_rows(
         self,
-        selected: Sequence[object],
+        selected: Sequence[SearchHit],
         *,
         base_first: str | None,
         ordinary: set[str],

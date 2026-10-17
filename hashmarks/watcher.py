@@ -415,7 +415,7 @@ class WatchdogBatchWatcher(_BatchedWatcherBase):
         owner = self
 
         class Handler(FileSystemEventHandler):
-            def on_any_event(self, event):
+            def on_any_event(self, event: object) -> None:
                 if should_ignore_observer_event(
                     event_type=str(getattr(event, "event_type", "")),
                     is_directory=bool(getattr(event, "is_directory", False)),
@@ -456,7 +456,7 @@ def create_default_watcher(
     debounce_seconds: float = 0.05,
     change_tracker: ChangeTracker | None = None,
     exclude_relative_paths: Iterable[str | Path] = (),
-):
+) -> NativeLinuxBatchWatcher | WatchdogBatchWatcher:
     """Create the fastest safe watcher available without mandatory extras.
 
     Linux/WSL uses native inotify and needs no third-party package. Other

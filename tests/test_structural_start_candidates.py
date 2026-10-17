@@ -2,8 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from contract_assertions import assert_object
+from pytest import MonkeyPatch
+
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.model import SearchHit
+from hashmarks.codemap.ownership_relation_types import OwnershipRelationGraph
 
 
 def _write(path: Path, content: str) -> None:
@@ -34,14 +38,45 @@ def _fixture(root: Path) -> tuple[str, tuple[SearchHit, ...]]:
     return "Fix behavior " + " ".join(terms), tuple(hits)
 
 
-def _graph(start_path: str, *, incomplete: bool = False) -> dict[str, object]:
+def _graph(
+    task: str, start_path: str, *, max_depth: int = 2, incomplete: bool = False
+) -> OwnershipRelationGraph:
     owner = "src/owner_b.py" if start_path.endswith("09.py") else "src/owner_a.py"
     selected = None if incomplete and start_path.endswith("09.py") else owner
+    complete = not (incomplete and selected is None)
     return {
         "schema": "hashmarks.ownership-relation-graph.v1",
+        "task": task,
+        "start_path": start_path,
+        "max_depth": max_depth,
+        "nodes": [],
+        "edges": [],
+        "selection_reason": "test-fixture",
+        "negative_evidence_admissible": complete,
+        "uniqueness_admissible": complete,
+        "truncation": "complete" if complete else "truncated",
+        "bounds": {
+            "max_depth": max_depth,
+            "edges_per_path": 100,
+            "node_symbols": 12,
+            "symbols_per_alias": 12,
+            "symbol_candidates": 5000,
+        },
+        "cycle_policy": "bounded-ancestor-cycle-cutoff-plus-revisit-deduplication",
+        "relation_authority": "imports-and-calls-are-evidence-not-ownership-truth",
+        "secret_knowledge_used": False,
         "selected": selected,
         "candidates": (
-            [{"path": selected, "depth": 1, "corroboration": ["task-locality"]}]
+            [
+                {
+                    "path": selected,
+                    "depth": 1,
+                    "corroboration": ["task-locality"],
+                    "relations": ["imports"],
+                    "exact_edges": 1,
+                    "task_locality_terms": [],
+                }
+            ]
             if selected
             else []
         ),
@@ -50,17 +85,15 @@ def _graph(start_path: str, *, incomplete: bool = False) -> dict[str, object]:
             if selected
             else []
         ),
-        "completeness": "incomplete" if incomplete and selected is None else "complete",
-        "search_bound_reasons": (
-            ["edge-per-path-limit"] if incomplete and selected is None else []
-        ),
+        "completeness": "complete" if complete else "incomplete",
+        "search_bound_reasons": ([] if complete else ["edge-per-path-limit"]),
         "cycle_count": 0,
         "revisit_count": 0,
     }
 
 
 def test_ninth_source_start_changes_observed_structural_ambiguity(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
     task, hits = _fixture(tmp_path)
     with CodeMap(tmp_path) as codemap:
@@ -71,7 +104,7 @@ def test_ninth_source_start_changes_observed_structural_ambiguity(
         monkeypatch.setattr(
             codemap,
             "ownership_relation_graph",
-            lambda _task, start_path, *, max_depth=2: _graph(start_path),
+            _graph,
         )
         first_eight = codemap.task_action_map(task, limit=8, per_role=1)
         all_nine = codemap.task_action_map(task, limit=9, per_role=1)
@@ -90,11 +123,11 @@ def test_ninth_source_start_changes_observed_structural_ambiguity(
     assert all_nine["ambiguity"]["reason"] == "multiple-task-local-structural-owners"
     assert wider_display["structural_starts"] == starts
     assert packet["edit"] is None
-    assert packet["structural_start_summary"]["candidate_count"] == 9
+    assert assert_object(packet["structural_start_summary"])["candidate_count"] == 9
 
 
 def test_unselected_graph_bound_and_stale_competitor_remain_visible(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
     task, hits = _fixture(tmp_path)
     with CodeMap(tmp_path) as codemap:
@@ -105,8 +138,8 @@ def test_unselected_graph_bound_and_stale_competitor_remain_visible(
         monkeypatch.setattr(
             codemap,
             "ownership_relation_graph",
-            lambda _task, start_path, *, max_depth=2: _graph(
-                start_path, incomplete=True
+            lambda task, start_path, *, max_depth=2: _graph(
+                task, start_path, max_depth=max_depth, incomplete=True
             ),
         )
         bounded = codemap.task_action_map(task, limit=9)
@@ -120,7 +153,7 @@ def test_unselected_graph_bound_and_stale_competitor_remain_visible(
         monkeypatch.setattr(
             codemap,
             "ownership_relation_graph",
-            lambda _task, start_path, *, max_depth=2: _graph(start_path),
+            _graph,
         )
         codemap.sync(["src/route_09.py"])
         before = codemap.task_action_map(task, limit=9)

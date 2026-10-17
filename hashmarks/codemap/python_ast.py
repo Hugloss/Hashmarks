@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from .model import (
@@ -13,6 +14,7 @@ from .model import (
     ParsedArtifact,
     SymbolRecord,
 )
+from .python_exports import python_import_target
 
 
 def estimate_tokens(text: str) -> int:
@@ -66,7 +68,7 @@ def _string_annotation_targets(value: str) -> tuple[str, ...]:
         )
 
 
-def _iterable_annotation_targets(nodes) -> tuple[str, ...]:
+def _iterable_annotation_targets(nodes: Iterable[ast.AST]) -> tuple[str, ...]:
     return tuple(value for node in nodes for value in _annotation_targets(node))
 
 
@@ -109,7 +111,14 @@ class _Collector(ast.NodeVisitor):
     def current(self) -> str | None:
         return ".".join(self.stack) if self.stack else None
 
-    def _symbol_record(self, node, kind, qualname, signature, span) -> SymbolRecord:
+    def _symbol_record(
+        self,
+        node: ast.AST,
+        kind: str,
+        qualname: str,
+        signature: str,
+        span: tuple[int, int],
+    ) -> SymbolRecord:
         start, end = span
         body = "\n".join(self.source.splitlines()[start - 1 : end])
         return SymbolRecord(
@@ -124,7 +133,9 @@ class _Collector(ast.NodeVisitor):
             parent=self.current,
         )
 
-    def _function_annotation_edges(self, node, qualname, start) -> None:
+    def _function_annotation_edges(
+        self, node: ast.FunctionDef | ast.AsyncFunctionDef, qualname: str, start: int
+    ) -> None:
         for target in _annotation_targets(node.returns):
             self.edges.append(
                 EdgeRecord(qualname, "return-type", target, start, "annotation")
@@ -140,7 +151,7 @@ class _Collector(ast.NodeVisitor):
                     EdgeRecord(qualname, "parameter-type", target, line, "annotation")
                 )
 
-    def _annotation_edges(self, node, qualname, start) -> None:
+    def _annotation_edges(self, node: ast.AST, qualname: str, start: int) -> None:
         if isinstance(node, ast.ClassDef):
             for base in node.bases:
                 for target in _annotation_targets(base):
@@ -183,9 +194,8 @@ class _Collector(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
-        prefix = "." * int(node.level) + (node.module or "")
         for alias in node.names:
-            target = f"{prefix}.{alias.name}" if prefix else alias.name
+            target = python_import_target(node, alias.name)
             self.edges.append(
                 EdgeRecord(self.current, "import", target, int(node.lineno))
             )

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import pytest
 
@@ -29,7 +29,7 @@ def _repository(root: Path) -> None:
 )
 def test_cold_warm_semantic_equivalence_for_supported_queries(
     tmp_path: Path,
-    query: str,
+    query: Literal["find_task", "task_action_map", "task_decision_packet"],
 ) -> None:
     _repository(tmp_path)
     result = verify_cold_warm_semantic_equivalence(

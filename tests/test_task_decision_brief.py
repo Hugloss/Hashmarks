@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
+from contract_assertions import assert_object
+
 from hashmarks.codemap import CodeMap
 
 if TYPE_CHECKING:
@@ -22,10 +24,14 @@ def test_brief_preserves_action_and_verification_without_verbose_candidates(
         c.sync()
         full = c.task_decision_packet("widget implementation test")
         brief = c.task_decision_brief("widget implementation test")
-    assert brief["edit"]["path"] == full["edit"]["path"]
-    assert brief["verify"]["path"] == full["verify"]["path"]
-    assert brief["verification_argv"] == full["verification_plan"]["argv"]
-    assert brief["safe"] == full["context_budget"]["safe"]
+    assert assert_object(brief["edit"])["path"] == assert_object(full["edit"])["path"]
+    assert (
+        assert_object(brief["verify"])["path"] == assert_object(full["verify"])["path"]
+    )
+    assert (
+        brief["verification_argv"] == assert_object(full["verification_plan"])["argv"]
+    )
+    assert brief["safe"] == assert_object(full["context_budget"])["safe"]
     assert "ambiguity" not in brief
     assert (
         len(json.dumps(brief, sort_keys=True))
@@ -44,7 +50,10 @@ def test_brief_deduplicates_contract_when_edit_is_contract(tmp_path: Path) -> No
         c.sync()
         brief = c.task_decision_brief("change policy config test")
     if brief["edit"] and brief.get("contract"):
-        assert brief["edit"]["path"] != brief["contract"]["path"]
+        assert (
+            assert_object(brief["edit"])["path"]
+            != assert_object(brief["contract"])["path"]
+        )
 
 
 def test_decision_brief_keeps_ambiguous_candidate_out_of_edit_authority(
@@ -65,11 +74,11 @@ def test_decision_brief_keeps_ambiguous_candidate_out_of_edit_authority(
         brief = c.task_decision_brief("Fix publish_result")
 
     assert packet["edit"] is None
-    assert packet["candidate"]["path"] in {"src/a.py", "src/b.py"}
-    assert packet["ownership_authority"]["owner_resolved"] is False
+    assert assert_object(packet["candidate"])["path"] in {"src/a.py", "src/b.py"}
+    assert assert_object(packet["ownership_authority"])["owner_resolved"] is False
     assert brief["safe"] is False
     assert brief["edit"] is None
-    assert brief["candidate"]["path"] in {"src/a.py", "src/b.py"}
+    assert assert_object(brief["candidate"])["path"] in {"src/a.py", "src/b.py"}
     assert brief["discrimination"] == {
         "needed": True,
         "reason": "competing-action-roles",

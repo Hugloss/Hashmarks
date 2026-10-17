@@ -78,14 +78,14 @@ class _TimeoutProcess:
         self.calls: list[tuple[object, ...]] = []
         self.wait_count = 0
 
-    def poll(self):
+    def poll(self) -> int | None:
         self.calls.append(("poll",))
         return None
 
     def send_signal(self, signal: int) -> None:
         self.calls.append(("send_signal", signal))
 
-    def wait(self, timeout: float):
+    def wait(self, timeout: float) -> int:
         self.calls.append(("wait", timeout))
         self.wait_count += 1
         if self.wait_count == 1:
@@ -100,7 +100,7 @@ class _ExitedProcess:
     def __init__(self) -> None:
         self.calls: list[tuple[object, ...]] = []
 
-    def poll(self):
+    def poll(self) -> int | None:
         self.calls.append(("poll",))
         return 0
 
@@ -318,7 +318,7 @@ def test_released_watcher_advances_fence_on_next_claim(tmp_path: Path) -> None:
         second.release()
 
 
-def test_codemap_watcher_keeps_map_hot_without_identity_daemon(tmp_path: Path):
+def test_codemap_watcher_keeps_map_hot_without_identity_daemon(tmp_path: Path) -> None:
     if not sys.platform.startswith("linux"):
         pytest.skip("native watcher regression is Linux-specific")
     _write_repo(tmp_path)

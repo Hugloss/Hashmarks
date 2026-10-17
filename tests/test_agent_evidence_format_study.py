@@ -74,7 +74,7 @@ def test_encoding_only_keeps_identical_facts_and_qualifications() -> None:
         assert "a.py" in trial["tool_response"] and "b.py" in trial["tool_response"]
 
 
-def _grades(trials):
+def _grades(trials: list[dict[str, object]]) -> list[dict[str, object]]:
     return [
         {
             "case_id": row["case_id"],

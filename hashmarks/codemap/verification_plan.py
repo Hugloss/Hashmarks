@@ -10,6 +10,7 @@ from .repository_domains import RepositoryDomain, classify_repository_path
 
 if TYPE_CHECKING:
     from .engine import CodeMap
+    from .task_evidence_types import TaskVerificationPlan
 
 
 class VerificationPlanMixin:
@@ -46,7 +47,7 @@ class VerificationPlanMixin:
         qualname: str | None,
         *,
         pytest_declared: bool | None = None,
-    ) -> dict[str, object]:
+    ) -> TaskVerificationPlan:
         if pytest_declared is None:
             pytest_declared = self._pytest_declared()
         test_symbol = self._verification_test_symbol(symbol, qualname)
@@ -66,7 +67,9 @@ class VerificationPlanMixin:
             "test_symbol": test_symbol,
         }
 
-    def _go_verification_plan(self, rel: str, target: Path) -> dict[str, object] | None:
+    def _go_verification_plan(
+        self, rel: str, target: Path
+    ) -> TaskVerificationPlan | None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         if (
@@ -99,7 +102,7 @@ class VerificationPlanMixin:
 
     def _javascript_verification_plan(
         self, rel: str, target: Path
-    ) -> dict[str, object] | None:
+    ) -> TaskVerificationPlan | None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         runner = self._vitest_runner(self.workspace)
@@ -139,7 +142,7 @@ class VerificationPlanMixin:
 
     def _typescript_verification_plan(
         self, rel: str, target: Path
-    ) -> dict[str, object] | None:
+    ) -> TaskVerificationPlan | None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         if target.suffix.lower() not in {".ts", ".tsx", ".mts", ".cts"}:
@@ -158,7 +161,9 @@ class VerificationPlanMixin:
             "scope": "typescript-project",
         }
 
-    def _polyglot_verification_plan(self, rel: str, target: Path) -> dict[str, object]:
+    def _polyglot_verification_plan(
+        self, rel: str, target: Path
+    ) -> TaskVerificationPlan:
         plan = self._go_verification_plan(rel, target)
         if plan is not None:
             return plan
@@ -179,7 +184,7 @@ class VerificationPlanMixin:
 
     def verification_plan(
         self, path: str, *, symbol: str | None = None, qualname: str | None = None
-    ) -> dict[str, object]:
+    ) -> TaskVerificationPlan:
         """Derive a bounded argv for a known verification surface."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)

@@ -12,6 +12,10 @@ from .decision_session import decision_scoped
 from .ownership.cache_invalidation import CacheInvalidationAnalyzer
 from .ownership.cache_ownership import CacheOwnershipAnalyzer
 from .ownership.concurrency_risk import ConcurrencyRiskAnalyzer
+from .ownership.filesystem_lifecycle import (
+    FilesystemLifecycleAnalyzer,
+    lifecycle_findings,
+)
 from .ownership.import_ownership import ImportOwnershipAnalyzer
 
 if TYPE_CHECKING:
@@ -178,12 +182,14 @@ class OwnershipAnalysisMixin:
             ),
         ]
         findings = [self._adjudicate_repository_finding(item) for item in findings]
+        lifecycle = FilesystemLifecycleAnalyzer(self).analyze(paths)
+        findings.extend(lifecycle_findings(lifecycle))
         severity_order = {"warning": 0, "advisory": 1}
         findings.sort(
             key=lambda item: (
                 severity_order.get(str(item["severity"]), 9),
                 str(item["path"]),
-                int(item["line"]),
+                int(str(item["line"])),
                 str(item["code"]),
             )
         )
@@ -213,6 +219,7 @@ class OwnershipAnalysisMixin:
                 "concurrency_risk": dict(concurrency_result["summary"]),
             },
             "findings": findings,
+            "resource_lifecycle": lifecycle,
             "boundary": (
                 "repository-evidence projection only; no execution, remediation, "
                 "admission, certification, or agent authority"
@@ -294,7 +301,11 @@ class OwnershipAnalysisMixin:
         return self._ast_imports_owner(tree, module, owner_name)
 
     @staticmethod
-    def _ownership_add_imports(nodes, edges, findings) -> None:
+    def _ownership_add_imports(
+        nodes: dict[tuple[str, str, str], dict[str, object]],
+        edges: list[dict[str, object]],
+        findings: list[dict[str, object]],
+    ) -> None:
         for finding in findings:
             source = str(finding["path"])
             target = finding.get("target_path")
@@ -324,7 +335,11 @@ class OwnershipAnalysisMixin:
             )
 
     @staticmethod
-    def _ownership_add_cache_owners(nodes, edges, owners) -> None:
+    def _ownership_add_cache_owners(
+        nodes: dict[tuple[str, str, str], dict[str, object]],
+        edges: list[dict[str, object]],
+        owners: list[dict[str, object]],
+    ) -> None:
         for owner in owners:
             path = str(owner["path"])
             name = str(owner["owner"])
@@ -353,7 +368,7 @@ class OwnershipAnalysisMixin:
             )
 
     @staticmethod
-    def _cache_owner_name_counts(owners) -> dict[str, int]:
+    def _cache_owner_name_counts(owners: list[dict[str, object]]) -> dict[str, int]:
         counts: dict[str, int] = {}
         for owner in owners:
             name = str(owner["owner"])
@@ -361,7 +376,11 @@ class OwnershipAnalysisMixin:
         return counts
 
     def _ownership_add_cache_readers(
-        self, nodes, edges, owners, selected: set[str]
+        self,
+        nodes: dict[tuple[str, str, str], dict[str, object]],
+        edges: list[dict[str, object]],
+        owners: list[dict[str, object]],
+        selected: set[str],
     ) -> None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -406,7 +425,9 @@ class OwnershipAnalysisMixin:
 
     @staticmethod
     def _ownership_add_invalidations(
-        nodes, edges, invalidation_result
+        nodes: dict[tuple[str, str, str], dict[str, object]],
+        edges: list[dict[str, object]],
+        invalidation_result: dict[str, object],
     ) -> tuple[set[str], set[str]]:
         cache_ids = {
             str(node["id"]) for node in nodes.values() if node.get("kind") == "cache"
@@ -428,7 +449,11 @@ class OwnershipAnalysisMixin:
         return cache_ids, resolved
 
     @staticmethod
-    def _ownership_add_concurrency(nodes, edges, findings) -> int:
+    def _ownership_add_concurrency(
+        nodes: dict[tuple[str, str, str], dict[str, object]],
+        edges: list[dict[str, object]],
+        findings: list[dict[str, object]],
+    ) -> int:
         unguarded = 0
         for finding in findings:
             path = str(finding["path"])
@@ -465,7 +490,11 @@ class OwnershipAnalysisMixin:
             unguarded += int(not bool(finding["guarded"]))
         return unguarded
 
-    def _ownership_graph_sources(self, paths: Sequence[str] | None):
+    def _ownership_graph_sources(
+        self, paths: Sequence[str] | None
+    ) -> tuple[
+        dict[str, object], dict[str, object], dict[str, object], dict[str, object]
+    ]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         normalized, all_rows = self._ownership_analysis_inputs(paths)

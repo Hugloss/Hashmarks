@@ -36,6 +36,11 @@ from .source_line_correspondence import (
     validated_source_lines,
 )
 
+REPOSITORY_DELTA_DEFAULT_OPTIONS = ChangeImpactOptions(
+    impact_limit_per_surface=4,
+    max_depth=3,
+)
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -1018,11 +1023,6 @@ class RepositoryDeltaMixin(ScopedSourceLiteralsMixin):
             )
         return self._scoped_source_result(batch)
 
-    @staticmethod
-    def _diagnostic_identity(row: Mapping[str, object]) -> str:
-        """Canonical diagnostic identity independent of aggregate count/order."""
-        return diagnostic_identity(row)
-
     diagnostic_source_revision_evidence = staticmethod(
         diagnostic_source_revision_evidence
     )
@@ -1107,6 +1107,8 @@ class RepositoryDeltaMixin(ScopedSourceLiteralsMixin):
             "change_set_completeness": completeness,
             "intersection": intersection,
             "authority": "observation-freshness-only",
+            "freshness_scope": "repository-correspondence-only",
+            "producer_freshness": "unknown",
             "execution_effect": "none",
         }
 
@@ -1390,11 +1392,9 @@ class RepositoryDeltaMixin(ScopedSourceLiteralsMixin):
         previous_snapshot: Mapping[str, object],
         limit: int = 20,
         per_role: int = 3,
-        options: ChangeImpactOptions = ChangeImpactOptions(
-            impact_limit_per_surface=4,
-            max_depth=3,
-        ),
+        options: ChangeImpactOptions | None = None,
     ) -> dict[str, object]:
+        options = options or REPOSITORY_DELTA_DEFAULT_OPTIONS
         """Return changed repository-intelligence facts between admitted states."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)

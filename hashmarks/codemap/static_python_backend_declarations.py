@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from hashmarks.paths import normalize_relative_path
 
 from .backend_evidence_navigation import backend_evidence_navigation
-from .handler_input_syntax import _annotation, _default
+from .handler_input_syntax import _annotation, _callee, _default
 from .repository_declaration_provider import (
     RepositoryDeclarationProviderContext,
     RepositoryDeclarationProviderResult,
@@ -22,6 +22,8 @@ MAX_BACKEND_SOURCE_BYTES = 262_144
 MAX_BACKEND_PATHS = 16
 MAX_BACKEND_GROUPS = 64
 MAX_MODEL_FIELDS = 24
+MAX_ANNOTATED_DECORATED_METHODS = 24
+MAX_METHOD_DECORATORS = 8
 MAX_ENV_KEY_CHARS = 128
 
 _MODEL_BASE_NAMES = frozenset({"BaseModel", "BaseSettings"})
@@ -65,7 +67,7 @@ def _class_field(node: ast.AnnAssign) -> dict[str, object] | None:
                     "configuration_precedence": "unknown",
                 }
             }
-            if direct_environment is not None
+            if direct_environment is not None and node.value is not None
             else {}
         ),
         "runtime_requiredness": "unknown",
@@ -127,14 +129,69 @@ def _group(
     }
 
 
+def _annotated_decorated_methods(
+    node: ast.ClassDef,
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    methods: list[dict[str, object]] = []
+    evidence: list[dict[str, object]] = []
+    for statement in node.body:
+        if (
+            isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and statement.returns is not None
+            and statement.decorator_list
+        ):
+            if len(statement.name) > 128:
+                raise ValueError("annotated decorated method name exceeds syntax bound")
+            if len(statement.decorator_list) > MAX_METHOD_DECORATORS:
+                raise ValueError("annotated method exceeds eight decorator sites")
+            methods.append(
+                {
+                    "name": statement.name,
+                    "line": statement.lineno,
+                    "end_line": statement.end_lineno or statement.lineno,
+                    "async_syntax": isinstance(statement, ast.AsyncFunctionDef),
+                    "return_annotation": _annotation(statement.returns),
+                    "decorators": [
+                        {
+                            "line": decorator.lineno,
+                            "end_line": decorator.end_lineno or decorator.lineno,
+                            "callee": _callee(
+                                decorator.func
+                                if isinstance(decorator, ast.Call)
+                                else decorator
+                            ),
+                            "call_arguments": (
+                                _default(decorator)
+                                if isinstance(decorator, ast.Call)
+                                else {"state": "not-supplied"}
+                            ),
+                        }
+                        for decorator in statement.decorator_list
+                    ],
+                    "runtime_field_role": "unknown",
+                    "runtime_binding": "not-established",
+                }
+            )
+            if len(methods) > MAX_ANNOTATED_DECORATED_METHODS:
+                raise ValueError("class exceeds 24 annotated decorated methods")
+            evidence.append(
+                {
+                    "start_line": min(d.lineno for d in statement.decorator_list),
+                    "end_line": statement.end_lineno or statement.lineno,
+                }
+            )
+    return methods, evidence
+
+
 def _model_group(
-    path: str, node: ast.ClassDef, *, name: str
+    path: str, node: ast.ClassDef, *, name: str, generic: bool = False
 ) -> dict[str, object] | None:
     bases = [_model_base(base) for base in node.bases]
     nominated = [base for base in bases if base is not None]
-    if not nominated:
+    if not nominated and not generic:
         return None
     fields: list[dict[str, object]] = []
+    methods, method_evidence = _annotated_decorated_methods(node)
     for statement in node.body:
         if isinstance(statement, ast.AnnAssign):
             field = _class_field(statement)
@@ -148,15 +205,34 @@ def _model_group(
         "class_line": node.lineno,
     }
     return _group(
-        f"{path}:model:{node.lineno}:{node.name}",
-        {"kind": "python-model-class-syntax", "syntax": "python-ast"},
+        f"{path}:{'class' if generic else 'model'}:{node.lineno}:{node.name}",
+        {
+            "kind": (
+                "python-annotated-class-syntax"
+                if generic
+                else "python-model-class-syntax"
+            ),
+            "syntax": "python-ast",
+        },
         scope,
         {
             "class_name_syntax": node.name,
-            "model_base_syntax": nominated,
+            **(
+                {
+                    "base_expressions": [_annotation(base) for base in node.bases],
+                    "class_identity": "not-established",
+                    "inherited_fields": "not-established",
+                    "runtime_field_roles": "unknown",
+                }
+                if generic
+                else {
+                    "model_base_syntax": nominated,
+                    "model_identity": "not-established",
+                }
+            ),
             "field_count": len(fields),
             "fields": fields,
-            "model_identity": "not-established",
+            **({"annotated_decorated_methods": methods} if methods else {}),
             "field_requiredness": "unknown",
             "schema_compatibility": "not-established",
         },
@@ -166,6 +242,7 @@ def _model_group(
                 {"path": path, "start_line": f["line"], "end_line": f["end_line"]}
                 for f in fields
             ],
+            *[{"path": path, **site} for site in method_evidence],
         ],
         name=name,
     )
@@ -211,7 +288,7 @@ def _env_key(node: ast.expr | None) -> dict[str, object]:
     return {"state": "literal-key-syntax", "value": node.value}
 
 
-def _source_site(node: ast.AST) -> dict[str, int]:
+def _source_site(node: ast.expr) -> dict[str, int]:
     return {
         "start_line": node.lineno,
         "end_line": node.end_lineno or node.lineno,
@@ -310,9 +387,11 @@ def _direct_assignment_targets(tree: ast.Module) -> dict[int, list[str]]:
 def _config_groups(
     path: str, tree: ast.Module, *, name: str
 ) -> list[dict[str, object]]:
-    sites: list[tuple[int, int, ast.AST, dict[str, object]]] = []
+    sites: list[tuple[int, int, ast.expr, dict[str, object]]] = []
     direct_targets = _direct_assignment_targets(tree)
     for node in ast.walk(tree):
+        if not isinstance(node, ast.expr):
+            continue
         observation = _env_site(node)
         if observation is not None:
             observation["direct_assignment_names"] = direct_targets.get(id(node), [])
@@ -322,7 +401,7 @@ def _config_groups(
                 raise ValueError("backend environment syntax exceeds group bound")
     rows: list[dict[str, object]] = []
     for line, column, node, value in sorted(sites, key=lambda x: x[:2]):
-        scope = {"path": path, "line": line, "column": column}
+        scope: dict[str, object] = {"path": path, "line": line, "column": column}
         rows.append(
             _group(
                 f"{path}:env:{line}:{column}",
@@ -351,6 +430,7 @@ class StaticPythonBackendDeclarations:
     include_model_fields: bool = True
     include_environment_reads: bool = True
     include_evidence_navigation: bool = False
+    include_class_fields: bool = False
 
     def __post_init__(self) -> None:
         if not 1 <= len(self.paths) <= MAX_BACKEND_PATHS:
@@ -367,9 +447,14 @@ class StaticPythonBackendDeclarations:
         if (
             type(self.include_model_fields) is not bool
             or type(self.include_environment_reads) is not bool
+            or type(self.include_class_fields) is not bool
         ):
             raise ValueError("backend provider switches must be boolean")
-        if not self.include_model_fields and not self.include_environment_reads:
+        if not (
+            self.include_model_fields
+            or self.include_environment_reads
+            or self.include_class_fields
+        ):
             raise ValueError("backend provider requires an enabled observation")
         if type(self.include_evidence_navigation) is not bool:
             raise ValueError("include_evidence_navigation must be boolean")
@@ -387,14 +472,23 @@ class StaticPythonBackendDeclarations:
             raise ValueError("backend source exceeds bounded syntax input")
         tree = ast.parse(source, filename=path)
         groups: list[dict[str, object]] = []
-        if self.include_model_fields:
-            for node in tree.body:
-                if isinstance(node, ast.ClassDef):
-                    group = _model_group(path, node, name=self.name)
-                    if group is not None:
-                        groups.append(group)
-                        if len(groups) > MAX_BACKEND_GROUPS:
-                            raise ValueError("backend declarations exceed group bound")
+        if self.include_model_fields or self.include_class_fields:
+            classes = sorted(
+                (node for node in ast.walk(tree) if isinstance(node, ast.ClassDef)),
+                key=lambda node: node.lineno,
+            )
+            for node in classes:
+                group = (
+                    _model_group(path, node, name=self.name)
+                    if self.include_model_fields
+                    else None
+                )
+                if group is None and self.include_class_fields:
+                    group = _model_group(path, node, name=self.name, generic=True)
+                if group is not None:
+                    groups.append(group)
+                    if len(groups) > MAX_BACKEND_GROUPS:
+                        raise ValueError("backend declarations exceed group bound")
         if self.include_environment_reads:
             groups.extend(_config_groups(path, tree, name=self.name))
         self._attach_navigation(groups)
@@ -421,6 +515,7 @@ class StaticPythonBackendDeclarations:
                 "missing_selected_paths": missing,
                 "model_fields": self.include_model_fields,
                 "environment_reads": self.include_environment_reads,
+                **({"class_fields": True} if self.include_class_fields else {}),
                 **(
                     {"evidence_navigation": "bounded-source-syntax-read-guidance"}
                     if self.include_evidence_navigation

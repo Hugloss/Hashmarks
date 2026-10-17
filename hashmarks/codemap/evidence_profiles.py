@@ -17,6 +17,10 @@ PROFILE_NAMES = get_args(ProfileName)
 
 
 EVIDENCE_PROFILE_SCHEMA = "hashmarks.evidence-profile.v1"
+EVIDENCE_PROFILE_DEFAULT_OPTIONS = ChangeImpactOptions(
+    impact_limit_per_surface=4,
+    max_depth=3,
+)
 
 
 class EvidenceProfilesMixin:
@@ -174,11 +178,9 @@ class EvidenceProfilesMixin:
         profile: str = "compact",
         limit: int = 20,
         per_role: int = 3,
-        options: ChangeImpactOptions = ChangeImpactOptions(
-            impact_limit_per_surface=4,
-            max_depth=3,
-        ),
+        options: ChangeImpactOptions | None = None,
     ) -> dict[str, object]:
+        options = options or EVIDENCE_PROFILE_DEFAULT_OPTIONS
         """Project one bounded F3 snapshot at compact, standard, or audit density."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)

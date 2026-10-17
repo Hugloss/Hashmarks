@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from copy import deepcopy
 from typing import Any
 
 
@@ -137,6 +138,102 @@ def _endpoint_comparison_lines(result: Mapping[str, Any]) -> list[str]:
                 "Repository absence is not inferred.",
             ]
     return []
+
+
+def _initial_endpoint_binding_refs(
+    endpoint: dict[str, Any], pointer: str
+) -> dict[str, str]:
+    """Factor only byte-equivalent binding values; references name native facts."""
+    binding = endpoint.get("source_binding")
+    resolution = endpoint.get("resolution")
+    refs: dict[str, str] = {}
+    if not isinstance(binding, Mapping) or not isinstance(resolution, dict):
+        return refs
+    owners = [(pointer + "/resolution", resolution)]
+    owners.extend(
+        (pointer + f"/resolution/candidates/{index}", candidate)
+        for index, candidate in enumerate(resolution.get("candidates", []))
+        if isinstance(candidate, dict)
+    )
+    for location, owner in owners:
+        if "source_binding" in owner and _encode(owner["source_binding"]) == _encode(
+            binding
+        ):
+            owner.pop("source_binding")
+            refs[location + "/source_binding"] = pointer + "/source_binding"
+    return refs
+
+
+def initial_semantic_relationship_details(
+    value: Mapping[str, Any],
+) -> tuple[dict[str, Any], dict[str, str]]:
+    """A lossless view: only JSON-identical duplicates become native value refs."""
+    details = deepcopy(dict(value))
+    refs: dict[str, str] = {}
+    _initial_evidence_value_refs(value, details, refs)
+    bindings = {
+        _encode(endpoint["source_binding"]): f"/claims/{index}/{side}/source_binding"
+        for index, claim in enumerate(value.get("claims", []))
+        if isinstance(claim, Mapping)
+        for side in ("source", "target")
+        if isinstance(endpoint := claim.get(side), Mapping)
+        and isinstance(endpoint.get("source_binding"), Mapping)
+    }
+    _initial_qualification_binding_refs(details, bindings, refs)
+    for index, claim in enumerate(details.get("claims", [])):
+        if not isinstance(claim, dict):
+            continue
+        for side in ("source", "target"):
+            endpoint = claim.get(side)
+            if isinstance(endpoint, dict):
+                refs.update(
+                    _initial_endpoint_binding_refs(endpoint, f"/claims/{index}/{side}")
+                )
+    return details, refs
+
+
+def _initial_evidence_value_refs(
+    value: Mapping[str, Any], details: dict[str, Any], refs: dict[str, str]
+) -> None:
+    evidence = details.get("evidence")
+    if isinstance(evidence, dict):
+        if all(
+            key in value and _encode(item) == _encode(value[key])
+            for key, item in evidence.items()
+        ):
+            details.pop("evidence")
+            refs["/evidence"] = "/evidence"
+        else:
+            for key in list(evidence):
+                if key in value and _encode(evidence[key]) == _encode(value[key]):
+                    evidence.pop(key)
+                    escaped = key.replace("~", "~0").replace("/", "~1")
+                    refs["/evidence/" + escaped] = "/" + escaped
+
+
+def _initial_qualification_binding_refs(
+    details: dict[str, Any], bindings: dict[str, str], refs: dict[str, str]
+) -> None:
+    for index, qualification in enumerate(details.get("qualifications", [])):
+        if not isinstance(qualification, dict):
+            continue
+        for ordinal, binding in enumerate(qualification.get("source_bindings", [])):
+            canonical = bindings.get(_encode(binding))
+            if canonical is not None:
+                qualification["source_bindings"][ordinal] = {"value_ref": canonical}
+                refs[f"/qualifications/{index}/source_bindings/{ordinal}"] = canonical
+
+
+def initial_semantic_relationship_text(packet: Mapping[str, object]) -> list[str]:
+    """Retain the complete supplied-claim record beside its qualified subject."""
+    relationships = packet.get("semantic_relationships")
+    if not isinstance(relationships, Mapping):
+        return []
+    details, refs = initial_semantic_relationship_details(relationships)
+    return [
+        f"Semantic subject: {_encode(relationships.get('subject'))}",
+        f"Producer relationships: {_encode({'record': details, 'value_refs': refs, 'value_ref_base': '/semantic_relationships'})} (@ /semantic_relationships; value refs use decoded native data).",
+    ]
 
 
 def evidence_projection_text(result: Mapping[str, Any]) -> str:

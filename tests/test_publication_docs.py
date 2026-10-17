@@ -564,7 +564,8 @@ def test_public_contract_docs_describe_current_api_and_authority() -> None:
     invariants = _text("docs/reference/INVARIANTS.md")
     integration = _text("docs/integration/OH_GOON_INTEGRATION.md")
 
-    assert "hashmarks.task-evidence.v2" in stability
+    assert "hashmarks.task-evidence.v5" in stability
+    assert "hashmarks.task-evidence-initial.v2" in stability
     assert "one current documented Python/CLI surface" in stability
     assert "measurement/evidence infrastructure, not installed product API" in stability
 

@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import json
 from threading import RLock
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, overload
 
 from . import repository_retry
 from .codemap import ChangeImpactOptions, CodeMap
 from .codemap.change_impact import CHANGE_IMPACT_DEFAULT_REQUEST
+from .codemap.diagnostic_observation import DIAGNOSTIC_ENDPOINT_MAX_BYTES
 from .codemap.evidence_correlation import (
     CORRELATION_PACKET_MAX_BYTES,
     CORRELATION_REQUEST_MAX_BYTES,
@@ -17,14 +18,22 @@ from .codemap.repository_declaration_contract import (
     MAX_PACKET_BYTES,
     MAX_REQUEST_BYTES,
 )
+from .codemap.repository_declaration_provider import MAX_DISCOVERY_PACKET_BYTES
 from .codemap.repository_intelligence_query import RepositoryIntelligenceQueryOptions
+from .codemap.static_python_backend_declarations import StaticPythonBackendDeclarations
+from .codemap.task_evidence_types import (
+    InitialTaskEvidenceEnvelope,
+    PreviousTaskEvidence,
+    TaskEvidencePacket,
+    TaskPostChangeDelta,
+)
 from .file_store import UnstableFileError
 from .mcp_contract import (
     MCP_ERROR_REASONS,
     MCP_ERROR_RECOVERY_AUTHORITY,
     MCP_ERROR_SCHEMA,
 )
-from .operation_contract import operation_default_mode
+from .operation_contract import operation_default_mode, operation_modes
 from .repository_retry import retry_transient_repository_race
 
 if TYPE_CHECKING:
@@ -90,6 +99,35 @@ def _surface_value_error(exc: ValueError) -> McpSurfaceError:
     return McpSurfaceError(message, reason=_value_error_reason(message))
 
 
+def _source_declaration_providers(
+    mode: str, paths: list[str] | None, include_class_fields: bool
+) -> list[StaticPythonBackendDeclarations] | None:
+    if type(include_class_fields) is not bool:
+        raise McpSurfaceError("include_class_fields must be boolean")
+    if mode != "discovery":
+        if paths is not None or include_class_fields:
+            raise McpSurfaceError("source selection requires result_mode=discovery")
+        return None
+    if paths is None:
+        if include_class_fields:
+            raise McpSurfaceError("include_class_fields requires selected paths")
+        return []
+    bounded_paths = _bounded_json(
+        paths,
+        name="python_backend_paths",
+        maximum=MAX_REQUEST_BYTES,
+        expected_type=list,
+    )
+    try:
+        return [
+            StaticPythonBackendDeclarations(
+                paths=tuple(bounded_paths), include_class_fields=include_class_fields
+            )
+        ]
+    except ValueError as exc:
+        raise _surface_value_error(exc) from exc
+
+
 def _bounded_text(
     value: str, *, name: str, maximum: int, allow_empty: bool = False
 ) -> str:
@@ -140,7 +178,7 @@ def _source_context_request(
     return 0, sorted(requested), 1
 
 
-def _previous_evidence(value: dict[str, Any]) -> dict[str, Any]:
+def _previous_evidence(value: PreviousTaskEvidence) -> PreviousTaskEvidence:
     if not isinstance(value, dict):
         raise McpSurfaceError("previous_evidence must be an object")
     try:
@@ -158,7 +196,7 @@ def _previous_evidence(value: dict[str, Any]) -> dict[str, Any]:
     return value
 
 
-def _bounded_json(value: Any, *, name: str, maximum: int, expected_type: type) -> Any:
+def _bounded_json(value: _T, *, name: str, maximum: int, expected_type: type) -> _T:
     if not isinstance(value, expected_type):
         kind = "an object" if expected_type is dict else "a list"
         raise McpSurfaceError(f"{name} must be {kind}")
@@ -171,6 +209,30 @@ def _bounded_json(value: Any, *, name: str, maximum: int, expected_type: type) -
     if len(encoded) > maximum:
         raise McpSurfaceError(f"{name} exceeds {maximum} encoded bytes")
     return value
+
+
+def _diagnostic_source_options(
+    result_mode: str,
+    before_source: dict[str, Any] | None,
+    after_source: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if before_source is None and after_source is None:
+        return {}
+    if result_mode != "diagnostics":
+        raise McpSurfaceError("source observations require diagnostics mode")
+    if before_source is None or after_source is None:
+        raise McpSurfaceError(
+            "source correspondence requires both endpoint observations"
+        )
+    return {
+        name: _bounded_json(
+            value, name=name, maximum=DIAGNOSTIC_ENDPOINT_MAX_BYTES, expected_type=dict
+        )
+        for name, value in (
+            ("before_source", before_source),
+            ("after_source", after_source),
+        )
+    }
 
 
 def _dependency_codemap_request(
@@ -264,6 +326,7 @@ class HashmarksMcpSurface:
         limit = _bounded_int(limit, name="limit", minimum=1, maximum=_MAX_LIMIT)
         return self._read(lambda: self._map.find_packet(query, limit=limit))
 
+    @overload
     def task_evidence(
         self,
         task: str,
@@ -272,7 +335,47 @@ class HashmarksMcpSurface:
         per_role: int = TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
         token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
         supplied_observations: list[dict[str, Any]] | None = None,
-    ) -> dict[str, object]:
+        result_mode: Literal["default"] = "default",
+    ) -> TaskEvidencePacket: ...
+
+    @overload
+    def task_evidence(
+        self,
+        task: str,
+        *,
+        limit: int = TASK_EVIDENCE_DEFAULT_OPTIONS.limit,
+        per_role: int = TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
+        token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
+        supplied_observations: list[dict[str, Any]] | None = None,
+        result_mode: Literal["initial"],
+    ) -> InitialTaskEvidenceEnvelope: ...
+
+    @overload
+    def task_evidence(
+        self,
+        task: str,
+        *,
+        limit: int = TASK_EVIDENCE_DEFAULT_OPTIONS.limit,
+        per_role: int = TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
+        token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
+        supplied_observations: list[dict[str, Any]] | None = None,
+        result_mode: str,
+    ) -> TaskEvidencePacket | InitialTaskEvidenceEnvelope: ...
+
+    def task_evidence(
+        self,
+        task: str,
+        *,
+        limit: int = TASK_EVIDENCE_DEFAULT_OPTIONS.limit,
+        per_role: int = TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
+        token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
+        supplied_observations: list[dict[str, Any]] | None = None,
+        result_mode: str = "default",
+    ) -> TaskEvidencePacket | InitialTaskEvidenceEnvelope:
+        if not isinstance(result_mode, str) or result_mode not in operation_modes(
+            "task_evidence"
+        ):
+            raise McpSurfaceError("unsupported task evidence result_mode")
         task = _bounded_text(task, name="task", maximum=_MAX_TASK_CHARS)
         limit = _bounded_int(limit, name="limit", minimum=1, maximum=_MAX_LIMIT)
         per_role = _bounded_int(per_role, name="per_role", minimum=1, maximum=8)
@@ -286,6 +389,7 @@ class HashmarksMcpSurface:
                 per_role=per_role,
                 token_budget=token_budget,
                 supplied_observations=supplied_observations,
+                result_mode=result_mode,
             )
         )
 
@@ -411,6 +515,8 @@ class HashmarksMcpSurface:
         *,
         previous_observation: dict[str, Any] | None = None,
         result_mode: str = operation_default_mode("repository_declarations"),
+        python_backend_paths: list[str] | None = None,
+        include_class_fields: bool = False,
     ) -> dict[str, object]:
         """Project one core-owned declaration operation without changing semantics."""
         bounded_groups = _bounded_json(
@@ -419,17 +525,24 @@ class HashmarksMcpSurface:
             maximum=MAX_REQUEST_BYTES,
             expected_type=list,
         )
+        mode = _bounded_text(result_mode, name="result_mode", maximum=32)
+        providers = _source_declaration_providers(
+            mode, python_backend_paths, include_class_fields
+        )
         previous = (
             None
             if previous_observation is None
             else _bounded_json(
                 previous_observation,
                 name="previous_observation",
-                maximum=MAX_PACKET_BYTES,
+                maximum=(
+                    MAX_DISCOVERY_PACKET_BYTES
+                    if mode == "discovery"
+                    else MAX_PACKET_BYTES
+                ),
                 expected_type=dict,
             )
         )
-        mode = _bounded_text(result_mode, name="result_mode", maximum=32)
 
         def project() -> dict[str, object]:
             try:
@@ -437,6 +550,7 @@ class HashmarksMcpSurface:
                     bounded_groups,
                     previous_observation=previous,
                     result_mode=mode,
+                    **({"providers": providers} if mode == "discovery" else {}),
                 )
             except ValueError as exc:
                 raise _surface_value_error(exc) from exc
@@ -690,6 +804,8 @@ class HashmarksMcpSurface:
         changed_paths: list[str] | None = None,
         change_set_complete: bool = False,
         relationship_evidence: dict[str, Any] | None = None,
+        before_source: dict[str, Any] | None = None,
+        after_source: dict[str, Any] | None = None,
     ) -> dict[str, object]:
         """Transport two explicit packets to their existing native comparison owner."""
         if result_mode not in (
@@ -702,9 +818,20 @@ class HashmarksMcpSurface:
                 "result_mode must be one of: structural, bindings, diagnostics, relationships"
             )
         before = _bounded_json(
-            before, name="before", maximum=524_288, expected_type=dict
+            before,
+            name="before",
+            maximum=DIAGNOSTIC_ENDPOINT_MAX_BYTES,
+            expected_type=dict,
         )
-        after = _bounded_json(after, name="after", maximum=524_288, expected_type=dict)
+        after = _bounded_json(
+            after,
+            name="after",
+            maximum=DIAGNOSTIC_ENDPOINT_MAX_BYTES,
+            expected_type=dict,
+        )
+        source_options = _diagnostic_source_options(
+            result_mode, before_source, after_source
+        )
         if result_mode != "diagnostics" and changed_paths:
             raise McpSurfaceError("changed_paths is only valid for diagnostics mode")
         if type(change_set_complete) is not bool:
@@ -734,6 +861,7 @@ class HashmarksMcpSurface:
                     result_mode=result_mode,
                     changed_paths=paths,
                     diagnostic_options={
+                        **source_options,
                         "change_set_complete": change_set_complete,
                         "relationship_evidence": relationship_evidence,
                     },
@@ -771,10 +899,10 @@ class HashmarksMcpSurface:
         self,
         task: str,
         changed_paths: list[str],
-        previous_evidence: dict[str, Any],
+        previous_evidence: PreviousTaskEvidence,
         *,
         token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
-    ) -> dict[str, object]:
+    ) -> TaskPostChangeDelta:
         task = _bounded_text(task, name="task", maximum=_MAX_TASK_CHARS)
         paths = _changed_paths(changed_paths)
         previous_evidence = _previous_evidence(previous_evidence)
@@ -782,7 +910,7 @@ class HashmarksMcpSurface:
             token_budget, name="token_budget", minimum=1, maximum=_MAX_TOKEN_BUDGET
         )
 
-        def project() -> dict[str, object]:
+        def project() -> TaskPostChangeDelta:
             try:
                 return self._map.task_post_change_delta(
                     task,

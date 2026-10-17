@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from contract_assertions import assert_number, assert_records
+
 from hashmarks.codemap import CodeMap
 
 
@@ -25,13 +27,13 @@ def test_decision_brief_budget_sweep_finds_smallest_safe_agent_budget(
             budgets=(1, 32, 64, 128, 256, 512),
         )
     assert sweep["schema"] == "hashmarks.task-decision-brief-budget-sweep.v1"
-    rows = sweep["rows"]
+    rows = assert_records(sweep["rows"])
     assert [row["budget"] for row in rows] == [1, 32, 64, 128, 256, 512]
     safe = [row for row in rows if row["safe"]]
     assert safe
     assert sweep["smallest_safe_budget"] == safe[0]["budget"]
     assert sweep["smallest_safe_visible_brief_bytes"] == safe[0]["visible_brief_bytes"]
-    assert all(row["visible_brief_bytes"] > 0 for row in rows)
+    assert all(assert_number(row["visible_brief_bytes"]) > 0 for row in rows)
     assert all(row["edit_available"] for row in safe)
     assert all(row["verify_available"] for row in safe)
     assert sweep["optimization_target"] == "minimum-safe-agent-visible-evidence"
@@ -46,6 +48,7 @@ def test_unsafe_budget_exposes_missing_roles_instead_of_false_qualification(
         sweep = codemap.task_decision_brief_budget_sweep(
             "widget implementation test", budgets=(1, 512)
         )
-    assert sweep["rows"][0]["safe"] is False
-    assert sweep["rows"][0]["missing_roles"]
-    assert sweep["rows"][-1]["safe"] is True
+    rows = assert_records(sweep["rows"])
+    assert rows[0]["safe"] is False
+    assert rows[0]["missing_roles"]
+    assert rows[-1]["safe"] is True

@@ -319,7 +319,10 @@ def test_cli_captured_reference_preserves_canonical_packet(
         encoding="utf-8",
     )
     printed = []
-    monkeypatch.setattr("hashmarks.repository_cli._print", printed.append)
+    monkeypatch.setattr(
+        "hashmarks.repository_cli._print",
+        lambda value, **_encoding: printed.append(value),
+    )
     monkeypatch.setenv("HASHMARKS_NO_UPDATE_CHECK", "1")
     assert (
         main(

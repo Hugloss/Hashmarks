@@ -11,7 +11,7 @@ from scripts.agent_evaluation.experimentability import (
 )
 
 
-def packet(stale=False, edit=True):
+def packet(stale: bool = False, edit: bool = True) -> dict[str, object]:
     return {
         "edit": {"path": "src/owner.py"} if edit else None,
         "verify": {"path": "tests/test_owner.py"},
@@ -33,7 +33,7 @@ def packet(stale=False, edit=True):
     }
 
 
-def test_capabilities_bounded():
+def test_capabilities_bounded() -> None:
     assert (
         normalize_capabilities({"semantic_nomination": True})
         == ExperimentCapabilities(semantic_nomination=True).as_record()
@@ -46,7 +46,7 @@ def test_capabilities_bounded():
         raise AssertionError("unsupported agent runner capability was accepted")
 
 
-def test_environment_identity():
+def test_environment_identity() -> None:
     e = experiment_environment(
         hashmarks_version="0.11.3",
         repository_state=ExperimentRepositoryState(
@@ -64,7 +64,7 @@ def test_environment_identity():
     )
 
 
-def test_economics():
+def test_economics() -> None:
     m = EvidenceEconomics()
     m.add("provider_calls", 2)
     m.add("graph_edges_examined", 9)
@@ -78,12 +78,12 @@ def test_economics():
     ) == (2, 9, 5.0, 2.0, 7)
 
 
-def test_trace_bounded():
+def test_trace_bounded() -> None:
     t = decision_trace(packet())
     assert t["candidate_count"] == 1 and "events" not in t and "reasoning" not in t
 
 
-def test_abstention_reasons():
+def test_abstention_reasons() -> None:
     d = classify_decision(packet(stale=True, edit=False))
     assert (
         d["status"] == "abstained"
@@ -92,7 +92,7 @@ def test_abstention_reasons():
     )
 
 
-def test_record_tamper_evident():
+def test_record_tamper_evident() -> None:
     p = packet()
     e = experiment_environment(
         hashmarks_version="0.11.3",

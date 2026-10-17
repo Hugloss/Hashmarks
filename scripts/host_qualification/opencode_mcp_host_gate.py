@@ -162,7 +162,7 @@ def _assert_completed_tool_set(
     return completed
 
 
-def _decode_json_object(value: Any) -> dict[str, Any] | None:
+def _decode_json_object(value: object) -> dict[str, object] | None:
     if isinstance(value, dict):
         return value
     if not isinstance(value, str):

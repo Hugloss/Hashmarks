@@ -1,0 +1,940 @@
+{
+  "grader_file": "grader.json",
+  "qualification_scope": "Twelve genuine declaration/source/verification workflows; six Python and six TypeScript. Source intake does not establish language-parity or capability qualification.",
+  "schema": "hashmarks.backend-evidence-workflows.v2",
+  "sources": {
+    "aiokafka-commit-refresh-order-after": {
+      "commit": "d8941bece2c34be571942887db4320ccb945bd13",
+      "content_identity": "sha256:356853f8c1c37ffd3490003e1d3acbff37a53716d5ce510c1958fd5795aef1ac:94",
+      "repository": "aiokafka",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/aio-libs/aiokafka"
+    },
+    "aiokafka-commit-refresh-order-before": {
+      "commit": "10160657f0b2dfca32a991a630c04cc87aaabc59",
+      "content_identity": "sha256:91da7cec55bed2c64930940d039246783f539b4ff1826314e84d19037e08d09b:94",
+      "repository": "aiokafka",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/aio-libs/aiokafka"
+    },
+    "aiokafka-commit-timeout-after": {
+      "commit": "214297859ed224e2259ded617fef90d5931e343f",
+      "content_identity": "sha256:d1c1c57e6fe58e6005d58290ac84c48711abe41dd2eac4ed0a00ef07c6bb5f73:134",
+      "repository": "aiokafka",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/aio-libs/aiokafka"
+    },
+    "aiokafka-commit-timeout-before": {
+      "commit": "83812395ab0df54172a54173ee96cfbd7d46842b",
+      "content_identity": "sha256:4982228f0e40eb9dc44ce0aa141832727a541ea4d5ef1e1e65f01c5176911904:134",
+      "repository": "aiokafka",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/aio-libs/aiokafka"
+    },
+    "fastify-http2-false-after": {
+      "commit": "0f54a40f63b399bfe06a3deeab832f8b5feb6345",
+      "content_identity": "sha256:aa6bd48d1047c4d82f369d2ab4d9184c4bcc4f382db1ec5496095fb38e3cbe70:395",
+      "repository": "fastify",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastify/fastify"
+    },
+    "fastify-http2-false-before": {
+      "commit": "0e9a3b35d8b13c9f261bf29bef46168a5d43c28f",
+      "content_identity": "sha256:fcefeff68b4e5634f3b6c25e142577231b00ef04ed8ab6a3f8218bca8c9cf48c:395",
+      "repository": "fastify",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastify/fastify"
+    },
+    "fastify-route-hook-this-after": {
+      "commit": "09b4a17a12a67407a4131d48c26a0dc309c55ecf",
+      "content_identity": "sha256:d17f7af653b32d90470bf9256b27e0fe273ba71186726f07621eaa6f4f722d1f:395",
+      "repository": "fastify",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastify/fastify"
+    },
+    "fastify-route-hook-this-before": {
+      "commit": "6ed472b6fe023cd0e6283badda231b84e45582d0",
+      "content_identity": "sha256:fc268e01e5b7e63fe4fd3f8aea74dff8aca01c43bdae3e5560438f4a8b5e8cc7:395",
+      "repository": "fastify",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastify/fastify"
+    },
+    "faststream-ack-cancellation-after": {
+      "commit": "b437a29e5b9707def86169f14dbab1493193b060",
+      "content_identity": "sha256:0c9d63cabeebb4843ec7ab474a3c434137e241b69a55fc6c368575e4a1b47932:2127",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/ag2ai/faststream"
+    },
+    "faststream-ack-cancellation-before": {
+      "commit": "4ece5bc44ee7206ccef845edcfd1f42bb78e6b6b",
+      "content_identity": "sha256:00a6628876208c57685755c6776f030d9b3ae1b39addd51d98b735fcff445f32:2126",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/ag2ai/faststream"
+    },
+    "faststream-batch-nack-after": {
+      "commit": "16417cce116e5578cd4fcd2e8d397461d87b7026",
+      "content_identity": "sha256:326ce5b76496da2750ac7d22258b49f1c7ca17f03a0d3ecc34414d6f9b4822d8:2065",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/ag2ai/faststream"
+    },
+    "faststream-batch-nack-before": {
+      "commit": "4bc51930795ab6ea5b85a79bb4b56f7e66200692",
+      "content_identity": "sha256:c772086060a7518d67111d6ad7736534e8af26f96d5ccefe2024195ac021a48b:2065",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/ag2ai/faststream"
+    },
+    "hono-cached-body-media-type-after": {
+      "commit": "edd138ee3049749190de3dcd7e32d7bcbf224e41",
+      "content_identity": "sha256:275b0dcb5ae0558a7507ae5df6399ae7bf6321fce0a822addd5638ba862a10b0:488",
+      "repository": "hono",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/honojs/hono"
+    },
+    "hono-cached-body-media-type-before": {
+      "commit": "9b4e9c2864c30ea9275cf426e2d2716bd9f05195",
+      "content_identity": "sha256:ecc373cfb118fc6d955259682c4896425da057327bc3626adae0cf298fa3b25d:488",
+      "repository": "hono",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/honojs/hono"
+    },
+    "hono-some-response-after": {
+      "commit": "afb2068c1c53a530528ac5f237e245793dd03c07",
+      "content_identity": "sha256:b6e91bd43e743592887f7f783b99e4b7e2d2d142ca24ffeef5b77c7943616b26:583",
+      "repository": "hono",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/honojs/hono"
+    },
+    "hono-some-response-before": {
+      "commit": "e5bb2062a3ddd645e3a16d1300bd76d6c9af33a5",
+      "content_identity": "sha256:9d5b2353911473473cdf7691fe46a0fd475784ed64a900139e67ad517b63fdde:583",
+      "repository": "hono",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/honojs/hono"
+    },
+    "nest-param-promise-after": {
+      "commit": "8f9fbfd76ffc86139ea423f858d09bc382c12497",
+      "content_identity": "sha256:413397990fda8b7d38df1d2ab3c0b7282ef21ba3463e36f6f642de0223706e38:2583",
+      "repository": "nest",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/nestjs/nest"
+    },
+    "nest-param-promise-before": {
+      "commit": "9b77f565bd9a404b715e75354a1e33f08c79151a",
+      "content_identity": "sha256:f622c2e6470e53bd886bb77c77728f3dcf0860079325c8e07bad563fb000a044:2583",
+      "repository": "nest",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/nestjs/nest"
+    },
+    "nest-redirect-result-after": {
+      "commit": "52509a55a929189ddb2e620bfa27054a784df3c1",
+      "content_identity": "sha256:edeff544c843bc06f1a7e917aedaa55c6580e5f11686dd236a58cfadb5bd104d:2575",
+      "repository": "nest",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/nestjs/nest"
+    },
+    "nest-redirect-result-before": {
+      "commit": "609e7cee9e4b0fed433c29075d6211da166189f5",
+      "content_identity": "sha256:8aca08e32933685247b6f8c12fc8fd1f4e450341b68c460e46cdeab33124ba89:2574",
+      "repository": "nest",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/nestjs/nest"
+    },
+    "sqlalchemy-aggregate-strings-after": {
+      "commit": "7e80ddda2a6b820860f8fc1fa8213b85e2819d2b",
+      "content_identity": "sha256:e0ec8b716941649c4379690070fc9de0b93841ac08aa48125f56b80ba49ac978:923",
+      "repository": "sqlalchemy",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/sqlalchemy/sqlalchemy"
+    },
+    "sqlalchemy-aggregate-strings-before": {
+      "commit": "ae11d43079207e159f3ba00f3c0e5188e2ccfe45",
+      "content_identity": "sha256:5c9d8c5648683524d3221cfefed3aa29cf328277e2a2cfa92843fbdc4c7839de:922",
+      "repository": "sqlalchemy",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/sqlalchemy/sqlalchemy"
+    },
+    "sqlalchemy-logging-token-reset-after": {
+      "commit": "975ffa7d77ee3bbf5afd470bc93a1bc1d7f88df4",
+      "content_identity": "sha256:340c2f8a1c08796a6c52cdc243502a771c8a96043c2a0af2a57b97f7f8ab8e14:923",
+      "repository": "sqlalchemy",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/sqlalchemy/sqlalchemy"
+    },
+    "sqlalchemy-logging-token-reset-before": {
+      "commit": "ae11d43079207e159f3ba00f3c0e5188e2ccfe45",
+      "content_identity": "sha256:5c9d8c5648683524d3221cfefed3aa29cf328277e2a2cfa92843fbdc4c7839de:922",
+      "repository": "sqlalchemy",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/sqlalchemy/sqlalchemy"
+    }
+  },
+  "suite": "backend-language-v2",
+  "workflows": [
+    {
+      "after": "aiokafka-commit-timeout-after",
+      "before": "aiokafka-commit-timeout-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 1022,
+              "path": "aiokafka/consumer/group_coordinator.py",
+              "start_line": 1022
+            }
+          ],
+          "changed_paths": [
+            "aiokafka/consumer/group_coordinator.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 1021,
+              "path": "aiokafka/consumer/group_coordinator.py",
+              "start_line": 1021
+            }
+          ],
+          "changed_paths": [
+            "aiokafka/consumer/group_coordinator.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        19
+      ],
+      "capability_proofs": {
+        "19": {
+          "pending": [
+            "independent language contract review",
+            "language-parity witness family",
+            "required witness membership"
+          ],
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "aiokafka/consumer/group_coordinator.py"
+      ],
+      "id": "aiokafka-commit-timeout",
+      "language": "python",
+      "native_fresh_required": true,
+      "native_observations": {
+        "after": {
+          "language": "python",
+          "paths": [
+            "aiokafka/consumer/group_coordinator.py"
+          ]
+        },
+        "before": {
+          "language": "python",
+          "paths": [
+            "aiokafka/consumer/group_coordinator.py"
+          ]
+        }
+      },
+      "native_required": true,
+      "problem_id": "214297859ed224e2259ded617fef90d5931e343f",
+      "problem_source": "https://github.com/aio-libs/aiokafka/commit/214297859ed224e2259ded617fef90d5931e343f",
+      "repository": "aiokafka",
+      "task": "Inspect RequestTimedOutError handling during GroupCoordinator._do_commit_offsets. Source: aiokafka/consumer/group_coordinator.py",
+      "transitions": [
+        {
+          "after_path": "aiokafka/consumer/group_coordinator.py",
+          "before_path": "aiokafka/consumer/group_coordinator.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "aiokafka-commit-refresh-order-after",
+      "before": "aiokafka-commit-refresh-order-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 719,
+              "path": "aiokafka/consumer/group_coordinator.py",
+              "start_line": 719
+            }
+          ],
+          "changed_paths": [
+            "aiokafka/consumer/group_coordinator.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 727,
+              "path": "aiokafka/consumer/group_coordinator.py",
+              "start_line": 727
+            }
+          ],
+          "changed_paths": [
+            "aiokafka/consumer/group_coordinator.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        19
+      ],
+      "capability_proofs": {
+        "19": {
+          "pending": [
+            "independent language contract review",
+            "language-parity witness family",
+            "required witness membership"
+          ],
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "aiokafka/consumer/group_coordinator.py"
+      ],
+      "id": "aiokafka-commit-refresh-order",
+      "language": "python",
+      "native_fresh_required": true,
+      "native_observations": {
+        "after": {
+          "language": "python",
+          "paths": [
+            "aiokafka/consumer/group_coordinator.py"
+          ]
+        },
+        "before": {
+          "language": "python",
+          "paths": [
+            "aiokafka/consumer/group_coordinator.py"
+          ]
+        }
+      },
+      "native_required": true,
+      "problem_id": "d8941bece2c34be571942887db4320ccb945bd13",
+      "problem_source": "https://github.com/aio-libs/aiokafka/commit/d8941bece2c34be571942887db4320ccb945bd13",
+      "repository": "aiokafka",
+      "task": "Inspect commit-refresh event clearing around GroupCoordinator._commit_refresh_routine. Source: aiokafka/consumer/group_coordinator.py",
+      "transitions": [
+        {
+          "after_path": "aiokafka/consumer/group_coordinator.py",
+          "before_path": "aiokafka/consumer/group_coordinator.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "faststream-ack-cancellation-after",
+      "before": "faststream-ack-cancellation-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 105,
+              "path": "faststream/middlewares/acknowledgement/middleware.py",
+              "start_line": 105
+            }
+          ],
+          "changed_paths": [
+            "faststream/middlewares/acknowledgement/middleware.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 91,
+              "path": "faststream/middlewares/acknowledgement/middleware.py",
+              "start_line": 91
+            }
+          ],
+          "changed_paths": [
+            "faststream/middlewares/acknowledgement/middleware.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        19
+      ],
+      "capability_proofs": {
+        "19": {
+          "pending": [
+            "independent language contract review",
+            "language-parity witness family",
+            "required witness membership"
+          ],
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "faststream/middlewares/acknowledgement/middleware.py",
+        "tests/brokers/base/consume.py",
+        "tests/brokers/kafka/test_cancellation.py"
+      ],
+      "id": "faststream-ack-cancellation",
+      "language": "python",
+      "native_fresh_required": true,
+      "native_observations": {
+        "after": {
+          "language": "python",
+          "paths": [
+            "faststream/middlewares/acknowledgement/middleware.py"
+          ]
+        },
+        "before": {
+          "language": "python",
+          "paths": [
+            "faststream/middlewares/acknowledgement/middleware.py"
+          ]
+        }
+      },
+      "native_required": true,
+      "problem_id": "b437a29e5b9707def86169f14dbab1493193b060",
+      "problem_source": "https://github.com/ag2ai/faststream/commit/b437a29e5b9707def86169f14dbab1493193b060",
+      "repository": "faststream",
+      "task": "Inspect acknowledgement behavior when _AcknowledgementMiddleware.__aexit__ receives cancellation. Source: faststream/middlewares/acknowledgement/middleware.py",
+      "transitions": [
+        {
+          "after_path": "faststream/middlewares/acknowledgement/middleware.py",
+          "before_path": "faststream/middlewares/acknowledgement/middleware.py",
+          "kind": "modify"
+        },
+        {
+          "after_path": "tests/brokers/base/consume.py",
+          "before_path": "tests/brokers/base/consume.py",
+          "kind": "modify"
+        },
+        {
+          "after_path": "tests/brokers/kafka/test_cancellation.py",
+          "before_path": null,
+          "kind": "add"
+        }
+      ]
+    },
+    {
+      "after": "faststream-batch-nack-after",
+      "before": "faststream-batch-nack-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 70,
+              "path": "faststream/confluent/message.py",
+              "start_line": 70
+            }
+          ],
+          "changed_paths": [
+            "faststream/confluent/message.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 62,
+              "path": "faststream/confluent/message.py",
+              "start_line": 62
+            }
+          ],
+          "changed_paths": [
+            "faststream/confluent/message.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        19
+      ],
+      "capability_proofs": {
+        "19": {
+          "pending": [
+            "independent language contract review",
+            "language-parity witness family",
+            "required witness membership"
+          ],
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "faststream/confluent/message.py",
+        "tests/brokers/confluent/test_test_client.py"
+      ],
+      "id": "faststream-batch-nack",
+      "language": "python",
+      "native_fresh_required": true,
+      "native_observations": {
+        "after": {
+          "language": "python",
+          "paths": [
+            "faststream/confluent/message.py"
+          ]
+        },
+        "before": {
+          "language": "python",
+          "paths": [
+            "faststream/confluent/message.py"
+          ]
+        }
+      },
+      "native_required": true,
+      "problem_id": "16417cce116e5578cd4fcd2e8d397461d87b7026",
+      "problem_source": "https://github.com/ag2ai/faststream/commit/16417cce116e5578cd4fcd2e8d397461d87b7026",
+      "repository": "faststream",
+      "task": "Inspect the message source used for a Confluent batch nack seek in KafkaMessage.nack. Source: faststream/confluent/message.py",
+      "transitions": [
+        {
+          "after_path": "faststream/confluent/message.py",
+          "before_path": "faststream/confluent/message.py",
+          "kind": "modify"
+        },
+        {
+          "after_path": "tests/brokers/confluent/test_test_client.py",
+          "before_path": "tests/brokers/confluent/test_test_client.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "sqlalchemy-logging-token-reset-after",
+      "before": "sqlalchemy-logging-token-reset-before",
+      "capabilities": [
+        19
+      ],
+      "capability_proofs": {
+        "19": {
+          "pending": [
+            "independent language contract review",
+            "language-parity witness family",
+            "required witness membership"
+          ],
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "lib/sqlalchemy/engine/characteristics.py"
+      ],
+      "explicit_target_task": "Fix LoggingTokenCharacteristic.set_connection_characteristic raising AttributeError when resetting a logging token twice.",
+      "id": "sqlalchemy-logging-token-reset",
+      "language": "python",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": true,
+          "reason": "frozen source owner and changed-symbol facts"
+        },
+        "owner_top_three": {
+          "eligible": true,
+          "reason": "source-reviewed behavior task without a named owner"
+        }
+      },
+      "native_fresh_required": true,
+      "native_required": true,
+      "problem_id": "975ffa7d77ee3bbf5afd470bc93a1bc1d7f88df4",
+      "problem_source": "https://github.com/sqlalchemy/sqlalchemy/commit/975ffa7d77ee3bbf5afd470bc93a1bc1d7f88df4",
+      "repository": "sqlalchemy",
+      "task": "Resetting a SQL connection logging token twice raises AttributeError instead of clearing its message formatter.",
+      "transitions": [
+        {
+          "after_path": "lib/sqlalchemy/engine/characteristics.py",
+          "before_path": "lib/sqlalchemy/engine/characteristics.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "sqlalchemy-aggregate-strings-after",
+      "before": "sqlalchemy-aggregate-strings-before",
+      "capabilities": [
+        19
+      ],
+      "capability_proofs": {
+        "19": {
+          "pending": [
+            "independent language contract review",
+            "language-parity witness family",
+            "required witness membership"
+          ],
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "lib/sqlalchemy/sql/compiler.py"
+      ],
+      "explicit_target_task": "Fix SQLCompiler.visit_aggregate_strings_func raising TypeError when aggregate_strings is compiled as a string.",
+      "id": "sqlalchemy-aggregate-strings",
+      "language": "python",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": true,
+          "reason": "frozen source owner and changed-symbol facts"
+        },
+        "owner_top_three": {
+          "eligible": true,
+          "reason": "source-reviewed behavior task without a named owner"
+        }
+      },
+      "native_fresh_required": true,
+      "native_required": true,
+      "problem_id": "7e80ddda2a6b820860f8fc1fa8213b85e2819d2b",
+      "problem_source": "https://github.com/sqlalchemy/sqlalchemy/commit/7e80ddda2a6b820860f8fc1fa8213b85e2819d2b",
+      "repository": "sqlalchemy",
+      "task": "Compiling a string aggregation expression raises TypeError when the dialect does not supply its function name.",
+      "transitions": [
+        {
+          "after_path": "lib/sqlalchemy/sql/compiler.py",
+          "before_path": "lib/sqlalchemy/sql/compiler.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "fastify-route-hook-this-after",
+      "before": "fastify-route-hook-this-before",
+      "capabilities": [
+        19
+      ],
+      "capability_proofs": {
+        "19": {
+          "pending": [
+            "independent language contract review",
+            "language-parity witness family",
+            "required witness membership"
+          ],
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "test/types/route.tst.ts",
+        "types/route.d.ts"
+      ],
+      "id": "fastify-route-hook-this",
+      "language": "typescript",
+      "native_fresh_required": true,
+      "native_observations": {
+        "after": {
+          "language": "typescript",
+          "paths": [
+            "types/route.d.ts"
+          ]
+        },
+        "before": {
+          "language": "typescript",
+          "paths": [
+            "types/route.d.ts"
+          ]
+        }
+      },
+      "native_required": true,
+      "problem_id": "09b4a17a12a67407a4131d48c26a0dc309c55ecf",
+      "problem_source": "https://github.com/fastify/fastify/commit/09b4a17a12a67407a4131d48c26a0dc309c55ecf",
+      "repository": "fastify",
+      "task": "Inspect RouteShorthandHook declarations when a route shorthand hook loses its this context. Source: types/route.d.ts",
+      "transitions": [
+        {
+          "after_path": "types/route.d.ts",
+          "before_path": "types/route.d.ts",
+          "kind": "modify"
+        },
+        {
+          "after_path": "test/types/route.tst.ts",
+          "before_path": "test/types/route.tst.ts",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "fastify-http2-false-after",
+      "before": "fastify-http2-false-before",
+      "capabilities": [
+        19
+      ],
+      "capability_proofs": {
+        "19": {
+          "pending": [
+            "independent language contract review",
+            "language-parity witness family",
+            "required witness membership"
+          ],
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "fastify.d.ts",
+        "test/types/fastify.tst.ts"
+      ],
+      "id": "fastify-http2-false",
+      "language": "typescript",
+      "native_fresh_required": true,
+      "native_observations": {
+        "after": {
+          "language": "typescript",
+          "paths": [
+            "fastify.d.ts"
+          ]
+        },
+        "before": {
+          "language": "typescript",
+          "paths": [
+            "fastify.d.ts"
+          ]
+        }
+      },
+      "native_required": true,
+      "problem_id": "0f54a40f63b399bfe06a3deeab832f8b5feb6345",
+      "problem_source": "https://github.com/fastify/fastify/commit/0f54a40f63b399bfe06a3deeab832f8b5feb6345",
+      "repository": "fastify",
+      "task": "Inspect FastifyHttpOptions declarations for a plain HTTP server that supplies http2: false. Source: fastify.d.ts",
+      "transitions": [
+        {
+          "after_path": "fastify.d.ts",
+          "before_path": "fastify.d.ts",
+          "kind": "modify"
+        },
+        {
+          "after_path": "test/types/fastify.tst.ts",
+          "before_path": "test/types/fastify.tst.ts",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "hono-some-response-after",
+      "before": "hono-some-response-before",
+      "capabilities": [
+        19
+      ],
+      "capability_proofs": {
+        "19": {
+          "pending": [
+            "independent language contract review",
+            "language-parity witness family",
+            "required witness membership"
+          ],
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "src/middleware/combine/index.test.ts",
+        "src/middleware/combine/index.ts"
+      ],
+      "id": "hono-some-response",
+      "language": "typescript",
+      "native_fresh_required": true,
+      "native_observations": {
+        "after": {
+          "language": "typescript",
+          "paths": [
+            "src/middleware/combine/index.ts"
+          ]
+        },
+        "before": {
+          "language": "typescript",
+          "paths": [
+            "src/middleware/combine/index.ts"
+          ]
+        }
+      },
+      "native_required": true,
+      "problem_id": "afb2068c1c53a530528ac5f237e245793dd03c07",
+      "problem_source": "https://github.com/honojs/hono/commit/afb2068c1c53a530528ac5f237e245793dd03c07",
+      "repository": "hono",
+      "task": "Inspect some middleware declarations when a short-circuiting middleware returns a Response without calling next. Source: src/middleware/combine/index.ts",
+      "transitions": [
+        {
+          "after_path": "src/middleware/combine/index.ts",
+          "before_path": "src/middleware/combine/index.ts",
+          "kind": "modify"
+        },
+        {
+          "after_path": "src/middleware/combine/index.test.ts",
+          "before_path": "src/middleware/combine/index.test.ts",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "hono-cached-body-media-type-after",
+      "before": "hono-cached-body-media-type-before",
+      "capabilities": [
+        19
+      ],
+      "capability_proofs": {
+        "19": {
+          "pending": [
+            "independent language contract review",
+            "language-parity witness family",
+            "required witness membership"
+          ],
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "src/request.test.ts",
+        "src/request.ts"
+      ],
+      "id": "hono-cached-body-media-type",
+      "language": "typescript",
+      "native_fresh_required": true,
+      "native_observations": {
+        "after": {
+          "language": "typescript",
+          "paths": [
+            "src/request.ts"
+          ]
+        },
+        "before": {
+          "language": "typescript",
+          "paths": [
+            "src/request.ts"
+          ]
+        }
+      },
+      "native_required": true,
+      "problem_id": "edd138ee3049749190de3dcd7e32d7bcbf224e41",
+      "problem_source": "https://github.com/honojs/hono/commit/edd138ee3049749190de3dcd7e32d7bcbf224e41",
+      "repository": "hono",
+      "task": "Inspect HonoRequest.#cachedBody declarations when reading text before formData loses the original request media type. Source: src/request.ts",
+      "transitions": [
+        {
+          "after_path": "src/request.ts",
+          "before_path": "src/request.ts",
+          "kind": "modify"
+        },
+        {
+          "after_path": "src/request.test.ts",
+          "before_path": "src/request.test.ts",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "nest-param-promise-after",
+      "before": "nest-param-promise-before",
+      "capabilities": [
+        19
+      ],
+      "capability_proofs": {
+        "19": {
+          "pending": [
+            "independent language contract review",
+            "language-parity witness family",
+            "required witness membership"
+          ],
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "packages/core/pipes/pipes-consumer.ts",
+        "packages/core/test/pipes/pipes-consumer.spec.ts"
+      ],
+      "id": "nest-param-promise",
+      "language": "typescript",
+      "native_fresh_required": true,
+      "native_observations": {
+        "after": {
+          "language": "typescript",
+          "paths": [
+            "packages/core/pipes/pipes-consumer.ts"
+          ]
+        },
+        "before": {
+          "language": "typescript",
+          "paths": [
+            "packages/core/pipes/pipes-consumer.ts"
+          ]
+        }
+      },
+      "native_required": true,
+      "problem_id": "8f9fbfd76ffc86139ea423f858d09bc382c12497",
+      "problem_source": "https://github.com/nestjs/nest/commit/8f9fbfd76ffc86139ea423f858d09bc382c12497",
+      "repository": "nest",
+      "task": "Inspect PipesConsumer.applyPipes declarations when an async parameter decorator hands a pending promise to the first pipe. Source: packages/core/pipes/pipes-consumer.ts",
+      "transitions": [
+        {
+          "after_path": "packages/core/pipes/pipes-consumer.ts",
+          "before_path": "packages/core/pipes/pipes-consumer.ts",
+          "kind": "modify"
+        },
+        {
+          "after_path": "packages/core/test/pipes/pipes-consumer.spec.ts",
+          "before_path": "packages/core/test/pipes/pipes-consumer.spec.ts",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "nest-redirect-result-after",
+      "before": "nest-redirect-result-before",
+      "capabilities": [
+        19
+      ],
+      "capability_proofs": {
+        "19": {
+          "pending": [
+            "independent language contract review",
+            "language-parity witness family",
+            "required witness membership"
+          ],
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "integration/hello-world/e2e/fastify-redirect.spec.ts",
+        "packages/core/router/router-response-controller.ts",
+        "packages/core/test/router/router-response-controller.spec.ts"
+      ],
+      "id": "nest-redirect-result",
+      "language": "typescript",
+      "native_fresh_required": true,
+      "native_observations": {
+        "after": {
+          "language": "typescript",
+          "paths": [
+            "packages/core/router/router-response-controller.ts"
+          ]
+        },
+        "before": {
+          "language": "typescript",
+          "paths": [
+            "packages/core/router/router-response-controller.ts"
+          ]
+        }
+      },
+      "native_required": true,
+      "problem_id": "52509a55a929189ddb2e620bfa27054a784df3c1",
+      "problem_source": "https://github.com/nestjs/nest/commit/52509a55a929189ddb2e620bfa27054a784df3c1",
+      "repository": "nest",
+      "task": "Inspect RouterResponseController.redirect declarations when a redirect reply settles after the route resolves. Source: packages/core/router/router-response-controller.ts",
+      "transitions": [
+        {
+          "after_path": "packages/core/router/router-response-controller.ts",
+          "before_path": "packages/core/router/router-response-controller.ts",
+          "kind": "modify"
+        },
+        {
+          "after_path": "packages/core/test/router/router-response-controller.spec.ts",
+          "before_path": "packages/core/test/router/router-response-controller.spec.ts",
+          "kind": "modify"
+        },
+        {
+          "after_path": "integration/hello-world/e2e/fastify-redirect.spec.ts",
+          "before_path": null,
+          "kind": "add"
+        }
+      ]
+    }
+  ]
+}

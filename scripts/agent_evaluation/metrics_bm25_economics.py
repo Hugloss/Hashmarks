@@ -32,7 +32,13 @@ FAMILY = "hashmarks-fielded-bm25-a"
 
 
 def _task_report(
-    workspace: Path, cm, idx, task, secret, *, limit: int
+    workspace: Path,
+    cm: object,
+    idx: int,
+    task: dict[str, object],
+    secret: dict[str, object],
+    *,
+    limit: int,
 ) -> dict[str, object]:
     query = task["query"]
     canonical = cm.task_entry_points(query, limit=limit)
@@ -148,7 +154,7 @@ def collect(root: Path, limit: int = 20) -> dict[str, object]:
     }
 
 
-def main():
+def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--root", type=Path, required=True)
     p.add_argument("--limit", type=int, default=20)

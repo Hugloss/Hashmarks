@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -39,14 +40,14 @@ class _FakeSocket:
 
 
 def _client_with_socket(
-    tmp_path: Path, monkeypatch, chunks: list[bytes]
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, chunks: list[bytes]
 ) -> IdentityClient:
     sock = _FakeSocket(chunks)
     monkeypatch.setattr("hashmarks.client.socket.socket", lambda *_args: sock)
     return IdentityClient(tmp_path, socket_path=tmp_path / "identity.sock")
 
 
-def test_compatibility_success(tmp_path: Path, monkeypatch) -> None:
+def test_compatibility_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     import json
 
     response = {
@@ -62,7 +63,9 @@ def test_compatibility_success(tmp_path: Path, monkeypatch) -> None:
     assert client._compatibility_validated is True
 
 
-def test_compatibility_protocol_mismatch(tmp_path: Path, monkeypatch) -> None:
+def test_compatibility_protocol_mismatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import json
 
     response = {
@@ -79,7 +82,9 @@ def test_compatibility_protocol_mismatch(tmp_path: Path, monkeypatch) -> None:
         client.status()
 
 
-def test_compatibility_semantics_mismatch(tmp_path: Path, monkeypatch) -> None:
+def test_compatibility_semantics_mismatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import json
 
     response = {
@@ -96,7 +101,9 @@ def test_compatibility_semantics_mismatch(tmp_path: Path, monkeypatch) -> None:
         client.status()
 
 
-def test_compatibility_invalid_capabilities_type(tmp_path: Path, monkeypatch) -> None:
+def test_compatibility_invalid_capabilities_type(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import json
 
     response = {
@@ -113,7 +120,9 @@ def test_compatibility_invalid_capabilities_type(tmp_path: Path, monkeypatch) ->
         client.status()
 
 
-def test_compatibility_missing_capabilities(tmp_path: Path, monkeypatch) -> None:
+def test_compatibility_missing_capabilities(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import json
 
     # Remove one required capability

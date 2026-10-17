@@ -5,6 +5,8 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from types import ModuleType
+from typing import Any, cast
 
 import pytest
 
@@ -21,7 +23,7 @@ def _run_benchmark_script(script: str, root: Path) -> dict:
     return json.loads(output.read_text(encoding="utf-8"))
 
 
-def _load_script(name: str, path: Path):
+def _load_script(name: str, path: Path) -> ModuleType:
     del name
     module = ".".join(path.with_suffix("").parts)
     return importlib.import_module(module)
@@ -80,7 +82,7 @@ def test_agent_suite_rejects_nested_repository_roots(tmp_path: Path) -> None:
 
 
 def test_suite_protocol_identity_binds_corpus_workspace_and_parameters(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     module = importlib.import_module("scripts.agent_evaluation.metrics_agent_suite")
     corpus = tmp_path / "tasks.json"

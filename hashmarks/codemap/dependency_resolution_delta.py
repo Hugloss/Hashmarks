@@ -46,7 +46,9 @@ def _evidence_sources(
 def _source_topology(observation: Mapping[str, object]) -> tuple[object, ...]:
     rows = []
     for row in _evidence_sources(observation):
-        authorities = tuple(str(value) for value in row.get("authorities", ()))
+        authorities = tuple(
+            str(value) for value in cast(Sequence[object], row.get("authorities", ()))
+        )
         rows.append(
             (
                 str(row.get("source_id") or ""),
@@ -135,7 +137,9 @@ def _selection_summary(row: Mapping[str, object]) -> dict[str, object]:
         "version": str(row.get("version") or ""),
         "source": str(row.get("source") or ""),
         "marker": str(row.get("marker") or ""),
-        "contexts": [str(value) for value in row.get("contexts", ())],
+        "contexts": [
+            str(value) for value in cast(Sequence[object], row.get("contexts", ()))
+        ],
     }
 
 

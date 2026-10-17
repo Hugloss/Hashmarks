@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 from pathlib import Path
+from types import TracebackType
 from typing import TYPE_CHECKING
 
 from hashmarks.client import default_runtime_dir
@@ -80,7 +81,12 @@ class WorktreeOverlay:
     def __enter__(self) -> WorktreeOverlay:
         return self
 
-    def __exit__(self, exc_type, exc, tb) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None:
         self.close()
 
     def close(self) -> None:

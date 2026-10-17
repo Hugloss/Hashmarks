@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
@@ -33,6 +33,8 @@ class FreshnessMapOptions:
     impact_limit_per_surface: int = 4
     max_depth: int = 3
 
+
+FRESHNESS_MAP_DEFAULT_OPTIONS = FreshnessMapOptions()
 
 FRESHNESS_MAP_SCHEMA = "hashmarks.evidence-freshness-map.v1"
 
@@ -97,6 +99,8 @@ class EvidenceFreshnessMapMixin:
         *,
         expected_task_identity: str,
     ) -> tuple[str, str]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if previous_map.get("schema") != FRESHNESS_MAP_SCHEMA:
             raise ValueError(
                 "previous_map must be a hashmarks.evidence-freshness-map.v1 packet"
@@ -229,6 +233,8 @@ class EvidenceFreshnessMapMixin:
         raw_member: str | Path,
         limit: int,
     ) -> dict[str, object]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         member = normalize_relative_path(raw_member, allow_root=False)
         explanation = self.explain_verification_selection(
             task,
@@ -269,13 +275,15 @@ class EvidenceFreshnessMapMixin:
         scope: _FreshnessScope,
         project_impact: object,
     ) -> dict[str, object] | None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if not isinstance(project_impact, Mapping):
             return None
         expanded = expand_project_impact(project_impact)
         producers = sorted(
             {
                 str(edge.get("producer") or "")
-                for edge in expanded.get("edges", [])
+                for edge in cast(Iterable[object], expanded.get("edges", []))
                 if isinstance(edge, Mapping) and edge.get("producer")
             }
         )
@@ -362,8 +370,9 @@ class EvidenceFreshnessMapMixin:
         *,
         negative_members: Sequence[str | Path] = (),
         previous_map: Mapping[str, object] | None = None,
-        options: FreshnessMapOptions = FreshnessMapOptions(),
+        options: FreshnessMapOptions | None = None,
     ) -> dict[str, object]:
+        options = options or FRESHNESS_MAP_DEFAULT_OPTIONS
         """Return current and prior freshness without persisting duplicate truth."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)

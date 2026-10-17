@@ -4,8 +4,15 @@ from __future__ import annotations
 
 from copy import deepcopy
 from pathlib import Path
+from typing import cast
 
 import pytest
+from contract_assertions import (
+    assert_array,
+    assert_number,
+    assert_object,
+    assert_records,
+)
 
 from hashmarks import CodeMap
 from hashmarks.evidence_presentation import present_repository_evidence
@@ -26,25 +33,30 @@ def test_opt_in_line_context_preserves_legacy_anchors_and_identity(
             "example.py", lines=(2,), anchor_context_lines=1
         )
     assert old == zero
-    assert old["line_anchors"][0]["state"] == "observed"
-    assert "context_excerpt" not in old["line_anchors"][0]
+    assert assert_object(assert_array(old["line_anchors"])[0])["state"] == "observed"
+    assert "context_excerpt" not in assert_object(assert_array(old["line_anchors"])[0])
     assert (
-        old["line_anchors"][0]["line_sha256"] == new["line_anchors"][0]["line_sha256"]
+        assert_object(assert_array(old["line_anchors"])[0])["line_sha256"]
+        == assert_object(assert_array(new["line_anchors"])[0])["line_sha256"]
     )
-    assert new["limits"]["anchor_context_lines"] == 1
-    assert "anchor_context_lines" not in old["limits"]
+    assert assert_object(new["limits"])["anchor_context_lines"] == 1
+    assert "anchor_context_lines" not in assert_object(old["limits"])
     assert new["observation_identity"] != old["observation_identity"]
     assert new["source_shape"] == old["source_shape"]
     assert new["line_coverage"] == old["line_coverage"] == "complete"
-    rows = new["line_anchors"][0]["context_excerpt"]
-    assert [(row["line"], row["role"]) for row in rows] == [
+    rows = assert_object(assert_array(new["line_anchors"])[0])["context_excerpt"]
+    assert [(row["line"], row["role"]) for row in assert_records(rows)] == [
         (1, "context"),
         (2, "anchor"),
         (3, "context"),
     ]
-    assert [row["text"] for row in rows] == ["before", "needle", "after"]
-    assert all(row["start_column"] == 1 for row in rows)
-    assert all(not row["truncated_right"] for row in rows)
+    assert [row["text"] for row in assert_records(rows)] == [
+        "before",
+        "needle",
+        "after",
+    ]
+    assert all(row["start_column"] == 1 for row in assert_records(rows))
+    assert all(not row["truncated_right"] for row in assert_records(rows))
 
 
 def test_line_context_clips_long_unicode_lines_without_changing_byte_anchor(
@@ -58,15 +70,20 @@ def test_line_context_clips_long_unicode_lines_without_changing_byte_anchor(
         packet = codemap.source_observation(
             "example.py", lines=(2,), anchor_context_lines=1
         )
-    anchor = packet["line_anchors"][0]
-    assert anchor["state"] == "observed"
-    excerpt = anchor["context_excerpt"][1]
-    assert excerpt["role"] == "anchor"
-    assert excerpt["start_column"] == 1
-    assert excerpt["text"] == "ö" * 320
-    assert excerpt["truncated_left"] is False
-    assert excerpt["truncated_right"] is True
-    assert packet["source_shape"]["maximum_physical_line_bytes"] > 400
+    anchor = assert_array(packet["line_anchors"])[0]
+    assert assert_object(anchor)["state"] == "observed"
+    excerpt = assert_array(assert_object(anchor)["context_excerpt"])[1]
+    assert assert_object(excerpt)["role"] == "anchor"
+    assert assert_object(excerpt)["start_column"] == 1
+    assert assert_object(excerpt)["text"] == "ö" * 320
+    assert assert_object(excerpt)["truncated_left"] is False
+    assert assert_object(excerpt)["truncated_right"] is True
+    assert (
+        assert_number(
+            assert_object(packet["source_shape"])["maximum_physical_line_bytes"]
+        )
+        > 400
+    )
 
 
 def test_unknown_blank_and_out_of_range_lines_never_get_excerpts(
@@ -78,14 +95,18 @@ def test_unknown_blank_and_out_of_range_lines_never_get_excerpts(
         packet = codemap.source_observation(
             "example.py", lines=(2, 4, 3), anchor_context_lines=1
         )
-    assert [row["line"] for row in packet["line_anchors"]] == [2, 3, 4]
-    assert [row["state"] for row in packet["line_anchors"]] == [
+    assert [row["line"] for row in assert_records(packet["line_anchors"])] == [2, 3, 4]
+    assert [row["state"] for row in assert_records(packet["line_anchors"])] == [
         "unknown",
         "observed",
         "unknown",
     ]
-    assert "context_excerpt" not in packet["line_anchors"][0]
-    assert "context_excerpt" not in packet["line_anchors"][2]
+    assert "context_excerpt" not in assert_object(
+        assert_array(packet["line_anchors"])[0]
+    )
+    assert "context_excerpt" not in assert_object(
+        assert_array(packet["line_anchors"])[2]
+    )
     assert packet["line_coverage"] == "unknown"
 
 
@@ -124,7 +145,7 @@ def test_invalid_native_line_context_fails_before_source_read(
             codemap.source_observation(
                 "not-present.py",
                 lines=(1,),
-                anchor_context_lines=bad,  # type: ignore[arg-type]
+                anchor_context_lines=cast(int, bad),  # type: ignore[arg-type]
             )
 
 
@@ -151,16 +172,41 @@ def test_mcp_line_context_transports_without_changing_literal_context(
         )
         original = deepcopy(source)
         projected = present_repository_evidence(source, format="compact")
-        group = next(g for g in projected["groups"] if g["family"] == "source")
-        anchor = next(row for row in group["findings"] if row["kind"] == "line_anchors")
+        group = next(
+            g for g in assert_records(projected["groups"]) if g["family"] == "source"
+        )
+        anchor = next(
+            row
+            for row in assert_records(group["findings"])
+            if row["kind"] == "line_anchors"
+        )
         assert anchor["source_refs"] == ["/line_anchors/0"]
-        assert anchor["details"]["context_excerpt"][1]["text"] == "needle"
-        assert anchor["details"]["context_excerpt"][1]["role"] == "anchor"
+        assert (
+            assert_object(
+                assert_array(assert_object(anchor["details"])["context_excerpt"])[1]
+            )["text"]
+            == "needle"
+        )
+        assert (
+            assert_object(
+                assert_array(assert_object(anchor["details"])["context_excerpt"])[1]
+            )["role"]
+            == "anchor"
+        )
         assert source == original
         literal = surface.source_observation(
             ["a.py"], literal="needle", context_lines=1
         )
-        assert literal["occurrences"][0]["context_excerpt"][1]["role"] == "match"
+        assert (
+            assert_object(
+                assert_array(
+                    assert_object(assert_array(literal["occurrences"])[0])[
+                        "context_excerpt"
+                    ]
+                )[1]
+            )["role"]
+            == "match"
+        )
     finally:
         surface.close()
 

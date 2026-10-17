@@ -1,4 +1,10 @@
+from __future__ import annotations
+
 from pathlib import Path
+from typing import Never
+
+from contract_assertions import assert_array
+from pytest import MonkeyPatch
 
 from hashmarks.codemap import CodeMap
 
@@ -35,7 +41,7 @@ def test_setuptools_src_layout_uses_import_identity_not_repository_prefix(
             "tests/test_api.py", "pkg.api.run"
         )
     assert row is not None and row["module_name"] == "pkg.api"
-    assert "src/pkg/use.py" in affected["affected_files"]
+    assert "src/pkg/use.py" in assert_array(affected["affected_files"])
     assert owners == ["src/pkg/api.py"]
     assert ambiguous is False
 
@@ -73,7 +79,7 @@ def test_unconfigured_src_namespace_keeps_src_as_module_identity(
         row = codemap.store.file_row("src/m0.py")
         affected = codemap.affected("src/m0.py", max_depth=2)
     assert row is not None and row["module_name"] == "src.m0"
-    assert "src/m1.py" in affected["affected_files"]
+    assert "src/m1.py" in assert_array(affected["affected_files"])
 
 
 def test_source_root_configuration_change_reprojects_reused_module_identity(
@@ -99,7 +105,7 @@ def test_source_root_configuration_change_reprojects_reused_module_identity(
     assert result.parsed_artifacts == 1
     assert result.reused_artifacts >= 2
     assert after is not None and after["module_name"] == "pkg.api"
-    assert "src/pkg/use.py" in affected["affected_files"]
+    assert "src/pkg/use.py" in assert_array(affected["affected_files"])
 
 
 def test_duplicate_configured_import_identity_is_ambiguous_and_not_reverse_owned(
@@ -134,8 +140,8 @@ def test_duplicate_configured_import_identity_is_ambiguous_and_not_reverse_owned
     assert paths == ["services/a/src/shared/api.py", "services/b/src/shared/api.py"]
     assert owners == []
     assert ambiguous is True
-    assert "consumer.py" not in affected_a["affected_files"]
-    assert "consumer.py" not in affected_b["affected_files"]
+    assert "consumer.py" not in assert_array(affected_a["affected_files"])
+    assert "consumer.py" not in assert_array(affected_b["affected_files"])
 
 
 def test_duplicate_import_identity_becomes_unique_after_one_owner_removed(
@@ -167,7 +173,7 @@ def test_duplicate_import_identity_becomes_unique_after_one_owner_removed(
         affected = codemap.affected("services/a/src/shared/api.py", max_depth=1)
     assert owners == ["services/a/src/shared/api.py"]
     assert ambiguous is False
-    assert "consumer.py" in affected["affected_files"]
+    assert "consumer.py" in assert_array(affected["affected_files"])
 
 
 def test_nested_project_pyproject_scopes_src_root_to_project_directory(
@@ -185,7 +191,7 @@ def test_nested_project_pyproject_scopes_src_root_to_project_directory(
         row = codemap.store.file_row("services/a/src/pkg/api.py")
         affected = codemap.affected("services/a/src/pkg/api.py", max_depth=1)
     assert row is not None and row["module_name"] == "pkg.api"
-    assert "services/a/src/pkg/use.py" in affected["affected_files"]
+    assert "services/a/src/pkg/use.py" in assert_array(affected["affected_files"])
 
 
 def test_nested_projects_exposing_same_import_identity_remain_ambiguous(
@@ -235,7 +241,7 @@ def test_same_service_targeted_pyproject_change_refreshes_import_roots(
         after = codemap.store.file_row("services/a/src/pkg/api.py")
         affected = codemap.affected("services/a/src/pkg/api.py", max_depth=1)
     assert after is not None and after["module_name"] == "pkg.api"
-    assert "services/a/src/pkg/use.py" in affected["affected_files"]
+    assert "services/a/src/pkg/use.py" in assert_array(affected["affected_files"])
 
 
 def test_uv_workspace_exclude_does_not_create_false_import_ambiguity(
@@ -535,7 +541,7 @@ def test_uv_workspace_same_namespace_concrete_module_duplicate_fails_closed(
 
 
 def test_uv_workspace_transition_reprojection_does_not_scan_all_persisted_rows(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
     _write(
         tmp_path,
@@ -555,7 +561,7 @@ def test_uv_workspace_transition_reprojection_does_not_scan_all_persisted_rows(
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
 
-        def forbidden():
+        def forbidden() -> Never:
             raise AssertionError(
                 "uv member reprojection must not materialize all repository rows"
             )

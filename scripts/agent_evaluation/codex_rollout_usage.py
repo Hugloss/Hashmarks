@@ -34,7 +34,7 @@ def thread_id_from_events(path: Path) -> str | None:
     return None
 
 
-def _walk(v: Any):
+def _walk(v: object) -> Iterator[dict[str, object]]:
     if isinstance(v, dict):
         yield v
         for x in v.values():

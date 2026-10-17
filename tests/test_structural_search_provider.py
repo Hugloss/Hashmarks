@@ -23,8 +23,10 @@ def test_structural_search_parses_stream_with_bounded_results(
     provider = AstGrepSearchProvider(tmp_path)
     provider.executable = "ast-grep"
 
-    def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
-        assert args[0] == [
+    def fake_run(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        assert command == [
             "ast-grep",
             "run",
             "--pattern",
@@ -36,7 +38,7 @@ def test_structural_search_parses_stream_with_bounded_results(
         ]
         assert kwargs["cwd"] == tmp_path
         return subprocess.CompletedProcess(
-            args[0],
+            command,
             0,
             stdout='\ninvalid\n{"path":"first.py"}\n{"path":"second.py"}\n',
             stderr="",

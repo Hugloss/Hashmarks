@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
@@ -8,8 +9,16 @@ from hashmarks.operation_contract import operation_response, operation_schema
 from hashmarks.paths import normalize_relative_path
 
 from .decision_session import decision_scoped
-from .model import EvidenceVisibility
+from .model import EvidenceVisibility, SearchHit
 from .ownership_relation_defaults import OWNERSHIP_RELATION_DEFAULT_OPTIONS
+from .ownership_relation_types import (
+    OwnershipCandidate,
+    OwnershipNode,
+    OwnershipPathHop,
+    OwnershipRelationEdge,
+    OwnershipRelationGraph,
+    StructuralOwnerCandidate,
+)
 from .python_ast import estimate_tokens
 from .query_primitives import _WORD_RE, _query_terms
 from .query_router import QueryRoute, route_query
@@ -23,9 +32,9 @@ if TYPE_CHECKING:
 class _OwnershipGraphState:
     start: str
     task_terms: set[str]
-    nodes: dict[str, dict[str, object]]
-    edges: list[dict[str, object]]
-    candidates: dict[str, dict[str, object]]
+    nodes: dict[str, OwnershipNode]
+    edges: list[OwnershipRelationEdge]
+    candidates: dict[str, OwnershipCandidate]
     parents: dict[str, tuple[str, str]]
     seen: set[str]
     search_bound_reasons: set[str] = field(default_factory=set)
@@ -90,7 +99,10 @@ class OwnershipGraphMixin:
 
     @staticmethod
     def _entry_role_match(
-        role: str, accepted, domains: tuple[RepositoryDomain, ...], path: str
+        role: str,
+        accepted: Sequence[RepositoryDomain],
+        domains: tuple[RepositoryDomain, ...],
+        path: str,
     ) -> bool:
         role_match = bool(set(domains).intersection(accepted))
         if role == "implementation" and RepositoryDomain.TEST in domains:
@@ -102,7 +114,7 @@ class OwnershipGraphMixin:
 
     def _entry_role_rows(
         self,
-        hits,
+        hits: Sequence[SearchHit],
         role_domains: dict[str, tuple[RepositoryDomain, ...]],
         task_terms: set[str],
     ) -> dict[str, list[dict[str, object]]]:
@@ -130,9 +142,9 @@ class OwnershipGraphMixin:
         for role, rows in candidates.items():
             rows.sort(
                 key=lambda row: (
-                    int(row["role_quality"]),
-                    -int(row["role_symbol_specificity"]),
-                    int(row["canonical_rank"]),
+                    int(cast("int", row["role_quality"])),
+                    -int(cast("int", row["role_symbol_specificity"])),
+                    int(cast("int", row["canonical_rank"])),
                     str(row["path"]),
                 )
             )
@@ -440,7 +452,10 @@ class OwnershipGraphMixin:
 
     @staticmethod
     def _entry_resolution(
-        ambiguous: bool, resolved_role: str | None, role_rows, role_anchor_tokens
+        ambiguous: bool,
+        resolved_role: str | None,
+        role_rows: dict[str, list[dict[str, object]]],
+        role_anchor_tokens: dict[str, list[str]],
     ) -> dict[str, object]:
         if resolved_role is not None:
             return {
@@ -498,7 +513,7 @@ class OwnershipGraphMixin:
         alternatives = [{"role": role, **role_rows[role][0]} for role in explicit_roles]
         alternatives.sort(
             key=lambda row: (
-                int(row["canonical_rank"]),
+                int(cast("int", row["canonical_rank"])),
                 str(row["role"]),
                 str(row["path"]),
             )
@@ -609,9 +624,7 @@ class OwnershipGraphMixin:
         except ValueError:
             return False
 
-    def _ownership_node(
-        self, state: _OwnershipGraphState, path: str
-    ) -> dict[str, object]:
+    def _ownership_node(self, state: _OwnershipGraphState, path: str) -> OwnershipNode:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         current = state.nodes.get(path)
@@ -627,13 +640,13 @@ class OwnershipGraphMixin:
                 _query_terms(str(symbol.get("qualname") or symbol.get("name") or ""))
             )
         path_terms = set(_query_terms(path.replace("/", " ")))
-        current = {
-            "path": path,
-            "domains": domains,
-            "task_locality_terms": sorted(
+        current = OwnershipNode(
+            path=path,
+            domains=domains,
+            task_locality_terms=sorted(
                 state.task_terms.intersection(path_terms | symbol_terms)
             ),
-        }
+        )
         state.nodes[path] = current
         return current
 
@@ -713,7 +726,10 @@ class OwnershipGraphMixin:
         )
 
     @staticmethod
-    def _ownership_call_shorts(expandable, edge_map) -> list[str]:
+    def _ownership_call_shorts(
+        expandable: Sequence[tuple[str, int, tuple[str, ...]]],
+        edge_map: Mapping[str, Sequence[dict[str, object]]],
+    ) -> list[str]:
         return sorted(
             {
                 str(edge.get("target_short") or "")
@@ -727,7 +743,7 @@ class OwnershipGraphMixin:
     @staticmethod
     def _index_ownership_symbols(
         state: _OwnershipGraphState,
-        call_symbols,
+        call_symbols: Sequence[dict[str, object]],
         wanted: set[str],
     ) -> dict[str, list[dict]]:
         symbols_by_short: dict[str, list[dict]] = {}
@@ -747,8 +763,8 @@ class OwnershipGraphMixin:
     def _ownership_symbol_map(
         self,
         state: _OwnershipGraphState,
-        expandable,
-        edge_map,
+        expandable: Sequence[tuple[str, int, tuple[str, ...]]],
+        edge_map: Mapping[str, Sequence[dict[str, object]]],
     ) -> dict[str, list[dict]]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -787,7 +803,11 @@ class OwnershipGraphMixin:
 
     @classmethod
     def _ownership_call_targets(
-        cls, path: str, edge: dict, imported_paths: set[str], symbols_by_short
+        cls,
+        path: str,
+        edge: dict,
+        imported_paths: set[str],
+        symbols_by_short: Mapping[str, Sequence[dict[str, object]]],
     ) -> list[tuple[str, str]]:
         short = str(edge.get("target_short") or "")
         if not short:
@@ -824,7 +844,7 @@ class OwnershipGraphMixin:
     def _ownership_candidate_row(
         state: _OwnershipGraphState,
         target_path: str,
-        target_node: dict[str, object],
+        target_node: OwnershipNode,
         depth: int,
         relation: str,
         resolution: str,
@@ -889,7 +909,7 @@ class OwnershipGraphMixin:
         )
 
     @staticmethod
-    def _ownership_import_targets(path_edges) -> list[str]:
+    def _ownership_import_targets(path_edges: Sequence[dict[str, object]]) -> list[str]:
         return list(
             dict.fromkeys(
                 str(edge.get("target") or "")
@@ -900,7 +920,7 @@ class OwnershipGraphMixin:
         )
 
     def _ownership_import_resolution(
-        self, path: str, path_edges
+        self, path: str, path_edges: Sequence[dict[str, object]]
     ) -> tuple[dict[str, list[str]], set[str]]:
         targets = self._ownership_import_targets(path_edges)
         resolved = {
@@ -914,9 +934,9 @@ class OwnershipGraphMixin:
         self,
         state: _OwnershipGraphState,
         item: tuple[str, int, tuple[str, ...]],
-        edge_map,
-        symbols_by_short,
-        frontier,
+        edge_map: Mapping[str, Sequence[dict[str, object]]],
+        symbols_by_short: dict[str, list[dict[str, object]]],
+        frontier: list[tuple[str, int, tuple[str, ...]]],
     ) -> None:
         path, depth, ancestry = item
         path_edges = edge_map.get(path, ())
@@ -932,7 +952,11 @@ class OwnershipGraphMixin:
                     state, expansion, target_path, resolution, kind
                 )
 
-    def _preload_direct_ownership_import_modules(self, expandable, edge_map) -> None:
+    def _preload_direct_ownership_import_modules(
+        self,
+        expandable: Sequence[tuple[str, int, tuple[str, ...]]],
+        edge_map: Mapping[str, Sequence[dict[str, object]]],
+    ) -> None:
         """Preload only the exact module probe each ownership import will ask first."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -979,10 +1003,10 @@ class OwnershipGraphMixin:
 
     def _rank_ownership_candidates(
         self, state: _OwnershipGraphState
-    ) -> list[dict[str, object]]:
+    ) -> list[OwnershipCandidate]:
         start_domains = set(self._ownership_node(state, state.start)["domains"])
         started_from_verification = RepositoryDomain.TEST.value in start_domains
-        ranked: list[dict[str, object]] = []
+        ranked: list[OwnershipCandidate] = []
         for row in state.candidates.values():
             locality = list(row.get("task_locality_terms") or [])
             corroboration = ["active-reachability"]
@@ -1013,7 +1037,9 @@ class OwnershipGraphMixin:
         return ranked
 
     @staticmethod
-    def _ownership_edge_delegates(edge, base_path: str, base_depth: int) -> bool:
+    def _ownership_edge_delegates(
+        edge: OwnershipRelationEdge, base_path: str, base_depth: int
+    ) -> bool:
         return (
             str(edge.get("from") or "") == base_path
             and int(edge.get("depth") or 0) == base_depth + 1
@@ -1022,7 +1048,7 @@ class OwnershipGraphMixin:
 
     @staticmethod
     def _ownership_edge_refines(
-        edge, target_locality: set[str], base_locality: set[str]
+        edge: OwnershipRelationEdge, target_locality: set[str], base_locality: set[str]
     ) -> bool:
         if (
             edge.get("relation") == "calls"
@@ -1038,11 +1064,11 @@ class OwnershipGraphMixin:
     @classmethod
     def _delegated_target_for_edge(
         cls,
-        edge: dict,
+        edge: OwnershipRelationEdge,
         base_path: str,
         base_depth: int,
         base_locality: set[str],
-        ranked_by_path,
+        ranked_by_path: dict[str, OwnershipCandidate],
     ) -> str | None:
         if not cls._ownership_edge_delegates(edge, base_path, base_depth):
             return None
@@ -1061,8 +1087,8 @@ class OwnershipGraphMixin:
     def _delegated_ownership_targets(
         cls,
         state: _OwnershipGraphState,
-        ranked: list[dict[str, object]],
-        selected: dict[str, object],
+        ranked: list[OwnershipCandidate],
+        selected: OwnershipCandidate,
     ) -> set[str]:
         base_path = str(selected.get("path") or "")
         base_depth = int(selected.get("depth") or 0)
@@ -1080,7 +1106,9 @@ class OwnershipGraphMixin:
         }
 
     @staticmethod
-    def _delegated_candidates(ranked, targets: set[str]) -> list[dict[str, object]]:
+    def _delegated_candidates(
+        ranked: Sequence[OwnershipCandidate], targets: set[str]
+    ) -> list[OwnershipCandidate]:
         return [
             row
             for row in ranked
@@ -1090,7 +1118,9 @@ class OwnershipGraphMixin:
         ]
 
     @staticmethod
-    def _baseline_ownership_candidate(ranked) -> dict[str, object] | None:
+    def _baseline_ownership_candidate(
+        ranked: Sequence[OwnershipCandidate],
+    ) -> OwnershipCandidate | None:
         baseline = [row for row in ranked if int(row.get("depth") or 0) <= 2]
         return next((row for row in baseline if row.get("corroborated")), None)
 
@@ -1098,9 +1128,9 @@ class OwnershipGraphMixin:
     def _select_ownership_candidate(
         cls,
         state: _OwnershipGraphState,
-        ranked: list[dict[str, object]],
+        ranked: list[OwnershipCandidate],
         max_depth: int,
-    ) -> tuple[dict[str, object] | None, str]:
+    ) -> tuple[OwnershipCandidate | None, str]:
         selected = cls._baseline_ownership_candidate(ranked)
         search_complete = not state.search_bound_reasons
         if selected is None:
@@ -1120,12 +1150,12 @@ class OwnershipGraphMixin:
 
     @staticmethod
     def _ownership_path(
-        state: _OwnershipGraphState, selected: dict[str, object] | None
-    ) -> list[dict[str, object]]:
+        state: _OwnershipGraphState, selected: OwnershipCandidate | None
+    ) -> list[OwnershipPathHop]:
         if selected is None:
             return []
         cursor = str(selected["path"])
-        reverse: list[dict[str, object]] = []
+        reverse: list[OwnershipPathHop] = []
         while cursor != state.start and cursor in state.parents:
             parent, relation = state.parents[cursor]
             reverse.append({"from": parent, "to": cursor, "relation": relation})
@@ -1133,7 +1163,7 @@ class OwnershipGraphMixin:
         return list(reversed(reverse))
 
     @staticmethod
-    def _selected_ownership_path(selected: dict[str, object] | None) -> str | None:
+    def _selected_ownership_path(selected: OwnershipCandidate | None) -> str | None:
         return None if selected is None else str(selected["path"])
 
     @operation_response("ownership_relation_graph")
@@ -1143,7 +1173,7 @@ class OwnershipGraphMixin:
         start_path: str,
         *,
         max_depth: int = OWNERSHIP_RELATION_DEFAULT_OPTIONS.max_depth,
-    ) -> dict[str, object]:
+    ) -> OwnershipRelationGraph:
         """Project a bounded, cycle-safe ownership relation graph."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -1160,7 +1190,7 @@ class OwnershipGraphMixin:
             start, set(_query_terms(task)), {}, [], {}, {}, {start}
         )
         self._ownership_node(state, start)
-        frontier = [(start, 0, (start,))]
+        frontier: list[tuple[str, int, tuple[str, ...]]] = [(start, 0, (start,))]
         while frontier:
             frontier = self._expand_ownership_level(state, frontier, max_depth)
         ranked = self._rank_ownership_candidates(state)
@@ -1201,8 +1231,8 @@ class OwnershipGraphMixin:
 
     @staticmethod
     def _selected_owner_row(
-        graph: dict[str, object], selected_path: object
-    ) -> dict[str, object] | None:
+        graph: OwnershipRelationGraph, selected_path: object
+    ) -> OwnershipCandidate | None:
         candidates = graph.get("candidates")
         if not isinstance(candidates, list):
             return None
@@ -1216,12 +1246,14 @@ class OwnershipGraphMixin:
         )
 
     @staticmethod
-    def _last_owner_path_row(owner_path: list[dict[str, object]]) -> dict[str, object]:
+    def _last_owner_path_row(
+        owner_path: Sequence[OwnershipPathHop],
+    ) -> Mapping[str, object]:
         return owner_path[-1] if owner_path else {}
 
     @staticmethod
     def _owner_projection_value(
-        row: dict[str, object], key: str, default: object
+        row: Mapping[str, object], key: str, default: object
     ) -> object:
         value = row.get(key)
         return default if value is None else value
@@ -1232,14 +1264,14 @@ class OwnershipGraphMixin:
         *,
         max_depth: int = OWNERSHIP_RELATION_DEFAULT_OPTIONS.max_depth,
         task: str = "",
-    ) -> dict[str, object] | None:
+    ) -> StructuralOwnerCandidate | None:
         """Project the selected typed ownership relation into the action anchor shape."""
         graph = self.ownership_relation_graph(task, start_path, max_depth=max_depth)
         return self._structural_owner_from_graph(graph, start_path)
 
     def _structural_owner_from_graph(
-        self, graph: dict[str, object], start_path: str
-    ) -> dict[str, object] | None:
+        self, graph: OwnershipRelationGraph, start_path: str
+    ) -> StructuralOwnerCandidate | None:
         """Retain graph qualification while projecting a selected candidate."""
         selected_path = graph.get("selected")
         if not selected_path:
@@ -1247,12 +1279,12 @@ class OwnershipGraphMixin:
         selected = self._selected_owner_row(graph, selected_path)
         if selected is None:
             return None
-        owner_path = list(graph.get("owner_path") or [])
+        owner_path = list(graph["owner_path"])
         last = self._last_owner_path_row(owner_path)
         via = self._owner_projection_value(last, "relation", "relation-graph")
         source_path = self._owner_projection_value(last, "from", start_path)
-        depth = self._owner_projection_value(selected, "depth", 0)
-        corroboration = self._owner_projection_value(selected, "corroboration", [])
+        depth = selected["depth"]
+        corroboration = selected.get("corroboration", [])
         return {
             "path": str(selected_path),
             "depth": int(depth),
@@ -1260,14 +1292,12 @@ class OwnershipGraphMixin:
             "source_path": str(source_path),
             "owner_path": owner_path,
             "corroboration": list(corroboration),
-            "cycle_count": int(graph.get("cycle_count") or 0),
-            "revisit_count": int(graph.get("revisit_count") or 0),
+            "cycle_count": graph["cycle_count"],
+            "revisit_count": graph["revisit_count"],
             "relation_graph_schema": graph["schema"],
-            "relation_graph_completeness": graph.get("completeness"),
-            "relation_graph_truncation": graph.get("truncation"),
-            "relation_graph_search_bound_reasons": list(
-                graph.get("search_bound_reasons") or []
-            ),
+            "relation_graph_completeness": graph["completeness"],
+            "relation_graph_truncation": graph["truncation"],
+            "relation_graph_search_bound_reasons": list(graph["search_bound_reasons"]),
         }
 
     @staticmethod
@@ -1288,7 +1318,7 @@ class OwnershipGraphMixin:
             "representation": "action-anchor",
             "content": content,
             "estimated_tokens": estimate_tokens(content),
-            "canonical_rank": int(row.get("canonical_rank") or 0),
+            "canonical_rank": int(cast("int", row.get("canonical_rank") or 0)),
             "reason": f"{role}-anchor",
             "mandatory": role in {"edit", "verify", "contract"},
         }

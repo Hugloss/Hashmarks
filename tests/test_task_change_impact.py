@@ -3,9 +3,12 @@ from __future__ import annotations
 import json
 import threading
 import time
+from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING
 
 import pytest
+from contract_assertions import assert_array, assert_object, assert_records
+from pytest import MonkeyPatch
 
 from hashmarks import cli
 from hashmarks.codemap import ChangeImpactOptions, CodeMap
@@ -38,7 +41,7 @@ def _repo(root: Path) -> str:
     return "Accepted responses are transformed by the wrong active owner for ember"
 
 
-def _task_candidate_path(packet: dict[str, object]) -> str:
+def _task_candidate_path(packet: Mapping[str, object]) -> str:
     ownership = packet.get("ownership")
     assert isinstance(ownership, dict)
     candidate = ownership.get("candidate")
@@ -46,7 +49,7 @@ def _task_candidate_path(packet: dict[str, object]) -> str:
     return str(candidate.get("path") or "")
 
 
-def _task_verification_path(packet: dict[str, object]) -> str:
+def _task_verification_path(packet: Mapping[str, object]) -> str:
     verification = packet.get("verification")
     assert isinstance(verification, dict)
     selected = verification.get("selected")
@@ -72,12 +75,13 @@ def test_task_change_impact_composes_owner_path_and_verification(
     assert impact["owner"] == "external"
     assert impact["authority"] == "advisory"
     assert impact["completeness"] == "not-claimed"
-    implementations = impact["surfaces"]["implementation"]
-    verification = impact["surfaces"]["verification"]
+    surfaces = assert_object(impact["surfaces"])
+    implementations = assert_records(surfaces["implementation"])
+    verification = assert_records(surfaces["verification"])
     assert implementations[0]["path"] == "src/case/route.py"
     assert implementations[0]["via"] == "task-owner-path"
     assert verification[0]["path"] == "tests/test_behavior.py"
-    assert verification[0]["verify"]["runner"] == "pytest"
+    assert assert_object(verification[0]["verify"])["runner"] == "pytest"
     assert verification[0]["selected"] is True
     encoded = json.dumps(impact, sort_keys=True)
     assert '"content"' not in encoded
@@ -101,11 +105,13 @@ def test_task_change_impact_config_root_is_typed_and_gets_verification(
         candidate_path = _task_candidate_path(start)
         assert candidate_path.endswith("policy.toml")
         impact = codemap.task_change_impact(config_task["query"], [candidate_path])
-    changed = impact["changed"][0]
-    assert "contract" in changed["roles"]
-    assert "build_config" in changed["roles"]
+    changed = assert_object(assert_array(impact["changed"])[0])
+    assert "contract" in assert_array(changed["roles"])
+    assert "build_config" in assert_array(changed["roles"])
     assert (
-        impact["surfaces"]["verification"][0]["path"]
+        assert_object(
+            assert_array(assert_object(impact["surfaces"])["verification"])[0]
+        )["path"]
         == "tests/case_004/test_behavior.py"
     )
 
@@ -134,8 +140,8 @@ def test_task_change_impact_bounded_fanout_never_claims_complete_impact(
             ["src/core.py"],
             options=ChangeImpactOptions(impact_limit_per_surface=3, max_depth=3),
         )
-    assert len(impact["surfaces"]["implementation"]) == 3
-    assert impact["bounds"]["per_surface"] == 3
+    assert len(assert_array(assert_object(impact["surfaces"])["implementation"])) == 3
+    assert assert_object(impact["bounds"])["per_surface"] == 3
     assert impact["completeness"] == "not-claimed"
 
 
@@ -148,9 +154,12 @@ def test_task_change_impact_bounds_surfaces(tmp_path: Path) -> None:
             ["src/case/engine.py"],
             options=ChangeImpactOptions(impact_limit_per_surface=1, max_depth=2),
         )
-    assert all(len(rows) <= 1 for rows in impact["surfaces"].values())
-    assert impact["bounds"]["per_surface"] == 1
-    assert impact["bounds"]["depth"] == 2
+    assert all(
+        len(assert_array(rows)) <= 1
+        for rows in assert_object(impact["surfaces"]).values()
+    )
+    assert assert_object(impact["bounds"])["per_surface"] == 1
+    assert assert_object(impact["bounds"])["depth"] == 2
 
 
 def test_task_change_impact_never_discloses_denied_path(tmp_path: Path) -> None:
@@ -164,10 +173,17 @@ def test_task_change_impact_never_discloses_denied_path(tmp_path: Path) -> None:
         impact = codemap.task_change_impact(task, ["src/case/engine.py"])
     encoded = json.dumps(impact, sort_keys=True)
     assert "src/case/route.py" not in encoded
-    assert impact["surfaces"]["verification"][0]["path"] == "tests/test_behavior.py"
+    assert (
+        assert_object(
+            assert_array(assert_object(impact["surfaces"])["verification"])[0]
+        )["path"]
+        == "tests/test_behavior.py"
+    )
 
 
-def test_task_change_impact_cli(tmp_path: Path, capsys) -> None:
+def test_task_change_impact_cli(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     task = _repo(tmp_path)
     assert (
         cli.main(
@@ -318,7 +334,10 @@ def test_task_change_impact_reconstructs_same_package_go_owner_chain(
         assert _task_verification_path(start) == "route/cobaltridgealpha_test.go"
         impact = codemap.task_change_impact(task, ["engine/engine.go"])
 
-    implementation = [row["path"] for row in impact["surfaces"]["implementation"]]
+    implementation = [
+        row["path"]
+        for row in assert_records(assert_object(impact["surfaces"])["implementation"])
+    ]
     assert implementation[:2] == [
         "route/route.go",
         "service/service.go",
@@ -326,7 +345,9 @@ def test_task_change_impact_reconstructs_same_package_go_owner_chain(
     assert "service/service.go" in implementation
     assert "route/route.go" in implementation
     assert (
-        impact["surfaces"]["verification"][0]["path"]
+        assert_object(
+            assert_array(assert_object(impact["surfaces"])["verification"])[0]
+        )["path"]
         == "route/cobaltridgealpha_test.go"
     )
 
@@ -350,6 +371,7 @@ def test_large_task_change_impact_matrix_small_smoke(tmp_path: Path) -> None:
 
 def test_exact_import_resolution_avoids_whole_file_map_materialization(
     tmp_path: Path,
+    monkeypatch: MonkeyPatch,
 ) -> None:
     ts_root = tmp_path / "ts"
     (ts_root / "src").mkdir(parents=True)
@@ -362,9 +384,13 @@ def test_exact_import_resolution_avoids_whole_file_map_materialization(
     )
     with CodeMap(ts_root) as codemap:
         codemap.sync()
-        codemap.store.all_file_rows = lambda: (_ for _ in ()).throw(
-            AssertionError("whole file map must not be materialized")
-        )  # type: ignore[method-assign]
+        monkeypatch.setattr(
+            codemap.store,
+            "all_file_rows",
+            lambda: (_ for _ in ()).throw(
+                AssertionError("whole file map must not be materialized")
+            ),
+        )
         assert codemap._resolve_import_paths("src/route.ts", "./engine.js") == [
             "src/engine.ts"
         ]
@@ -384,16 +410,20 @@ def test_exact_import_resolution_avoids_whole_file_map_materialization(
     )
     with CodeMap(go_root) as codemap:
         codemap.sync()
-        codemap.store.all_file_rows = lambda: (_ for _ in ()).throw(
-            AssertionError("whole file map must not be materialized")
-        )  # type: ignore[method-assign]
+        monkeypatch.setattr(
+            codemap.store,
+            "all_file_rows",
+            lambda: (_ for _ in ()).throw(
+                AssertionError("whole file map must not be materialized")
+            ),
+        )
         assert codemap._resolve_import_paths(
             "route/route.go", "example.local/demo/engine"
         ) == ["engine/engine.go"]
 
 
 def test_task_change_impact_declared_project_provenance_and_shared_input_refresh(
-    tmp_path: Path, fake_maven_wrapper
+    tmp_path: Path, fake_maven_wrapper: Callable[[Path], None]
 ) -> None:
     (tmp_path / "backend/src").mkdir(parents=True)
     (tmp_path / "frontend/src").mkdir(parents=True)
@@ -433,12 +463,17 @@ def test_task_change_impact_declared_project_provenance_and_shared_input_refresh
         )
         assert source_impact["projects"] == ["npm:@demo/mobile", "npm:@demo/web"]
         rows = {
-            row["project"]: row for row in source_impact["project_impact"]["affected"]
+            row["project"]: row
+            for row in assert_records(
+                assert_object(source_impact["project_impact"])["affected"]
+            )
         }
         assert rows["npm:@demo/web"]["depth"] == 1
         assert any(
             edge["producer"] == "declared-project-links"
-            for edge in source_impact["project_impact"]["edges"]
+            for edge in assert_records(
+                assert_object(source_impact["project_impact"])["edges"]
+            )
         )
         assert rows["npm:@demo/mobile"]["depth"] == 2
 
@@ -452,13 +487,22 @@ def test_task_change_impact_declared_project_provenance_and_shared_input_refresh
         "npm:@demo/mobile",
         "npm:@demo/web",
     ]
-    assert shared_impact["project_refresh"]["producer"] == "declared-project-links"
-    assert shared_impact["project_refresh"]["changed"] == "openapi.yaml"
+    assert (
+        assert_object(shared_impact["project_refresh"])["producer"]
+        == "declared-project-links"
+    )
+    assert assert_object(shared_impact["project_refresh"])["changed"] == "openapi.yaml"
     project_rows = {
-        row["project"]: row for row in shared_impact["project_impact"]["affected"]
+        row["project"]: row
+        for row in assert_records(
+            assert_object(shared_impact["project_impact"])["affected"]
+        )
     }
     assert any(
-        edge["kind"] == "contract" for edge in shared_impact["project_impact"]["edges"]
+        edge["kind"] == "contract"
+        for edge in assert_records(
+            assert_object(shared_impact["project_impact"])["edges"]
+        )
     )
     assert project_rows["npm:@demo/mobile"]["depth"] == 2
 
@@ -490,12 +534,12 @@ def test_task_change_impact_project_provenance_is_bounded(tmp_path: Path) -> Non
             ["root/value.ts"],
             options=ChangeImpactOptions(impact_limit_per_surface=3),
         )
-    assert len(impact["project_impact"]["affected"]) == 3
-    assert len(impact["projects"]) == 8
+    assert len(assert_array(assert_object(impact["project_impact"])["affected"])) == 3
+    assert len(assert_array(impact["projects"])) == 8
 
 
 def test_cross_repository_impact_qualification_small_smoke(
-    tmp_path: Path, fake_maven_wrapper
+    tmp_path: Path, fake_maven_wrapper: Callable[[Path], None]
 ) -> None:
     from scripts.score_cross_repository_impact import generate, run
 
@@ -513,7 +557,9 @@ def test_cross_repository_impact_qualification_small_smoke(
     assert payload["protocol"]["secret_join_after_packet_freeze"] is True
 
 
-def test_project_impact_limit_is_independent_and_reports_truncation(tmp_path: Path):
+def test_project_impact_limit_is_independent_and_reports_truncation(
+    tmp_path: Path,
+) -> None:
     root = tmp_path
     for index in range(10):
         project = root / f"p{index}"
@@ -552,18 +598,18 @@ def test_project_impact_limit_is_independent_and_reports_truncation(tmp_path: Pa
                 max_depth=20, impact_limit_per_surface=2, project_impact_limit=20
             ),
         )
-    assert bounded["bounds"]["per_surface"] == 2
-    assert bounded["bounds"]["project_impact"] == 3
-    assert bounded["project_impact"]["reported_affected"] == 3
-    assert bounded["project_impact"]["total_affected"] == 9
-    assert bounded["project_impact"]["complete"] is False
-    assert complete["project_impact"]["reported_affected"] == 9
-    assert complete["project_impact"]["total_affected"] == 9
-    assert complete["project_impact"]["complete"] is True
+    assert assert_object(bounded["bounds"])["per_surface"] == 2
+    assert assert_object(bounded["bounds"])["project_impact"] == 3
+    assert assert_object(bounded["project_impact"])["reported_affected"] == 3
+    assert assert_object(bounded["project_impact"])["total_affected"] == 9
+    assert assert_object(bounded["project_impact"])["complete"] is False
+    assert assert_object(complete["project_impact"])["reported_affected"] == 9
+    assert assert_object(complete["project_impact"])["total_affected"] == 9
+    assert assert_object(complete["project_impact"])["complete"] is True
 
 
 def test_declared_shared_input_refresh_rebinds_freshness_without_recollecting_topology(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
     (tmp_path / "backend").mkdir()
     (tmp_path / "frontend").mkdir()
@@ -592,7 +638,7 @@ def test_declared_shared_input_refresh_rebinds_freshness_without_recollecting_to
         original_collect = provider.collect
         calls = 0
 
-        def counted_collect(workspace):
+        def counted_collect(workspace: Path) -> object:
             nonlocal calls
             calls += 1
             return original_collect(workspace)
@@ -606,13 +652,15 @@ def test_declared_shared_input_refresh_rebinds_freshness_without_recollecting_to
     assert calls == 0
     assert impact["generation"] == impact_generation
     assert impact_generation > before_generation
-    assert impact["project_refresh"]["mode"] == "freshness-rebind"
-    assert impact["project_refresh"]["changed_manifests"] == ["contract.json"]
+    assert assert_object(impact["project_refresh"])["mode"] == "freshness-rebind"
+    assert assert_object(impact["project_refresh"])["changed_manifests"] == [
+        "contract.json"
+    ]
     assert impact["projects"] == ["npm:backend", "npm:frontend"]
 
 
 def test_declared_topology_change_recollects_provider(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
     for name in ("backend", "frontend", "mobile"):
         (tmp_path / name).mkdir()
@@ -638,7 +686,7 @@ def test_declared_topology_change_recollects_provider(
         original_collect = provider.collect
         calls = 0
 
-        def counted_collect(workspace):
+        def counted_collect(workspace: Path) -> object:
             nonlocal calls
             calls += 1
             return original_collect(workspace)
@@ -659,8 +707,11 @@ def test_declared_topology_change_recollects_provider(
     assert calls == 1
     assert impact["generation"] == impact_generation
     assert impact_generation > before_generation
-    assert impact["project_refresh"]["mode"] == "topology-recollect"
-    assert impact["project_refresh"]["changed"] == ".hashmarks-project-links.toml"
+    assert assert_object(impact["project_refresh"])["mode"] == "topology-recollect"
+    assert (
+        assert_object(impact["project_refresh"])["changed"]
+        == ".hashmarks-project-links.toml"
+    )
     assert source["projects"] == ["npm:frontend", "npm:mobile"]
 
 
@@ -734,8 +785,14 @@ def test_task_change_impact_compact_project_provenance_round_trips(
             ),
         )
 
-    assert compact["project_impact"]["schema"] == COMPACT_PROJECT_IMPACT_SCHEMA
-    assert expand_project_impact(compact["project_impact"]) == verbose["project_impact"]
+    assert (
+        assert_object(compact["project_impact"])["schema"]
+        == COMPACT_PROJECT_IMPACT_SCHEMA
+    )
+    assert (
+        expand_project_impact(assert_object(compact["project_impact"]))
+        == verbose["project_impact"]
+    )
     assert len(json.dumps(compact, sort_keys=True, separators=(",", ":"))) < len(
         json.dumps(verbose, sort_keys=True, separators=(",", ":"))
     )
@@ -780,12 +837,15 @@ def test_task_change_impact_compact_preserves_multiple_edges_from_one_project(
 
     client_edges = [
         edge
-        for edge in verbose["project_impact"]["edges"]
+        for edge in assert_records(assert_object(verbose["project_impact"])["edges"])
         if edge["from"] == "npm:client"
     ]
     assert len(client_edges) == 2
     assert {edge["to"] for edge in client_edges} == {"npm:root-a", "npm:root-b"}
-    assert expand_project_impact(compact["project_impact"]) == verbose["project_impact"]
+    assert (
+        expand_project_impact(assert_object(compact["project_impact"]))
+        == verbose["project_impact"]
+    )
 
 
 def test_task_change_impact_rejects_unknown_project_impact_encoding(
@@ -809,20 +869,24 @@ def test_task_change_impact_rejects_unknown_project_impact_encoding(
 @pytest.mark.parametrize(
     ("options", "message"),
     [
-        ({"impact_limit_per_surface": 0}, "impact_limit_per_surface must be >= 1"),
-        ({"max_depth": 0}, "max_depth must be >= 1"),
-        ({"project_impact_limit": 0}, "project_impact_limit must be >= 1"),
+        (
+            ChangeImpactOptions(impact_limit_per_surface=0),
+            "impact_limit_per_surface must be >= 1",
+        ),
+        (ChangeImpactOptions(max_depth=0), "max_depth must be >= 1"),
+        (
+            ChangeImpactOptions(project_impact_limit=0),
+            "project_impact_limit must be >= 1",
+        ),
     ],
 )
 def test_task_change_impact_rejects_invalid_bounds_before_refresh(
-    tmp_path: Path, options: dict[str, int], message: str
+    tmp_path: Path, options: ChangeImpactOptions, message: str
 ) -> None:
     task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         with pytest.raises(ValueError, match=message):
-            codemap.task_change_impact(
-                task, ["src/case/engine.py"], options=ChangeImpactOptions(**options)
-            )
+            codemap.task_change_impact(task, ["src/case/engine.py"], options=options)
 
 
 def test_task_change_impact_never_erases_reported_missing_path(tmp_path: Path) -> None:
@@ -834,7 +898,7 @@ def test_task_change_impact_never_erases_reported_missing_path(tmp_path: Path) -
             ["src/case/engine.py", "src/case/deleted.py"],
         )
 
-    changed = {row["path"]: row for row in impact["changed"]}
+    changed = {row["path"]: row for row in assert_records(impact["changed"])}
     assert set(changed) == {"src/case/engine.py", "src/case/deleted.py"}
     assert changed["src/case/engine.py"]["state"] == "indexed"
     assert changed["src/case/deleted.py"]["state"] == "missing"
@@ -857,7 +921,12 @@ def test_stylesheet_changed_evidence_is_accounted_as_source(
         codemap.sync()
         impact = codemap.task_change_impact(task, [stylesheet.relative_to(tmp_path)])
 
-    assert impact["changed"][0]["path"] == f"src/case/theme{suffix}"
-    assert impact["changed"][0]["state"] == "indexed"
-    assert "implementation" in impact["changed"][0]["roles"]
-    assert impact["changed_evidence"]["complete"] is True
+    assert (
+        assert_object(assert_array(impact["changed"])[0])["path"]
+        == f"src/case/theme{suffix}"
+    )
+    assert assert_object(assert_array(impact["changed"])[0])["state"] == "indexed"
+    assert "implementation" in assert_array(
+        assert_object(assert_array(impact["changed"])[0])["roles"]
+    )
+    assert assert_object(impact["changed_evidence"])["complete"] is True

@@ -1,11 +1,30 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from collections.abc import Callable
+from typing import TYPE_CHECKING, ParamSpec, TypeVar
+
+from contract_assertions import assert_object
 
 from hashmarks import CodeMap
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    import pytest
+
+
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
+
+
+def _counted(
+    calls: dict[str, int], name: str, function: Callable[_P, _R]
+) -> Callable[_P, _R]:
+    def counted(*args: _P.args, **kwargs: _P.kwargs) -> _R:
+        calls[name] += 1
+        return function(*args, **kwargs)
+
+    return counted
 
 
 def _repo(root: Path) -> tuple[str, list[str]]:
@@ -24,26 +43,22 @@ def _repo(root: Path) -> tuple[str, list[str]]:
 
 
 def test_identical_snapshot_requests_reuse_one_generation_bound_composition(
-    tmp_path: Path,
-    monkeypatch,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     task, paths = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         calls = {"brief": 0, "freshness": 0}
-        original_brief = codemap.change_intelligence_brief
-        original_freshness = codemap.evidence_freshness_map
-
-        def counted_brief(*args, **kwargs):
-            calls["brief"] += 1
-            return original_brief(*args, **kwargs)
-
-        def counted_freshness(*args, **kwargs):
-            calls["freshness"] += 1
-            return original_freshness(*args, **kwargs)
-
-        monkeypatch.setattr(codemap, "change_intelligence_brief", counted_brief)
-        monkeypatch.setattr(codemap, "evidence_freshness_map", counted_freshness)
+        monkeypatch.setattr(
+            codemap,
+            "change_intelligence_brief",
+            _counted(calls, "brief", codemap.change_intelligence_brief),
+        )
+        monkeypatch.setattr(
+            codemap,
+            "evidence_freshness_map",
+            _counted(calls, "freshness", codemap.evidence_freshness_map),
+        )
 
         with codemap.decision_session():
             first = codemap.repository_intelligence_snapshot(task, paths)
@@ -63,20 +78,17 @@ def test_identical_snapshot_requests_reuse_one_generation_bound_composition(
 
 
 def test_snapshot_reuse_key_includes_task_paths_and_all_bounds(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     task, paths = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        calls = 0
-        original = codemap.change_intelligence_brief
-
-        def counted(*args, **kwargs):
-            nonlocal calls
-            calls += 1
-            return original(*args, **kwargs)
-
-        monkeypatch.setattr(codemap, "change_intelligence_brief", counted)
+        calls = {"brief": 0}
+        monkeypatch.setattr(
+            codemap,
+            "change_intelligence_brief",
+            _counted(calls, "brief", codemap.change_intelligence_brief),
+        )
         with codemap.decision_session():
             codemap.repository_intelligence_snapshot(task, paths)
             codemap.repository_intelligence_snapshot(task + " safely", paths)
@@ -92,7 +104,7 @@ def test_snapshot_reuse_key_includes_task_paths_and_all_bounds(
             codemap.repository_intelligence_snapshot(task, paths)
             stats = codemap.decision_session_stats()
 
-        assert calls == 7
+        assert calls["brief"] == 7
         assert stats["snapshot_miss"] == 7
         assert stats["snapshot_hit"] == 1
 
@@ -105,33 +117,30 @@ def test_cached_snapshot_isolated_from_caller_mutation(tmp_path: Path) -> None:
             first = codemap.repository_intelligence_snapshot(task, paths)
             identity = first["snapshot_identity"]
             first["repository"] = {"mutated": True}
-            first["paths"].clear()
+            assert_object(first["paths"]).clear()
             second = codemap.repository_intelligence_snapshot(task, paths)
 
         assert second["snapshot_identity"] == identity
         assert second["repository"] != {"mutated": True}
-        assert "src/owner.py" in second["paths"]
+        assert "src/owner.py" in assert_object(second["paths"])
 
 
 def test_snapshot_cache_is_not_reused_across_decision_sessions(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     task, paths = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        calls = 0
-        original = codemap.change_intelligence_brief
-
-        def counted(*args, **kwargs):
-            nonlocal calls
-            calls += 1
-            return original(*args, **kwargs)
-
-        monkeypatch.setattr(codemap, "change_intelligence_brief", counted)
+        calls = {"brief": 0}
+        monkeypatch.setattr(
+            codemap,
+            "change_intelligence_brief",
+            _counted(calls, "brief", codemap.change_intelligence_brief),
+        )
         with codemap.decision_session():
             codemap.repository_intelligence_snapshot(task, paths)
             codemap.repository_intelligence_snapshot(task, paths)
         with codemap.decision_session():
             codemap.repository_intelligence_snapshot(task, paths)
 
-        assert calls == 2
+        assert calls["brief"] == 2

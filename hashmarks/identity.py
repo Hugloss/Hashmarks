@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
+from types import TracebackType
 from typing import TYPE_CHECKING
 
 from .client import DaemonCompatibilityError, DaemonUnavailableError, IdentityClient
@@ -14,6 +15,8 @@ from .specs import InputValue, validate_input_values
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
     from pathlib import Path
+
+    from .codemap import CodeMap
 
 
 class RepositoryIdentityMode(str, Enum):
@@ -66,7 +69,12 @@ class RepositoryIdentity:
     def __enter__(self) -> RepositoryIdentity:
         return self
 
-    def __exit__(self, exc_type, exc, tb) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None:
         self.close()
 
     def close(self) -> None:
@@ -208,7 +216,7 @@ class RepositoryIdentity:
                 self._daemon_confirmed = False
         return self._prepare_local_read().snapshot(manifest, verify=verify)
 
-    def code_map(self):
+    def code_map(self) -> CodeMap:
         """Return the lazily-created derived CodeMap for repository-intelligence queries.
 
         Importing or using Identity never loads CodeMap unless this method is called,

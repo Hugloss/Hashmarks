@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import threading
 import time
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+from pytest import CaptureFixture, MonkeyPatch
 
 from hashmarks import (
     Directory,
@@ -36,7 +38,9 @@ class _BarrierWatcher:
         return True
 
 
-def _start_daemon(workspace: Path, tmp_path: Path):
+def _start_daemon(
+    workspace: Path, tmp_path: Path
+) -> tuple[IdentityDaemon, _BarrierWatcher, Path, threading.Thread]:
     watcher = _BarrierWatcher()
     socket_path = tmp_path / "identity.sock"
     daemon = IdentityDaemon(
@@ -60,7 +64,7 @@ def _start_daemon(workspace: Path, tmp_path: Path):
     return daemon, watcher, socket_path, thread
 
 
-def test_identity_auto_falls_back_to_safe_local(tmp_path: Path):
+def test_identity_auto_falls_back_to_safe_local(tmp_path: Path) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     target = workspace / "a.txt"
@@ -77,7 +81,7 @@ def test_identity_auto_falls_back_to_safe_local(tmp_path: Path):
         assert second.hash != first.hash
 
 
-def test_identity_daemon_mode_uses_daemon_snapshot(tmp_path: Path):
+def test_identity_daemon_mode_uses_daemon_snapshot(tmp_path: Path) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     (workspace / "a.txt").write_text("A")
@@ -99,7 +103,7 @@ def test_identity_daemon_mode_uses_daemon_snapshot(tmp_path: Path):
         assert watcher.stopped
 
 
-def test_input_specs_are_small_and_explicit(tmp_path: Path):
+def test_input_specs_are_small_and_explicit(tmp_path: Path) -> None:
     workspace = tmp_path / "repo"
     (workspace / "src").mkdir(parents=True)
     (workspace / "src" / "a.py").write_text("A")
@@ -113,7 +117,7 @@ def test_input_specs_are_small_and_explicit(tmp_path: Path):
         assert globbed.paths == ("src/a.py",)
 
 
-def test_snapshot_diff_explains_repository_identity_change(tmp_path: Path):
+def test_snapshot_diff_explains_repository_identity_change(tmp_path: Path) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     target = workspace / "a.txt"
@@ -131,8 +135,8 @@ def test_snapshot_diff_explains_repository_identity_change(tmp_path: Path):
 
 
 def test_registered_manifest_is_uploaded_once_and_reused_hot(
-    tmp_path: Path, monkeypatch
-):
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     paths = []
@@ -150,7 +154,7 @@ def test_registered_manifest_is_uploaded_once_and_reused_hot(
     calls = {"count": 0}
     original = daemon.engine.file_store._metadata
 
-    def counting(path):
+    def counting(path: str) -> object:
         calls["count"] += 1
         return original(path)
 
@@ -164,7 +168,7 @@ def test_registered_manifest_is_uploaded_once_and_reused_hot(
     thread.join(timeout=2)
 
 
-def test_stats_expose_cache_and_incremental_counters(tmp_path: Path):
+def test_stats_expose_cache_and_incremental_counters(tmp_path: Path) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     (workspace / "a.txt").write_text("A")
@@ -178,14 +182,14 @@ def test_stats_expose_cache_and_incremental_counters(tmp_path: Path):
     assert "manifest_digest_calls" in stats["merkle"]
 
 
-def test_daemon_mode_is_explicitly_required_when_requested(tmp_path: Path):
+def test_daemon_mode_is_explicitly_required_when_requested(tmp_path: Path) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     with pytest.raises(DaemonUnavailableError):
         RepositoryIdentity(workspace, mode="daemon", state_dir=tmp_path / "state")
 
 
-def test_typed_input_specs_reject_wrong_kind(tmp_path: Path):
+def test_typed_input_specs_reject_wrong_kind(tmp_path: Path) -> None:
     workspace = tmp_path / "repo"
     (workspace / "src").mkdir(parents=True)
     (workspace / "a.txt").write_text("A")
@@ -200,7 +204,7 @@ def test_typed_input_specs_reject_wrong_kind(tmp_path: Path):
 
 def test_local_watcher_mode_detects_immediate_edit_without_manual_record(
     tmp_path: Path,
-):
+) -> None:
     if not __import__("sys").platform.startswith("linux"):
         pytest.skip("native request barrier test is Linux-specific")
     workspace = tmp_path / "repo"
@@ -219,7 +223,9 @@ def test_local_watcher_mode_detects_immediate_edit_without_manual_record(
         assert second.hash != first.hash
 
 
-def test_cli_snapshot_auto_mode_safely_falls_back_local(tmp_path: Path, capsys):
+def test_cli_snapshot_auto_mode_safely_falls_back_local(
+    tmp_path: Path, capsys: CaptureFixture[str]
+) -> None:
     from hashmarks.cli import main
 
     workspace = tmp_path / "repo"
@@ -241,7 +247,9 @@ def test_cli_snapshot_auto_mode_safely_falls_back_local(tmp_path: Path, capsys):
     assert '"mode": "local"' in output
 
 
-def test_cli_stats_and_doctor_are_available(tmp_path: Path, capsys):
+def test_cli_stats_and_doctor_are_available(
+    tmp_path: Path, capsys: CaptureFixture[str]
+) -> None:
     from hashmarks.cli import main
 
     workspace = tmp_path / "repo"
@@ -256,8 +264,8 @@ def test_cli_stats_and_doctor_are_available(tmp_path: Path, capsys):
 
 
 def test_identity_snapshot_manifest_registers_once_with_daemon(
-    tmp_path: Path, monkeypatch
-):
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     paths = []
@@ -276,7 +284,7 @@ def test_identity_snapshot_manifest_registers_once_with_daemon(
     calls = {"count": 0}
     original = identity.client.register_manifest
 
-    def counting(manifest, *, chunk_size=10_000):
+    def counting(manifest: InputManifest, *, chunk_size: int = 10_000) -> object:
         calls["count"] += 1
         return original(manifest, chunk_size=chunk_size)
 
@@ -293,7 +301,7 @@ def test_identity_snapshot_manifest_registers_once_with_daemon(
 
 def test_manual_local_observer_reuses_hot_state_when_changes_are_reported(
     tmp_path: Path,
-):
+) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     target = workspace / "a.txt"
@@ -311,7 +319,7 @@ def test_manual_local_observer_reuses_hot_state_when_changes_are_reported(
         assert second.hash != first.hash
 
 
-def test_workspace_isolation_with_shared_persistent_state(tmp_path: Path):
+def test_workspace_isolation_with_shared_persistent_state(tmp_path: Path) -> None:
     a = tmp_path / "worktree-a"
     b = tmp_path / "worktree-b"
     a.mkdir()
@@ -334,7 +342,7 @@ def test_workspace_isolation_with_shared_persistent_state(tmp_path: Path):
         assert sb2.hash == sb.hash
 
 
-def test_workspace_runtime_socket_namespaces_are_distinct(tmp_path: Path):
+def test_workspace_runtime_socket_namespaces_are_distinct(tmp_path: Path) -> None:
     from hashmarks.client import default_socket_path
 
     a = tmp_path / "worktree-a"

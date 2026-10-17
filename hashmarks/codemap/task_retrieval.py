@@ -68,8 +68,24 @@ def _nonempty_str(value: object) -> str | None:
 
 
 def _positive_int(value: object) -> int | None:
-    number = int(value or 0)
+    number = _integer_value(value)
     return number or None
+
+
+def _integer_value(value: object) -> int:
+    if value is None:
+        return 0
+    if not isinstance(value, (int, float, str, bytes, bytearray)):
+        raise TypeError("expected an integer-compatible repository value")
+    return int(value or 0)
+
+
+def _number_value(value: object) -> float:
+    if value is None:
+        return 0.0
+    if not isinstance(value, (int, float, str, bytes, bytearray)):
+        raise TypeError("expected a numeric repository value")
+    return float(value or 0.0)
 
 
 def _evidence_visibility(value: object) -> EvidenceVisibility:
@@ -118,7 +134,9 @@ class TaskRetrievalMixin:
         }
     )
 
-    def _decision_preflight(self, method_name, args, kwargs):
+    def _decision_preflight(
+        self, method_name: str, args: tuple[object, ...], kwargs: dict[str, object]
+    ) -> None:
         """Reconcile known stale task evidence before authority is sampled."""
         if method_name not in self._TASK_CACHE_PREFLIGHT_METHODS or not args:
             return
@@ -275,11 +293,11 @@ class TaskRetrievalMixin:
         return min(60.0, boost), tuple(domain.value for domain in matches)
 
     def _apply_repository_domain_hints(
-        self, rows: tuple[dict, ...], route: QueryRoute
-    ) -> tuple[dict, ...]:
+        self, rows: tuple[dict[str, object], ...], route: QueryRoute
+    ) -> tuple[dict[str, object], ...]:
         if not route.preferred_domains:
             return rows
-        enriched: list[dict] = []
+        enriched: list[dict[str, object]] = []
         path_hints: dict[str, tuple[float, tuple[str, ...]]] = {}
         for row in rows:
             path = str(row.get("path", ""))
@@ -293,14 +311,14 @@ class TaskRetrievalMixin:
                 continue
             value = dict(row)
             value["_relation_boost"] = (
-                float(value.get("_relation_boost", 0.0) or 0.0) + boost
+                _number_value(value.get("_relation_boost")) + boost
             )
             value["_repository_domains"] = matches
             enriched.append(value)
         return tuple(enriched)
 
     @staticmethod
-    def _score_surface(row: dict) -> _ScoreSurface:
+    def _score_surface(row: dict[str, object]) -> _ScoreSurface:
         return _ScoreSurface(
             path=str(row.get("path", "")).lower(),
             name=str(row.get("name", "")).lower(),
@@ -355,11 +373,11 @@ class TaskRetrievalMixin:
     def _score(
         self,
         query: str,
-        row: dict,
+        row: dict[str, object],
         *,
         ranks: dict[str, float] | None = None,
         recent: set[str] | None = None,
-        tokens: list[str] | None = None,
+        tokens: Sequence[str] | None = None,
         raw_query: str | None = None,
     ) -> float:
         if TYPE_CHECKING:
@@ -379,13 +397,13 @@ class TaskRetrievalMixin:
                 if any(token in {"test", "tests", "spec"} for token in tokens)
                 else -16.0
             )
-        score += float(row.get("_relation_boost", 0.0) or 0.0)
+        score += _number_value(row.get("_relation_boost"))
         return score
 
     def _candidate_prescore(
         self,
         query: str,
-        row: dict,
+        row: dict[str, object],
         *,
         tokens: tuple[str, ...],
         raw_query: str,
@@ -398,16 +416,18 @@ class TaskRetrievalMixin:
         """
         surface = self._score_surface(row)
         return (
-            float(row.get("_relation_boost", 0.0) or 0.0)
+            _number_value(row.get("_relation_boost"))
             + self._identity_score(raw_query, surface, _PRESCORE_IDENTITY_WEIGHTS)
             + self._token_score(tokens, surface, _PRESCORE_TOKEN_WEIGHTS)
         )
 
     @staticmethod
     def _best_rerank_candidate_by_path(
-        scored: Sequence[tuple[tuple[float, str, str, int], dict]],
-    ) -> dict[str, tuple[tuple[float, str, str, int], dict]]:
-        best_by_path: dict[str, tuple[tuple[float, str, str, int], dict]] = {}
+        scored: Sequence[tuple[tuple[float, str, str, int], dict[str, object]]],
+    ) -> dict[str, tuple[tuple[float, str, str, int], dict[str, object]]]:
+        best_by_path: dict[
+            str, tuple[tuple[float, str, str, int], dict[str, object]]
+        ] = {}
         for item in scored:
             path = str(item[1].get("path", ""))
             current = best_by_path.get(path)
@@ -418,11 +438,11 @@ class TaskRetrievalMixin:
     def _bounded_rerank_rows(
         self,
         query: str,
-        rows: tuple[dict, ...],
+        rows: tuple[dict[str, object], ...],
         *,
         limit: int,
         tokens: tuple[str, ...],
-    ) -> tuple[dict, ...]:
+    ) -> tuple[dict[str, object], ...]:
         """Keep the full candidate set for small queries; bound huge reranks.
 
         The cap is intentionally generous and path-diverse.  This makes the
@@ -437,7 +457,7 @@ class TaskRetrievalMixin:
         # Score every candidate once, then use bounded top-N selection rather
         # than sorting the entire broad pool. The original ordering is stable
         # on ties, so retain the input index as the final deterministic key.
-        scored: list[tuple[tuple[float, str, str, int], dict]] = []
+        scored: list[tuple[tuple[float, str, str, int], dict[str, object]]] = []
         for index, row in enumerate(rows):
             key = (
                 -self._candidate_prescore(query, row, tokens=tokens, raw_query=raw),
@@ -759,7 +779,7 @@ class TaskRetrievalMixin:
         )
         if bound_reasons is not None and len(rows) >= row_limit:
             bound_reasons.add("task-island-candidate-limit")
-        island = [row for row in rows if int(row.get("matches") or 0) >= 2]
+        island = [row for row in rows if _integer_value(row.get("matches")) >= 2]
         if not island or len(island) > 16:
             return None
         domains_by_path = {
@@ -847,7 +867,7 @@ class TaskRetrievalMixin:
             is_test = RepositoryDomain.TEST in domains
             return (
                 0 if is_test else 1,
-                -int(row.get("matches") or 0),
+                -_integer_value(row.get("matches")),
                 len(Path(path).parts),
                 path,
             )
@@ -879,10 +899,10 @@ class TaskRetrievalMixin:
                     signature=(str(symbol.get("signature") or "") or None)
                     if symbol is not None
                     else None,
-                    start_line=(int(symbol.get("start_line") or 0) or None)
+                    start_line=_positive_int(symbol.get("start_line"))
                     if symbol is not None
                     else None,
-                    end_line=(int(symbol.get("end_line") or 0) or None)
+                    end_line=_positive_int(symbol.get("end_line"))
                     if symbol is not None
                     else None,
                     evidence_visibility=visibility,
@@ -1136,7 +1156,7 @@ class TaskRetrievalMixin:
                     len(token_order),
                 ),
                 str(row.get("path") or ""),
-                int(row.get("start_line") or 0),
+                _integer_value(row.get("start_line")),
             )
         )
         if not rows:
@@ -1204,7 +1224,9 @@ class TaskRetrievalMixin:
             self._task_preserve_component_hits(hits, fusion)
 
     @staticmethod
-    def _task_natural_term_variants(token: str) -> tuple[str, ...]:
+    def _task_natural_term_variants(
+        token: str, *, include_derivations: bool = False
+    ) -> tuple[str, ...]:
         """Return conservative identifier-like forms for one natural-language token."""
         value = token.lower().strip("_-")
         variants = [value]
@@ -1219,16 +1241,24 @@ class TaskRetrievalMixin:
         if len(value) >= 7 and value.endswith("ing"):
             stem = value[:-3]
             variants.extend((stem, stem + "e"))
+        if include_derivations and len(value) >= 8 and value.endswith("ation"):
+            # Alternative lookup spellings only: neither form establishes an
+            # exact identifier or changes action/ownership selection.
+            variants.extend((value[:-3] + "e", value[:-5] + "e"))
         return tuple(dict.fromkeys(item for item in variants if len(item) >= 3))
 
     @classmethod
-    def _task_natural_term_candidates(cls, task: str) -> tuple[tuple[str, ...], bool]:
+    def _task_natural_term_candidates(
+        cls, task: str, *, include_derivations: bool = False
+    ) -> tuple[tuple[str, ...], bool]:
         candidates: list[str] = []
         for raw in _WORD_RE.findall(task):
             lowered = raw.lower().strip("_-")
             if len(lowered) < 4 or lowered in _TASK_STOPWORDS:
                 continue
-            for variant in cls._task_natural_term_variants(lowered):
+            for variant in cls._task_natural_term_variants(
+                lowered, include_derivations=include_derivations
+            ):
                 if variant not in candidates:
                     candidates.append(variant)
             if len(candidates) >= 32:

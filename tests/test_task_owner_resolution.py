@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.task_action_types import (
@@ -12,6 +12,8 @@ from hashmarks.codemap.task_action_types import (
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from pytest import MonkeyPatch
 
 
 def _write(root: Path, rel: str, text: str) -> None:
@@ -145,8 +147,7 @@ def test_owner_resolution_marks_structural_repository_owner(
 
 
 def test_unique_exact_owner_does_not_enter_weaker_structural_resolution(
-    tmp_path: Path,
-    monkeypatch,
+    tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
     from hashmarks.codemap.ownership_graph import OwnershipGraphMixin
 
@@ -157,7 +158,7 @@ def test_unique_exact_owner_does_not_enter_weaker_structural_resolution(
         "    del expected_sequence\n",
     )
 
-    def forbidden(*args, **kwargs):
+    def forbidden(*args, **kwargs) -> None:
         del args, kwargs
         raise AssertionError("exact owner must terminate before structural resolution")
 
@@ -169,10 +170,13 @@ def test_unique_exact_owner_does_not_enter_weaker_structural_resolution(
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        action = codemap.task_action_map(
-            "change cancel_queued_admission",
-            limit=1,
-            per_role=1,
+        action = cast(
+            dict[str, Any],
+            codemap.task_action_map(
+                "change cancel_queued_admission",
+                limit=1,
+                per_role=1,
+            ),
         )
 
     assert action["edit"]["path"] == "src/owner.py"
@@ -196,10 +200,13 @@ def test_exact_owner_cannot_be_displaced_by_contract_projection(
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        action = codemap.task_action_map(
-            "Change PublicationAuthority contract",
-            limit=20,
-            per_role=3,
+        action = cast(
+            dict[str, Any],
+            codemap.task_action_map(
+                "Change PublicationAuthority contract",
+                limit=20,
+                per_role=3,
+            ),
         )
 
     assert action["edit"]["path"] == "src/authority.py"
@@ -237,9 +244,12 @@ def test_requested_edit_target_owns_dependency_identifier_evidence(
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        action = codemap.task_action_map(
-            "Fix publish_result so it uses AuthorityReceipt.canonical_identity",
-            limit=20,
+        action = cast(
+            dict[str, Any],
+            codemap.task_action_map(
+                "Fix publish_result so it uses AuthorityReceipt.canonical_identity",
+                limit=20,
+            ),
         )
 
     assert action["edit"]["path"] == "src/publish.py"
@@ -255,9 +265,12 @@ def test_requested_edit_target_role_survives_dependency_first_wording(
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        action = codemap.task_action_map(
-            "Use AuthorityReceipt.canonical_identity in publish_result",
-            limit=20,
+        action = cast(
+            dict[str, Any],
+            codemap.task_action_map(
+                "Use AuthorityReceipt.canonical_identity in publish_result",
+                limit=20,
+            ),
         )
 
     assert action["edit"]["path"] == "src/publish.py"
@@ -273,9 +286,12 @@ def test_requested_edit_role_does_not_hide_true_duplicate_target_ambiguity(
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        action = codemap.task_action_map(
-            "Fix publish_result so it uses AuthorityReceipt.canonical_identity",
-            limit=20,
+        action = cast(
+            dict[str, Any],
+            codemap.task_action_map(
+                "Fix publish_result so it uses AuthorityReceipt.canonical_identity",
+                limit=20,
+            ),
         )
 
     assert action["ambiguity"]["ambiguous"] is True
@@ -296,7 +312,10 @@ def test_requested_edit_role_is_stable_across_dependency_phrasings(
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        actions = [codemap.task_action_map(task, limit=20) for task in tasks]
+        actions = [
+            cast(dict[str, Any], codemap.task_action_map(task, limit=20))
+            for task in tasks
+        ]
 
     assert all(action["edit"]["path"] == "src/publish.py" for action in actions)
     assert all(action["edit"]["name"] == "publish_result" for action in actions)
@@ -312,9 +331,12 @@ def test_two_requested_exact_edit_targets_remain_ambiguous(tmp_path: Path) -> No
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        action = codemap.task_action_map(
-            "Change publish_result and store_result",
-            limit=20,
+        action = cast(
+            dict[str, Any],
+            codemap.task_action_map(
+                "Change publish_result and store_result",
+                limit=20,
+            ),
         )
 
     assert action["ambiguity"]["ambiguous"] is True

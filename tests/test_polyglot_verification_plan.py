@@ -13,7 +13,9 @@ def test_node_test_verification_plan_is_bounded(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
         plan = codemap.verification_plan("tests/ember.test.js")
     assert plan["available"] is True
+    assert "runner" in plan
     assert plan["runner"] == "node-test"
+    assert "argv" in plan
     assert plan["argv"] == ["node", "--test", "tests/ember.test.js"]
 
 
@@ -28,7 +30,9 @@ def test_typescript_verification_plan_uses_existing_tsconfig(tmp_path: Path) -> 
     with CodeMap(tmp_path) as codemap:
         plan = codemap.verification_plan("tests/ember.test.ts")
     assert plan["available"] is True
+    assert "runner" in plan
     assert plan["runner"] == "typescript-compiler"
+    assert "argv" in plan
     assert plan["argv"] == ["tsc", "--noEmit", "-p", "tsconfig.json"]
 
 
@@ -42,7 +46,9 @@ def test_local_vitest_takes_precedence_for_typescript(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
         plan = codemap.verification_plan("tests/ember.test.ts")
     assert plan["available"] is True
+    assert "runner" in plan
     assert plan["runner"] == "vitest"
+    assert "argv" in plan
     assert plan["argv"] == ["node_modules/.bin/vitest", "run", "tests/ember.test.ts"]
 
 

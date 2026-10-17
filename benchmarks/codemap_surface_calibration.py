@@ -597,8 +597,9 @@ def evaluate_existing_group(
     corpus_path: Path,
     state_dir: Path,
     artifact_db: Path,
-    options: ExistingGroupOptions = ExistingGroupOptions(),
+    options: ExistingGroupOptions | None = None,
 ) -> dict[str, Any]:
+    options = options or ExistingGroupOptions()
     corpus = json.loads(corpus_path.read_text(encoding="utf-8"))
     if not isinstance(corpus, list):
         raise ValueError("corpus must be a JSON list")

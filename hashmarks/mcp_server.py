@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import argparse
-from typing import TYPE_CHECKING, Any, Literal
+import json
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from ._version import __version__
 from .codemap.change_impact import CHANGE_IMPACT_DEFAULT_REQUEST
@@ -33,8 +34,10 @@ from .operation_contract import operation_modes
 from .paths import canonical_host_path
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Mapping
     from pathlib import Path
+
+    from mcp.types import CallToolResult
 
 _INSTALL_HINT = (
     'Hashmarks MCP support requires the optional extra: pip install "hashmarks[mcp]"'
@@ -46,16 +49,35 @@ _Presentation = PresentationFormat
 _QuerySurface = QuerySurface
 _Profile = ProfileName
 
-_DependencyCodemapResultMode = Literal[*tuple(operation_modes("dependency_codemap"))]
-_RepositoryDeclarationsResultMode = Literal[
-    *tuple(operation_modes("repository_declarations"))
-]
-_SourceObservationResultMode = Literal[*tuple(operation_modes("source_observation"))]
-_RepositoryEvidenceResultMode = Literal[*tuple(operation_modes("repository_evidence"))]
-_EvidenceComparisonResultMode = Literal[*tuple(operation_modes("evidence_comparison"))]
+if TYPE_CHECKING:
+    # Static checkers cannot evaluate computed Literal arguments. Runtime tool
+    # schemas still derive their exact selectors from the operation owner.
+    _DependencyCodemapResultMode = str
+    _RepositoryDeclarationsResultMode = str
+    _SourceObservationResultMode = str
+    _RepositoryEvidenceResultMode = str
+    _EvidenceComparisonResultMode = str
+    _TaskEvidenceResultMode = str
+else:
+    _DependencyCodemapResultMode = Literal[
+        *tuple(operation_modes("dependency_codemap"))
+    ]
+    _RepositoryDeclarationsResultMode = Literal[
+        *tuple(operation_modes("repository_declarations"))
+    ]
+    _SourceObservationResultMode = Literal[
+        *tuple(operation_modes("source_observation"))
+    ]
+    _RepositoryEvidenceResultMode = Literal[
+        *tuple(operation_modes("repository_evidence"))
+    ]
+    _EvidenceComparisonResultMode = Literal[
+        *tuple(operation_modes("evidence_comparison"))
+    ]
+    _TaskEvidenceResultMode = Literal[*tuple(operation_modes("task_evidence"))]
 
 
-def _sdk():
+def _sdk() -> tuple[type[Any], type[Any], type[Any]]:
     try:
         from mcp.server import MCPServer
         from mcp.server.mcpserver.exceptions import ToolError
@@ -65,15 +87,72 @@ def _sdk():
     return MCPServer, ToolAnnotations, ToolError
 
 
+def _compact_json_tool_result(result: dict[str, object]) -> CallToolResult:
+    """Mirror the validated native JSON without pretty-print amplification."""
+    from mcp.types import CallToolResult, TextContent
+
+    return CallToolResult(
+        content=[
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    result, separators=(",", ":"), ensure_ascii=False, allow_nan=False
+                ),
+            )
+        ],
+        structured_content=result,
+    )
+
+
+def _task_evidence_tool_result(
+    result: dict[str, Any], mode: str, presentation: str
+) -> CallToolResult:
+    if mode != "initial":
+        return _compact_json_tool_result(result)
+    from mcp.types import CallToolResult, TextContent
+
+    native = result.get("result", result)
+    projection = result.get("presentation")
+    if projection is None:
+        text = "Initial repository evidence is available in structuredContent."
+    elif presentation == "text":
+        text = str(projection["text"])
+    else:
+        text = json.dumps(
+            projection, separators=(",", ":"), ensure_ascii=False, allow_nan=False
+        )
+    return CallToolResult(
+        content=[TextContent(type="text", text=text)], structured_content=native
+    )
+
+
+def _register_json_mirror_tool(
+    server: object,
+    contract: McpToolContract,
+    annotations: object,
+    handler: Callable[..., object],
+) -> None:
+    from mcp.types import CallToolResult
+
+    # Preserve structured-output validation and the object output schema while
+    # accepting an explicit compact JSON mirror through the supported SDK API.
+    handler.__annotations__["return"] = Annotated[CallToolResult, dict[str, object]]
+    server.tool(
+        name=contract.name,
+        description=contract.description,
+        annotations=annotations,
+    )(handler)
+
+
 def _call_surface(
     contract: McpToolContract,
     tool_error: type[Exception],
-    operation: Callable[..., dict[str, object]],
+    operation: Callable[..., Mapping[str, object]],
     /,
-    *args: Any,
+    *args: object,
     response_mode: str | None = None,
     presentation: str = "none",
-    **kwargs: Any,
+    **kwargs: object,
 ) -> dict[str, object]:
     """Translate consumer errors and enforce the canonical response contract."""
 
@@ -83,7 +162,7 @@ def _call_surface(
         validate_presentation(presentation)
         if contract.operation == "repository_intelligence_query":
             kwargs["presentation"] = presentation
-        result = operation(*args, **kwargs)
+        result = dict(operation(*args, **kwargs))
         contract.validate_response(
             result,
             result_mode=response_mode,
@@ -106,9 +185,9 @@ def _call_surface(
 
 
 def _register_repository_declarations_tool(
-    server: Any,
+    server: object,
     surface: HashmarksMcpSurface,
-    annotations: Any,
+    annotations: object,
     tool_error: type[Exception],
 ) -> None:
     contract = tool_contract("repository_declarations")
@@ -123,6 +202,8 @@ def _register_repository_declarations_tool(
         previous_observation: dict[str, Any] | None = None,
         result_mode: _RepositoryDeclarationsResultMode = contract.default_response_mode,
         presentation: _Presentation = "none",
+        python_backend_paths: list[str] | None = None,
+        include_class_fields: bool = False,
     ) -> dict[str, object]:
         return _call_surface(
             contract,
@@ -133,22 +214,29 @@ def _register_repository_declarations_tool(
             result_mode=result_mode,
             response_mode=result_mode,
             presentation=presentation,
+            **(
+                {
+                    "python_backend_paths": python_backend_paths,
+                    "include_class_fields": include_class_fields,
+                }
+                if python_backend_paths is not None or include_class_fields
+                else {}
+            ),
         )
 
 
 def _register_agent_evidence_tools(
-    server: Any,
+    server: object,
     surface: HashmarksMcpSurface,
-    annotations: Any,
+    annotations: object,
     tool_error: type[Exception],
-    *,
-    query_surfaces: tuple[str, ...],
+    query_surfaces: tuple[str, ...] | list[str] | None = None,
 ) -> None:
     """Expose existing producers while keeping MCP registration bounded."""
     intelligence_contract = tool_contract("repository_intelligence_query")
 
     query_description = intelligence_contract.description
-    if query_surfaces != tuple(QUERY_SURFACES):
+    if query_surfaces is not None and query_surfaces != tuple(QUERY_SURFACES):
         query_description += (
             " This server projection permits only these surfaces: "
             + ", ".join(query_surfaces)
@@ -292,9 +380,9 @@ def _register_agent_evidence_tools(
 
 
 def _register_evidence_comparison_tool(
-    server: Any,
+    server: object,
     surface: HashmarksMcpSurface,
-    annotations: Any,
+    annotations: object,
     tool_error: type[Exception],
 ) -> None:
     """Expose native two-endpoint comparisons with no history or execution state."""
@@ -312,6 +400,8 @@ def _register_evidence_comparison_tool(
         changed_paths: list[str] | None = None,
         change_set_complete: bool = False,
         relationship_evidence: dict[str, Any] | None = None,
+        before_source: dict[str, Any] | None = None,
+        after_source: dict[str, Any] | None = None,
         presentation: _Presentation = "none",
     ) -> dict[str, object]:
         return _call_surface(
@@ -325,11 +415,13 @@ def _register_evidence_comparison_tool(
             changed_paths=changed_paths,
             change_set_complete=change_set_complete,
             relationship_evidence=relationship_evidence,
+            before_source=before_source,
+            after_source=after_source,
             presentation=presentation,
         )
 
 
-def _apply_tool_projection(server: Any, selected_tools: tuple[str, ...]) -> None:
+def _apply_tool_projection(server: object, selected_tools: tuple[str, ...]) -> None:
     selected = set(selected_tools)
     for name in MCP_TOOL_NAMES:
         if name not in selected:
@@ -359,7 +451,7 @@ def build_server(
     state_dir: str | Path | None = None,
     tool_names: tuple[str, ...] | list[str] | None = None,
     query_surfaces: tuple[str, ...] | list[str] | None = None,
-):
+) -> object:
     MCPServer, ToolAnnotations, ToolError = _sdk()
     selected_tools, selected_query_surfaces = _server_projection_selection(
         tool_names,
@@ -425,20 +517,17 @@ def build_server(
 
     task_evidence_contract = tool_contract("task_evidence")
 
-    @server.tool(
-        name=task_evidence_contract.name,
-        description=task_evidence_contract.description,
-        annotations=annotations,
-    )
-    def task_evidence(
+    def task_evidence(  # noqa: PLR0913 - preserve explicit MCP inputs with disclosure mode
         task: str,
+        *,
         limit: int = TASK_EVIDENCE_DEFAULT_OPTIONS.limit,
         per_role: int = TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
         token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
         presentation: _Presentation = "none",
         supplied_observations: list[dict[str, Any]] | None = None,
-    ) -> dict[str, object]:
-        return _call_surface(
+        result_mode: _TaskEvidenceResultMode = "default",
+    ) -> CallToolResult:
+        result = _call_surface(
             task_evidence_contract,
             ToolError,
             surface.task_evidence,
@@ -447,8 +536,15 @@ def build_server(
             per_role=per_role,
             token_budget=token_budget,
             supplied_observations=supplied_observations,
+            result_mode=result_mode,
+            response_mode=result_mode,
             presentation=presentation,
         )
+        return _task_evidence_tool_result(result, result_mode, presentation)
+
+    _register_json_mirror_tool(
+        server, task_evidence_contract, annotations, task_evidence
+    )
 
     change_impact_contract = tool_contract("change_impact")
 

@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from hashmarks.codemap import CodeMap
-from hashmarks.codemap.model import EvidenceVisibility
+from hashmarks.codemap.model import ContextPack, EvidenceVisibility
 from hashmarks.codemap.parsers import parse_source
 from hashmarks.codemap.repository_index_store import WorkspaceMapStore
 
@@ -32,7 +32,7 @@ def _write_repo(root: Path) -> None:
     )
 
 
-def test_identity_import_graph_does_not_import_codemap():
+def test_identity_import_graph_does_not_import_codemap() -> None:
     code = "import hashmarks; import sys; print(any(k.startswith('hashmarks.codemap') for k in sys.modules))"
     completed = subprocess.run(
         [sys.executable, "-c", code],
@@ -44,7 +44,7 @@ def test_identity_import_graph_does_not_import_codemap():
     assert completed.stdout.strip() == "False"
 
 
-def test_codemap_sync_outline_find_and_context(tmp_path: Path):
+def test_codemap_sync_outline_find_and_context(tmp_path: Path) -> None:
     _write_repo(tmp_path)
     with CodeMap(
         tmp_path, artifact_db=tmp_path / "shared-artifacts.sqlite3"
@@ -76,7 +76,7 @@ def test_codemap_sync_outline_find_and_context(tmp_path: Path):
         assert all(item.representation != "full-file" for item in pack.items)
 
 
-def test_codemap_unknown_query_abstains(tmp_path: Path):
+def test_codemap_unknown_query_abstains(tmp_path: Path) -> None:
     _write_repo(tmp_path)
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
@@ -86,7 +86,7 @@ def test_codemap_unknown_query_abstains(tmp_path: Path):
     assert not pack.items
 
 
-def test_outline_refreshes_only_changed_file(tmp_path: Path):
+def test_outline_refreshes_only_changed_file(tmp_path: Path) -> None:
     _write_repo(tmp_path)
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         first = codemap.sync()
@@ -102,7 +102,7 @@ def test_outline_refreshes_only_changed_file(tmp_path: Path):
         assert new["generation"] > first.generation
 
 
-def test_evidence_visibility_is_separate_from_indexing(tmp_path: Path):
+def test_evidence_visibility_is_separate_from_indexing(tmp_path: Path) -> None:
     _write_repo(tmp_path)
     (tmp_path / "vendor").mkdir()
     (tmp_path / "vendor" / "lib.py").write_text(
@@ -131,7 +131,7 @@ def test_evidence_visibility_is_separate_from_indexing(tmp_path: Path):
         assert all(hit.path != ".env.py" for hit in codemap.find("never-index-me"))
 
 
-def test_path_only_index_supports_other_repo_languages(tmp_path: Path):
+def test_path_only_index_supports_other_repo_languages(tmp_path: Path) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "src" / "app.ts").write_text(
         "export function login() { return true }\n", encoding="utf-8"
@@ -151,7 +151,7 @@ def test_path_only_index_supports_other_repo_languages(tmp_path: Path):
 @pytest.mark.host_git
 def test_content_addressed_artifacts_reused_across_git_worktrees(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-):
+) -> None:
     if not shutil_which("git"):
         pytest.skip("git not installed")
     # Exercise the production default shared-cache routing without depending on
@@ -204,7 +204,7 @@ def shutil_which(name: str) -> str | None:
 
 def test_incremental_sync_reindexes_only_changed_path_and_handles_subtree_removal(
     tmp_path: Path,
-):
+) -> None:
     _write_repo(tmp_path)
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
@@ -228,7 +228,7 @@ def test_incremental_sync_reindexes_only_changed_path_and_handles_subtree_remova
 
 def test_persistent_grep_returns_only_candidate_lines_and_respects_outline_only(
     tmp_path: Path,
-):
+) -> None:
     _write_repo(tmp_path)
     (tmp_path / "src" / "errors.py").write_text(
         "def fail():\n    raise RuntimeError('terminal cancellation handshake failed')\n",
@@ -254,7 +254,7 @@ def test_persistent_grep_returns_only_candidate_lines_and_respects_outline_only(
     assert "vendor/hidden.py" not in by_path
 
 
-def test_find_auto_indexes_cold_repo(tmp_path: Path):
+def test_find_auto_indexes_cold_repo(tmp_path: Path) -> None:
     _write_repo(tmp_path)
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         assert codemap.status()["files"] == 0
@@ -263,7 +263,7 @@ def test_find_auto_indexes_cold_repo(tmp_path: Path):
         assert codemap.status()["files"] == 3
 
 
-def test_polyglot_advisory_outlines_are_provenance_bounded(tmp_path: Path):
+def test_polyglot_advisory_outlines_are_provenance_bounded(tmp_path: Path) -> None:
     (tmp_path / "web").mkdir()
     (tmp_path / "web" / "auth.ts").write_text(
         """import { user } from './user'\nexport class AuthService {}\nexport async function login(token: string): Promise<boolean> { return true }\nexport const logout = () => false\n""",
@@ -296,7 +296,7 @@ def test_polyglot_advisory_outlines_are_provenance_bounded(tmp_path: Path):
     )
 
 
-def test_symbol_source_is_exact_budgeted_and_policy_checked(tmp_path: Path):
+def test_symbol_source_is_exact_budgeted_and_policy_checked(tmp_path: Path) -> None:
     _write_repo(tmp_path)
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
@@ -309,7 +309,7 @@ def test_symbol_source_is_exact_budgeted_and_policy_checked(tmp_path: Path):
         assert "content" not in tiny
 
 
-def test_reverse_dependency_graph_finds_transitive_tests(tmp_path: Path):
+def test_reverse_dependency_graph_finds_transitive_tests(tmp_path: Path) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
     (tmp_path / "src" / "users.py").write_text(
@@ -332,7 +332,7 @@ def test_reverse_dependency_graph_finds_transitive_tests(tmp_path: Path):
     assert "tests/test_auth.py" in tests["tests"]
 
 
-def test_public_codemap_api_is_lazy_and_identity_owns_lazy_map(tmp_path: Path):
+def test_public_codemap_api_is_lazy_and_identity_owns_lazy_map(tmp_path: Path) -> None:
     code = (
         "import sys; import hashmarks; "
         "print(any(k.startswith('hashmarks.codemap') for k in sys.modules)); "
@@ -361,11 +361,11 @@ def test_public_codemap_api_is_lazy_and_identity_owns_lazy_map(tmp_path: Path):
     assert identity._codemap is None
 
 
-def test_optional_precision_provider_changes_artifact_namespace(tmp_path: Path):
+def test_optional_precision_provider_changes_artifact_namespace(tmp_path: Path) -> None:
     _write_repo(tmp_path)
 
     class FakeStatus:
-        def as_dict(self):
+        def as_dict(self) -> dict[str, Any]:
             return {
                 "name": "fake-structural",
                 "available": True,
@@ -374,19 +374,21 @@ def test_optional_precision_provider_changes_artifact_namespace(tmp_path: Path):
             }
 
     class FakeProvider:
-        def signature(self, language):
+        def signature(self, language: str) -> str:
             return f"fake.v1:{language}"
 
-        def enrich(self, artifact, source, language):
+        def enrich(self, artifact: Any, source: Any, language: str) -> Any:
             return artifact
 
-        def status(self):
+        def status(self) -> FakeStatus:
             return FakeStatus()
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.range_provider = FakeProvider()
         first = codemap.sync()
-        key = str(codemap.store.file_row("src/auth.py")["artifact_key"])
+        row = codemap.store.file_row("src/auth.py")
+        assert row is not None
+        key = str(row["artifact_key"])
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as plain:
         plain.range_provider = type(
             "Off",
@@ -398,13 +400,17 @@ def test_optional_precision_provider_changes_artifact_namespace(tmp_path: Path):
             },
         )()
         second = plain.sync()
-        plain_key = str(plain.store.file_row("src/auth.py")["artifact_key"])
+        plain_row = plain.store.file_row("src/auth.py")
+        assert plain_row is not None
+        plain_key = str(plain_row["artifact_key"])
     assert first.parsed_artifacts == 3
     assert second.parsed_artifacts == 3
     assert key != plain_key
 
 
-def test_npm_project_graph_enrichment_and_reverse_project_impact(tmp_path: Path):
+def test_npm_project_graph_enrichment_and_reverse_project_impact(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "packages" / "a" / "src").mkdir(parents=True)
     (tmp_path / "packages" / "b" / "src").mkdir(parents=True)
     (tmp_path / "package.json").write_text(
@@ -442,7 +448,7 @@ def test_npm_project_graph_enrichment_and_reverse_project_impact(tmp_path: Path)
 
 def test_ast_grep_structural_search_is_optional_local_and_policy_filtered(
     tmp_path: Path,
-):
+) -> None:
     _write_repo(tmp_path)
     binary = tmp_path / "node_modules" / ".bin" / "ast-grep"
     binary.parent.mkdir(parents=True)
@@ -473,7 +479,9 @@ print(json.dumps({
     assert providers["ast-grep-structural-search"]["available"] is True
 
 
-def test_ast_grep_structural_search_never_discloses_outline_only_match(tmp_path: Path):
+def test_ast_grep_structural_search_never_discloses_outline_only_match(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "vendor").mkdir()
     (tmp_path / "vendor" / "secret.py").write_text(
         "def secret_impl():\n    return 42\n", encoding="utf-8"
@@ -500,7 +508,9 @@ print(json.dumps({'text':'return 42','file':'vendor/secret.py','language':'Pytho
     assert result["matches"] == []
 
 
-def test_scip_json_import_adds_native_definitions_and_references(tmp_path: Path):
+def test_scip_json_import_adds_native_definitions_and_references(
+    tmp_path: Path,
+) -> None:
     _write_repo(tmp_path)
     scip_json = tmp_path / "index.json"
     scip_json.write_text(
@@ -552,7 +562,7 @@ def test_scip_json_import_adds_native_definitions_and_references(tmp_path: Path)
 
 def test_graph_reference_expansion_prefers_referenced_source_over_unreferenced_source(
     tmp_path: Path,
-):
+) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "src" / "central.py").write_text(
         "def shared_name():\n    return 1\n", encoding="utf-8"
@@ -577,7 +587,9 @@ def test_graph_reference_expansion_prefers_referenced_source_over_unreferenced_s
     assert hits[0].path == "src/central.py"
 
 
-def test_typescript_native_resolver_edges_close_path_alias_impact(tmp_path: Path):
+def test_typescript_native_resolver_edges_close_path_alias_impact(
+    tmp_path: Path,
+) -> None:
     from hashmarks.codemap.typescript_resolver import TypeScriptResolverProvider
 
     (tmp_path / "src").mkdir()
@@ -616,7 +628,7 @@ print(json.dumps({'version':'test-ts','config':'tsconfig.json','edges':[{'source
 
 def test_context_orients_before_source_and_does_not_spend_budget_on_test_bodies(
     tmp_path: Path,
-):
+) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
     (tmp_path / "src" / "policy.py").write_text(
@@ -658,7 +670,7 @@ def test_context_orients_before_source_and_does_not_spend_budget_on_test_bodies(
 
 def test_context_can_include_test_body_when_task_explicitly_requests_tests(
     tmp_path: Path,
-):
+) -> None:
     _write_repo(tmp_path)
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
@@ -669,7 +681,9 @@ def test_context_can_include_test_body_when_task_explicitly_requests_tests(
     )
 
 
-def test_scip_evidence_is_ignored_after_codemap_generation_changes(tmp_path: Path):
+def test_scip_evidence_is_ignored_after_codemap_generation_changes(
+    tmp_path: Path,
+) -> None:
     _write_repo(tmp_path)
     scip_json = tmp_path / "index.json"
     scip_json.write_text(
@@ -725,7 +739,7 @@ def test_scip_evidence_is_ignored_after_codemap_generation_changes(tmp_path: Pat
 
 def test_typescript_native_edges_are_ignored_after_source_generation_changes(
     tmp_path: Path,
-):
+) -> None:
     from hashmarks.codemap.typescript_resolver import TypeScriptResolverProvider
 
     (tmp_path / "src").mkdir()
@@ -762,7 +776,7 @@ def test_typescript_native_edges_are_ignored_after_source_generation_changes(
     assert deps["native_file_edges"] == []
 
 
-def test_project_graph_is_ignored_when_manifest_bytes_change(tmp_path: Path):
+def test_project_graph_is_ignored_when_manifest_bytes_change(tmp_path: Path) -> None:
     (tmp_path / "packages" / "a" / "src").mkdir(parents=True)
     (tmp_path / "packages" / "b" / "src").mkdir(parents=True)
     (tmp_path / "package.json").write_text(
@@ -796,7 +810,9 @@ def test_project_graph_is_ignored_when_manifest_bytes_change(tmp_path: Path):
     assert projects["projects"] == []
 
 
-def test_nx_native_project_graph_enrichment_and_generation_freshness(tmp_path: Path):
+def test_nx_native_project_graph_enrichment_and_generation_freshness(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "apps" / "web" / "src").mkdir(parents=True)
     (tmp_path / "libs" / "core" / "src").mkdir(parents=True)
     (tmp_path / "nx.json").write_text(
@@ -853,7 +869,9 @@ def test_nx_native_project_graph_enrichment_and_generation_freshness(tmp_path: P
         assert projects["edges"] == []
 
 
-def test_pants_native_target_graph_enrichment_and_generation_freshness(tmp_path: Path):
+def test_pants_native_target_graph_enrichment_and_generation_freshness(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
     (tmp_path / "pants.toml").write_text("[GLOBAL]\n", encoding="utf-8")
@@ -891,8 +909,8 @@ def test_pants_native_target_graph_enrichment_and_generation_freshness(tmp_path:
 
 
 def test_maven_project_graph_enrichment_and_reverse_impact(
-    tmp_path: Path, fake_maven_wrapper
-):
+    tmp_path: Path, fake_maven_wrapper: Any
+) -> None:
     (tmp_path / "core" / "src" / "main" / "java").mkdir(parents=True)
     (tmp_path / "app" / "src" / "main" / "java").mkdir(parents=True)
     (tmp_path / "pom.xml").write_text(
@@ -931,7 +949,9 @@ def test_maven_project_graph_enrichment_and_reverse_impact(
     assert "maven:com.example:app" in affected["affected_projects"]
 
 
-def test_gradle_native_project_graph_enrichment_and_reverse_impact(tmp_path: Path):
+def test_gradle_native_project_graph_enrichment_and_reverse_impact(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "core" / "src" / "main" / "java").mkdir(parents=True)
     (tmp_path / "app" / "src" / "main" / "java").mkdir(parents=True)
     (tmp_path / "settings.gradle").write_text(
@@ -985,7 +1005,9 @@ def test_gradle_native_project_graph_enrichment_and_reverse_impact(tmp_path: Pat
     assert "gradle::app" in affected["affected_projects"]
 
 
-def test_cli_accepts_every_codemap_enrichment_provider(tmp_path: Path, capsys):
+def test_cli_accepts_every_codemap_enrichment_provider(
+    tmp_path: Path, capsys: pytest.Capsys
+) -> None:
     from hashmarks.cli import main
 
     providers = (
@@ -1019,8 +1041,8 @@ def test_cli_accepts_every_codemap_enrichment_provider(tmp_path: Path, capsys):
 
 
 def test_declared_cross_ecosystem_links_compose_native_projects_and_shared_inputs(
-    tmp_path: Path, fake_maven_wrapper
-):
+    tmp_path: Path, fake_maven_wrapper: Any
+) -> None:
     (tmp_path / "backend" / "src").mkdir(parents=True)
     (tmp_path / "frontend" / "src").mkdir(parents=True)
     (tmp_path / "backend" / "pom.xml").write_text(
@@ -1066,7 +1088,9 @@ def test_declared_cross_ecosystem_links_compose_native_projects_and_shared_input
         assert shared_after["affected_projects"] == []
 
 
-def test_declared_project_links_reject_invalid_shared_input_escape(tmp_path: Path):
+def test_declared_project_links_reject_invalid_shared_input_escape(
+    tmp_path: Path,
+) -> None:
     (tmp_path / ".hashmarks-project-links.toml").write_text(
         "[[shared_input]]\npath='../secret'\nprojects=['npm:web']\n", encoding="utf-8"
     )
@@ -1078,8 +1102,8 @@ def test_declared_project_links_reject_invalid_shared_input_escape(tmp_path: Pat
 
 
 def test_vitest_vite_native_graph_enrichment_and_generation_freshness(
-    tmp_path: Path, monkeypatch
-):
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import hashmarks.codemap.engine as codemap_engine
     from hashmarks.codemap import CodeMap
     from hashmarks.native_vitest import VitestViteEdge, VitestViteGraph
@@ -1125,7 +1149,9 @@ def test_vitest_vite_native_graph_enrichment_and_generation_freshness(
         assert "tests/auth.test.ts" not in stale["affected_files"]
 
 
-def test_pyright_type_server_resolves_absolute_and_relative_imports(tmp_path: Path):
+def test_pyright_type_server_resolves_absolute_and_relative_imports(
+    tmp_path: Path,
+) -> None:
     from hashmarks.codemap.pyright_type_server import PyrightTypeServerProvider
 
     (tmp_path / "pkg").mkdir()
@@ -1141,16 +1167,22 @@ def test_pyright_type_server_resolves_absolute_and_relative_imports(tmp_path: Pa
     class FakeClient:
         protocol_version = "0.4.1"
 
-        def __init__(self):
+        def __init__(self) -> None:
             self.calls = []
 
-        def initialize(self):
+        def initialize(self) -> None:
             return None
 
-        def snapshot(self):
+        def snapshot(self) -> int:
             return 7
 
-        def resolve_import(self, source_uri, leading_dots, name_parts, snapshot):
+        def resolve_import(
+            self,
+            source_uri: str,
+            leading_dots: int,
+            name_parts: tuple[str, ...],
+            snapshot: int,
+        ) -> str | None:
             self.calls.append((source_uri, leading_dots, name_parts, snapshot))
             if (leading_dots, name_parts) in {
                 (0, ("pkg", "util")),
@@ -1159,7 +1191,7 @@ def test_pyright_type_server_resolves_absolute_and_relative_imports(tmp_path: Pa
                 return (tmp_path / "pkg" / "util.py").as_uri()
             return None
 
-        def close(self):
+        def close(self) -> None:
             return None
 
     client = FakeClient()
@@ -1180,7 +1212,9 @@ def test_pyright_type_server_resolves_absolute_and_relative_imports(tmp_path: Pa
     }
 
 
-def test_pyright_type_server_ignores_resolutions_outside_workspace(tmp_path: Path):
+def test_pyright_type_server_ignores_resolutions_outside_workspace(
+    tmp_path: Path,
+) -> None:
     from hashmarks.codemap.pyright_type_server import PyrightTypeServerProvider
 
     (tmp_path / "src").mkdir()
@@ -1193,16 +1227,22 @@ def test_pyright_type_server_ignores_resolutions_outside_workspace(tmp_path: Pat
     class FakeClient:
         protocol_version = "0.4.1"
 
-        def initialize(self):
+        def initialize(self) -> None:
             return None
 
-        def snapshot(self):
+        def snapshot(self) -> int:
             return 1
 
-        def resolve_import(self, source_uri, leading_dots, name_parts, snapshot):
+        def resolve_import(
+            self,
+            source_uri: str,
+            leading_dots: int,
+            name_parts: tuple[str, ...],
+            snapshot: int,
+        ) -> str | None:
             return outside.as_uri()
 
-        def close(self):
+        def close(self) -> None:
             return None
 
     provider = PyrightTypeServerProvider(
@@ -1213,7 +1253,7 @@ def test_pyright_type_server_ignores_resolutions_outside_workspace(tmp_path: Pat
     assert result.edges == ()
 
 
-def test_pyright_type_server_retries_once_after_stale_snapshot(tmp_path: Path):
+def test_pyright_type_server_retries_once_after_stale_snapshot(tmp_path: Path) -> None:
     from hashmarks.codemap.pyright_type_server import (
         PyrightTypeServerProvider,
         _JsonRpcError,
@@ -1228,24 +1268,30 @@ def test_pyright_type_server_retries_once_after_stale_snapshot(tmp_path: Path):
     class FakeClient:
         protocol_version = "0.4.1"
 
-        def __init__(self):
+        def __init__(self) -> None:
             self.snapshots = iter((10, 11))
             self.resolve_calls = 0
 
-        def initialize(self):
+        def initialize(self) -> None:
             return None
 
-        def snapshot(self):
+        def snapshot(self) -> int:
             return next(self.snapshots)
 
-        def resolve_import(self, source_uri, leading_dots, name_parts, snapshot):
+        def resolve_import(
+            self,
+            source_uri: str,
+            leading_dots: int,
+            name_parts: tuple[str, ...],
+            snapshot: int,
+        ) -> str | None:
             self.resolve_calls += 1
             if self.resolve_calls == 1:
                 raise _JsonRpcError(-32802, "stale snapshot")
             assert snapshot == 11
             return (tmp_path / "src" / "dep.py").as_uri()
 
-        def close(self):
+        def close(self) -> None:
             return None
 
     client = FakeClient()
@@ -1260,18 +1306,18 @@ def test_pyright_type_server_retries_once_after_stale_snapshot(tmp_path: Path):
     assert client.resolve_calls == 2
 
 
-def test_pyright_type_server_rejects_unsupported_tsp_minor(tmp_path: Path):
+def test_pyright_type_server_rejects_unsupported_tsp_minor(tmp_path: Path) -> None:
     from hashmarks.codemap.pyright_type_server import _PyrightTypeServerClient
 
     class FakeRpc:
-        def request(self, method, params=None):
+        def request(self, method: str, params: object | None = None) -> object:
             if method == "initialize":
                 return {"capabilities": {}}
             if method == "typeServer/getSupportedProtocolVersion":
                 return "0.5.0"
             raise AssertionError(method)
 
-        def notify(self, method, params=None):
+        def notify(self, method: str, params: object | None = None) -> None:
             assert method == "initialized"
 
     client = _PyrightTypeServerClient.__new__(_PyrightTypeServerClient)
@@ -1282,7 +1328,9 @@ def test_pyright_type_server_rejects_unsupported_tsp_minor(tmp_path: Path):
         client.initialize()
 
 
-def test_pyright_native_edges_are_generation_bound_and_become_stale(tmp_path: Path):
+def test_pyright_native_edges_are_generation_bound_and_become_stale(
+    tmp_path: Path,
+) -> None:
     from hashmarks.codemap import CodeMap
     from hashmarks.codemap.pyright_type_server import PyrightTypeServerProvider
 
@@ -1297,16 +1345,22 @@ def test_pyright_native_edges_are_generation_bound_and_become_stale(tmp_path: Pa
     class FakeClient:
         protocol_version = "0.4.1"
 
-        def initialize(self):
+        def initialize(self) -> None:
             return None
 
-        def snapshot(self):
+        def snapshot(self) -> int:
             return 1
 
-        def resolve_import(self, source_uri, leading_dots, name_parts, snapshot):
+        def resolve_import(
+            self,
+            source_uri: str,
+            leading_dots: int,
+            name_parts: tuple[str, ...],
+            snapshot: int,
+        ) -> str | None:
             return dep.as_uri()
 
-        def close(self):
+        def close(self) -> None:
             return None
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
@@ -1335,7 +1389,9 @@ def test_pyright_native_edges_are_generation_bound_and_become_stale(tmp_path: Pa
         assert "generation changed" in str(pyright_status[0]["reason"])
 
 
-def test_pyright_jsonrpc_client_answers_server_requests_without_stealing_response():
+def test_pyright_jsonrpc_client_answers_server_requests_without_stealing_response() -> (
+    None
+):
     import queue
 
     from hashmarks.codemap.pyright_type_server import _JsonRpcProcess
@@ -1367,7 +1423,9 @@ def test_pyright_jsonrpc_client_answers_server_requests_without_stealing_respons
     assert sent[1] == {"jsonrpc": "2.0", "id": 1, "result": [None, None]}
 
 
-def test_codemap_disambiguates_repeated_lexical_qualnames_in_one_file(tmp_path: Path):
+def test_codemap_disambiguates_repeated_lexical_qualnames_in_one_file(
+    tmp_path: Path,
+) -> None:
     """Repeated local helper names are legal source, not a map-sync failure."""
     (tmp_path / "mod.py").write_text(
         """
@@ -1400,7 +1458,9 @@ def outer(flag):
         assert all(row["qualname"].startswith("outer.value") for row in rows)
 
 
-def test_codemap_indexes_small_control_files_but_skips_noisy_lockfiles(tmp_path: Path):
+def test_codemap_indexes_small_control_files_but_skips_noisy_lockfiles(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "Makefile").write_text(
         "DEPENDENCY_RESOLUTION_RUNNER = python3 tools/bootstrap.py\ninit:\n\t$(DEPENDENCY_RESOLUTION_RUNNER)\n",
         encoding="utf-8",
@@ -1464,7 +1524,9 @@ def test_find_promotes_symbol_less_control_file_with_broad_lexical_coverage(
     assert any(hit.path == "Makefile" for hit in hits)
 
 
-def test_context_progressive_disclosure_levels_share_one_evidence_base(tmp_path: Path):
+def test_context_progressive_disclosure_levels_share_one_evidence_base(
+    tmp_path: Path,
+) -> None:
     _write_repo(tmp_path)
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
@@ -1518,7 +1580,9 @@ def test_context_progressive_disclosure_levels_share_one_evidence_base(tmp_path:
     assert {item.path for item in outline.items}.issubset(orient_paths)
 
 
-def test_context_lower_disclosure_levels_never_read_source_bodies(tmp_path: Path):
+def test_context_lower_disclosure_levels_never_read_source_bodies(
+    tmp_path: Path,
+) -> None:
     _write_repo(tmp_path)
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
@@ -1532,7 +1596,7 @@ def test_context_lower_disclosure_levels_never_read_source_bodies(tmp_path: Path
             )
 
 
-def test_context_rejects_unknown_disclosure_level(tmp_path: Path):
+def test_context_rejects_unknown_disclosure_level(tmp_path: Path) -> None:
     _write_repo(tmp_path)
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
@@ -1542,7 +1606,7 @@ def test_context_rejects_unknown_disclosure_level(tmp_path: Path):
 
 def test_candidate_rerank_stage_bounds_large_working_set_with_path_diversity(
     tmp_path: Path,
-):
+) -> None:
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         rows = []
         for index in range(600):
@@ -1568,7 +1632,9 @@ def test_candidate_rerank_stage_bounds_large_working_set_with_path_diversity(
     assert len({row["path"] for row in bounded}) >= 64
 
 
-def test_candidate_rerank_stage_does_not_truncate_normal_queries(tmp_path: Path):
+def test_candidate_rerank_stage_does_not_truncate_normal_queries(
+    tmp_path: Path,
+) -> None:
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         rows = tuple({"path": f"src/{i}.py", "name": f"n{i}"} for i in range(30))
         bounded = codemap._bounded_rerank_rows("n1", rows, limit=20, tokens=("n1",))
@@ -1577,7 +1643,7 @@ def test_candidate_rerank_stage_does_not_truncate_normal_queries(tmp_path: Path)
 
 def test_context_cas_reuses_structural_payload_without_replaying_freshness(
     tmp_path: Path,
-):
+) -> None:
     _write_repo(tmp_path)
     state = tmp_path / ".state"
     with CodeMap(
@@ -1603,7 +1669,7 @@ def test_context_cas_reuses_structural_payload_without_replaying_freshness(
     assert second.warnings
 
 
-def test_context_cas_source_payload_requires_positive_freshness(tmp_path: Path):
+def test_context_cas_source_payload_requires_positive_freshness(tmp_path: Path) -> None:
     _write_repo(tmp_path)
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
@@ -1622,7 +1688,7 @@ def test_context_cas_source_payload_requires_positive_freshness(tmp_path: Path):
     assert any(item.representation == "source-range" for item in second.items)
 
 
-def test_context_cas_action_binds_budget_disclosure_and_policy(tmp_path: Path):
+def test_context_cas_action_binds_budget_disclosure_and_policy(tmp_path: Path) -> None:
     _write_repo(tmp_path)
     state = tmp_path / ".state"
     with CodeMap(
@@ -1664,7 +1730,7 @@ def test_context_cas_action_binds_budget_disclosure_and_policy(tmp_path: Path):
     assert policy_pack.context_action_hash != outline.context_action_hash
 
 
-def test_find_singleflight_shares_equivalent_concurrent_work(tmp_path: Path):
+def test_find_singleflight_shares_equivalent_concurrent_work(tmp_path: Path) -> None:
     import threading
     import time
 
@@ -1678,7 +1744,7 @@ def test_find_singleflight_shares_equivalent_concurrent_work(tmp_path: Path):
         results = []
         errors = []
 
-        def slow_find(query: str, *, limit: int = 20):
+        def slow_find(query: str, *, limit: int = 20) -> list[Any]:
             nonlocal calls
             with calls_lock:
                 calls += 1
@@ -1687,7 +1753,7 @@ def test_find_singleflight_shares_equivalent_concurrent_work(tmp_path: Path):
 
         codemap._find_compose = slow_find  # type: ignore[method-assign]
 
-        def worker():
+        def worker() -> None:
             try:
                 barrier.wait()
                 results.append(codemap.find("AuthService login", limit=20))
@@ -1706,7 +1772,9 @@ def test_find_singleflight_shares_equivalent_concurrent_work(tmp_path: Path):
     assert all(result == results[0] for result in results)
 
 
-def test_context_singleflight_returns_only_shared_immutable_result(tmp_path: Path):
+def test_context_singleflight_returns_only_shared_immutable_result(
+    tmp_path: Path,
+) -> None:
     import threading
     import time
 
@@ -1725,8 +1793,8 @@ def test_context_singleflight_returns_only_shared_immutable_result(tmp_path: Pat
             *,
             token_budget: int = 4000,
             limit: int = 30,
-            disclosure="source",
-        ):
+            disclosure: str = "source",
+        ) -> ContextPack:
             nonlocal calls
             with calls_lock:
                 calls += 1
@@ -1737,7 +1805,7 @@ def test_context_singleflight_returns_only_shared_immutable_result(tmp_path: Pat
 
         codemap._context_impl = slow_context  # type: ignore[method-assign]
 
-        def worker():
+        def worker() -> None:
             try:
                 barrier.wait()
                 results.append(
@@ -1765,7 +1833,7 @@ def test_context_singleflight_returns_only_shared_immutable_result(tmp_path: Pat
     )
 
 
-def test_source_singleflight_requires_positive_freshness(tmp_path: Path):
+def test_source_singleflight_requires_positive_freshness(tmp_path: Path) -> None:
     import threading
     import time
 
@@ -1783,8 +1851,8 @@ def test_source_singleflight_requires_positive_freshness(tmp_path: Path):
             *,
             token_budget: int = 4000,
             limit: int = 30,
-            disclosure="source",
-        ):
+            disclosure: str = "source",
+        ) -> ContextPack:
             nonlocal calls
             with calls_lock:
                 calls += 1
@@ -1795,7 +1863,7 @@ def test_source_singleflight_requires_positive_freshness(tmp_path: Path):
 
         codemap._context_impl = slow_context  # type: ignore[method-assign]
 
-        def worker():
+        def worker() -> None:
             barrier.wait()
             results.append(
                 codemap.context(
@@ -1816,7 +1884,7 @@ def test_source_singleflight_requires_positive_freshness(tmp_path: Path):
 
 def test_annotation_relationship_protects_return_type_from_test_name_crowding(
     tmp_path: Path,
-):
+) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
     (tmp_path / "src" / "context.py").write_text(
@@ -1845,7 +1913,7 @@ def test_annotation_relationship_protects_return_type_from_test_name_crowding(
     assert "ContextPack" in symbols
 
 
-def test_python_annotations_emit_bounded_type_relationships(tmp_path: Path):
+def test_python_annotations_emit_bounded_type_relationships(tmp_path: Path) -> None:
     (tmp_path / "model.py").write_text(
         "class Base:\n    pass\n\n"
         "class Payload:\n    pass\n\n"
@@ -1865,7 +1933,7 @@ def test_python_annotations_emit_bounded_type_relationships(tmp_path: Path):
     assert ("Service.run", "return-type", "Payload") in triples
 
 
-def test_edge_relationship_indexes_cover_path_and_source_lookup(tmp_path: Path):
+def test_edge_relationship_indexes_cover_path_and_source_lookup(tmp_path: Path) -> None:
     (tmp_path / "service.py").write_text("class Payload:\n    pass\n", encoding="utf-8")
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
@@ -1877,7 +1945,9 @@ def test_edge_relationship_indexes_cover_path_and_source_lookup(tmp_path: Path):
     assert "edge_path_source_line_idx" in names
 
 
-def test_fresh_lexical_schema_uses_token_primary_key_and_path_index(tmp_path: Path):
+def test_fresh_lexical_schema_uses_token_primary_key_and_path_index(
+    tmp_path: Path,
+) -> None:
     store = WorkspaceMapStore(tmp_path / "codemap.sqlite3")
     try:
         sql = str(
@@ -1899,7 +1969,7 @@ def test_fresh_lexical_schema_uses_token_primary_key_and_path_index(tmp_path: Pa
     assert "lexical_token_path_idx" not in indexes
 
 
-def test_incompatible_lexical_schema_is_discarded_and_rebuilt(tmp_path: Path):
+def test_incompatible_lexical_schema_is_discarded_and_rebuilt(tmp_path: Path) -> None:
     db_path = tmp_path / "legacy-codemap.sqlite3"
     db = sqlite3.connect(db_path)
     db.executescript(
@@ -1941,11 +2011,11 @@ def test_incompatible_lexical_schema_is_discarded_and_rebuilt(tmp_path: Path):
 
 def test_bulk_file_writes_commit_completed_chunks_and_rollback_only_current_chunk(
     tmp_path: Path,
-):
+) -> None:
     db_path = tmp_path / "codemap.sqlite3"
     store = WorkspaceMapStore(db_path)
 
-    def artifact(name: str):
+    def artifact(name: str) -> Any:
         return parse_source(
             f"def {name}():\n    return '{name}'\n",
             file_digest=f"digest-{name}",
@@ -2107,7 +2177,7 @@ def test_find_task_preserves_exact_identifier_symbol_anchor(tmp_path: Path) -> N
 
 def test_index_preflight_and_economics_report_measured_surfaces_without_execution_policy(
     tmp_path: Path,
-):
+) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
     (tmp_path / "docs").mkdir()
@@ -2175,7 +2245,9 @@ def test_lexical_file_expansion_does_not_promote_unrelated_symbols(
     assert any(hit.path == "owner.py" for hit in hits)
 
 
-def test_incremental_economics_uses_compact_exact_per_file_facts(tmp_path: Path):
+def test_incremental_economics_uses_compact_exact_per_file_facts(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
     (tmp_path / "docs").mkdir()

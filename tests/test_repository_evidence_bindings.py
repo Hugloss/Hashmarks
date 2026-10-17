@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
 from typing import TYPE_CHECKING
 
 import pytest
+from contract_assertions import assert_array, assert_object, assert_records, assert_text
 
 from hashmarks import CodeMap
 from hashmarks.client import RepositoryObservation
@@ -11,6 +13,18 @@ from hashmarks.observation import ObservationState
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+
+def _first_binding(packet: Mapping[str, object]) -> dict[str, object]:
+    return assert_object(assert_array(packet["bindings"])[0])
+
+
+def _first_evidence(packet: Mapping[str, object]) -> dict[str, object]:
+    return assert_object(assert_array(_first_binding(packet)["evidence"])[0])
+
+
+def _changed_binding(packet: Mapping[str, object]) -> dict[str, object]:
+    return assert_object(assert_array(assert_object(packet["bindings"])["changed"])[0])
 
 
 def test_repository_evidence_bindings_are_generic_deterministic_repository_facts(
@@ -33,14 +47,29 @@ def test_repository_evidence_bindings_are_generic_deterministic_repository_facts
     assert first["schema"] == "hashmarks.repository-evidence-bindings.v1"
     assert first["authority"] == "repository-intelligence-only"
     assert first["execution_effect"] == "none"
-    assert first["observer"]["identity"].startswith("sha256:")
-    assert "evidence-bindings" in first["observer"]["capabilities"]
-    assert first["repository"]["source_identity"].startswith("sha256:")
-    row = first["bindings"][0]
+    assert assert_text(assert_object(first["observer"])["identity"]).startswith(
+        "sha256:"
+    )
+    assert "evidence-bindings" in assert_array(
+        assert_object(first["observer"])["capabilities"]
+    )
+    assert assert_text(
+        assert_object(first["repository"])["source_identity"]
+    ).startswith("sha256:")
+    row = _first_binding(first)
     assert row["binding_id"] == "consumer:a"
-    assert row["evidence"][0]["state"] == "known-present"
-    assert row["evidence"][0]["span_identity"].startswith("sha256:")
-    assert len(row["evidence"][0]["member_revision"]) == 64
+    assert assert_object(assert_array(row["evidence"])[0])["state"] == "known-present"
+    assert assert_text(
+        assert_object(assert_array(row["evidence"])[0])["span_identity"]
+    ).startswith("sha256:")
+    assert (
+        len(
+            assert_text(
+                assert_object(assert_array(row["evidence"])[0])["member_revision"]
+            )
+        )
+        == 64
+    )
 
 
 def test_span_identity_survives_unrelated_member_edit_while_member_revision_changes(
@@ -61,8 +90,8 @@ def test_span_identity_survives_unrelated_member_edit_while_member_revision_chan
         codemap.sync(["src.py"])
         after = codemap.repository_evidence_bindings(binding)
 
-    old = before["bindings"][0]["evidence"][0]
-    new = after["bindings"][0]["evidence"][0]
+    old = _first_evidence(before)
+    new = _first_evidence(after)
     assert old["span_identity"] == new["span_identity"]
     assert old["member_revision"] != new["member_revision"]
 
@@ -88,8 +117,8 @@ def test_binding_reports_deleted_and_unsupported_members_without_policy_decision
         codemap.sync()
         absent = codemap.repository_evidence_bindings(missing)
         nontext = codemap.repository_evidence_bindings(unsupported)
-    assert absent["bindings"][0]["evidence"][0]["state"] == "known-absent"
-    assert nontext["bindings"][0]["evidence"][0]["state"] == "unsupported"
+    assert _first_evidence(absent)["state"] == "known-absent"
+    assert _first_evidence(nontext)["state"] == "unsupported"
 
 
 def test_binding_rejects_duplicate_identity_and_invalid_range(tmp_path: Path) -> None:
@@ -155,8 +184,7 @@ def test_span_identity_preserves_newline_bytes(tmp_path: Path) -> None:
         codemap.sync(["a.py"])
         lf = codemap.repository_evidence_bindings(binding)
     assert (
-        crlf["bindings"][0]["evidence"][0]["span_identity"]
-        != lf["bindings"][0]["evidence"][0]["span_identity"]
+        _first_evidence(crlf)["span_identity"] != _first_evidence(lf)["span_identity"]
     )
 
 
@@ -177,7 +205,7 @@ def test_binding_rejects_symlinked_ancestor_evidence(tmp_path: Path) -> None:
                 }
             ]
         )
-    row = packet["bindings"][0]["evidence"][0]
+    row = _first_evidence(packet)
     assert row["state"] == "unsupported"
     assert row["reason"] == "symlink-evidence-not-observed"
 
@@ -196,7 +224,8 @@ def test_binding_observation_is_decision_session_scoped(tmp_path: Path) -> None:
                 ]
             )
             assert (
-                packet["repository"]["codemap_generation"] == codemap.store.generation()
+                assert_object(packet["repository"])["codemap_generation"]
+                == codemap.store.generation()
             )
 
 
@@ -225,12 +254,17 @@ def test_dependency_change_is_separate_from_unchanged_direct_evidence(
         )
         delta = codemap.repository_evidence_binding_delta(before, after)
 
-    changed = delta["bindings"]["changed"][0]
-    assert changed["direct_evidence"]["state"] == "preserved"
-    assert changed["declared_dependencies"]["state"] == "affected"
-    observations = changed["declared_dependencies"]["observations"]
+    changed = _changed_binding(delta)
+    assert assert_object(changed["direct_evidence"])["state"] == "preserved"
+    assert assert_object(changed["declared_dependencies"])["state"] == "affected"
+    observations = assert_object(
+        assert_object(changed["declared_dependencies"])["observations"]
+    )
     assert observations["state"] == "changed"
-    assert observations["changes"][0]["path"] == "dependency.py"
+    assert (
+        assert_object(assert_array(observations["changes"])[0])["path"]
+        == "dependency.py"
+    )
 
 
 def test_unrelated_change_does_not_affect_declared_dependency(tmp_path: Path) -> None:
@@ -256,8 +290,8 @@ def test_unrelated_change_does_not_affect_declared_dependency(tmp_path: Path) ->
         )
         delta = codemap.repository_evidence_binding_delta(before, after)
 
-    assert delta["bindings"]["preserved"] == ["generic:binding"]
-    assert delta["bindings"]["changed"] == []
+    assert assert_object(delta["bindings"])["preserved"] == ["generic:binding"]
+    assert assert_object(delta["bindings"])["changed"] == []
 
 
 def test_indexed_relationship_evidence_is_bounded_and_non_authoritative(
@@ -280,11 +314,13 @@ def test_indexed_relationship_evidence_is_bounded_and_non_authoritative(
         packet = codemap.repository_evidence_bindings(
             binding, relationship_limit_per_path=8
         )
-    relationships = packet["bindings"][0]["relationships"]
+    relationships = assert_object(_first_binding(packet)["relationships"])
     assert relationships["state"] == "observed"
     assert relationships["completeness"] == "bounded-not-claimed"
-    assert relationships["bounds"]["limit_per_path"] == 8
-    assert any(row.get("target") for row in relationships["relationships"])
+    assert assert_object(relationships["bounds"])["limit_per_path"] == 8
+    assert any(
+        row.get("target") for row in assert_records(relationships["relationships"])
+    )
 
 
 def test_relationship_change_does_not_masquerade_as_direct_content_change(
@@ -307,12 +343,12 @@ def test_relationship_change_does_not_masquerade_as_direct_content_change(
         codemap.sync(["source.py"])
         after = codemap.repository_evidence_bindings(binding)
         delta = codemap.repository_evidence_binding_delta(before, after)
-    changed = delta["bindings"]["changed"][0]
-    assert changed["direct_evidence"]["state"] == "preserved"
-    relationships = changed["relationship_evidence"]
+    changed = _changed_binding(delta)
+    assert assert_object(changed["direct_evidence"])["state"] == "preserved"
+    relationships = assert_object(changed["relationship_evidence"])
     assert relationships["state"] == "changed"
     assert relationships["comparability"] == "comparable"
-    assert relationships["facts"]["state"] == "changed"
+    assert assert_object(relationships["facts"])["state"] == "changed"
     assert relationships["completeness"] == "bounded-not-claimed"
 
 
@@ -338,13 +374,17 @@ def test_complete_change_set_can_prove_outside_declared_bindings(
             changed_paths=["bound.py", "dependency.py", "outside.py"],
             change_set_complete=True,
         )
-    assert coverage["classification"]["bound_member_precision_unknown"] == ["bound.py"]
-    assert coverage["classification"]["declared_dependencies_changed"] == [
-        "dependency.py"
+    assert assert_object(coverage["classification"])[
+        "bound_member_precision_unknown"
+    ] == ["bound.py"]
+    assert assert_object(coverage["classification"])[
+        "declared_dependencies_changed"
+    ] == ["dependency.py"]
+    assert assert_object(coverage["classification"])["outside_declared_bindings"] == [
+        "outside.py"
     ]
-    assert coverage["classification"]["outside_declared_bindings"] == ["outside.py"]
-    assert coverage["coverage"]["state"] == "complete"
-    assert coverage["coverage"]["outside_classification"] == "known"
+    assert assert_object(coverage["coverage"])["state"] == "complete"
+    assert assert_object(coverage["coverage"])["outside_classification"] == "known"
 
 
 def test_incomplete_change_set_never_claims_unmapped_change(tmp_path: Path) -> None:
@@ -362,12 +402,12 @@ def test_incomplete_change_set_never_claims_unmapped_change(tmp_path: Path) -> N
         coverage = codemap.repository_evidence_coverage(
             packet, changed_paths=["seen.py"], change_set_complete=False
         )
-    assert coverage["classification"]["outside_declared_bindings"] == []
-    assert coverage["classification"]["outside_declared_bindings_candidates"] == [
-        "seen.py"
-    ]
-    assert coverage["coverage"]["state"] == "incomplete"
-    assert coverage["coverage"]["outside_classification"] == "unknown"
+    assert assert_object(coverage["classification"])["outside_declared_bindings"] == []
+    assert assert_object(coverage["classification"])[
+        "outside_declared_bindings_candidates"
+    ] == ["seen.py"]
+    assert assert_object(coverage["coverage"])["state"] == "incomplete"
+    assert assert_object(coverage["coverage"])["outside_classification"] == "unknown"
 
 
 def test_coverage_is_order_independent_and_identity_stable(tmp_path: Path) -> None:
@@ -428,16 +468,27 @@ def test_coverage_distinguishes_bound_range_from_elsewhere_in_member(
             binding_delta_before=after,
         )
 
-    assert outside_range["classification"]["changed_inside_bound_evidence"] == []
-    assert outside_range["classification"]["changed_elsewhere_in_bound_member"] == [
-        "source.py"
-    ]
-    assert outside_range["classification"]["bound_member_precision_unknown"] == []
-    assert inside_range["classification"]["changed_inside_bound_evidence"] == [
-        "source.py"
-    ]
-    assert inside_range["classification"]["changed_elsewhere_in_bound_member"] == []
-    assert inside_range["precision"]["bound_range"] == "known"
+    assert (
+        assert_object(outside_range["classification"])["changed_inside_bound_evidence"]
+        == []
+    )
+    assert assert_object(outside_range["classification"])[
+        "changed_elsewhere_in_bound_member"
+    ] == ["source.py"]
+    assert (
+        assert_object(outside_range["classification"])["bound_member_precision_unknown"]
+        == []
+    )
+    assert assert_object(inside_range["classification"])[
+        "changed_inside_bound_evidence"
+    ] == ["source.py"]
+    assert (
+        assert_object(inside_range["classification"])[
+            "changed_elsewhere_in_bound_member"
+        ]
+        == []
+    )
+    assert assert_object(inside_range["precision"])["bound_range"] == "known"
 
 
 def test_path_only_coverage_refuses_to_infer_range_impact(tmp_path: Path) -> None:
@@ -454,10 +505,17 @@ def test_path_only_coverage_refuses_to_infer_range_impact(tmp_path: Path) -> Non
         coverage = codemap.repository_evidence_coverage(
             packet, changed_paths=["source.py"], change_set_complete=True
         )
-    assert coverage["classification"]["changed_inside_bound_evidence"] == []
-    assert coverage["classification"]["changed_elsewhere_in_bound_member"] == []
-    assert coverage["classification"]["bound_member_precision_unknown"] == ["source.py"]
-    assert coverage["precision"]["bound_range"] == "unknown"
+    assert (
+        assert_object(coverage["classification"])["changed_inside_bound_evidence"] == []
+    )
+    assert (
+        assert_object(coverage["classification"])["changed_elsewhere_in_bound_member"]
+        == []
+    )
+    assert assert_object(coverage["classification"])[
+        "bound_member_precision_unknown"
+    ] == ["source.py"]
+    assert assert_object(coverage["precision"])["bound_range"] == "unknown"
 
 
 def test_relationship_projection_can_be_skipped_without_changing_evidence_authority(
@@ -475,10 +533,10 @@ def test_relationship_projection_can_be_skipped_without_changing_evidence_author
         packet = codemap.repository_evidence_bindings(
             binding, include_relationships=False
         )
-    row = packet["bindings"][0]
-    assert row["evidence"][0]["state"] == "known-present"
-    assert row["relationships"]["state"] == "not-requested"
-    assert row["relationships"]["completeness"] == "not-observed"
+    row = _first_binding(packet)
+    assert assert_object(assert_array(row["evidence"])[0])["state"] == "known-present"
+    assert assert_object(row["relationships"])["state"] == "not-requested"
+    assert assert_object(row["relationships"])["completeness"] == "not-observed"
 
 
 @pytest.mark.parametrize(
@@ -504,12 +562,12 @@ def test_relationship_projection_can_be_skipped_without_changing_evidence_author
     ],
 )
 def test_binding_contract_rejects_malformed_or_escaping_inputs(
-    tmp_path: Path, payload: object, match: str
+    tmp_path: Path, payload: list[dict[str, object]], match: str
 ) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         with pytest.raises((TypeError, ValueError), match=match):
-            codemap.repository_evidence_bindings(payload)  # type: ignore[arg-type]
+            codemap.repository_evidence_bindings(payload)
 
 
 def test_overlapping_and_duplicate_spans_remain_explicit_evidence(
@@ -531,7 +589,7 @@ def test_overlapping_and_duplicate_spans_remain_explicit_evidence(
         packet = codemap.repository_evidence_bindings(
             binding, include_relationships=False
         )
-    evidence = packet["bindings"][0]["evidence"]
+    evidence = assert_records(_first_binding(packet)["evidence"])
     assert len(evidence) == 3
     identities = [str(row["span_identity"]) for row in evidence]
     assert len(set(identities)) == 2
@@ -565,14 +623,18 @@ def test_deleted_bound_member_is_first_class_delta(tmp_path: Path) -> None:
             binding_delta=delta,
             binding_delta_before=before,
         )
-    changed = delta["bindings"]["changed"][0]
-    assert changed["direct_evidence"]["state"] == "preserved"
-    assert changed["locator_evidence"]["state"] == "changed"
-    member_change = changed["member_evidence"]["changes"][0]
+    changed = _changed_binding(delta)
+    assert assert_object(changed["direct_evidence"])["state"] == "preserved"
+    assert assert_object(changed["locator_evidence"])["state"] == "changed"
+    member_change = assert_object(
+        assert_array(assert_object(changed["member_evidence"])["changes"])[0]
+    )
     assert member_change["state"] == "removed"
     assert member_change["observation_state_changed"] is True
-    assert after["bindings"][0]["evidence"][0]["state"] == "known-absent"
-    assert coverage["classification"]["bound_members_removed"] == ["a.py"]
+    assert _first_evidence(after)["state"] == "known-absent"
+    assert assert_object(coverage["classification"])["bound_members_removed"] == [
+        "a.py"
+    ]
     assert coverage["binding_impacts"] == [
         {
             "binding_id": "deleted",
@@ -598,7 +660,7 @@ def test_exact_span_uses_physical_lf_lines_not_unicode_line_separators(
         packet = codemap.repository_evidence_bindings(
             binding, include_relationships=False
         )
-    evidence = packet["bindings"][0]["evidence"][0]
+    evidence = _first_evidence(packet)
     assert evidence["state"] == "known-present"
     assert evidence["byte_length"] == len(first_line)
 
@@ -617,9 +679,7 @@ def test_exact_span_preserves_utf8_bom_as_repository_bytes(tmp_path: Path) -> No
         packet = codemap.repository_evidence_bindings(
             binding, include_relationships=False
         )
-    assert packet["bindings"][0]["evidence"][0]["byte_length"] == len(
-        b"\xef\xbb\xbfvalue = 1\n"
-    )
+    assert _first_evidence(packet)["byte_length"] == len(b"\xef\xbb\xbfvalue = 1\n")
 
 
 def test_binding_obeys_context_policy_source_disclosure(tmp_path: Path) -> None:
@@ -640,7 +700,7 @@ def test_binding_obeys_context_policy_source_disclosure(tmp_path: Path) -> None:
         packet = codemap.repository_evidence_bindings(
             binding, include_relationships=False
         )
-    evidence = packet["bindings"][0]["evidence"][0]
+    evidence = _first_evidence(packet)
     assert evidence["state"] == "unsupported"
     assert evidence["reason"] == "repository-evidence-denied"
     assert "do-not-disclose" not in repr(packet)
@@ -664,7 +724,7 @@ def test_outline_visibility_does_not_become_raw_source_binding(tmp_path: Path) -
         packet = codemap.repository_evidence_bindings(
             binding, include_relationships=False
         )
-    evidence = packet["bindings"][0]["evidence"][0]
+    evidence = _first_evidence(packet)
     assert evidence["state"] == "unsupported"
     assert evidence["reason"] == "source-evidence-not-visible"
     assert "span_identity" not in evidence
@@ -687,7 +747,7 @@ def test_unsignaled_member_edit_fails_closed_against_indexed_revision(
         packet = codemap.repository_evidence_bindings(
             binding, include_relationships=False
         )
-    evidence = packet["bindings"][0]["evidence"][0]
+    evidence = _first_evidence(packet)
     assert evidence["state"] == "unknown"
     assert evidence["reason"] == "member-revision-mismatch"
     assert "span_identity" not in evidence
@@ -714,20 +774,20 @@ def test_binding_definition_change_is_not_relationship_content_change(
         )
         delta = codemap.repository_evidence_binding_delta(before, after)
 
-    before_row = before["bindings"][0]
-    after_row = after["bindings"][0]
+    before_row = _first_binding(before)
+    after_row = _first_binding(after)
     assert (
         before_row["binding_definition_identity"]
         != after_row["binding_definition_identity"]
     )
-    changed = delta["bindings"]["changed"][0]
-    assert changed["definition"]["state"] == "changed"
-    relationships = changed["relationship_evidence"]
+    changed = _changed_binding(delta)
+    assert assert_object(changed["definition"])["state"] == "changed"
+    relationships = assert_object(changed["relationship_evidence"])
     assert relationships["state"] == "unknown"
     assert relationships["comparability"] == "observation-configuration-changed"
-    assert relationships["facts"]["state"] == "unknown"
-    assert relationships["locators"]["state"] == "unknown"
-    assert relationships["observation"]["changed"] is True
+    assert assert_object(relationships["facts"])["state"] == "unknown"
+    assert assert_object(relationships["locators"])["state"] == "unknown"
+    assert assert_object(relationships["observation"])["changed"] is True
 
 
 def test_observer_proven_change_set_keeps_completeness_provenance(
@@ -755,9 +815,9 @@ def test_observer_proven_change_set_keeps_completeness_provenance(
             repository_observation=observation,
         )
     assert coverage["changed_paths"] == ["owner.py"]
-    assert coverage["coverage"]["state"] == "complete"
-    assert coverage["coverage"]["source"] == "repository-observer"
-    assert coverage["change_set"]["generation"] == 7
+    assert assert_object(coverage["coverage"])["state"] == "complete"
+    assert assert_object(coverage["coverage"])["source"] == "repository-observer"
+    assert assert_object(coverage["change_set"])["generation"] == 7
 
 
 def test_coverage_reports_binding_ids_and_stable_impact_reasons(tmp_path: Path) -> None:
@@ -816,7 +876,7 @@ def test_whole_member_binding_supports_empty_and_binary_repository_members(
             binding, include_relationships=False
         )
 
-    evidence = packet["bindings"][0]["evidence"]
+    evidence = assert_records(_first_binding(packet)["evidence"])
     assert [row["scope"] for row in evidence] == ["member", "member"]
     assert all(row["state"] == "known-present" for row in evidence)
     assert all(len(str(row["member_revision"])) == 64 for row in evidence)
@@ -852,10 +912,15 @@ def test_whole_member_change_is_direct_content_and_member_change(
             binding_delta_before=before,
         )
 
-    changed = delta["bindings"]["changed"][0]
-    assert changed["direct_evidence"]["state"] == "changed"
-    assert changed["direct_evidence"]["changes"][0]["scope"] == "member"
-    assert changed["member_evidence"]["state"] == "changed"
+    changed = _changed_binding(delta)
+    assert assert_object(changed["direct_evidence"])["state"] == "changed"
+    assert (
+        assert_object(
+            assert_array(assert_object(changed["direct_evidence"])["changes"])[0]
+        )["scope"]
+        == "member"
+    )
+    assert assert_object(changed["member_evidence"])["state"] == "changed"
     assert coverage["binding_impacts"] == [
         {
             "binding_id": "whole",
@@ -927,7 +992,7 @@ def test_binding_identity_is_order_independent_but_duplicates_remain_explicit(
             include_relationships=False,
         )
     assert first == second
-    assert len(first["bindings"][0]["evidence"]) == 3
+    assert len(assert_array(_first_binding(first)["evidence"])) == 3
 
 
 def test_binding_contract_rejects_unknown_dependency_owner_and_unbounded_requests(
@@ -983,12 +1048,12 @@ def test_binding_delta_preserves_duplicate_evidence_multiplicity(
         )
         delta = codemap.repository_evidence_binding_delta(before, after)
 
-    changed = delta["bindings"]["changed"][0]
-    assert changed["definition"]["state"] == "changed"
-    assert changed["direct_evidence"]["state"] == "preserved"
-    assert changed["direct_evidence"]["changes"] == []
-    assert changed["locator_evidence"]["state"] == "preserved"
-    assert changed["member_evidence"]["state"] == "preserved"
+    changed = _changed_binding(delta)
+    assert assert_object(changed["definition"])["state"] == "changed"
+    assert assert_object(changed["direct_evidence"])["state"] == "preserved"
+    assert assert_object(changed["direct_evidence"])["changes"] == []
+    assert assert_object(changed["locator_evidence"])["state"] == "preserved"
+    assert assert_object(changed["member_evidence"])["state"] == "preserved"
 
 
 def test_coverage_rejects_tampered_binding_packet(tmp_path: Path) -> None:
@@ -1002,7 +1067,7 @@ def test_coverage_rejects_tampered_binding_packet(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         packet = codemap.repository_evidence_bindings(binding)
-        packet["bindings"][0]["evidence"][0]["state"] = "known-absent"
+        _first_evidence(packet)["state"] = "known-absent"
 
         with pytest.raises(ValueError, match="bindings identity mismatch"):
             codemap.repository_evidence_coverage(
@@ -1089,7 +1154,7 @@ def test_coverage_rejects_tampered_binding_delta(tmp_path: Path) -> None:
         codemap.sync(["a.py"])
         after = codemap.repository_evidence_bindings(binding)
         delta = codemap.repository_evidence_binding_delta(before, after)
-        delta["bindings"]["changed"].clear()
+        assert_array(assert_object(delta["bindings"])["changed"]).clear()
 
         with pytest.raises(ValueError, match="binding_delta identity mismatch"):
             codemap.repository_evidence_coverage(
@@ -1118,7 +1183,7 @@ def test_whole_member_binding_cannot_bypass_pruned_analysis_scope(
         packet = codemap.repository_evidence_bindings(
             binding, include_relationships=False
         )
-    evidence = packet["bindings"][0]["evidence"][0]
+    evidence = _first_evidence(packet)
     assert evidence["state"] == "unsupported"
     assert evidence["reason"] == "repository-evidence-not-admitted"
     assert "member_revision" not in evidence
@@ -1151,15 +1216,15 @@ def test_relationship_locator_change_is_separate_from_relationship_fact_change(
         after = codemap.repository_evidence_bindings(binding)
         delta = codemap.repository_evidence_binding_delta(before, after)
 
-    changed = delta["bindings"]["changed"][0]
-    assert changed["direct_evidence"]["state"] == "preserved"
-    relationships = changed["relationship_evidence"]
+    changed = _changed_binding(delta)
+    assert assert_object(changed["direct_evidence"])["state"] == "preserved"
+    relationships = assert_object(changed["relationship_evidence"])
     assert relationships["state"] == "changed"
-    assert relationships["facts"]["state"] == "unchanged"
-    assert relationships["facts"]["added"] == []
-    assert relationships["facts"]["removed"] == []
-    assert relationships["locators"]["state"] == "changed"
-    assert len(relationships["locators"]["changes"]) >= 1
+    assert assert_object(relationships["facts"])["state"] == "unchanged"
+    assert assert_object(relationships["facts"])["added"] == []
+    assert assert_object(relationships["facts"])["removed"] == []
+    assert assert_object(relationships["locators"])["state"] == "changed"
+    assert len(assert_array(assert_object(relationships["locators"])["changes"])) >= 1
 
 
 def test_range_definition_change_does_not_masquerade_as_repository_change(
@@ -1195,11 +1260,11 @@ def test_range_definition_change_does_not_masquerade_as_repository_change(
             binding_delta_before=before,
         )
 
-    changed = delta["bindings"]["changed"][0]
-    assert changed["definition"]["state"] == "changed"
-    assert changed["direct_evidence"]["state"] == "preserved"
-    assert changed["locator_evidence"]["state"] == "preserved"
-    assert changed["member_evidence"]["state"] == "preserved"
+    changed = _changed_binding(delta)
+    assert assert_object(changed["definition"])["state"] == "changed"
+    assert assert_object(changed["direct_evidence"])["state"] == "preserved"
+    assert assert_object(changed["locator_evidence"])["state"] == "preserved"
+    assert assert_object(changed["member_evidence"])["state"] == "preserved"
     assert coverage["binding_impacts"] == [
         {
             "binding_id": "range-definition",
@@ -1238,8 +1303,8 @@ def test_dependency_definition_change_is_not_dependency_observation_change(
             binding_delta_before=before,
         )
 
-    changed = delta["bindings"]["changed"][0]
-    declared = changed["declared_dependencies"]
+    changed = _changed_binding(delta)
+    declared = assert_object(changed["declared_dependencies"])
     assert declared["state"] == "definition-changed"
     assert declared["definition"] == {
         "state": "changed",
@@ -1247,7 +1312,7 @@ def test_dependency_definition_change_is_not_dependency_observation_change(
         "removed": [],
     }
     assert declared["observations"] == {"state": "unchanged", "changes": []}
-    assert changed["definition"]["state"] == "changed"
+    assert assert_object(changed["definition"])["state"] == "changed"
     assert coverage["binding_impacts"] == [
         {
             "binding_id": "dependency-definition",
@@ -1272,12 +1337,12 @@ def test_out_of_range_span_separates_member_presence_from_locator_state(
             binding, include_relationships=False
         )
 
-    evidence = packet["bindings"][0]["evidence"][0]
+    evidence = _first_evidence(packet)
     assert evidence["member_state"] == "known-present"
     assert evidence["state"] == "known-absent"
     assert evidence["locator_state"] == "outside-member"
     assert evidence["content_state"] == "known-absent"
-    assert packet["completeness"]["state"] == "complete"
+    assert assert_object(packet["completeness"])["state"] == "complete"
 
 
 def test_cheap_binding_mode_does_not_query_relationship_lane(tmp_path: Path) -> None:
@@ -1326,10 +1391,10 @@ def test_bindings_are_language_neutral_for_typescript_and_config(
             bindings, include_relationships=False
         )
 
-    evidence = packet["bindings"][0]["evidence"]
+    evidence = assert_records(_first_binding(packet)["evidence"])
     assert [row["path"] for row in evidence] == ["src.ts", "settings.json"]
     assert all(row["state"] == "known-present" for row in evidence)
-    assert packet["completeness"]["state"] == "complete"
+    assert assert_object(packet["completeness"])["state"] == "complete"
 
 
 def test_binding_delta_keeps_observer_change_separate_from_repository_change(
@@ -1347,7 +1412,7 @@ def test_binding_delta_keeps_observer_change_separate_from_repository_change(
         before = codemap.repository_evidence_bindings(binding)
         after = deepcopy(before)
         after["observer"] = {
-            **after["observer"],
+            **assert_object(after["observer"]),
             "identity": "sha256:" + "a" * 64,
         }
         after["bindings_identity"] = "sha256:" + codemap._packet_digest(
@@ -1356,9 +1421,9 @@ def test_binding_delta_keeps_observer_change_separate_from_repository_change(
         )
         delta = codemap.repository_evidence_binding_delta(before, after)
 
-    assert delta["observer"]["changed"] is True
-    assert delta["bindings"]["preserved"] == ["observer-separation"]
-    assert delta["bindings"]["changed"] == []
+    assert assert_object(delta["observer"])["changed"] is True
+    assert assert_object(delta["bindings"])["preserved"] == ["observer-separation"]
+    assert assert_object(delta["bindings"])["changed"] == []
 
 
 def test_binding_delta_rejects_cross_repository_comparison(tmp_path: Path) -> None:
@@ -1473,8 +1538,10 @@ def test_binding_delta_reports_previously_absent_member_as_added(
         )
         delta = codemap.repository_evidence_binding_delta(before, after)
 
-    changed = delta["bindings"]["changed"][0]
-    member_change = changed["member_evidence"]["changes"][0]
+    changed = _changed_binding(delta)
+    member_change = assert_object(
+        assert_array(assert_object(changed["member_evidence"])["changes"])[0]
+    )
     assert member_change["state"] == "added"
     assert member_change["before_state"] == "known-absent"
     assert member_change["after_state"] == "known-present"
@@ -1520,7 +1587,7 @@ def test_binding_delta_rejects_tampered_authenticated_packet(tmp_path: Path) -> 
         codemap.sync()
         packet = codemap.repository_evidence_bindings(binding)
         before = deepcopy(packet)
-        before["bindings"][0]["evidence"][0]["state"] = "known-absent"
+        _first_evidence(before)["state"] = "known-absent"
 
         with pytest.raises(ValueError, match="before bindings identity mismatch"):
             codemap.repository_evidence_binding_delta(before, packet)
@@ -1538,7 +1605,7 @@ def test_binding_delta_rejects_resigned_nested_binding_tamper(tmp_path: Path) ->
         codemap.sync()
         packet = codemap.repository_evidence_bindings(binding)
         before = deepcopy(packet)
-        before["bindings"][0]["evidence"][0]["state"] = "known-absent"
+        _first_evidence(before)["state"] = "known-absent"
         payload = {
             key: value for key, value in before.items() if key != "bindings_identity"
         }
@@ -1604,7 +1671,7 @@ def test_binding_delta_rejects_resigned_malformed_definition_identity(
         codemap.sync()
         packet = codemap.repository_evidence_bindings(binding)
         before = deepcopy(packet)
-        before["bindings"][0]["binding_definition_identity"] = "forged"
+        _first_binding(before)["binding_definition_identity"] = "forged"
         payload = {
             key: value for key, value in before.items() if key != "bindings_identity"
         }
@@ -1628,7 +1695,7 @@ def test_binding_delta_rejects_resigned_duplicate_binding_ids(tmp_path: Path) ->
         codemap.sync()
         packet = codemap.repository_evidence_bindings(binding)
         before = deepcopy(packet)
-        before["bindings"].append(deepcopy(before["bindings"][0]))
+        assert_array(before["bindings"]).append(deepcopy(_first_binding(before)))
         payload = {
             key: value for key, value in before.items() if key != "bindings_identity"
         }
@@ -1668,7 +1735,11 @@ def test_binding_delta_reports_unsupported_member_becoming_present_as_state_chan
         )
         delta = codemap.repository_evidence_binding_delta(before, after)
 
-    change = delta["bindings"]["changed"][0]["member_evidence"]["changes"][0]
+    change = assert_object(
+        assert_array(
+            assert_object(_changed_binding(delta)["member_evidence"])["changes"]
+        )[0]
+    )
     assert change["state"] == "state-changed"
     assert change["before_state"] == "unsupported"
     assert change["after_state"] == "known-present"
@@ -1686,7 +1757,7 @@ def test_coverage_rejects_resigned_duplicate_binding_packet(tmp_path: Path) -> N
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         packet = codemap.repository_evidence_bindings(binding)
-        packet["bindings"].append(deepcopy(packet["bindings"][0]))
+        assert_array(packet["bindings"]).append(deepcopy(_first_binding(packet)))
         payload = {
             key: value for key, value in packet.items() if key != "bindings_identity"
         }
@@ -1722,7 +1793,7 @@ def test_coverage_rejects_resigned_contradictory_binding_delta(tmp_path: Path) -
             bindings, include_relationships=False
         )
         delta = codemap.repository_evidence_binding_delta(before, after)
-        delta["bindings"]["preserved"].append("value")
+        assert_array(assert_object(delta["bindings"])["preserved"]).append("value")
         payload = {
             key: value for key, value in delta.items() if key != "delta_identity"
         }
@@ -1756,7 +1827,7 @@ def test_coverage_rejects_resigned_forged_binding_delta_detail(tmp_path: Path) -
         codemap.sync(["source.py"])
         after = codemap.repository_evidence_bindings(bindings)
         delta = codemap.repository_evidence_binding_delta(before, after)
-        delta["bindings"]["changed"][0]["direct_evidence"]["state"] = "preserved"
+        assert_object(_changed_binding(delta)["direct_evidence"])["state"] = "preserved"
         payload = {
             key: value for key, value in delta.items() if key != "delta_identity"
         }
@@ -1796,7 +1867,9 @@ def test_coverage_rejects_authenticated_delta_with_foreign_repository_claim(
             bindings, include_relationships=False
         )
         delta = codemap.repository_evidence_binding_delta(before, after)
-        delta["repository"]["after"]["repository_identity"] = "sha256:foreign"
+        assert_object(assert_object(delta["repository"])["after"])[
+            "repository_identity"
+        ] = "sha256:foreign"
         payload = {
             key: value for key, value in delta.items() if key != "delta_identity"
         }
@@ -1836,7 +1909,9 @@ def test_coverage_rejects_authenticated_delta_with_foreign_before_repository_cla
             bindings, include_relationships=False
         )
         delta = codemap.repository_evidence_binding_delta(before, after)
-        delta["repository"]["before"]["repository_identity"] = "sha256:foreign"
+        assert_object(assert_object(delta["repository"])["before"])[
+            "repository_identity"
+        ] = "sha256:foreign"
         payload = {
             key: value for key, value in delta.items() if key != "delta_identity"
         }

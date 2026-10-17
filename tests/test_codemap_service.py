@@ -44,6 +44,8 @@ def test_codemap_service_shares_one_warm_authority(tmp_path: Path) -> None:
         assert status["syncs"] == 1
         assert client_a.find_task("NxImpactAdapter")[0]["path"] == "src/adapter.py"
         action = client_b.task_action_map("NxImpactAdapter implementation test")
+        assert action["edit"] is not None
+        assert action["verify"] is not None
         assert action["edit"]["path"] == "src/adapter.py"
         assert action["verify"]["path"] == "tests/test_adapter.py"
         packet = client_b.task_decision_packet("NxImpactAdapter implementation test")
@@ -232,6 +234,9 @@ def test_service_agent_task_start_returns_bounded_source_evidence(
         assert start["schema"] == operation_schema("task_evidence")
         ownership = start["ownership"]
         assert ownership["status"] == "resolved"
+        assert ownership["owner"] is not None
+        assert ownership["source_budget"] is not None
+        assert ownership["source_evidence"] is not None
         assert ownership["owner"]["path"] == "src/engine.py"
         assert ownership["source_budget"]["complete"] is True
         assert ownership["source_evidence"]["representation"] == "source-range"

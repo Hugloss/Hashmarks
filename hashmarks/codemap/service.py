@@ -32,12 +32,25 @@ from .evidence_packet import (
     TASK_EVIDENCE_DEFAULT_OPTIONS,
 )
 from .ownership_relation_defaults import OWNERSHIP_RELATION_DEFAULT_OPTIONS
+from .ownership_relation_types import OwnershipRelationGraph
 from .post_change import POST_CHANGE_DEFAULT_OPTIONS, PostChangeOptions
 from .repository_intelligence_query import (
     REPOSITORY_INTELLIGENCE_QUERY_DEFAULT_OPTIONS,
     RepositoryIntelligenceQueryOptions,
 )
 from .task_action_projection import TASK_ACTION_DEFAULT_OPTIONS
+from .task_evidence_contract import (
+    read_ownership_relation_graph,
+    read_post_change_delta,
+    read_task_action_map,
+    read_task_evidence,
+)
+from .task_evidence_types import (
+    PreviousTaskEvidence,
+    TaskActionMap,
+    TaskEvidencePacket,
+    TaskPostChangeDelta,
+)
 from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 
 PROTOCOL = "hashmarks.codemap-service.v2"
@@ -279,7 +292,7 @@ class CodeMapService:
         self._initial_sync_ms = 0.0
 
     @staticmethod
-    def _write(stream, response: dict[str, Any]) -> None:
+    def _write(stream: object, response: dict[str, object]) -> None:
         payload = (
             json.dumps(response, separators=(",", ":"), sort_keys=True) + "\n"
         ).encode("utf-8")
@@ -847,7 +860,7 @@ class CodeMapServiceClient:
                     ) from None
                 time.sleep(0.005)
 
-    def request(self, op: str, **payload: Any) -> dict[str, Any]:
+    def request(self, op: str, **payload: object) -> dict[str, object]:
         message = {"protocol": PROTOCOL, "op": op, **payload}
         raw = (
             json.dumps(message, separators=(",", ":"), sort_keys=True) + "\n"
@@ -955,8 +968,8 @@ class CodeMapServiceClient:
         *,
         limit: int = TASK_ACTION_DEFAULT_OPTIONS.limit,
         per_role: int = TASK_ACTION_DEFAULT_OPTIONS.per_role,
-    ) -> dict[str, Any]:
-        return dict(
+    ) -> TaskActionMap:
+        return read_task_action_map(
             self.request(
                 "task_action_map",
                 task=task,
@@ -987,8 +1000,8 @@ class CodeMapServiceClient:
         start_path: str,
         *,
         max_depth: int = OWNERSHIP_RELATION_DEFAULT_OPTIONS.max_depth,
-    ) -> dict[str, Any]:
-        return dict(
+    ) -> OwnershipRelationGraph:
+        return read_ownership_relation_graph(
             self.request(
                 "ownership_relation_graph",
                 task=task,
@@ -1056,8 +1069,8 @@ class CodeMapServiceClient:
         per_role: int = TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
         token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
         supplied_observations: list[dict[str, Any]] | None = None,
-    ) -> dict[str, Any]:
-        return dict(
+    ) -> TaskEvidencePacket:
+        return read_task_evidence(
             self.request(
                 "task_evidence",
                 task=task,
@@ -1161,12 +1174,12 @@ class CodeMapServiceClient:
         task: str,
         changed_paths: tuple[str, ...] | list[str],
         *,
-        previous_evidence: dict[str, Any],
+        previous_evidence: PreviousTaskEvidence,
         limit: int = TASK_EVIDENCE_DEFAULT_OPTIONS.limit,
         per_role: int = TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
         token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
-    ) -> dict[str, Any]:
-        return dict(
+    ) -> TaskPostChangeDelta:
+        return read_post_change_delta(
             self.request(
                 "task_post_change_delta",
                 task=task,

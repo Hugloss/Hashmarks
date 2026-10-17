@@ -92,6 +92,7 @@ _FORBIDDEN_EXECUTION_POLICY_KEYS = frozenset(
 # subdivision, scheduling, and resume behavior.
 PROCESS_SENSITIVE_NODEIDS = (
     "tests/test_codemap_watcher.py::test_codemap_watcher_keeps_map_hot_without_identity_daemon",
+    "tests/test_filesystem_lifecycle_native.py::test_native_child_replacement_is_separate_from_source_evidence",
 )
 
 # These are benchmark/measurement assertions, not release-correctness owners.

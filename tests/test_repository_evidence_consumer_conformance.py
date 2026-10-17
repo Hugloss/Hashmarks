@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from copy import deepcopy
+from typing import Any
 
 from hashmarks.consumer_conformance import validate_native_repository_evidence_bundle
 from hashmarks.evidence_context import evidence_context_identity
@@ -16,7 +19,11 @@ REPO_A = "sha256:" + "1" * 64 + ":1"
 REPO_B = "sha256:" + "2" * 64 + ":1"
 
 
-def _bundle(producer=PRODUCER_A, repo=REPO_A, generation=7):
+def _bundle(
+    producer: str = PRODUCER_A,
+    repo: str = REPO_A,
+    generation: int = 7,
+) -> tuple[dict[str, object], dict[str, object], dict[str, object], dict[str, object]]:
     membership = verification_membership(
         [verification_member("tests/test_a.py", test_symbol="test_a")]
     )
@@ -49,7 +56,7 @@ def _bundle(producer=PRODUCER_A, repo=REPO_A, generation=7):
     return envelope, contract, receipt, provenance
 
 
-def test_accepts_same_producer_repository_and_generation():
+def test_accepts_same_producer_repository_and_generation() -> None:
     assert (
         validate_native_repository_evidence_bundle(
             *_bundle(), expected_producer_implementation_identity=PRODUCER_A
@@ -58,7 +65,7 @@ def test_accepts_same_producer_repository_and_generation():
     )
 
 
-def test_rejects_cross_producer_context_pairing():
+def test_rejects_cross_producer_context_pairing() -> None:
     envelope, contract, _, _ = _bundle(PRODUCER_A)
     _, _, receipt, provenance = _bundle(PRODUCER_B)
     state = validate_native_repository_evidence_bundle(
@@ -72,7 +79,9 @@ def test_rejects_cross_producer_context_pairing():
     assert "context:context-identity-mismatch" in state["reasons"]
 
 
-def test_rejects_cross_repository_pairing_even_when_each_side_is_self_consistent():
+def test_rejects_cross_repository_pairing_even_when_each_side_is_self_consistent() -> (
+    None
+):
     envelope, contract, _, _ = _bundle(PRODUCER_A, REPO_A)
     _, _, receipt, provenance = _bundle(PRODUCER_A, REPO_B)
     state = validate_native_repository_evidence_bundle(
@@ -85,7 +94,9 @@ def test_rejects_cross_repository_pairing_even_when_each_side_is_self_consistent
     assert "cross-contract-repository-identity-mismatch" in state["reasons"]
 
 
-def test_rejects_cross_generation_pairing_even_when_each_side_is_self_consistent():
+def test_rejects_cross_generation_pairing_even_when_each_side_is_self_consistent() -> (
+    None
+):
     envelope, contract, _, _ = _bundle(PRODUCER_A, REPO_A, 7)
     _, _, receipt, provenance = _bundle(PRODUCER_A, REPO_A, 8)
     state = validate_native_repository_evidence_bundle(
@@ -98,7 +109,7 @@ def test_rejects_cross_generation_pairing_even_when_each_side_is_self_consistent
     assert "cross-contract-codemap-generation-mismatch" in state["reasons"]
 
 
-def test_rejects_tampered_verification_membership_with_valid_context():
+def test_rejects_tampered_verification_membership_with_valid_context() -> None:
     envelope, contract, receipt, provenance = _bundle()
     tampered = deepcopy(envelope)
     tampered["selection"]["members"][0]["member_id"] = "sha256:" + "f" * 64

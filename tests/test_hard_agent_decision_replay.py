@@ -4,7 +4,9 @@ from scripts.agent_evaluation.generate_hard_agent_corpus import generate
 from scripts.agent_evaluation.score_hard_agent_decisions import run
 
 
-def test_replay_freezes_before_grading_and_reports_all_categories(tmp_path: Path):
+def test_replay_freezes_before_grading_and_reports_all_categories(
+    tmp_path: Path,
+) -> None:
     repo = tmp_path / "repo"
     public = tmp_path / "public.json"
     secret = tmp_path / "secret.json"
@@ -18,7 +20,9 @@ def test_replay_freezes_before_grading_and_reports_all_categories(tmp_path: Path
     assert all("expected_edit_path" not in row for row in result["results"])
 
 
-def test_task_specific_symbol_anchor_beats_sibling_contract_noise(tmp_path: Path):
+def test_task_specific_symbol_anchor_beats_sibling_contract_noise(
+    tmp_path: Path,
+) -> None:
     repo = tmp_path / "repo"
     public = tmp_path / "public.json"
     secret = tmp_path / "secret.json"
@@ -53,7 +57,7 @@ def test_task_specific_symbol_anchor_beats_sibling_contract_noise(tmp_path: Path
     assert packet["edit"]["path"] == truth["expected_edit_path"]
 
 
-def test_explicit_policy_uses_task_namespace_not_sibling_policy(tmp_path: Path):
+def test_explicit_policy_uses_task_namespace_not_sibling_policy(tmp_path: Path) -> None:
     import json
     import shutil
 

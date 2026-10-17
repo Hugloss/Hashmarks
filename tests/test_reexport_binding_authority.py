@@ -11,7 +11,7 @@ def _write(root: Path, path: str, text: str) -> None:
     target.write_text(text)
 
 
-def _owners(tmp_path: Path, facade: str):
+def _owners(tmp_path: Path, facade: str) -> tuple[list[str], bool]:
     _write(tmp_path, "pkg/__init__.py", facade)
     _write(tmp_path, "pkg/impl.py", "def Public(): pass\n")
     _write(tmp_path, "tests/test_public.py", "from pkg import Public\n")

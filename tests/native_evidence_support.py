@@ -22,7 +22,7 @@ LSP_CORPUS = Path(__file__).parent / "fixtures" / "native_lsp"
 TASK = "Change normalize_widget in src/engine.py to lowercase the trimmed value and verify its semantics."
 
 
-def assert_literal_returned_counts(packet: Any) -> None:
+def assert_literal_returned_counts(packet: dict[str, object]) -> None:
     """Every advertised returned count accounts for the emitted rows only."""
     rows = packet["occurrences"]
     members = [
@@ -75,7 +75,7 @@ def materialize_scip(root: Path, source: Path) -> None:
     _replace_inputs(root, source, paths)
 
 
-def lsp_capture(root: Path, source: Path, name: str) -> dict[str, Any]:
+def lsp_capture(root: Path, source: Path, name: str) -> dict[str, object]:
     """Rebase only fixture-owned file URIs; raw capture bytes remain untouched."""
     metadata = json.loads((source / "capture.json").read_text())
     original = metadata["original_root_uri"]
@@ -84,7 +84,7 @@ def lsp_capture(root: Path, source: Path, name: str) -> dict[str, Any]:
         for path in metadata["source_revisions"]
     }
 
-    def rebase(value: Any) -> Any:
+    def rebase(value: object) -> object:
         if isinstance(value, str):
             return owned.get(value, value)
         if isinstance(value, list):
@@ -101,7 +101,75 @@ def lsp_capture(root: Path, source: Path, name: str) -> dict[str, Any]:
     return rebase(row["capture"])
 
 
-def import_native_scip(cm: Any, source: Path) -> None:
+def _lsp_document_event(
+    source: Path,
+    event: dict,
+    owned: dict[str, str],
+    documents: dict[str, dict],
+    lifetimes: Counter[str],
+) -> None:
+    document = event["params"]["textDocument"]
+    path = owned[document["uri"]]
+    method = event["method"]
+    if method == "textDocument/didOpen":
+        assert document["text"] == (source / path).read_text(encoding="utf-8")
+        lifetimes[path] += 1
+        documents[path] = {
+            "text": document["text"],
+            "revision_kind": "utf8-document-text",
+            "provenance": {
+                "producer_session": "fixture-session",
+                "document_lifetime": f"open-{lifetimes[path]}",
+                "document_version": document["version"],
+                "source_kind": "buffer",
+                "binding_basis": "producer-snapshot",
+            },
+        }
+    elif method == "textDocument/didChange":
+        (change,) = event["params"]["contentChanges"]
+        assert set(change) == {"text"}, "this corpus records full document changes"
+        documents[path]["text"] = change["text"]
+        documents[path]["provenance"]["document_version"] = document["version"]
+    else:
+        documents[path]["text"] = (source / path).read_text(encoding="utf-8")
+        documents[path]["provenance"]["source_kind"] = "disk"
+
+
+def assert_lsp_transcript(source: Path, metadata: dict, captures: list[dict]) -> None:
+    """Bind each retained request, reply and snapshot to the raw protocol events."""
+    owned = {
+        metadata["original_root_uri"] + "/" + path: path
+        for path in metadata["source_revisions"]
+    }
+    expected = {row["capture"]["request"]["id"]: row["capture"] for row in captures}
+    assert len(expected) == len(captures)
+    documents: dict[str, dict] = {}
+    lifetimes: Counter[str] = Counter()
+    requests, responses = set(), set()
+    for entry in json.loads((source / "transcript.json").read_text()):
+        if "sent" in entry:
+            event = entry["sent"]
+            method = event.get("method")
+            if method in (
+                "textDocument/didOpen",
+                "textDocument/didChange",
+                "textDocument/didClose",
+            ):
+                _lsp_document_event(source, event, owned, documents, lifetimes)
+            elif method and event.get("id") in expected:
+                capture = expected[event["id"]]
+                assert capture["request"] == event
+                assert capture["documents"] == documents
+                requests.add(event["id"])
+        else:
+            event = entry["received"]
+            if "method" not in event and event.get("id") in expected:
+                assert expected[event["id"]]["response"] == event
+                responses.add(event["id"])
+    assert requests == responses == set(expected)
+
+
+def import_native_scip(cm: object, source: Path) -> None:
     cm.import_scip(
         source / "index.json",
         provenance=json.loads((source / "provenance.json").read_text()),
@@ -132,7 +200,7 @@ def input_revisions(root: Path, paths: list[str]) -> list[dict[str, str]]:
 
 def dependency_capture(
     producer: str, source: Path, inputs: list[dict[str, str]]
-) -> Any:
+) -> dict[str, object]:
     if producer == "uv":
         return uv_lock_dependency_observation(
             lock=(source / "uv.lock").read_bytes(), repository_inputs=inputs
@@ -146,10 +214,11 @@ def dependency_capture(
     )
 
 
-def assert_projection(native: Any, operation: str, mode: str = "default") -> None:
+def assert_projection(native: object, operation: str, mode: str = "default") -> None:
     """Check exact selected evidence and explicit exclusions across all encodings."""
+    assert isinstance(native, dict)
     for format in FORMATS:
-        response: Any = presentation_response(
+        response: dict[str, object] = presentation_response(
             operation, native, format=format, result_mode=mode
         )
         if format == "none":
@@ -172,7 +241,9 @@ def assert_projection(native: Any, operation: str, mode: str = "default") -> Non
                 assert row["details"] == value
 
 
-def assert_hover_capture(packet: Any, capture: Any) -> Any:
+def assert_hover_capture(
+    packet: dict[str, object], capture: dict[str, object]
+) -> dict[str, object]:
     """A genuine hover's exact text remains an attributed, non-relational claim."""
     row = next(
         row for row in packet["observations"] if row["producer"] == capture["producer"]
@@ -195,7 +266,11 @@ def assert_hover_capture(packet: Any, capture: Any) -> Any:
     return row
 
 
-def assert_hover_presentation(packet: Any, presentation: Any, capture: Any) -> None:
+def assert_hover_presentation(
+    packet: dict[str, object],
+    presentation: dict[str, object],
+    capture: dict[str, object],
+) -> None:
     """Check the transported context, including its independent qualifications."""
     row = assert_hover_capture(packet, capture)
     assert validate_evidence_presentation(packet, presentation)["valid"] is True
@@ -217,7 +292,7 @@ def assert_hover_presentation(packet: Any, presentation: Any, capture: Any) -> N
         assert contents in presentation["text"]
 
 
-def semantic_dependency_fields(observation: Any) -> Any:
+def semantic_dependency_fields(observation: dict[str, object]) -> dict[str, object]:
     return {
         key: observation[key]
         for key in (

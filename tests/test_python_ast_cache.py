@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from hashmarks.python_ast_cache import ast_cache_info, clear_ast_cache, read_python_ast
+
+if TYPE_CHECKING:
+    import pytest
 
 
 def _function_names(tree: ast.Module) -> list[str]:
@@ -101,7 +105,7 @@ def test_python_ast_cache_observes_atomic_replace_with_same_size_and_mtime(
 
 
 def test_python_ast_cache_retries_when_source_changes_during_read(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     clear_ast_cache()
     source = tmp_path / "sample.py"
@@ -109,9 +113,9 @@ def test_python_ast_cache_retries_when_source_changes_during_read(
     original_read_text = Path.read_text
     calls = 0
 
-    def mutating_read_text(path: Path, *args, **kwargs) -> str:
+    def mutating_read_text(path: Path, *_args: object, **_kwargs: object) -> str:
         nonlocal calls
-        text = original_read_text(path, *args, **kwargs)
+        text = original_read_text(path, *_args, **_kwargs)
         if path == source and calls == 0:
             calls += 1
             source.write_text("def bravo():\n    return 2\n", encoding="utf-8")

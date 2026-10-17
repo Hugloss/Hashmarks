@@ -9,7 +9,7 @@ from scripts.agent_evaluation.repository_quality import (
 )
 
 
-def _case(**overrides):
+def _case(**overrides: object) -> dict[str, object]:
     value = {
         "schema": "hashmarks.repository-quality-case.v1",
         "case_id": "case-1",
@@ -38,7 +38,7 @@ def _case(**overrides):
     return value
 
 
-def _qualification_rows():
+def _qualification_rows() -> list[dict[str, object]]:
     cases = [
         _case(case_id="unique"),
         _case(
@@ -57,7 +57,10 @@ def _qualification_rows():
         {"state": "no-edit-authority", "owner": None},
         {"state": "explicit-test-target", "owner": None},
     ]
-    return [evaluate_case(case, result) for case, result in zip(cases, observed)]
+    return [
+        evaluate_case(case, result)
+        for case, result in zip(cases, observed, strict=True)
+    ]
 
 
 def test_sufficient_unique_owner_resolves_without_authority_violation() -> None:

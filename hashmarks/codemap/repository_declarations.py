@@ -25,6 +25,7 @@ from .repository_declaration_delta import declaration_delta
 
 if TYPE_CHECKING:
     from .engine import CodeMap
+    from .repository_declaration_provider import RepositoryDeclarationProvider
 
 _SCHEMA = operation_schema("repository_declarations")
 
@@ -322,6 +323,7 @@ class RepositoryDeclarationsMixin:
         *,
         name: str,
     ) -> Mapping[str, object]:
+        self = cast("CodeMap", self)
         repository = packet.get("repository")
         if not isinstance(repository, Mapping):
             raise ValueError(f"{name} repository must be an object")
@@ -416,6 +418,8 @@ class RepositoryDeclarationsMixin:
         binding_rows: Mapping[str, Mapping[str, object]],
         name: str,
     ) -> str:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         declaration_id = str(declaration.get("declaration_id") or "")
         if not declaration_id:
             raise ValueError(f"{name} declaration_id must not be empty")
@@ -521,6 +525,8 @@ class RepositoryDeclarationsMixin:
         *,
         name: str,
     ) -> None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         (
             group_id,
             semantic_namespace,
@@ -648,6 +654,8 @@ class RepositoryDeclarationsMixin:
             raise ValueError(f"{name} repository evidence binding set mismatch")
 
     def _validate_previous_declarations(self, previous: Mapping[str, object]) -> None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         self._validate_declaration_observation(
             previous,
             name="previous declaration observation",
@@ -677,7 +685,8 @@ class RepositoryDeclarationsMixin:
             bindings, include_relationships=False
         )
         binding_rows = {
-            str(row["binding_id"]): row for row in evidence_packet["bindings"]
+            str(row["binding_id"]): row
+            for row in cast("list[dict[str, object]]", evidence_packet["bindings"])
         }
         projected = [
             self._declaration_group(group, binding_rows) for group in normalized_groups
@@ -751,9 +760,24 @@ class RepositoryDeclarationsMixin:
         *,
         previous_observation: Mapping[str, object] | None = None,
         result_mode: str = operation_default_mode("repository_declarations"),
+        providers: Sequence[RepositoryDeclarationProvider] | None = None,
     ) -> dict[str, object]:
         """Execute one canonical declaration operation independent of transport."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         mode = require_operation_mode("repository_declarations", result_mode)
+        if mode == "discovery":
+            if groups:
+                raise ValueError("discovery requires empty caller-supplied groups")
+            discovered = self.discover_repository_declarations(
+                providers if providers is not None else (),
+                previous_observation=previous_observation,
+            )
+            return validate_operation_response(
+                "repository_declarations", discovered, mode=mode
+            )
+        if providers is not None:
+            raise ValueError("providers require result_mode=discovery")
         if mode == "explain" and previous_observation is not None:
             raise ValueError("previous_observation requires result_mode=observation")
         packet = self.repository_declarations(

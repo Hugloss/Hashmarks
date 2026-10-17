@@ -3,15 +3,19 @@ from __future__ import annotations
 import json
 import threading
 import time
-from typing import TYPE_CHECKING
+from collections.abc import Callable
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from hashmarks.codemap import CodeMap, CodeMapService, CodeMapServiceClient
 
 if TYPE_CHECKING:
-    from pathlib import Path
+    pass
 
 
-def _repo(root: Path, fake_maven_wrapper) -> tuple[str, str, str]:
+def _repo(
+    root: Path, fake_maven_wrapper: Callable[[Path], None]
+) -> tuple[str, str, str]:
     backend = "maven:com.example:api"
     web = "npm:@demo/web"
     mobile = "npm:@demo/mobile"
@@ -45,7 +49,7 @@ def _prepare(codemap: CodeMap) -> None:
 
 
 def test_cross_repository_packet_preserves_provenance_and_freshness(
-    tmp_path: Path, fake_maven_wrapper
+    tmp_path: Path, fake_maven_wrapper: Callable[[Path], None]
 ) -> None:
     backend, web, mobile = _repo(tmp_path, fake_maven_wrapper)
     with CodeMap(tmp_path) as codemap:
@@ -81,7 +85,7 @@ def test_cross_repository_packet_preserves_provenance_and_freshness(
 
 
 def test_shared_input_packet_reports_all_affected_projects(
-    tmp_path: Path, fake_maven_wrapper
+    tmp_path: Path, fake_maven_wrapper: Callable[[Path], None]
 ) -> None:
     backend, web, mobile = _repo(tmp_path, fake_maven_wrapper)
     with CodeMap(tmp_path) as codemap:
@@ -113,7 +117,7 @@ def test_no_cross_repository_evidence_is_explicitly_unresolved(tmp_path: Path) -
 
 
 def test_cross_repository_packet_service_roundtrip(
-    tmp_path: Path, fake_maven_wrapper
+    tmp_path: Path, fake_maven_wrapper: Callable[[Path], None]
 ) -> None:
     _repo(tmp_path, fake_maven_wrapper)
     socket_path = tmp_path / "cross-repo.sock"

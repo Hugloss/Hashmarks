@@ -19,7 +19,7 @@ from hashmarks.codemap import CodeMap
 from hashmarks.evidence_presentation import FORMATS, present_repository_evidence
 
 
-def reactor_capture(root: Path, source: Path, paths: list[str]) -> Any:
+def reactor_capture(root: Path, source: Path, paths: list[str]) -> dict[str, object]:
     contexts = ("alpha", "beta")
     return maven_dependency_observation(
         trees={
@@ -36,7 +36,9 @@ def reactor_capture(root: Path, source: Path, paths: list[str]) -> Any:
     )
 
 
-def _maven_capture(root: Path, source: Path, paths: list[str], scenario: str) -> Any:
+def _maven_capture(
+    root: Path, source: Path, paths: list[str], scenario: str
+) -> dict[str, object]:
     if scenario == "multi-module":
         return reactor_capture(root, source, paths)
     return dependency_capture("maven", source, input_revisions(root, paths))

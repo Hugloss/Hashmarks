@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING
 
 from hashmarks.operation_contract import operation_schema
 from hashmarks.python_ast_cache import read_python_ast

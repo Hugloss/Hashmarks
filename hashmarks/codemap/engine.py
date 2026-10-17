@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import TracebackType
 
 from hashmarks.client import (
     DaemonCompatibilityError,
@@ -22,7 +23,12 @@ from hashmarks.paths import canonical_host_path, normalize_relative_path
 from .change_intelligence import ChangeIntelligenceMixin
 from .context_cache import ContextCache
 from .cross_repository_evidence import CrossRepositoryEvidenceMixin
-from .decision_session import DecisionSessionMixin, decision_scoped
+from .decision_session import (
+    DecisionSessionMixin,
+    _DecisionDiagnosticFrame,
+    _DecisionProducerStats,
+    decision_scoped,
+)
 from .dependency_resolution_delta import DependencyResolutionDeltaMixin
 from .dependency_resolution_derivation import DependencyResolutionDerivationMixin
 from .dependency_resolution_evidence import DependencyResolutionEvidenceMixin
@@ -76,6 +82,7 @@ from .repository_task_action import TaskActionMixin
 from .singleflight import SingleFlight
 from .structural_locality import StructuralLocalityMixin
 from .structural_search import AstGrepSearchProvider
+from .task_evidence_types import TaskActionMap
 from .task_retrieval import TaskRetrievalMixin, _TaskRetrievalResult
 from .typescript_resolver import TypeScriptResolverProvider
 from .verification_explanation import VerificationExplanationMixin
@@ -261,7 +268,8 @@ class CodeMap(
             tuple[int, tuple[str, ...]], tuple[int, dict[str, int]]
         ] = {}
         self._decision_candidates_cache: dict[
-            tuple[int, tuple[str, ...], int], list[dict[str, object]]
+            tuple[int, tuple[str, ...], int, tuple[str, ...] | None],
+            list[dict[str, object]],
         ] = {}
         self._decision_repository_identity_cache: tuple[int, str] | None = None
         # Complete repository-intelligence snapshots are expensive compositions of
@@ -274,7 +282,7 @@ class CodeMap(
         # generation-bound retrieval/ownership evidence. Reuse only exact request
         # identities inside one explicit decision session.
         self._decision_task_action_cache: dict[
-            tuple[int, str, int, int], dict[str, object]
+            tuple[int, str, int, int], TaskActionMap
         ] = {}
         # Owner-chain reconstruction can traverse the bounded ownership relation
         # graph repeatedly while several impact-derived surfaces share one task
@@ -326,15 +334,20 @@ class CodeMap(
         self._decision_diagnostics_enabled = False
         self._decision_diagnostics_started_ns = 0
         self._decision_diagnostics_sequence = 0
-        self._decision_diagnostics_stack: list[dict[str, object]] = []
+        self._decision_diagnostics_stack: list[_DecisionDiagnosticFrame] = []
         self._decision_diagnostics_spans: list[dict[str, object]] = []
-        self._decision_diagnostics_producers: dict[str, dict[str, object]] = {}
+        self._decision_diagnostics_producers: dict[str, _DecisionProducerStats] = {}
         self._decision_diagnostics_last: dict[str, object] | None = None
 
     def __enter__(self) -> CodeMap:
         return self
 
-    def __exit__(self, exc_type, exc, tb) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None:
         self.close()
 
     def close(self) -> None:

@@ -5,6 +5,8 @@ import threading
 import time
 from typing import TYPE_CHECKING
 
+import pytest
+
 from hashmarks.cli import main
 from hashmarks.codemap import CodeMap, CodeMapService, CodeMapServiceClient
 
@@ -88,7 +90,7 @@ def test_repository_findings_path_scope_preserves_repository_import_risk_linkage
 
 
 def test_cli_map_findings_is_one_step_repository_analysis_surface(
-    tmp_path: Path, capsys
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     _write_repository(tmp_path)
     assert main(["map", "findings", "--workspace", str(tmp_path)]) == 0

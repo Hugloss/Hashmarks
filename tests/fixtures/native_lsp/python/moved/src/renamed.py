@@ -1,2 +1,2 @@
-def target():
+def target() -> int:
     return 1

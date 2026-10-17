@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import pytest
+
 from hashmarks.codemap import CodeMap
 
 if TYPE_CHECKING:
@@ -29,17 +31,56 @@ def _ref(path: str) -> dict[str, object]:
     }
 
 
+@pytest.mark.parametrize("reference_count", [1023, 1030])
+def test_real_indexed_reference_window_qualifies_completeness_before_projection(
+    tmp_path: Path, reference_count: int
+) -> None:
+    _write_owner(tmp_path)
+    (tmp_path / "src" / "callers.py").write_text(
+        "from src.owner import target\n\ndef caller():\n"
+        + "".join(
+            f"    value_{index} = target()\n" for index in range(reference_count)
+        ),
+        encoding="utf-8",
+    )
+    task = "Change target in src/owner.py"
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        # A smaller cached prefix must not hide the larger lookahead request.
+        with codemap.decision_session():
+            prefix = codemap._session_refs_many(["target"], limit_per_target=1024)
+            lookahead = codemap._session_refs_many(["target"], limit_per_target=1025)
+        assert len(prefix["target"]) == 1024
+        assert len(lookahead["target"]) == min(reference_count + 1, 1025)
+        assert prefix["target"] == lookahead["target"][:1024]
+        packet = codemap.verification_relevance(task)
+        graph = codemap.verification_ownership_graph(task)
+    truncated = reference_count + 1 > 1024
+    assert "search_bound_reasons" in packet
+    reasons = packet["search_bound_reasons"]
+    assert isinstance(reasons, list)
+    assert "negative_evidence_admissible" in packet
+    assert packet["negative_evidence_admissible"] is not truncated
+    assert ("direct-reverse-ref-limit" in reasons) is truncated
+    assert "completeness" in packet
+    assert packet["completeness"] == ("incomplete" if truncated else "complete")
+    summary = graph["summary"]
+    assert isinstance(summary, dict)
+    assert summary["unowned"] is (None if truncated else True)
+
+
 def test_bounded_reference_search_cannot_report_no_verification_candidate(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _write_owner(tmp_path)
     refs = [_ref(f"src/noise_{index}.py") for index in range(_DIRECT_REF_LIMIT + 1)]
-
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
 
-        def refs_many(targets, *, limit_per_target):
+        def refs_many(
+            targets: list[str], *, limit_per_target: int
+        ) -> dict[str, list[dict[str, object]]]:
             targets = list(targets)
             if limit_per_target == _DIRECT_REF_LIMIT + 1:
                 assert targets == ["target"]
@@ -68,15 +109,19 @@ def test_bounded_reference_search_cannot_report_no_verification_candidate(
 
     assert packet["selected"] is None
     assert packet["selection_reason"] == "verification-candidate-search-bounded"
+    assert "completeness" in packet
     assert packet["completeness"] == "incomplete"
+    assert "truncation" in packet
     assert packet["truncation"] == "truncated"
+    assert "negative_evidence_admissible" in packet
     assert packet["negative_evidence_admissible"] is False
+    assert "search_bound_reasons" in packet
     assert "direct-reverse-ref-limit" in packet["search_bound_reasons"]
 
 
 def test_bounded_reference_search_cannot_manufacture_unique_verifier(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _write_owner(tmp_path)
     (tmp_path / "tests").mkdir()
@@ -88,11 +133,12 @@ def test_bounded_reference_search_cannot_manufacture_unique_verifier(
     )
     refs = [_ref("tests/test_owner.py")]
     refs.extend(_ref(f"src/noise_{index}.py") for index in range(_DIRECT_REF_LIMIT))
-
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
 
-        def refs_many(targets, *, limit_per_target):
+        def refs_many(
+            targets: list[str], *, limit_per_target: int
+        ) -> dict[str, list[dict[str, object]]]:
             targets = list(targets)
             if limit_per_target == _DIRECT_REF_LIMIT + 1:
                 assert targets == ["target"]
@@ -113,25 +159,31 @@ def test_bounded_reference_search_cannot_manufacture_unique_verifier(
             rows=[],
         )
 
+    assert packet["selected"] is not None
     assert packet["selected"]["path"] == "tests/test_owner.py"
+    assert "selection_reason" in packet["selected"]
     assert (
         packet["selected"]["selection_reason"] == "best-bounded-verification-evidence"
     )
+    assert "completeness" in packet
     assert packet["completeness"] == "incomplete"
+    assert "negative_evidence_admissible" in packet
     assert packet["negative_evidence_admissible"] is False
+    assert "search_bound_reasons" in packet
     assert "direct-reverse-ref-limit" in packet["search_bound_reasons"]
 
 
 def test_exhausted_verification_search_can_still_authorize_absence(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _write_owner(tmp_path)
-
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
 
-        def refs_many(targets, *, limit_per_target):
+        def refs_many(
+            targets: list[str], *, limit_per_target: int
+        ) -> dict[str, list[dict[str, object]]]:
             return {symbol: [] for symbol in targets}
 
         monkeypatch.setattr(codemap, "_session_refs_many", refs_many)
@@ -150,7 +202,11 @@ def test_exhausted_verification_search_can_still_authorize_absence(
 
     assert packet["selected"] is None
     assert packet["selection_reason"] == "no-verification-candidate"
+    assert "completeness" in packet
     assert packet["completeness"] == "complete"
+    assert "truncation" in packet
     assert packet["truncation"] == "complete"
+    assert "negative_evidence_admissible" in packet
     assert packet["negative_evidence_admissible"] is True
+    assert "search_bound_reasons" in packet
     assert packet["search_bound_reasons"] == []

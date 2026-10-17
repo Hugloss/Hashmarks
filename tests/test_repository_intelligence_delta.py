@@ -6,6 +6,7 @@ import time
 from typing import TYPE_CHECKING
 
 import pytest
+from contract_assertions import assert_array, assert_object, assert_records, assert_text
 
 from hashmarks import CodeMap
 from hashmarks.codemap.repository_delta import (
@@ -34,18 +35,18 @@ def _repo(root: Path) -> tuple[Path, str]:
 
 
 def _apply(previous: dict[str, object], delta: dict[str, object]) -> dict[str, object]:
-    out = json.loads(json.dumps(previous))
-    for change in delta["changes"]:
-        path = change["path"]
+    out = assert_object(json.loads(json.dumps(previous)))
+    for change in assert_records(delta["changes"]):
+        path = [assert_text(part) for part in assert_array(change["path"])]
         current = out
         for part in path[:-1]:
-            current = current[part]
+            current = assert_object(current[part])
         key = path[-1]
         if change.get("delete"):
             del current[key]
         else:
             current[key] = change["value"]
-    out["snapshot_identity"] = delta["to"]["snapshot_identity"]
+    out["snapshot_identity"] = assert_object(delta["to"])["snapshot_identity"]
     return out
 
 
@@ -57,13 +58,12 @@ def test_snapshot_contains_path_symbols_dependencies_and_repository_evidence(
         codemap.sync()
         snapshot = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
     assert snapshot["schema"] == "hashmarks.repository-intelligence-snapshot.v1"
-    assert "src/owner.py" in snapshot["paths"]
-    assert any(
-        row.get("name") == "widget"
-        for row in snapshot["paths"]["src/owner.py"]["symbols"]
-    )
-    assert isinstance(snapshot["paths"]["src/owner.py"]["dependencies"], list)
-    assert snapshot["verification"]["member"] == "tests/test_owner.py"
+    paths = assert_object(snapshot["paths"])
+    owner = assert_object(paths["src/owner.py"])
+    assert "src/owner.py" in paths
+    assert any(row.get("name") == "widget" for row in assert_records(owner["symbols"]))
+    assert isinstance(owner["dependencies"], list)
+    assert assert_object(snapshot["verification"])["member"] == "tests/test_owner.py"
     assert snapshot["freshness"]
     assert snapshot["storage"] == "derived-not-persisted"
 
@@ -90,10 +90,10 @@ def test_repository_delta_is_smaller_and_exactly_reconstructs_current_snapshot(
     assert len(json.dumps(delta, sort_keys=True)) < len(
         json.dumps(current, sort_keys=True)
     )
-    assert "paths" in delta["changed_sections"]
-    assert "impact_changed" not in delta["semantic"]
-    assert "verification_changed" not in delta["semantic"]
-    assert delta["semantic"]["freshness_changed"] is True
+    assert "paths" in assert_array(delta["changed_sections"])
+    assert "impact_changed" not in assert_object(delta["semantic"])
+    assert "verification_changed" not in assert_object(delta["semantic"])
+    assert assert_object(delta["semantic"])["freshness_changed"] is True
 
 
 def test_repository_delta_reports_dependency_change(tmp_path: Path) -> None:
@@ -128,11 +128,15 @@ def test_repository_delta_reports_dependency_change(tmp_path: Path) -> None:
     assert _apply(previous, delta) == current
     assert any(
         row.get("target") == "src.b.widget"
-        for row in delta["semantic"]["dependencies_added"]
+        for row in assert_records(
+            assert_object(delta["semantic"])["dependencies_added"]
+        )
     )
     assert any(
         row.get("target") == "src.a.widget"
-        for row in delta["semantic"]["dependencies_removed"]
+        for row in assert_records(
+            assert_object(delta["semantic"])["dependencies_removed"]
+        )
     )
 
 
@@ -165,11 +169,11 @@ def test_repository_delta_does_not_promote_name_similarity_to_move_identity(
         )
     assert any(
         row.get("name") == "widget" and row["path"] == "src/right.py"
-        for row in delta["semantic"]["symbols_added"]
+        for row in assert_records(assert_object(delta["semantic"])["symbols_added"])
     )
     assert any(
         row.get("name") == "widget" and row["path"] == "src/left.py"
-        for row in delta["semantic"]["symbols_removed"]
+        for row in assert_records(assert_object(delta["semantic"])["symbols_removed"])
     )
     assert any(
         row.get("name") == "widget"
@@ -177,7 +181,9 @@ def test_repository_delta_does_not_promote_name_similarity_to_move_identity(
         and row["to"] == "src/right.py"
         and row["state"] == "possible"
         and row["identity_authority"] is False
-        for row in delta["semantic"]["possible_symbol_moves"]
+        for row in assert_records(
+            assert_object(delta["semantic"])["possible_symbol_moves"]
+        )
     )
 
 
@@ -216,7 +222,9 @@ def test_repository_delta_rejects_tampered_retained_snapshot(tmp_path: Path) -> 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         previous = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
-        previous["paths"]["src/owner.py"]["member_state"] = "known-absent"
+        assert_object(assert_object(previous["paths"])["src/owner.py"])[
+            "member_state"
+        ] = "known-absent"
 
         with pytest.raises(ValueError, match="snapshot identity mismatch"):
             codemap.repository_intelligence_delta(
@@ -272,8 +280,10 @@ def test_repository_snapshot_exposes_observer_and_explicit_completeness(
         codemap.sync()
         snapshot = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
 
-    assert snapshot["observer"]["identity"].startswith("sha256:")
-    assert snapshot["observer"]["producer"] == "hashmarks"
+    assert assert_text(assert_object(snapshot["observer"])["identity"]).startswith(
+        "sha256:"
+    )
+    assert assert_object(snapshot["observer"])["producer"] == "hashmarks"
     assert snapshot["completeness"] == {
         "state": "complete",
         "scope": "bounded-explicit-change-set",
@@ -289,7 +299,7 @@ def test_repository_delta_keeps_observer_change_separate_from_repository_change(
         codemap.sync()
         previous = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
         previous["observer"] = {
-            **previous["observer"],
+            **assert_object(previous["observer"]),
             "identity": "sha256:older-observer",
         }
         previous["snapshot_identity"] = "sha256:" + codemap._packet_digest(
@@ -304,8 +314,8 @@ def test_repository_delta_keeps_observer_change_separate_from_repository_change(
             task, ["src/owner.py"], previous_snapshot=previous
         )
 
-    assert delta["observer"]["changed"] is True
-    assert delta["observer"]["before"] == "sha256:older-observer"
+    assert assert_object(delta["observer"])["changed"] is True
+    assert assert_object(delta["observer"])["before"] == "sha256:older-observer"
     assert delta["repository_identity"]
 
 
@@ -318,30 +328,39 @@ def test_snapshot_relationship_rows_have_stable_identity_and_provenance(
         first = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
         second = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
 
-    symbol = first["paths"]["src/owner.py"]["symbols"][0]
-    assert symbol["identity"].startswith("sha256:")
+    first_owner = assert_object(assert_object(first["paths"])["src/owner.py"])
+    second_owner = assert_object(assert_object(second["paths"])["src/owner.py"])
+    symbol = assert_records(first_owner["symbols"])[0]
+    assert assert_text(symbol["identity"]).startswith("sha256:")
     assert symbol["provenance"] == {
         "source": "codemap-symbol-index",
         "path": "src/owner.py",
     }
-    assert (
-        second["paths"]["src/owner.py"]["symbols"][0]["identity"] == symbol["identity"]
-    )
+    assert assert_records(second_owner["symbols"])[0]["identity"] == symbol["identity"]
 
 
 def test_relationship_identity_does_not_turn_provenance_into_semantic_delta(
     tmp_path: Path,
 ) -> None:
-    _source, task = _repo(tmp_path)
+    source, task = _repo(tmp_path)
+    (tmp_path / "src/dependency.py").write_text("VALUE = 1\n", encoding="utf-8")
+    source.write_text(
+        "from src.dependency import VALUE\ndef widget(): return VALUE\n",
+        encoding="utf-8",
+    )
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         previous = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
-        dependencies = previous["paths"]["src/owner.py"]["dependencies"]
-        if dependencies:
-            dependencies[0]["provenance"] = {
-                "source": "older-compatible-observer",
-                "path": "src/owner.py",
-            }
+        dependencies = assert_records(
+            assert_object(assert_object(previous["paths"])["src/owner.py"])[
+                "dependencies"
+            ]
+        )
+        assert dependencies
+        dependencies[0]["provenance"] = {
+            "source": "older-compatible-observer",
+            "path": "src/owner.py",
+        }
         previous["snapshot_identity"] = "sha256:" + codemap._packet_digest(
             "hashmarks.repository-intelligence-snapshot.v1",
             {
@@ -354,8 +373,8 @@ def test_relationship_identity_does_not_turn_provenance_into_semantic_delta(
             task, ["src/owner.py"], previous_snapshot=previous
         )
 
-    assert not delta["semantic"].get("dependencies_added")
-    assert not delta["semantic"].get("dependencies_removed")
+    assert not assert_object(delta["semantic"]).get("dependencies_added")
+    assert not assert_object(delta["semantic"]).get("dependencies_removed")
 
 
 def test_diagnostic_delta_uses_identity_not_aggregate_count() -> None:
@@ -382,12 +401,13 @@ def test_diagnostic_delta_uses_identity_not_aggregate_count() -> None:
         before, after, changed_paths=["src/a.py"]
     )
 
-    assert delta["diagnostics"]["before_count"] == 2
-    assert delta["diagnostics"]["after_count"] == 2
-    assert len(delta["diagnostics"]["added"]) == 1
-    assert len(delta["diagnostics"]["removed"]) == 1
-    assert len(delta["diagnostics"]["added_in_changed_scope"]) == 1
-    assert delta["diagnostics"]["unchanged_count"] == 1
+    diagnostics = assert_object(delta["diagnostics"])
+    assert diagnostics["before_count"] == 2
+    assert diagnostics["after_count"] == 2
+    assert len(assert_array(diagnostics["added"])) == 1
+    assert len(assert_array(diagnostics["removed"])) == 1
+    assert len(assert_array(diagnostics["added_in_changed_scope"])) == 1
+    assert diagnostics["unchanged_count"] == 1
 
 
 def test_blocked_environment_is_observation_not_repository_failure() -> None:
@@ -547,7 +567,7 @@ def test_verification_relationship_has_provider_identity_without_sufficiency_cla
             provenance="static-reference",
         )
 
-    assert relationship["evidence_identity"].startswith("sha256:")
+    assert assert_text(relationship["evidence_identity"]).startswith("sha256:")
     assert relationship["classification"] == "direct"
     assert "boundary" not in relationship
     assert relationship["relation_kind"] == "behavioral-verification"

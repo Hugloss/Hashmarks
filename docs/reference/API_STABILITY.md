@@ -27,15 +27,57 @@ The local read-only MCP tools `dependency_codemap` and `repository_declarations`
 
 The documented `RepositoryDeclarationProvider`, `RepositoryDeclarationProviderContext`, `RepositoryDeclarationProviderResult`, `RepositoryDeclarationProviderError`, and `CodeMap.discover_repository_declarations()` surface is also supported Python API. The provider context exposes bounded admitted-path enumeration via `paths(prefix)`, plus revision-bound `exists`, `read_bytes`, and `read_text`; it intentionally does not expose a raw repository filesystem path. Discovery uses the `hashmarks.repository-declaration-discovery.v1` and `hashmarks.repository-declaration-discovery-delta.v1` wrapper schemas. Providers are explicitly supplied Python objects; ambient entry-point loading and arbitrary provider execution inside MCP are not part of the public contract.
 
-`CodeMap.task_evidence()` is the supported role-separated task-evidence API. Its schema is `hashmarks.task-evidence.v2`: bounded retrieval, explicit-target evidence, ownership, verification, related evidence, freshness and provenance are distinct authority domains.
+`CodeMap.task_evidence()` is the supported role-separated task-evidence API. Its default schema is `hashmarks.task-evidence.v5`: bounded retrieval, explicit-target evidence, ownership, verification, related evidence, freshness and provenance are distinct authority domains. Initial responses use `hashmarks.task-evidence-initial.v2` and retain the same facts through the initial packet codec; presentation bounds do not establish repository absence or ownership uniqueness.
 
-For natural-language tasks, `retrieval.results` may end with at most two `retrieval_supplement: "bounded-natural-language"` rows. These use the same search-hit fields as canonical rows, but their `score_basis` is `natural-term-match-count`; their scores are not comparable with canonical relevance scores. The requested result limit remains a hard cap. When supplements displace canonical rows, `retrieval.canonical_omitted_results` reports the exact number displaced and `retrieval.ordering` is `canonical-then-bounded-natural-language`. Supplements carry no ownership or verification authority.
+The current task-action, task-evidence, initial-envelope, and post-change response shapes are declared once in `hashmarks.codemap.task_evidence_types`. These `TypedDict` contracts preserve ordinary dictionary/JSON responses; they describe field structure, not repository authority. Default and initial calls have distinct return types. Nullable evidence remains nullable and conditional fields remain optional. Ownership hops and bounded graph projections share `hashmarks.codemap.ownership_relation_types`; trace and authority records are owned by `hashmarks.ownership_decision`. Service-client responses use these same shapes and validate their required fields and nested structure at the JSON boundary, preserving additional producer evidence. MCP Python calls retain the default/initial return distinction. Available and unavailable verification plans have separate typed shapes.
+
+The semantic initial view has its own `InitialTaskEvidenceProjection` contract, including encoded collections and omission accounting; it is not a complete default packet. `read_initial_projection()` reads this view after the lossless initial codec decodes it. The codec itself also supports opaque extension JSON and does not qualify repository authority.
+
+`PreviousTaskEvidence` accepts a current typed default packet or an ordinary dictionary loaded from JSON. Read-only mappings are rejected, and packet identity/context validation still runs before synchronization. `task_post_change_delta()` accepts only the current default task-evidence schema; older development packets are rejected before synchronization.
+
+For natural-language tasks, `retrieval.results` may end with at most two `retrieval_supplement: "bounded-natural-language"` rows. These use the same search-hit fields as canonical rows, but their `score_basis` is `natural-identifier-phrase-relevance`; their scores are not comparable with canonical relevance scores. The requested result limit remains a hard cap. When supplements displace canonical rows, `retrieval.canonical_omitted_results` reports the exact number displaced and `retrieval.ordering` is `canonical-then-bounded-natural-language`. Supplements carry no ownership or verification authority.
+
+`CodeMap.verification_ownership_graph()` and `hashmarks map verification-ownership` expose existing edit-authority links and bounded verifier candidates through `hashmarks.verification-ownership.v2`. `verification_qualification` retains the underlying relevance observation's authority, completeness, truncation, candidate count and bounds when supplied. Summary `unowned` and `ambiguous` values may be `null` when their observation scope is unknown or incomplete. Empty returned candidates alone cannot establish absence; a hidden, observed second candidate cannot disappear from ambiguity merely because the displayed candidate limit is smaller. These summaries describe repository observations, not verification sufficiency or execution permission.
+
+Verification relevance distinguishes aggregate reference uncertainty
+(`qualified_identity_ambiguous`) from unresolved identity in observed test
+references/imports (`verifier_identity_ambiguous`). The latter is an additive,
+optional boolean, qualified before output bounds and preserved in task evidence,
+initial projections and `verification_qualification`. Integers are not booleans at
+the JSON boundary. A missing scoped qualifier retains the aggregate ambiguity
+veto in task-owner projection.
+
+An unresolved production receiver call remains disclosed and prevents qualified
+verification absence or uniqueness; it does not by itself veto an independently
+established edit owner. Unresolved verifier identity still requires owner
+discrimination. Aggregate uncertainty continues to prevent verification evidence
+from being promoted into decisive owner discrimination. Neither field proves a
+dynamic receiver's type, test sufficiency or execution outcome.
+
+Selection traces and ownership authority qualify different facts. A trace may
+describe a resolved retrieval selection while its ownership proof remains
+incomplete. In that case the authority and task-evidence ownership status are
+`unresolved`, `owner_resolved` is false, and the candidate remains visible.
+`resolved` ownership requires the admitted owner and completed proof; only that
+owner supplies ownership source evidence. Competing-owner ambiguity is evaluated
+independently of verification uncertainty, so an unresolved production call cannot
+clear an existing conflict. Verification candidates and project-scoped test
+commands remain available even when edit ownership is unresolved.
 
 Importable implementation submodules under `hashmarks.*` are **not automatically public** merely because Python allows importing them. Internal helpers, storage classes, parsers, adapters, and mixins may change without compatibility guarantees unless a current public document explicitly promotes them into the contract.
 
 Development material under `scripts/agent_evaluation/`, `benchmarks/agent_evaluation/`, and `tests/` is measurement/evidence infrastructure, not installed product API.
 
 ## Pre-1.0 contract evolution
+
+Existing findings, structural-locality and resolved-owner task-evidence surfaces
+may carry the additive `resource_lifecycle` observation documented in
+[Filesystem lifecycle evidence](FILESYSTEM_LIFECYCLE_EVIDENCE.md). Its nested
+`hashmarks.python-filesystem-lifecycle-observation.v1` schema is accepted by
+`validate_repository_intelligence_evidence()`. Source-reference relationships,
+runtime identity, freshness, semantic coverage, lexical guards and external
+claims remain separate; validation never establishes protection or exploitability.
+An envelope without this optional family means evidence was not supplied.
 
 For the `0.x` series:
 
@@ -56,3 +98,47 @@ Compatibility must never weaken Hashmarks' authority model. In particular:
 - fail-closed freshness and provenance rules take precedence over preserving an obsolete convenience API.
 
 See [`PRODUCT_BOUNDARY.md`](PRODUCT_BOUNDARY.md) and [`INVARIANTS.md`](INVARIANTS.md).
+
+Task retrieval may include `same_name_declarations`: up to four other indexed
+callable declarations with the same spelling in the retrieved callable's file.
+The context retains exact source spans, member revision, index generation and
+observed/returned/omitted counts. Initial and presented responses preserve these
+facts. Same spelling establishes neither runtime identity nor inheritance,
+dispatch, ownership or verification selection; no global name graph is created.
+
+Diagnostic queries may also disclose one `bounded-lexical-source-position`
+supplement: a current source-visible callable containing query-token conjunctions
+after its declaration line. Lookup examines at most eight adjacent query-term
+groups (two observed spelling variants per term), thirty-two indexed declarations
+and one returned source-position hint. These are disclosure bounds, not semantic
+completeness or failure-owner proof. Explicit locators retain precedence and
+edit/verification selection remains independently owned.
+
+Such a locator may carry `direct_call_declarations`, containing up to four
+same-file callable targets from at most sixty-four direct indexed calls. The
+existing structural-locality resolver must qualify each target; nested callable
+calls, shadowed names and transitive targets are excluded. Exact target spans,
+call positions, source revision, generation, omissions and unqualified-call counts
+remain visible in every format. Runtime invocation remains unestablished and no
+negative-evidence authority is granted.
+
+Source-candidate test disclosure also retains task words in a candidate's directory
+before considering the union of declared names throughout its module. It derives
+that ordering from existing path and task-anchor facts. Qualified reference and
+filename evidence retain their ordering, and the selected verifier and edit owner
+are unchanged. A directory match establishes no test relationship or sufficiency.
+
+Initial compact declaration tables bind their scope through the finding's exact
+`source_refs[0]` plus the declaration-family key. Table row references append
+`/declarations/<i>` in native order. This avoids repeating that pointer inside
+each table; the complete native context, qualifiers and row values are retained.
+
+Observed repository fact/evidence: distinct same-named callable declarations in
+one selected repository file.
+Authority source: existing source-derived CodeMap symbol index and member binding.
+Completeness/freshness behavior: current visible source only, bounded disclosure
+with explicit omissions, no negative-evidence authority.
+Existing Hashmarks owner extended: task evidence lexical declaration disclosure.
+Consumer/execution responsibility explicitly not acquired: runtime dispatch,
+solution selection, execution and certification.
+Decision: OBSERVER.

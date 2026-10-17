@@ -123,7 +123,7 @@ class EvidenceFreshnessMixin:
             ):
                 continue
             try:
-                recorded_generation = int(cast(Any, value.get("generation")))
+                recorded_generation = int(cast(int, value.get("generation")))
             except (TypeError, ValueError):
                 continue
             if recorded_generation != previous_generation:
@@ -176,6 +176,8 @@ class EvidenceFreshnessMixin:
     def _rebind_project_freshness(
         self, producer: str, *, expected_generation: int | None = None
     ) -> int | None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         value = self._evidence_snapshot("project", producer)
         if value is None or bool(value.get("bind_generation", False)):
             return None
@@ -218,7 +220,7 @@ class EvidenceFreshnessMixin:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         try:
-            recorded_generation = int(cast(Any, value.get("generation")))
+            recorded_generation = int(cast(int, value.get("generation")))
         except (TypeError, ValueError):
             return False, "invalid generation snapshot"
         current_generation = self.store.generation()

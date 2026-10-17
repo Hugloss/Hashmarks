@@ -7,6 +7,7 @@ import multiprocessing as mp
 import os
 import tempfile
 import time
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -30,7 +31,7 @@ class WorkerResult:
     last_generation: int | None
 
 
-def _generation(payload: dict[str, Any]) -> int | None:
+def _generation(payload: Mapping[str, object]) -> int | None:
     value = payload.get("generation")
     if isinstance(value, int):
         return value
@@ -42,7 +43,7 @@ def _generation(payload: dict[str, Any]) -> int | None:
     return None
 
 
-def _surface_call(surface: HashmarksMcpSurface, lane: int) -> dict[str, Any]:
+def _surface_call(surface: HashmarksMcpSurface, lane: int) -> Mapping[str, object]:
     if lane == 0:
         return surface.repository_context(max_areas=8)
     if lane == 1:
@@ -62,7 +63,7 @@ def _surface_call(surface: HashmarksMcpSurface, lane: int) -> dict[str, Any]:
 
 
 def _generation_observation(
-    payload: dict[str, Any], last_generation: int | None
+    payload: Mapping[str, object], last_generation: int | None
 ) -> tuple[int | None, int]:
     generation = _generation(payload)
     if generation is None:

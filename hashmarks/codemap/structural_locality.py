@@ -19,6 +19,8 @@ from hashmarks.producer_identity import native_producer_implementation_identity
 from hashmarks.python_ast_cache import read_python_ast
 
 from .model import EvidenceVisibility
+from .ownership.filesystem_lifecycle import locality_lifecycle
+from .python_exports import python_class_node
 
 if TYPE_CHECKING:
     from .engine import CodeMap
@@ -220,16 +222,11 @@ class StructuralLocalityMixin:
         if not path.endswith(".py") or not source or not name:
             return False
         try:
-            tree = read_python_ast(self.workspace / path, errors="replace").tree
+            snapshot = read_python_ast(self.workspace / path, errors="replace")
         except (OSError, SyntaxError, UnicodeError, ValueError):
             return True
         function_name = source.rsplit(".", 1)[-1]
-        matching = [
-            node
-            for node in ast.walk(tree)
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-            and node.name == function_name
-        ]
+        matching = snapshot.function_definitions_by_name.get(function_name, ())
         if len(matching) != 1:
             return True
         function = matching[0]
@@ -259,21 +256,28 @@ class StructuralLocalityMixin:
             return None, candidate_ids, False
         kind, targets = self._python_export_binding(source_path, short)
         if kind == "local":
+            declared = self._python_export_is_declaration(source_path, short)
             local = [
-                row for row in candidates if str(row.get("path") or "") == source_path
+                row
+                for row in candidates
+                if declared and str(row.get("path") or "") == source_path
             ]
-            return _binding_result(local, candidates, unresolved=len(local) > 1)
+            return _binding_result(
+                local, candidates, unresolved=not declared or len(local) > 1
+            )
         if kind == "reexport" and len(targets) == 1:
-            owners, unresolved = self._resolve_import_owner_evidence(
+            symbols, unresolved = self._resolve_import_symbol_evidence(
                 source_path, targets[0]
             )
             if unresolved:
-                return None, candidate_ids, True, True
-            owner_paths = set(owners)
+                return None, candidate_ids, True
             owned = [
-                row for row in candidates if str(row.get("path") or "") in owner_paths
+                row
+                for row in candidates
+                if (str(row.get("path") or ""), str(row.get("qualname") or ""))
+                in symbols
             ]
-            return _binding_result(owned, candidates, unresolved=bool(owners))
+            return _binding_result(owned, candidates, unresolved=bool(symbols))
         if kind in {"ambiguous", "star"}:
             return None, candidate_ids, True
         return None, candidate_ids, False
@@ -287,19 +291,7 @@ class StructuralLocalityMixin:
             tree = read_python_ast(self.workspace / path, errors="replace").tree
         except (OSError, SyntaxError, UnicodeError, ValueError):
             return None
-        body: Sequence[ast.stmt] = tree.body
-        selected: ast.ClassDef | None = None
-        for part in qualname.split("."):
-            matches = [
-                node
-                for node in body
-                if isinstance(node, ast.ClassDef) and node.name == part
-            ]
-            if len(matches) != 1:
-                return None
-            selected = matches[0]
-            body = selected.body
-        return selected
+        return python_class_node(tree, qualname)
 
     def _python_class_bases(
         self, path: str, qualname: str
@@ -568,6 +560,8 @@ class StructuralLocalityMixin:
         target: str,
         candidates: list[dict[str, object]],
     ) -> tuple[dict[str, object] | None, list[str], bool, bool]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         candidate_ids = sorted(_symbol_id(row) for row in candidates)
         root = target.split(".", 1)[0]
         if not root or self._python_function_locally_binds(
@@ -575,7 +569,7 @@ class StructuralLocalityMixin:
         ):
             return None, candidate_ids, False, True
         kind, targets = self._python_export_binding(source_path, root)
-        if kind == "local":
+        if kind == "local" and self._python_export_is_declaration(source_path, root):
             return self._python_local_qualified_call_binding(
                 source_path, target, root, candidates
             )
@@ -583,21 +577,28 @@ class StructuralLocalityMixin:
             return self._python_reexport_qualified_call_binding(
                 source_path, target, targets[0], candidates
             )
-        return None, candidate_ids, kind in {"ambiguous", "star"}, True
+        return None, candidate_ids, kind in {"local", "ambiguous", "star"}, True
 
     def _resolve_call_target(
         self, edge: Mapping[str, object]
     ) -> tuple[dict[str, object] | None, list[str], bool, bool]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         target = str(edge.get("target") or "").strip()
         short = target.rsplit(".", 1)[-1]
         if not short:
             return None, [], False, True
-        evidence = self._visible_named_symbol_candidates(short)
+        source_path = str(edge.get("path") or "")
+        name = (
+            self._python_imported_call_name(source_path, short)
+            if target == short
+            else short
+        )
+        evidence = self._visible_named_symbol_candidates(name)
         candidates = evidence.rows
         candidate_ids = sorted(_symbol_id(row) for row in candidates)
         if not evidence.complete:
             return None, candidate_ids, True, False
-        source_path = str(edge.get("path") or "")
         source_qualname = str(edge.get("source") or "")
         source_row = self.store.file_row(source_path)
         language = "" if source_row is None else str(source_row["language"] or "")
@@ -623,10 +624,10 @@ class StructuralLocalityMixin:
     ) -> tuple[list[dict[str, object]], bool, list[dict[str, object]]]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        name = str(row["name"])
         target_id = _symbol_id(row)
-        raw_refs = [dict(ref) for ref in self.store.refs(name, limit=ref_limit)]
-        reference_bound_complete = len(raw_refs) < ref_limit
+        raw_refs, reference_bound_complete = self._python_call_reference_candidates(
+            row, ref_limit
+        )
         raw = [ref for ref in raw_refs if str(ref.get("kind") or "") == "call"]
         callers: dict[tuple[str, str], dict[str, object]] = {}
         unresolved: list[dict[str, object]] = []
@@ -1256,17 +1257,10 @@ class StructuralLocalityMixin:
             call_limit_per_symbol=call_limit_per_symbol,
             ref_limit_per_symbol=ref_limit_per_symbol,
         )
-        verification_paths = sorted(
-            {
-                str(path)
-                for path in self.tests(str(target_row["path"]), max_depth=3).get(
-                    "tests", []
-                )
-            }
-        )
         target_node = next(
             row for row in ordered_nodes if row["symbol_id"] == _symbol_id(target_row)
         )
+        verification_paths = self._locality_verification_paths(target_row, target_node)
         dimensions = {
             "symbol_count": len(ordered_nodes),
             "file_count": len({str(row["path"]) for row in ordered_nodes}),
@@ -1357,6 +1351,9 @@ class StructuralLocalityMixin:
         # Preserve unavailable and stale provider coverage without making it a
         # repository-negative relationship claim.
         semantic.update(self._scip_direct_relationships(target_row, target_node))
+        semantic["resource_lifecycle"] = locality_lifecycle(
+            self, ordered_nodes, max_depth, call_limit_per_symbol, ref_limit_per_symbol
+        )
         return {**semantic, "evidence_identity": _identity(semantic)}
 
 

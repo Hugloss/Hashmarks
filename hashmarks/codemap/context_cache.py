@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 _CONTEXT_ACTION_DOMAIN = b"hashmarks.context-action.v1\0"
 
 
-def canonical_json_bytes(value: Any) -> bytes:
+def canonical_json_bytes(value: object) -> bytes:
     return json.dumps(
         value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
     ).encode("utf-8")

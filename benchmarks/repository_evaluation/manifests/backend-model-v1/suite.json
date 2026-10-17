@@ -1,0 +1,742 @@
+{
+  "grader_file": "grader.json",
+  "qualification_scope": "Twelve independently reviewed genuine source problems. Class-variable annotation-only changes retain explicitly unknown verification correspondence. Explicit production paths and model source nomination; not answer-blind owner recall. Remaining model breadth and initial sufficiency are unqualified.",
+  "schema": "hashmarks.backend-evidence-workflows.v2",
+  "sources": {
+    "fastapi-dict-exclude-defaults-after": {
+      "commit": "aadfcce76380ab169fe172d5cda21722e53c4924",
+      "content_identity": "sha256:2f615ba2fb85aaf8b0b9ff1b3577150ebbf786798df49be2cb6481eb9c65dce5:3134",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/fastapi"
+    },
+    "fastapi-dict-exclude-defaults-before": {
+      "commit": "4ffd45172059cb32c3326cedde2c7ecf579c5db8",
+      "content_identity": "sha256:2ce7cfa1a7a0340ea62a8a38237ef804b5092124e9fd3b0f9bff4f3272683ca9:3134",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/fastapi"
+    },
+    "fastapi-iterable-response-options-after": {
+      "commit": "d6537f774b0e80e376e2cf4e0fa998a38c6d0c09",
+      "content_identity": "sha256:df4f016032a76da5d2cf29af9f1495356b42c1c79b493145b23db0ad61d03e32:3135",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/fastapi"
+    },
+    "fastapi-iterable-response-options-before": {
+      "commit": "0f3d3b2f9f09f04fe612d4b7db32485170c9f1dd",
+      "content_identity": "sha256:ccf6682ec80563d9b74bfd2cc89c8a31afda4a96c35f00d7340a037661fda23a:3135",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/fastapi"
+    },
+    "litestar-notrequired-field-schema-after": {
+      "commit": "ce3ff9e6de8a3f69b45e8ab2c716908cb7c9b749",
+      "content_identity": "sha256:ce20973c71352bb8bdae5bd6cf1f625629f34c0ba6a62c456d16941d11c1cb93:1445",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar"
+    },
+    "litestar-notrequired-field-schema-before": {
+      "commit": "7c9d0e0dd8c68c92d162ad65f39f44f3b75cbcd4",
+      "content_identity": "sha256:e610dde327395441f4825327418c68a8b9010ccc5fd47b5ce7cbc2fa8c683e82:1445",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar"
+    },
+    "litestar-nullable-required-fields-after": {
+      "commit": "0377e285cb3c1f0d3e17876fcdc0b6be443d0a58",
+      "content_identity": "sha256:4509516280bf7369d16784c0794320c504ef2c53e3be37b2efb29ce82f732363:1387",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar"
+    },
+    "litestar-nullable-required-fields-before": {
+      "commit": "e0204f0db1aeff58b17ccc7d6daa168588a16799",
+      "content_identity": "sha256:fb4689d651cbd2e777b069ac67b7d9ef8d76acce168cb076f7f61bc0771006bb:1387",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar"
+    },
+    "litestar-optional-computed-field-after": {
+      "commit": "6e432d0d6b4ae2a7f794641eef6eae4d89d2e92e",
+      "content_identity": "sha256:5fe150c8e06cad6e557c11df18351ed135fadb99bb97b4de26d65b3e8266b7ff:1400",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar"
+    },
+    "litestar-optional-computed-field-before": {
+      "commit": "e44964c2ba2ed0f43e45e7e454d6119835f3db78",
+      "content_identity": "sha256:f3bcc38a20b499e5577c684fa5097ce72edd4cc2d4368077e9113850d37aa8ad:1399",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar"
+    },
+    "litestar-optional-nested-dto-after": {
+      "commit": "4e6c3f24bac978ea3e38a034e65a933b1b3a2f3f",
+      "content_identity": "sha256:0bdf61a0ac7611a52fbd447efe6bd10f182e8d8728b1616af51a67b090bcea55:1404",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar"
+    },
+    "litestar-optional-nested-dto-before": {
+      "commit": "2613a77c4f5dc37741bdbffaec223817f24f06e1",
+      "content_identity": "sha256:1c8514d0c8f722e5fa133b16be24e2e84c6a1fb17d66472dbd8f834656e7d128:1404",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar"
+    },
+    "litestar-root-schema-name-after": {
+      "commit": "e68dd0b58b078fa83d5ad23a542ce4d7116a83ed",
+      "content_identity": "sha256:2a2e5f8d4b47f2bb006578aa1edc9b4e65fcd3732923cb71f85a39c30c4bad7e:1404",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar"
+    },
+    "litestar-root-schema-name-before": {
+      "commit": "30ae1fa5ef197e816bd89968625ad395e367ba0b",
+      "content_identity": "sha256:5d7ad0a4eb50701d99b805d81ac593b321f14e13ca1b6ec66be988ef6364acc4:1404",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar"
+    },
+    "sqlmodel-field-discriminator-after": {
+      "commit": "073023d84546490bd5dce86ce94fe6e8914db7c2",
+      "content_identity": "sha256:52c47becdd7c2af0a5795317b693725fa5a1b8005eeae2b48c00affe87ce7c79:508",
+      "repository": "sqlmodel",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/sqlmodel"
+    },
+    "sqlmodel-field-discriminator-before": {
+      "commit": "43353a45817b30a51b7904d0b30e500bbbcef7ca",
+      "content_identity": "sha256:aac1ee4905b23bbef428faf1cb80d87561a10fd0e02bff8534f929e054151cc2:508",
+      "repository": "sqlmodel",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/sqlmodel"
+    },
+    "sqlmodel-field-item-bounds-after": {
+      "commit": "2d02c4cd6fe861fca9ffd1a487eb32202f85c8df",
+      "content_identity": "sha256:73d2fbe3ae72a1896d9c99b53d323ad4a16fd97f39edab4abbf45636cec6e2c4:508",
+      "repository": "sqlmodel",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/sqlmodel"
+    },
+    "sqlmodel-field-item-bounds-before": {
+      "commit": "83db52b0556e9437d5b0b229abdda5938eb09a9f",
+      "content_identity": "sha256:c9e55030c465f08970aa117b911cb1f1d25dd22a737a20ef9d6ed79137510fe9:508",
+      "repository": "sqlmodel",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/sqlmodel"
+    },
+    "sqlmodel-field-sa-type-after": {
+      "commit": "01960be28ed852c5c118c5be163c91bb72f3cd91",
+      "content_identity": "sha256:b1149d32dd24c30fce2347797b563e04fcaa9d6a85bcb44bb92f5c4cf5d36593:509",
+      "repository": "sqlmodel",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/sqlmodel"
+    },
+    "sqlmodel-field-sa-type-before": {
+      "commit": "7fec3bcbdbca5b29b21ac4777e3fb341d8a7e4e1",
+      "content_identity": "sha256:596145813826677d63fd6beac23cee6a3cd4292a7388c17f990c2cd95d9ec2d1:508",
+      "repository": "sqlmodel",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/sqlmodel"
+    },
+    "sqlmodel-relationship-declaration-type-after": {
+      "commit": "fcb2da310d5906c878f90dac2121d194388c39f3",
+      "content_identity": "sha256:22094ae8546a5d60bc9a63bc1f9effd548b3a28e2e38cb03dacfac450e5f37b1:506",
+      "repository": "sqlmodel",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/sqlmodel"
+    },
+    "sqlmodel-relationship-declaration-type-before": {
+      "commit": "46abf3fb662909c5d1f2a157f04091126304026c",
+      "content_identity": "sha256:3d5986753171bf04cf1c02559e31a6c6d868663c413812ce104ef399f214d708:506",
+      "repository": "sqlmodel",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/sqlmodel"
+    },
+    "sqlmodel-utc-timedelta-after": {
+      "commit": "bc809ca3f54cafb9eb93b826e00507cf8582e55a",
+      "content_identity": "sha256:97ee5e4af7ce01062c07ac6fc3d20325c27d88f150e69ce074df2d026bfadf4b:525",
+      "repository": "sqlmodel",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/sqlmodel"
+    },
+    "sqlmodel-utc-timedelta-before": {
+      "commit": "dcaf3296ae0b79d802ce69c18eced6b590e499b7",
+      "content_identity": "sha256:7d3fd4319c2b562e4fb7168e99a1a9a8a18fbe4495931b6a44400c60cb7dbd12:525",
+      "repository": "sqlmodel",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/sqlmodel"
+    }
+  },
+  "suite": "backend-model-v1",
+  "workflows": [
+    {
+      "after": "fastapi-dict-exclude-defaults-after",
+      "before": "fastapi-dict-exclude-defaults-before",
+      "capabilities": [
+        10
+      ],
+      "changed_paths": [
+        "fastapi/encoders.py",
+        "tests/test_jsonable_encoder.py"
+      ],
+      "declaration_observations": {
+        "after": {
+          "groups": [],
+          "include_class_fields": true,
+          "python_backend_paths": [
+            "tests/test_jsonable_encoder.py"
+          ],
+          "result_mode": "discovery"
+        },
+        "before": {
+          "groups": [],
+          "include_class_fields": true,
+          "python_backend_paths": [
+            "tests/test_jsonable_encoder.py"
+          ],
+          "result_mode": "discovery"
+        }
+      },
+      "id": "fastapi-dict-exclude-defaults",
+      "native_required": true,
+      "problem_id": "aadfcce76380ab169fe172d5cda21722e53c4924",
+      "problem_source": "https://github.com/fastapi/fastapi/commit/aadfcce76380ab169fe172d5cda21722e53c4924",
+      "repository": "fastapi",
+      "task": "Fix exclude_defaults propagation for models nested in dicts and lists in fastapi/encoders.py.",
+      "transitions": [
+        {
+          "after_path": "fastapi/encoders.py",
+          "before_path": "fastapi/encoders.py",
+          "kind": "modify"
+        },
+        {
+          "after_path": "tests/test_jsonable_encoder.py",
+          "before_path": "tests/test_jsonable_encoder.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "litestar-notrequired-field-schema-after",
+      "before": "litestar-notrequired-field-schema-before",
+      "capabilities": [
+        10
+      ],
+      "changed_paths": [
+        "litestar/plugins/pydantic/utils.py",
+        "tests/unit/test_plugins/test_pydantic/test_schema_plugin.py"
+      ],
+      "declaration_observations": {
+        "after": {
+          "groups": [],
+          "include_class_fields": true,
+          "python_backend_paths": [
+            "tests/unit/test_plugins/test_pydantic/test_schema_plugin.py"
+          ],
+          "result_mode": "discovery"
+        },
+        "before": {
+          "groups": [],
+          "include_class_fields": true,
+          "python_backend_paths": [
+            "tests/unit/test_plugins/test_pydantic/test_schema_plugin.py"
+          ],
+          "result_mode": "discovery"
+        }
+      },
+      "id": "litestar-notrequired-field-schema",
+      "native_required": true,
+      "problem_id": "ce3ff9e6de8a3f69b45e8ab2c716908cb7c9b749",
+      "problem_source": "https://github.com/litestar-org/litestar/commit/ce3ff9e6de8a3f69b45e8ab2c716908cb7c9b749",
+      "repository": "litestar",
+      "task": "Fix default_factory constrained field schema classification in litestar/plugins/pydantic/utils.py.",
+      "transitions": [
+        {
+          "after_path": "litestar/plugins/pydantic/utils.py",
+          "before_path": "litestar/plugins/pydantic/utils.py",
+          "kind": "modify"
+        },
+        {
+          "after_path": "tests/unit/test_plugins/test_pydantic/test_schema_plugin.py",
+          "before_path": "tests/unit/test_plugins/test_pydantic/test_schema_plugin.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "sqlmodel-field-discriminator-after",
+      "before": "sqlmodel-field-discriminator-before",
+      "capabilities": [
+        10
+      ],
+      "changed_paths": [
+        "sqlmodel/main.py",
+        "tests/test_pydantic/test_field.py"
+      ],
+      "declaration_observations": {
+        "after": {
+          "groups": [],
+          "include_class_fields": true,
+          "python_backend_paths": [
+            "tests/test_pydantic/test_field.py"
+          ],
+          "result_mode": "discovery"
+        },
+        "before": {
+          "groups": [],
+          "include_class_fields": true,
+          "python_backend_paths": [
+            "tests/test_pydantic/test_field.py"
+          ],
+          "result_mode": "discovery"
+        }
+      },
+      "id": "sqlmodel-field-discriminator",
+      "native_required": true,
+      "problem_id": "073023d84546490bd5dce86ce94fe6e8914db7c2",
+      "problem_source": "https://github.com/fastapi/sqlmodel/commit/073023d84546490bd5dce86ce94fe6e8914db7c2",
+      "repository": "sqlmodel",
+      "task": "Support callable Field discriminator declarations in sqlmodel/main.py.",
+      "transitions": [
+        {
+          "after_path": "sqlmodel/main.py",
+          "before_path": "sqlmodel/main.py",
+          "kind": "modify"
+        },
+        {
+          "after_path": "tests/test_pydantic/test_field.py",
+          "before_path": "tests/test_pydantic/test_field.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "fastapi-iterable-response-options-after",
+      "before": "fastapi-iterable-response-options-before",
+      "capabilities": [
+        10
+      ],
+      "changed_paths": [
+        "fastapi/routing.py",
+        "tests/test_skip_defaults.py"
+      ],
+      "declaration_observations": {
+        "after": {
+          "groups": [],
+          "include_class_fields": true,
+          "python_backend_paths": [
+            "tests/test_skip_defaults.py"
+          ],
+          "result_mode": "discovery"
+        },
+        "before": {
+          "groups": [],
+          "include_class_fields": true,
+          "python_backend_paths": [
+            "tests/test_skip_defaults.py"
+          ],
+          "result_mode": "discovery"
+        }
+      },
+      "id": "fastapi-iterable-response-options",
+      "native_required": true,
+      "problem_id": "d6537f774b0e80e376e2cf4e0fa998a38c6d0c09",
+      "problem_source": "https://github.com/fastapi/fastapi/commit/d6537f774b0e80e376e2cf4e0fa998a38c6d0c09",
+      "repository": "fastapi",
+      "task": "Fix Iterable response model options in fastapi/routing.py.",
+      "transitions": [
+        {
+          "after_path": "fastapi/routing.py",
+          "before_path": "fastapi/routing.py",
+          "kind": "modify"
+        },
+        {
+          "after_path": "tests/test_skip_defaults.py",
+          "before_path": "tests/test_skip_defaults.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "litestar-nullable-required-fields-after",
+      "before": "litestar-nullable-required-fields-before",
+      "capabilities": [
+        10
+      ],
+      "changed_paths": [
+        "litestar/typing.py"
+      ],
+      "declaration_observations": {
+        "after": {
+          "groups": [],
+          "include_class_fields": true,
+          "python_backend_paths": [
+            "tests/unit/test_plugins/test_pydantic/models.py"
+          ],
+          "result_mode": "discovery"
+        },
+        "before": {
+          "groups": [],
+          "include_class_fields": true,
+          "python_backend_paths": [
+            "tests/unit/test_plugins/test_pydantic/models.py"
+          ],
+          "result_mode": "discovery"
+        }
+      },
+      "id": "litestar-nullable-required-fields",
+      "native_required": true,
+      "problem_id": "0377e285cb3c1f0d3e17876fcdc0b6be443d0a58",
+      "problem_source": "https://github.com/litestar-org/litestar/commit/0377e285cb3c1f0d3e17876fcdc0b6be443d0a58",
+      "repository": "litestar",
+      "task": "Fix nullable field requiredness declarations in litestar/typing.py.",
+      "transitions": [
+        {
+          "after_path": "litestar/typing.py",
+          "before_path": "litestar/typing.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "sqlmodel-utc-timedelta-after",
+      "before": "sqlmodel-utc-timedelta-before",
+      "capabilities": [
+        10
+      ],
+      "changed_paths": [
+        "sqlmodel/sql/sqltypes.py",
+        "tests/test_datetime.py"
+      ],
+      "declaration_observations": {
+        "after": {
+          "groups": [],
+          "include_class_fields": true,
+          "python_backend_paths": [
+            "tests/test_datetime.py"
+          ],
+          "result_mode": "discovery"
+        },
+        "before": {
+          "groups": [],
+          "include_class_fields": true,
+          "python_backend_paths": [
+            "tests/test_datetime.py"
+          ],
+          "result_mode": "discovery"
+        }
+      },
+      "id": "sqlmodel-utc-timedelta",
+      "native_required": true,
+      "problem_id": "bc809ca3f54cafb9eb93b826e00507cf8582e55a",
+      "problem_source": "https://github.com/fastapi/sqlmodel/commit/bc809ca3f54cafb9eb93b826e00507cf8582e55a",
+      "repository": "sqlmodel",
+      "task": "Fix UTC datetime field timedelta comparisons in sqlmodel/sql/sqltypes.py.",
+      "transitions": [
+        {
+          "after_path": "sqlmodel/sql/sqltypes.py",
+          "before_path": "sqlmodel/sql/sqltypes.py",
+          "kind": "modify"
+        },
+        {
+          "after_path": "tests/test_datetime.py",
+          "before_path": "tests/test_datetime.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "sqlmodel-relationship-declaration-type-after",
+      "before": "sqlmodel-relationship-declaration-type-before",
+      "capabilities": [
+        10
+      ],
+      "changed_paths": [
+        "sqlmodel/main.py"
+      ],
+      "declaration_observations": {
+        "after": {
+          "groups": [],
+          "include_class_fields": true,
+          "python_backend_paths": [
+            "sqlmodel/main.py"
+          ],
+          "result_mode": "discovery"
+        },
+        "before": {
+          "groups": [],
+          "include_class_fields": true,
+          "python_backend_paths": [
+            "sqlmodel/main.py"
+          ],
+          "result_mode": "discovery"
+        }
+      },
+      "id": "sqlmodel-relationship-declaration-type",
+      "native_required": true,
+      "problem_id": "fcb2da310d5906c878f90dac2121d194388c39f3",
+      "problem_source": "https://github.com/fastapi/sqlmodel/commit/fcb2da310d5906c878f90dac2121d194388c39f3",
+      "repository": "sqlmodel",
+      "task": "Fix the declared class-variable relationship annotation in sqlmodel/main.py.",
+      "transitions": [
+        {
+          "after_path": "sqlmodel/main.py",
+          "before_path": "sqlmodel/main.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "litestar-optional-computed-field-after",
+      "before": "litestar-optional-computed-field-before",
+      "capabilities": [
+        10
+      ],
+      "changed_paths": [
+        "litestar/plugins/pydantic/dto.py",
+        "tests/unit/test_plugins/test_pydantic/test_computed_optional_field.py"
+      ],
+      "declaration_observations": {
+        "after": {
+          "groups": [],
+          "include_class_fields": true,
+          "python_backend_paths": [
+            "tests/unit/test_plugins/test_pydantic/test_computed_optional_field.py"
+          ],
+          "result_mode": "discovery"
+        },
+        "before": {
+          "groups": [],
+          "include_class_fields": true,
+          "python_backend_paths": [
+            "tests/unit/test_plugins/test_pydantic/test_pydantic_dto_factory.py"
+          ],
+          "result_mode": "discovery"
+        }
+      },
+      "id": "litestar-optional-computed-field",
+      "native_required": true,
+      "problem_id": "6e432d0d6b4ae2a7f794641eef6eae4d89d2e92e",
+      "problem_source": "https://github.com/litestar-org/litestar/commit/6e432d0d6b4ae2a7f794641eef6eae4d89d2e92e",
+      "repository": "litestar",
+      "task": "Fix optional computed-field return declarations in litestar/plugins/pydantic/dto.py.",
+      "transitions": [
+        {
+          "after_path": "litestar/plugins/pydantic/dto.py",
+          "before_path": "litestar/plugins/pydantic/dto.py",
+          "kind": "modify"
+        },
+        {
+          "after_path": "tests/unit/test_plugins/test_pydantic/test_computed_optional_field.py",
+          "before_path": null,
+          "kind": "add"
+        }
+      ]
+    },
+    {
+      "after": "litestar-optional-nested-dto-after",
+      "before": "litestar-optional-nested-dto-before",
+      "capabilities": [
+        10
+      ],
+      "changed_paths": [
+        "litestar/dto/_codegen_backend.py",
+        "tests/unit/test_dto/test_factory/test_backends/test_backends.py"
+      ],
+      "declaration_observations": {
+        "after": {
+          "groups": [],
+          "include_class_fields": true,
+          "python_backend_paths": [
+            "tests/unit/test_dto/test_factory/test_backends/test_backends.py"
+          ],
+          "result_mode": "discovery"
+        },
+        "before": {
+          "groups": [],
+          "include_class_fields": true,
+          "python_backend_paths": [
+            "tests/unit/test_dto/test_factory/test_backends/test_backends.py"
+          ],
+          "result_mode": "discovery"
+        }
+      },
+      "id": "litestar-optional-nested-dto",
+      "native_required": true,
+      "problem_id": "4e6c3f24bac978ea3e38a034e65a933b1b3a2f3f",
+      "problem_source": "https://github.com/litestar-org/litestar/commit/4e6c3f24bac978ea3e38a034e65a933b1b3a2f3f",
+      "repository": "litestar",
+      "task": "Fix optional nested model transfer in litestar/dto/_codegen_backend.py.",
+      "transitions": [
+        {
+          "after_path": "litestar/dto/_codegen_backend.py",
+          "before_path": "litestar/dto/_codegen_backend.py",
+          "kind": "modify"
+        },
+        {
+          "after_path": "tests/unit/test_dto/test_factory/test_backends/test_backends.py",
+          "before_path": "tests/unit/test_dto/test_factory/test_backends/test_backends.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "litestar-root-schema-name-after",
+      "before": "litestar-root-schema-name-before",
+      "capabilities": [
+        10
+      ],
+      "changed_paths": [
+        "litestar/dto/_backend.py",
+        "tests/unit/test_dto/test_factory/test_backends/test_base_dto.py",
+        "tests/unit/test_openapi/test_integration.py"
+      ],
+      "declaration_observations": {
+        "after": {
+          "groups": [],
+          "include_class_fields": true,
+          "python_backend_paths": [
+            "tests/unit/test_openapi/test_integration.py"
+          ],
+          "result_mode": "discovery"
+        },
+        "before": {
+          "groups": [],
+          "include_class_fields": true,
+          "python_backend_paths": [
+            "tests/unit/test_dto/test_factory/test_backends/test_base_dto.py"
+          ],
+          "result_mode": "discovery"
+        }
+      },
+      "id": "litestar-root-schema-name",
+      "native_required": true,
+      "problem_id": "e68dd0b58b078fa83d5ad23a542ce4d7116a83ed",
+      "problem_source": "https://github.com/litestar-org/litestar/commit/e68dd0b58b078fa83d5ad23a542ce4d7116a83ed",
+      "repository": "litestar",
+      "task": "Fix root DTO schema names for nested model declarations in litestar/dto/_backend.py.",
+      "transitions": [
+        {
+          "after_path": "litestar/dto/_backend.py",
+          "before_path": "litestar/dto/_backend.py",
+          "kind": "modify"
+        },
+        {
+          "after_path": "tests/unit/test_dto/test_factory/test_backends/test_base_dto.py",
+          "before_path": "tests/unit/test_dto/test_factory/test_backends/test_base_dto.py",
+          "kind": "modify"
+        },
+        {
+          "after_path": "tests/unit/test_openapi/test_integration.py",
+          "before_path": "tests/unit/test_openapi/test_integration.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "sqlmodel-field-sa-type-after",
+      "before": "sqlmodel-field-sa-type-before",
+      "capabilities": [
+        10
+      ],
+      "changed_paths": [
+        "sqlmodel/main.py",
+        "tests/test_field_sa_args_kwargs.py",
+        "tests/test_field_sa_type.py"
+      ],
+      "declaration_observations": {
+        "after": {
+          "groups": [],
+          "include_class_fields": true,
+          "python_backend_paths": [
+            "tests/test_field_sa_type.py"
+          ],
+          "result_mode": "discovery"
+        },
+        "before": {
+          "groups": [],
+          "include_class_fields": true,
+          "python_backend_paths": [
+            "tests/test_field_sa_args_kwargs.py"
+          ],
+          "result_mode": "discovery"
+        }
+      },
+      "id": "sqlmodel-field-sa-type",
+      "native_required": true,
+      "problem_id": "01960be28ed852c5c118c5be163c91bb72f3cd91",
+      "problem_source": "https://github.com/fastapi/sqlmodel/commit/01960be28ed852c5c118c5be163c91bb72f3cd91",
+      "repository": "sqlmodel",
+      "task": "Support explicit Field sa_type declarations in sqlmodel/main.py.",
+      "transitions": [
+        {
+          "after_path": "sqlmodel/main.py",
+          "before_path": "sqlmodel/main.py",
+          "kind": "modify"
+        },
+        {
+          "after_path": "tests/test_field_sa_args_kwargs.py",
+          "before_path": "tests/test_field_sa_args_kwargs.py",
+          "kind": "modify"
+        },
+        {
+          "after_path": "tests/test_field_sa_type.py",
+          "before_path": null,
+          "kind": "add"
+        }
+      ]
+    },
+    {
+      "after": "sqlmodel-field-item-bounds-after",
+      "before": "sqlmodel-field-item-bounds-before",
+      "capabilities": [
+        10
+      ],
+      "changed_paths": [
+        "sqlmodel/main.py",
+        "tests/test_pydantic/test_field.py"
+      ],
+      "declaration_observations": {
+        "after": {
+          "groups": [],
+          "include_class_fields": true,
+          "python_backend_paths": [
+            "tests/test_pydantic/test_field.py"
+          ],
+          "result_mode": "discovery"
+        },
+        "before": {
+          "groups": [],
+          "include_class_fields": true,
+          "python_backend_paths": [
+            "tests/test_pydantic/test_field.py"
+          ],
+          "result_mode": "discovery"
+        }
+      },
+      "id": "sqlmodel-field-item-bounds",
+      "native_required": true,
+      "problem_id": "2d02c4cd6fe861fca9ffd1a487eb32202f85c8df",
+      "problem_source": "https://github.com/fastapi/sqlmodel/commit/2d02c4cd6fe861fca9ffd1a487eb32202f85c8df",
+      "repository": "sqlmodel",
+      "task": "Fix declared Field min_items and max_items constraints in sqlmodel/main.py.",
+      "transitions": [
+        {
+          "after_path": "sqlmodel/main.py",
+          "before_path": "sqlmodel/main.py",
+          "kind": "modify"
+        },
+        {
+          "after_path": "tests/test_pydantic/test_field.py",
+          "before_path": "tests/test_pydantic/test_field.py",
+          "kind": "modify"
+        }
+      ]
+    }
+  ]
+}

@@ -6,7 +6,9 @@ import pytest
 from scripts.agent_evaluation.generate_hard_agent_corpus import CATEGORIES, generate
 
 
-def test_generator_keeps_public_answer_blind_and_secret_external(tmp_path: Path):
+def test_generator_keeps_public_answer_blind_and_secret_external(
+    tmp_path: Path,
+) -> None:
     repo = tmp_path / "worker"
     public = tmp_path / "authority" / "public.json"
     secret = tmp_path / "authority" / "secret.json"
@@ -20,7 +22,7 @@ def test_generator_keeps_public_answer_blind_and_secret_external(tmp_path: Path)
     assert not (repo / "benchmarks" / "agent_tasks.json").exists()
 
 
-def test_generator_covers_every_hardness_category(tmp_path: Path):
+def test_generator_covers_every_hardness_category(tmp_path: Path) -> None:
     repo = tmp_path / "worker"
     public = tmp_path / "public.json"
     secret = tmp_path / "secret.json"
@@ -29,7 +31,7 @@ def test_generator_covers_every_hardness_category(tmp_path: Path):
     assert categories == set(CATEGORIES)
 
 
-def test_generator_is_deterministic(tmp_path: Path):
+def test_generator_is_deterministic(tmp_path: Path) -> None:
     a = tmp_path / "a"
     b = tmp_path / "b"
     pa = tmp_path / "pa.json"
@@ -44,7 +46,7 @@ def test_generator_is_deterministic(tmp_path: Path):
     assert ma["secret_identity"] == mb["secret_identity"]
 
 
-def test_generator_refuses_secret_inside_worker_repo(tmp_path: Path):
+def test_generator_refuses_secret_inside_worker_repo(tmp_path: Path) -> None:
     repo = tmp_path / "worker"
     with pytest.raises(ValueError):
         generate(

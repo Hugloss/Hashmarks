@@ -23,6 +23,8 @@ from hashmarks.operation_contract import operation_default_mode, operation_modes
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from mcp import ClientSession
+
 pytestmark = pytest.mark.host_mcp_sdk
 
 _MCP_AVAILABLE = importlib.util.find_spec("mcp") is not None
@@ -102,13 +104,15 @@ def test_mcp_native_server_catalog_and_structured_call(tmp_path: Path) -> None:
         ] == _EXPECTED_TOOLS
         task_description = descriptions["task_evidence"]
         for phrase in (
-            "Semantic first choice",
-            "exploratory grep/read",
-            "retrieval from ownership",
-            "owner/ambiguity",
+            "Unknown paths",
+            "retrieval",
+            "ownership/ambiguity",
             "source/next-read",
             "verification",
             "freshness",
+            "structuredContent",
+            "readable text",
+            "JSON mirror",
         ):
             assert phrase in task_description
         schemas = _assert_canonical_result_mode_schemas(
@@ -226,4 +230,51 @@ def test_mcp_native_stdio_initialize_catalog_call_and_error(tmp_path: Path) -> N
                     "recovery_authority": "consumer-owned",
                 }
 
+                await _assert_initial_delivery(session)
+
     asyncio.run(exercise())
+
+
+async def _assert_initial_delivery(session: ClientSession) -> None:
+    from hashmarks.codemap.task_evidence_initial import (
+        decode_initial_packet,
+    )
+    from hashmarks.evidence_presentation import (
+        FORMATS,
+        present_repository_evidence,
+    )
+
+    initial_identity = None
+    for mode in FORMATS:
+        initial = await session.call_tool(
+            "task_evidence",
+            arguments={
+                "task": "Fix flare041",
+                "result_mode": "initial",
+                "presentation": mode,
+            },
+        )
+        assert not initial.is_error
+        native = initial.structured_content
+        assert isinstance(native, dict)
+        logical = decode_initial_packet(native)
+        assert logical["ownership"]["owner"]["path"] == "src/feature.py"
+        identity = logical["evidence_packet_identity"]
+        if initial_identity is None:
+            initial_identity = identity
+        assert identity == initial_identity
+        assert len(initial.content) == 1
+        text = initial.content[0].text
+        if mode != "none":
+            projection = present_repository_evidence(native, format=mode)
+            assert (text if mode == "text" else json.loads(text)) == (
+                projection["text"] if mode == "text" else projection
+            )
+        assert (
+            "encoding" not in json.loads(text)
+            if mode in {"structured", "compact"}
+            else True
+        )
+    full = await session.call_tool("task_evidence", arguments={"task": "Fix flare041"})
+    assert full.structured_content["schema"] == "hashmarks.task-evidence.v5"
+    assert json.loads(full.content[0].text) == full.structured_content

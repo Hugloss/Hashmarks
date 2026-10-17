@@ -4,6 +4,7 @@ import tomllib
 from pathlib import Path
 
 import pytest
+from contract_assertions import assert_array, assert_object, assert_records, assert_text
 
 from hashmarks.adapters import uv_lock_dependency_observation
 from hashmarks.codemap.engine import CodeMap
@@ -45,10 +46,14 @@ def test_uv_lock_adapter_preserves_selection_source_and_factual_delta(
         delta = codemap.dependency_resolution_delta(before, after)
 
     before_dep = next(
-        row for row in before["selections"] if row["component_id"] == "dummy-dep"
+        row
+        for row in assert_records(before["selections"])
+        if row["component_id"] == "dummy-dep"
     )
     after_dep = next(
-        row for row in after["selections"] if row["component_id"] == "dummy-dep"
+        row
+        for row in assert_records(after["selections"])
+        if row["component_id"] == "dummy-dep"
     )
     assert before_dep["version"] == "1.0.0"
     assert after_dep["version"] == "2.0.0"
@@ -72,16 +77,19 @@ def test_uv_lock_adapter_preserves_relationship_and_inventory_change(
         delta = codemap.dependency_resolution_delta(before, after)
 
     assert before["definition_identity"] == after["definition_identity"]
-    assert len(delta["inventory_added"]) == 1
-    assert len(delta["inventory_removed"]) == 1
-    assert len(delta["relationships_added"]) == 1
-    assert len(delta["relationships_removed"]) == 1
+    assert len(assert_array(delta["inventory_added"])) == 1
+    assert len(assert_array(delta["inventory_removed"])) == 1
+    assert len(assert_array(delta["relationships_added"])) == 1
+    assert len(assert_array(delta["relationships_removed"])) == 1
 
 
 def test_uv_lock_adapter_uses_one_multi_authority_physical_source() -> None:
     raw = uv_lock_dependency_observation(lock=_lock())
 
-    assert raw["producer"]["adapter_semantics"] == "hashmarks.uv-dependency-adapter.v1"
+    assert (
+        assert_object(raw["producer"])["adapter_semantics"]
+        == "hashmarks.uv-dependency-adapter.v1"
+    )
     assert raw["evidence_sources"] == [
         {
             "source_id": "uv:lock",
@@ -94,19 +102,23 @@ def test_uv_lock_adapter_uses_one_multi_authority_physical_source() -> None:
             "context": "lock",
             "completeness": "complete",
             "truncation": "complete",
-            "producer_digest": raw["evidence_sources"][0]["producer_digest"],
+            "producer_digest": assert_records(raw["evidence_sources"])[0][
+                "producer_digest"
+            ],
         }
     ]
-    assert {ref for row in raw["inventory"] for ref in row["evidence_sources"]} == {
-        "uv:lock"
-    }
+    assert {
+        ref
+        for row in assert_records(raw["inventory"])
+        for ref in assert_array(row["evidence_sources"])
+    } == {"uv:lock"}
 
 
 def test_uv_lock_adapter_does_not_promote_declared_metadata_to_resolution() -> None:
     raw = uv_lock_dependency_observation(lock=_lock())
 
-    assert len(raw["relationships"]) == 1
-    assert raw["relationships"][0]["kind"] == "dependency"
+    assert len(assert_array(raw["relationships"])) == 1
+    assert assert_records(raw["relationships"])[0]["kind"] == "dependency"
     assert raw["scope"] == {"requires_python": ">=3.11"}
     assert raw["module_ownership"] == []
 
@@ -123,35 +135,42 @@ def test_uv_lock_adapter_includes_every_committed_lock_dependency_group(
         for package in document["package"]
     )
     raw = uv_lock_dependency_observation(lock=lock)
-    assert raw["producer"]["resolution_markers"] == document.get(
+    assert assert_object(raw["producer"])["resolution_markers"] == document.get(
         "resolution-markers", []
     )
-    assert len(raw["relationships"]) == expected
-    assert len(raw["evidence_sources"]) == 1
+    assert len(assert_array(raw["relationships"])) == expected
+    assert len(assert_array(raw["evidence_sources"])) == 1
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         observation = codemap.dependency_resolution_evidence(raw)
         root_id = next(
             row["node_id"]
-            for row in observation["roots"]
-            if row["node_id"].startswith("hashmarks:")
+            for row in assert_records(observation["roots"])
+            if assert_text(row["node_id"]).startswith("hashmarks:")
         )
-        query = codemap.dependency_resolution_queries(
+        queries = codemap.dependency_resolution_queries(
             observation,
             [{"operation": "dependencies", "node_id": root_id, "context": "lock"}],
-        )["results"][0]
+        )
+        query = assert_records(queries["results"])[0]
 
     assert query["result"]
-    assert {row["selection"]["component_id"] for row in query["result"]} >= {
+    assert {
+        assert_object(row["selection"])["component_id"]
+        for row in assert_records(query["result"])
+    } >= {
         "mcp",
         "ruff",
     }
     assert query["completeness"] == "incomplete"
-    assert any(row["reason"] == "conditional-edge" for row in query["omissions"])
+    assert any(
+        row["reason"] == "conditional-edge"
+        for row in assert_records(query["omissions"])
+    )
     assert {
         row["effective_scope"]
-        for row in observation["relationships"]
+        for row in assert_records(observation["relationships"])
         if row["source"] == root_id
     } >= {
         "extra:mcp",
@@ -342,7 +361,7 @@ source = { virtual = "." }
 
     raw = uv_lock_dependency_observation(lock=lock)
 
-    assert raw["producer"]["resolution_markers"] == [
+    assert assert_object(raw["producer"])["resolution_markers"] == [
         "python_full_version >= '3.12'",
         "python_full_version < '3.12'",
     ]
@@ -495,12 +514,14 @@ source = {{ registry = "https://example.invalid/simple" }}
 
     raw = uv_lock_dependency_observation(lock=lock)
 
-    assert len(raw["roots"]) == 1
-    root_id = raw["roots"][0]["node_id"]
-    assert root_id.startswith("app:0.1.0@")
-    assert {row["node_id"] for row in raw["inventory"]} == {
+    assert len(assert_array(raw["roots"])) == 1
+    root_id = assert_records(raw["roots"])[0]["node_id"]
+    assert assert_text(root_id).startswith("app:0.1.0@")
+    assert {row["node_id"] for row in assert_records(raw["inventory"])} == {
         next(
-            row["node_id"] for row in raw["selections"] if row["component_id"] == "dep"
+            row["node_id"]
+            for row in assert_records(raw["selections"])
+            if row["component_id"] == "dep"
         )
     }
 

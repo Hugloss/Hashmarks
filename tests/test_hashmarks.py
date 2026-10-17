@@ -6,7 +6,7 @@ from hashmarks.graph import IdentityGraph
 from hashmarks.merkle import MerkleTree
 
 
-def test_merkle_changes_when_file_changes(tmp_path: Path):
+def test_merkle_changes_when_file_changes(tmp_path: Path) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     (workspace / "src").mkdir()
@@ -24,7 +24,7 @@ def test_merkle_changes_when_file_changes(tmp_path: Path):
     assert before != after
 
 
-def test_merkle_same_when_content_restored(tmp_path: Path):
+def test_merkle_same_when_content_restored(tmp_path: Path) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     target = workspace / "a.txt"
@@ -45,7 +45,7 @@ def test_merkle_same_when_content_restored(tmp_path: Path):
     assert after == before
 
 
-def test_selected_inputs_ignore_unrelated_file(tmp_path: Path):
+def test_selected_inputs_ignore_unrelated_file(tmp_path: Path) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     (workspace / "src").mkdir()
@@ -64,24 +64,24 @@ def test_selected_inputs_ignore_unrelated_file(tmp_path: Path):
     assert before == after
 
 
-def test_cas_round_trip(tmp_path: Path):
+def test_cas_round_trip(tmp_path: Path) -> None:
     cas = CAS(tmp_path / "cas")
     digest = cas.put_bytes(b"hello")
     assert cas.get_bytes(digest) == b"hello"
     assert cas.has(digest)
 
 
-def test_graph_equality_cutoff():
+def test_graph_equality_cutoff() -> None:
     values = {"file": "A"}
     calls = {"leaf": 0, "parent": 0}
 
     graph: IdentityGraph[str, str] = IdentityGraph()
 
-    def leaf(_):
+    def leaf(_: object) -> str:
         calls["leaf"] += 1
         return values["file"]
 
-    def parent(deps):
+    def parent(deps: dict[str, str]) -> str:
         calls["parent"] += 1
         return "P:" + deps["leaf"]
 

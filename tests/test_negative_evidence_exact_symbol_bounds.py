@@ -8,6 +8,8 @@ from hashmarks.codemap.model import SearchHit
 if TYPE_CHECKING:
     from pathlib import Path
 
+    import pytest
+
 _INDEX_LIMIT = 1024
 
 
@@ -38,7 +40,7 @@ def _canonical_test_hit() -> SearchHit:
 
 
 def _install_bounded_exact_index(
-    codemap: CodeMap, monkeypatch, *, visible: bool
+    codemap: CodeMap, monkeypatch: pytest.MonkeyPatch, *, visible: bool
 ) -> None:
     original = codemap._session_exact_symbol_candidates
     actual = list(original(["collision_owner"], limit=10))
@@ -52,7 +54,7 @@ def _install_bounded_exact_index(
     probe = ([first] if visible else []) + stale + [hidden]
     assert len(probe) == _INDEX_LIMIT + 1
 
-    def exact_symbols(names, *, limit):
+    def exact_symbols(names: list[str], *, limit: int) -> list[object]:
         normalized = {str(name).lower() for name in names}
         if "collision_owner" in normalized and limit == _INDEX_LIMIT + 1:
             return probe[:limit]
@@ -68,7 +70,7 @@ def _install_bounded_exact_index(
 
 def test_exact_symbol_bound_cannot_manufacture_unique_owner(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _write_duplicate_owners(tmp_path)
 
@@ -101,7 +103,7 @@ def test_exact_symbol_bound_cannot_manufacture_unique_owner(
 
 def test_exact_symbol_bound_cannot_become_no_exact_owner_then_structural_fallback(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _write_duplicate_owners(tmp_path)
     (tmp_path / "tests" / "test_surface.py").write_text(
@@ -170,7 +172,7 @@ def test_complete_exact_symbol_search_can_still_resolve_unique_owner(
 
 def test_literal_path_remains_independent_authority_when_symbol_index_is_bounded(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _write_duplicate_owners(tmp_path)
 
@@ -195,7 +197,7 @@ def test_literal_path_remains_independent_authority_when_symbol_index_is_bounded
 
 
 def test_skipped_exact_identifier_search_cannot_claim_negative_or_unique_evidence(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "src" / "owner.py").write_text(
@@ -209,9 +211,9 @@ def test_skipped_exact_identifier_search_cannot_claim_negative_or_unique_evidenc
         calls = []
         original = codemap._task_action_exact_identifier_edit_candidates
 
-        def tracked(*args, **kwargs):
+        def tracked(*_args: object, **_kwargs: object) -> object:
             calls.append(True)
-            return original(*args, **kwargs)
+            return original(*_args, **_kwargs)
 
         monkeypatch.setattr(
             codemap, "_task_action_exact_identifier_edit_candidates", tracked

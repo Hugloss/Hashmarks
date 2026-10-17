@@ -1,4 +1,7 @@
 from pathlib import Path
+from typing import Any
+
+import pytest
 
 from hashmarks.codemap import CodeMap
 
@@ -67,7 +70,7 @@ def test_incremental_scope_pruning_is_segment_aware(tmp_path: Path) -> None:
 
 
 def test_incremental_scope_removes_previously_admitted_dependency_rows(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     import hashmarks.codemap.repository_file_discovery as discovery
 

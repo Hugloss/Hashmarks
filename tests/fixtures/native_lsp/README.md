@@ -12,6 +12,11 @@ The external capture caller claims collection completeness; it does not certify
 the server or make absence admissible. Call hierarchy requests reuse the exact
 prepared item, including producer data when present.
 
+Integrity tests compare each retained request and reply with the protocol
+transcript and reconstruct its document snapshots from the recorded open,
+change, and close events. Source edits require fresh producer captures; rewriting
+snapshot text or checksums cannot substitute for recapturing the server response.
+
 Python exercises cross-file definition, references with and without declarations,
 prepare/incoming/outgoing calls, duplicate symbol names, file movement, disk
 changes, and an unsaved buffer followed by close/reopen. A definition request at a

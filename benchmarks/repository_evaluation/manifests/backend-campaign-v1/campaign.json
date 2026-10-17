@@ -1,0 +1,88 @@
+{
+  "capabilities": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20
+  ],
+  "matrix_schema": "hashmarks.backend-evidence-matrix.v5",
+  "schema": "hashmarks.backend-evidence-campaign.v4",
+  "suites": [
+    {
+      "grader_sha256": "7d73de59010dc5bd67b78cafa4861b996b152bce3a9fd71357eeb91b3af928c7",
+      "id": "backend-v1",
+      "suite_file": "../backend-v1/suite.json",
+      "suite_sha256": "b67112bb47d6e355a91dddfeb8399dddf9af72ca5fba1e69c9fb88e0338d58f4",
+      "workflow_ids": [
+        "aiokafka-fetch-cancellation",
+        "aiokafka-sender-node-failure",
+        "aiokafka-metadata-future",
+        "aiokafka-stable-offset",
+        "sqlalchemy-failed-begin",
+        "sqlalchemy-logging-token-reset",
+        "sqlalchemy-pickle-extra-criteria",
+        "sqlalchemy-aggregate-strings",
+        "faststream-middleware-enter-error",
+        "faststream-subscriber-stop",
+        "faststream-concurrent-queue-lifetime",
+        "faststream-partial-pull-batch"
+      ]
+    },
+    {
+      "grader_sha256": "34a1fba7c3fc05a8bef11ad7ea2de335292fa1e30e0db2371f5fdfe35a31b772",
+      "id": "backend-async-v1",
+      "suite_file": "../backend-async-v1/suite.json",
+      "suite_sha256": "783d7b390517ba0bad8023c7652102dce4e1a3c1b38f32c71187657d7d48dfcf",
+      "workflow_ids": [
+        "aiokafka-fetch-cancellation",
+        "aiokafka-sender-node-failure",
+        "aiokafka-metadata-future",
+        "aiokafka-stable-offset",
+        "sqlalchemy-failed-begin",
+        "faststream-middleware-enter-error",
+        "faststream-subscriber-stop",
+        "faststream-concurrent-queue-lifetime",
+        "faststream-partial-pull-batch",
+        "litestar-redis-close",
+        "litestar-psycopg-listener-stop",
+        "litestar-asyncpg-listener-lock"
+      ]
+    },
+    {
+      "grader_sha256": "32c46f270d27b58cd49eb0057adc5514844cf048aac5e5d4079284cc109ca034",
+      "id": "backend-model-v1",
+      "suite_file": "../backend-model-v1/suite.json",
+      "suite_sha256": "5e84b9e6c1272bac10614878a79a9dd1dd9517724c02215937ca2cf0b7ff3856",
+      "workflow_ids": [
+        "fastapi-dict-exclude-defaults",
+        "litestar-notrequired-field-schema",
+        "sqlmodel-field-discriminator",
+        "fastapi-iterable-response-options",
+        "litestar-nullable-required-fields",
+        "sqlmodel-utc-timedelta",
+        "sqlmodel-relationship-declaration-type",
+        "litestar-optional-computed-field",
+        "litestar-optional-nested-dto",
+        "litestar-root-schema-name",
+        "sqlmodel-field-sa-type",
+        "sqlmodel-field-item-bounds"
+      ]
+    }
+  ]
+}

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import TYPE_CHECKING
+from types import ModuleType
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
@@ -14,7 +15,7 @@ _MODULE = __import__(
 )
 
 
-def _load():
+def _load() -> ModuleType:
     return _MODULE
 
 

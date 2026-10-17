@@ -128,7 +128,13 @@ def test_configure_opencode_mcp_uses_natural_project_config_discovery(
     monkeypatch.setenv("OPENCODE_CONFIG", "/tmp/foreign.json")
     monkeypatch.setenv("OPENCODE_CONFIG_CONTENT", '{"mcp":{}}')
 
-    def fake_run(argv, *, cwd, env=None, timeout=600):
+    def fake_run(
+        argv: list[str],
+        *,
+        cwd: Path,
+        env: dict[str, str] | None = None,
+        timeout: int = 600,
+    ) -> subprocess.CompletedProcess[str]:
         del timeout
         assert argv == ["opencode", "mcp", "list"]
         assert cwd == repo
@@ -160,7 +166,13 @@ def test_configure_opencode_mcp_fails_when_real_project_registration_is_not_load
     repo.mkdir()
     fake_hashmarks = tmp_path / "venv" / "bin" / "hashmarks"
 
-    def fake_run(argv, *, cwd, env=None, timeout=600):
+    def fake_run(
+        argv: list[str],
+        *,
+        cwd: Path,
+        env: dict[str, str] | None = None,
+        timeout: int = 600,
+    ) -> subprocess.CompletedProcess[str]:
         del argv, cwd, env, timeout
         import subprocess
 
@@ -184,7 +196,13 @@ def test_configure_opencode_mcp_rejects_misleading_failed_connected_text(
     repo.mkdir()
     fake_hashmarks = tmp_path / "venv" / "bin" / "hashmarks"
 
-    def fake_run(argv, *, cwd, env=None, timeout=600):
+    def fake_run(
+        argv: list[str],
+        *,
+        cwd: Path,
+        env: dict[str, str] | None = None,
+        timeout: int = 600,
+    ) -> subprocess.CompletedProcess[str]:
         del cwd, env, timeout
         import subprocess
 
@@ -211,7 +229,13 @@ def test_opencode_run_uses_native_model_authority(
 ) -> None:
     captured: list[str] = []
 
-    def fake_run(argv, *, cwd, env=None, timeout=600):
+    def fake_run(
+        argv: list[str],
+        *,
+        cwd: Path,
+        env: dict[str, str] | None = None,
+        timeout: int = 600,
+    ) -> subprocess.CompletedProcess[str]:
         del cwd, env, timeout
         captured.extend(argv)
         return subprocess.CompletedProcess(argv, 0, "", "")
@@ -281,10 +305,13 @@ def test_selection_scenarios_are_neutral_and_keep_negative_controls(
                 row for row in host_gate.SELECTION_SCENARIOS if row.name == name
             )
             packet = surface.task_evidence(scenario.prompt)
+            assert packet["ownership"]["candidate"] is not None
+            assert packet["verification"]["selected"] is not None
             assert packet["ownership"]["candidate"]["path"] == owner
             assert packet["verification"]["selected"]["path"] == verification
         ambiguous = surface.task_evidence(host_gate.SELECTION_SCENARIOS[1].prompt)
         assert ambiguous["ownership"]["basis"] == "exact-import-owner"
+        assert ambiguous["ownership"]["owner"] is not None
         assert ambiguous["ownership"]["owner"]["path"] == "src/checkout/pricing.py"
     finally:
         surface.close()
@@ -445,7 +472,7 @@ def test_main_resolves_repository_root_for_diagnostic(
 ) -> None:
     roots = []
 
-    def fake_diagnostic(args, project_root):
+    def fake_diagnostic(args: Namespace, project_root: Path) -> dict[str, object]:
         roots.append(project_root)
         return {
             "schema": "hashmarks.opencode-selection-diagnostic.v1",
@@ -469,7 +496,7 @@ def test_selection_stops_after_model_environment_failure(
 ) -> None:
     calls = []
 
-    def fake_trial(*args):
+    def fake_trial(*args: object) -> dict[str, object]:
         calls.append(args)
         return {"trial_status": "ENVIRONMENT_BLOCKED"}
 
@@ -493,7 +520,7 @@ def test_selection_timeout_keeps_partial_event_log_as_incomplete(
         lambda *_args, **_kwargs: (None, "opencode.json", {}),
     )
 
-    def timed_out(*_args, **_kwargs):
+    def timed_out(*_args: object, **_kwargs: object) -> None:
         raise subprocess.TimeoutExpired(
             ["opencode", "run"], 120, output=b'{"type":"text"}\n'
         )
@@ -562,7 +589,13 @@ def test_host_gate_runs_both_protocol_phases_and_binds_receipt(
     )
     monkeypatch.setattr(host_gate.shutil, "which", lambda _name: "/bin/opencode")
 
-    def fake_run(argv, *, cwd, env=None, timeout=600):
+    def fake_run(
+        argv: list[str],
+        *,
+        cwd: Path,
+        env: dict[str, str] | None = None,
+        timeout: int = 600,
+    ) -> subprocess.CompletedProcess[str]:
         del cwd, env, timeout
         if argv == ["opencode", "--version"]:
             return subprocess.CompletedProcess(argv, 0, "opencode 2.0.4\n", "")
@@ -649,7 +682,14 @@ def test_host_gate_runs_both_protocol_phases_and_binds_receipt(
     ]
     calls = []
 
-    def fake_opencode_run(opencode, *, repo, prompt, env, session_id=None):
+    def fake_opencode_run(
+        opencode: object,
+        *,
+        repo: Path,
+        prompt: str,
+        env: dict[str, str],
+        session_id: str | None = None,
+    ) -> subprocess.CompletedProcess[str]:
         del opencode, repo, prompt
         calls.append((env, session_id))
         events = phase1_events if session_id is None else phase2_events

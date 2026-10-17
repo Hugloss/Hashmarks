@@ -5,6 +5,7 @@ import json
 import logging
 import tempfile
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 from hashmarks._command_output import log_command_output
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 SCHEMA = "hashmarks.agent-metrics.v1"
 
 
-def _timed(fn):
+def _timed(fn: Callable[[], object]) -> tuple[object, float]:
     started = time.perf_counter()
     value = fn()
     return value, time.perf_counter() - started

@@ -35,15 +35,15 @@ class JournalIdentity:
     model_config_identity: str
 
 
-def _load_normalizer() -> Any:
+def _load_normalizer() -> object:
     return import_sibling("normalize_agent_trace", __package__)
 
 
-def _read_json(path: Path) -> Any:
+def _read_json(path: Path) -> object:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _nonempty(value: Any, field: str) -> str:
+def _nonempty(value: object, field: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{field} must be a non-empty string")
     return value
@@ -166,7 +166,9 @@ def _journal_events(journal: Path) -> list[dict[str, Any]]:
     return events
 
 
-def _write_validated_raw(output: Path, raw: dict[str, Any], normalizer: Any) -> None:
+def _write_validated_raw(
+    output: Path, raw: dict[str, object], normalizer: object
+) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_name = tempfile.mkstemp(
         prefix=".runner-log-", suffix=".tmp", dir=output.parent

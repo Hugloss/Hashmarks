@@ -137,7 +137,7 @@ def test_interrupted_sync_rolls_back_candidate_generation(
     artifact_db = tmp_path / "artifacts.sqlite3"
     with CodeMap(tmp_path, artifact_db=artifact_db) as codemap:
 
-        def explode(*args, **kwargs):
+        def explode(*args, **kwargs) -> None:
             raise RuntimeError("synthetic interruption")
 
         monkeypatch.setattr(codemap, "_parse_or_reuse", explode)

@@ -3,17 +3,39 @@ from __future__ import annotations
 import hashlib
 import json
 import time
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Generator, Iterable, Mapping, Sequence
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from functools import wraps
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, cast
+from typing import TYPE_CHECKING, Concatenate, ParamSpec, TypeVar, cast
+
+from .store_queries import MAX_REFERENCE_QUERY_ROWS
 
 if TYPE_CHECKING:
     from .engine import CodeMap
 
 _P = ParamSpec("_P")
 _R = TypeVar("_R")
+_S = TypeVar("_S")
+
+
+@dataclass
+class _DecisionDiagnosticFrame:
+    id: int
+    name: str
+    parent_id: int | None
+    started_ns: int
+    request_identity: str
+    child_ns: int = 0
+
+
+@dataclass
+class _DecisionProducerStats:
+    calls: int = 0
+    inclusive_ns: int = 0
+    exclusive_ns: int = 0
+    request_identities: set[str] = field(default_factory=set)
 
 
 class DecisionRefreshRequired(RuntimeError):
@@ -25,24 +47,25 @@ class DecisionRefreshRequired(RuntimeError):
 
 
 def _decision_scoped(
-    method: Callable[_P, _R], *, allow_incomplete: bool
-) -> Callable[_P, _R]:
+    method: Callable[Concatenate[_S, _P], _R], *, allow_incomplete: bool
+) -> Callable[Concatenate[_S, _P], _R]:
     """Bind one public CodeMap decision to one freshness/readiness sample."""
 
     @wraps(method)
-    def wrapped(self, *args, **kwargs):
-        if self._decision_session_depth > 0:
-            with self.decision_session(_allow_incomplete=allow_incomplete):
+    def wrapped(self: _S, *args: _P.args, **kwargs: _P.kwargs) -> _R:
+        owner = cast("CodeMap", self)
+        if owner._decision_session_depth > 0:
+            with owner.decision_session(_allow_incomplete=allow_incomplete):
                 return method(self, *args, **kwargs)
 
         refreshed: set[str] = set()
         while True:
-            incomplete_build = self.store.meta("sync.build_state") == "BUILDING"
-            preflight = getattr(self, "_decision_preflight", None)
+            incomplete_build = owner.store.meta("sync.build_state") == "BUILDING"
+            preflight = getattr(owner, "_decision_preflight", None)
             if preflight is not None and not (allow_incomplete and incomplete_build):
-                preflight(method.__name__, args, kwargs)
+                preflight(getattr(method, "__name__", "unknown"), args, kwargs)
             try:
-                with self.decision_session(_allow_incomplete=allow_incomplete):
+                with owner.decision_session(_allow_incomplete=allow_incomplete):
                     return method(self, *args, **kwargs)
             except DecisionRefreshRequired as exc:
                 if exc.path in refreshed:
@@ -50,29 +73,38 @@ def _decision_scoped(
                         f"CodeMap path remained stale after refresh: {exc.path}"
                     ) from exc
                 refreshed.add(exc.path)
-                self._refresh_path_current(exc.path)
+                owner._refresh_path_current(exc.path)
 
     return wrapped
 
 
-def decision_scoped(method: Callable[_P, _R]) -> Callable[_P, _R]:
+def decision_scoped(
+    method: Callable[Concatenate[_S, _P], _R],
+) -> Callable[Concatenate[_S, _P], _R]:
     """Bind a decision to one complete repository-intelligence generation."""
     return _decision_scoped(method, allow_incomplete=False)
 
 
-def incomplete_decision_scoped(method: Callable[_P, _R]) -> Callable[_P, _R]:
+def incomplete_decision_scoped(
+    method: Callable[Concatenate[_S, _P], _R],
+) -> Callable[Concatenate[_S, _P], _R]:
     """Allow a safety-reporting decision to describe an incomplete generation."""
     return _decision_scoped(method, allow_incomplete=True)
 
 
-def diagnostic_producer(method: Callable[_P, _R]) -> Callable[_P, _R]:
+def diagnostic_producer(
+    method: Callable[Concatenate[_S, _P], _R],
+) -> Callable[Concatenate[_S, _P], _R]:
     """Measure one high-level repository-intelligence producer when diagnostics are active."""
 
     @wraps(method)
-    def wrapped(self, *args, **kwargs):
-        if not getattr(self, "_decision_diagnostics_enabled", False):
+    def wrapped(self: _S, *args: _P.args, **kwargs: _P.kwargs) -> _R:
+        owner = cast("CodeMap", self)
+        if not owner._decision_diagnostics_enabled:
             return method(self, *args, **kwargs)
-        with self._decision_diagnostic_span(method.__name__, args, kwargs):
+        with owner._decision_diagnostic_span(
+            getattr(method, "__name__", "unknown"), args, kwargs
+        ):
             return method(self, *args, **kwargs)
 
     return wrapped
@@ -167,6 +199,8 @@ class DecisionSessionMixin:
         allow_incomplete: bool,
         expected_generation: int | None,
     ) -> int:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if self._decision_session_depth == 0:
             generation = self._begin_decision_session(
                 diagnostics=diagnostics,
@@ -202,7 +236,7 @@ class DecisionSessionMixin:
         diagnostics: bool = False,
         _allow_incomplete: bool = False,
         expected_generation: int | None = None,
-    ):
+    ) -> Generator["CodeMap", None, None]:
         """Reuse immutable evidence primitives across many decisions on one generation.
 
         The session is read-only and generation-bound. It never caches final
@@ -256,54 +290,48 @@ class DecisionSessionMixin:
     @contextmanager
     def _decision_diagnostic_span(
         self, name: str, args: tuple[object, ...], kwargs: Mapping[str, object]
-    ):
+    ) -> Generator[None, None, None]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         self._decision_diagnostics_sequence += 1
         span_id = self._decision_diagnostics_sequence
         parent_id = (
-            self._decision_diagnostics_stack[-1]["id"]
+            self._decision_diagnostics_stack[-1].id
             if self._decision_diagnostics_stack
             else None
         )
-        frame: dict[str, Any] = {
-            "id": span_id,
-            "name": name,
-            "parent_id": parent_id,
-            "started_ns": time.perf_counter_ns(),
-            "child_ns": 0,
-            "request_identity": self._diagnostic_request_identity(name, args, kwargs),
-        }
+        frame = _DecisionDiagnosticFrame(
+            id=span_id,
+            name=name,
+            parent_id=parent_id,
+            started_ns=time.perf_counter_ns(),
+            request_identity=self._diagnostic_request_identity(name, args, kwargs),
+        )
         self._decision_diagnostics_stack.append(frame)
         try:
             yield
         finally:
             ended_ns = time.perf_counter_ns()
             current = self._decision_diagnostics_stack.pop()
-            inclusive_ns = ended_ns - int(current["started_ns"])
-            exclusive_ns = max(0, inclusive_ns - int(current["child_ns"]))
+            inclusive_ns = ended_ns - current.started_ns
+            exclusive_ns = max(0, inclusive_ns - current.child_ns)
             if self._decision_diagnostics_stack:
-                self._decision_diagnostics_stack[-1]["child_ns"] += inclusive_ns
+                self._decision_diagnostics_stack[-1].child_ns += inclusive_ns
             producer = self._decision_diagnostics_producers.setdefault(
-                name,
-                {
-                    "calls": 0,
-                    "inclusive_ns": 0,
-                    "exclusive_ns": 0,
-                    "request_identities": set(),
-                },
+                name, _DecisionProducerStats()
             )
-            producer["calls"] += 1
-            producer["inclusive_ns"] += inclusive_ns
-            producer["exclusive_ns"] += exclusive_ns
-            producer["request_identities"].add(str(current["request_identity"]))
+            producer.calls += 1
+            producer.inclusive_ns += inclusive_ns
+            producer.exclusive_ns += exclusive_ns
+            producer.request_identities.add(current.request_identity)
+
             if len(self._decision_diagnostics_spans) < 256:
                 self._decision_diagnostics_spans.append(
                     {
                         "id": span_id,
                         "parent_id": parent_id,
                         "producer": name,
-                        "request_identity": current["request_identity"],
+                        "request_identity": current.request_identity,
                         "inclusive_ns": inclusive_ns,
                         "exclusive_ns": exclusive_ns,
                     }
@@ -315,14 +343,14 @@ class DecisionSessionMixin:
         stats = self.decision_session_stats()
         producers: dict[str, object] = {}
         for name, row in sorted(self._decision_diagnostics_producers.items()):
-            unique = len(row["request_identities"])
-            calls = int(row["calls"])
+            unique = len(row.request_identities)
+            calls = row.calls
             producers[name] = {
                 "calls": calls,
                 "unique_requests": unique,
                 "duplicate_calls": max(0, calls - unique),
-                "inclusive_ns": int(row["inclusive_ns"]),
-                "exclusive_ns": int(row["exclusive_ns"]),
+                "inclusive_ns": row.inclusive_ns,
+                "exclusive_ns": row.exclusive_ns,
             }
         reuse = {
             k: int(v)
@@ -490,7 +518,7 @@ class DecisionSessionMixin:
         unique = list(dict.fromkeys(str(target) for target in targets if target))
         if not unique:
             return {}
-        requested = min(max(1, int(limit_per_target)), 1024)
+        requested = min(max(1, int(limit_per_target)), MAX_REFERENCE_QUERY_ROWS)
         if self._decision_session_depth <= 0:
             return self.store.refs_many(unique, limit_per_target=requested)
         generation = int(self._decision_session_generation or self.store.generation())
@@ -703,7 +731,7 @@ class DecisionSessionMixin:
             self = cast("CodeMap", self)
         normalized = tuple(sorted({str(term).lower() for term in terms if term}))
         if self._decision_session_depth <= 0:
-            return self.store.lexical_document_frequencies(normalized)
+            return self.store.lexical_document_frequencies(list(normalized))
         generation = int(self._decision_session_generation or self.store.generation())
         key = (generation, normalized)
         cached = self._decision_df_cache.get(key)
@@ -711,26 +739,31 @@ class DecisionSessionMixin:
             self._decision_session_stats["df_hit"] += 1
             return cached
         self._decision_session_stats["df_miss"] += 1
-        value = self.store.lexical_document_frequencies(normalized)
+        value = self.store.lexical_document_frequencies(list(normalized))
         self._decision_df_cache[key] = value
         return value
 
     def _session_lexical_file_candidates(
-        self, terms: Sequence[str], *, limit: int
+        self, terms: Sequence[str], *, limit: int, paths: Sequence[str] | None = None
     ) -> list[dict[str, object]]:
         # Cache by the store's true semantic identity, not caller token order.
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         normalized = tuple(sorted({str(term).lower() for term in terms if term}))
+        scope = None if paths is None else tuple(sorted(set(paths)))
         if self._decision_session_depth <= 0:
-            return self.store.lexical_file_candidates(normalized, limit=limit)
+            return self.store.lexical_file_candidates(
+                list(normalized), limit=limit, paths=scope
+            )
         generation = int(self._decision_session_generation or self.store.generation())
-        key = (generation, normalized, int(limit))
+        key = (generation, normalized, int(limit), scope)
         cached = self._decision_candidates_cache.get(key)
         if cached is not None:
             self._decision_session_stats["candidates_hit"] += 1
             return cached
         self._decision_session_stats["candidates_miss"] += 1
-        value = self.store.lexical_file_candidates(normalized, limit=limit)
+        value = self.store.lexical_file_candidates(
+            list(normalized), limit=limit, paths=scope
+        )
         self._decision_candidates_cache[key] = value
         return value
