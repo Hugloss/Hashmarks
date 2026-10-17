@@ -16,6 +16,46 @@ Before adding a new state field, state word, delta, identity, freshness result, 
 
 A new schema is **not** evidence that a new semantic owner is needed.
 
+## Cross-owner operations
+
+A canonical owner is a responsibility, not necessarily one class or file.
+`CodeMap` wires these responsibilities together; its shared `self` does not make
+every mixin an authorized writer of every field. Construction may initialize
+owned state without acquiring that state's semantic or invalidation authority.
+
+The following existing boundaries are the starting points for changes. They do
+not introduce a dispatcher, interface registry, or new public API.
+
+| Responsibility | Existing operation / owner | Contract for consumers |
+| --- | --- | --- |
+| Stable bytes and content digest | `file_store.py::FileDigestStore.read_bytes_stable` | Returns bytes and their digest from one stable read, or fails with an unavailable/unstable read. It does not establish repository admission, index freshness, or publication. |
+| Identity observation source | `repository_observation.py::RepositoryObservationSource.observe` | Reads one atomic observation through its narrow reader. Unavailable/incompatible transport returns unknown (`None`); the source does not cache observations or depend on CodeMap/indexing. Read scopes own reuse. |
+| Repository-file admission | `repository_file_discovery.py::RepositoryFiles.is_admitted`, `iter_files`, `visible_file`, `visible_manifests` | Independently constructed owner of admission/traversal and the loaded policy. `CodeMap.files` is a read-only component reference. Host/control roots are canonicalized once; member symlinks remain excluded. Parser support, readable bytes, and complete semantic coverage are separate questions. |
+| Qualified member observation | `repository_source.py::RepositorySource.member` | Composes admission, member revision, availability, and optional bytes. Binding, declaration, and correlation consumers reuse this independent Source owner; ingestion uses stable bytes directly and cannot call back through Source. |
+| Generation-bound read scope | `decision_session.py::DecisionScope.session`, exposed by `CodeMap.reads` | Owns primitive query reuse and diagnostics for one existing store generation and atomic identity observation. Nested scopes share an immutable `ReadScope` value. Ended scopes cannot supply another scope's final task/snapshot/impact/ownership memo; those paired memo values remain domain-owned. The static `ReadScopeOwner` port has no state, registry or runtime policy. |
+| Parsed artifact | `parsers.py::parse_source`, `artifact_key_for` | Interprets supplied source under the supplied content revision and parser signature. File-backed ingestion must bind the supplied digest to the bytes actually parsed. Mechanisms do not own repository admission or generation. |
+| Index publication | `indexing_lifecycle.py::RepositoryIndex.sync` and `repository_index_store.py::publication_transaction` | The independently constructed Index owns ingestion/reconciliation and import-root projection. The store owns atomic derived writes. Consumers call `CodeMap.index`; the old root sync/preflight/clean/watch entry points are removed. Index has no source/read-scope/relationship-cache dependency. |
+| Qualified import identity | `import_resolution.py::RepositoryImports` | Produces bounded repository import/re-export identity. Retrieval, relationship, and verification consumers preserve unresolved/ambiguous results rather than resolve again by short name. |
+| Relationship reuse | `evidence_graph.py::_reverse_file_graph` | Relationship evidence owns the meaning, contents, and validity of its reverse-graph cache. Cache hits require the published generation and the same freshly qualified native-edge inputs. Index no longer calls or writes this upper cache. A no-change sync may reuse it; source/manifest disqualification of native evidence must invalidate reuse even without a new generation. |
+| Task retrieval | `task_retrieval.py::_find_task_evidence_impl`; bounded disclosure in `task_evidence_retrieval.py` | Produces ranked candidates and explicit bounds. Retrieval rank and source supplements are not ownership or verification proof. |
+| Task-owner qualification | `task_action_owner_resolution.py`, `task_action_projection.py`, `ownership_decision.py` | Existing task-action composition establishes the candidate and its qualified authority before packet presentation. Intermediate candidate selection is distinct from the final ownership proof. |
+| Verification relevance | `evidence_verification.py::_verification_relevance` | Consumes the already-selected edit surface and qualified references/locality. Returns relevance, uncertainty, bounds, and selection evidence; never test sufficiency or execution results. |
+| Consumer projection | `evidence_packet.py`, `task_evidence_initial.py`, `evidence_presentation.py` | Composes or projects owner-produced facts while preserving qualification and omission accounting. A format cannot independently resolve ownership or source authority. |
+| Operation/schema identity | `operation_contract.py` | Domain operations and CLI/MCP/service adapters consume the same registered operation/mode/schema. Domain validation, untrusted-wire validation, and presentation conformance remain distinct boundaries. |
+
+When a meaningful boundary changes, document the operation's owner, typed inputs
+and outputs, bounds and revision requirements, state effects, callers and
+dependencies, errors, preserved invariants, replaceable mechanism, and direct
+owning tests. An existing typed function plus its tests can express this
+contract; a new interface class is not required.
+
+Trace operation dependencies rather than treating the mixin inheritance list as
+a semantic dependency graph. In particular, qualified member reads may request
+index reconciliation. Indexing must not call back through that reconciliation
+path merely to obtain bytes; it uses the stable-byte mechanism after admission.
+Keep coordination with the existing composition owner, and preserve fail-closed
+validation at every untrusted boundary.
+
 ## State families are separate axes
 
 Similar-looking state words are not interchangeable. A consumer must know which axis a value belongs to. New public schemas must reuse the canonical state spelling for an existing axis rather than introduce a local synonym.
@@ -23,8 +63,8 @@ Similar-looking state words are not interchangeable. A consumer must know which 
 | State family | Meaning | Canonical owner | Extension rule |
 | --- | --- | --- | --- |
 | Repository continuity | Whether the observer has a clean, dirty, or unknown repository observation | `hashmarks/observation.py::ObservationState` and `client.py::RepositoryObservation` | Reuse the atomic observation. Never reconstruct continuity from separate samples. A standalone CodeMap watcher must first acquire the persisted continuity authority with an atomic owner/fence claim; every later publication must match that fence, and a replacement owner advances it so stale writers cannot overwrite current continuity. |
-| Repository / CodeMap generation | Which admitted derived repository state a projection is bound to | CodeMap store + `decision_session.py` | Reuse the existing generation. Do not create feature-local generations. Retained native/project enrichment that can affect a decision must publish its rows and freshness binding atomically under this same generation authority. Mutation-then-read operations must bind the entire post-mutation composition to the exact generation they published; generation drift before or during composition fails closed. A worktree overlay must capture the exact base generation and workspace fingerprint at overlay sync; fused reads fail if either base authority moves, and only an explicit overlay resync may adopt a new base. |
-| Repository identity | Content/repository identity independent of a consumer projection | canonical identity owners and `_repository_packet_identity()` | A projection may reference identity; it does not redefine it. |
+| Repository / CodeMap generation | Which admitted derived repository state a projection is bound to | CodeMap store + `decision_session.py` | Reuse the existing generation. Do not create feature-local generations. Clearing a bound store atomically advances this same generation and preserves its counter, so rebuilding cannot resurrect an older cached/read-scope authority. Retained native/project enrichment that can affect a decision must publish its rows and freshness binding atomically under this same generation authority. Mutation-then-read operations must bind the entire post-mutation composition to the exact generation they published; generation drift before or during composition fails closed. A worktree overlay must capture the exact base generation and workspace fingerprint at overlay sync; fused reads fail if either base authority moves, and only an explicit overlay resync may adopt a new base. |
+| Repository identity | Content/repository identity independent of a consumer projection | canonical identity owners; existing packet repository binding projected by `DecisionScope.repository_identity()` | A projection may reference identity; it does not redefine it. Neutral `packet_digest`/`evidence_identity` functions in `repository_observation.py` preserve existing digest domains/encoding without owning domain semantics. |
 | Member revision | Content identity of one admitted indexed repository member | CodeMap file row / repository-intelligence snapshot path revision | Reuse the indexed revision semantics. A projection must distinguish missing, unindexed/unknown, denied/unsupported, and present members rather than treating them as one state. |
 | Evidence availability | Whether a requested repository fact is known present, known absent, unavailable/unknown, or unsupported | repository-intelligence evidence producers; endpoint delta vocabulary is coordinated by `repository_delta.py` | Do not invent synonyms in a new packet. Add a new value only at the owning evidence layer. |
 | Freshness | Whether a previously observed fact is still current for the claim being made | transport-neutral `hashmarks/freshness.py` owns the serialized vocabulary/classifier; `evidence_freshness.py`, `freshness_map.py`, and repository-delta projections consume that authority | The serialized state vocabulary is exactly `current`, `stale`, or `unknown`. Proof strength such as `proven` belongs in a separate proof/provenance field; `invalidated` is a delta consequence, not a freshness-state synonym. Never turn unknown into current. |

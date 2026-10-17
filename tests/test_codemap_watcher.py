@@ -137,9 +137,9 @@ def test_watcher_continuity_is_one_atomic_freshness_authority(
         state_dir=state,
         artifact_db=tmp_path / "artifacts.sqlite3",
     ) as codemap:
-        codemap.sync()
-        monkeypatch.setattr(codemap, "_daemon_observation", lambda: None)
-        session = _IndexWatchSession(codemap, None)
+        codemap.index.sync()
+        monkeypatch.setattr(codemap._observation_source, "observe", lambda: None)
+        session = _IndexWatchSession(codemap.index, None)
         session.acquire()
         assert session.tracker.mark_reconciled(expected_generation=0)
         session.publish()
@@ -181,9 +181,9 @@ def test_clean_watcher_observation_only_covers_its_published_codemap_generation(
         state_dir=tmp_path / ".state",
         artifact_db=tmp_path / "artifacts.sqlite3",
     ) as codemap:
-        codemap.sync()
-        monkeypatch.setattr(codemap, "_daemon_observation", lambda: None)
-        session = _IndexWatchSession(codemap, None)
+        codemap.index.sync()
+        monkeypatch.setattr(codemap._observation_source, "observe", lambda: None)
+        session = _IndexWatchSession(codemap.index, None)
         session.acquire()
         assert session.tracker.mark_reconciled(expected_generation=0)
         session.publish()
@@ -206,9 +206,9 @@ def test_inactive_watcher_observation_cannot_authorize_current_state(
         state_dir=tmp_path / ".state",
         artifact_db=tmp_path / "artifacts.sqlite3",
     ) as codemap:
-        codemap.sync()
-        monkeypatch.setattr(codemap, "_daemon_observation", lambda: None)
-        session = _IndexWatchSession(codemap, None)
+        codemap.index.sync()
+        monkeypatch.setattr(codemap._observation_source, "observe", lambda: None)
+        session = _IndexWatchSession(codemap.index, None)
         session.acquire()
         assert session.tracker.mark_reconciled(expected_generation=0)
         session.publish(active=False)
@@ -228,10 +228,10 @@ def test_second_live_watcher_cannot_claim_continuity_authority(
         state_dir=tmp_path / ".state",
         artifact_db=tmp_path / "artifacts.sqlite3",
     ) as codemap:
-        codemap.sync()
-        first = _IndexWatchSession(codemap, None)
+        codemap.index.sync()
+        first = _IndexWatchSession(codemap.index, None)
         first.acquire()
-        second = _IndexWatchSession(codemap, None)
+        second = _IndexWatchSession(codemap.index, None)
 
         with pytest.raises(WatchLeaseHeldError, match="already owned"):
             second.acquire()
@@ -254,8 +254,8 @@ def test_replacement_fence_blocks_stale_clean_overwrite(
         state_dir=tmp_path / ".state",
         artifact_db=tmp_path / "artifacts.sqlite3",
     ) as codemap:
-        codemap.sync()
-        first = _IndexWatchSession(codemap, None)
+        codemap.index.sync()
+        first = _IndexWatchSession(codemap.index, None)
         assert first.tracker.mark_reconciled(expected_generation=0)
         first.acquire()
 
@@ -274,7 +274,7 @@ def test_replacement_fence_blocks_stale_clean_overwrite(
         )
         codemap.store.set_meta(WATCH_CONTINUITY_META, expired.to_json())
 
-        replacement = _IndexWatchSession(codemap, None)
+        replacement = _IndexWatchSession(codemap.index, None)
         assert replacement.tracker.mark_reconciled(expected_generation=0)
         replacement.tracker.mark_dirty(["src/auth.py"])
         replacement.acquire()
@@ -305,13 +305,13 @@ def test_released_watcher_advances_fence_on_next_claim(tmp_path: Path) -> None:
         state_dir=tmp_path / ".state",
         artifact_db=tmp_path / "artifacts.sqlite3",
     ) as codemap:
-        codemap.sync()
-        first = _IndexWatchSession(codemap, None)
+        codemap.index.sync()
+        first = _IndexWatchSession(codemap.index, None)
         first.acquire()
         first_fence = first.fence
         first.release()
 
-        second = _IndexWatchSession(codemap, None)
+        second = _IndexWatchSession(codemap.index, None)
         second.acquire()
         assert first_fence is not None
         assert second.fence == first_fence + 1

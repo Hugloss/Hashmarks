@@ -85,7 +85,7 @@ def collect(root: Path, limit: int = 20) -> dict[str, object]:
         hidden = _load_corpus(corpus)
         public = json.loads(public_path.read_text())["tasks"]
         with CodeMap(workspace) as cm:
-            cm.sync()
+            cm.index.sync()
             t = time.perf_counter()
             idx = FieldedBM25Index.build(cm)
             build_ms += (time.perf_counter() - t) * 1000

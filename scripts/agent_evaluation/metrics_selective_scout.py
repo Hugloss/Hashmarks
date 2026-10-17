@@ -72,7 +72,7 @@ def run_scout(packet: Path, output: Path) -> None:
 def _base_rows(workspace: Path, public: list[dict], limit: int) -> list[dict]:
     rows = []
     with CodeMap(workspace) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         for task in public:
             entry = codemap.task_entry_points(task["query"], limit=limit)
             recommended = [

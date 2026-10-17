@@ -42,7 +42,7 @@ def test_change_intelligence_brief_is_compact_identity_bound_repository_truth(
 ) -> None:
     task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.task_decision_packet(task)
         brief = codemap.change_intelligence_brief(task, ["src/case/engine.py"])
 
@@ -72,7 +72,7 @@ def test_change_intelligence_brief_preserves_project_provenance_and_valid_change
 ) -> None:
     task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         monkeypatch.setattr(
             codemap,
             "task_change_impact",
@@ -96,7 +96,7 @@ def test_verification_explanation_selected_and_why_not_are_deterministic(
     task = _repo(tmp_path)
     (tmp_path / "tests" / "test_other.py").write_text("def test_other(): assert True\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         first = codemap.explain_verification_selection(task)
         second = codemap.explain_verification_selection(task)
         why_not = codemap.explain_verification_selection(task, "tests/test_other.py")
@@ -145,7 +145,7 @@ def test_verification_explanation_preserves_bounded_candidate_reason(
         "task_anchor_terms": ["ember"],
     }
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         monkeypatch.setattr(
             codemap,
             "verification_relevance",

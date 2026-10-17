@@ -120,8 +120,8 @@ def test_reopen_refreshes_ranges_after_native_binding_change(
     with CodeMap(
         repo, state_dir=tmp_path / "state", artifact_db=tmp_path / "artifacts.db"
     ) as codemap:
-        codemap.sync()
-        before = codemap.outline("request.ts")
+        codemap.index.sync()
+        before = codemap.source.outline("request.ts")
         symbols = before["symbols"]
         assert isinstance(symbols, list)
         assert symbols[0]["end_line"] == 1
@@ -130,7 +130,7 @@ def test_reopen_refreshes_ranges_after_native_binding_change(
     with CodeMap(
         repo, state_dir=tmp_path / "state", artifact_db=tmp_path / "artifacts.db"
     ) as codemap:
-        after = codemap.outline("request.ts")
+        after = codemap.source.outline("request.ts")
         assert after["file_digest"] == before["file_digest"]
         symbols = after["symbols"]
         assert isinstance(symbols, list)

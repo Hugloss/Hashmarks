@@ -49,7 +49,7 @@ def changed_impact_economics_receipt(
         with CodeMap(
             workspace_path, state_dir=state, artifact_db=state / "artifacts.sqlite3"
         ) as codemap:
-            sync = codemap.sync()
+            sync = codemap.index.sync()
             started = time.perf_counter_ns()
             result = codemap.task_change_impact(task, normalized)
             elapsed = time.perf_counter_ns() - started

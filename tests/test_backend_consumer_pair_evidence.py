@@ -50,7 +50,7 @@ def _provider(
 
 def _observe(root: Path, provider: StaticPythonInterfaceDeclarations) -> dict:
     with CodeMap(root) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         return codemap.discover_repository_declarations([provider])
 
 
@@ -176,7 +176,7 @@ def test_opt_out_preserves_existing_declaration_evidence(
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         default = cm.discover_repository_declarations(
             [StaticPythonInterfaceDeclarations(paths=("api.py", "client.py"))]
         )
@@ -194,7 +194,7 @@ def test_order_does_not_change_pair_identity_and_mutation_changes_observation(
         ("api.py", "serve", "client.py", "render", "payload"),
     )
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         first = cm.discover_repository_declarations([_provider(pairs)])
         second = cm.discover_repository_declarations(
             [_provider(tuple(reversed(pairs)))]
@@ -204,7 +204,7 @@ def test_order_does_not_change_pair_identity_and_mutation_changes_observation(
         source.write_text(
             source.read_text().replace('response["name"]', 'response["age"]')
         )
-        cm.sync(["client.py"])
+        cm.index.sync(["client.py"])
         changed = cm.discover_repository_declarations(
             [_provider(pairs)], previous_observation=first
         )
@@ -254,7 +254,7 @@ def test_bounded_consumer_syntax_fails_closed_instead_of_false_empty(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         with pytest.raises(RepositoryDeclarationProviderError, match="bound"):
             cm.discover_repository_declarations([_provider()])
 
@@ -281,7 +281,7 @@ def test_mutated_consumer_without_resync_refuses_old_repository_evidence(
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         provider = _provider()
         original = cm.discover_repository_declarations([provider])
         (tmp_path / "client.py").write_text(

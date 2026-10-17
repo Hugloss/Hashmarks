@@ -70,14 +70,12 @@ def _table_rows(
     return columns, extras, result
 
 
-def declaration_scope_text(
+def declaration_scope_table(
     context: Mapping[str, Any],
-    ref: str,
     *,
     shared: Mapping[str, Any] | None = None,
-    label: str = "Declarations",
-) -> list[str]:
-    """Rows follow native order; a scope pointer plus row index locates each fact."""
+) -> dict[str, Any]:
+    """Factor JSON-identical declarations without encoding JSON inside text."""
     rows = context.get("declarations", [])
     if isinstance(context.get("declarations_encoding"), dict):
         rows = decode_initial_collection(rows, context["declarations_encoding"])
@@ -93,10 +91,30 @@ def declaration_scope_text(
         for key, value in _metadata(context).items()
         if key not in (shared or {})
     }
+    return {
+        "metadata": metadata,
+        "common": common,
+        "prefix": prefix,
+        "columns": columns,
+        "extras": extras,
+        "rows": table,
+    }
+
+
+def declaration_scope_text(
+    context: Mapping[str, Any],
+    ref: str,
+    *,
+    shared: Mapping[str, Any] | None = None,
+    label: str = "Declarations",
+) -> list[str]:
+    """Rows follow native order; a scope pointer plus row index locates each fact."""
+    table = declaration_scope_table(context, shared=shared)
+    metadata = table["metadata"]
     return [
         f"{label + ' @ ' + ref if ref else label}: {_dump(metadata)}",
-        f"Common={_dump(common)}; prefix={_dump(prefix)}; columns={_dump(columns)}; extras={_dump(extras)}",
-        *(_dump(row) for row in table),
+        f"Common={_dump(table['common'])}; prefix={_dump(table['prefix'])}; columns={_dump(table['columns'])}; extras={_dump(table['extras'])}",
+        *(_dump(row) for row in table["rows"]),
     ]
 
 

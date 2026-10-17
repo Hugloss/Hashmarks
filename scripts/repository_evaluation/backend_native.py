@@ -574,7 +574,7 @@ def qualify_native_workflow(
                     output,
                 )
             with CodeMap(workspace, state_dir=state) as codemap:
-                codemap.sync()
+                codemap.index.sync()
                 write_json(
                     output / stage / "import.json",
                     codemap.import_scip(

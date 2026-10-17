@@ -5,7 +5,8 @@ from typing import TYPE_CHECKING, cast
 
 from hashmarks.paths import normalize_relative_path
 
-from .decision_session import diagnostic_producer
+from .decision_session import ReadScopeOwner, diagnostic_producer
+from .repository_observation import packet_digest
 from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 
 if TYPE_CHECKING:
@@ -17,7 +18,7 @@ if TYPE_CHECKING:
 VERIFICATION_EXPLANATION_SCHEMA = "hashmarks.verification-selection-explanation.v1"
 
 
-class VerificationExplanationMixin:
+class VerificationExplanationMixin(ReadScopeOwner):
     """Bounded explanations over existing verification-selection semantics."""
 
     @staticmethod
@@ -119,16 +120,16 @@ class VerificationExplanationMixin:
             reason = "not-in-bounded-candidate-set"
             facts = []
 
-        generation, identity_generation, stale = self._generation_status()
+        generation, identity_generation, stale = self.reads.generation_status()
         payload: dict[str, object] = {
             "schema": VERIFICATION_EXPLANATION_SCHEMA,
-            "repository_identity": self._repository_packet_identity(),
-            "source_identity": self._source_packet_identity(
+            "repository_identity": self.reads.repository_identity(),
+            "source_identity": self.source.packet_identity(
                 generation=generation,
                 identity_generation=identity_generation,
                 stale=stale,
             ),
-            "task_identity": self._packet_digest("hashmarks.task.v1", {"task": task}),
+            "task_identity": packet_digest("hashmarks.task.v1", {"task": task}),
             "member": requested or None,
             "selected_member": selected_path or None,
             "status": status,
@@ -138,7 +139,7 @@ class VerificationExplanationMixin:
             "authority": "repository-intelligence-only",
             "execution_effect": "none",
         }
-        payload["explanation_identity"] = "sha256:" + self._packet_digest(
+        payload["explanation_identity"] = "sha256:" + packet_digest(
             VERIFICATION_EXPLANATION_SCHEMA,
             payload,
         )

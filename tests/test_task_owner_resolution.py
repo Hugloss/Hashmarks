@@ -64,7 +64,7 @@ def test_owner_resolution_recovers_unique_exact_symbol_without_retrieval_rows(
 
     task = "cancel_queued_admission expected_sequence"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         owner = codemap._task_action_resolve_owner(_owner_request(codemap, task))
 
     assert owner.edit is not None
@@ -81,7 +81,7 @@ def test_owner_resolution_keeps_duplicate_exact_symbols_unresolved(
 
     task = "fix cancel_queued_admission"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         owner = codemap._task_action_resolve_owner(_owner_request(codemap, task))
 
     assert owner.edit is None
@@ -101,7 +101,7 @@ def test_owner_resolution_marks_literal_path_as_stronger_than_retrieval_order(
 
     task = "optimize src/worker.py"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         context = codemap._task_action_map_context(task, 20)
         selection = codemap._task_action_surface_owner_state(task, context, 20, 3)
 
@@ -137,7 +137,7 @@ def test_owner_resolution_marks_structural_repository_owner(
 
     task = "Fix ember accepted response behavior owner"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         context = codemap._task_action_map_context(task, 20)
         selection = codemap._task_action_surface_owner_state(task, context, 20, 3)
 
@@ -169,7 +169,7 @@ def test_unique_exact_owner_does_not_enter_weaker_structural_resolution(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = cast(
             dict[str, Any],
             codemap.task_action_map(
@@ -199,7 +199,7 @@ def test_exact_owner_cannot_be_displaced_by_contract_projection(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = cast(
             dict[str, Any],
             codemap.task_action_map(
@@ -243,7 +243,7 @@ def test_requested_edit_target_owns_dependency_identifier_evidence(
     _write_publish_dependency_fixture(tmp_path)
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = cast(
             dict[str, Any],
             codemap.task_action_map(
@@ -264,7 +264,7 @@ def test_requested_edit_target_role_survives_dependency_first_wording(
     _write_publish_dependency_fixture(tmp_path)
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = cast(
             dict[str, Any],
             codemap.task_action_map(
@@ -285,7 +285,7 @@ def test_requested_edit_role_does_not_hide_true_duplicate_target_ambiguity(
     _write_publish_dependency_fixture(tmp_path, duplicate_target=True)
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = cast(
             dict[str, Any],
             codemap.task_action_map(
@@ -311,7 +311,7 @@ def test_requested_edit_role_is_stable_across_dependency_phrasings(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         actions = [
             cast(dict[str, Any], codemap.task_action_map(task, limit=20))
             for task in tasks
@@ -330,7 +330,7 @@ def test_two_requested_exact_edit_targets_remain_ambiguous(tmp_path: Path) -> No
     _write(tmp_path, "src/store.py", "def store_result(value):\n    return value\n")
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = cast(
             dict[str, Any],
             codemap.task_action_map(

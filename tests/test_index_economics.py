@@ -13,7 +13,7 @@ def test_preflight_scale_ladder_classifies_repository_shape_without_predicting_t
     codemap = CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3")
     try:
         for count, expected in cases:
-            visibility = codemap.policy.decide("src/f.py").evidence_visibility
+            visibility = codemap.files.decide("src/f.py").evidence_visibility
             discovered = [
                 _DiscoveredFile(
                     f"src/f{i}.py",
@@ -26,7 +26,7 @@ def test_preflight_scale_ladder_classifies_repository_shape_without_predicting_t
             ]
             # Missing paths deliberately make bytes zero: this proves file-count
             # scaling is independently represented and no timeout is invented.
-            preflight = codemap._preflight_from_discovered(discovered)
+            preflight = codemap.index._preflight_from_discovered(discovered)
             assert preflight["indexable_files"] == count
             assert preflight["work_class"] == expected
             assert preflight["estimated_lexical_rows"] is None

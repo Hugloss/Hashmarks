@@ -29,7 +29,7 @@ def test_economics_receipt_measures_hashmarks_owned_evidence_only(
 ) -> None:
     _source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         receipt = codemap.intelligence_economics_receipt(task, ["src/owner.py"])
     assert receipt["schema"] == "hashmarks.intelligence-economics-receipt.v1"
     rows = receipt["profile_economics"]
@@ -57,7 +57,7 @@ def test_economics_receipt_measures_hashmarks_owned_evidence_only(
 def test_economics_receipt_is_deterministic_and_identity_bound(tmp_path: Path) -> None:
     _source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         first = codemap.intelligence_economics_receipt(task, ["src/owner.py"])
         second = codemap.intelligence_economics_receipt(task, ["src/owner.py"])
         snapshot = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
@@ -70,10 +70,10 @@ def test_economics_receipt_delta_economics_use_existing_delta_authority(
 ) -> None:
     source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         previous = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
         source.write_text("def widget(): return 'new'\n", encoding="utf-8")
-        codemap.sync(["src/owner.py"])
+        codemap.index.sync(["src/owner.py"])
         receipt = codemap.intelligence_economics_receipt(
             task, ["src/owner.py"], previous_snapshot=previous
         )
@@ -105,7 +105,7 @@ def test_query_facade_exposes_economics_without_changing_receipt(
 ) -> None:
     _source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         direct = codemap.intelligence_economics_receipt(task, ["src/owner.py"])
         query = codemap.repository_intelligence_query(
             "economics", task, ["src/owner.py"]

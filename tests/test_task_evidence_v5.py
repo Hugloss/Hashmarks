@@ -44,7 +44,7 @@ def test_named_class_scopes_method_evidence_without_resolving_class_as_method(
         "validates bounded input and returns task evidence."
     )
     with _codemap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.task_evidence(task)
         exact = codemap.task_evidence("Change WidgetSurface.task_evidence method")
 
@@ -78,7 +78,7 @@ def test_task_evidence_v5_separates_retrieval_ownership_and_freshness(
     )
 
     with _codemap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.task_evidence("change target_impl behavior", token_budget=256)
 
     assert packet["schema"] == "hashmarks.task-evidence.v5"
@@ -113,7 +113,7 @@ def test_task_evidence_v5_retrieval_is_compact_non_authoritative_projection(
     task = "locate target_impl behavior"
 
     with _codemap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map(task, limit=20)
         packet = codemap.task_evidence(task, limit=20, token_budget=256)
 
@@ -160,7 +160,7 @@ def test_task_evidence_v5_consumes_canonical_admitted_edit(
     task = "change target_impl behavior"
 
     with _codemap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map(task)
         assert action["ownership_authority"]["owner_resolved"] is True
         assert action["edit"] is not None
@@ -193,7 +193,7 @@ def test_task_evidence_v5_keeps_ambiguity_independent_from_freshness(
 
     task = "fix calculate_value"
     with _codemap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map(task)
         packet = codemap.task_evidence(task, token_budget=256)
 
@@ -252,7 +252,7 @@ def test_task_evidence_v5_prefers_complete_unique_structural_owner_for_discrimin
     }
 
     with _codemap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         next_read = codemap._task_evidence_discrimination_next_read(action)
 
     assert next_read is not None
@@ -305,7 +305,7 @@ def test_task_evidence_v5_structural_discrimination_fails_closed_on_incomplete_o
     }
 
     with _codemap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         next_read = codemap._task_evidence_discrimination_next_read(action)
 
     assert next_read is None
@@ -334,7 +334,7 @@ def test_task_evidence_v5_structural_discrimination_fails_closed_on_multiple_own
     }
 
     with _codemap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         next_read = codemap._task_evidence_discrimination_next_read(action)
 
     assert next_read is None
@@ -361,7 +361,7 @@ def test_task_evidence_v5_owner_is_invariant_to_bounded_retrieval(
 
     task = "cancel_queued_admission expected_sequence"
     with _codemap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         narrow = codemap.task_evidence(task, limit=1, per_role=1, token_budget=256)
         wide = codemap.task_evidence(task, limit=20, per_role=3, token_budget=256)
 
@@ -389,7 +389,7 @@ def test_task_evidence_v5_keeps_dependency_as_related_evidence_not_owner(
     task = "Fix publish_result so it uses AuthorityReceipt.canonical_identity"
 
     with _codemap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map(task, limit=20)
         packet = codemap.task_evidence(task, limit=20, token_budget=256)
 
@@ -436,7 +436,7 @@ def test_natural_language_prefix_path_owner_does_not_drift_to_query_neighbor(
         "a requested prefix."
     )
     with _codemap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map(task, limit=20, per_role=3)
 
     assert action["ambiguity"]["ambiguous"] is False
@@ -457,7 +457,7 @@ def test_behavioral_test_shaped_source_requires_production_reference(
         "def runtime_probe_state():\n    return 'ready'\n",
     )
     with _codemap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map(
             "Change the behavior that reports runtime probe state."
         )
@@ -556,7 +556,7 @@ def test_behavioral_owner_discovery_stays_on_semantic_owner(tmp_path: Path) -> N
         for rel, content in files.items():
             _write(root, rel, content)
         with _codemap(root) as codemap:
-            codemap.sync()
+            codemap.index.sync()
             action = codemap.task_action_map(task, limit=20, per_role=3)
         assert action["ambiguity"]["ambiguous"] is False, case_id
         assert action["edit"] is not None
@@ -569,7 +569,7 @@ def test_task_evidence_projects_same_authority_proof_across_bounds(
     _write(tmp_path, "src/owner.py", "def unique_owner(value):\n    return value\n")
     task = "Refactor owner.unique_owner without changing behavior"
     with _codemap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map(task, limit=1, per_role=1)
         narrow = codemap.task_evidence(task, limit=1, per_role=1, token_budget=64)
         wide = codemap.task_evidence(task, limit=20, per_role=3, token_budget=256)
@@ -670,7 +670,7 @@ def test_task_evidence_preserves_dense_natural_language_owner_candidates(
             )
 
         with _codemap(root) as codemap:
-            codemap.sync()
+            codemap.index.sync()
             for query in (
                 task,
                 task + " Return exactly one JSON object with keys path and symbol, "
@@ -714,7 +714,7 @@ def test_task_evidence_natural_supplements_respect_deny_visibility(
     )
 
     with _codemap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.task_evidence(
             "Change cobalt route behavior and verify it",
             limit=20,
@@ -773,7 +773,7 @@ def test_named_method_remains_visible_when_retrieval_prefers_its_class(
     )
     task = "Fix Subscriber.start blocking other subscribers from shutting down when one stops slowly."
     with _codemap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.task_evidence(task)
         candidate = packet["ownership"]["candidate"]
         rows = packet["retrieval"]["results"]
@@ -801,7 +801,7 @@ def test_task_evidence_v5_compact_retrieval_is_materially_smaller_than_internal_
 ) -> None:
     _owner, task = _dense_prefix_repository(tmp_path)
     with _codemap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map(task, limit=9)
         packet = codemap.task_evidence(task, limit=9, token_budget=256)
 
@@ -825,7 +825,7 @@ def test_task_evidence_supplements_account_for_displaced_canonical_hits(
 ) -> None:
     owner, task = _dense_prefix_repository(tmp_path)
     with _codemap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map(task, limit=20)
         packet = codemap.task_evidence(task, limit=20, token_budget=256)
         tight = codemap.task_evidence(task, limit=9, token_budget=256)
@@ -901,7 +901,7 @@ def test_task_evidence_supplement_excludes_unsignaled_stale_symbol(
 ) -> None:
     owner, task = _dense_prefix_repository(tmp_path)
     with _codemap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.task_evidence(task, limit=20, token_budget=256)
         assert any(
             row.get("supplement")
@@ -936,7 +936,7 @@ def test_task_evidence_supplement_preserves_outline_visibility(
         'visibility = "outline"\n',
     )
     with _codemap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.task_evidence(task, limit=20, token_budget=256)
 
     supplements = [

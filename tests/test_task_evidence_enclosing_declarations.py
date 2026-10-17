@@ -17,7 +17,7 @@ def test_nested_helper_discloses_source_bound_enclosing_method_in_initial_and_fu
         "class Worker:\n    def drain(self):\n        def nested_cleanup_marker():\n            return 1\n        return nested_cleanup_marker()\n"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         full = cast(
             "dict[str, Any]", codemap.task_evidence("Inspect nested_cleanup_marker")
         )
@@ -63,7 +63,7 @@ def test_deep_nesting_is_bounded_and_does_not_establish_absence(tmp_path: Path) 
     lines.append("    " * 6 + "return 1")
     (tmp_path / "backend.py").write_text("\n".join(lines) + "\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = cast("dict[str, Any]", codemap.task_evidence("Inspect level_5"))
     rows = [
         row["enclosing_declarations"]

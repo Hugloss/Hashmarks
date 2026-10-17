@@ -56,7 +56,7 @@ def test_config_request_selects_config_edit_surface(tmp_path: Path) -> None:
     _write(tmp_path, "src/main.py", "DEFAULT_TIMEOUT = 30\n")
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         result = codemap.task_action_map("update timeout config")
 
     edit, ambiguity = result["edit"], result["ambiguity"]
@@ -73,7 +73,7 @@ def test_config_source_fallback_preserves_test_verification_role(
     _write(tmp_path, "tests/test_config.py", "def test_timeout(): pass\n")
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         result = codemap.task_action_map("change the timeout setting")
 
     edit, verify = result["edit"], result["verify"]
@@ -89,7 +89,7 @@ def test_locally_admitted_config_siblings_have_scoring_evidence(tmp_path: Path) 
     _write(tmp_path, "service/b.toml", "[opaque]\nvalue = 2\n")
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         result = codemap.task_action_map("update timeout config", limit=5)
 
     edit = result["edit"]

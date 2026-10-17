@@ -3,6 +3,8 @@ from __future__ import annotations
 import copy
 from pathlib import Path
 
+from contract_assertions import assert_array, assert_object, assert_records, assert_text
+
 from hashmarks.codemap.engine import CodeMap
 
 
@@ -56,17 +58,24 @@ def _group(
 
 
 def _by_id(packet: dict[str, object]) -> dict[str, dict[str, object]]:
-    group = packet["groups"][0]
-    return {row["declaration_id"]: row for row in group["declarations"]}
+    group = assert_records(packet["groups"])[0]
+    return {
+        assert_text(row["declaration_id"]): row
+        for row in assert_records(group["declarations"])
+    }
 
 
 def _binding_change(
     packet: dict[str, object],
     declaration: dict[str, object],
 ) -> dict[str, object]:
-    changed = packet["delta_from_previous"]["repository_evidence"]["bindings"][
-        "changed"
-    ]
+    changed = assert_records(
+        assert_object(
+            assert_object(
+                assert_object(packet["delta_from_previous"])["repository_evidence"]
+            )["bindings"]
+        )["changed"]
+    )
     return next(
         row for row in changed if row["binding_id"] == declaration["binding_id"]
     )
@@ -96,35 +105,37 @@ def test_declaration_evidence_path_move_is_definition_change_not_value_change(
     )
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.repository_declarations([before_group])
 
         new_path.parent.mkdir()
         old_path.replace(new_path)
-        codemap.sync(["owner-secondary.yaml", "moved/owner-secondary.yaml"])
+        codemap.index.sync(["owner-secondary.yaml", "moved/owner-secondary.yaml"])
         after = codemap.repository_declarations(
             [after_group],
             previous_observation=before,
         )
 
-    before_group_row = before["groups"][0]
-    after_group_row = after["groups"][0]
+    before_group_row = assert_records(before["groups"])[0]
+    after_group_row = assert_records(after["groups"])[0]
     before_declarations = _by_id(before)
     after_declarations = _by_id(after)
     secondary_before = before_declarations["secondary"]
     secondary_after = after_declarations["secondary"]
 
-    assert before_group_row["comparison"]["state"] == "equivalent"
-    assert after_group_row["comparison"]["state"] == "equivalent"
-    assert before_group_row["absence"]["state"] == "known-present"
-    assert after_group_row["absence"]["state"] == "known-present"
+    assert assert_object(before_group_row["comparison"])["state"] == "equivalent"
+    assert assert_object(after_group_row["comparison"])["state"] == "equivalent"
+    assert assert_object(before_group_row["absence"])["state"] == "known-present"
+    assert assert_object(after_group_row["absence"])["state"] == "known-present"
     assert secondary_before["value"] == secondary_after["value"] == "team-a"
     assert (
         secondary_before["declaration_definition_identity"]
         != secondary_after["declaration_definition_identity"]
     )
 
-    changed = after["delta_from_previous"]["changed_groups"][0]
+    changed = assert_records(
+        assert_object(after["delta_from_previous"])["changed_groups"]
+    )[0]
     assert changed["definition_changed"] is True
     assert changed["definition_changed_declaration_ids"] == ["secondary"]
     assert changed["value_changed_declaration_ids"] == []
@@ -133,10 +144,10 @@ def test_declaration_evidence_path_move_is_definition_change_not_value_change(
     assert changed["absence_changed"] is False
 
     binding_change = _binding_change(after, secondary_after)
-    assert binding_change["definition"]["state"] == "changed"
-    assert binding_change["direct_evidence"]["state"] == "preserved"
-    assert binding_change["locator_evidence"]["state"] == "preserved"
-    assert binding_change["member_evidence"]["state"] == "preserved"
+    assert assert_object(binding_change["definition"])["state"] == "changed"
+    assert assert_object(binding_change["direct_evidence"])["state"] == "preserved"
+    assert assert_object(binding_change["locator_evidence"])["state"] == "preserved"
+    assert assert_object(binding_change["member_evidence"])["state"] == "preserved"
 
 
 def _loss_restoration_packets(
@@ -155,18 +166,18 @@ def _loss_restoration_packets(
     )
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         present = codemap.repository_declarations([group])
 
         secondary.unlink()
-        codemap.sync(["owner-secondary.yaml"])
+        codemap.index.sync(["owner-secondary.yaml"])
         missing = codemap.repository_declarations(
             [group],
             previous_observation=present,
         )
 
         secondary.write_text("owner: team-a\n", encoding="utf-8")
-        codemap.sync(["owner-secondary.yaml"])
+        codemap.index.sync(["owner-secondary.yaml"])
         restored = codemap.repository_declarations(
             [group],
             previous_observation=missing,
@@ -178,8 +189,8 @@ def _assert_evidence_loss(
     present: dict[str, object],
     missing: dict[str, object],
 ) -> None:
-    present_group = present["groups"][0]
-    missing_group = missing["groups"][0]
+    present_group = assert_records(present["groups"])[0]
+    missing_group = assert_records(missing["groups"])[0]
     present_secondary = _by_id(present)["secondary"]
     missing_secondary = _by_id(missing)["secondary"]
 
@@ -189,14 +200,14 @@ def _assert_evidence_loss(
     )
     assert present_secondary["evidence_state"] == "known-present"
     assert missing_secondary["evidence_state"] == "known-absent"
-    assert present_group["comparison"]["state"] == "equivalent"
+    assert assert_object(present_group["comparison"])["state"] == "equivalent"
     assert missing_group["comparison"] == {
         "state": "ambiguous",
         "reason": "repository-evidence-not-qualified",
         "unqualified_declaration_ids": ["secondary"],
         "distinct_values": [],
     }
-    assert present_group["absence"]["state"] == "known-present"
+    assert assert_object(present_group["absence"])["state"] == "known-present"
     assert missing_group["absence"] == {
         "state": "known-absent",
         "missing_declaration_ids": ["secondary"],
@@ -204,24 +215,49 @@ def _assert_evidence_loss(
         "unexpected_declaration_ids": [],
     }
 
-    delta = missing["delta_from_previous"]["changed_groups"][0]
+    delta = assert_records(
+        assert_object(missing["delta_from_previous"])["changed_groups"]
+    )[0]
     assert delta["definition_changed"] is False
     assert delta["value_changed_declaration_ids"] == []
     assert delta["observation_changed_declaration_ids"] == ["secondary"]
     assert delta["comparison_changed"] is True
     assert delta["absence_changed"] is True
 
-    subject = missing["delta_from_previous"]["semantic_subjects"]["changed"][0]
+    subject = assert_records(
+        assert_object(
+            assert_object(missing["delta_from_previous"])["semantic_subjects"]
+        )["changed"]
+    )[0]
     assert subject["evidence_state_changed_declaration_ids"] == ["secondary"]
     assert subject["value_changed_declaration_ids"] == []
-    assert subject["comparison_transition"]["before"]["state"] == "equivalent"
-    assert subject["comparison_transition"]["after"]["state"] == "ambiguous"
-    assert subject["absence_transition"]["before"]["state"] == "known-present"
-    assert subject["absence_transition"]["after"]["state"] == "known-absent"
+    assert (
+        assert_object(assert_object(subject["comparison_transition"])["before"])[
+            "state"
+        ]
+        == "equivalent"
+    )
+    assert (
+        assert_object(assert_object(subject["comparison_transition"])["after"])["state"]
+        == "ambiguous"
+    )
+    assert (
+        assert_object(assert_object(subject["absence_transition"])["before"])["state"]
+        == "known-present"
+    )
+    assert (
+        assert_object(assert_object(subject["absence_transition"])["after"])["state"]
+        == "known-absent"
+    )
 
     binding = _binding_change(missing, missing_secondary)
-    assert binding["definition"]["state"] == "preserved"
-    assert binding["member_evidence"]["changes"][0]["state"] == "removed"
+    assert assert_object(binding["definition"])["state"] == "preserved"
+    assert (
+        assert_object(
+            assert_records(assert_object(binding["member_evidence"])["changes"])[0]
+        )["state"]
+        == "removed"
+    )
 
 
 def _assert_evidence_restoration(
@@ -237,29 +273,74 @@ def _assert_evidence_restoration(
     )
     assert missing_secondary["evidence_state"] == "known-absent"
     assert restored_secondary["evidence_state"] == "known-present"
-    assert missing["groups"][0]["comparison"]["state"] == "ambiguous"
-    assert restored["groups"][0]["comparison"]["state"] == "equivalent"
-    assert missing["groups"][0]["absence"]["state"] == "known-absent"
-    assert restored["groups"][0]["absence"]["state"] == "known-present"
+    assert (
+        assert_object(
+            assert_object(assert_records(missing["groups"])[0])["comparison"]
+        )["state"]
+        == "ambiguous"
+    )
+    assert (
+        assert_object(
+            assert_object(assert_records(restored["groups"])[0])["comparison"]
+        )["state"]
+        == "equivalent"
+    )
+    assert (
+        assert_object(assert_object(assert_records(missing["groups"])[0])["absence"])[
+            "state"
+        ]
+        == "known-absent"
+    )
+    assert (
+        assert_object(assert_object(assert_records(restored["groups"])[0])["absence"])[
+            "state"
+        ]
+        == "known-present"
+    )
 
-    delta = restored["delta_from_previous"]["changed_groups"][0]
+    delta = assert_records(
+        assert_object(restored["delta_from_previous"])["changed_groups"]
+    )[0]
     assert delta["definition_changed"] is False
     assert delta["value_changed_declaration_ids"] == []
     assert delta["observation_changed_declaration_ids"] == ["secondary"]
     assert delta["comparison_changed"] is True
     assert delta["absence_changed"] is True
 
-    subject = restored["delta_from_previous"]["semantic_subjects"]["changed"][0]
+    subject = assert_records(
+        assert_object(
+            assert_object(restored["delta_from_previous"])["semantic_subjects"]
+        )["changed"]
+    )[0]
     assert subject["evidence_state_changed_declaration_ids"] == ["secondary"]
     assert subject["value_changed_declaration_ids"] == []
-    assert subject["comparison_transition"]["before"]["state"] == "ambiguous"
-    assert subject["comparison_transition"]["after"]["state"] == "equivalent"
-    assert subject["absence_transition"]["before"]["state"] == "known-absent"
-    assert subject["absence_transition"]["after"]["state"] == "known-present"
+    assert (
+        assert_object(assert_object(subject["comparison_transition"])["before"])[
+            "state"
+        ]
+        == "ambiguous"
+    )
+    assert (
+        assert_object(assert_object(subject["comparison_transition"])["after"])["state"]
+        == "equivalent"
+    )
+    assert (
+        assert_object(assert_object(subject["absence_transition"])["before"])["state"]
+        == "known-absent"
+    )
+    assert (
+        assert_object(assert_object(subject["absence_transition"])["after"])["state"]
+        == "known-present"
+    )
 
     binding = _binding_change(restored, restored_secondary)
-    assert binding["definition"]["state"] == "preserved"
-    assert binding["member_evidence"]["changes"][0]["state"] == "added"
+    assert assert_object(binding["definition"])["state"] == "preserved"
+    assert (
+        assert_object(
+            assert_records(assert_object(binding["member_evidence"])["changes"])[0]
+        )["state"]
+        == "added"
+    )
 
 
 def test_declaration_evidence_loss_and_restoration_change_observation_not_definition(
@@ -278,12 +359,16 @@ def test_declaration_producer_provenance_change_is_observation_only(
     (repo / "owner.yaml").write_text("owner: team-a\n", encoding="utf-8")
 
     before_group = _group([_declaration("owner", "owner.yaml", "team-a")])
-    before_group["declarations"][0]["semantic_role"] = {"kind": "repository-owner"}
+    assert_object(assert_records(before_group["declarations"])[0])["semantic_role"] = {
+        "kind": "repository-owner"
+    }
     after_group = copy.deepcopy(before_group)
-    after_group["declarations"][0]["producer"]["version"] = "2"
+    assert_object(
+        assert_object(assert_records(after_group["declarations"])[0])["producer"]
+    )["version"] = "2"
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.repository_declarations([before_group])
         after = codemap.repository_declarations(
             [after_group],
@@ -305,32 +390,60 @@ def test_declaration_producer_provenance_change_is_observation_only(
         == after_declaration["semantic_declaration_identity"]
     )
     assert (
-        before["groups"][0]["group_definition_identity"]
-        == after["groups"][0]["group_definition_identity"]
+        assert_object(assert_records(before["groups"])[0])["group_definition_identity"]
+        == assert_object(assert_records(after["groups"])[0])[
+            "group_definition_identity"
+        ]
     )
-    assert before["groups"][0]["comparison"] == after["groups"][0]["comparison"]
+    assert (
+        assert_object(assert_records(before["groups"])[0])["comparison"]
+        == assert_object(assert_records(after["groups"])[0])["comparison"]
+    )
 
-    changed = after["delta_from_previous"]["changed_groups"][0]
+    changed = assert_records(
+        assert_object(after["delta_from_previous"])["changed_groups"]
+    )[0]
     assert changed["definition_changed"] is False
     assert changed["value_changed_declaration_ids"] == []
     assert changed["observation_changed_declaration_ids"] == ["owner"]
     assert changed["comparison_changed"] is False
     assert changed["absence_changed"] is False
-    semantic = after["delta_from_previous"]["semantic_subjects"]["changed"][0][
-        "semantic_declarations"
-    ]
+    semantic = assert_object(
+        assert_object(
+            assert_records(
+                assert_object(
+                    assert_object(after["delta_from_previous"])["semantic_subjects"]
+                )["changed"]
+            )[0]
+        )["semantic_declarations"]
+    )
     assert semantic["added"] == []
     assert semantic["removed"] == []
     assert semantic["ambiguous"] == []
-    assert len(semantic["changed"]) == 1
-    role_change = semantic["changed"][0]
+    assert len(assert_array(semantic["changed"])) == 1
+    role_change = assert_records(semantic["changed"])[0]
     assert role_change["semantic_role"] == {"kind": "repository-owner"}
     assert role_change["declaration_id_changed"] is False
-    assert role_change["producer_transition"]["before"]["version"] == "1"
-    assert role_change["producer_transition"]["after"]["version"] == "2"
+    assert (
+        assert_object(assert_object(role_change["producer_transition"])["before"])[
+            "version"
+        ]
+        == "1"
+    )
+    assert (
+        assert_object(assert_object(role_change["producer_transition"])["after"])[
+            "version"
+        ]
+        == "2"
+    )
     assert "value_transition" not in role_change
     assert (
-        after["delta_from_previous"]["repository_evidence"]["bindings"]["changed"] == []
+        assert_object(
+            assert_object(
+                assert_object(after["delta_from_previous"])["repository_evidence"]
+            )["bindings"]
+        )["changed"]
+        == []
     )
 
 
@@ -347,7 +460,7 @@ def test_correspondence_basis_change_is_group_observation_only(
     ]
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.repository_declarations(
             [_group(declarations, basis_version="1")]
         )
@@ -357,13 +470,23 @@ def test_correspondence_basis_change_is_group_observation_only(
         )
 
     assert (
-        before["groups"][0]["group_definition_identity"]
-        == after["groups"][0]["group_definition_identity"]
+        assert_object(assert_records(before["groups"])[0])["group_definition_identity"]
+        == assert_object(assert_records(after["groups"])[0])[
+            "group_definition_identity"
+        ]
     )
-    assert before["groups"][0]["comparison"] == after["groups"][0]["comparison"]
-    assert before["groups"][0]["absence"] == after["groups"][0]["absence"]
+    assert (
+        assert_object(assert_records(before["groups"])[0])["comparison"]
+        == assert_object(assert_records(after["groups"])[0])["comparison"]
+    )
+    assert (
+        assert_object(assert_records(before["groups"])[0])["absence"]
+        == assert_object(assert_records(after["groups"])[0])["absence"]
+    )
 
-    changed = after["delta_from_previous"]["changed_groups"][0]
+    changed = assert_records(
+        assert_object(after["delta_from_previous"])["changed_groups"]
+    )[0]
     assert changed["definition_changed"] is False
     assert changed["definition_changed_declaration_ids"] == []
     assert changed["value_changed_declaration_ids"] == []
@@ -372,5 +495,10 @@ def test_correspondence_basis_change_is_group_observation_only(
     assert changed["comparison_changed"] is False
     assert changed["absence_changed"] is False
     assert (
-        after["delta_from_previous"]["repository_evidence"]["bindings"]["changed"] == []
+        assert_object(
+            assert_object(
+                assert_object(after["delta_from_previous"])["repository_evidence"]
+            )["bindings"]
+        )["changed"]
+        == []
     )

@@ -1332,7 +1332,6 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         return seen
 
     def clear(self) -> dict[str, int]:
-        before = self.stats()
         tables = (
             "native_file_edge",
             "native_edge",
@@ -1344,10 +1343,17 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
             "symbol",
             "file_map",
         )
-        with self._lock, sqlite_transaction(self._db, begin="BEGIN IMMEDIATE"):
+        with self.publication_transaction():
+            before = self.stats()
+            # Disposal is a publication, not a new generation namespace. Keeping
+            # this counter prevents caches/read scopes from accepting an older
+            # authority after clear followed by a rebuild of the same store.
+            self.bump_generation()
             for table in tables:
                 self._db.execute(f"DELETE FROM {table}")
-            self._db.execute("DELETE FROM meta WHERE key != 'state.workspace'")
+            self._db.execute(
+                "DELETE FROM meta WHERE key NOT IN ('state.workspace', 'generation')"
+            )
         return before
 
     def stats(self) -> dict[str, int]:

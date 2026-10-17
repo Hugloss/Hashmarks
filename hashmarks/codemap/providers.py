@@ -91,6 +91,16 @@ class ProviderStatus:
         }
 
 
+class SourceRangeProvider(Protocol):
+    """The range producer operations consumed by ingestion and capability views."""
+
+    def signature(self, language: str) -> str | None: ...
+    def enrich(
+        self, artifact: ParsedArtifact, source: str, language: str
+    ) -> ParsedArtifact: ...
+    def status(self) -> ProviderStatus: ...
+
+
 class TreeSitterRangeProvider:
     """Optional structural range enrichment for CodeMap.
 

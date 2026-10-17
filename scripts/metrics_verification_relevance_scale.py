@@ -67,7 +67,7 @@ def collect(*, sizes: tuple[int, ...] = (10, 50, 100, 500)) -> dict[str, object]
             with CodeMap(workspace) as codemap:
                 timings = {}
                 started = time.perf_counter()
-                codemap.sync()
+                codemap.index.sync()
                 timings["sync_ms"] = (time.perf_counter() - started) * 1000.0
                 started = time.perf_counter()
                 action = codemap.task_action_map(task, limit=20)

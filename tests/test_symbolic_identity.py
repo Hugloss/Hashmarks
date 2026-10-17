@@ -44,7 +44,7 @@ def test_decision_packet_exposes_nomination_without_ranking_authority(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.task_decision_packet(
             "Fix NormalizeWidget implementation",
             limit=20,

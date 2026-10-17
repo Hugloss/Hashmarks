@@ -5,7 +5,8 @@ from copy import deepcopy
 from typing import TYPE_CHECKING, Literal, cast, get_args
 
 from .change_impact import ChangeImpactOptions
-from .decision_session import diagnostic_producer
+from .decision_session import ReadScopeOwner, diagnostic_producer
+from .repository_observation import packet_digest
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -23,7 +24,7 @@ EVIDENCE_PROFILE_DEFAULT_OPTIONS = ChangeImpactOptions(
 )
 
 
-class EvidenceProfilesMixin:
+class EvidenceProfilesMixin(ReadScopeOwner):
     """Density projections over one authoritative repository-intelligence snapshot.
 
     Profiles never persist or independently own repository facts.  Each projection
@@ -163,7 +164,7 @@ class EvidenceProfilesMixin:
             "execution_effect": "none",
             "evidence": evidence,
         }
-        payload["profile_identity"] = "sha256:" + self._packet_digest(
+        payload["profile_identity"] = "sha256:" + packet_digest(
             EVIDENCE_PROFILE_SCHEMA,
             payload,
         )

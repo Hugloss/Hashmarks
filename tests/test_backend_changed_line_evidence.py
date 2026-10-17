@@ -57,7 +57,7 @@ def test_direct_changed_lines_preserve_owner_and_verifier_surfaces(
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         plain = cm.task_change_impact(TASK, [PATH])
         augmented = cm.task_change_impact(TASK, [PATH], options=_options())
     assert "changed_line_evidence" not in plain
@@ -91,7 +91,7 @@ def test_direct_changed_lines_preserve_owner_and_verifier_surfaces(
 def test_changed_lines_are_not_implicit_at_file_scope(tmp_path: Path) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         impact = cm.task_change_impact(TASK, [PATH], options=_options(start=4, end=4))
     row = impact["changed_line_evidence"]["observations"][0]
     assert row["state"] == "source-index-correspondence-observed"
@@ -105,7 +105,7 @@ def test_changed_lines_outside_source_never_claim_missing_symbol(
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         impact = cm.task_change_impact(TASK, [PATH], options=_options(start=20, end=20))
     row = impact["changed_line_evidence"]["observations"][0]
     assert row["state"] == "unresolved"
@@ -140,7 +140,7 @@ def test_bad_spans_fail_before_sync(tmp_path: Path, spans: object) -> None:
         def forbidden_sync(*args: object, **kwargs: object) -> Never:
             raise AssertionError("work before range admission")
 
-        cm.sync = forbidden_sync  # type: ignore[method-assign]
+        cm.index.sync = forbidden_sync  # type: ignore[method-assign]
         with pytest.raises(ValueError):
             cm.task_change_impact(
                 TASK,
@@ -166,7 +166,7 @@ def test_source_denial_does_not_expose_symbol_names(tmp_path: Path) -> None:
         '[[rule]]\npattern = "src/backend.py"\nvisibility = "deny"\n'
     )
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         impact = cm.task_change_impact(TASK, [PATH], options=_options())
     row = impact["changed_line_evidence"]["observations"][0]
     assert row["state"] == "unresolved"
@@ -177,7 +177,7 @@ def test_sparse_source_or_unsupported_file_has_unknown_coverage(tmp_path: Path) 
     _repo(tmp_path)
     (tmp_path / "src/other.txt").write_bytes(b"\xff\x80")
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         impact = cm.task_change_impact(
             TASK,
             [PATH, "src/other.txt"],
@@ -195,7 +195,7 @@ def test_overlap_is_bounded_with_excess_reported(tmp_path: Path) -> None:
         nested.extend([f"def fn_{index}():", "    return 1"])
     (tmp_path / PATH).write_text("\n".join(nested) + "\n")
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         impact = cm.task_change_impact(
             TASK,
             [PATH],
@@ -256,7 +256,7 @@ def test_backend_route_decorator_maps_to_handler_without_false_symbol_overlap(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         impact = cm.task_change_impact(TASK, [PATH], options=_options(start=2, end=2))
     row = impact["changed_line_evidence"]["observations"][0]
     assert row["state"] == "source-index-correspondence-observed"
@@ -292,7 +292,7 @@ def test_backend_nested_method_decorator_is_not_confused_with_enclosing_class(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         impact = cm.task_change_impact(TASK, [PATH], options=_options(start=2, end=2))
     row = impact["changed_line_evidence"]["observations"][0]
     # The enclosing class overlaps the edited line; the method declaration
@@ -319,7 +319,7 @@ def test_backend_decorator_association_is_bounded_and_never_negative(
         )
     (tmp_path / PATH).write_text("\n".join(lines) + "\n", encoding="utf-8")
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         impact = cm.task_change_impact(
             TASK, [PATH], options=_options(start=1, end=len(lines))
         )
@@ -347,7 +347,7 @@ def test_backend_decorator_evidence_absent_when_source_is_denied(
         '[[rule]]\npattern = "src/backend.py"\nvisibility = "deny"\n'
     )
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         impact = cm.task_change_impact(TASK, [PATH], options=_options(start=1, end=1))
     row = impact["changed_line_evidence"]["observations"][0]
     assert row["state"] == "unresolved"
@@ -391,7 +391,7 @@ def test_backend_changed_auth_decorator_shows_adjacent_route_syntax(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         result = cm.task_change_impact(TASK, [PATH], options=_options(start=1, end=1))
     row = result["changed_line_evidence"]["observations"][0]
     assert row["symbols"] == []
@@ -438,7 +438,7 @@ def test_backend_decorator_call_arguments_preserve_dynamic_and_unpacking(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         result = cm.task_change_impact(TASK, [PATH], options=_options(start=1, end=1))
     ctx = result["changed_line_evidence"]["observations"][0]["decorator_associations"][
         "associations"
@@ -464,7 +464,7 @@ def test_backend_decorator_context_prioritizes_edited_under_bound(
     ]
     (tmp_path / PATH).write_text("\n".join(lines) + "\n", encoding="utf-8")
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         result = cm.task_change_impact(TASK, [PATH], options=_options(start=10, end=10))
     context = result["changed_line_evidence"]["observations"][0][
         "decorator_associations"
@@ -491,7 +491,7 @@ def test_backend_decorator_context_does_not_expose_literals_in_outline(
         '[[rule]]\npattern = "src/backend.py"\nvisibility = "outline"\n'
     )
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         result = cm.task_change_impact(TASK, [PATH], options=_options(start=1, end=1))
     row = result["changed_line_evidence"]["observations"][0]
     if row["state"] == "source-index-correspondence-observed":

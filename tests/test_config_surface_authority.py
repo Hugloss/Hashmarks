@@ -38,7 +38,7 @@ def test_explicit_config_surface_beats_same_stem_contract_source(
     _write(tmp_path / "src/case/policy.toml", "suffix = '-old'\n")
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map(
             "Change flare001 policy.toml from x-old to x-new"
         )
@@ -53,7 +53,7 @@ def test_multiple_concrete_configs_use_unique_task_specificity(tmp_path: Path) -
     _write(tmp_path / "src/case/policy.yaml", "suffix: '-old'\n")
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         toml = codemap.task_action_map("Change flare001 policy.toml to x-new")
         yaml = codemap.task_action_map("Change flare001 policy.yaml to x-new")
 
@@ -67,7 +67,7 @@ def test_multiple_concrete_configs_do_not_invent_generic_winner(tmp_path: Path) 
     _write(tmp_path / "src/case/policy.yaml", "suffix: '-old'\n")
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         generic = codemap.task_action_map(
             "Repair flare001 accepted response contract to x-new"
         )

@@ -24,7 +24,7 @@ PATH = "backend.py"
 
 def _observe(repo: Path, *, guidance: bool) -> dict:
     with CodeMap(repo) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         return codemap.discover_repository_declarations(
             [
                 StaticPythonBackendDeclarations(
@@ -173,7 +173,7 @@ def test_default_provider_identity_is_not_modified_without_opt_in(
 ) -> None:
     _write(tmp_path, "import os\nx = os.getenv('K')\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         implicit = codemap.discover_repository_declarations(
             [StaticPythonBackendDeclarations(paths=(PATH,))]
         )
@@ -213,10 +213,10 @@ def test_source_revision_delta_includes_guidance_without_cached_old_ranges(
         paths=(PATH,), include_evidence_navigation=True
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.discover_repository_declarations([provider])
         _write(tmp_path, "import os\nx = os.getenv(make_key())\n")
-        codemap.sync([PATH])
+        codemap.index.sync([PATH])
         after = codemap.discover_repository_declarations(
             [provider], previous_observation=before
         )
@@ -235,7 +235,7 @@ def test_visibility_blocks_source_guidance_without_leaking_literals(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(RepositoryDeclarationProviderError):
             codemap.discover_repository_declarations(
                 [

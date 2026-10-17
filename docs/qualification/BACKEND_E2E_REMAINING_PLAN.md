@@ -1,4 +1,28 @@
-# Backend 5/5 remaining implementation
+# Backend 5/5 research backlog
+
+## Current development priority: implement the canonical component rewrite
+
+The current implementation handoff is
+[Canonical component rewrite](../plans/CANONICAL_COMPONENT_REWRITE_PLAN.md).
+The user authorizes a breaking Python API and removal of compatibility paths.
+Implementation is in progress under the user's explicit instruction. Earlier
+source-binding/cache/source-read/manifest/metadata repairs are implemented.
+Files, identity observation access, Index, DecisionScope and Source are
+independent components with bounded proof. The remaining domains and broad
+qualification are unfinished.
+Follow the implementation checkpoint in the component plan and continue CR-02
+rather than replaying the captured baseline or already repaired defects.
+
+The broad twenty-capability 5/5 target below is retained as a later research and
+qualification track. Its minima, oracles, review requirements, failed evidence
+and machine-readable matrix are unchanged. They are not prerequisites for
+closing every local architecture subgoal. Owner-sized proof, selected integration
+closure, whole-project typing and final release qualification have distinct
+scopes; a scoped pass must always name its scope.
+
+The sections below retain prior campaign checkpoints and the full research
+backlog. Their historical "current" identities/counts refer to those checkpoints,
+not proof of a later candidate. No capability is promoted to 5/5 by this change.
 
 This handoff is Hashmarks development QA. Product code remains a repository
 observer; consumers own reasoning and external execution layers own execution
@@ -13,16 +37,741 @@ extends it to 61 entries and 51 distinct problems across five suites. Language
 intake adds twelve entries, six new upstream problems and three new repositories:
 the language checkpoint had 73 entries and 57 distinct problems across six suites.
 Debugging intake adds four entries, including two new upstream problems. The
-current campaign has 77 entries and 59 distinct problems across seven suites.
+debugging checkpoint had 77 entries and 59 distinct problems across seven suites.
+Selected-call intake adds twelve capability-specific views of existing problems:
+the current campaign has **89 entries / 59 distinct problems / eight suites**.
 Its language catalog has six Python and six TypeScript cases over twenty-four
 source trees. Copying a suite or reusing a problem adds no distinct evidence.
 The original campaign remains historical. The active schemas remain workflow
 v2, campaign v4 and matrix v5. Additional capability membership is admitted only
 after source review and executable witness proof.
 
-## Completion contract
+## Research completion contract and retained checkpoints
 
-### Latest implementation checkpoint: 2026-10-17, base `1280456`
+### Current checkpoint: native service reply validation
+
+**The campaign remains INCOMPLETE. No capability is established at 5/5.**
+Current observer is
+`sha256:acd5e5c7aa9bd4582a2ffc2a95972fdd8f68cb2255a8c08f91e88a8746761455`;
+evaluator remains `81b2085…`. All `0e962bd…`, `31c3938…` and earlier public/native
+reports below retain their original identities and are historical after this
+production repair.
+
+T09 inspection reproduced a transport correctness defect: canonical clients
+accepted wrong/missing schemas and coerced arrays of pairs into repository
+objects. `find_task` accepted arrays containing non-object hits, and internal
+handlers could return non-object replies. The current repair reuses the existing
+`_SERVICE_ROUTES` and operation-schema owner for seventeen canonical clients,
+requires object hit rows and handler replies, preserves unknown fields and
+literal false/zero/null values, and leaves empty bounded hits without negative
+authority. Unix server ownership and byte-writer interfaces are typed without
+changing lifecycle, request/response limits, retries or execution policy. This
+is an internal repair to the observer's transport boundary.
+
+Evidence lives in `typing-intake/service-boundary-01/` under
+`.hashmarks/backend-e2e/explicit-retrieval-20261016/`:
+
+- `frozen-before-tests-02.log`: **7 FAIL / 2 PASS** against the independently
+  extracted `0e962bd…` candidate. `baseline-import-origin-02.json` proves the
+  exact exercised module and producer identity; the frozen extraction is intact.
+- `route-preservation.json`: every rewritten request operation, response key and
+  semantic schema agrees with the pre-existing route owner. Request argument
+  values and one shallow copy of valid replies are preserved. No registry,
+  schema value, authority rule or qualification threshold changed.
+- `service-transport-tests-after-01.log`: **93 tests PASS**, including actual
+  Unix service, verification, MCP and presentation consumers.
+- `hostile-schema-probes-01.log`: **17 additional checks PASS**, covering another
+  registered operation's schema on every repaired canonical client.
+  `probe-addition-preservation.json` proves the already tested protocol functions,
+  fixtures and helpers are unchanged when these probes are added. These are
+  controlled protocol regressions, not new genuine corpus problems.
+- Scoped Ty/Pyright pass for the service and protocol tests. Existing type ignores
+  are removed; the invalid-classification case still reaches native dataclass
+  validation through `replace`, retaining its unsupported value.
+
+Fresh full inventories are `full-ty-after-02.log`: **2,069 diagnostics**, and
+`full-pyright-after-02.log`: **2,041 errors**. Both full gates remain red.
+Structural Locality's earlier typing debt is still open. The next persistent
+source candidate is `source-service-boundary-01/`; inspect its manifest and
+independent extraction results before treating it as qualified. Final journal
+edits may postdate the ZIP.
+
+The remaining work is still T03–T10: missing catalogs, independent semantic
+review, exact witness closure, metadata localization, full configured typing,
+current public/native acquisition, complete deterministic test membership,
+heldouts, comparable economics and final artifacts. Neither protocol hardening
+nor green scoped tests substitutes for that work.
+
+### Typing and source-review checkpoint after interruption
+
+The last six test-owner repairs are complete in
+`typing-intake/{endpoint-presentation-01,negative-authority-01,correspondence-consumer-01}/`
+under `.hashmarks/backend-e2e/explicit-retrieval-20261016/`. The three named
+batches pass **22, 13 and 18 tests** respectively, including actual MCP SDK
+delivery, declaration authority, qualified negative evidence and consumer
+conformance. All six owners pass both checkers. Each batch's `preservation.json`
+compares the entire original module AST after erasing checked reads and type
+annotations: every original fixture, assertion, parameter and production-call
+value is retained. The retrieval spy's obsolete return annotation is corrected
+to the actual producer tuple; no replacement API or unchecked cast is added.
+
+Fresh full inventories at
+`typing-intake/correspondence-consumer-01/full-{ty,pyright}-after-01.log` report
+**2,096 Ty diagnostics / 2,103 Pyright errors**, down from 2,339 / 2,345. Both
+full gates remain red. Production/evaluator identities remain `0e962bd…` /
+`81b2085…`; the frozen `source-context-explicit-01` ZIP predates these six
+test-only repairs as well as later journal edits. Do not claim it contains them.
+
+The historical `31c3938…` SQLAlchemy path batch is now terminal INCOMPLETE:
+all four workflows pass all ten gates. Together the three historical repository
+batches complete all twelve workflows: eleven pass all ten common gates; the
+cancellation-before duplicate failure is preserved and subsequently repaired
+under `0e962bd…` as detailed below. These historical reports cannot become current
+by merging them with the current cancellation report.
+
+`metadata-task-source-review-02.json` adds source-only caller/constructor evidence
+without changing the admitted task. `metadata-task-compare-01/summary.json`
+compares original → source-neutral → original API queries against the same
+pinned source/index, retaining all original required facts. Both phrasings miss
+the same method; the original replay is stable. Removing the unsupported future
+kind does not repair localization. Keep the original case, source oracles and
+failure; do not treat a wording change as a product repair or a new distinct
+problem. Missing catalogs, independent reviews, witness closure, complete typing
+and final qualification below remain open.
+
+### Latest implementation checkpoint: 2026-10-17, declaration-context retrieval
+
+**The campaign remains INCOMPLETE. No capability is established at 5/5.**
+Current observer:
+`sha256:0e962bd7bd543ccbb76af1e6c3588975b4f906444a6b74fa1a0b0649ad061b64`.
+Evaluator remains `81b2085…`. This supersedes the observer checkpoint below;
+historical reports retain their original identities.
+
+The two SQLAlchemy localization failures below reproduced two generic disclosure
+gaps. Their expected files ranked 58th and 18th in the existing lexical pool,
+outside its twelve-path shortlist. In addition, a method with no matching word
+in its own name was discarded even when its enclosing class and signature
+matched. `localization-probe-01/summary.json` and
+`declaration-context-probe-01.json` retain the diagnostic measurements.
+
+The repair adds one weak `bounded-declaration-context` hint using the existing
+sixty-four-file pool before that shortlist. It examines at most thirty-two
+declarations; SQL prefixes are only a prefilter and existing identifier-part rules
+qualify the match. Current source/outline visibility is required. Explicit
+locators, the two-supplement limit, the requested response bound and independently
+owned edit/verifier selection remain unchanged. A matching class does not prove
+runtime dispatch or behavioral ownership. Duplicate hints retain the existing
+natural-language declaration and its presentation contract.
+
+Evidence under `.hashmarks/backend-e2e/explicit-retrieval-20261016/`:
+
+| Evidence | Result and limit |
+| --- | --- |
+| `path-intake/context-before-01.log` | Two neutral opaque-method/outline failures reproduced before repair |
+| `path-intake/context-adversarial-01.log` | Eight tests PASS: coherent class/signature disclosure, hidden/changed/deleted source, outline policy, explicit precedence, coarse-prefix rejection, hidden-row bounds and repeated task words |
+| `path-intake/context-api-01/summary.json` | Both revisions and both API profiles of failed BEGIN and repeated loader pickling retain all frozen task facts under intermediate observer `4b8debd…`; expected source files occur in the first three results, and exact changed methods are direct or declared-member evidence |
+| `source-declaration-context-01/extracted-regression-01.log` | Intermediate observer `4b8debd…`: 780 PASS / 1 FAIL. A duplicate context hint changed an existing declaration hint's ordering/tag; the unchanged regression remains preserved |
+| `path-intake/context-dedup-after-01.log` | 44 focused disclosure, invalidation, authority and duplicate-hint tests PASS after repair |
+| `source-declaration-context-dedup-01/source.zip` | Independent candidate, ZIP SHA-256 `e080885c7039e3d91736a9e1d4b412bfe04d358c888a680b02c1c372d714a05f`, 1,136 members, observer `31c3938…` |
+| `source-declaration-context-dedup-01/extracted-regression-01.log` | 781 tests PASS from independent extraction, including actual SDK/IPC, task evidence, structural scopes, public presentation, backend grading/regrading, native LSP and CodeMap regressions |
+| `path-intake/context-candidate-diff-01.json` | Path suite/grader bytes and modes unchanged; exact source-member accounting identifies only the two retrieval/query production repairs, one new test and documentation changes |
+| `path-intake/native-transport-typing-preservation-01.json` | Entire native transport test module AST identical after erasing imports, annotations and checked JSON-read wrappers. All original fixtures, assertions, parameters and production-call values remain identical |
+| `path-intake/native-transport-tests-after-01.log` | All 11 native CLI/official-MCP transport tests PASS after that separate test-only narrowing; scoped Ty/Pyright both pass |
+
+The candidate ZIP predates the native transport test-only narrowing and the
+latest documentation. Do not claim it contains those edits. Production and
+evaluator identities remain unchanged. Current complete configured inventories
+are `full-ty-native-transport-narrowing-01.log`: **2,339 diagnostics**, and
+`full-pyright-native-transport-narrowing-01.log`: **2,345 errors** (both in
+`path-intake/`). The previous current inventories were 2,382 / 2,391. Neither
+full typing gate is green.
+
+The current frozen candidate is `source-context-explicit-01/`; its manifest records
+the exact ZIP identity and import/extraction binding. It includes the separate
+native transport test typing cleanup. Final journal edits may postdate the ZIP;
+always distinguish its manifest from the current worktree.
+
+Acquisition outputs under the preceding `31c3938…` observer are
+`path-intake/context-dedup-public-01-{aiokafka,
+faststream,sqlalchemy}/`, `context-core-public-01/` for the original metadata and
+sender problems, and `context-native-live-01/` with its distinct
+`context-native-live-captures-01/` directory. Acquire/inspect terminal summaries
+before treating any batch as proof. The aiokafka path batch is complete: all four
+workflows pass all ten gates; overall status remains INCOMPLETE. Fresh native
+acquisition completes **12 workflows / 24 revisions PASS**. This is selected
+source-binding/transport evidence; these path native outcomes have no executable
+native fact witnesses and do not close capability-specific witness or native
+semantic review. The FastStream path batch is terminal FAIL: three workflows
+pass all gates; cancellation-before loses its independently required existing
+verifier. The SQLAlchemy batch is still in flight at this checkpoint. The older
+`context-public-01/` uses `4b8debd…` and is historical after the duplicate repair.
+
+The cancellation failure proved an additional duplicate: an explicit locator and
+a context hint for the same method occupied separate slots, displacing `AckPolicy`
+from the first three source candidates and hiding `test_ack_policy.py`. The
+neutral explicit/context fixture fails before repair. The current repair also
+deduplicates against the already admitted explicit supplements;
+`context-explicit-after-02.log` passes 45 affected tests. Both revisions and both
+API profiles now pass the unchanged cancellation facts in
+`context-explicit-api-02/summary.json`. Current actual-transport qualification is
+still required. All `31c3938…` reports remain historical after this repair.
+
+The current core metadata/sender report above is terminal FAIL. Sender passes all
+ten gates with maximum complete initial MCP compact size 3,849. Metadata still
+misses `ClusterMetadata.failed_update` and its owner file in the first three.
+`metadata-baseline-api-01/summary.json` independently reproduces that missing
+method under pre-change `db18918…`; it is not introduced by this context repair.
+Its smaller response is not an evidence-economics improvement: the required fact
+is missing. This is an open localization problem in the original core corpus.
+
+The broad non-diagnostic lexical trial did not repair that genuine case and
+introduced two existing declaration regressions (44 PASS / 2 FAIL). It is
+rejected. `rejected-nondiagnostic-lexical-01/` retains its exact production/test
+bytes, experiment fixture and decision; `lexical-topic-after-01.log` and
+`metadata-topic-api-01/summary.json` retain the failures. The original core oracle,
+all pre-existing regressions, membership, facts and bounds remain unchanged.
+Do not revive this trial or add task/package keywords without a better generic,
+source-grounded retrieval explanation and neutral adversarial proof.
+
+Current-candidate qualification now completes:
+
+- `source-context-explicit-01/source.zip`: SHA-256
+  `f120a32ef510e9bae0746829dc2de0e79eb145dab73e865111bb2ae638de7724`,
+  1,136 members. `import-origin-01.json` proves observer/evaluator imports from
+  the independent extraction. `extracted-regression-01.log` passes **793 tests**,
+  including the new explicit/context duplicate control and all eleven native
+  transport tests. `source-compile-01.log` completes the configured source
+  `compileall` scope successfully. This is a focused ring, not full deterministic
+  membership or final packaging/promotion proof.
+- `path-intake/context-explicit-public-01/summary.json`: the genuine cancellation
+  workflow passes all ten gates at both revisions through default/initial API,
+  every CLI/MCP format, task variants and source invalidation. Complete initial
+  CLI compact replies are 2,687 / 2,725 tokens; MCP compact replies are
+  **2,797 / 2,835**. All compact/text replies remain below 4,000. Overall status
+  is INCOMPLETE; the test is still a weak candidate, not established coverage.
+- `context-current-aggregate-02/summary.json` (under `path-intake/`) purely
+  revalidates that current report and its **297 artifact-bound fact witnesses**.
+  It admits the valid workflow input and accounts for all 89 expected campaign
+  outcomes. Overall and input integrity remain INCOMPLETE for missing proof.
+- `context-stale-native-aggregate-02/summary.json` rejects the preceding
+  `31c3938…` native report while retaining the current workflow input: FAIL, as
+  expected. Older successful native evidence is not promoted to current.
+  Report-map attempt 01 used `path` and was rejected as an unknown namespace;
+  corrected maps use the authoritative campaign ID **`backend-path-v2`**.
+- Fresh configured `full-ty-context-explicit-01.log` /
+  `full-pyright-context-explicit-01.log` retain **2,339 diagnostics / 2,345 errors**.
+  Both remain red; scoped checks on the two modified production owners and two
+  affected test owners pass. Current preflight passes Ruff, hygiene, complexity
+  and size gates. Final journal updates postdate the frozen source ZIP.
+
+Source-only investigation also identifies a task-grounding concern:
+`metadata-task-source-audit-01.json` records that both pinned metadata revisions
+import `Future` from `concurrent.futures` at line 6 and assign
+`self._future = Future()` at line 183, while the public task names an asyncio
+future. This is a declared-source mismatch requiring oracle review, not runtime
+type proof. No dependency implementation was inspected. The original case,
+question and all required facts remain unchanged. Review that premise and its
+caller boundary before tuning production retrieval against it; a correction
+must preserve the original misleading-input case and cannot weaken bounds or
+required evidence. Do not infer that the missing method has been repaired.
+
+Economics investigation now has a bounded profiling lead in
+`path-intake/localization-profile-01/{summary.json,hot-owners.json,top.txt}`.
+One failed-BEGIN API call against an existing saved index makes 87,976,482
+profiled calls and takes 35.57 seconds with profiler overhead. Candidate-verifier
+collection accounts for 22.37 cumulative seconds; the new declaration-context
+lookup accounts for 0.183 seconds. The measured operation parses 496 Python
+snapshots and builds 462 reference projections. These cumulative costs overlap
+and must not be added. The single run has concurrent qualification activity and
+no same-version control: it is characterization, not a performance regression,
+speedup or capability-20 qualification. Investigate the verification/import
+qualification owners before proposing lexical representation changes or word
+matching caches. Preserve references, ambiguity, source binding, candidate bounds
+and packet facts. Use T10's comparable cold/warm/incremental samples and controls
+before making an economics claim.
+
+Next: finish and retain these exact batches, inspect all failures and sizes,
+purely regrade their artifact-bound witnesses, and update the aggregate without
+reusing historical observer reports as current proof. All independent capability
+reviews remain pending. Campaign population is still 89 entries / 59 distinct
+problems / eight suites; debugging still needs eight problems across two more
+repositories, and catalogs 8, 9, 11, 15, 16, 18 and 20 remain missing. Complete
+T03–T10 below; scoped regression/typing passes do not close those tickets.
+
+### Historical implementation checkpoint: 2026-10-17, selected call scopes and collections
+
+**The campaign remains INCOMPLETE. No capability is established at 5/5.**
+This checkpoint supersedes the historical checkpoints below. Current observer:
+`sha256:db189183ae2d49a6ff4e01cbc30d50bc03f109890ecf61b56aab878426646b75`.
+Current evaluator:
+`sha256:81b208502ea966e6363e48c9509d8e8af3f8b0fd77a3007d4c4d0009c3b59a74`.
+Historical public/native reports below remain bound to their original identities;
+they are not qualification of this candidate.
+
+Catalog 2 now has twelve distinct source-bound problems across aiokafka,
+SQLAlchemy and FastStream. Its task inputs, exact direct segments, unresolved
+receivers, endpoint labels and structured/compact/text display facts were frozen
+from admitted source before the selected-call measurements. It adds no new
+distinct campaign problems. All review flags remain false. The 720 required
+positive/adversarial witness contexts cover both revisions, API, CLI and MCP,
+native and displayed facts. `backend_structural.py` composes the existing public
+surface and transport owners; retained-byte regrading and artifact-bound
+witnesses use the existing qualification machinery. No product execution or
+semantic graph responsibility was added.
+
+Source-first intake reproduced and repaired three generic observer defects:
+
+1. **Nested caller scope:** `edges_from` includes descendants. Structural Locality
+   now selects the indexed source's own calls before its per-symbol limit.
+   Nested callbacks/methods retain their own caller; no transitive shortcut or
+   callback invocation is invented. Three neutral cases failed before repair.
+2. **Definition-expression scope:** decorator/default/base calls no longer become
+   calls made by the declared body. A genuine SQLAlchemy decorator was previously
+   emitted as an exact `_prepare_impl` call at line 1281, before that method's
+   body starts at 1284. Three neutral regressions reproduced the defect.
+   Parser identity advances from v6 to v7 so persisted artifacts are invalidated.
+3. **Qualified lexical scope:** same-named methods and unrelated nested bindings
+   no longer hide an independently qualified import call. Actual local function,
+   class and closure shadowing remains unresolved. Five of eight neutral cases
+   failed before repair, including three false exact import edges. The repair
+   reuses `python_exports`' existing scope-aware name-write owner and a qualified
+   function index on the same stable AST snapshot. There is no parallel binding
+   authority or persistent relationship state. Classification: REFACTOR
+   INTERNALLY, motivated by the reproduced binding defects, not file size.
+
+Evidence under `.hashmarks/backend-e2e/explicit-retrieval-20261016/path-intake/`:
+
+| Evidence | Result and qualification limit |
+| --- | --- |
+| `direct-call-scope-before-01.log` | Three false enclosing-caller associations reproduced |
+| `nested-callback-source-oracle-01.json`, `nested-callback-before-01/` | Genuine pinned FastStream shutdown source oracle, frozen before measurement; after-change caller FAIL reproduced |
+| `nested-callback-public-after-01/summary.json` | 27 API/CLI/official-MCP observations PASS across both revisions under intermediate observer `82c8201…`; this is lexical caller repair evidence, not current/full capability qualification |
+| `decorator-source-oracle-01.json`, `decorator-before-02/` | Source-frozen genuine SQLAlchemy definition-header false exact edge at both revisions |
+| `definition-scope-after-01.log` | 110 parser/CodeMap/locality/direct-declaration regressions PASS after the definition-scope repair |
+| `parser-migration-01/summary.json` | PASS: unchanged source, same durable state and artifact stores; independent v6 extraction's wrong call lines `[5,6,7]` become `[7]`, one artifact reparsed under v7 |
+| `structural-workflow-tests-01.log` | 141 QA/workflow/witness/transport tests PASS before the final qualified-scope repair; includes actual public transports, pure replay, tamper rejection and incomplete-transport controls |
+| `api-probe-01-{aiokafka,sqlalchemy,faststream}/summary.json` | All 24 revision observations completed under intermediate observer `f1177c0…`. Native facts and endpoint revision binding pass 20/24; structured display passes 20/24; compact/text pass only 4/24. These failures remain recorded |
+| `import-scope-before-01.log`, `import-scope-after-01.log` | Five neutral failures reproduced before qualified-scope repair; 58 affected parser/cache/authority/locality regressions PASS afterward |
+
+The four native failures above concern both revisions of repeated loader
+pickling and empty batch publication. They motivated the qualified-scope repair;
+current genuine remeasurement is required. Display truncation is still open:
+the existing five-row relationship projection hides admitted direct segments
+and unresolved next hops. Preserve the frozen facts, native bounds and exact
+source references when repairing presentation. Raising scores, deleting adverse
+checks, dropping admitted facts or weakening the 4,000-token initial-response
+ceiling is not a repair.
+
+The collection-presentation repair is now implemented after that failed probe.
+Every already bounded node/call/unresolved/external collection is retained as a
+single native-referenced finding, with an explicit member count. Repeated
+per-edge presentation metadata is removed. The observation's native traversal
+bounds and every admitted field remain intact. Three new neutral checks failed
+before repair; all four collection checks pass afterward, including independent
+recovery from actual text lines, future qualifiers and strict false/zero values.
+The collection counts are documented in `STRUCTURAL_LOCALITY.md` and
+`API_STABILITY.md`.
+
+Additional evidence in `path-intake/`:
+
+| Evidence | Result and qualification limit |
+| --- | --- |
+| `call-scope-public-01/<workflow>/summary.json` | Both revisions of repeated loader pickling and empty batch publication now pass native facts, authority and endpoint binding on API and every real CLI/MCP format under observer `a5f48d0…`. Both reports still fail compact/text display. This proves the lexical-scope repair and preserves the display failure |
+| `../source-call-scope-01/extracted-regression-01.log` | 574 tests PASS from an independent extraction under observer `a5f48d0…`, including actual SDK/IPC, parser, source/verification, authority, native LSP, backend workflow/regrading and presentation contracts |
+| `collection-oracle-preservation-01.json` | Suite bytes unchanged. Every oracle fact, check ID/predicate, support/authority flag, source label, bound and witness is unchanged; only display record pointers follow the new native collection arrays. Original grader `b5dcfc8…` remains frozen; current grader is `2258f4a…` |
+| `collection-format-replay-01/summary.json` | 84 pure format replays conserve every field of all four collections. Historical API bytes retain their original missing facts: 60/72 display checks pass. All 12 replays of the four corrected lexical-scope observations pass their frozen display facts. Projection JSON totals change from 8,351,549 to 7,564,598 bytes. This is historical-byte projection evidence, not current repository or actual transport qualification |
+| `locality-projection-contract-01.log` | 24 focused collection/backend/public-transport/presentation tests PASS after the collection repair |
+
+`full-ty-call-scope-01.log` and `full-pyright-call-scope-01.log` report **2,382 Ty
+diagnostics / 2,393 Pyright errors** under the preceding call-scope candidate.
+Both remain red. These inventories predate the collection projection; fresh
+configured inventories and independent extraction/public qualification are next.
+
+The collection candidate was independently frozen as
+`source-call-collections-01/source.zip` (ZIP SHA-256
+`e928091f8b0a7742210e787a009b3738632a743b2f4d744885bc763d640d045d`,
+1,135 members; observer `b8e33d0…`). Its extracted ring completed with
+**577 PASS / 1 FAIL**: collection ordering displaced the existing first SCIP
+producer-claim finding. The current repair restores that ordering while keeping
+all four bounded collections. `scip-collection-order-after-01.log` passes 21
+affected discovery, collection and import-scope tests. Preflight passes. This
+repair requires a new frozen candidate; preserve the failed candidate's bytes.
+
+That ordering repair is now frozen as
+`source-call-collections-scip-01/source.zip`, SHA-256
+`84f2d3a6bc6e3930587501adee55f74639506b4426d178e5b42d792259b7dd8f`
+(1,135 members, current observer `9ccc6b3…`, evaluator `81b2085…`). Its
+`extracted-regression-01.log` completes **578 tests PASS** from independent
+extraction, including the restored SCIP-first contract and exact collection
+preservation. This is a persistent development candidate, not final release proof.
+
+The subsequent test-only verification-reference typing cleanup passes all four
+tests and scoped Ty/Pyright. `verification-fallback-typing-preservation-01.json`
+proves the entire module's original fixtures, assertions and production-call
+values unchanged after erasing two checked string narrowings. The ZIP predates
+this test-only cleanup and the subsequent filename-disclosure production repair.
+It is historical; do not claim it contains all latest source/documentation edits.
+
+Full `collections-full-public-01-*` batches use frozen observer `b8e33d0…` and
+are historical after that ordering repair. The aiokafka batch is complete: all
+four workflows pass all ten gates, including both initial profiles/transports,
+sizes and source invalidation; overall status remains INCOMPLETE. All three
+repository batches are now terminal: **12 workflows / 24 revisions** complete.
+Every nominated structural component passes all five component gates on API,
+CLI and MCP. Nine workflows pass all ten common gates. The other three retain
+these genuine common task-evidence failures:
+
+- `sqlalchemy-failed-begin`, both revisions: source owner and changed symbol
+  missing from task evidence and the first-three owner result. Its nominated
+  structural component passes every gate. Repair generic localization at its
+  existing owner; do not feed the nominated call target into task ownership or
+  rewrite the natural-language task to contain the expected answer.
+- `sqlalchemy-pickle-extra-criteria`: the natural-language owner/symbol and
+  first-three owner result are missing; its separately nominated structural
+  component passes. Preserve this case alongside failed BEGIN when repairing
+  generic localization.
+- `faststream-ack-cancellation`, after revision: the independently required
+  existing verifier is missing. Its structural component passes every gate, and
+  the before revision passes the task facts. Inspect the retained verification
+  disclosure and indexed source/test evidence; do not drop the after-only
+  cancellation test or infer a verified relationship from lexical similarity.
+
+Fresh complete inventories for the collection candidate are
+`full-ty-collections-01.log`: **2,382 diagnostics**, and
+`full-pyright-collections-01.log`: **2,393 errors**. No full typing gate is green.
+
+The cancellation test was present in the scored candidate pool: 64 candidates,
+rank 25, outside the eight returned slots. Its only task matches were
+`cancellation` and `py`; generic protocol helpers ranked above it on source-name
+overlap. `cancellation-candidates-probe-01/summary.json` records that unchanged
+ranking, not a missing repository test or a discovery failure.
+
+The current minimal repair ranks a filename matching the task concern after
+exact reference, source filename and namespace precedence, before incidental
+source-name overlap. It subtracts the nominated source path/symbol and existing
+stopwords from the filename topic match. It changes disclosure only: candidate
+limits, canonical edit/verifier selection and relationship authority remain
+unchanged. The neutral protocol-helper example fails before repair and passes
+afterward; `problem-test-after-01.log` passes 15 related tests, including both
+profiles, namespace/reference controls and unchanged canonical selection.
+Scoped Ty/Pyright pass. `cancellation-candidates-probe-02/summary.json` retains
+64 scored/eight returned candidates and now includes the required test.
+`problem-filename-api-01/summary.json` passes the frozen task facts at both source
+revisions in default and initial API profiles. Actual current transport/size,
+freshness and artifact qualification remain next; do not promote this API probe
+to a complete workflow PASS.
+
+The filename-disclosure candidate is independently frozen as
+`source-problem-filename-01/source.zip`, SHA-256
+`5bb840d834bcc4e1cc039710b9fcd28f33ba6d389c95e2b51ec4b4459fda3b8b`
+(1,135 members, observer `db18918…`, evaluator `81b2085…`). Its import-origin
+receipt verifies the independent extraction. `extracted-regression-01.log`
+completes **583 tests PASS**. This is focused qualification, not the complete
+deterministic project membership.
+
+`problem-filename-public-01/summary.json` now completes the genuine cancellation
+workflow under that candidate: **all ten gates true** at both revisions, through
+default/initial API, all CLI/MCP formats, variants and source invalidation. Overall
+status remains INCOMPLETE for wider qualification. Complete initial MCP compact
+responses measure **2,869 before / 2,907 after**; all required compact/text
+responses are below 4,000 tokens. The former missing test remains a weak
+candidate with explicit unestablished relationship authority.
+
+The pure aggregate reader also caught a metadata authoring error: the new path
+campaign entry used physical file SHA-256 instead of the established canonical
+JSON identities. `campaign-binding-correction-01.json` proves only those two entry
+fields changed; every suite/oracle byte, expected fact, bound, witness and other
+entry is unchanged. Existing artifacts retain the rejected entry as history.
+Correct canonical suite/grader identities are `77955acc…` / `d7500354…`.
+`collections-aggregate-02/summary.json` now accepts and regrades all twelve
+provided historical `b8e33d0…` reports and preserves FAIL for their three observed
+task failures. Overall input integrity remains INCOMPLETE for missing reports;
+this is not an aggregate clean-pass claim. The
+filename-disclosure ZIP above predates this metadata correction; materialize a
+corrected candidate before using its campaign entry for artifact qualification.
+
+The corrected candidate is now
+`source-path-qualified-01/source.zip`, SHA-256
+`5c94b40234a7f703b0b7cd920d9bd9f1c718ccaa4409e3c367191f6271c1453a`
+(1,135 members, same `db18918…` observer and `81b2085…` evaluator).
+`path-qualified-code-preservation-01.json` compares every one of the 1,003
+production/evaluator/test/tool-configuration members with the 583-test candidate:
+all bytes and modes are identical. Only campaign metadata and documentation
+changed. `source-path-qualified-01/campaign-admission-01.json` independently loads
+all eight frozen suites, source trees and canonical oracle identities: PASS.
+These checks close the manifest binding repair, not the remaining qualification.
+
+The latest complete Pyright inventory after the separate typing cleanup is
+`full-pyright-after-verification-fallback-01.log`: **2,391 errors**. Full Ty remains
+last measured at 2,382 diagnostics. Neither full checker is green.
+
+Current complete configured inventories, including the filename-disclosure
+repair, are `full-ty-problem-filename-01.log`: **2,382 diagnostics**, and
+`full-pyright-problem-filename-01.log`: **2,391 errors**. Both remain red.
+
+Continue in this order:
+
+1. Campaign metadata and all eight bindings now pass the independent reader;
+   cancellation has complete current public proof. Repair the two independently labeled natural-language
+   owner failures. Preserve the frozen tasks and oracles. Run all twelve workflows at
+   both revisions, default/initial profiles, actual CLI/MCP, all required formats,
+   source invalidation and pure witness regrading. The lexical-scope repair has
+   genuine public proof; the collection repair still needs current full workflow
+   proof. API-only or historical-byte projection probes cannot replace it.
+2. Complete catalogs 8, 9, 11, 15, 16, 18 and 20, and eight more debugging
+   problems across two additional admitted repositories. Catalog 2's population
+   is supplied; its review, display, native, freshness and final qualification
+   are not closed. Do not count transports or reused problems as new breadth.
+3. Finish independent review and exact witness closure, then current public and
+   fresh native qualification for every composed packet. The earlier four
+   debugging and sixteen native workflow entries are historical after these
+   observer/evaluator changes. Original metadata/sender workflows remain open.
+4. Finish T09 full typing and T10 deterministic membership, heldouts, comparable
+   cold/warm/incremental economics with a noise control, and final artifact proof.
+   The last completed whole-project inventories below still report 2,384 Ty
+   diagnostics / 2,395 Pyright errors. They predate this candidate; scoped typing
+   is never a substitute for a fresh complete inventory.
+
+### Historical verified checkpoint: 2026-10-17, declaration words
+
+**The four nominated debugging workflows pass every behavioral and transport gate.
+The twenty-capability campaign remains INCOMPLETE. No capability is certified 5/5.**
+
+The latest observer is
+`sha256:39419ff6240fa082b4a6d0feeaae0b955ed2cbfaba34a8d694c8cdabc66ed662`;
+the evaluator is
+`sha256:3c36b8cddc21d4b764b2a9d2cc0f9f53b6112348f362abb9c0a41cb693ed3ab2`.
+The independently extracted source ZIP is
+`.hashmarks/backend-e2e/explicit-retrieval-20261016/source-declaration-words-01/source.zip`,
+SHA-256 `60d776feb612cc98b3198fbf884fd7bbc74c86744cca61f42aec2b7e4d6efd6f`.
+Its import-origin receipt proves the exercised observer and evaluator came from
+that extraction. The working observer/evaluator still match those identities.
+
+All evidence paths in the following table are relative to
+`.hashmarks/backend-e2e/explicit-retrieval-20261016/`.
+
+| Evidence | Verified result and limit |
+| --- | --- |
+| `source-declaration-words-01/extracted-regression-01.log` | 342 affected tests PASS from independent extraction, including actual MCP/IPC, native LSP change regressions, source/test disclosure, codec/presentation and dependency replay |
+| `debug-declaration-words-public-01/<workflow>/summary.json` | Logging-token reset, aggregate strings, metadata and annotation diagnostics each pass all ten gates at both source revisions, through API, CLI and official MCP with required formats/variants and stale controls. Overall reports remain INCOMPLETE for wider qualification |
+| Same public reports | Relevant existing tests survive both revisions. Every complete initial compact/text CLI/MCP reply meets the unchanged 4,000-token ceiling. Metadata's MCP compact response is **3,890 before / 3,890 after** |
+| `debug-declaration-words-native-01/summary.json` | Fresh genuine captures: four nominated debugging workflows / 510 witnesses PASS |
+| `language-declaration-words-native-01/summary.json` | Fresh genuine captures: twelve nominated language workflows / 900 witnesses PASS, including the four newly supplied Python native oracles |
+| `declaration-words-aggregate-02/summary.json` | Existing pure aggregate reader revalidates all four complete public reports and both complete native reports under matching source/oracle/observer identities. Campaign result is INCOMPLETE; missing work is retained |
+| `declaration-words-checkpoint-01.json` | Exact artifact/report identities, all workflow gates and initial transport sizes, native witness counts, typing failures and missing populations |
+| `source-word-verifier-before-01.log` / `source-word-verifier-after-02.log` | A generic paraphrased task loses its source-named test before the repair; 22 relevant source/test and authority regressions PASS afterward |
+| `duplicate-key-oracle-independence-01.json` | Root and nested duplicate keys are rejected even when a permissive parser would satisfy the semantic identity. Removing only the duplicate-key guard admits those packets; identity checking cannot mask this regression |
+| `duplicate-identity-regression-01.log` | 36 codec/profile tests PASS, including the strengthened identity-matching duplicate-key controls |
+
+The sixteen native workflow entries include problems shared between suites. They
+do not add sixteen new distinct backend problems or fill missing catalogs. Native
+nomination/source-binding PASS does not establish natural-language retrieval,
+runtime causality, language parity, independent review or complete capability QA.
+The campaign remains **77 entries / 59 distinct genuine problems / seven suites**.
+
+The observer repairs preserve canonical edit/verifier selection and authority.
+Source namespace locality, coherent declaration words and balanced disclosure
+across observed sources retain relevant tests without making lexical matches
+relationships. Direct semantic JSON compression and structured declaration tables
+remove encoding/escaping overhead while preserving all admitted facts. Earlier
+failed candidates and source-only measurements remain historical below.
+
+Additional test-only typing batches after that ZIP pass their focused tests and
+scoped Ty/Pyright: eleven authority-adversarial cases and thirty-nine query-router
+cases. Their preservation receipts compare every original fixture and assertion
+after removing checked narrowing/annotations. The ZIP predates these two test-only
+cleanups and the strengthened duplicate-key test; its production observer and
+evaluator are unchanged. Do not claim it is a final shipping artifact.
+
+The latest complete configured inventories are
+`full-ty-after-authority-router-01.log`: **2,384 diagnostics**, and
+`full-pyright-after-authority-router-01.log`: **2,395 errors**. Both remain red.
+Changed owners pass their scoped checks, and current preflight passes formatting,
+full Ruff, hygiene, zero complexity and the production size ceiling. Neither
+scoped typing nor 342 focused tests closes T09 or T10.
+
+Execute the remaining work in this order:
+
+1. **T07: finish genuine populations.** Catalogs 2, 8, 9, 11, 15, 16, 18 and 20
+   remain missing. Debugging still has four of twelve required problems and one
+   of three required repositories: admit eight further genuine problems from
+   two additional explicitly selected repositories. Follow the source-first
+   intake below; do not copy tags, count variants as problems or chase imported
+   dependency implementations. Existing cases may support another capability
+   only when their actual task and independently expected evidence demonstrate
+   that capability's semantics.
+2. **T07/T08: finish independent oracles and witnesses.** Keep all review flags
+   false until supported review exists. Freeze exact source owners, changed
+   symbols, relevant existing tests, positive/adversarial/display facts and
+   required witness membership before observing Hashmarks. Native target oracles
+   now exist for all twelve language cases, but the other missing semantic
+   families and independent reviews remain open.
+3. **Qualify each observer repair before widening scope.** First check all known
+   supported problems at **both** source revisions in default and initial API
+   profiles. The after-only probe previously hid the aggregate-strings regression.
+   Then freeze stable bytes and run actual public/native transport qualification.
+   API size estimates never replace complete MCP/CLI measurements. Reuse the
+   existing owners/runners; do not add execution control, retries or resume state.
+4. **T09: finish full typing.** Continue bounded, preserved test/owner repairs;
+   no `Any`, casts, ignores, exclusions or assertion/input removal to make counts
+   green. Checked mutable views must retain the original dictionaries/lists in
+   tamper tests. Variadic fixture helpers that deliberately submit invalid input
+   must continue exercising production validation, rather than rejecting it in a
+   new test helper. Fresh full Ty and Pyright must both reach zero.
+5. **T10: final qualification.** Run every required deterministic test member in
+   named complete batches, then unseen heldouts, real cold/warm/incremental
+   economics with identical evidence and a same-version noise control, and final
+   exact-artifact proof. Other five suites and the historical messaging
+   metadata/sender findings still require current qualifying reports; the four
+   debugging passes do not clear those tasks. An interrupted batch is incomplete,
+   and completed same-candidate batches are not discarded because another window
+   expires. Use the repository's existing batch entrypoints below.
+
+Do not raise any capability to 5/5, mark the goal complete, issue a clean-pass
+claim or weaken the release gate until populations, independent review, exact
+witness closure, full typing and final project validation all pass.
+
+### Historical repair checkpoint: 2026-10-17, base `4dc2527`
+
+The next source-name repair is implemented after the checkpoint below. Frozen
+candidate `source-json-tables-01` (ZIP SHA-256
+`9bc7035b46ca6e945f113b67dacaf33224b8dad09f6f6603527ccfd34aff8250`;
+observer `sha256:5439d9d65b65b47b8455cf3fb8d2a52337c81aea5cc03cde4c06ea74a2cba90c`)
+passed 326 independent-extraction tests and fresh native acquisition for all four
+debugging workflows / 510 witnesses and all twelve language workflows / 900
+witnesses. `json-tables-native-aggregate-01` revalidates those reports and remains
+INCOMPLETE for broader qualification. Its full public logging workflow passed
+all ten gates. Before-revision metadata MCP compact measured 3,890 tokens, below
+the unchanged 4,000 bound. Other full public summaries must be inspected before
+claiming their gates complete.
+
+The same candidate still missed aggregate strings' existing test before the
+change. The task says `aggregation` / `string`; the existing declaration and test
+say `aggregate_strings`. Current disclosure now observes coherent overlap of at
+least two words from the retrieved source declaration inside one indexed test.
+It does not infer morphology, call relationships, owner or verifier authority.
+`source-word-verifier-before-01.log` reproduces the generic failure;
+`source-word-verifier-after-02.log` passes 22 relevant tests. All four problems
+now pass their frozen facts at both revisions in default and initial API probes
+(`source-word-verifier-probe-01`); complete transport qualification remains next.
+Preserve the preceding candidate's failure and completed native evidence under
+its original identity. The current source-name repair requires a new candidate.
+
+Dependency dogfood typing is also repaired: 15 tests and scoped Ty/Pyright pass;
+`dependency-dogfood-typing-preservation-01.json` verifies all original capture
+inputs and assertions. The only additional state is an explicit unknown result
+before the existing Maven-only branch. Latest full inventories before the final
+source-name normalization report **2,481 Ty diagnostics / 2,496 Pyright errors**.
+They remain red and do not close T09.
+
+No capability is complete at 5/5. There are still 77 entries / 59 distinct genuine
+problems / seven suites, eight missing catalogs (2, 8, 9, 11, 15, 16, 18, 20), and
+only four debugging problems from one repository. All independent review flags
+remain false. No tasks, thresholds, source identities or problem floors changed.
+
+The source-directory candidate (`sha256:dc6271d73ff91bc6ec160daa83f708933c16e1e9adff3787109966297403c83c`)
+completed genuine API/CLI/official-MCP observation at both revisions for all four
+debugging workflows. The preserved reports show:
+
+- Logging-token reset and aggregate strings: FAIL. All source-owner, revision,
+  freshness, authority and size gates passed, but the relevant existing tests
+  disappeared from bounded disclosure.
+- Metadata: FAIL only for initial size. Complete MCP compact replies measured
+  4,222 before / 4,224 after estimated tokens; CLI measured 3,996 / 3,998.
+  Passing an API-only estimate was insufficient transport proof.
+- Forward-reference diagnostics: all ten workflow gates passed, overall
+  INCOMPLETE for corpus/review qualification.
+
+Those reports remain under `debug-directory-public-02/<workflow>/summary.json`;
+they are historical after the following repairs, not current passes.
+
+Current generic repairs:
+
+1. Source namespace locality precedes directory task words in candidate test
+   disclosure. The module-wide union of unrelated declaration words no longer
+   determines this disclosure score: use the largest overlap in one indexed test
+   declaration. A specific matching test only breaks an otherwise equal tie.
+   The original module-wide emitted facts and canonical selection remain intact.
+2. Preserve each observed source's local candidate order when merging the first
+   three source pools. Do not globally compare namespace scores computed against
+   different source owners. Canonical task candidates and the selected verifier
+   remain represented within the existing eight-path limit. No heuristic gains
+   ownership, relationship, completeness or verification-selection authority.
+3. Initial packets compress semantic JSON directly as `json+zlib`. Compressing
+   the string-table intermediate cost 672–868 extra bytes on the four admitted
+   after packets. The existing uncompressed string table and historical compressed
+   decoder remain supported; allocation, exact size, trailing/concatenated-stream
+   and semantic-identity checks remain. Direct JSON rejects duplicate object keys.
+4. Initial compact declaration tables expose structured rows and metadata rather
+   than JSON quoted inside text. Text and structured formats retain their facts.
+   A stale presentation regression expected an older nested source-reference
+   wrapper; it now independently reconstructs every row and qualifier from the
+   supported representation and the finding's exact source pointer.
+
+Proof under `.hashmarks/backend-e2e/explicit-retrieval-20261016/`:
+
+| Evidence | Scope and result |
+| --- | --- |
+| `disclosure-frozen-before-01.log` | Same six neutral cases against independent frozen source-directory extraction: four reproduced failures / two passes |
+| `specific-verifier-probe-01`, `-02` | Historical API probes exposing missing test and ordering interactions; retain their failures |
+| `specific-verifier-probe-03` | After-only API: all independently frozen source/test/override/helper facts PASS in default and initial profiles for all four problems; precedes the codec/table repair |
+| `initial-json-tables-ring-01.log` | 48 current tests PASS, including both compression formats, corrupt/over-bound streams, duplicate keys, exact declaration recovery and disclosure interactions |
+| `initial-json-tables-preservation-01.json` | Pure transformation of all eight retained actual MCP replies: decoded native identities and all declaration facts/source references preserved. Metadata compact falls 4,224 → 3,882 after and 4,222 → 3,881 before. This is same-packet comparison, not fresh transport qualification |
+| `initial-json-tables-preflight-02.log` | Canonical formatting, complete Ruff, hygiene, zero current complexity and production file-size debt PASS |
+| `source-directory-01/source.zip` | Historical source artifact SHA-256 `aa329c5d120074654e11ab185cb43f08f6d94d7d327e742feec8c4525eda215e`; 314 independent-extraction tests PASS |
+| `debug-directory-native-closure-01.json` | Revalidated disjoint native batches, all four nominated debugging cases and 510 witnesses PASS on source-directory observer; explicit native binding/invalidation/transport scope only |
+| `language-complete-native-closure-01.json` | All twelve nominated language workflows and 900 witnesses PASS on the same historical observer; exact capture, source, artifact and witness regrading. Does not establish language parity, independent review or 5/5 |
+
+Four language cases previously had no executable native target oracle: aiokafka
+commit timeout/refresh order and FastStream cancellation/batch nack. Their eight
+before/after target oracles now derive from already frozen source labels and exact
+member bytes, without reading Hashmarks or native results. The language grader is
+`27982182fe9d89a51196d5eb3a0c05cb78963b8cfc49289734351d30cf14be77`;
+the campaign binding is updated. Every language case now has a native source
+oracle. Independent review remains outstanding; capability 18 has not been filled
+by retagging capability 19.
+
+Typing cleanup now covers declaration discovery (55 diagnostics removed, 35 tests
+PASS) and CodeMap tests (81 removed, 69 tests PASS), in addition to earlier work.
+`declaration-discovery-typing-preservation-01.json` and
+`codemap-tests-typing-preservation-01.json` compare the original bodies, providers,
+fixture values and assertions after erasing checked narrowing/annotations and
+interpreting identical pytest method overrides as their former assignments.
+Pytest additionally restores overrides after their tests. No input/assertion
+removal, `Any`, cast, ignore or exclusion was introduced by this cleanup.
+The latest complete global inventories before the codec change are
+`full-ty-after-codemap-01.log`: **2,549 diagnostics**, and
+`full-pyright-after-codemap-01.log`: **2,565 errors**. Scoped green checks do not
+close T09. Rerun the configured full commands after any further typing repair.
+
+Immediate execution order:
+
+1. Finish scoped Ty/Pyright and current preflight. Compile source once and freeze
+   one new source ZIP including all current repairs. Use independent extraction,
+   assert actual import origin, and run the affected source, codec, presentation,
+   selection and transport regressions there. Do not edit that extraction.
+2. From those immutable bytes, qualify each of the four debugging cases at both
+   revisions through API, CLI and official MCP, all required profiles, formats,
+   variants and stale controls. Use the existing `run_backend` runner, unchanged
+   suite/grader and source map. Preserve full response size, every exact witness
+   and all failed or incomplete work. Metadata MCP must pass the unchanged 4,000
+   bound; restored test facts must survive every transport.
+3. Regenerate native captures for the same observer using `run_backend_native`,
+   the existing installed qualification tools, and exact source nominations.
+   Regrade all 510 debugging witnesses. Keep the completed language 900-witness
+   proof bound to its historical observer until properly requalified.
+4. Aggregate compatible reports only. Corpus floors, independent review and
+   witness-family omissions must remain INCOMPLETE; any hard failure remains
+   FAIL. Never convert native source-binding PASS into broad retrieval proof.
+5. Continue T07 intake: eight more debugging problems in two additional target
+   repositories, eight missing catalogs, independently source-frozen oracles and
+   exact positive/adversarial/display witness families. Do not chase dependencies
+   or promote historical external-library findings into roadmap tasks.
+6. Complete T09 typing, then T10 full deterministic test membership, unseen
+   heldouts, economics/noise controls and final exact-artifact qualification.
+   Missing, interrupted and partial batches cannot count as clean qualification.
+
+### Historical checkpoint: 2026-10-17, base `1280456`
 
 No capability is complete at 5/5. Corpus breadth is still 77 entries / 59 distinct
 problems / seven suites. Eight entire catalogs remain missing: 2, 8, 9, 11, 15,
@@ -1122,8 +1871,9 @@ the transaction/persistence catalog has twelve across three. The language
 catalog has twelve across six, balanced between Python and TypeScript.
 Their incomplete qualification is detailed above. Debugging now has four
 SQLAlchemy problems and still needs eight problems across two repositories.
-Eight other catalogs still require genuine source intake: 2, 8, 9, 11, 15, 16,
-18 and 20.
+The selected-call catalog now has twelve problems across three repositories;
+its independent review and qualification remain open. Seven other catalogs
+still require genuine source intake: 8, 9, 11, 15, 16, 18 and 20.
 
 Each catalog targets four genuine problems per repository in the initial pool.
 Inspect source history from recorded revisions; pin exact before/after archives;

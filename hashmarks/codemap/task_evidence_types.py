@@ -383,8 +383,8 @@ class StringTableEncoding(TypedDict):
     strings: list[list[int | str]]
 
 
-class CompressedStringTableEncoding(TypedDict):
-    kind: Literal["json-string-table.v1+zlib"]
+class CompressedInitialEncoding(TypedDict):
+    kind: Literal["json-string-table.v1+zlib", "json+zlib"]
     decoded_bytes: int
 
 
@@ -450,7 +450,7 @@ class StringTableInitialEnvelope(InitialEnvelopeHeaders):
 
 
 class CompressedInitialEnvelope(InitialEnvelopeHeaders):
-    encoding: CompressedStringTableEncoding
+    encoding: CompressedInitialEncoding
     data: str
 
 

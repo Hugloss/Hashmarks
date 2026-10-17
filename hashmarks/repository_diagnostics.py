@@ -178,7 +178,7 @@ def repository_query_runtime_diagnostics(
             state_dir=state_dir,
             artifact_db=state_dir / "artifacts.sqlite3",
         ) as codemap:
-            sync = codemap.sync()
+            sync = codemap.index.sync()
             clear_ast_cache()
             before = ast_cache_info()
             started_ns = time.perf_counter_ns()
@@ -241,14 +241,14 @@ def _related_query_session(
     task: str,
     limit: int,
 ) -> tuple[object, dict[str, object], dict[str, object], dict[str, dict[str, int]]]:
-    with codemap.decision_session():
-        start = codemap.decision_session_stats()
+    with codemap.reads.session():
+        start = codemap.reads.stats()
         found = codemap.find_task(task, limit=limit)
-        after_find = codemap.decision_session_stats()
+        after_find = codemap.reads.stats()
         action = codemap.task_action_map(task, limit=limit)
-        after_action = codemap.decision_session_stats()
+        after_action = codemap.reads.stats()
         packet = codemap.task_decision_packet(task, limit=limit)
-        after_packet = codemap.decision_session_stats()
+        after_packet = codemap.reads.stats()
     deltas = {
         "find_task": _delta_stats(start, after_find),
         "task_action_map": _delta_stats(after_find, after_action),
@@ -334,7 +334,7 @@ def related_query_reuse_receipt(
             state_dir=state_dir,
             artifact_db=state_dir / "artifacts.sqlite3",
         ) as codemap:
-            codemap.sync()
+            codemap.index.sync()
             found, action, packet, deltas = _related_query_session(codemap, task, limit)
 
     semantics, equivalent = _related_query_semantics(found, action, packet)
@@ -398,7 +398,7 @@ def bounded_top_n_candidate_profile(
             state_dir=state_dir,
             artifact_db=state_dir / "artifacts.sqlite3",
         ) as codemap:
-            codemap.sync()
+            codemap.index.sync()
             profiles = [_profile_limit(codemap, task, limit) for limit in normalized]
 
     largest = profiles[-1]["paths"]
@@ -455,7 +455,7 @@ def ownership_graph_economics_receipt(
             state_dir=state_dir,
             artifact_db=state_dir / "artifacts.sqlite3",
         ) as codemap:
-            codemap.sync()
+            codemap.index.sync()
             started_ns = time.perf_counter_ns()
             graph = codemap.ownership_relation_graph(
                 task,

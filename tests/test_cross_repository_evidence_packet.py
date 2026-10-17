@@ -42,7 +42,7 @@ def _repo(
 
 
 def _prepare(codemap: CodeMap) -> None:
-    codemap.sync()
+    codemap.index.sync()
     codemap.enrich_projects(
         ("npm-package-graph", "maven-pom-graph", "declared-project-links")
     )
@@ -104,7 +104,7 @@ def test_no_cross_repository_evidence_is_explicitly_unresolved(tmp_path: Path) -
     (tmp_path / "src").mkdir()
     (tmp_path / "src" / "owner.py").write_text("VALUE = 1\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.cross_repository_evidence_packet(
             "Update owner value", ["src/owner.py"]
         )

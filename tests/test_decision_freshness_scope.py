@@ -26,7 +26,7 @@ def _map(tmp_path: Path) -> CodeMap:
         encoding="utf-8",
     )
     codemap = CodeMap(root, artifact_db=tmp_path / "artifacts.sqlite3")
-    codemap.sync()
+    codemap.index.sync()
     generation = codemap.store.generation()
     codemap.store.set_meta("identity_generation", str(generation))
     return codemap
@@ -46,7 +46,7 @@ def _count_observations(codemap: CodeMap, monkeypatch: pytest.MonkeyPatch) -> li
             dirty_path_count=0,
         )
 
-    monkeypatch.setattr(codemap, "_daemon_observation", sample)
+    monkeypatch.setattr(codemap._observation_source, "observe", sample)
     return calls
 
 
@@ -92,7 +92,7 @@ def test_decision_session_still_fails_if_generation_changes(tmp_path: Path) -> N
     codemap = _map(tmp_path)
     try:
         try:
-            with codemap.decision_session():
+            with codemap.reads.session():
                 codemap.store.bump_generation()
         except RuntimeError as exc:
             assert "generation changed during decision session" in str(exc)
@@ -144,12 +144,12 @@ def test_map_readiness_reconciles_changed_daemon_generation(
         paths_complete=complete,
         dirty_path_count=len(paths),
     )
-    monkeypatch.setattr(codemap, "_daemon_observation", lambda: observation)
+    monkeypatch.setattr(codemap._observation_source, "observe", lambda: observation)
     monkeypatch.setattr(
-        codemap, "sync", lambda changed_paths=None: calls.append(changed_paths)
+        codemap.index, "sync", lambda changed_paths=None: calls.append(changed_paths)
     )
     try:
-        assert codemap._ensure_map_ready() is observation
+        assert codemap.reads.ready() is observation
         assert calls == [expected_sync]
     finally:
         codemap.close()
@@ -159,8 +159,8 @@ def test_map_readiness_does_not_promote_incomplete_generation(tmp_path: Path) ->
     codemap = _map(tmp_path)
     codemap.store.set_meta("sync.build_state", "BUILDING")
     try:
-        assert codemap._ensure_map_ready(_allow_incomplete=True) is None
+        assert codemap.reads.ready(_allow_incomplete=True) is None
         with pytest.raises(RuntimeError, match="generation is incomplete"):
-            codemap._ensure_map_ready()
+            codemap.reads.ready()
     finally:
         codemap.close()

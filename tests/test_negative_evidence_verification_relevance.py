@@ -45,11 +45,11 @@ def test_real_indexed_reference_window_qualifies_completeness_before_projection(
     )
     task = "Change target in src/owner.py"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         # A smaller cached prefix must not hide the larger lookahead request.
-        with codemap.decision_session():
-            prefix = codemap._session_refs_many(["target"], limit_per_target=1024)
-            lookahead = codemap._session_refs_many(["target"], limit_per_target=1025)
+        with codemap.reads.session():
+            prefix = codemap.reads.refs_many(["target"], limit_per_target=1024)
+            lookahead = codemap.reads.refs_many(["target"], limit_per_target=1025)
         assert len(prefix["target"]) == 1024
         assert len(lookahead["target"]) == min(reference_count + 1, 1025)
         assert prefix["target"] == lookahead["target"][:1024]
@@ -76,7 +76,7 @@ def test_bounded_reference_search_cannot_report_no_verification_candidate(
     _write_owner(tmp_path)
     refs = [_ref(f"src/noise_{index}.py") for index in range(_DIRECT_REF_LIMIT + 1)]
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
 
         def refs_many(
             targets: list[str], *, limit_per_target: int
@@ -88,7 +88,7 @@ def test_bounded_reference_search_cannot_report_no_verification_candidate(
             assert limit_per_target == 257
             return {symbol: [] for symbol in targets}
 
-        monkeypatch.setattr(codemap, "_session_refs_many", refs_many)
+        monkeypatch.setattr(codemap.reads, "refs_many", refs_many)
         monkeypatch.setattr(
             codemap.store,
             "refs_matching_target_suffix",
@@ -134,7 +134,7 @@ def test_bounded_reference_search_cannot_manufacture_unique_verifier(
     refs = [_ref("tests/test_owner.py")]
     refs.extend(_ref(f"src/noise_{index}.py") for index in range(_DIRECT_REF_LIMIT))
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
 
         def refs_many(
             targets: list[str], *, limit_per_target: int
@@ -145,7 +145,7 @@ def test_bounded_reference_search_cannot_manufacture_unique_verifier(
                 return {"target": refs[:limit_per_target]}
             return {symbol: [] for symbol in targets}
 
-        monkeypatch.setattr(codemap, "_session_refs_many", refs_many)
+        monkeypatch.setattr(codemap.reads, "refs_many", refs_many)
         monkeypatch.setattr(
             codemap.store,
             "refs_matching_target_suffix",
@@ -179,14 +179,14 @@ def test_exhausted_verification_search_can_still_authorize_absence(
 ) -> None:
     _write_owner(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
 
         def refs_many(
             targets: list[str], *, limit_per_target: int
         ) -> dict[str, list[dict[str, object]]]:
             return {symbol: [] for symbol in targets}
 
-        monkeypatch.setattr(codemap, "_session_refs_many", refs_many)
+        monkeypatch.setattr(codemap.reads, "refs_many", refs_many)
         monkeypatch.setattr(
             codemap.store,
             "refs_matching_target_suffix",

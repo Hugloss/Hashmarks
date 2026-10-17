@@ -12,16 +12,14 @@ from hashmarks.paths import normalize_relative_path
 
 from .diagnostic_provenance import _revision_scope, member_collection_states
 from .evidence_correlation import EvidenceCorrelationMixin
-from .evidence_verification import VerificationMixin
 from .repository_evidence_binding_delta import RepositoryEvidenceBindingDeltaMixin
+from .repository_observation import packet_digest
 
 
 class _RetainedRelationshipEvidence(
     EvidenceCorrelationMixin, RepositoryEvidenceBindingDeltaMixin
 ):
     """Reuse native binding integrity validation without observing repository state."""
-
-    _packet_digest = staticmethod(VerificationMixin._packet_digest)
 
 
 def _canonical_path(value: object) -> str | None:
@@ -44,7 +42,7 @@ def _relationship_packet(value: Mapping[str, object]) -> Mapping[str, Any]:
     _RetainedRelationshipEvidence._validate_previous_correlation_size(value)
     if value.get("schema") != operation_schema("correlate_evidence"):
         raise ValueError("relationship_evidence must be a canonical correlation packet")
-    expected = "sha256:" + VerificationMixin._packet_digest(
+    expected = "sha256:" + packet_digest(
         operation_schema("correlate_evidence"),
         {
             key: item

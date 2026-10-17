@@ -26,7 +26,7 @@ def _write(root: Path, source: str, *, path: str = PATH) -> None:
 
 def _observe(root: Path, provider: StaticPythonBackendDeclarations) -> dict:
     with CodeMap(root) as cm:
-        cm.sync()
+        cm.index.sync()
         return cm.discover_repository_declarations([provider])
 
 
@@ -146,12 +146,12 @@ def test_selected_source_revision_edit_changes_identity_without_reinterpreting(
     _write(tmp_path, "import os\nvalue = os.getenv('FIRST')\n")
     provider = StaticPythonBackendDeclarations(paths=(PATH,))
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         before = cm.discover_repository_declarations([provider])
         same = cm.discover_repository_declarations([provider])
         assert same["observation_identity"] == before["observation_identity"]
         _write(tmp_path, "import os\nvalue = os.getenv('SECOND')\n")
-        cm.sync([PATH])
+        cm.index.sync([PATH])
         after = cm.discover_repository_declarations(
             [provider], previous_observation=before
         )
@@ -193,7 +193,7 @@ def test_invalid_ast_and_bound_excess_fail_closed(tmp_path: Path) -> None:
     provider = StaticPythonBackendDeclarations(paths=(PATH,))
     _write(tmp_path, "class Payload(BaseModel):\n    unfinished =\n")
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         with pytest.raises(
             (ValueError, SyntaxError, RepositoryDeclarationProviderError)
         ):
@@ -201,7 +201,7 @@ def test_invalid_ast_and_bound_excess_fail_closed(tmp_path: Path) -> None:
     fields = "\n".join(f"    field_{n}: int" for n in range(MAX_MODEL_FIELDS + 1))
     _write(tmp_path, f"class Payload(BaseModel):\n{fields}\n")
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         with pytest.raises((ValueError, RepositoryDeclarationProviderError)):
             cm.discover_repository_declarations([provider])
 
@@ -214,7 +214,7 @@ def test_restricted_visibility_cannot_publish_source_syntax(tmp_path: Path) -> N
     )
     provider = StaticPythonBackendDeclarations(paths=(PATH,))
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         with pytest.raises(RepositoryDeclarationProviderError):
             cm.discover_repository_declarations([provider])
 
@@ -224,7 +224,7 @@ def test_provider_has_no_ambient_discovery_without_explicit_selection(
 ) -> None:
     _write(tmp_path, "import os\nsecret = os.getenv('ONLY_IF_SELECTED')\n")
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         packet = cast("dict", cm.discover_repository_declarations([]))
     assert packet["declarations"]["groups"] == []
 
@@ -366,13 +366,13 @@ def test_generic_class_reopen_rejects_stale_source_and_does_not_replay(
         paths=(PATH,), include_class_fields=True, include_environment_reads=False
     )
     with CodeMap(tmp_path, state_dir=state) as cm:
-        cm.sync()
+        cm.index.sync()
         before = cm.discover_repository_declarations([provider])
     _write(tmp_path, "class Payload(Parent):\n    current: str\n")
     with CodeMap(tmp_path, state_dir=state) as cm:
         with pytest.raises(RepositoryDeclarationProviderError, match="input changed"):
             cm.discover_repository_declarations([provider], previous_observation=before)
-        cm.sync([PATH])
+        cm.index.sync([PATH])
         after = cast(
             "dict",
             cm.discover_repository_declarations(

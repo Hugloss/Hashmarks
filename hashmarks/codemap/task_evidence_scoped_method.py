@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping, Sequence
+from itertools import zip_longest
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -54,8 +55,8 @@ class TaskEvidenceScopedMethodMixin:
                     "call_line": edge["line"],
                 },
             )
-        member = codemap._session_file_row(path)
-        if not targets or member is None or not codemap._indexed_path_current(path):
+        member = codemap.reads.file_row(path)
+        if not targets or member is None or not codemap.index.is_current(path):
             return None
         declarations = list(targets.values())
         return {
@@ -85,15 +86,15 @@ class TaskEvidenceScopedMethodMixin:
             path = row["path"]
             if (
                 row.get("supplement") != "bounded-lexical-source-position"
-                or not codemap._indexed_path_current(path)
+                or not codemap.index.is_current(path)
                 or codemap._task_evidence_visibility(path)
                 is not EvidenceVisibility.SOURCE
-                or codemap.policy.decide(path).evidence_visibility
+                or codemap.files.decide(path).evidence_visibility
                 is not EvidenceVisibility.SOURCE
             ):
                 continue
             context = codemap._task_evidence_direct_call_declarations(path, row)
-            if context is not None and codemap._indexed_path_current(path):
+            if context is not None and codemap.index.is_current(path):
                 row["direct_call_declarations"] = context
 
     @staticmethod
@@ -126,10 +127,10 @@ class TaskEvidenceScopedMethodMixin:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         indexed: dict[str, list[dict]] = {}
-        for row in self._session_symbols_for_path(path):
+        for row in self.reads.symbols_for_path(path):
             indexed.setdefault(str(row.get("qualname") or ""), []).append(row)
         selected = indexed.get(symbol, [])
-        member = self._session_file_row(path)
+        member = self.reads.file_row(path)
         if len(selected) != 1 or member is None:
             return None
         child = selected[0]
@@ -179,7 +180,7 @@ class TaskEvidenceScopedMethodMixin:
         return (
             self._task_evidence_visibility(path)
             in {EvidenceVisibility.SOURCE, EvidenceVisibility.OUTLINE}
-            and self.policy.decide(path).evidence_visibility
+            and self.files.decide(path).evidence_visibility
             is not EvidenceVisibility.DENY
         )
 
@@ -193,12 +194,12 @@ class TaskEvidenceScopedMethodMixin:
             return
         for row in retrieval.get("results", [])[:3]:
             path, symbol = row.get("path"), row.get("symbol")
-            if not path or not symbol or not self._indexed_path_current(path):
+            if not path or not symbol or not self.index.is_current(path):
                 continue
             if not self._task_evidence_declaration_visible(path):
                 continue
             context = self._task_evidence_enclosing_functions(path, symbol)
-            if context is not None and self._indexed_path_current(path):
+            if context is not None and self.index.is_current(path):
                 row["enclosing_declarations"] = context
 
     def _task_evidence_class_declarations(
@@ -215,7 +216,7 @@ class TaskEvidenceScopedMethodMixin:
         members = sorted(
             (
                 row
-                for row in self._session_symbols_for_path(path)
+                for row in self.reads.symbols_for_path(path)
                 if row.get("parent") == qualname
                 and row.get("kind") == "method"
                 and isinstance(row.get("start_line"), int)
@@ -230,7 +231,7 @@ class TaskEvidenceScopedMethodMixin:
                 str(row.get("qualname") or ""),
             ),
         )
-        member = self._session_file_row(path)
+        member = self.reads.file_row(path)
         assert member is not None
         context: dict[str, object] = {
             "authority": "indexed-lexical-declarations-only",
@@ -270,7 +271,7 @@ class TaskEvidenceScopedMethodMixin:
         """Resolve one indexed lexical class or direct method container."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        symbols = self._session_symbols_for_path(path)
+        symbols = self.reads.symbols_for_path(path)
         selected = [
             symbol for symbol in symbols if symbol.get("qualname") == row.get("symbol")
         ]
@@ -312,7 +313,7 @@ class TaskEvidenceScopedMethodMixin:
     ) -> dict[str, object] | None:
         """Expose lexical name alternatives, without dispatch/inheritance claims."""
         codemap = cast("CodeMap", self)
-        symbols = codemap._session_symbols_for_path(path)
+        symbols = codemap.reads.symbols_for_path(path)
         selected = [
             row
             for row in symbols
@@ -335,7 +336,7 @@ class TaskEvidenceScopedMethodMixin:
             ),
             key=lambda row: str(row.get("qualname") or ""),
         )
-        member = codemap._session_file_row(path)
+        member = codemap.reads.file_row(path)
         if not alternatives or member is None:
             return None
         return {
@@ -366,7 +367,7 @@ class TaskEvidenceScopedMethodMixin:
     ) -> None:
         codemap = cast("CodeMap", self)
         alternatives = codemap._task_evidence_same_named_declarations(path, row)
-        if alternatives is not None and codemap._indexed_path_current(path):
+        if alternatives is not None and codemap.index.is_current(path):
             row["same_name_declarations"] = alternatives
 
     def _task_evidence_attach_class_declarations(
@@ -380,7 +381,7 @@ class TaskEvidenceScopedMethodMixin:
         observed = set()
         for row in retrieval.get("results", [])[:3]:
             path, symbol = row.get("path"), row.get("symbol")
-            if not path or not symbol or not codemap._indexed_path_current(path):
+            if not path or not symbol or not codemap.index.is_current(path):
                 continue
             if "verify" in row.get("roles", []) and "edit" not in row.get("roles", []):
                 continue
@@ -394,7 +395,7 @@ class TaskEvidenceScopedMethodMixin:
             context = codemap._task_evidence_class_declarations(
                 path, declaration, selected_symbol=str(symbol)
             )
-            if codemap._indexed_path_current(path):
+            if codemap.index.is_current(path):
                 row["class_declarations"] = context
 
     def _task_evidence_verification_subject(
@@ -402,7 +403,7 @@ class TaskEvidenceScopedMethodMixin:
     ) -> Mapping[str, object] | None:
         codemap = cast("CodeMap", self)
         path = str(row.get("path") or "")
-        if not path or not codemap._indexed_path_current(path):
+        if not path or not codemap.index.is_current(path):
             return None
         if not codemap._task_evidence_declaration_visible(path):
             return None
@@ -411,7 +412,7 @@ class TaskEvidenceScopedMethodMixin:
             return parent
         matches = [
             symbol
-            for symbol in codemap._session_symbols_for_path(path)
+            for symbol in codemap.reads.symbols_for_path(path)
             if symbol.get("qualname") == row.get("symbol")
             and (symbol.get("start_line"), symbol.get("end_line"))
             == (row.get("start_line"), row.get("end_line"))
@@ -431,7 +432,7 @@ class TaskEvidenceScopedMethodMixin:
         if RepositoryDomain.TEST in classify_repository_path(path):
             return []
         subject = codemap._task_evidence_verification_subject(row)
-        member = codemap._session_file_row(path)
+        member = codemap.reads.file_row(path)
         if subject is None or member is None:
             return []
         state = codemap._verification_state(task, path, "", ())
@@ -443,7 +444,7 @@ class TaskEvidenceScopedMethodMixin:
             )
         )
         lexical = (
-            codemap._session_lexical_file_candidates(subject_terms, limit=65)
+            codemap.reads.lexical_file_candidates(subject_terms, limit=65)
             if subject_terms
             else []
         )
@@ -474,7 +475,10 @@ class TaskEvidenceScopedMethodMixin:
             )
             candidate.update(filename_candidates.get(str(candidate["path"]), {}))
         candidates.sort(
-            key=codemap._task_evidence_candidate_verifier_score, reverse=True
+            key=lambda candidate: codemap._task_evidence_candidate_verifier_score(
+                candidate, source_symbol=str(row.get("symbol") or ""), source_path=path
+            ),
+            reverse=True,
         )
         basis = {
             "path": path,
@@ -488,10 +492,10 @@ class TaskEvidenceScopedMethodMixin:
         }
         result = []
         for candidate in candidates[: VERIFICATION_RELEVANCE_DEFAULTS.candidate_limit]:
-            test_member = codemap._session_file_row(str(candidate["path"]))
+            test_member = codemap.reads.file_row(str(candidate["path"]))
             if (
                 test_member is None
-                or not codemap._indexed_path_current(str(candidate["path"]))
+                or not codemap.index.is_current(str(candidate["path"]))
                 or not codemap._task_evidence_declaration_visible(
                     str(candidate["path"])
                 )
@@ -533,8 +537,8 @@ class TaskEvidenceScopedMethodMixin:
             )
         return (
             result
-            if codemap._indexed_path_current(path)
-            and all(codemap._indexed_path_current(name) for name in test_modules)
+            if codemap.index.is_current(path)
+            and all(codemap.index.is_current(name) for name in test_modules)
             else []
         )
 
@@ -554,26 +558,108 @@ class TaskEvidenceScopedMethodMixin:
             state.search_bound_reasons.add("source-candidate-test-module-limit")
         result = {}
         for path in paths[:16]:
-            member = codemap._session_file_row(path)
-            if member is not None and codemap._indexed_path_current(path):
+            member = codemap.reads.file_row(path)
+            if member is not None and codemap.index.is_current(path):
                 result[path] = str(member["file_digest"])
             else:
                 state.search_bound_reasons.add("source-candidate-test-module-stale")
         return result
 
     def _task_evidence_candidate_verifier_score(
-        self, row: Mapping[str, object]
+        self,
+        row: Mapping[str, object],
+        *,
+        source_symbol: str = "",
+        source_path: str = "",
     ) -> tuple:
         """Projection ordering only; lexical locality never grants selection proof."""
+        from .query_primitives import _query_terms
+
         codemap = cast("CodeMap", self)
         score = codemap._verification_candidate_score(row)
+        declaration_matches = self._task_evidence_test_declaration_matches(
+            row, fallback=score[2]
+        )
+        # Tasks can paraphrase a declaration's spelling. Coherent multiword
+        # overlap with that observed declaration remains weak lexical evidence.
+        source_overlap = (
+            self._task_evidence_test_declaration_matches(
+                {
+                    **row,
+                    "task_anchor_terms": list(
+                        _query_terms(source_symbol.rsplit(".", 1)[-1])
+                    ),
+                },
+                fallback=0,
+            )
+            if source_symbol
+            else 0
+        )
         return (
             score[0],
             int(row.get("source_filename_prefix_match") is True),
-            self._task_evidence_test_directory_matches(row),
             score[1],
+            self._task_evidence_problem_filename_matches(
+                row, source_symbol=source_symbol, source_path=source_path
+            ),
+            source_overlap if source_overlap >= 2 else 0,
+            self._task_evidence_test_directory_matches(row),
             cast("int", row.get("subject_term_matches", 0)),
-            *score[2:],
+            declaration_matches,
+            int(bool(row.get("test_symbol")) and declaration_matches > 0),
+            *score[3:],
+        )
+
+    @staticmethod
+    def _task_evidence_problem_filename_matches(
+        row: Mapping[str, object], *, source_symbol: str, source_path: str
+    ) -> int:
+        """Keep a task's concern visible beside incidental source-name matches.
+
+        Exact references and namespace locality retain their earlier precedence.
+        A filename match remains lexical disclosure, with no selection authority.
+        """
+        from .query_primitives import _TASK_STOPWORDS, _query_terms
+
+        anchors = row.get("task_anchor_terms")
+        if not source_path or not isinstance(anchors, list):
+            return 0
+        identity_terms = set(_query_terms(source_path + " " + source_symbol))
+        problem_terms = (
+            {term for term in anchors if isinstance(term, str)}
+            - identity_terms
+            - _TASK_STOPWORDS
+            - {"source", "inspect"}
+        )
+        filename = Path(str(row.get("path") or "")).stem
+        return len(problem_terms.intersection(_query_terms(filename)))
+
+    def _task_evidence_test_declaration_matches(
+        self, row: Mapping[str, object], *, fallback: int
+    ) -> int:
+        """Rank a coherent declaration match without changing module-wide facts."""
+        from .query_primitives import _query_terms
+
+        codemap = cast("CodeMap", self)
+        anchors = row.get("task_anchor_terms")
+        if not isinstance(anchors, list):
+            return fallback
+        terms = {term for term in anchors if isinstance(term, str)}
+        # Candidate construction has already loaded the complete symbol rows
+        # into this decision's generation-bound session. Reuse that observation.
+        symbols = codemap.reads.symbols_for_path(str(row["path"]))
+        return max(
+            (
+                len(
+                    terms.intersection(
+                        _query_terms(str(symbol.get("qualname") or symbol["name"]))
+                    )
+                )
+                for symbol in symbols
+                if str(symbol.get("name") or "").startswith("test_")
+                and symbol.get("kind") in {"function", "method"}
+            ),
+            default=fallback,
         )
 
     @staticmethod
@@ -606,7 +692,7 @@ class TaskEvidenceScopedMethodMixin:
             if Path(path).name.split(".", 1)[0].removeprefix("test_").casefold()
             == prefix
         ]
-        codemap._session_file_rows(paths)
+        codemap.reads.file_rows(paths)
         paths = [
             path for path in paths if codemap._task_evidence_declaration_visible(path)
         ]
@@ -614,7 +700,7 @@ class TaskEvidenceScopedMethodMixin:
             state.search_bound_reasons.add("source-filename-test-candidate-limit")
         if not paths:
             return {}
-        matches = codemap._session_lexical_file_candidates(
+        matches = codemap.reads.lexical_file_candidates(
             subject_terms, limit=65, paths=paths[:64]
         )
         return {
@@ -623,7 +709,7 @@ class TaskEvidenceScopedMethodMixin:
                 "subject_term_matches": row["matches"],
             }
             for row in matches
-            if codemap._indexed_path_current(str(row["path"]))
+            if codemap.index.is_current(str(row["path"]))
         }
 
     def _task_evidence_attach_candidate_verifiers(
@@ -647,15 +733,15 @@ class TaskEvidenceScopedMethodMixin:
             if RepositoryDomain.TEST
             not in classify_repository_path(str(row.get("path") or ""))
         ][:3]
-        candidates = [
-            candidate
-            for row in source_rows
-            for candidate in codemap._task_evidence_candidate_verifiers(task, row)
+        candidate_groups = [
+            codemap._task_evidence_candidate_verifiers(task, row) for row in source_rows
         ]
         by_path = {
             str(row["path"]): dict(row) for row in relevance.get("candidates", [])
         }
-        for candidate in candidates:
+        for candidate in (
+            candidate for group in candidate_groups for candidate in group
+        ):
             path = str(candidate["path"])
             previous = by_path.get(path)
             if previous is None:
@@ -678,11 +764,19 @@ class TaskEvidenceScopedMethodMixin:
                 ):
                     by_path[path] = candidate
                 by_path[path]["source_candidate_basis"] = merged_bases
-        ordered = sorted(
-            by_path.values(),
-            key=codemap._task_evidence_candidate_verifier_score,
-            reverse=True,
+        # Each namespace/reference score is relative to its observed source.
+        # Preserve those source-local orders instead of comparing their scores
+        # globally, where one source's broad pool can hide every other source.
+        ordered_by_path = {
+            str(row["path"]): by_path[str(row["path"])]
+            for rows in zip_longest(*candidate_groups)
+            for row in rows
+            if row is not None
+        }
+        ordered_by_path.update(
+            (path, row) for path, row in by_path.items() if path not in ordered_by_path
         )
+        ordered = list(ordered_by_path.values())
         ordered = codemap._verification_disclosure_order(
             ordered,
             task_candidates=[
@@ -716,7 +810,7 @@ class TaskEvidenceScopedMethodMixin:
         terms = self._task_action_exact_identifier_terms(task)
         if re.search(r"\bmethod\b", task, flags=re.IGNORECASE) is None or not terms:
             return None
-        indexed = self._session_exact_symbol_candidates(terms, limit=65)
+        indexed = self.reads.exact_symbol_candidates(terms, limit=65)
         classes = [
             row
             for row in indexed
@@ -733,9 +827,9 @@ class TaskEvidenceScopedMethodMixin:
         visibility = self._task_evidence_visibility(path)
         admitted = (
             visibility in {EvidenceVisibility.SOURCE, EvidenceVisibility.OUTLINE}
-            and self.policy.decide(path).evidence_visibility
+            and self.files.decide(path).evidence_visibility
             is not EvidenceVisibility.DENY
-            and self._indexed_path_current(path)
+            and self.index.is_current(path)
         )
         if not admitted:
             return None
@@ -759,7 +853,7 @@ class TaskEvidenceScopedMethodMixin:
         path, qualname, visibility = scope
         members = [
             row
-            for row in self._session_symbols_for_path(path)
+            for row in self.reads.symbols_for_path(path)
             if row.get("kind") == "method" and str(row.get("parent") or "") == qualname
         ]
         scored = sorted(
@@ -821,9 +915,10 @@ class TaskEvidenceScopedMethodMixin:
             EvidenceVisibility.OUTLINE,
         }:
             return None, scope
-        if (
-            self.policy.decide(path).evidence_visibility is EvidenceVisibility.DENY
-            or not self._indexed_path_current(path)
+        if self.files.decide(
+            path
+        ).evidence_visibility is EvidenceVisibility.DENY or not self.index.is_current(
+            path
         ):
             return None, scope
         return (
@@ -888,7 +983,7 @@ class TaskEvidenceScopedMethodMixin:
         from .semantic_relationship_model import compact_relationships
         from .semantic_relationship_observation import semantic_relationship_observation
 
-        with self.decision_session(expected_generation=selection_generation):
+        with self.reads.session(expected_generation=selection_generation):
             current, subject_scope = self._task_evidence_current_scip_symbol(
                 owner, supplied_observations
             )

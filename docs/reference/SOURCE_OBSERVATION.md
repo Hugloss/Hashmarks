@@ -12,8 +12,8 @@ Python API:
 from hashmarks import CodeMap
 
 with CodeMap(".") as codemap:
-    codemap.sync()
-    observation = codemap.source_observation(
+    codemap.index.sync()
+    observation = codemap.source.observe(
         "src/example.py",
         literal="example",
         limit=50,
@@ -68,10 +68,8 @@ Use **the existing** source observer, not another search engine:
 
 ```python
 with CodeMap(".") as codemap:
-    codemap.sync()
-    packet = codemap.source_observation(
-        "src/example.py", literal="target", context_lines=1
-    )
+    codemap.index.sync()
+    packet = codemap.source.observe("src/example.py", literal="target", context_lines=1)
     hit = packet["occurrences"][0]
     excerpt = hit["context_excerpt"]
 ```
@@ -121,8 +119,8 @@ asserting that the external diagnostic is correct:
 
 ```python
 with CodeMap(".") as codemap:
-    codemap.sync()
-    packet = codemap.source_observation(
+    codemap.index.sync()
+    packet = codemap.source.observe(
         "src/example.py", lines=(12,), anchor_context_lines=1
     )
     rows = packet["line_anchors"][0]["context_excerpt"]
@@ -170,8 +168,8 @@ these bytes, passed verification, or reached a complete diagnostic collection.
 
 ```python
 with CodeMap(".") as codemap:
-    codemap.sync()
-    packet = codemap.scoped_source_occurrences(
+    codemap.index.sync()
+    packet = codemap.source.scoped_occurrences(
         ["src/core.py", "tests/test_core.py"],
         "example",
         limit=100,
@@ -350,12 +348,12 @@ outside the collection's declared path scope fail before rows are published.
 Omitting a claim means **unknown**, not unchanged source. The supplied scope
 and collection-state claims remain external producer authority.
 
-After obtaining explicit up-to-date `CodeMap.source_observation` member
+After obtaining explicit up-to-date `CodeMap.source.observe` member
 packets, the consumer may compare them **without launching** a diagnostic
 producer or letting Hashmarks track agent reads:
 
 ```python
-source = codemap.source_observation("src/example.py")
+source = codemap.source.observe("src/example.py")
 evidence = RepositoryDeltaMixin.diagnostic_source_revision_evidence(
     diagnostic, [source]
 )
@@ -562,7 +560,7 @@ Regression and handoff fixtures: `tests/test_diagnostic_member_evidence.py`.
 
 ### Source-backed diagnostic line correspondence
 
-The canonical `CodeMap.source_observation(path, lines=[N])` can now include up to
+The canonical `CodeMap.source.observe(path, lines=[N])` can now include up to
 32 explicitly requested **physical-line anchors**. Anchors are derived from the
 same stable, visibility-checked source bytes and carry the canonical member
 revision, exact byte-line SHA-256 digest, number of identical nonblank lines in

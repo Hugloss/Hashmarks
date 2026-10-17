@@ -683,9 +683,9 @@ class HashmarksMcpSurface:
 
         def project() -> dict[str, object]:
             try:
-                self._map.sync(paths)
+                self._map.index.sync(paths)
                 if result_mode == "member":
-                    return self._map.source_observation(
+                    return self._map.source.observe(
                         paths[0],
                         literal=literal,
                         limit=limit,
@@ -695,11 +695,11 @@ class HashmarksMcpSurface:
                     )
                 if result_mode == "literals":
                     assert literals is not None
-                    return self._map.scoped_source_literals(
+                    return self._map.source.scoped_literals(
                         paths, literals, limit=limit, context_lines=literal_context
                     )
                 assert literal is not None
-                return self._map.scoped_source_occurrences(
+                return self._map.source.scoped_occurrences(
                     paths, literal, limit=limit, context_lines=literal_context
                 )
             except ValueError as exc:
@@ -751,7 +751,7 @@ class HashmarksMcpSurface:
 
         def project() -> dict[str, object]:
             try:
-                self._map.sync()
+                self._map.index.sync()
                 producers = {
                     "observation": self._repository_binding_observation,
                     "coverage": self._repository_binding_coverage,
@@ -766,7 +766,7 @@ class HashmarksMcpSurface:
         bounded = _changed_paths(paths) if paths else None
 
         def project() -> dict[str, object]:
-            self._map.sync()
+            self._map.index.sync()
             return self._map.repository_findings(bounded)
 
         return self._read(project)
@@ -789,7 +789,7 @@ class HashmarksMcpSurface:
 
             return semantic_relationship_delta(before, after)
         if result_mode == "bindings":
-            self._map.sync()
+            self._map.index.sync()
             return self._map.repository_evidence_binding_delta(before, after)
         return self._map.diagnostic_observation_delta(
             before, after, changed_paths=changed_paths, **diagnostic_options

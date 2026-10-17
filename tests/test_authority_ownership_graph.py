@@ -27,7 +27,7 @@ def _repo(root: Path) -> None:
 def test_authority_graph_composes_loader_cache_and_reader(tmp_path: Path) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         graph = codemap.repository_ownership_graph()
     assert graph["schema"] == "hashmarks.authority-ownership-graph.v3"
     relations = {e["relation"] for e in graph["edges"]}
@@ -58,7 +58,7 @@ def test_authority_graph_v2_composes_exact_imported_invalidator(tmp_path: Path) 
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         graph = codemap.repository_ownership_graph()
     assert graph["schema"] == "hashmarks.authority-ownership-graph.v3"
     edge = next(e for e in graph["edges"] if e["relation"] == "invalidates-cache")
@@ -79,7 +79,7 @@ def test_authority_graph_v2_keeps_unqualified_same_name_invalidator_ambiguous(
         "def reset(CACHE):\n    CACHE.clear()\n", encoding="utf-8"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         graph = codemap.repository_ownership_graph()
     assert not any(e["relation"] == "invalidates-cache" for e in graph["edges"])
     assert set(graph["ambiguities"]) == {"cache:a.py:CACHE", "cache:b.py:CACHE"}
@@ -95,7 +95,7 @@ def test_authority_graph_v3_composes_unguarded_concurrency_risk_as_nomination(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         graph = codemap.repository_ownership_graph(["store.py"])
     assert graph["schema"] == "hashmarks.authority-ownership-graph.v3"
     risk = next(n for n in graph["nodes"] if n["kind"] == "concurrency-risk")
@@ -120,7 +120,7 @@ def test_authority_graph_v3_keeps_visible_guard_as_non_runtime_proof(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         graph = codemap.repository_ownership_graph(["store.py"])
     risk = next(n for n in graph["nodes"] if n["kind"] == "concurrency-risk")
     assert risk["guarded"] is True
@@ -134,7 +134,7 @@ def test_repository_ownership_graph_materializes_repository_rows_once(
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         original = codemap.store.all_file_rows
         calls = 0
 
@@ -159,7 +159,7 @@ def test_scoped_repository_ownership_graph_reuses_rows_without_collapsing_eviden
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         original = codemap.store.all_file_rows
         calls = 0
 

@@ -62,7 +62,7 @@ def test_scip_rows_and_freshness_snapshot_roll_back_together(
     artifacts = tmp_path / "artifacts.sqlite3"
 
     with CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         codemap.import_scip(scip)
         before_generation = codemap.store.generation()
         before_snapshot = _scip_snapshot(codemap)
@@ -91,7 +91,7 @@ def test_project_rows_and_freshness_snapshot_roll_back_together(
     artifacts = tmp_path / "artifacts.sqlite3"
 
     with CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         codemap.enrich_projects(("npm-package-graph",))
         before_generation = codemap.store.generation()
         before_nodes = codemap.store.project_nodes()
@@ -131,7 +131,7 @@ def test_enrichment_commit_invalidates_inflight_generation_session(
     artifacts = tmp_path / "artifacts.sqlite3"
 
     with CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as seed:
-        seed.sync()
+        seed.index.sync()
         seed.import_scip(scip)
 
     _write_scip(scip, symbol="AfterOwner")
@@ -143,7 +143,7 @@ def test_enrichment_commit_invalidates_inflight_generation_session(
         with pytest.raises(
             RuntimeError, match="generation changed during decision session"
         ):
-            with reader.decision_session():
+            with reader.reads.session():
                 assert reader._fresh_native_definitions("BeforeOwner")
                 writer.import_scip(scip)
                 assert writer.store.generation() == before_generation + 1
@@ -160,7 +160,7 @@ def test_enrichment_only_generation_carries_unrelated_scip_binding(
     artifacts = tmp_path / "artifacts.sqlite3"
 
     with CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         codemap.import_scip(scip)
         before_generation = codemap.store.generation()
         assert codemap._evidence_fresh("scip", "scip-python:publication-test") == (

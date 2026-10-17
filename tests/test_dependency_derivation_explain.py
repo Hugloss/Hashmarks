@@ -78,7 +78,7 @@ def _snapshot() -> dict[str, object]:
 
 def test_dependency_explain_projects_semantics_and_derivation(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot())
         explanation = codemap.dependency_resolution_explain(observation)
 
@@ -111,12 +111,12 @@ def test_dependency_explain_remains_endpoint_local_after_repository_advances(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot())
         original_binding = copy.deepcopy(observation["repository_binding"])
 
         (tmp_path / "later.py").write_text("VALUE = 1\n", encoding="utf-8")
-        codemap.sync(["later.py"])
+        codemap.index.sync(["later.py"])
         explanation = codemap.dependency_resolution_explain(observation)
 
     derivation = explanation["derivation"]
@@ -129,7 +129,7 @@ def test_dependency_explain_remains_endpoint_local_after_repository_advances(
 
 def test_dependency_explain_revalidates_before_projecting(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot())
         tampered = copy.deepcopy(observation)
         tampered["producer"]["adapter_semantics"] = "fixture.forged.v2"

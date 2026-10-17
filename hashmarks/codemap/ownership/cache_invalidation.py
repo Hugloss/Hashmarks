@@ -27,7 +27,7 @@ class CacheInvalidationAnalyzer:
         nodes = self._cache_owner_nodes(owners, owner_ids)
         edges, invalidated = self._cache_invalidation_edges(findings, owner_ids, nodes)
         unresolved = sorted(cid for cid in owner_ids.values() if cid not in invalidated)
-        generation, identity_generation, stale = codemap._generation_status()
+        generation, identity_generation, stale = codemap.reads.generation_status()
         return {
             "schema": operation_schema("cache_invalidation_ownership"),
             "generation": generation,

@@ -347,7 +347,7 @@ def test_present_ambiguous_native_subject_does_not_pass_invalidation(
         "def first():\n    class Model: pass\ndef second():\n    class Model: pass\n"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(KeyError):
             _stale_native_observation(codemap, {"path": "models.py", "symbol": "Model"})
 

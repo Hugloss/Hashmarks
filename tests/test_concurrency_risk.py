@@ -9,7 +9,7 @@ def test_rmw_risk_nominates_same_owner_read_then_write(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as c:
-        c.sync()
+        c.index.sync()
         result = c.concurrency_risk_findings(["store.py"])
     f = result["findings"][0]
     assert f["code"] == "python-read-modify-write-without-visible-guard"
@@ -23,7 +23,7 @@ def test_rmw_risk_recognizes_visible_transaction_guard(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as c:
-        c.sync()
+        c.index.sync()
         result = c.concurrency_risk_findings(["store.py"])
     assert result["findings"][0]["guarded"] is True
     assert result["summary"]["unguarded"] == 0
@@ -37,7 +37,7 @@ def test_os_read_write_different_file_descriptors_are_not_one_rmw_owner(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as c:
-        c.sync()
+        c.index.sync()
         result = c.concurrency_risk_findings(["copy.py"])
     assert result["findings"] == []
 
@@ -50,7 +50,7 @@ def test_os_read_write_same_file_descriptor_remains_rmw_nomination(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as c:
-        c.sync()
+        c.index.sync()
         result = c.concurrency_risk_findings(["state.py"])
     finding = result["findings"][0]
     assert finding["read_call"] == "os.read"
@@ -63,7 +63,7 @@ def test_aliased_os_read_write_bind_file_descriptor_owner(tmp_path: Path) -> Non
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as c:
-        c.sync()
+        c.index.sync()
         result = c.concurrency_risk_findings(["copy.py"])
     assert result["findings"] == []
 
@@ -77,7 +77,7 @@ def test_rmw_risk_ignores_function_local_fresh_mapping(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as c:
-        c.sync()
+        c.index.sync()
         result = c.concurrency_risk_findings(["local.py"])
     assert result["findings"] == []
 
@@ -92,7 +92,7 @@ def test_rmw_risk_ignores_fresh_os_environ_copy(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as c:
-        c.sync()
+        c.index.sync()
         result = c.concurrency_risk_findings(["local_env.py"])
     assert result["findings"] == []
 
@@ -107,7 +107,7 @@ def test_rmw_risk_keeps_direct_os_environ_alias(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as c:
-        c.sync()
+        c.index.sync()
         result = c.concurrency_risk_findings(["shared_env.py"])
     assert len(result["findings"]) == 1
     assert result["findings"][0]["read_call"] == "env.get"
@@ -122,7 +122,7 @@ def test_rmw_risk_keeps_parameter_owned_mapping(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as c:
-        c.sync()
+        c.index.sync()
         result = c.concurrency_risk_findings(["shared.py"])
     assert len(result["findings"]) == 1
     assert result["findings"][0]["read_call"] == "store.get"
@@ -140,7 +140,7 @@ def test_rmw_risk_ignores_contextvar_owner(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as c:
-        c.sync()
+        c.index.sync()
         result = c.concurrency_risk_findings(["context_state.py"])
     assert result["findings"] == []
 
@@ -157,7 +157,7 @@ def test_rmw_risk_ignores_runvar_owner(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as c:
-        c.sync()
+        c.index.sync()
         result = c.concurrency_risk_findings(["run_state.py"])
     assert result["findings"] == []
 
@@ -172,6 +172,6 @@ def test_rmw_risk_does_not_suppress_reassigned_local_alias(tmp_path: Path) -> No
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as c:
-        c.sync()
+        c.index.sync()
         result = c.concurrency_risk_findings(["alias.py"])
     assert len(result["findings"]) == 1

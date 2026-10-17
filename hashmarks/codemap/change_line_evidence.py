@@ -44,7 +44,7 @@ def _current_python_tree(
     reason = _python_tree_input_reason(path, raw)
     if reason is not None:
         return None, reason
-    source = codemap._repository_member_source(path)
+    source = codemap.source._repository_member_source(path)
     if isinstance(source, dict):
         return None, "canonical-member-unavailable"
     try:
@@ -178,7 +178,7 @@ def observe_changed_line_spans(
     rows: list[dict[str, object]] = []
     for span in spans:
         path = str(span["path"])
-        member, raw = codemap._repository_member_observation(path, include_bytes=True)
+        member, raw = codemap.source.member(path, include_bytes=True)
         if (
             member.get("state") != "known-present"
             or member.get("index_state") != "indexed"
@@ -216,7 +216,7 @@ def observe_changed_line_spans(
             tree=tree,
         )
         # Reading outside the indexed source is not proof of its correspondence.
-        after, _ = codemap._repository_member_observation(path, include_bytes=True)
+        after, _ = codemap.source.member(path, include_bytes=True)
         if (
             after.get("state") != "known-present"
             or after.get("member_revision") != member.get("member_revision")

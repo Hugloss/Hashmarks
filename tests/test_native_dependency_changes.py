@@ -36,7 +36,7 @@ def test_native_dependency_sequence_binds_real_inputs_and_reopens(
         paths = materialize_dependency(root, source)
         raw = dependency_capture(producer, source, input_revisions(root, paths))
         with CodeMap(root, state_dir=state) as cm:
-            cm.sync()
+            cm.index.sync()
             current: Any = cm.dependency_resolution_evidence(raw)
             assert all(
                 row["source_equivalence"] == "proven"
@@ -57,7 +57,7 @@ def test_native_dependency_sequence_binds_real_inputs_and_reopens(
         with CodeMap(root, state_dir=state) as reopened:
             restored: Any = reopened.dependency_resolution_evidence(raw)
         with CodeMap(root, state_dir=tmp_path / f"fresh-{name}-{expected}") as fresh:
-            fresh.sync()
+            fresh.index.sync()
             rebuilt: Any = fresh.dependency_resolution_evidence(raw)
         assert semantic_dependency_fields(restored) == semantic_dependency_fields(
             current
@@ -77,10 +77,10 @@ def test_old_native_capture_keeps_input_mismatch_visible(
     paths = materialize_dependency(root, before_source)
     raw = dependency_capture(producer, before_source, input_revisions(root, paths))
     with CodeMap(root, state_dir=tmp_path / "state") as cm:
-        cm.sync()
+        cm.index.sync()
         before: Any = cm.dependency_resolution_evidence(raw)
         materialize_dependency(root, native_dependency_corpus / producer / "v2")
-        cm.sync()
+        cm.index.sync()
         reused: Any = cm.dependency_resolution_evidence(raw)
         delta: Any = cm.dependency_resolution_delta(before, reused)
         response = cm.dependency_codemap(raw)
@@ -102,7 +102,7 @@ def test_native_dependency_formatting_change_is_not_resolution_change(
     paths = materialize_dependency(root, source)
     raw = dependency_capture(producer, source, input_revisions(root, paths))
     with CodeMap(root, state_dir=tmp_path / "state") as cm:
-        cm.sync()
+        cm.index.sync()
         before: Any = cm.dependency_resolution_evidence(raw)
         path = root / ("uv.lock" if producer == "uv" else "pom.xml")
         prefix = (
@@ -116,7 +116,7 @@ def test_native_dependency_formatting_change_is_not_resolution_change(
             if producer == "uv"
             else content.replace("</project>", prefix + "</project>")
         )
-        cm.sync()
+        cm.index.sync()
         after_raw = dependency_capture(producer, source, input_revisions(root, paths))
         if producer == "uv":
             from hashmarks.adapters import uv_lock_dependency_observation
@@ -151,7 +151,7 @@ def test_native_maven_file_changes_preserve_expected_delta_and_projection(
         for endpoint in ("before", "after"):
             source = native_dependency_corpus / "maven" / scenario / endpoint
             paths = materialize_dependency(root, source)
-            cm.sync()
+            cm.index.sync()
             observations.append(
                 cm.dependency_resolution_evidence(
                     dependency_capture("maven", source, input_revisions(root, paths))
@@ -190,7 +190,7 @@ def test_native_uv_grouped_bounds_and_incomplete_inventory_cannot_prove_absence(
     paths = materialize_dependency(root, source)
     raw = dependency_capture("uv", source, input_revisions(root, paths))
     with CodeMap(root, state_dir=tmp_path / "state") as cm:
-        cm.sync()
+        cm.index.sync()
         observation: Any = cm.dependency_resolution_evidence(raw)
         request = {
             "operation": "dependencies",
@@ -238,7 +238,7 @@ def test_native_maven_bounded_search_does_not_turn_unvisited_into_absent(
     source = native_dependency_corpus / "maven" / "transitive-upgrade" / "after"
     paths = materialize_dependency(root, source)
     with CodeMap(root, state_dir=tmp_path / "state") as cm:
-        cm.sync()
+        cm.index.sync()
         observation: Any = cm.dependency_resolution_evidence(
             dependency_capture("maven", source, input_revisions(root, paths))
         )
@@ -291,7 +291,7 @@ def test_native_maven_profiles_do_not_promote_context_absence_to_global_absence(
         repository_inputs=input_revisions(root, paths),
     )
     with CodeMap(root, state_dir=tmp_path / "state") as cm:
-        cm.sync()
+        cm.index.sync()
         observation: Any = cm.dependency_resolution_evidence(raw)
         selection = next(
             row

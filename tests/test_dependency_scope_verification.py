@@ -26,7 +26,7 @@ def test_verification_plan_rejects_pruned_dependency_test_path(tmp_path: Path) -
     rel = dependency.relative_to(tmp_path).as_posix()
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         assert rel not in codemap.store.paths()
         plan = codemap.verification_plan(rel)
         assert plan == {
@@ -51,7 +51,7 @@ def test_verification_plan_rejects_context_denied_test_path(tmp_path: Path) -> N
     rel = hidden.relative_to(tmp_path).as_posix()
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         assert rel not in codemap.store.paths()
         plan = codemap.verification_plan(rel)
         assert plan["available"] is False
@@ -64,7 +64,7 @@ def test_pruned_javascript_test_is_rejected_before_source_read(tmp_path: Path) -
     rel = dependency.relative_to(tmp_path).as_posix()
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with patch(
             "pathlib.Path.read_text",
             side_effect=AssertionError("dependency source must not be read"),
@@ -81,7 +81,7 @@ def test_verification_scope_pruning_is_segment_aware(tmp_path: Path) -> None:
     rel = owned.relative_to(tmp_path).as_posix()
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         assert rel in codemap.store.paths()
         plan = codemap.verification_plan(rel)
         assert plan["available"] is True

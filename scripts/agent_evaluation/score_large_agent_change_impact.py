@@ -76,7 +76,7 @@ def _freeze_scenario(
     frozen = []
     with CodeMap(repo) as codemap:
         started = time.perf_counter()
-        codemap.sync()
+        codemap.index.sync()
         sync_ms = (time.perf_counter() - started) * 1000.0
         for task in tasks:
             query = str(task["query"])

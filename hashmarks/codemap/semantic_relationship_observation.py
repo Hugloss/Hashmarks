@@ -65,11 +65,12 @@ def semantic_relationship_observation(
     observations.extend(
         lsp_relationship_observation(capture, target, resolver) for capture in captures
     )
-    freshness = codemap._query_freshness_fields()
+    freshness = codemap.reads.freshness_fields()
     stale = freshness.get("stale")
     repository = {
         "scope_identity": content_identity(str(codemap.workspace)),
-        "content_identity": "sha256:" + codemap._workspace_fingerprint_from_store(),
+        "content_identity": "sha256:"
+        + codemap.index._workspace_fingerprint_from_store(),
         "generation": codemap.store.generation(),
         "freshness": "current"
         if stale is False

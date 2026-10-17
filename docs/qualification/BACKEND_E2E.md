@@ -1,5 +1,11 @@
 # Backend E2E qualification
 
+The current architecture handoff is the active
+[canonical component rewrite](../plans/CANONICAL_COMPONENT_REWRITE_PLAN.md),
+with breaking Python APIs and explicit owners. Implementation is in progress under the user’s explicit instruction.
+The broader qualification definition below remains intact for later research;
+it is not the completion criterion for every bounded architecture subgoal.
+
 The target is defensible **5/5 Local E2E evidence for all twenty backend
 capabilities**. Expected value is a separate audit judgment. A coverage rating
 is never inferred from an average score or from the size of the test suite.
@@ -135,12 +141,13 @@ declaration supplements, all already-bounded verification alternatives, and the
 separate weak task matches. It retains exact source locations while omitting the
 source body, ancillary locator/ranking detail and related sections. Every
 collection reduction and omitted section is recorded in `initial_projection`.
-The v2 wire packet uses a lossless packet-local `json-string-table.v1` encoding:
-keys and string values reference a sorted prefix-compressed table; JSON numbers,
-booleans, nulls and array order retain their types and meaning. When smaller, the
-same table/data is wrapped as `json-string-table.v1+zlib`, with base64 data and
-an exact decoded-byte count. Decoder allocation is bounded to 1 MiB for that
-encoding; larger valid packets retain the uncompressed representation. Truncated,
+The v2 wire packet compresses semantic JSON directly as `json+zlib`, with base64
+data and an exact decoded-byte count. Compressing the former string-table
+intermediate added overhead on the genuine corpus. Decoders retain both earlier
+`json-string-table.v1` and `json-string-table.v1+zlib` formats. The uncompressed
+string table remains the fallback for small or over-bound packets; JSON numbers,
+booleans, nulls and array order retain their types and meaning. Decoder allocation
+is bounded to 1 MiB for compressed encodings. Duplicate JSON keys, truncated,
 concatenated or trailing compressed data and identity mismatches fail closed. Use
 `decode_initial_packet` before interpreting data. Its semantic identity is
 verified against the decoded view. Presentation references use the explicit
@@ -149,7 +156,8 @@ once in `structuredContent`, with the readable projection in text content.
 Default full MCP responses retain their JSON mirror.
 
 Initial compact/text rendering factors identical declaration qualifications and
-common source locators into readable scope tables. Rows preserve declaration
+common source locators into scope tables. Compact uses structured rows; text
+retains its readable tables. Rows preserve declaration
 order, exact ranges, future fields and field absence. All already-bounded initial
 verification alternatives are displayed; a second five-row presentation cap does
 not hide a relevant test. Unresolved task ownership may expose fresh test candidates

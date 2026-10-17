@@ -9,7 +9,7 @@ from hashmarks.codemap import CodeMap
 
 def _sync(root: Path) -> CodeMap:
     c = CodeMap(root)
-    c.sync()
+    c.index.sync()
     return c
 
 

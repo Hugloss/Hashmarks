@@ -62,7 +62,7 @@ def _indexed_map(tmp_path: Path) -> CodeMap:
     workspace.mkdir()
     (workspace / "a.py").write_text("def before():\n    return 1\n", encoding="utf-8")
     codemap = CodeMap(workspace, artifact_db=tmp_path / "artifacts.sqlite3")
-    codemap.sync()
+    codemap.index.sync()
     codemap.store.set_meta("identity_generation", "1")
     return codemap
 
@@ -97,10 +97,12 @@ def test_map_ready_reuses_one_atomic_complete_observation(
         return _observation()
 
     try:
-        monkeypatch.setattr(codemap, "_daemon_observation", sample)
-        monkeypatch.setattr(codemap, "sync", lambda paths=None: calls.append(paths))
+        monkeypatch.setattr(codemap._observation_source, "observe", sample)
+        monkeypatch.setattr(
+            codemap.index, "sync", lambda paths=None: calls.append(paths)
+        )
 
-        codemap._ensure_map_ready()
+        codemap.reads.ready()
 
         assert calls == [("a.py",)]
         assert observations == 1
@@ -115,13 +117,15 @@ def test_map_ready_falls_back_to_full_sync_without_authoritative_change_set(
     calls: list[object] = []
     try:
         monkeypatch.setattr(
-            codemap,
-            "_daemon_observation",
+            codemap._observation_source,
+            "observe",
             lambda: _observation(paths=(), paths_complete=False, dirty_path_count=1),
         )
-        monkeypatch.setattr(codemap, "sync", lambda paths=None: calls.append(paths))
+        monkeypatch.setattr(
+            codemap.index, "sync", lambda paths=None: calls.append(paths)
+        )
 
-        codemap._ensure_map_ready()
+        codemap.reads.ready()
 
         assert calls == [None]
     finally:
@@ -135,15 +139,17 @@ def test_map_ready_clean_matching_generation_does_not_sync(
     calls: list[object] = []
     try:
         monkeypatch.setattr(
-            codemap,
-            "_daemon_observation",
+            codemap._observation_source,
+            "observe",
             lambda: _observation(
                 state=ObservationState.CLEAN, generation=1, paths=(), dirty_path_count=0
             ),
         )
-        monkeypatch.setattr(codemap, "sync", lambda paths=None: calls.append(paths))
+        monkeypatch.setattr(
+            codemap.index, "sync", lambda paths=None: calls.append(paths)
+        )
 
-        codemap._ensure_map_ready()
+        codemap.reads.ready()
 
         assert calls == []
     finally:
@@ -157,8 +163,8 @@ def test_map_ready_unknown_generation_change_falls_back_to_full_sync(
     calls: list[object] = []
     try:
         monkeypatch.setattr(
-            codemap,
-            "_daemon_observation",
+            codemap._observation_source,
+            "observe",
             lambda: _observation(
                 state=ObservationState.UNKNOWN,
                 generation=2,
@@ -167,9 +173,11 @@ def test_map_ready_unknown_generation_change_falls_back_to_full_sync(
                 dirty_path_count=0,
             ),
         )
-        monkeypatch.setattr(codemap, "sync", lambda paths=None: calls.append(paths))
+        monkeypatch.setattr(
+            codemap.index, "sync", lambda paths=None: calls.append(paths)
+        )
 
-        codemap._ensure_map_ready()
+        codemap.reads.ready()
 
         assert calls == [None]
     finally:

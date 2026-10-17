@@ -239,7 +239,7 @@ class VerificationOwnershipMixin:
         )
         linked_paths = self._linked_edit_paths(verifiers)
         unowned, ambiguous = self._verification_summary_state(relevance, len(verifiers))
-        generation, identity_generation, stale = self._generation_status()
+        generation, identity_generation, stale = self.reads.generation_status()
         return {
             "schema": operation_schema("verification_ownership"),
             "generation": generation,

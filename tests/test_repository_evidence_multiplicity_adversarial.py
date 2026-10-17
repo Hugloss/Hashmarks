@@ -66,7 +66,7 @@ def test_duplicate_locator_multiplicity_is_definition_topology_not_content_chang
     (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         single = codemap.repository_evidence_bindings(
             _lines_binding(),
             include_relationships=False,
@@ -114,7 +114,7 @@ def test_lines_to_member_scope_switch_is_definition_not_repository_content_chang
     (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         lines = codemap.repository_evidence_bindings(
             _lines_binding(),
             include_relationships=False,

@@ -190,7 +190,35 @@ def _check_workflow(
     _check_boundary_inputs(workflow, rule, sources)
     _check_declaration_inputs(workflow, rule, sources)
     _check_runtime_inputs(workflow, rule, sources)
+    _check_structural_inputs(workflow, rule, sources)
     _check_native_oracles(rule)
+
+
+def _check_structural_inputs(
+    workflow: dict[str, Any], rule: dict[str, Any], sources: dict[str, Path]
+) -> None:
+    from .backend_structural import validate_structural_stage
+
+    inputs, oracles = (
+        workflow.get("structural_observations"),
+        rule.get("structural_oracles"),
+    )
+    if inputs is None and oracles is None:
+        return
+    if (
+        not isinstance(inputs, dict)
+        or not isinstance(oracles, dict)
+        or set(inputs) != {"before", "after"}
+        or set(oracles) != set(inputs)
+    ):
+        raise ValueError(
+            "structural observations require both revision inputs and oracles"
+        )
+    for stage in ("before", "after"):
+        source = workflow[stage]
+        validate_structural_stage(
+            sources[source], inputs[stage], oracles[stage], source
+        )
 
 
 def _check_runtime_inputs(

@@ -22,7 +22,7 @@ def test_python_reverse_fast_path_preserves_longest_module_resolution(
         '[project]\nname="x"\nversion="0"\n', encoding="utf-8"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         package = codemap.affected("src/pkg/__init__.py", max_depth=2)
         module = codemap.affected("src/pkg/sub.py", max_depth=2)
     assert "src/consumer.py" not in package["affected_files"]
@@ -46,7 +46,7 @@ def test_exact_path_change_impact_does_not_reinterpret_path_as_free_text(
         '[project]\nname="x"\nversion="0"\n', encoding="utf-8"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         impact = codemap.change_impact(
             "src/m050000.py", max_depth=2, limit_per_surface=6
         )
@@ -70,7 +70,7 @@ def test_python_reverse_fast_path_matches_full_graph_on_chain(tmp_path: Path) ->
         '[project]\nname="x"\nversion="0"\n', encoding="utf-8"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         roots = {"src/m7.py"}
         fast = codemap._python_reverse_levels(roots, max_depth=8)
         reverse = codemap._reverse_file_graph()

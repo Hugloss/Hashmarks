@@ -143,9 +143,8 @@ def test_private_qualified_identifier_keeps_exact_scope_and_duplicate_ambiguity(
     task = "Inspect Request.#cachedBody declarations"
     if literal_path:
         task += ". Source: request.ts"
-    with CodeMap(tmp_path) as codemap:
-        codemap.range_provider = native_ranges
-        codemap.sync()
+    with CodeMap(tmp_path, range_provider=native_ranges) as codemap:
+        codemap.index.sync()
         action = codemap.task_action_map(task)
         owner = action["admitted_edit"]
         assert owner is not None
@@ -154,9 +153,8 @@ def test_private_qualified_identifier_keeps_exact_scope_and_duplicate_ambiguity(
             "Request.#cachedBody",
         )
     (tmp_path / "duplicate.ts").write_text(declaration)
-    with CodeMap(tmp_path) as codemap:
-        codemap.range_provider = native_ranges
-        codemap.sync()
+    with CodeMap(tmp_path, range_provider=native_ranges) as codemap:
+        codemap.index.sync()
         action = codemap.task_action_map(task)
         if literal_path:
             owner = action["admitted_edit"]
@@ -198,9 +196,8 @@ def test_matching_test_filename_is_a_bound_candidate_without_reference_authority
             f'[[rule]]\npattern = "{expected}"\nvisibility = "deny"\n'
         )
     task = "Inspect Options declarations for plain HTTP http2 false. Source: src/contracts.d.ts"
-    with CodeMap(tmp_path) as codemap:
-        codemap.range_provider = native_ranges
-        codemap.sync()
+    with CodeMap(tmp_path, range_provider=native_ranges) as codemap:
+        codemap.index.sync()
         action = codemap.task_action_map(task)
         packet = codemap.task_evidence(task)
         initial = read_initial_projection(
@@ -249,9 +246,8 @@ def test_named_declaration_keeps_failure_context_as_evidence(
         f"Inspect Request.#cachedBody declarations {context} Request.formData "
         "reads the cached input. Source: request.ts"
     )
-    with CodeMap(tmp_path) as codemap:
-        codemap.range_provider = native_ranges
-        codemap.sync()
+    with CodeMap(tmp_path, range_provider=native_ranges) as codemap:
+        codemap.index.sync()
         action = codemap.task_action_map(task)
     owner = action["admitted_edit"]
     assert owner is not None
@@ -268,10 +264,9 @@ def test_namespace_member_survives_reopen_and_revision_change(
     source = tmp_path / "request.ts"
     source.write_text("namespace api {\n export type Result =\n  string;\n}\n")
     state = tmp_path / "state"
-    with CodeMap(tmp_path, state_dir=state) as codemap:
-        codemap.range_provider = native_ranges
-        codemap.sync()
-        first = codemap.outline("request.ts")
+    with CodeMap(tmp_path, state_dir=state, range_provider=native_ranges) as codemap:
+        codemap.index.sync()
+        first = codemap.source.outline("request.ts")
         symbols = first["symbols"]
         assert isinstance(symbols, list)
         assert any(
@@ -282,10 +277,9 @@ def test_namespace_member_survives_reopen_and_revision_change(
     source.write_text(
         "namespace api {\n export type Result =\n  string |\n  number;\n}\n"
     )
-    with CodeMap(tmp_path, state_dir=state) as codemap:
-        codemap.range_provider = native_ranges
-        codemap.sync()
-        second = codemap.outline("request.ts")
+    with CodeMap(tmp_path, state_dir=state, range_provider=native_ranges) as codemap:
+        codemap.index.sync()
+        second = codemap.source.outline("request.ts")
         assert second["file_digest"] != first["file_digest"]
         symbols = second["symbols"]
         assert isinstance(symbols, list)
@@ -309,9 +303,8 @@ def test_literal_file_discloses_common_and_private_names_without_owner_promotion
         "namespace api { export type Options = { http2?: false }; }\n"
         "class Request { #cachedBody = () => 'body'; }\n"
     )
-    with CodeMap(tmp_path) as codemap:
-        codemap.range_provider = native_ranges
-        codemap.sync()
+    with CodeMap(tmp_path, range_provider=native_ranges) as codemap:
+        codemap.index.sync()
         for requested, expected, line in [
             ("some", "some", 1),
             ("Options", "api.Options", 2),
@@ -354,9 +347,8 @@ def test_literal_file_disclosure_preserves_duplicate_scopes_and_denied_visibilit
         "namespace right { export interface Options {} }\n"
     )
     task = "Inspect Options declarations. Source: handler.ts"
-    with CodeMap(tmp_path) as codemap:
-        codemap.range_provider = native_ranges
-        codemap.sync()
+    with CodeMap(tmp_path, range_provider=native_ranges) as codemap:
+        codemap.index.sync()
         action = codemap.task_action_map(task)
         packet = codemap.task_evidence(task)
         assert {row.get("symbol") for row in packet["retrieval"]["results"][:2]} == {
@@ -368,9 +360,8 @@ def test_literal_file_disclosure_preserves_duplicate_scopes_and_denied_visibilit
     (tmp_path / ".hashmarks-context.toml").write_text(
         '[[rule]]\npattern = "handler.ts"\nvisibility = "deny"\n'
     )
-    with CodeMap(tmp_path) as codemap:
-        codemap.range_provider = native_ranges
-        codemap.sync()
+    with CodeMap(tmp_path, range_provider=native_ranges) as codemap:
+        codemap.index.sync()
         packet = codemap.task_evidence(task)
         assert all(
             row["path"] != "handler.ts" for row in packet["retrieval"]["results"]

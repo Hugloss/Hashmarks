@@ -42,7 +42,7 @@ def test_explicit_findings_do_not_read_pruned_dependency_implementation(
     rel = dependency.relative_to(tmp_path).as_posix()
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         assert rel not in codemap.store.paths()
         with patch(
             "hashmarks.codemap.ownership_analysis.read_python_ast",
@@ -70,7 +70,7 @@ def test_explicit_findings_respect_context_policy_index_denial(tmp_path: Path) -
     rel = private.relative_to(tmp_path).as_posix()
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         assert rel not in codemap.store.paths()
         result = codemap.import_ownership_findings([rel])
         assert result["summary"]["files_considered"] == 0
@@ -84,7 +84,7 @@ def test_findings_scope_pruning_is_segment_aware(tmp_path: Path) -> None:
     rel = owner.relative_to(tmp_path).as_posix()
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         assert rel in codemap.store.paths()
         result = codemap.repository_findings([rel])
         assert result["summary"]["findings"] == 1

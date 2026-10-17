@@ -12,7 +12,7 @@ from .change_line_evidence import (
     normalize_changed_line_spans,
     observe_changed_line_spans,
 )
-from .decision_session import diagnostic_producer
+from .decision_session import ReadScopeOwner, diagnostic_producer
 from .model import EvidenceVisibility
 from .project_impact_codec import compact_project_impact
 from .repository_domains import RepositoryDomain, classify_repository_path
@@ -20,8 +20,22 @@ from .repository_domains import RepositoryDomain, classify_repository_path
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
 
+    from .decision_session import ReadScope
     from .engine import CodeMap
     from .ownership_relation_types import OwnershipPathHop
+
+
+@dataclass
+class _ImpactOwnerReuse:
+    """Disposable impact owner reuse bound to one read scope."""
+
+    scope: ReadScope | None = None
+    entries: dict[
+        tuple[int, str, int, int],
+        tuple[
+            str, dict[str, object] | None, str, list[str], dict[tuple[str, str], str]
+        ],
+    ] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -128,7 +142,7 @@ class _ImpactState:
         return tuple(dict.fromkeys(roles)) or ("other",)
 
     def visible(self, path: str) -> bool:
-        row = self.owner._session_file_row(path)
+        row = self.owner.reads.file_row(path)
         return (
             row is not None
             and EvidenceVisibility(str(row["evidence_visibility"]))
@@ -244,7 +258,7 @@ class _ImpactState:
         return compact_project_impact(verbose) if encoding == "compact" else verbose
 
 
-class ChangeImpactMixin:
+class ChangeImpactMixin(ReadScopeOwner):
     def _refresh_declared_project_impact(
         self,
         normalized: tuple[str, ...],
@@ -361,8 +375,11 @@ class ChangeImpactMixin:
     ) -> tuple[int, str, int, int] | None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        if self._decision_session_depth <= 0:
+        if self.reads.depth <= 0:
             return None
+        if self._impact_owner_reuse.scope is not self.reads.scope:
+            self._impact_owner_reuse.entries.clear()
+            self._impact_owner_reuse.scope = self.reads.scope
         bounds = action.get("bounds")
         defaults = CHANGE_IMPACT_DEFAULT_REQUEST
         limit = (
@@ -375,7 +392,7 @@ class ChangeImpactMixin:
             if isinstance(bounds, dict)
             else defaults.per_role
         )
-        generation = int(self._decision_session_generation or self.store.generation())
+        generation = int(self.reads.generation or self.store.generation())
         return generation, task, limit, per_role
 
     def _same_package_go_owner(
@@ -452,11 +469,11 @@ class ChangeImpactMixin:
             self = cast("CodeMap", self)
         cache_key = self._change_impact_owner_cache_key(task, action)
         if cache_key is not None:
-            cached = self._decision_change_impact_owner_chain_cache.get(cache_key)
+            cached = self._impact_owner_reuse.entries.get(cache_key)
             if cached is not None:
-                self._decision_session_stats["impact_owner_chain_hit"] += 1
+                self.reads.count("impact_owner_chain_hit")
                 return deepcopy(cached)
-            self._decision_session_stats["impact_owner_chain_miss"] += 1
+            self.reads.count("impact_owner_chain_miss")
 
         ownership = action.get("ownership_resolution")
         owner_edges = (
@@ -479,7 +496,7 @@ class ChangeImpactMixin:
         chain, relations = self._owner_chain_from_edges(owner_edges)
         result = (edit_path, verify, verify_path, chain, relations)
         if cache_key is not None:
-            self._decision_change_impact_owner_chain_cache[cache_key] = deepcopy(result)
+            self._impact_owner_reuse.entries[cache_key] = deepcopy(result)
         return result
 
     @staticmethod
@@ -547,7 +564,7 @@ class ChangeImpactMixin:
     ) -> list[dict[str, object]]:
         evidence: list[dict[str, object]] = []
         for path in state.changed:
-            row = state.owner._session_file_row(path)
+            row = state.owner.reads.file_row(path)
             if row is None:
                 evidence.append(
                     {
@@ -653,8 +670,8 @@ class ChangeImpactMixin:
         # A standalone CLI/service call may arrive before a warm map exists.
         # Establish the repository map once, then keep the post-change refresh
         # bounded to the caller-reported paths.
-        self._ensure_map_ready()
-        sync_result = self.sync(normalized)
+        self.reads.ready()
+        sync_result = self.index.sync(normalized)
 
         # Declared project links are topology owned by the repository.  A
         # caller-reported edit to one of that provider's freshness-bound shared
@@ -670,7 +687,7 @@ class ChangeImpactMixin:
             sync_result.generation if refresh_generation is None else refresh_generation
         )
 
-        with self.decision_session(expected_generation=decision_generation):
+        with self.reads.session(expected_generation=decision_generation):
             action = self.task_action_map(task, limit=limit, per_role=per_role)
             state = self._change_impact_surface_state(
                 normalized,

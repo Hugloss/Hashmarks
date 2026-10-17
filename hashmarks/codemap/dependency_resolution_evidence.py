@@ -233,7 +233,7 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
             "relationships": relationships,
         }
         repository_binding = {
-            "repository_identity": self._repository_packet_identity(),
+            "repository_identity": self.reads.repository_identity(),
             "codemap_generation": int(self.store.generation()),
         }
         negative = self._dependency_negative_evidence_v3(coverage)
@@ -407,7 +407,7 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
         binding = cast("Mapping[str, object]", observation["repository_binding"])
         if binding[
             "repository_identity"
-        ] != self._repository_packet_identity() or binding["codemap_generation"] != int(
+        ] != self.reads.repository_identity() or binding["codemap_generation"] != int(
             self.store.generation()
         ):
             raise ValueError("dependency observation repository binding mismatch")
@@ -1241,7 +1241,7 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
                 not isinstance(claimed, str) or not _MEMBER_REVISION.fullmatch(claimed)
             ):
                 raise ValueError("member_revision must be lowercase sha256 hex")
-            member, _raw = self._repository_member_observation(path)
+            member, _raw = self.source.member(path)
             observed = member.get("member_revision")
             if claimed is None or observed is None:
                 equivalence = "unknown"

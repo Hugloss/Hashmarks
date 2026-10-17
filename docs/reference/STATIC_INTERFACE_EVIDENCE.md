@@ -20,7 +20,7 @@ provider = StaticPythonInterfaceDeclarations(
     tool_objects=("mcp",),
 )
 with CodeMap(".") as codemap:
-    codemap.sync()
+    codemap.index.sync()
     observation = codemap.discover_repository_declarations([provider])
 ```
 
@@ -158,7 +158,7 @@ from hashmarks.codemap.static_python_backend_declarations import (
 )
 
 with CodeMap(".") as codemap:
-    codemap.sync()
+    codemap.index.sync()
     observation = codemap.discover_repository_declarations(
         [StaticPythonBackendDeclarations(paths=("src/models.py", "src/settings.py"))]
     )

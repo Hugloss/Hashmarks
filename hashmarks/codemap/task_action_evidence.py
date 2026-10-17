@@ -218,9 +218,9 @@ class TaskActionEvidenceMixin:
             for value in _WORD_RE.findall(task)
             if len(value) >= 4 and value.lower() not in _TASK_STOPWORDS
         ]
-        _, document_frequency = self._session_lexical_document_frequencies(terms)
-        candidates = self._session_lexical_file_candidates(terms, limit=64)
-        file_rows = self._session_file_rows(
+        _, document_frequency = self.reads.lexical_document_frequencies(terms)
+        candidates = self.reads.lexical_file_candidates(terms, limit=64)
+        file_rows = self.reads.file_rows(
             str(candidate.get("path") or "") for candidate in candidates
         )
         return _TaskActionProjectionState(
@@ -338,7 +338,7 @@ class TaskActionEvidenceMixin:
         )
         if existing is not None:
             return existing
-        symbols = self._session_symbols_for_path(path)
+        symbols = self.reads.symbols_for_path(path)
         symbol = symbols[0] if symbols else {}
         file_row = state.file_rows[path]
         existing = {
@@ -415,7 +415,7 @@ class TaskActionEvidenceMixin:
                         str(symbol.get(key) or "").lower()
                         for key in ("name", "qualname", "signature")
                     )
-                    for symbol in self._session_symbols_for_path(
+                    for symbol in self.reads.symbols_for_path(
                         str(row.get("path") or "")
                     )
                 )
@@ -463,7 +463,7 @@ class TaskActionEvidenceMixin:
             normalized = self._normalized_relative_sql_reference(match.group(1))
             if normalized is None:
                 continue
-            referenced_row = self._session_file_row(normalized)
+            referenced_row = self.reads.file_row(normalized)
             if (
                 (self.workspace / normalized).is_file()
                 and referenced_row is not None
@@ -487,7 +487,7 @@ class TaskActionEvidenceMixin:
             (row for row in rows if str(row.get("path")) == owner_path), None
         )
         if existing is None:
-            file_row = self._session_file_row(owner_path)
+            file_row = self.reads.file_row(owner_path)
             existing = {
                 "path": owner_path,
                 "canonical_rank": limit + 1,
@@ -557,8 +557,8 @@ class TaskActionEvidenceMixin:
         )
         if existing is not None:
             return existing
-        file_row = self._session_file_row(active_path)
-        symbols = self._session_symbols_for_path(active_path)
+        file_row = self.reads.file_row(active_path)
+        symbols = self.reads.symbols_for_path(active_path)
         symbol = symbols[0] if symbols else {}
         projected = {
             "path": active_path,
@@ -603,7 +603,7 @@ class TaskActionEvidenceMixin:
     ) -> dict[str, object] | None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        file_row = self._session_file_row(local_path)
+        file_row = self.reads.file_row(local_path)
         if (
             file_row is None
             or EvidenceVisibility(str(file_row["evidence_visibility"]))
@@ -619,7 +619,7 @@ class TaskActionEvidenceMixin:
         }
         if not set(local_domains).intersection(allowed):
             return None
-        symbols = self._session_symbols_for_path(local_path)
+        symbols = self.reads.symbols_for_path(local_path)
         symbol = symbols[0] if symbols else {}
         return {
             "path": local_path,

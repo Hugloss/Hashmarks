@@ -30,7 +30,7 @@ def _source(tmp_path: Path) -> tuple[Path, dict[str, Any]]:
     )
     state = tmp_path / "state"
     with CodeMap(tmp_path, state_dir=state) as cm:
-        cm.sync()
+        cm.index.sync()
         packet = cast(
             "dict[str, Any]",
             cm.repository_declarations_operation(

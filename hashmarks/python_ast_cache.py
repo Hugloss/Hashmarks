@@ -42,6 +42,30 @@ class PythonAstSnapshot:
             {name: tuple(nodes) for name, nodes in definitions.items()}
         )
 
+    @cached_property
+    def function_definitions_by_qualname(
+        self,
+    ) -> Mapping[str, tuple[ast.FunctionDef | ast.AsyncFunctionDef, ...]]:
+        """Index exact lexical scopes, retaining duplicate declarations.
+
+        Like the short-name index, this is acceleration within one stable AST
+        snapshot. Consumers still qualify binding, ambiguity and freshness.
+        """
+        definitions: dict[str, list[ast.FunctionDef | ast.AsyncFunctionDef]] = {}
+
+        def visit(node: ast.AST, scope: tuple[str, ...]) -> None:
+            if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+                scope = (*scope, node.name)
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    definitions.setdefault(".".join(scope), []).append(node)
+            for child in ast.iter_child_nodes(node):
+                visit(child, scope)
+
+        visit(self.tree, ())
+        return MappingProxyType(
+            {name: tuple(nodes) for name, nodes in definitions.items()}
+        )
+
 
 def _metadata(path: Path) -> _FileIdentity:
     stat = path.stat()

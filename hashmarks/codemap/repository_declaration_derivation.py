@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, cast
 
 from hashmarks.operation_contract import operation_schema
 
+from .repository_observation import packet_digest
+
 if TYPE_CHECKING:
     from .engine import CodeMap
 
@@ -106,7 +108,7 @@ class RepositoryDeclarationDerivationMixin:
             "interpretation_authority": observation["interpretation_authority"],
             "observation_identity": observation["observation_identity"],
             "derivation_identity": "sha256:"
-            + self._packet_digest(_DERIVATION_SCHEMA, identity_payload),
+            + packet_digest(_DERIVATION_SCHEMA, identity_payload),
             "repository": deepcopy(observation["repository"]),
             "observer": deepcopy(observation["observer"]),
             "repository_evidence_identity": repository_evidence["bindings_identity"],

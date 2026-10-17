@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, cast
 
 from hashmarks.operation_contract import operation_schema
 
-from .decision_session import decision_scoped
+from .decision_session import ReadScopeOwner, decision_scoped
 from .repository_declaration_contract import encoded_json_bytes
 from .repository_declaration_provider import (
     MAX_DECLARATION_PROVIDERS,
@@ -18,6 +18,7 @@ from .repository_declaration_provider import (
     collect_repository_declaration_providers,
     validate_repository_declaration_provider_inputs,
 )
+from .repository_observation import packet_digest
 
 if TYPE_CHECKING:
     from .engine import CodeMap
@@ -185,7 +186,7 @@ def _previous_declarations(
     return candidate
 
 
-class RepositoryDeclarationDiscoveryMixin:
+class RepositoryDeclarationDiscoveryMixin(ReadScopeOwner):
     """Run explicit declaration providers and qualify their claims."""
 
     def _declaration_provider_member_read(
@@ -195,7 +196,7 @@ class RepositoryDeclarationDiscoveryMixin:
     ) -> tuple[dict[str, object], bytes | None]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        return self._repository_member_observation(
+        return self.source.member(
             path,
             include_bytes=include_bytes,
         )
@@ -205,7 +206,7 @@ class RepositoryDeclarationDiscoveryMixin:
             self = cast("CodeMap", self)
         visible = (
             item.rel
-            for item in self._iter_admitted_repository_files(prefix)
+            for item in self.files.iter_files(prefix)
             if item.visibility.value != "deny"
         )
         return tuple(islice(visible, MAX_PROVIDER_ENUMERATED_PATHS + 1))
@@ -234,7 +235,7 @@ class RepositoryDeclarationDiscoveryMixin:
             "authority": packet.get("authority"),
             "execution_effect": packet.get("execution_effect"),
         }
-        return "sha256:" + self._packet_digest(_SCHEMA, payload)
+        return "sha256:" + packet_digest(_SCHEMA, payload)
 
     def _validate_previous_declaration_discovery(
         self,
@@ -255,7 +256,7 @@ class RepositoryDeclarationDiscoveryMixin:
             if isinstance(repository, Mapping)
             else ""
         )
-        if repository_identity != self._repository_packet_identity():
+        if repository_identity != self.reads.repository_identity():
             raise ValueError("previous declaration discovery repository-mismatch")
         _provider_rows(previous.get("providers"))
         declarations = _previous_declarations(previous)

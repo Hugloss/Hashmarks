@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import hashlib
-import json
 import os
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
@@ -20,7 +18,7 @@ from hashmarks.verification_selection import (
 from .model import EvidenceVisibility
 from .query_primitives import _TASK_STOPWORDS, _query_terms
 from .repository_domains import RepositoryDomain, classify_repository_path
-from .repository_index_store import git_base_identity
+from .repository_observation import packet_digest
 from .task_evidence_contract import read_task_candidate
 from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 from .verification_ownership import VerificationOwnershipMixin
@@ -227,7 +225,7 @@ class VerificationMixin(VerificationOwnershipMixin):
         if selected_symbols:
             return selected_symbols, True
 
-        symbol_rows = self._session_symbols_for_path(edit_path)
+        symbol_rows = self.reads.symbols_for_path(edit_path)
         # A file-level target has no selected declaration. Seed its bounded
         # reference search from module-level, ordinary identifiers before
         # private/nested implementation helpers. This is candidate ordering,
@@ -284,19 +282,19 @@ class VerificationMixin(VerificationOwnershipMixin):
             for ref in import_refs
             if str(ref.get("path") or "")
         }
-        self._session_file_rows(import_source_paths)
+        self.reads.file_rows(import_source_paths)
         module_prefetch: set[str] = set()
         for ref in import_refs:
             ref_path = str(ref.get("path") or "")
             target = str(ref.get("target") or "")
             if not ref_path or not target:
                 continue
-            ref_row = self._session_file_row(ref_path)
+            ref_row = self.reads.file_row(ref_path)
             if ref_row is not None and str(ref_row.get("language") or "") == "python":
                 module_prefetch.update(
-                    self._python_import_module_candidates(ref_path, target)
+                    self._imports._python_import_module_candidates(ref_path, target)
                 )
-        self._session_preload_module_paths(module_prefetch)
+        self.reads.preload_module_paths(module_prefetch)
 
     def _verification_relative_import_paths(
         self,
@@ -313,7 +311,7 @@ class VerificationMixin(VerificationOwnershipMixin):
         keep = max(0, len(source_parts) - max(0, leading - 1))
         absolute_target = ".".join(source_parts[:keep] + ([suffix] if suffix else []))
         return (
-            set(self._resolve_import_paths(ref_path, absolute_target))
+            set(self._imports._resolve_import_paths(ref_path, absolute_target))
             if absolute_target
             else set()
         )
@@ -323,8 +321,8 @@ class VerificationMixin(VerificationOwnershipMixin):
     ) -> set[str]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        resolved_paths, unresolved_identity = self._resolve_import_owner_evidence(
-            ref_path, target
+        resolved_paths, unresolved_identity = (
+            self._imports._resolve_import_owner_evidence(ref_path, target)
         )
         if unresolved_identity and RepositoryDomain.TEST in set(
             classify_repository_path(ref_path)
@@ -416,11 +414,11 @@ class VerificationMixin(VerificationOwnershipMixin):
             return None
         imported, suffix = binding
         module = (
-            self._python_relative_module_candidate(ref_path, imported)
+            self._imports._python_relative_module_candidate(ref_path, imported)
             if imported.startswith(".")
             else imported
         )
-        if suffix != symbol or not self._session_module_paths(module):
+        if suffix != symbol or not self.reads.module_paths(module):
             return None
         owners = self._verification_resolved_import_paths(
             state, ref_path, imported + "." + suffix
@@ -444,13 +442,15 @@ class VerificationMixin(VerificationOwnershipMixin):
         imported, suffix = binding
         qualified = imported + "." + suffix
         if imported.startswith("."):
-            qualified = self._python_relative_module_candidate(ref_path, qualified)
+            qualified = self._imports._python_relative_module_candidate(
+                ref_path, qualified
+            )
         owners = self._verification_resolved_import_paths(state, ref_path, imported)
         if not owners:
             return None
         if state.edit_path not in owners:
             return False
-        row = self._session_file_row(state.edit_path)
+        row = self.reads.file_row(state.edit_path)
         module = str(row.get("module_name") or "") if row is not None else ""
         return True if module and qualified == module + "." + symbol else None
 
@@ -540,7 +540,7 @@ class VerificationMixin(VerificationOwnershipMixin):
     ) -> dict[str, list[Mapping[str, object]]]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        raw = self._session_refs_many(selected_symbols, limit_per_target=1025)
+        raw = self.reads.refs_many(selected_symbols, limit_per_target=1025)
         bounded: dict[str, list[Mapping[str, object]]] = {}
         for symbol in selected_symbols:
             refs: list[Mapping[str, object]] = list(raw.get(symbol, ()))
@@ -592,7 +592,7 @@ class VerificationMixin(VerificationOwnershipMixin):
             state, selected_symbols
         )
         # Probe owner-targeted evidence before semantic qualification.
-        edit_row = self._session_file_row(state.edit_path)
+        edit_row = self.reads.file_row(state.edit_path)
         edit_module = "" if edit_row is None else str(edit_row.get("module_name") or "")
         if edit_module:
             for symbol in selected_symbols:
@@ -634,7 +634,7 @@ class VerificationMixin(VerificationOwnershipMixin):
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         via_symbol_sources = self._verification_via_symbols(state)
-        indirect_ref_sets = self._session_refs_many(
+        indirect_ref_sets = self.reads.refs_many(
             [symbol for _via_path, symbol, _short in via_symbol_sources],
             limit_per_target=257,
         )
@@ -866,10 +866,8 @@ class VerificationMixin(VerificationOwnershipMixin):
         paths = sorted(state.candidate_paths)
         # Observe each selected module before bounding the reply. A source-order
         # prefix can hide the relevant test or manufacture a unique best symbol.
-        self._session_preload_symbols(paths)
-        candidate_symbols = {
-            path: self._session_symbols_for_path(path) for path in paths
-        }
+        self.reads.preload_symbols(paths)
+        candidate_symbols = {path: self.reads.symbols_for_path(path) for path in paths}
         result: list[dict[str, object]] = []
         pytest_declared = (
             self._pytest_declared()
@@ -968,7 +966,7 @@ class VerificationMixin(VerificationOwnershipMixin):
     ) -> list[dict[str, object]]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        return self._session_lexical_file_candidates(
+        return self.reads.lexical_file_candidates(
             sorted(state.task_terms),
             limit=65,
             paths=self._verification_test_paths(state),
@@ -1336,56 +1334,6 @@ class VerificationMixin(VerificationOwnershipMixin):
             ]
         return result
 
-    @staticmethod
-    def _packet_digest(domain: str, payload: object) -> str:
-        encoded = json.dumps(
-            payload,
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=False,
-            allow_nan=False,
-        ).encode("utf-8")
-        return hashlib.sha256(domain.encode("utf-8") + b"\0" + encoded).hexdigest()
-
-    def _repository_packet_identity(self) -> str:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        generation = self.store.generation()
-        cached = self._decision_repository_identity_cache
-        if (
-            self._decision_session_depth > 0
-            and cached is not None
-            and cached[0] == generation
-        ):
-            return cached[1]
-        base = git_base_identity(self.workspace)
-        if base:
-            identity = f"git-tree:{base}"
-        else:
-            path_digest = hashlib.sha256(os.fsencode(str(self.workspace))).hexdigest()
-            identity = f"workspace:{path_digest}"
-        if self._decision_session_depth > 0:
-            self._decision_repository_identity_cache = (generation, identity)
-        return identity
-
-    def _source_packet_identity(
-        self,
-        *,
-        generation: int,
-        identity_generation: int | None,
-        stale: bool | None,
-    ) -> str:
-        digest = self._packet_digest(
-            "hashmarks.source-identity.v1",
-            {
-                "repository_identity": self._repository_packet_identity(),
-                "codemap_generation": generation,
-                "identity_generation": identity_generation,
-                "stale": stale is not False,
-            },
-        )
-        return f"sha256:{digest}"
-
     def _decision_evidence_receipt(
         self,
         task: str,
@@ -1401,7 +1349,7 @@ class VerificationMixin(VerificationOwnershipMixin):
         """
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        generation, identity_generation, stale = self._generation_status()
+        generation, identity_generation, stale = self.reads.generation_status()
 
         def anchor(value: object) -> dict[str, object] | None:
             if not isinstance(value, Mapping) or not value.get("path"):
@@ -1429,11 +1377,11 @@ class VerificationMixin(VerificationOwnershipMixin):
         ambiguity = ambiguity if isinstance(ambiguity, Mapping) else {}
         payload: dict[str, object] = {
             "schema": "hashmarks.decision-evidence.v1",
-            "repository_identity": self._repository_packet_identity(),
+            "repository_identity": self.reads.repository_identity(),
             "codemap_generation": generation,
             "identity_generation": identity_generation,
             "stale": stale,
-            "task_identity": self._packet_digest("hashmarks.task.v1", {"task": task}),
+            "task_identity": packet_digest("hashmarks.task.v1", {"task": task}),
             "edit": anchor(action.get("edit")),
             "verify": anchor(action.get("verify")),
             "contract": anchor(action.get("contract")),
@@ -1446,13 +1394,11 @@ class VerificationMixin(VerificationOwnershipMixin):
                 "ambiguous": bool(ambiguity.get("ambiguous")),
                 "reason": str(ambiguity.get("reason") or ""),
             },
-            "verification_plan_digest": self._packet_digest(
+            "verification_plan_digest": packet_digest(
                 "hashmarks.verification-plan.v1", verification
             ),
         }
-        evidence_identity = self._packet_digest(
-            "hashmarks.decision-evidence.v1", payload
-        )
+        evidence_identity = packet_digest("hashmarks.decision-evidence.v1", payload)
         return {
             "schema": "hashmarks.decision-evidence-receipt.v1",
             "evidence_identity": evidence_identity,
@@ -1470,12 +1416,12 @@ class VerificationMixin(VerificationOwnershipMixin):
         return {
             "verification_plan": f"sha256:{verification_digest}",
             "verification_relevance": "sha256:"
-            + self._packet_digest(
+            + packet_digest(
                 operation_schema("verification_relevance"),
                 action.get("verification_relevance"),
             ),
             "ownership": "sha256:"
-            + self._packet_digest(
+            + packet_digest(
                 "hashmarks.ownership-resolution.v1",
                 action.get("ownership_resolution"),
             ),
@@ -1486,7 +1432,7 @@ class VerificationMixin(VerificationOwnershipMixin):
         state: _VerificationSelectionState,
     ) -> tuple[dict[str, object] | None, str, dict[str, object] | None]:
         membership = verification_membership_from_selection(state.verify)
-        source_identity = self._source_packet_identity(
+        source_identity = self.source.packet_identity(
             generation=state.generation,
             identity_generation=state.identity_generation,
             stale=state.stale,
@@ -1497,7 +1443,7 @@ class VerificationMixin(VerificationOwnershipMixin):
         owner_evidence = owner_evidence if isinstance(owner_evidence, Mapping) else None
         envelope = verification_selection_envelope(
             VerificationSelectionEnvelopeState(
-                repository_identity=self._repository_packet_identity(),
+                repository_identity=self.reads.repository_identity(),
                 source_identity=source_identity,
                 codemap_generation=state.generation,
                 identity_generation=state.identity_generation,

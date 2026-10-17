@@ -83,7 +83,7 @@ def test_scip_relationship_flags_are_direct_and_provenance_bound(
         ],
     )
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as cm:
-        cm.sync()
+        cm.index.sync()
         cm.import_scip(index)
         packet = cm.structural_locality("code.py::Impl", refresh=False)
         relations = assert_object(packet["native_semantic_relationships"])
@@ -163,13 +163,13 @@ def test_scip_relationship_claims_are_excluded_after_source_changes(
     _repository(tmp_path)
     index = _scip(tmp_path, [{"symbol": _BASE, "isImplementation": True}])
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as cm:
-        cm.sync()
+        cm.index.sync()
         cm.import_scip(index)
         (tmp_path / "code.py").write_text(
             "class Base:\n    pass\n\nclass Impl(Base):\n    pass\n\n# changed\n",
             encoding="utf-8",
         )
-        cm.sync(["code.py"])
+        cm.index.sync(["code.py"])
         stale = cm.structural_locality("code.py::Impl", refresh=False)
         stale_relations = assert_object(stale["native_semantic_relationships"])
         assert stale_relations["producer_bindings"] == []
@@ -192,7 +192,7 @@ def test_scip_relationship_truncation_and_reimport_replacement(
         [{"symbol": f"index-symbol-{i}", "isImplementation": True} for i in range(65)],
     )
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as cm:
-        cm.sync()
+        cm.index.sync()
         cm.import_scip(index)
         observed = _relations(cm)
         assert observed["truncated"] is True
@@ -224,7 +224,7 @@ def test_scip_relationship_target_reports_ambiguous_candidates(
     )
     index.write_text(json.dumps(value), encoding="utf-8")
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as cm:
-        cm.sync()
+        cm.index.sync()
         cm.import_scip(index)
         packet = cm.structural_locality("code.py::Impl")
     relations = assert_object(packet["native_semantic_relationships"])
@@ -243,7 +243,7 @@ def test_scip_relationship_packet_explains_missing_provider_observation(
 ) -> None:
     _repository(tmp_path)
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as cm:
-        cm.sync()
+        cm.index.sync()
         packet = cm.structural_locality("code.py::Impl")
     relations = assert_object(packet["native_semantic_relationships"])
     assert (
@@ -261,7 +261,7 @@ def test_scip_relationship_publication_rolls_back_atomically(
     _repository(tmp_path)
     index = _scip(tmp_path, [{"symbol": _BASE, "isImplementation": True}])
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as cm:
-        cm.sync()
+        cm.index.sync()
         cm.import_scip(index)
         before = _relations(cm)
         _scip(tmp_path, [{"symbol": _BASE, "isDefinition": True}])
@@ -281,7 +281,7 @@ def test_scip_relation_claim_delta_requires_same_untruncated_producer(
     _repository(tmp_path)
     index = _scip(tmp_path, [{"symbol": _BASE, "isImplementation": True}])
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as cm:
-        cm.sync()
+        cm.index.sync()
         cm.import_scip(index)
         before = cm.structural_locality("code.py::Impl")
 
@@ -289,7 +289,7 @@ def test_scip_relation_claim_delta_requires_same_untruncated_producer(
             "class Base:\n    pass\n\nclass Impl(Base):\n    pass\n\n# revision\n",
             encoding="utf-8",
         )
-        cm.sync(["code.py"])
+        cm.index.sync(["code.py"])
         _scip(tmp_path, [{"symbol": _BASE, "isTypeDefinition": True}])
         cm.import_scip(index)
         after = cm.structural_locality("code.py::Impl")
@@ -356,7 +356,7 @@ def test_scip_relationship_delta_requires_comparable_exact_endpoints(
     _repository(tmp_path)
     index = _scip(tmp_path, [{"symbol": _BASE, "isImplementation": True}])
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as cm:
-        cm.sync()
+        cm.index.sync()
         cm.import_scip(index)
         before = cm.structural_locality("code.py::Impl")
         after = dict(before)

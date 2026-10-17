@@ -26,7 +26,7 @@ def test_task_action_brief_is_smaller_than_authority_brief_and_action_complete(
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as c:
-        c.sync()
+        c.index.sync()
         full = c.task_decision_brief("widget implementation test", token_budget=64)
         agent = c.task_action_brief("widget implementation test", token_budget=64)
     assert agent["schema"] == "hashmarks.task-action-brief.v1"
@@ -46,7 +46,7 @@ def test_task_action_brief_fails_closed_without_hiding_missing_roles(
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as c:
-        c.sync()
+        c.index.sync()
         agent = c.task_action_brief("widget implementation test", token_budget=1)
     assert agent["status"] == "unsafe"
     assert agent["missing"]
@@ -57,7 +57,7 @@ def test_task_action_brief_auto_budget_qualifies_instead_of_assuming_fixed_minim
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as c:
-        c.sync()
+        c.index.sync()
         auto = c.task_action_brief("widget implementation test")
         forced_tiny = c.task_action_brief("widget implementation test", token_budget=1)
     assert auto["status"] == "safe-unknown"
@@ -67,7 +67,7 @@ def test_task_action_brief_auto_budget_qualifies_instead_of_assuming_fixed_minim
 def test_task_action_brief_fast_budget_matches_diagnostic_sweep(tmp_path: Path) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as c:
-        c.sync()
+        c.index.sync()
         sweep = c.task_decision_brief_budget_sweep(
             "widget implementation test", budgets=[1, 32, 64, 96, 128]
         )
@@ -89,7 +89,7 @@ def test_task_action_brief_auto_budget_does_not_call_diagnostic_sweep(
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as c:
-        c.sync()
+        c.index.sync()
 
         def forbidden(*args, **kwargs) -> None:
             raise AssertionError(
@@ -107,7 +107,7 @@ def test_task_action_brief_computes_canonical_action_map_once(
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as c:
-        c.sync()
+        c.index.sync()
         original = c.task_action_map
         calls = 0
 
@@ -147,7 +147,7 @@ def test_rare_ticket_action_brief_uses_exact_index_anchor_without_general_find(
         'def ABC123(): return "legacy"\n'
     )
     with CodeMap(tmp_path) as c:
-        c.sync()
+        c.index.sync()
         original_find = c.find
         queries: list[str] = []
 
@@ -184,7 +184,7 @@ def test_rare_ticket_fast_path_is_not_used_for_configuration_authority(
         'def test_abc123(): assert ABC123() == "new"\n'
     )
     with CodeMap(tmp_path) as c:
-        c.sync()
+        c.index.sync()
 
         def forbidden(*args, **kwargs) -> None:
             raise AssertionError(
@@ -215,7 +215,7 @@ def test_multi_term_task_local_island_beats_large_generic_vocabulary(
         "from src.case.route import route_value\n\ndef test_case():\n    assert route_value() == 'new'\n\n# cobalt grove behavior verification\n"
     )
     codemap = CodeMap(tmp_path)
-    codemap.sync()
+    codemap.index.sync()
     try:
         brief = codemap.task_action_brief(
             "Change the cobalt grove accepted response from old to new. Update the implementation that drives the request and verify the behavior."
@@ -243,7 +243,7 @@ def test_multi_term_island_does_not_activate_when_multiple_tests_share_terms(
             f"from src.{name}.engine import resolve\ndef test_{name}(): assert resolve() == 'old'\n# cobalt grove\n"
         )
     codemap = CodeMap(tmp_path)
-    codemap.sync()
+    codemap.index.sync()
     try:
         hits = codemap._task_local_lexical_island_hits(
             "cobalt grove behavior", limit=20
@@ -261,7 +261,7 @@ def test_task_action_brief_never_claims_safe_without_edit_target(
         "def test_only(): assert True\n# scarlet field behavior\n"
     )
     codemap = CodeMap(tmp_path)
-    codemap.sync()
+    codemap.index.sync()
     try:
         brief = codemap.task_action_brief(
             "Change the scarlet field behavior and verify it"
@@ -283,7 +283,7 @@ def test_multi_term_lexical_island_does_not_intercept_plain_compound_symbol_look
         "from src.adapter import NxImpactAdapter\n"
     )
     codemap = CodeMap(tmp_path)
-    codemap.sync()
+    codemap.index.sync()
     try:
         assert codemap.find_task("NxImpactAdapter")[0].path == "src/adapter.py"
     finally:
@@ -311,7 +311,7 @@ def test_task_action_brief_does_not_launder_named_dependency_into_owner(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         brief = codemap.task_action_brief(
             "Fix publish_result so it uses AuthorityReceipt.canonical_identity"
         )
@@ -334,7 +334,7 @@ def test_non_ambiguous_action_edit_remains_separate_from_repository_owner_proof(
     task = "Adapter implementation test"
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map(task, limit=20)
         packet = codemap.task_decision_packet(task, limit=20, token_budget=256)
 
@@ -364,7 +364,7 @@ def test_task_action_brief_keeps_ambiguous_candidate_out_of_edit_authority(
         "def test_publish(): assert True\n", encoding="utf-8"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map("Fix publish_result")
         brief = codemap.task_action_brief("Fix publish_result", token_budget=256)
 
@@ -385,7 +385,7 @@ def test_task_action_brief_consumes_canonical_action_edit(
     _repo(tmp_path)
     task = "widget implementation test"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map(task)
         assert action["ambiguity"]["ambiguous"] is False
         assert action["edit"] is not None
@@ -409,7 +409,7 @@ def test_action_surfaces_consume_canonical_action_discrimination(
     _repo(tmp_path)
     task = "widget implementation test"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map(task)
         assert action["action_discrimination"] == {
             "needed": True,
@@ -439,11 +439,11 @@ def test_task_action_brief_receipt_is_assembled_inside_decision_session(
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         original = codemap._decision_evidence_receipt
 
         def observed(*args, **kwargs) -> object:
-            assert codemap._decision_session_depth > 0
+            assert codemap.reads.depth > 0
             return original(*args, **kwargs)
 
         monkeypatch.setattr(codemap, "_decision_evidence_receipt", observed)
@@ -466,7 +466,7 @@ def test_ambiguity_is_sticky_across_retrieval_presentation_bounds(
         "def test_duplicate(): assert True\n", encoding="utf-8"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map(
             "Fix duplicate_owner", limit=limit, per_role=per_role
         )
@@ -486,7 +486,7 @@ def test_task_action_brief_preserves_authority_proof_identity_across_budgets(
     _repo(tmp_path)
     task = "Refactor engine.widget without changing behavior"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map(task, limit=20, per_role=3)
         briefs = [
             codemap.task_action_brief(task, limit=20, per_role=3, token_budget=budget)

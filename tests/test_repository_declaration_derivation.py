@@ -89,7 +89,7 @@ def test_declaration_derivation_traces_exact_repository_evidence(
     )
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.repository_declarations([group])
         derivation = codemap.repository_declaration_derivation_authority(packet)
 
@@ -140,12 +140,12 @@ def test_declaration_explain_is_endpoint_local_after_repository_advances(
     group = _group([_declaration("owner", "owner.yaml", "team-a")])
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.repository_declarations([group])
         original_repository = copy.deepcopy(packet["repository"])
 
         path.write_text("owner: team-b\n", encoding="utf-8")
-        codemap.sync(["owner.yaml"])
+        codemap.index.sync(["owner.yaml"])
 
         explanation = codemap.repository_declaration_explain(packet)
 
@@ -175,7 +175,7 @@ def test_declaration_derivation_rejects_resigned_nested_identity_tamper(
     group = _group([_declaration("owner", "owner.yaml", "team-a")])
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.repository_declarations([group])
         tampered = copy.deepcopy(packet)
         tampered["groups"][0]["declarations"][0]["producer"] = {
@@ -201,7 +201,7 @@ def test_declaration_derivation_rejects_resigned_semantic_subject_tamper(
     group = _group([_declaration("owner", "owner.yaml", "team-a")])
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.repository_declarations([group])
         tampered = copy.deepcopy(packet)
         tampered["groups"][0]["semantic_subject_identity"] = "sha256:" + ("0" * 64)
@@ -234,7 +234,7 @@ def test_declaration_derivation_rejects_resigned_semantic_role_tamper(
     )
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.repository_declarations([group])
         tampered = copy.deepcopy(packet)
         declaration = tampered["groups"][0]["declarations"][0]
@@ -259,7 +259,7 @@ def test_declaration_derivation_rejects_orphan_semantic_declaration_identity(
     group = _group([_declaration("owner", "owner.yaml", "team-a")])
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.repository_declarations([group])
         tampered = copy.deepcopy(packet)
         declaration = tampered["groups"][0]["declarations"][0]
@@ -284,7 +284,7 @@ def test_declaration_derivation_rejects_resigned_projection_mismatch(
     group = _group([_declaration("owner", "owner.yaml", "team-a")])
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.repository_declarations([group])
         tampered = copy.deepcopy(packet)
         tampered["observer"] = {"state": "forged"}
@@ -305,7 +305,7 @@ def test_declaration_derivation_rejects_resigned_duplicate_group(
     group = _group([_declaration("owner", "owner.yaml", "team-a")])
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.repository_declarations([group])
         tampered = copy.deepcopy(packet)
         tampered["groups"].append(copy.deepcopy(tampered["groups"][0]))
@@ -332,7 +332,7 @@ def test_declaration_derivation_rejects_resigned_noncanonical_order(
     )
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.repository_declarations([group])
         tampered = copy.deepcopy(packet)
         tampered["groups"][0]["declarations"].reverse()
@@ -352,7 +352,7 @@ def test_declaration_producer_change_preserves_definition_but_changes_derivation
     (repo / "owner.yaml").write_text("owner: team-a\n", encoding="utf-8")
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.repository_declarations(
             [
                 _group(
@@ -411,7 +411,7 @@ def test_declaration_evidence_definition_change_is_explicit_authority_change(
     )
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.repository_declarations(
             [_group([_declaration("owner", "owner.yaml", "team-a", line=1)])]
         )
@@ -442,7 +442,7 @@ def test_declaration_explain_preserves_provider_claims_without_adapter_contract(
     group = _group([_declaration("owner", "owner.yaml", "team-a")])
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.repository_declarations([group])
         explanation = codemap.repository_declaration_explain(packet)
 

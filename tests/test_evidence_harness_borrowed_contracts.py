@@ -118,7 +118,7 @@ def test_lsp_direct_claims_are_request_local(
     repo: Path, method: str, subject: str, kind: str, source: str, target: str
 ) -> None:
     with CodeMap(repo) as cm:
-        cm.sync()
+        cm.index.sync()
         result = cm.structural_locality(
             f"source.py::{subject}",
             result_mode="relationships",
@@ -144,7 +144,7 @@ def test_lsp_direct_claims_are_request_local(
 
 def test_prepare_call_hierarchy_exposes_no_invented_edges(repo: Path) -> None:
     with CodeMap(repo) as cm:
-        cm.sync()
+        cm.index.sync()
         result = cm.structural_locality(
             "source.py::target",
             result_mode="relationships",
@@ -220,7 +220,7 @@ def test_projection_rejects_claim_upgrade_and_omitted_context() -> None:
 
 def test_reacquisition_reference_is_scope_only_not_current_proof(repo: Path) -> None:
     with CodeMap(repo) as cm:
-        cm.sync()
+        cm.index.sync()
         packet = cm.repository_evidence_bindings(
             [
                 {
@@ -358,7 +358,7 @@ def test_legacy_relationship_packet_without_correspondence_still_validates(
     repo: Path,
 ) -> None:
     with CodeMap(repo) as cm:
-        cm.sync()
+        cm.index.sync()
         packet = cm.structural_locality(
             "source.py::target", result_mode="relationships"
         )
@@ -374,7 +374,7 @@ def test_legacy_relationship_packet_without_correspondence_still_validates(
 
 def test_forged_cross_producer_correspondence_is_rejected(repo: Path) -> None:
     with CodeMap(repo) as cm:
-        cm.sync()
+        cm.index.sync()
         packet = cm.structural_locality(
             "source.py::target", result_mode="relationships"
         )

@@ -74,7 +74,7 @@ bundles = [
 ]
 
 with CodeMap(".") as codemap:
-    codemap.sync()
+    codemap.index.sync()
     packet = codemap.correlate_evidence(
         bundles,
         path_mappings=[{"external_prefix": "/app", "repository_prefix": ""}],

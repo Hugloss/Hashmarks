@@ -5,6 +5,7 @@ from pathlib import Path
 from contract_assertions import assert_object, assert_records
 
 from hashmarks.codemap.engine import CodeMap
+from hashmarks.codemap.repository_observation import packet_digest
 
 
 def _binding() -> list[dict[str, object]]:
@@ -19,7 +20,7 @@ def _binding() -> list[dict[str, object]]:
 
 
 def _resign_packet(codemap: CodeMap, packet: dict[str, object]) -> None:
-    packet["bindings_identity"] = "sha256:" + codemap._packet_digest(
+    packet["bindings_identity"] = "sha256:" + packet_digest(
         "hashmarks.repository-evidence-bindings.v1",
         {key: value for key, value in packet.items() if key != "bindings_identity"},
     )
@@ -86,7 +87,7 @@ def test_relationship_observation_enable_disable_is_non_comparable_not_fact_chan
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         not_requested = codemap.repository_evidence_bindings(
             _binding(),
             include_relationships=False,
@@ -147,11 +148,11 @@ def test_observer_change_keeps_relationship_facts_unknown_but_member_change_visi
     source.write_text("from alpha import VALUE\nKEEP = 1\n", encoding="utf-8")
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.repository_evidence_bindings(_binding())
 
         source.write_text("from beta import VALUE\nKEEP = 1\n", encoding="utf-8")
-        codemap.sync(["source.py"])
+        codemap.index.sync(["source.py"])
         after = codemap.repository_evidence_bindings(_binding())
         after["observer"] = {
             **assert_object(after["observer"]),

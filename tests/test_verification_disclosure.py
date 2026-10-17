@@ -43,7 +43,7 @@ def test_task_candidate_survives_reference_fanout_without_reference_authority(
 ) -> None:
     task, expected = _repository(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map(task)
         packet = codemap.task_evidence(task)
         initial = read_initial_projection(
@@ -80,7 +80,7 @@ def test_disclosure_bounds_preserve_selected_verifier_and_candidate_population(
 ) -> None:
     task, _ = _repository(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         projections = [
             codemap.verification_relevance(task, candidate_limit=limit)
             for limit in (1, 3, 8)
@@ -109,7 +109,7 @@ def test_short_identifier_components_remain_verification_task_evidence(
             f"def test_{name}_options(): assert field() is None\n"
         )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.task_evidence("Inspect field db_type in src/backend.py")
     rows = {
         row["path"]: row for row in packet["verification"]["relevance"]["candidates"]
@@ -138,7 +138,7 @@ def test_production_lexical_fanout_cannot_hide_the_test_observation_scope(
     expected = "tests/test_cancellation.py"
     (tmp_path / expected).write_text("def test_cancellation(client): client.close()\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.task_evidence(
             "Inspect cancellation scope cleanup in src/engine.py"
         )

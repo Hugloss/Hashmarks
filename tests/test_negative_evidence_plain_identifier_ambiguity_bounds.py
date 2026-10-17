@@ -26,7 +26,7 @@ def _write_plain_owners(tmp_path: Path, *, duplicate: bool = True) -> None:
 
 
 def _bounded_plain_probe(codemap: CodeMap, monkeypatch: pytest.MonkeyPatch) -> None:
-    original = codemap._session_exact_symbol_candidates
+    original = codemap.reads.exact_symbol_candidates
     actual = list(original(["resolve"], limit=10))
     by_path = {str(row.get("path") or ""): dict(row) for row in actual}
     first = by_path["src/a.py"]
@@ -44,7 +44,7 @@ def _bounded_plain_probe(codemap: CodeMap, monkeypatch: pytest.MonkeyPatch) -> N
             return probe[:limit]
         return original(names, limit=limit)
 
-    monkeypatch.setattr(codemap, "_session_exact_symbol_candidates", exact_symbols)
+    monkeypatch.setattr(codemap.reads, "exact_symbol_candidates", exact_symbols)
 
 
 def test_bounded_plain_identifier_scan_cannot_hide_duplicate_owner(
@@ -55,7 +55,7 @@ def test_bounded_plain_identifier_scan_cannot_hide_duplicate_owner(
     task = "Fix resolve behavior"
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         _bounded_plain_probe(codemap, monkeypatch)
         context = codemap._task_action_map_context(task, 1)
         evidence = codemap._task_action_exact_identifier_edit_candidates(
@@ -87,7 +87,7 @@ def test_complete_plain_identifier_scan_can_prove_duplicate_ambiguity(
     task = "Fix resolve behavior"
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         context = codemap._task_action_map_context(task, 20)
         evidence = codemap._task_action_exact_identifier_edit_candidates(
             task, context.rows, context.failed
@@ -112,7 +112,7 @@ def test_complete_plain_identifier_scan_can_leave_generic_name_unpromoted(
     task = "Fix resolve behavior"
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         context = codemap._task_action_map_context(task, 20)
         evidence = codemap._task_action_exact_identifier_edit_candidates(
             task, context.rows, context.failed
@@ -135,8 +135,8 @@ def test_explicit_identifier_authority_is_independent_of_plain_scan_bound(
     original = None
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        original = codemap._session_exact_symbol_candidates
+        codemap.index.sync()
+        original = codemap.reads.exact_symbol_candidates
         resolve_rows = list(original(["resolve"], limit=10))
         by_path = {str(row.get("path") or ""): dict(row) for row in resolve_rows}
         first = by_path["src/a.py"]
@@ -160,7 +160,7 @@ def test_explicit_identifier_authority_is_independent_of_plain_scan_bound(
                 return probe[:limit]
             return original(names, limit=limit)
 
-        monkeypatch.setattr(codemap, "_session_exact_symbol_candidates", exact_symbols)
+        monkeypatch.setattr(codemap.reads, "exact_symbol_candidates", exact_symbols)
         task = "Refactor explicit_owner_name and resolve behavior"
         action = codemap.task_action_map(task, limit=1, per_role=1)
 

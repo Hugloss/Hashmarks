@@ -28,14 +28,14 @@ def test_unknown_freshness_converges_across_decision_surfaces(
     task = "widget implementation test"
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         generation = codemap.store.generation()
 
         def unknown_status(observation: object = None) -> tuple[int, int, bool | None]:
             del observation
             return generation, generation, None
 
-        monkeypatch.setattr(codemap, "_generation_status", unknown_status)
+        monkeypatch.setattr(codemap.reads, "generation_status", unknown_status)
 
         packet = codemap.task_decision_packet(task, token_budget=256)
         decision = codemap.task_decision_brief(task, token_budget=256)
@@ -59,16 +59,16 @@ def test_codemap_completeness_does_not_redefine_freshness(
     task = "widget implementation test"
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         generation = codemap.store.generation()
 
         def current_status(observation: object = None) -> tuple[int, int, bool]:
             del observation
             return generation, generation, False
 
-        monkeypatch.setattr(codemap, "_generation_status", current_status)
+        monkeypatch.setattr(codemap.reads, "generation_status", current_status)
         monkeypatch.setattr(
-            codemap,
+            codemap.index,
             "_codemap_build_state",
             lambda: {"state": "BUILDING", "complete": False},
         )
@@ -87,7 +87,7 @@ def test_action_brief_status_consumes_receipt_freshness_once(
     task = "widget implementation test"
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         generation = codemap.store.generation()
         action = codemap.task_action_map(task)
         reads = 0
@@ -102,7 +102,7 @@ def test_action_brief_status_consumes_receipt_freshness_once(
                 )
             return generation, generation, False
 
-        monkeypatch.setattr(codemap, "_generation_status", one_freshness_read)
+        monkeypatch.setattr(codemap.reads, "generation_status", one_freshness_read)
         brief = codemap._task_action_brief_from_action(
             action,
             task=task,

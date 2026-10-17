@@ -27,20 +27,20 @@ def test_exact_ownership_import_paths_reuses_exact_request_in_one_session(
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         calls = 0
-        original = codemap._resolve_import_owner_evidence
+        original = codemap._imports._resolve_import_owner_evidence
 
         def counted(source_path: str, target: str) -> list[str]:
             nonlocal calls
             calls += 1
             return original(source_path, target)
 
-        monkeypatch.setattr(codemap, "_resolve_import_owner_evidence", counted)
-        with codemap.decision_session():
+        monkeypatch.setattr(codemap._imports, "_resolve_import_owner_evidence", counted)
+        with codemap.reads.session():
             first = codemap._exact_ownership_import_paths("consumer.py", "pkg.widget")
             second = codemap._exact_ownership_import_paths("consumer.py", "pkg.widget")
-            stats = codemap.decision_session_stats()
+            stats = codemap.reads.stats()
         assert second == first and calls == 1
         assert (
             stats["ownership_import_paths_miss"] == 1
@@ -53,21 +53,21 @@ def test_ownership_import_path_cache_key_includes_source_and_target(
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         calls = 0
-        original = codemap._resolve_import_owner_evidence
+        original = codemap._imports._resolve_import_owner_evidence
 
         def counted(source_path: str, target: str) -> list[str]:
             nonlocal calls
             calls += 1
             return original(source_path, target)
 
-        monkeypatch.setattr(codemap, "_resolve_import_owner_evidence", counted)
-        with codemap.decision_session():
+        monkeypatch.setattr(codemap._imports, "_resolve_import_owner_evidence", counted)
+        with codemap.reads.session():
             codemap._exact_ownership_import_paths("consumer.py", "pkg.widget")
             codemap._exact_ownership_import_paths("consumer.py", "pkg.missing")
             codemap._exact_ownership_import_paths("pkg/__init__.py", ".owner.widget")
-            stats = codemap.decision_session_stats()
+            stats = codemap.reads.stats()
         assert (
             calls == 3
             and stats["ownership_import_paths_miss"] == 3
@@ -80,8 +80,8 @@ def test_cached_ownership_import_paths_are_detached_from_caller_mutation(
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        with codemap.decision_session():
+        codemap.index.sync()
+        with codemap.reads.session():
             first = codemap._exact_ownership_import_paths("consumer.py", "pkg.widget")
             expected = list(first)
             first.append("mutated.py")
@@ -94,12 +94,12 @@ def test_exact_ownership_import_paths_preserves_direct_and_missing_module_eviden
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        with codemap.decision_session():
+        codemap.index.sync()
+        with codemap.reads.session():
             direct = codemap._exact_ownership_import_paths("consumer.py", "pkg.owner")
             missing = codemap._exact_ownership_import_paths("consumer.py", "pkg.absent")
             empty = codemap._exact_ownership_import_paths("consumer.py", "")
-            stats = codemap.decision_session_stats()
+            stats = codemap.reads.stats()
         assert direct == ["pkg/owner.py"]
         assert missing == [] and empty == []
         assert stats["ownership_import_paths_miss"] == 2
@@ -110,20 +110,20 @@ def test_ownership_import_path_cache_is_not_reused_across_sessions(
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         calls = 0
-        original = codemap._resolve_import_owner_evidence
+        original = codemap._imports._resolve_import_owner_evidence
 
         def counted(source_path: str, target: str) -> list[str]:
             nonlocal calls
             calls += 1
             return original(source_path, target)
 
-        monkeypatch.setattr(codemap, "_resolve_import_owner_evidence", counted)
-        with codemap.decision_session():
+        monkeypatch.setattr(codemap._imports, "_resolve_import_owner_evidence", counted)
+        with codemap.reads.session():
             codemap._exact_ownership_import_paths("consumer.py", "pkg.widget")
             codemap._exact_ownership_import_paths("consumer.py", "pkg.widget")
-        with codemap.decision_session():
+        with codemap.reads.session():
             codemap._exact_ownership_import_paths("consumer.py", "pkg.widget")
         assert calls == 2
 
@@ -144,13 +144,13 @@ def test_public_ownership_graph_batches_repeated_exact_module_probes_without_cha
     (tmp_path / "consumer.py").write_text("\n".join(imports) + "\n", encoding="utf-8")
 
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         original = codemap._preload_direct_ownership_import_modules
         monkeypatch.setattr(
             codemap, "_preload_direct_ownership_import_modules", lambda *_: None
         )
         codemap.store.reset_read_counters()
-        with codemap.decision_session():
+        with codemap.reads.session():
             baseline = codemap.ownership_relation_graph(
                 "change imported owners", "consumer.py", max_depth=1
             )
@@ -160,7 +160,7 @@ def test_public_ownership_graph_batches_repeated_exact_module_probes_without_cha
             codemap, "_preload_direct_ownership_import_modules", original
         )
         codemap.store.reset_read_counters()
-        with codemap.decision_session():
+        with codemap.reads.session():
             candidate = codemap.ownership_relation_graph(
                 "change imported owners", "consumer.py", max_depth=1
             )

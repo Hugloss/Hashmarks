@@ -46,7 +46,7 @@ def test_benchmark_membership_variant_is_copy_only_and_preserves_source_owner(
         }
     ]
     with CodeMap(workspace, state_dir=full_state, artifact_db=artifacts) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         full = evaluate(codemap, corpus)
     full_rows = _lexical_rows(full_state / "codemap.sqlite3")
 
@@ -78,7 +78,7 @@ def test_benchmark_scores_expected_discrimination_for_underspecified_tasks(
         state_dir=tmp_path / "state",
         artifact_db=tmp_path / "artifacts.sqlite3",
     ) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         result = evaluate(
             codemap,
             [
@@ -181,13 +181,13 @@ def test_decision_session_reuses_evidence_primitives_without_caching_final_packe
         state_dir=tmp_path / "state-session",
         artifact_db=tmp_path / "artifacts-session.sqlite3",
     ) as codemap:
-        codemap.sync()
-        with codemap.decision_session():
+        codemap.index.sync()
+        with codemap.reads.session():
             first = codemap.task_decision_packet("Change LeaseOwner issue behavior.")
             second = codemap.task_decision_packet(
                 "Add regression coverage for LeaseOwner issue behavior."
             )
-            stats = codemap.decision_session_stats()
+            stats = codemap.reads.stats()
         assert first["task"] != second["task"]
         assert (
             first["identity"]["codemap_generation"]
@@ -249,7 +249,7 @@ def test_decision_scale_ladder_reports_per_task_cost(tmp_path: Path) -> None:
         state_dir=tmp_path / "state-scale",
         artifact_db=tmp_path / "artifacts-scale.sqlite3",
     ) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         ladder = decision_scale_ladder(codemap, corpus, sizes=(1, 8, 16))
     assert [row["tasks"] for row in ladder["rows"]] == [1, 8]
     assert all(row["seconds_per_task"] >= 0 for row in ladder["rows"])
@@ -315,7 +315,7 @@ def test_weak_generic_contract_anchor_fails_closed_but_identifier_anchor_resolve
         state_dir=tmp_path / "state-weak-anchor",
         artifact_db=tmp_path / "artifacts-weak-anchor.sqlite3",
     ) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         generic = codemap.task_action_map(
             "Change the observer behavior while preserving its existing public contract."
         )
@@ -367,10 +367,10 @@ def test_resumable_calibration_reuses_exact_task_receipts_after_interruption(
     artifacts = tmp_path / "artifacts-resume.sqlite3"
     receipts = tmp_path / "receipts"
     with CodeMap(workspace, state_dir=state, artifact_db=artifacts) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         manifest = build_manifest(
             corpus,
-            repository_identity=codemap._repository_packet_identity(),
+            repository_identity=codemap.reads.repository_identity(),
             generation=codemap.store.generation(),
             variant="full",
             group_size=3,
@@ -427,10 +427,10 @@ def test_resumable_calibration_rejects_receipt_identity_drift(tmp_path: Path) ->
     artifacts = tmp_path / "artifacts-drift.sqlite3"
     receipts = tmp_path / "receipts-drift"
     with CodeMap(workspace, state_dir=state, artifact_db=artifacts) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         manifest = build_manifest(
             corpus,
-            repository_identity=codemap._repository_packet_identity(),
+            repository_identity=codemap.reads.repository_identity(),
             generation=codemap.store.generation(),
             variant="full",
             group_size=1,

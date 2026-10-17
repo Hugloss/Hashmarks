@@ -4,9 +4,10 @@ from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, cast
 
 from .change_impact import ChangeImpactOptions
-from .decision_session import diagnostic_producer
+from .decision_session import ReadScopeOwner, diagnostic_producer
 from .freshness_map import FreshnessMapOptions
 from .project_impact_codec import expand_project_impact
+from .repository_observation import packet_digest
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -17,7 +18,7 @@ if TYPE_CHECKING:
 CROSS_REPOSITORY_SCHEMA = "hashmarks.cross-repository-evidence-packet.v1"
 
 
-class CrossRepositoryEvidenceMixin:
+class CrossRepositoryEvidenceMixin(ReadScopeOwner):
     """Bounded cross-repository projection over existing Hashmarks authorities.
 
     This surface does not discover, clone, execute, schedule, or persist external
@@ -271,7 +272,7 @@ class CrossRepositoryEvidenceMixin:
             "storage": "derived-not-persisted",
             "execution_effect": "none",
         }
-        payload["packet_identity"] = "sha256:" + self._packet_digest(
+        payload["packet_identity"] = "sha256:" + packet_digest(
             CROSS_REPOSITORY_SCHEMA,
             payload,
         )

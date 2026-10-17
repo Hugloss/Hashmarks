@@ -19,7 +19,7 @@ def test_late_relevant_test_declaration_is_not_hidden_by_module_prefix(
         + "def test_reserved_attribute_warning(): assert execute() == 1\n"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         relevance = codemap.verification_relevance(
             "Fix backend.py execute reserved attribute warning"
         )
@@ -44,7 +44,7 @@ def test_late_equal_match_preserves_unknown_test_symbol(tmp_path: Path) -> None:
         + "def test_reserved_attribute_warning_last(): assert execute() == 1\n"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         relevance = codemap.verification_relevance(
             "Fix backend.py execute reserved attribute warning"
         )

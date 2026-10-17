@@ -53,8 +53,8 @@ def _repo_inputs(root: Path) -> list[str]:
 
 def _codemap_probe(root: Path) -> dict:
     with CodeMap(root) as codemap:
-        first, first_s = _timed(codemap.sync)
-        second, second_s = _timed(codemap.sync)
+        first, first_s = _timed(codemap.index.sync)
+        second, second_s = _timed(codemap.index.sync)
         hits, find_s = _timed(lambda: codemap.find("Identity impact", limit=10))
         pack, context_s = _timed(
             lambda: codemap.context("Identity impact", token_budget=1200, limit=10)

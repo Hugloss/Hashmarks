@@ -20,14 +20,17 @@ from .python_exports import (
 )
 
 if TYPE_CHECKING:
-    from .engine import CodeMap
+    from .decision_session import DecisionScope
+    from .repository_file_discovery import RepositoryFiles
+    from .repository_index_store import WorkspaceMapStore
+    from .repository_source import RepositorySource
 
 
 @dataclass
 class _OwnerWalk:
     """Request-local re-export traversal with one ambiguity owner."""
 
-    resolver: CodeMap
+    resolver: RepositoryImports
     leaves: set[str] = field(default_factory=set)
     symbol_leaves: set[tuple[str, str]] = field(default_factory=set)
     visited: set[tuple[str, str]] = field(default_factory=set)
@@ -38,10 +41,10 @@ class _OwnerWalk:
         self, facade_path: str, exported_name: str
     ) -> list[str] | None:
         resolver = self.resolver
-        decision = resolver.policy.decide(facade_path)
+        decision = resolver.files.decide(facade_path)
         if not decision.index or decision.evidence_visibility.value != "source":
             self.symbol_unresolved = True
-        symbols = resolver._session_symbols_for_path(facade_path)
+        symbols = resolver.reads.symbols_for_path(facade_path)
         has_local_symbol = any(
             str(symbol.get("name") or "") == exported_name for symbol in symbols
         )
@@ -124,7 +127,7 @@ class _OwnerWalk:
 class _CallReferenceSearch:
     """Bounded request-local reverse nomination over the existing edge index."""
 
-    resolver: CodeMap
+    resolver: RepositoryImports
     target: tuple[str, str]
     remaining: int
     frontier: deque[tuple[str, int]]
@@ -176,14 +179,27 @@ class _CallReferenceSearch:
         return self.rows, self.complete
 
 
-class ImportResolutionMixin:
+class RepositoryImports:
+    """Own bounded repository import, alias and re-export identity."""
+
+    def __init__(
+        self,
+        files: RepositoryFiles,
+        source: RepositorySource,
+        reads: DecisionScope,
+        store: WorkspaceMapStore,
+    ) -> None:
+        self.files = files
+        self.source = source
+        self.reads = reads
+        self.store = store
+        self.workspace = files.workspace
+
     """Own repository import/re-export identity resolution for CodeMap evidence."""
 
     def _python_call_reference_candidates(
         self, row: Mapping[str, object], limit: int
     ) -> tuple[list[dict[str, object]], bool]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         if not str(row["path"]).endswith(".py"):
             refs = [dict(ref) for ref in self.store.refs(str(row["name"]), limit=limit)]
             return refs, len(refs) < limit
@@ -198,9 +214,7 @@ class ImportResolutionMixin:
     def _python_reverse_import_aliases(
         self, path: str, name: str, target: tuple[str, str]
     ) -> tuple[list[str], bool]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        decision = self.policy.decide(path)
+        decision = self.files.decide(path)
         if (
             not path.endswith(".py")
             or not decision.index
@@ -225,8 +239,6 @@ class ImportResolutionMixin:
 
     def _python_imported_call_name(self, source_path: str, called_name: str) -> str:
         """Nominate the declared imported spelling; this alone proves no owner."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         kind, targets = self._python_export_binding(source_path, called_name)
         if kind == "reexport" and len(targets) == 1:
             symbols, unresolved = self._resolve_import_symbol_evidence(
@@ -237,9 +249,7 @@ class ImportResolutionMixin:
         return called_name
 
     def _python_export_is_declaration(self, path: str, name: str) -> bool:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        decision = self.policy.decide(path)
+        decision = self.files.decide(path)
         if not decision.index or decision.evidence_visibility.value != "source":
             return False
         try:
@@ -252,8 +262,6 @@ class ImportResolutionMixin:
         self, source_path: str, target: str
     ) -> tuple[list[tuple[str, str]], bool]:
         """Expose exact declaration leaves from the existing bounded import walk."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         paths = self._resolve_import_paths(source_path, target)
         walk = _OwnerWalk(self)
         if len(paths) > 1 or self._python_import_identity_ambiguous(
@@ -281,8 +289,6 @@ class ImportResolutionMixin:
         a star import only for the single name currently being qualified.  Parse
         failures simply contribute no extra authority.
         """
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         if not facade_path.endswith(".py") or not exported_name:
             return []
         try:
@@ -301,8 +307,6 @@ class ImportResolutionMixin:
         import execution order.  A single direct re-export and a local binding can
         however be ordered exactly when both are unconditional top-level statements.
         """
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         if not facade_path.endswith(".py") or not exported_name:
             return "unknown", []
         try:
@@ -320,8 +324,6 @@ class ImportResolutionMixin:
         authoritative, while absent ``__all__`` exports non-underscore names.
         Dynamic or ambiguous ``__all__`` remains unknown/fail-closed.
         """
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         if not exported_name or exported_name.startswith("_"):
             return False
         module_target = (
@@ -343,7 +345,7 @@ class ImportResolutionMixin:
             return None
         if isinstance(exports, list):
             return exported_name in exports
-        symbols = self._session_symbols_for_path(owner)
+        symbols = self.reads.symbols_for_path(owner)
         return any(str(symbol.get("name") or "") == exported_name for symbol in symbols)
 
     def _resolve_import_owner_evidence(
@@ -356,13 +358,11 @@ class ImportResolutionMixin:
         make safety decisions must preserve that uncertainty rather than treating
         a facade-only resolution as proof of the underlying owner.
         """
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         resolved = list(self._resolve_import_paths(source_path, target))
         module_candidates = self._python_import_module_candidates(source_path, target)
         direct_module = module_candidates[0] if module_candidates else ""
         if len(resolved) == 1 and direct_module:
-            file_row = self._session_file_row(resolved[0])
+            file_row = self.reads.file_row(resolved[0])
             if (
                 file_row is not None
                 and str(file_row.get("module_name") or "") == direct_module
@@ -394,11 +394,9 @@ class ImportResolutionMixin:
         self, source_path: str, candidate: str
     ) -> str:
         """Resolve a relative module against the indexed source package."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         leading = len(candidate) - len(candidate.lstrip("."))
         suffix = candidate[leading:]
-        source_row = self._session_file_row(source_path)
+        source_row = self.reads.file_row(source_path)
         source_module = (
             "" if source_row is None else str(source_row.get("module_name") or "")
         )
@@ -435,28 +433,22 @@ class ImportResolutionMixin:
         ambiguity, not deterministic ownership.  Path ordering may stabilize the
         evidence but must never choose an owner.
         """
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         for candidate in self._python_import_module_candidates(source_path, target):
-            resolved = self._session_module_paths(candidate)
+            resolved = self.reads.module_paths(candidate)
             if resolved:
                 return resolved if len(resolved) == 1 else []
         return []
 
     def _python_import_identity_ambiguous(self, source_path: str, target: str) -> bool:
         """Report whether the first resolvable Python module identity has >1 owner."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         for candidate in self._python_import_module_candidates(source_path, target):
-            resolved = self._session_module_paths(candidate)
+            resolved = self.reads.module_paths(candidate)
             if resolved:
                 return len(resolved) > 1
         return False
 
     def _resolve_js_import_paths(self, source_path: str, target: str) -> list[str]:
         """Resolve exact in-workspace JS/TS relative-import evidence."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         if not target.startswith("."):
             return []
         base = (Path(source_path).parent / target).as_posix()
@@ -500,13 +492,11 @@ class ImportResolutionMixin:
             )
         )
         ordered = list(dict.fromkeys(candidates))
-        existing = self._session_file_rows(ordered)
+        existing = self.reads.file_rows(ordered)
         return [candidate for candidate in ordered if candidate in existing]
 
     def _resolve_go_import_paths(self, target: str) -> list[str]:
         """Resolve Go module/package evidence without broad repository guessing."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         go_mod = self.workspace / "go.mod"
         if not go_mod.is_file():
             return []
@@ -549,12 +539,10 @@ class ImportResolutionMixin:
 
     def _resolve_import_paths(self, source_path: str, target: str) -> list[str]:
         """Resolve import evidence by language while preserving exact resolver semantics."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         target = target.strip()
         if not target:
             return []
-        source_row = self._session_file_row(source_path)
+        source_row = self.reads.file_row(source_path)
         language = None if source_row is None else str(source_row["language"])
         if language == "python":
             return self._resolve_python_import_paths(source_path, target)

@@ -82,7 +82,7 @@ def _initial_header(packet: Mapping[str, object], key: str) -> str:
 
 
 def encode_initial_packet(packet: Mapping[str, object]) -> InitialTaskEvidenceEnvelope:
-    """Losslessly serialize a semantic initial packet using a local string table."""
+    """Losslessly serialize semantic facts; compression never changes identity."""
     headers: InitialEnvelopeHeaders = {
         "schema": _initial_header(packet, "schema"),
         "source_evidence_identity": _initial_header(packet, "source_evidence_identity"),
@@ -116,7 +116,7 @@ def encode_initial_packet(packet: Mapping[str, object]) -> InitialTaskEvidenceEn
         "data": _encode_strings(data, indices),
     }
     payload = json.dumps(
-        {"strings": table, "data": original["data"]},
+        data,
         ensure_ascii=False,
         separators=(",", ":"),
         allow_nan=False,
@@ -131,7 +131,7 @@ def encode_initial_packet(packet: Mapping[str, object]) -> InitialTaskEvidenceEn
         "source_evidence_identity": headers["source_evidence_identity"],
         "evidence_packet_identity": headers["evidence_packet_identity"],
         "encoding": {
-            "kind": "json-string-table.v1+zlib",
+            "kind": "json+zlib",
             "decoded_bytes": len(payload),
         },
         "data": compressed,
@@ -139,9 +139,7 @@ def encode_initial_packet(packet: Mapping[str, object]) -> InitialTaskEvidenceEn
     return packed if len(compressed) + 96 < len(payload) else original
 
 
-def _unpack_string_table(
-    encoding: dict[str, object], data: object
-) -> tuple[dict[str, object], object]:
+def _unpack_initial(encoding: dict[str, object], data: object) -> object:
     limit = encoding.get("decoded_bytes")
     if (
         set(encoding) != {"kind", "decoded_bytes"}
@@ -150,7 +148,7 @@ def _unpack_string_table(
         or not isinstance(data, str)
         or len(data) > 2 * _MAX_COMPRESSED_INITIAL_DECODED_BYTES
     ):
-        raise ValueError("invalid compressed initial string table")
+        raise ValueError("invalid compressed initial payload")
     try:
         raw = base64.b64decode(data, validate=True)
         decoder = zlib.decompressobj()
@@ -164,21 +162,12 @@ def _unpack_string_table(
             raise ValueError(
                 "compressed initial payload differs from declared size or scope"
             )
-        decoded = json.loads(payload)
+        return json.loads(payload, object_pairs_hook=_unique_initial_object)
     except (ValueError, zlib.error, binascii.Error) as exc:
-        raise ValueError("invalid compressed initial string table") from exc
-    if (
-        not isinstance(decoded, dict)
-        or set(decoded) != {"strings", "data"}
-        or not isinstance(decoded["strings"], list)
-    ):
-        raise ValueError("invalid compressed initial string table fields")
-    return {"kind": "json-string-table.v1", "strings": decoded["strings"]}, decoded[
-        "data"
-    ]
+        raise ValueError("invalid compressed initial payload") from exc
 
 
-def _decode_string_table(encoding: dict[str, Any]) -> list[str]:
+def _decode_string_table(encoding: Mapping[str, Any]) -> list[str]:
     strings: list[str] = []
     previous = ""
     for row in encoding["strings"]:
@@ -199,7 +188,7 @@ def _decode_string_table(encoding: dict[str, Any]) -> list[str]:
     return strings
 
 
-def _decode_strings(encoding: dict[str, object], data: object) -> object:
+def _decode_strings(encoding: Mapping[str, object], data: object) -> object:
     strings = _decode_string_table(encoding)
 
     def string(index: str) -> str:
@@ -235,6 +224,30 @@ def _unique_initial_object(items: list[tuple[str, Any]]) -> dict[str, Any]:
     return decoded
 
 
+def _decode_initial_data(encoding: object, data: object) -> object:
+    if not isinstance(encoding, dict):
+        raise ValueError("invalid initial encoding")
+    if encoding.get("kind") in ("json-string-table.v1+zlib", "json+zlib"):
+        data = _unpack_initial(encoding, data)
+        if encoding["kind"] == "json+zlib":
+            return data
+        if (
+            not isinstance(data, dict)
+            or set(data) != {"strings", "data"}
+            or not isinstance(data["strings"], list)
+        ):
+            raise ValueError("invalid compressed initial string table fields")
+        encoding = {"kind": "json-string-table.v1", "strings": data["strings"]}
+        data = data["data"]
+    if (
+        set(encoding) != {"kind", "strings"}
+        or encoding["kind"] != "json-string-table.v1"
+        or not isinstance(encoding["strings"], list)
+    ):
+        raise ValueError("invalid initial string table")
+    return _decode_strings(encoding, data)
+
+
 def decode_initial_packet(packet: Mapping[str, Any]) -> dict[str, Any]:
     """Resolve wire references without conflating numeric strings and numbers."""
     if packet.get("schema") != operation_schema("task_evidence", "initial"):
@@ -247,21 +260,7 @@ def decode_initial_packet(packet: Mapping[str, Any]) -> dict[str, Any]:
         "data",
     }:
         raise ValueError("invalid initial packet fields")
-    encoding = packet["encoding"]
-    data = packet["data"]
-    if (
-        isinstance(encoding, dict)
-        and encoding.get("kind") == "json-string-table.v1+zlib"
-    ):
-        encoding, data = _unpack_string_table(encoding, data)
-    if (
-        not isinstance(encoding, dict)
-        or set(encoding) != {"kind", "strings"}
-        or encoding["kind"] != "json-string-table.v1"
-        or not isinstance(encoding["strings"], list)
-    ):
-        raise ValueError("invalid initial string table")
-    data = _decode_strings(encoding, data)
+    data = _decode_initial_data(packet["encoding"], packet["data"])
     if not isinstance(data, dict) or set(data) & {
         "schema",
         "source_evidence_identity",

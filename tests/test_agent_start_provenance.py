@@ -45,7 +45,7 @@ def test_task_evidence_exposes_compact_selection_source_revision_and_unknown_fre
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         start = codemap.task_evidence(_task(), token_budget=512)
 
     with CodeMap(tmp_path) as codemap:
@@ -68,10 +68,10 @@ def test_task_evidence_maps_generation_bound_continuity_to_current(
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         generation = codemap.store.generation()
         monkeypatch.setattr(
-            codemap, "_generation_status", lambda: (generation, 71, False)
+            codemap.reads, "generation_status", lambda: (generation, 71, False)
         )
         start = codemap.task_evidence(_task(), token_budget=512)
 
@@ -87,10 +87,10 @@ def test_task_evidence_reports_stale_when_continuity_reports_change(
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         generation = codemap.store.generation()
         monkeypatch.setattr(
-            codemap, "_generation_status", lambda: (generation, 72, True)
+            codemap.reads, "generation_status", lambda: (generation, 72, True)
         )
         start = codemap.task_evidence(_task(), token_budget=512)
 
@@ -105,7 +105,7 @@ def test_task_evidence_marks_action_stale_if_selected_source_refresh_changes_gen
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         original = codemap._task_evidence_evidence_item
 
         def mutate_then_project(
@@ -148,7 +148,7 @@ def test_config_projection_provenance_stays_post_selection(tmp_path: Path) -> No
     # the natural-language ranking alone does not establish config ownership.
     policy = next(repo.glob("src/*/policy.toml")).relative_to(repo).as_posix()
     with CodeMap(repo) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         start = codemap.task_evidence(f"{task['query']} in {policy}", token_budget=512)
 
     assert _ownership(start)["candidate"]["path"].endswith("policy.toml")
@@ -163,7 +163,7 @@ def test_task_evidence_context_identity_is_budget_independent_and_revision_bound
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         starts = [
             codemap.task_evidence(_task(), token_budget=budget)
             for budget in (1, 32, 512)
@@ -175,7 +175,7 @@ def test_task_evidence_context_identity_is_budget_independent_and_revision_bound
         (tmp_path / "src" / "engine.py").write_text(
             "def cobalt_value() -> str:\n    return 'new-revision'\n", encoding="utf-8"
         )
-        codemap.sync()
+        codemap.index.sync()
         changed = codemap.task_evidence(_task(), token_budget=32)
     assert changed["provenance"]["context_identity"] not in identities
 
@@ -185,11 +185,11 @@ def test_task_evidence_context_identity_changes_with_freshness_authority(
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         unknown = codemap.task_evidence(_task(), token_budget=32)
         generation = codemap.store.generation()
         monkeypatch.setattr(
-            codemap, "_generation_status", lambda: (generation, 91, False)
+            codemap.reads, "generation_status", lambda: (generation, 91, False)
         )
         current = codemap.task_evidence(_task(), token_budget=32)
     assert unknown["provenance"]["freshness"] == "unknown"
@@ -205,7 +205,7 @@ def test_task_evidence_marks_stale_when_selected_verification_contents_change_af
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         (tmp_path / "tests" / "test_engine.py").write_text(
             "def test_unrelated():\n    assert True\n", encoding="utf-8"
         )
@@ -225,7 +225,7 @@ def test_task_evidence_marks_stale_when_selected_verification_is_deleted_after_s
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         (tmp_path / "tests" / "test_engine.py").unlink()
         start = codemap.task_evidence(_task(), token_budget=512)
     assert _freshness(start)["state"] == "stale"
@@ -241,7 +241,7 @@ def test_task_evidence_marks_stale_when_selected_verification_is_renamed_after_s
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         (tmp_path / "tests" / "test_engine.py").rename(
             tmp_path / "tests" / "test_engine_renamed.py"
         )
@@ -259,7 +259,7 @@ def test_task_evidence_closing_fence_catches_verification_mutation_during_packet
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         original = codemap._task_evidence_evidence_item
 
         def mutate_verification_then_project(

@@ -17,7 +17,7 @@ PATH = "backend.py"
 def _observe(repo: Path, *, source: str) -> dict:
     (repo / PATH).write_text(source, encoding="utf-8")
     with CodeMap(repo) as cm:
-        cm.sync()
+        cm.index.sync()
         return cm.discover_repository_declarations(
             [StaticPythonBackendDeclarations(paths=(PATH,))]
         )
@@ -176,14 +176,14 @@ def test_source_mutation_changes_direct_initializer_correspondence(
     )
     provider = StaticPythonBackendDeclarations(paths=(PATH,))
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         before = cm.discover_repository_declarations([provider])
         source.write_text(
             "import os\nclass Settings(BaseSettings):\n"
             "    key: str = os.getenv('TWO')\n",
             encoding="utf-8",
         )
-        cm.sync([PATH])
+        cm.index.sync([PATH])
         after = cm.discover_repository_declarations(
             [provider], previous_observation=before
         )
@@ -205,7 +205,7 @@ def test_explicit_opt_in_observation_modes_still_independent(tmp_path: Path) -> 
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         model = cm.discover_repository_declarations(
             [
                 StaticPythonBackendDeclarations(

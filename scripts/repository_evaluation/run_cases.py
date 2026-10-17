@@ -48,14 +48,14 @@ def _case_result(codemap: CodeMap, case: Mapping[str, object]) -> dict[str, Any]
     task = str(case.get("task") or "")
     limit = int(case.get("limit") or 20)
     started = time.perf_counter_ns()
-    with codemap.decision_session(diagnostics=True):
+    with codemap.reads.session(diagnostics=True):
         hits = codemap.find_task(task, limit=limit)
         action = codemap.task_action_map(
             task,
             limit=limit,
             per_role=int(case.get("per_role") or 3),
         )
-        diagnostics = codemap.decision_session_diagnostics()
+        diagnostics = codemap.reads.diagnostics()
     return {
         "task": task,
         "retrieval": [
@@ -107,7 +107,7 @@ def run_cases(
         state_dir=shard_state,
         artifact_db=shard_state / "artifacts.sqlite3",
     ) as codemap:
-        sync = codemap.sync()
+        sync = codemap.index.sync()
         repository_identity = _repository_identity(codemap)
         protocol_identity = "sha256:" + canonical_sha256(
             {

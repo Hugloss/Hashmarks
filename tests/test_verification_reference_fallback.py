@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from contract_assertions import assert_text
+
 from hashmarks import CodeMap
 from hashmarks.codemap.evidence_verification import _VerificationRelevanceState
 
@@ -52,7 +54,7 @@ def test_exact_verification_import_requires_resolved_owner_path(tmp_path: Path) 
         unresolved_import_identity_paths=set(),
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         paths, available = codemap._verification_exact_import_paths(
             state,
             [
@@ -95,7 +97,7 @@ def test_verification_locality_replaces_unrelated_canonical_without_reference_pr
     }
 
     chosen, reason = CodeMap._verification_select_candidate(
-        [local, selected], selected["path"]
+        [local, selected], assert_text(selected["path"])
     )
 
     assert chosen is local
@@ -123,7 +125,7 @@ def test_verification_locality_never_overrides_reference_evidence() -> None:
     }
 
     chosen, reason = CodeMap._verification_select_candidate(
-        [local, selected], selected["path"]
+        [local, selected], assert_text(selected["path"])
     )
 
     assert chosen is selected

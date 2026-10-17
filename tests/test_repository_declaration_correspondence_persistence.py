@@ -156,7 +156,7 @@ def _initial_correspondence_packet(
 ) -> dict[str, object]:
     providers = [*_source_providers(), _CorrelationProvider()]
     with CodeMap(repo, state_dir=state_dir) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.discover_repository_declarations(providers)
 
     assert packet["storage"] == "derived-not-persisted"

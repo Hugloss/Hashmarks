@@ -38,7 +38,7 @@ def test_candidate_disclosure_preserves_ambiguity_and_verification_selection(
     _repository(tmp_path)
     task = "Inspect update_metadata behavior"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map(task)
         packet = codemap.task_evidence(task)
         initial = read_initial_projection(
@@ -90,7 +90,7 @@ def test_candidate_disclosure_never_promotes_stale_test_revision(
     _repository(tmp_path)
     path = tmp_path / "tests/test_original.py"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         codemap.task_evidence("Inspect update_metadata behavior")
         path.write_text("def test_different_surface():\n    assert True\n")
         packet = codemap.task_evidence("Inspect update_metadata behavior")
@@ -121,7 +121,7 @@ def test_source_identifier_scout_keeps_late_test_body_without_claiming_reference
             "from bridge import helper\ndef test_result():\n    helper()\n    assert 'metadata'\n"
         )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.task_evidence("Inspect metadata token behavior")
     assert packet["ownership"]["owner"] is None
     candidate = next(

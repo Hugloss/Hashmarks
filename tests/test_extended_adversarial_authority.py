@@ -49,7 +49,7 @@ def _freshness_state(packet: dict[str, object]) -> str:
 def test_cross_task_previous_evidence_never_launders_authority(tmp_path: Path) -> None:
     repo, tasks = _hard_repo(tmp_path)
     with CodeMap(repo) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         starts = [codemap.task_evidence(row["query"]) for row in tasks]
         assert all(_candidate_path(start) for start in starts)
         for index, row in enumerate(tasks):
@@ -64,7 +64,7 @@ def test_cross_task_previous_evidence_never_launders_authority(tmp_path: Path) -
 def test_context_identity_mutation_matrix_fails_closed(tmp_path: Path) -> None:
     repo, tasks = _hard_repo(tmp_path)
     with CodeMap(repo) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         for row in tasks:
             start = codemap.task_evidence(row["query"])
             tampered = copy.deepcopy(start)
@@ -80,7 +80,7 @@ def test_selected_verification_mutation_is_never_safe_fresh_across_hard_corpus(
 ) -> None:
     repo, tasks = _hard_repo(tmp_path)
     with CodeMap(repo) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         for row in tasks:
             start = codemap.task_evidence(row["query"])
             verify_path = repo / _verification_path(start)
@@ -119,7 +119,7 @@ def test_bounded_fanout_never_claims_exhaustive(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         impact = codemap.task_change_impact(
             "change shared implementation",
             ["src/core.py"],

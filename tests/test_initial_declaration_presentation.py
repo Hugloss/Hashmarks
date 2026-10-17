@@ -17,22 +17,13 @@ from hashmarks.codemap.task_evidence_initial import (
 from hashmarks.evidence_presentation import presentation_response
 
 
-def _read_table(text: str, shared: dict[str, Any]) -> dict[str, Any]:
-    lines = text.splitlines()
-    metadata = {**shared, **json.loads(lines[0].split(": ", 1)[1])}
-    remaining = lines[1]
-    values = []
-    decoder = json.JSONDecoder()
-    for label in ("Common=", "; prefix=", "; columns=", "; extras="):
-        assert remaining.startswith(label)
-        value, end = decoder.raw_decode(remaining[len(label) :])
-        values.append(value)
-        remaining = remaining[len(label) + end :]
-    assert not remaining
-    common, prefix, columns, extras = values
+def _read_table(table: dict[str, Any], shared: dict[str, Any]) -> dict[str, Any]:
+    metadata = {**shared, **table["metadata"]}
+    common, prefix, columns, extras = (
+        table[key] for key in ("common", "prefix", "columns", "extras")
+    )
     declarations = []
-    for line in lines[2:]:
-        row = json.loads(line)
+    for row in table["rows"]:
         declaration = {**common, **dict(zip(columns, row[: len(columns)], strict=True))}
         if prefix:
             declaration["symbol"] = prefix + declaration["symbol"]
@@ -50,7 +41,7 @@ def test_compact_tables_recover_all_locators_qualifiers_and_future_fields(
         "class Worker:\n    def update(self):\n        return self.failed_update()\n    def failed_update(self):\n        return False\n"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         wire = cast(
             "dict[str, Any]",
             codemap.task_evidence(
@@ -90,10 +81,10 @@ def test_compact_tables_recover_all_locators_qualifiers_and_future_fields(
     )
     for index, finding in enumerate(group["findings"]):
         rendered = finding["details"]["class_declarations"]
-        assert (
-            rendered["source_ref"] == f"/retrieval/results/{index}/class_declarations"
+        assert finding["source_refs"][0] + "/class_declarations" == (
+            f"/retrieval/results/{index}/class_declarations"
         )
-        recovered = _read_table(rendered["text"], group["declaration_qualifiers"])
+        recovered = _read_table(rendered, group["declaration_qualifiers"])
         expected = logical["retrieval"]["results"][index]["class_declarations"]
         assert recovered == expected
         assert type(recovered["future_qualification"]) is type(

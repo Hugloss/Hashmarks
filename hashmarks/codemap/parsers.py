@@ -10,7 +10,7 @@ from .model import CODEMAP_SCHEMA, EdgeRecord, ParsedArtifact, SymbolRecord
 from .python_ast import PYTHON_PARSER, estimate_tokens, lexical_records, parse_python
 
 if TYPE_CHECKING:
-    from .providers import TreeSitterRangeProvider
+    from .providers import SourceRangeProvider
 
 NODE_PARSER = "hashmarks.ecmascript-outline.v4"
 GO_PARSER = "hashmarks.go-outline.v2"
@@ -31,7 +31,7 @@ def parser_id(language: str) -> str:
 
 
 def parser_signature(
-    language: str, range_provider: TreeSitterRangeProvider | None = None
+    language: str, range_provider: SourceRangeProvider | None = None
 ) -> str:
     base = parser_id(language)
     if range_provider is None:
@@ -44,7 +44,7 @@ def artifact_key_for(
     file_digest: str,
     language: str,
     *,
-    range_provider: TreeSitterRangeProvider | None = None,
+    range_provider: SourceRangeProvider | None = None,
 ) -> str:
     payload = json.dumps(
         {
@@ -56,7 +56,8 @@ def artifact_key_for(
         sort_keys=True,
         separators=(",", ":"),
     ).encode("utf-8")
-    return hashlib.sha256(b"hashmarks.codemap-artifact.v1\0" + payload).hexdigest()
+    # Retire artifacts that ingestion could bind to a digest from another read.
+    return hashlib.sha256(b"hashmarks.codemap-artifact.v2\0" + payload).hexdigest()
 
 
 def _symbol(
@@ -400,7 +401,7 @@ def parse_source(
     *,
     file_digest: str,
     language: str,
-    range_provider: TreeSitterRangeProvider | None = None,
+    range_provider: SourceRangeProvider | None = None,
 ) -> ParsedArtifact:
     if language == "python":
         artifact = parse_python(source, file_digest=file_digest)

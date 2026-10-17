@@ -175,7 +175,7 @@ def _codemap_observation(
 ) -> WorkerObservation:
     with CodeMap(repo) as codemap:
         started = time.perf_counter()
-        codemap.sync()
+        codemap.index.sync()
         cold_ms = (time.perf_counter() - started) * 1000
         candidates, first, ambiguity, alternatives, search_event = _codemap_candidates(
             codemap, query, strategy, limit=limit

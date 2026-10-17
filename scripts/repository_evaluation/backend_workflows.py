@@ -20,6 +20,7 @@ from .backend_gates import combine_required, fact_state, presentation_conformanc
 from .backend_grading import _authority_safe, _gates, _packet, display_fact_gate
 from .backend_matrix import INITIAL_TOKEN_CEILING
 from .backend_runtime import observe_runtime
+from .backend_structural import observe_structural
 from .backend_transport import capture_cli, capture_mcp
 from .backend_witnesses import (
     delta_fact_witnesses,
@@ -144,7 +145,7 @@ def _observe_task_profiles(
     captured: dict[str, dict[str, list[dict[str, Any]]]] = {}
     for mode, profile in profiles.items():
         with CodeMap(workspace, state_dir=state) as codemap:
-            codemap.sync()
+            codemap.index.sync()
             profile["packet"] = codemap.task_evidence(
                 workflow["task"], result_mode=profile["result_mode"]
             )
@@ -232,6 +233,20 @@ def _observe_stage(
         if runtime_inputs is not None and runtime_oracles is not None
         else None
     )
+    structural_inputs = workflow.get("structural_observations", {}).get(rule["_stage"])
+    structural_rule = rule.get("structural_oracles", {}).get(rule["_stage"])
+    structural = (
+        observe_structural(
+            workspace,
+            state,
+            structural_inputs,
+            structural_rule,
+            output / "structural",
+            transports,
+        )
+        if structural_inputs is not None and structural_rule is not None
+        else None
+    )
     # A sequence of public observations must belong to one stable repository
     # snapshot, including producer and transport reads after the writer closes.
     _check_snapshot(workspace, snapshot)
@@ -247,6 +262,7 @@ def _observe_stage(
         "boundary": boundary,
         "declarations": declarations,
         "runtime": runtime,
+        "structural": structural,
     }
 
 
@@ -267,7 +283,7 @@ def _freshness(
     codemap: CodeMap, paths: list[str], before_revisions: dict[str, str | None]
 ) -> dict[str, Any]:
     observations = [
-        cast("dict[str, Any]", codemap.source_observation(path)) for path in paths
+        cast("dict[str, Any]", codemap.source.observe(path)) for path in paths
     ]
     passed = bool(observations) and all(
         _invalidated_member(
@@ -368,7 +384,12 @@ def execute_workflow(
         )
     gates = _gates(before, after, stale, rule, delta_grade)
     for stage in (before, after):
-        for component in (stage["boundary"], stage["declarations"], stage["runtime"]):
+        for component in (
+            stage["boundary"],
+            stage["declarations"],
+            stage["runtime"],
+            stage["structural"],
+        ):
             if component is None:
                 continue
             for key, value in component["gates"].items():
@@ -394,6 +415,16 @@ def execute_workflow(
             "before": before["declarations"],
             "after": after["declarations"],
         },
+        **(
+            {
+                "structural_observations": {
+                    "before": before["structural"],
+                    "after": after["structural"],
+                }
+            }
+            if "structural_observations" in workflow
+            else {}
+        ),
         **(
             {
                 "runtime_observations": {
@@ -427,6 +458,11 @@ def execute_workflow(
                 "delta": delta,
                 "boundary": [before["boundary"], after["boundary"]],
                 "declarations": [before["declarations"], after["declarations"]],
+                **(
+                    {"structural": [before["structural"], after["structural"]]}
+                    if "structural_observations" in workflow
+                    else {}
+                ),
                 **(
                     {"runtime": [before["runtime"], after["runtime"]]}
                     if "runtime_observations" in workflow

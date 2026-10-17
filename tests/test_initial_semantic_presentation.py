@@ -42,7 +42,7 @@ def test_initial_relationship_view_preserves_all_values_and_future_types(
 ) -> None:
     (tmp_path / "owner.py").write_text("class Worker:\n    pass\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         wire = cast(
             "dict[str, Any]",
             codemap.task_evidence("Inspect owner.py", result_mode="initial"),

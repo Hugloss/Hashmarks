@@ -47,7 +47,7 @@ def test_requested_declaration_precedes_weaker_hits_without_changing_ownership(
 ) -> None:
     _repository(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map(_TASK, limit=limit)
         packet = codemap.task_evidence(_TASK, limit=limit)
         initial = read_initial_projection(
@@ -85,7 +85,7 @@ def test_literal_path_keeps_a_same_named_declaration_from_displacing_the_target(
         "class DeliveryStream:\n    async def close(self): return None\n"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map(_TASK)
         packet = codemap.task_evidence(_TASK)
     first = packet["retrieval"]["results"][0]
@@ -104,7 +104,7 @@ def test_duplicate_qualified_targets_keep_both_locators_and_owner_ambiguity(
     )
     task = "Inspect DeliveryStream.close declarations"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map(task)
         packet = codemap.task_evidence(task)
     rows = packet["retrieval"]["results"][:2]
@@ -120,7 +120,7 @@ def test_denied_requested_target_is_not_disclosed_by_ordering(tmp_path: Path) ->
         '[[rule]]\npattern = "transport.py"\nvisibility = "deny"\n'
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.task_evidence(_TASK)
     assert all(row["path"] != "transport.py" for row in packet["retrieval"]["results"])
     assert packet["ownership"]["owner"] is None
@@ -150,7 +150,7 @@ def test_literal_path_precedes_same_named_methods_without_unique_ownership(
         "in BatchRepository. Source: repository/z_async.py"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map(task)
         packet = codemap.task_evidence(task, result_mode=result_mode)
     observed = (
@@ -179,7 +179,7 @@ def _check_initial_transport(root: Path, transport: str, ambiguous: bool) -> Non
         task = "Inspect DeliveryStream.close declarations"
     state = root / ".hashmarks"
     with CodeMap(root, state_dir=state) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         expected = read_initial_projection(
             decode_initial_packet(
                 codemap.task_evidence(task, limit=3, result_mode="initial")

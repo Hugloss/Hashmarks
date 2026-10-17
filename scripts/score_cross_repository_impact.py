@@ -157,7 +157,7 @@ def _freeze_task(base: Path, task: dict) -> tuple[dict, float]:
     changed = str(task["changed"])
     with CodeMap(repo, artifact_db=repo / "artifacts.sqlite3") as codemap:
         started = time.perf_counter()
-        codemap.sync()
+        codemap.index.sync()
         codemap.enrich_projects(
             ("npm-package-graph", "maven-pom-graph", "declared-project-links")
         )

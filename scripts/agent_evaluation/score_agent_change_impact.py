@@ -94,7 +94,7 @@ def _freeze_public_evidence(
     frozen: list[dict[str, Any]] = []
     with CodeMap(repo) as codemap:
         started = time.perf_counter()
-        codemap.sync()
+        codemap.index.sync()
         sync_ms = (time.perf_counter() - started) * 1000.0
         for task in tasks:
             task_id = str(task["id"])

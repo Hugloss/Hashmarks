@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 import pytest
-from contract_assertions import assert_object, assert_records
+from contract_assertions import assert_array, assert_object, assert_records
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.task_evidence_initial import decode_initial_packet
@@ -42,7 +42,7 @@ def test_direct_source_call_keeps_exact_target_and_unknown_runtime_across_format
 ) -> None:
     source = _repository(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packets = [
             codemap.task_evidence(_TASK),
             codemap.task_evidence(_TASK, result_mode="initial"),
@@ -99,9 +99,9 @@ def test_direct_source_call_keeps_exact_target_and_unknown_runtime_across_format
                 )
                 details = assert_object(finding["details"])
                 table = details["direct_call_declarations"]
-                assert isinstance(table, str)
-                assert '"_local"' in table
-                assert '"call_line"' in table
+                table = assert_object(table)
+                assert "call_line" in assert_array(table["columns"])
+                assert table["rows"] == [["_local", 2, 2, 6]]
                 shared = assert_object(group["declaration_qualifiers"])
                 assert shared["source_revision"] == context["source_revision"]
 
@@ -111,7 +111,7 @@ def test_shadowed_call_name_does_not_admit_same_named_declaration(
 ) -> None:
     _repository(tmp_path, shadow=True)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.task_evidence(_TASK)
     rows = assert_records(assert_object(packet["retrieval"])["results"])
     assert not any("direct_call_declarations" in row for row in rows)
@@ -125,7 +125,7 @@ def test_direct_call_bound_accounts_for_unreturned_targets(tmp_path: Path) -> No
         + "".join(f"    local_{i}()\n" for i in range(6))
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.task_evidence(_TASK)
     context = _context(packet)
     assert (
@@ -150,7 +150,7 @@ def test_direct_calls_cannot_reuse_stale_or_hidden_source(
             '[[rule]]\npattern="backend.py"\nvisibility="deny"\n'
         )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         if invalidity == "changed":
             source.write_text("def replacement(): return None\n")
         elif invalidity == "deleted":

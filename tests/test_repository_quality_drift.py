@@ -62,7 +62,7 @@ def test_real_owner_and_verifier_converge_across_bounds_and_mcp(
     with CodeMap(
         repo, state_dir=state, artifact_db=state / "artifacts.sqlite3"
     ) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         wide = codemap.task_action_map(task, limit=20)
         narrow = codemap.task_action_map(task, limit=1)
         evidence = codemap.task_evidence(task, limit=20, token_budget=64)
@@ -97,14 +97,14 @@ def test_removed_import_anchor_cannot_leave_a_unique_owner_after_reopen(
     artifact = state / "artifacts.sqlite3"
 
     with CodeMap(repo, state_dir=state, artifact_db=artifact) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.task_action_map(task, limit=20)
         assert before["ownership_authority"]["resolved_owner"] == f"src/{owner_name}"
 
         (repo / "src" / owner_name).rename(
             repo / "src" / f"moved.{owner_name.rsplit('.', 1)[1]}"
         )
-        codemap.sync()
+        codemap.index.sync()
         changed = codemap.task_action_map(task, limit=20)
 
     assert changed["admitted_edit"] is None
@@ -139,7 +139,7 @@ def test_bounded_ambiguous_exact_symbol_stays_unresolved_in_mcp(
     state = tmp_path / "state"
 
     with CodeMap(repo, state_dir=state) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         wide = codemap.task_action_map(task, limit=20)
         narrow = codemap.task_action_map(task, limit=1)
 
@@ -164,7 +164,7 @@ def test_wording_and_non_edit_intent_do_not_change_repository_owner_proof(
     repo, task, owner_name, _verifier = _fixture(tmp_path, language)
     symbol = "pulse_gate" if language == "python" else "PulseGate"
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         change = codemap.task_action_map(task, limit=20)
         inspect = codemap.task_action_map(
             f"Investigate {symbol} without editing any files", limit=1
@@ -199,7 +199,7 @@ def test_exact_owner_uses_its_own_importing_test_as_verifier(
         symbol = "PulseGate"
         decoy_test = "tests/decoy.test.ts"
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         active = codemap.task_action_map(
             f"Change src.active.{symbol} implementation and verify it", limit=20
         )
@@ -230,7 +230,7 @@ def test_typescript_generic_function_is_an_exact_owner(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map("Fix withRefreshOutcome", limit=1)
 
     assert action["admitted_edit"] is not None
@@ -253,7 +253,7 @@ def test_typescript_overload_signatures_share_the_implementation_owner(
         encoding="utf-8",
     )
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map("Fix encodePayload", limit=1)
 
     assert action["admitted_edit"] is not None
@@ -275,8 +275,8 @@ def test_typescript_overload_does_not_cross_a_scope_boundary(tmp_path: Path) -> 
         encoding="utf-8",
     )
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
-        outline = codemap.outline("src/encoding.ts")
+        codemap.index.sync()
+        outline = codemap.source.outline("src/encoding.ts")
         action = codemap.task_action_map("Fix encodePayload", limit=1)
 
     assert (

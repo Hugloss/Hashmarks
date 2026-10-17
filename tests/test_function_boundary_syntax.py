@@ -15,7 +15,7 @@ from scripts.repository_evaluation.backend_transport import capture_cli
 
 def _observe(root: Path, *, start: int = 2, end: int = 2) -> dict[str, object]:
     with CodeMap(root) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.task_change_impact(
             "Inspect reported changes in service.py",
             ["service.py"],
@@ -157,7 +157,7 @@ def test_reported_multiline_call_and_cli_formats_retain_qualified_syntax(
     )
     state = tmp_path / "state"
     with CodeMap(tmp_path, state_dir=state) as codemap:
-        codemap.sync()
+        codemap.index.sync()
     captures = capture_cli(
         tmp_path,
         state,
@@ -218,7 +218,7 @@ def test_file_backed_body_and_decorator_share_cached_tree(
         "@router.post('/jobs')\nasync def process():\n    await execute()\n"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         read_python_ast(path)
 
         def forbidden_parse(*_args: object, **_kwargs: object) -> object:

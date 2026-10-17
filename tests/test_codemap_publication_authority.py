@@ -25,7 +25,7 @@ class _PublicationHarness:
         self.state = root / ".state"
         self.artifacts = root / "artifacts.sqlite3"
         with CodeMap(root, state_dir=self.state, artifact_db=self.artifacts) as seed:
-            self.initial = seed.sync()
+            self.initial = seed.index.sync()
         self.source.write_text(
             "def after_owner():\n    return 'after'\n",
             encoding="utf-8",
@@ -45,8 +45,8 @@ class _PublicationHarness:
     def install_writer_serialization_hooks(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        original_a_begin = self.writer_a._sync_begin_build
-        original_b_begin = self.writer_b._sync_begin_build
+        original_a_begin = self.writer_a.index._sync_begin_build
+        original_b_begin = self.writer_b.index._sync_begin_build
 
         def block_a(*args: object, **kwargs: object) -> object:
             value = original_a_begin(*args, **kwargs)
@@ -59,11 +59,11 @@ class _PublicationHarness:
             self.b_entered.set()
             return original_b_begin(*args, **kwargs)
 
-        monkeypatch.setattr(self.writer_a, "_sync_begin_build", block_a)
-        monkeypatch.setattr(self.writer_b, "_sync_begin_build", observe_b)
+        monkeypatch.setattr(self.writer_a.index, "_sync_begin_build", block_a)
+        monkeypatch.setattr(self.writer_b.index, "_sync_begin_build", observe_b)
 
     def install_staged_finalize_hook(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        original_finalize = self.writer_a._sync_finalize_identity
+        original_finalize = self.writer_a.index._sync_finalize_identity
 
         def block_before_publication(*args: object, **kwargs: object) -> object:
             self.staged.set()
@@ -72,14 +72,14 @@ class _PublicationHarness:
             return original_finalize(*args, **kwargs)
 
         monkeypatch.setattr(
-            self.writer_a, "_sync_finalize_identity", block_before_publication
+            self.writer_a.index, "_sync_finalize_identity", block_before_publication
         )
 
     def run(self, writer: CodeMap, *, started: threading.Event | None = None) -> None:
         if started is not None:
             started.set()
         try:
-            self.results.append(writer.sync())
+            self.results.append(writer.index.sync())
         except BaseException as exc:  # pragma: no cover - surfaced below
             self.errors.append(exc)
 
@@ -158,7 +158,7 @@ def test_inflight_decision_never_observes_uncommitted_next_generation(
         with pytest.raises(
             RuntimeError, match="generation changed during decision session"
         ):
-            with harness.reader.decision_session():
+            with harness.reader.reads.session():
                 assert harness.reader.store.generation() == harness.initial.generation
                 assert harness.reader.store.symbol("before_owner")
                 assert harness.reader.store.symbol("after_owner") == []
@@ -200,7 +200,7 @@ def test_public_symbol_fails_instead_of_mixing_committed_generations(
             harness.errors.append(TimeoutError("reader did not reach symbol evidence"))
             return
         try:
-            harness.writer_a.sync()
+            harness.writer_a.index.sync()
         except BaseException as exc:  # pragma: no cover - surfaced below
             harness.errors.append(exc)
         finally:
@@ -212,7 +212,7 @@ def test_public_symbol_fails_instead_of_mixing_committed_generations(
         with pytest.raises(
             RuntimeError, match="generation changed during decision session"
         ):
-            harness.reader.symbol("before_owner")
+            harness.reader.source.symbol("before_owner")
         thread.join(timeout=5)
         assert not thread.is_alive()
         assert harness.errors == []
@@ -229,7 +229,7 @@ class _LazyRefreshHarness:
         self.state = root / ".state"
         self.artifacts = root / "artifacts.sqlite3"
         with CodeMap(root, state_dir=self.state, artifact_db=self.artifacts) as seed:
-            self.initial = seed.sync()
+            self.initial = seed.index.sync()
             self.initial_fingerprint = seed.store.meta("workspace_fingerprint")
         self.reader = CodeMap(root, state_dir=self.state, artifact_db=self.artifacts)
         self.observer = CodeMap(root, state_dir=self.state, artifact_db=self.artifacts)
@@ -256,7 +256,7 @@ class _LazyRefreshHarness:
 
     def run_outline(self) -> None:
         try:
-            self.results.append(self.reader.outline("src/owner.py"))
+            self.results.append(self.reader.source.outline("src/owner.py"))
         except BaseException as exc:  # pragma: no cover - surfaced below
             self.errors.append(exc)
 

@@ -1,8 +1,14 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import pytest
+from contract_assertions import (
+    assert_array,
+    assert_number,
+    assert_object,
+    assert_records,
+)
 
 from hashmarks.codemap.engine import CodeMap
 from hashmarks.codemap.find_engine import _FindEvidence
@@ -53,7 +59,7 @@ def test_ambiguous_route_preserves_hybrid_retrieval() -> None:
 def test_codemap_exposes_route_without_search(tmp_path: Path) -> None:
     (tmp_path / "service.py").write_text("class AuthService:\n    pass\n")
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         route = codemap.query_route("AuthService")
         assert route.intent is QueryIntent.IDENTIFIER
         assert route.as_dict()["schema"] == "hashmarks.codemap-query-route.v1"
@@ -64,7 +70,7 @@ def test_query_router_exposes_intent_scoped_repository_domains() -> None:
     route = route_query(
         "who owns release packaging and which make command enforces the contract"
     )
-    domains = route.as_dict()["preferred_domains"]
+    domains = assert_array(route.as_dict()["preferred_domains"])
     assert domains[:2] == ["ownership", "build"]
     assert "contract" in domains
     assert "source" not in domains
@@ -91,7 +97,7 @@ def test_repository_control_surface_domains_are_not_global_boosts(
         "class ReleaseAuthority:\n    pass\n", encoding="utf-8"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         ownership = codemap.find(
             "who owns release authority and build contract", limit=8
         )
@@ -119,7 +125,7 @@ def test_task_query_formulation_is_candidate_visible_and_governance_aware(
     )
     task = "Where does an API route change belong, what must the API layer not own, and which architectural contract governs it?"
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         formulated = codemap.formulate_task_query(task)
         hits = codemap.find_task(task, limit=8)
     assert "api" in formulated.split()
@@ -143,7 +149,7 @@ def test_task_query_views_add_generic_evidence_families_without_project_filename
     )
     task = "How do public logs avoid leaking private values during release automation?"
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         views = codemap.task_query_views(task)
         hits = codemap.find_task(task, limit=8)
     assert views["schema"] == "hashmarks.task-query-views.v2"
@@ -164,7 +170,7 @@ def test_task_query_evidence_family_does_not_change_exact_identifier_leader(
         "class ReleaseAuthority:\n    pass\n", encoding="utf-8"
     )
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         hits = codemap.find_task("ReleaseAuthority", limit=6)
     assert hits[0].path == "service.py"
 
@@ -174,11 +180,11 @@ def test_find_task_deduplicates_identical_query_views(
 ) -> None:
     (tmp_path / "service.py").write_text("class Widget:\n    pass\n", encoding="utf-8")
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         original = codemap.find
         calls: list[str] = []
 
-        def counted(query: str, *, limit: int = 20) -> list[SearchHit]:
+        def counted(query: str, *, limit: int = 20) -> tuple[SearchHit, ...]:
             calls.append(query)
             return original(query, limit=limit)
 
@@ -441,19 +447,24 @@ def test_task_graph_adjacency_is_additive_bounded_and_provenanced(
         encoding="utf-8",
     )
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         primary = codemap.find_task("test widget execute_widget", limit=1)
         adjacency = codemap.task_graph_adjacency(
             "test widget execute_widget", seed_limit=1, limit=3
         )
-    assert [row["path"] for row in adjacency["primary"]] == [
+    assert [row["path"] for row in assert_records(adjacency["primary"])] == [
         hit.path for hit in primary
     ]
-    assert adjacency["bounds"]["max_hops"] == 1
-    assert len(adjacency["adjacent"]) <= 3
+    assert assert_object(adjacency["bounds"])["max_hops"] == 1
+    assert len(assert_array(adjacency["adjacent"])) <= 3
     if adjacency["adjacent"]:
-        assert adjacency["adjacent"][0]["provenance"]
-        assert adjacency["adjacent"][0]["provenance"][0]["seed_rank"] == 1
+        assert assert_records(adjacency["adjacent"])[0]["provenance"]
+        assert (
+            assert_records(assert_records(adjacency["adjacent"])[0]["provenance"])[0][
+                "seed_rank"
+            ]
+            == 1
+        )
 
 
 def test_task_graph_adjacency_never_rewrites_canonical_find_task(
@@ -464,7 +475,7 @@ def test_task_graph_adjacency_never_rewrites_canonical_find_task(
     )
     (tmp_path / "b.py").write_text("def beta():\n    return 1\n", encoding="utf-8")
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.find_task("alpha", limit=5)
         codemap.task_graph_adjacency("alpha", seed_limit=5, limit=4)
         after = codemap.find_task("alpha", limit=5)
@@ -476,7 +487,7 @@ def test_task_graph_adjacency_validates_bounds(tmp_path: Path) -> None:
         "def service():\n    return 1\n", encoding="utf-8"
     )
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         import pytest
 
         with pytest.raises(ValueError):
@@ -501,19 +512,19 @@ def test_scoped_authority_resolves_root_nested_and_override_without_ranking_effe
     source = pkg / "service.py"
     source.write_text("def serve():\n    return 1\n", encoding="utf-8")
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = [hit.path for hit in codemap.find_task("serve service", limit=20)]
         value = codemap.repository_instruction_scope("backend/pkg/service.py")
         after = [hit.path for hit in codemap.find_task("serve service", limit=20)]
     assert value["scope_source"] == "explicit-path"
-    assert [row["path"] for row in value["authority"]] == [
+    assert [row["path"] for row in assert_records(value["authority"])] == [
         "AGENTS.md",
         "backend/AGENTS.md",
         "backend/pkg/AGENTS.md",
         "backend/pkg/AGENTS.override.md",
     ]
-    assert value["authority"][-1]["kind"] == "override"
-    assert value["authority"][-1]["specificity"] == 2
+    assert assert_records(value["authority"])[-1]["kind"] == "override"
+    assert assert_records(value["authority"])[-1]["specificity"] == 2
     assert before == after
     assert value["ranking_effect"] == "none"
 
@@ -528,9 +539,9 @@ def test_scoped_authority_does_not_treat_readme_as_authority(tmp_path: Path) -> 
     source = area / "service.py"
     source.write_text("def serve():\n    return 1\n", encoding="utf-8")
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         value = codemap.repository_instruction_scope("area/service.py")
-    assert [row["path"] for row in value["authority"]] == ["AGENTS.md"]
+    assert [row["path"] for row in assert_records(value["authority"])] == ["AGENTS.md"]
 
 
 def test_explain_task_retrieval_reports_rrf_provenance_without_changing_results(
@@ -545,19 +556,21 @@ def test_explain_task_retrieval_reports_rrf_provenance_without_changing_results(
         "from alpha import alpha_service\n", encoding="utf-8"
     )
     with CodeMap(root, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.find_task("alpha service test", limit=5)
         explained = codemap.explain_task_retrieval("alpha service test", limit=5)
         after = codemap.find_task("alpha service test", limit=5)
     assert [hit.path for hit in before] == [hit.path for hit in after]
     assert explained["schema"] == "hashmarks.task-retrieval-provenance.v1"
     assert explained["ranking_effect"] == "none"
-    assert [row["path"] for row in explained["selected"]] == [
+    assert [row["path"] for row in assert_records(explained["selected"])] == [
         hit.path for hit in before
     ]
-    assert explained["selected"][0]["discovered_by"]
+    assert assert_records(explained["selected"])[0]["discovered_by"]
     assert {
-        item["lane"] for row in explained["selected"] for item in row["discovered_by"]
+        item["lane"]
+        for row in assert_records(explained["selected"])
+        for item in assert_records(row["discovered_by"])
     } <= {"base", "governance", "evidence"}
 
 
@@ -576,7 +589,7 @@ def test_find_task_reuses_generation_bound_result_without_replaying_views(
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("def alpha():\n    return 1\n", encoding="utf-8")
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         calls = 0
         original_find = codemap._find_evidence
 
@@ -601,7 +614,7 @@ def test_find_task_cache_is_invalidated_by_codemap_generation(
     source.parent.mkdir(parents=True, exist_ok=True)
     source.write_text("def alpha():\n    return 1\n", encoding="utf-8")
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         calls = 0
         original_find = codemap._find_evidence
 
@@ -614,7 +627,7 @@ def test_find_task_cache_is_invalidated_by_codemap_generation(
         codemap.find_task("alpha implementation", limit=10)
         before = calls
         source.write_text("def alpha():\n    return 2\n", encoding="utf-8")
-        codemap.sync(["src/alpha.py"])
+        codemap.index.sync(["src/alpha.py"])
         codemap.find_task("alpha implementation", limit=10)
         assert calls > before
 
@@ -624,14 +637,16 @@ def test_task_context_plan_is_bounded_and_route_sensitive(tmp_path: Path) -> Non
         "class AuthService:\n    pass\n", encoding="utf-8"
     )
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         identifier = codemap.task_context_plan("AuthService")
         conceptual = codemap.task_context_plan(
             "review ownership authority architecture contract"
         )
-        assert 512 <= int(identifier["token_budget"]) <= 2400
-        assert 512 <= int(conceptual["token_budget"]) <= 2400
-        assert int(conceptual["token_budget"]) > int(identifier["token_budget"])
+        assert 512 <= int(assert_number(identifier["token_budget"])) <= 2400
+        assert 512 <= int(assert_number(conceptual["token_budget"])) <= 2400
+        assert int(assert_number(conceptual["token_budget"])) > int(
+            assert_number(identifier["token_budget"])
+        )
         assert identifier["ranking_effect"] == "none"
 
 
@@ -640,7 +655,7 @@ def test_task_context_explicit_budget_overrides_adaptive_plan(tmp_path: Path) ->
         "class AuthService:\n    pass\n", encoding="utf-8"
     )
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         pack = codemap.task_context(
             "AuthService", token_budget=600, disclosure="outline"
         )
@@ -661,7 +676,7 @@ def test_task_relationships_composes_typed_layers_without_changing_primary(
     )
     (src / "beta.py").write_text("def beta():\n    return 1\n", encoding="utf-8")
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = [hit.path for hit in codemap.find_task("alpha beta", limit=10)]
         value = codemap.task_relationships("alpha beta", seed_limit=10)
         after = [hit.path for hit in codemap.find_task("alpha beta", limit=10)]
@@ -670,9 +685,13 @@ def test_task_relationships_composes_typed_layers_without_changing_primary(
     assert value["schema"] == "hashmarks.task-relationships.v1"
     assert any(
         row["layer"] == "authority" and row["relation"] == "governs"
-        for row in value["relationships"]
+        for row in assert_records(value["relationships"])
     )
-    assert set(value["layer_counts"]) <= {"code-graph", "change-impact", "authority"}
+    assert set(assert_object(value["layer_counts"])) <= {
+        "code-graph",
+        "change-impact",
+        "authority",
+    }
 
 
 def test_task_relationships_validates_bounds(tmp_path: Path) -> None:
@@ -693,14 +712,14 @@ def test_retrieval_stability_replays_without_changing_canonical_result(
         "from alpha import alpha_service\n", encoding="utf-8"
     )
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.find_task("alpha service test", limit=10)
         value = codemap.retrieval_stability("alpha service test", limit=10, repeats=4)
         after = codemap.find_task("alpha service test", limit=10)
     assert value["schema"] == "hashmarks.retrieval-stability.v1"
     assert value["stable"] is True
     assert value["divergences"] == []
-    assert len(set(value["fingerprints"])) == 1
+    assert len(set(assert_array(value["fingerprints"]))) == 1
     assert value["ranking_effect"] == "none"
     assert before == after
 
@@ -726,7 +745,7 @@ def test_task_entry_points_projects_roles_without_changing_find_task(
         "package configuration historical notes\n", encoding="utf-8"
     )
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = [
             hit.path for hit in codemap.find_task("package configuration", limit=20)
         ]
@@ -738,8 +757,8 @@ def test_task_entry_points_projects_roles_without_changing_find_task(
     assert value["ranking_effect"] == "none"
     assert value["discovery_effect"] == "none"
     assert value["recommended"]
-    assert value["recommended"][0]["role"] == "config_build"
-    assert value["recommended"][0]["path"] == "package.json"
+    assert assert_records(value["recommended"])[0]["role"] == "config_build"
+    assert assert_records(value["recommended"])[0]["path"] == "package.json"
 
 
 def test_task_entry_points_prefers_scoped_authority_for_authority_task(
@@ -750,10 +769,10 @@ def test_task_entry_points_prefers_scoped_authority_for_authority_task(
         "def service():\n    return 1\n", encoding="utf-8"
     )
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         value = codemap.task_entry_points("service authority ownership", limit=20)
-    assert value["recommended"][0]["role"] == "authority"
-    assert value["recommended"][0]["path"] == "AGENTS.md"
+    assert assert_records(value["recommended"])[0]["role"] == "authority"
+    assert assert_records(value["recommended"])[0]["path"] == "AGENTS.md"
 
 
 def test_task_entry_points_reports_test_authority_ambiguity_without_ranking_change(
@@ -766,7 +785,7 @@ def test_task_entry_points_reports_test_authority_ambiguity_without_ranking_chan
         "def test_service():\n    assert True\n", encoding="utf-8"
     )
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = [
             hit.path
             for hit in codemap.find_task("service tests AGENTS authority", limit=20)
@@ -778,12 +797,18 @@ def test_task_entry_points_reports_test_authority_ambiguity_without_ranking_chan
         ]
     assert before == after
     assert value["schema"] == "hashmarks.task-entry-points.v4"
-    assert value["bounds"]["canonical_completeness"] == "complete"
-    assert value["ambiguity"]["completeness"] == "complete"
-    assert value["ambiguity"]["truncation"] == "complete"
-    assert value["ambiguity"]["ambiguous"] is True
-    assert set(value["ambiguity"]["explicit_roles"]) >= {"authority", "verification"}
-    assert {row["path"] for row in value["ambiguity"]["alternatives"]} >= {
+    assert assert_object(value["bounds"])["canonical_completeness"] == "complete"
+    assert assert_object(value["ambiguity"])["completeness"] == "complete"
+    assert assert_object(value["ambiguity"])["truncation"] == "complete"
+    assert assert_object(value["ambiguity"])["ambiguous"] is True
+    assert set(assert_array(assert_object(value["ambiguity"])["explicit_roles"])) >= {
+        "authority",
+        "verification",
+    }
+    assert {
+        row["path"]
+        for row in assert_records(assert_object(value["ambiguity"])["alternatives"])
+    } >= {
         "AGENTS.md",
         "tests/test_service.py",
     }
@@ -804,16 +829,19 @@ def test_task_entry_points_never_projects_test_source_as_implementation(
         encoding="utf-8",
     )
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         value = codemap.task_entry_points("submit_order implementation", limit=20)
-    assert value["roles"]["implementation"]
-    assert value["roles"]["implementation"][0]["path"] == "src/service.py"
+    assert assert_object(value["roles"])["implementation"]
+    assert (
+        assert_records(assert_object(value["roles"])["implementation"])[0]["path"]
+        == "src/service.py"
+    )
     assert all(
         not str(row["path"]).startswith("tests/")
-        for row in value["roles"]["implementation"]
+        for row in assert_records(assert_object(value["roles"])["implementation"])
     )
-    assert value["recommended"][0]["role"] == "implementation"
-    assert value["recommended"][0]["path"] == "src/service.py"
+    assert assert_records(value["recommended"])[0]["role"] == "implementation"
+    assert assert_records(value["recommended"])[0]["path"] == "src/service.py"
 
 
 def test_task_entry_points_prefers_stronger_same_role_symbol_evidence(
@@ -830,7 +858,7 @@ def test_task_entry_points_prefers_stronger_same_role_symbol_evidence(
         encoding="utf-8",
     )
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         canonical = [
             hit.path
             for hit in codemap.find_task("OrderStore save_order persistence", limit=20)
@@ -841,12 +869,20 @@ def test_task_entry_points_prefers_stronger_same_role_symbol_evidence(
             for hit in codemap.find_task("OrderStore save_order persistence", limit=20)
         ]
     assert canonical == after
-    assert value["roles"]["implementation"][0]["path"] == "src/storage.py"
     assert (
-        value["roles"]["implementation"][0]["role_symbol_specificity"]
-        > value["roles"]["implementation"][1]["role_symbol_specificity"]
+        assert_records(assert_object(value["roles"])["implementation"])[0]["path"]
+        == "src/storage.py"
     )
-    assert value["recommended"][0]["path"] == "src/storage.py"
+    assert assert_number(
+        assert_records(assert_object(value["roles"])["implementation"])[0][
+            "role_symbol_specificity"
+        ]
+    ) > assert_number(
+        assert_records(assert_object(value["roles"])["implementation"])[1][
+            "role_symbol_specificity"
+        ]
+    )
+    assert assert_records(value["recommended"])[0]["path"] == "src/storage.py"
 
 
 def test_task_entry_points_reports_vite_test_config_ambiguity(tmp_path: Path) -> None:
@@ -859,10 +895,13 @@ def test_task_entry_points_reports_vite_test_config_ambiguity(tmp_path: Path) ->
         "export function panelTest() { return true }\n", encoding="utf-8"
     )
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         value = codemap.task_entry_points("vite test environment", limit=20)
-    assert value["ambiguity"]["ambiguous"] is True
-    assert set(value["ambiguity"]["explicit_roles"]) >= {"config_build", "verification"}
+    assert assert_object(value["ambiguity"])["ambiguous"] is True
+    assert set(assert_array(assert_object(value["ambiguity"])["explicit_roles"])) >= {
+        "config_build",
+        "verification",
+    }
 
 
 def test_task_entry_points_distinctive_test_identifier_resolves_role_ambiguity(
@@ -877,22 +916,27 @@ def test_task_entry_points_distinctive_test_identifier_resolves_role_ambiguity(
         "def test_release_checksum_contract():\n    assert True\n", encoding="utf-8"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         value = codemap.task_entry_points(
             "test_release_checksum_contract checksum contract test", limit=20
         )
-    ambiguity = value["ambiguity"]
+    ambiguity = assert_object(value["ambiguity"])
     assert ambiguity["schema"] == "hashmarks.entry-point-ambiguity.v4"
     assert ambiguity["completeness"] == "complete"
     assert ambiguity["truncation"] == "complete"
-    assert set(ambiguity["explicit_roles"]) >= {"contract", "verification"}
+    assert set(assert_array(ambiguity["explicit_roles"])) >= {
+        "contract",
+        "verification",
+    }
     assert ambiguity["ambiguous"] is False
     assert ambiguity["reason"] == "resolved-by-distinctive-role-anchor"
-    assert ambiguity["resolution"]["role"] == "verification"
-    assert ambiguity["resolution"]["path"] == "tests/test_release_contract.py"
+    assert assert_object(ambiguity["resolution"])["role"] == "verification"
     assert (
-        "test_release_checksum_contract"
-        in ambiguity["resolution"]["task_anchor_tokens"]
+        assert_object(ambiguity["resolution"])["path"]
+        == "tests/test_release_contract.py"
+    )
+    assert "test_release_checksum_contract" in assert_array(
+        assert_object(ambiguity["resolution"])["task_anchor_tokens"]
     )
     assert ambiguity["secret_knowledge_used"] is False
 
@@ -909,11 +953,14 @@ def test_task_entry_points_generic_implementation_test_stays_ambiguous(
         "def widget(): return 1\n", encoding="utf-8"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         value = codemap.task_entry_points("widget implementation test", limit=20)
-    ambiguity = value["ambiguity"]
-    assert set(ambiguity["explicit_roles"]) >= {"implementation", "verification"}
+    ambiguity = assert_object(value["ambiguity"])
+    assert set(assert_array(ambiguity["explicit_roles"])) >= {
+        "implementation",
+        "verification",
+    }
     assert ambiguity["ambiguous"] is True
     assert ambiguity["reason"] == "multiple-explicit-role-cues"
-    assert ambiguity["resolution"]["status"] == "unresolved"
+    assert assert_object(ambiguity["resolution"])["status"] == "unresolved"
     assert ambiguity["discrimination_question"]

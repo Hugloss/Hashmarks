@@ -35,7 +35,7 @@ def _reference(
 ) -> dict[str, Any]:
     candidates = [
         row
-        for row in cast("list[dict[str, Any]]", codemap._session_symbols_for_path(path))
+        for row in cast("list[dict[str, Any]]", codemap.reads.symbols_for_path(path))
         if int(row["start_line"]) <= occurrence.line <= int(row["end_line"])
     ]
     candidates.sort(
@@ -126,11 +126,11 @@ def collect_scip_rows(
         except ValueError:
             rows.skipped += 1
             continue
-        member = codemap._session_file_row(path)
+        member = codemap.reads.file_row(path)
         if (
             member is None
             or member["evidence_visibility"] == "deny"
-            or codemap.policy.decide(path).evidence_visibility.value == "deny"
+            or codemap.files.decide(path).evidence_visibility.value == "deny"
         ):
             rows.skipped += 1
             continue

@@ -39,7 +39,7 @@ def test_unqualified_or_conflicting_method_receiver_is_not_direct_evidence(
 ) -> None:
     _repository(tmp_path, verifier)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         relevance = codemap.verification_relevance("Inspect Message.nack in alpha.py")
     candidate = next(
         row
@@ -66,7 +66,7 @@ def test_explicit_import_and_member_scope_qualify_the_static_reference(
 ) -> None:
     _repository(tmp_path, verifier)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         relevance = codemap.verification_relevance("Inspect Message.nack in alpha.py")
     candidate = next(
         row
@@ -89,7 +89,7 @@ def test_unknown_method_receivers_cannot_make_a_known_verifier_unique(
         "def test_unresolved(message):\n    message.nack()\n"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         relevance = codemap.verification_relevance("Inspect Message.nack in alpha.py")
     assert relevance.get("negative_evidence_admissible") is False
     assert relevance.get("qualified_identity_ambiguous") is True
@@ -119,7 +119,7 @@ def test_instance_method_spelling_does_not_reference_an_unrelated_module_functio
     (tmp_path / "tests").mkdir()
     (tmp_path / "tests/test_delivery.py").write_text(verifier)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         relevance = codemap._verification_relevance(
             "Inspect emit in alpha.py",
             edit={"path": "alpha.py", "name": "emit", "qualname": "emit"},
@@ -154,7 +154,7 @@ def test_explicit_module_function_reference_retains_its_authority(
         f"{binding}\ndef test_delivery():\n    {call}\n"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         relevance = codemap.verification_relevance("Inspect emit in alpha.py")
     candidate = next(
         row
@@ -179,7 +179,7 @@ def test_indirect_member_proof_cannot_strengthen_an_unused_direct_import(
         "def test_delivery():\n    beta.Other.emit()\n"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         relevance = codemap.verification_relevance("Inspect emit in alpha.py")
     candidate = next(
         row

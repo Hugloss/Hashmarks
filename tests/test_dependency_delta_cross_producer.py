@@ -81,7 +81,7 @@ def test_uv_and_maven_version_changes_share_dependency_delta_semantics(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         uv_b, uv_a, uv_delta = _delta(codemap, uv_before, uv_after)
         mvn_b, mvn_a, mvn_delta = _delta(codemap, maven_before, maven_after)
 
@@ -190,7 +190,7 @@ def test_uv_source_change_is_a_selection_change_without_component_change(
         )
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         _before, _after, delta = _delta(codemap, before_raw, after_raw)
 
     assert delta["comparability"] == "comparable"
@@ -224,7 +224,7 @@ def test_uv_marker_change_is_relationship_only_delta(tmp_path: Path) -> None:
         )
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         _before, _after, delta = _delta(codemap, before_raw, after_raw)
 
     assert delta["selections_added"] == []
@@ -249,7 +249,7 @@ def test_maven_classifier_change_is_selection_change_without_component_change(
         inventories={"compile": _maven_inventory_variant("1.0.0", classifier="tests")},
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         _before, _after, delta = _delta(codemap, before_raw, after_raw)
 
     assert delta["components_added"] == []
@@ -279,7 +279,7 @@ def test_maven_effective_scope_change_is_relationship_only_delta(
         inventories={"test": _maven_inventory_variant("1.0.0", scope="runtime")},
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         _before, _after, delta = _delta(codemap, before_raw, after_raw)
 
     assert delta["selections_added"] == []
@@ -310,7 +310,7 @@ def test_maven_context_membership_change_is_selection_and_inventory_delta(
         },
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.dependency_resolution_evidence(before_raw)
         after = codemap.dependency_resolution_evidence(after_raw)
         delta = codemap.dependency_resolution_delta(before, after)
@@ -381,7 +381,7 @@ def test_uv_and_maven_dependency_addition_share_delta_semantics(tmp_path: Path) 
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         _uv_b, _uv_a, uv_delta = _delta(codemap, uv_before, uv_after)
         _mv_b, _mv_a, maven_delta = _delta(codemap, maven_before, maven_after)
 
@@ -417,7 +417,7 @@ def test_uv_and_maven_dependency_removal_share_delta_semantics(tmp_path: Path) -
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         _uv_b, _uv_a, uv_delta = _delta(codemap, uv_before, uv_after)
         _mv_b, _mv_a, maven_delta = _delta(codemap, maven_before, maven_after)
 
@@ -471,7 +471,7 @@ source = { registry = "https://example.invalid/simple" }
     after_raw = uv_lock_dependency_observation(lock=after_lock)
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before, after, delta = _delta(codemap, before_raw, after_raw)
 
     shared_before = [
@@ -516,7 +516,7 @@ def test_maven_simultaneous_variants_preserve_independent_selection_delta(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before, after, delta = _delta(codemap, before_raw, after_raw)
 
     assert len(before["selections"]) == 2
@@ -555,7 +555,7 @@ def test_uv_repository_input_change_preserves_resolution_delta(
     )
     with CodeMap(tmp_path) as codemap:
         (tmp_path / "uv.lock").write_bytes(lock)
-        codemap.sync()
+        codemap.index.sync()
         before, after, delta = _delta(codemap, before_raw, after_raw)
 
     assert before["resolution_identity"] == after["resolution_identity"]
@@ -596,7 +596,7 @@ def test_maven_module_ownership_change_does_not_change_resolution_identity(
         },
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before, after, delta = _delta(codemap, before_raw, after_raw)
 
     assert before["resolution_identity"] == after["resolution_identity"]
@@ -636,7 +636,7 @@ def test_maven_same_module_owner_change_is_observation_delta_only(
         },
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before, after, delta = _delta(codemap, before_raw, after_raw)
 
     assert before["resolution_identity"] != after["resolution_identity"]

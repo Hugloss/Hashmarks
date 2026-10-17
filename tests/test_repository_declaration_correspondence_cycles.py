@@ -254,13 +254,13 @@ def _cycle_packets(
     )
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         cycle = codemap.discover_repository_declarations(
             [provider_a, provider_b, provider_c, ab, bc, ca]
         )
 
         (repo / "owner-c.txt").write_text("owner: team-b\n", encoding="utf-8")
-        codemap.sync(["owner-c.txt"])
+        codemap.index.sync(["owner-c.txt"])
         changed = codemap.discover_repository_declarations(
             [provider_a, provider_b, provider_c, ab, bc, ca],
             previous_observation=cycle,

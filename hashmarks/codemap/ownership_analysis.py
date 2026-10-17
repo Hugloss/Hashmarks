@@ -8,7 +8,7 @@ from hashmarks.operation_contract import operation_response, operation_schema
 from hashmarks.paths import normalize_relative_path
 from hashmarks.python_ast_cache import read_python_ast
 
-from .decision_session import decision_scoped
+from .decision_session import ReadScopeOwner, decision_scoped
 from .ownership.cache_invalidation import CacheInvalidationAnalyzer
 from .ownership.cache_ownership import CacheOwnershipAnalyzer
 from .ownership.concurrency_risk import ConcurrencyRiskAnalyzer
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from .engine import CodeMap
 
 
-class OwnershipAnalysisMixin:
+class OwnershipAnalysisMixin(ReadScopeOwner):
     def _ownership_analysis_inputs(
         self, paths: Sequence[str] | None
     ) -> tuple[tuple[str, ...] | None, list[dict[str, object]]]:
@@ -41,9 +41,9 @@ class OwnershipAnalysisMixin:
             current: list[str] = []
             for raw in paths:
                 rel = normalize_relative_path(raw, allow_root=False)
-                if not self._path_admitted_for_analysis(rel):
+                if not self.files.is_admitted(rel):
                     continue
-                self._ensure_path_current(rel)
+                self.source.ensure_current(rel)
                 current.append(rel)
             normalized = tuple(current)
 
@@ -56,7 +56,7 @@ class OwnershipAnalysisMixin:
     ) -> dict[str, object]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        self._ensure_map_ready()
+        self.reads.ready()
         normalized, all_rows = self._ownership_analysis_inputs(paths)
         result = ImportOwnershipAnalyzer().analyze(self, normalized, all_rows)
         return cast(dict[str, object], result)
@@ -150,7 +150,7 @@ class OwnershipAnalysisMixin:
         """
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        self._ensure_map_ready()
+        self.reads.ready()
         normalized, all_rows = self._ownership_analysis_inputs(paths)
         import_result = ImportOwnershipAnalyzer().analyze(self, normalized, all_rows)
         repository_import_result = (
@@ -197,7 +197,7 @@ class OwnershipAnalysisMixin:
         for finding in findings:
             category = str(finding["category"])
             categories[category] = categories.get(category, 0) + 1
-        generation, identity_generation, stale = self._generation_status()
+        generation, identity_generation, stale = self.reads.generation_status()
         return {
             "schema": operation_schema("repository_findings"),
             "generation": generation,
@@ -233,7 +233,7 @@ class OwnershipAnalysisMixin:
     ) -> dict[str, object]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        self._ensure_map_ready()
+        self.reads.ready()
         normalized, all_rows = self._ownership_analysis_inputs(paths)
         result = ConcurrencyRiskAnalyzer().analyze(self, normalized, all_rows)
         return cast(dict[str, object], result)
@@ -530,7 +530,7 @@ class OwnershipAnalysisMixin:
         """Compose repository ownership evidence without inventing runtime authority."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        self._ensure_map_ready()
+        self.reads.ready()
         import_result, cache_result, invalidation_result, concurrency_result = (
             self._ownership_graph_sources(paths)
         )
@@ -548,7 +548,7 @@ class OwnershipAnalysisMixin:
             nodes, edges, concurrency_result["findings"]
         )
         ambiguous = sorted(cache_ids - resolved)
-        generation, identity_generation, stale = self._generation_status()
+        generation, identity_generation, stale = self.reads.generation_status()
         return {
             "schema": operation_schema("repository_ownership"),
             "generation": generation,
@@ -584,7 +584,7 @@ class OwnershipAnalysisMixin:
         """Resolve repository-visible cache invalidators to exact cache owners."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        self._ensure_map_ready()
+        self.reads.ready()
         normalized, all_rows = self._ownership_analysis_inputs(paths)
         import_result = ImportOwnershipAnalyzer().analyze(self, None, all_rows)
         repository_cache_result = CacheOwnershipAnalyzer().analyze(
@@ -602,7 +602,7 @@ class OwnershipAnalysisMixin:
     ) -> dict[str, object]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        self._ensure_map_ready()
+        self.reads.ready()
         normalized, all_rows = self._ownership_analysis_inputs(paths)
         import_result = ImportOwnershipAnalyzer().analyze(self, None, all_rows)
         result = CacheOwnershipAnalyzer().analyze(

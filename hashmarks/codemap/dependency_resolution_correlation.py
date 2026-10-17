@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, cast
 from . import dependency_resolution_contract as _contract
 from .dependency_resolution_contract import normalized_text as _text
 from .dependency_resolution_contract import object_rows as _objects
+from .repository_observation import packet_digest
 
 if TYPE_CHECKING:
     from .engine import CodeMap
@@ -106,7 +107,9 @@ class DependencyResolutionCorrelationMixin:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         self._require_current_dependency_observation_v3(observation)
-        candidates = self._python_import_module_candidates(source_path, import_target)
+        candidates = self._imports._python_import_module_candidates(
+            source_path, import_target
+        )
         ownership = cast(
             "Sequence[Mapping[str, object]]", observation["module_ownership"]
         )
@@ -118,7 +121,9 @@ class DependencyResolutionCorrelationMixin:
             "import_target": import_target,
             **({"context": context} if context is not None else {}),
             "import_claim_authority": "caller-claimed",
-            "repository_paths": self._resolve_import_paths(source_path, import_target),
+            "repository_paths": self._imports._resolve_import_paths(
+                source_path, import_target
+            ),
             "matched_modules": [
                 {
                     "context": row["context"],
@@ -215,9 +220,7 @@ class DependencyResolutionCorrelationMixin:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         definition, anchors = self._dependency_correlation_row_definition(raw)
-        digest = self._packet_digest(
-            "hashmarks.dependency-correlation-bundle.v2", definition
-        )
+        digest = packet_digest("hashmarks.dependency-correlation-bundle.v2", definition)
         ordinal = occurrences.get(digest, 0)
         occurrences[digest] = ordinal + 1
         bundle_id = f"dependency-correlation:{digest}:{ordinal}"

@@ -51,7 +51,7 @@ def test_directory_spelling_does_not_decide_owner_authority(
         root.mkdir()
         _owner_corpus(root, name)
         with CodeMap(root) as codemap:
-            codemap.sync()
+            codemap.index.sync()
             assert {"src/owner.py", f"{name}/owner.py"} <= set(codemap.store.paths())
             vague = codemap.task_action_map("Fix handle_orbit behavior", limit=20)
             explicit = codemap.task_action_map(
@@ -87,7 +87,7 @@ def test_project_names_have_no_generic_query_expansion(
         _write(root, f"app/{name}.py", f"def {name}_handler(): return 1\n")
         _write(root, "README.md", f"{name} handler reference\n")
         with CodeMap(root) as codemap:
-            codemap.sync()
+            codemap.index.sync()
             task = f"Fix {name} handler"
             views.append(codemap.task_query_views(task))
             paths.append(tuple(hit.path for hit in codemap.find_task(task, limit=5)))
@@ -126,7 +126,7 @@ def test_qualified_reexport_outweighs_unrelated_duplicate(
         "def test_other(): assert handle_orbit() == 'other'\n",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map("Fix src.case.handle_orbit", limit=20)
     assert action["edit"]["path"] == "src/case/engine.py"
     assert action["owner_basis"] == "exact-import-owner"
@@ -140,7 +140,7 @@ def test_newly_admitted_directory_is_discovered_on_reopen_and_bounded_sync(
     _write(tmp_path, ".fastidentity/source.py", "def newly_visible(): return 2\n")
     state_dir = tmp_path / ".state"
     with CodeMap(tmp_path, state_dir=state_dir) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         codemap.store.delete_paths([".fastidentity/source.py"])
         codemap.store.set_meta("analysis_scope_conformance_identity", "old-scope")
     with CodeMap(tmp_path, state_dir=state_dir) as codemap:
@@ -149,7 +149,7 @@ def test_newly_admitted_directory_is_discovered_on_reopen_and_bounded_sync(
         }
         codemap.store.delete_paths([".fastidentity/source.py"])
         codemap.store.set_meta("analysis_scope_conformance_identity", "old-scope")
-        codemap.sync(["ordinary.py"])
+        codemap.index.sync(["ordinary.py"])
         assert ".fastidentity/source.py" in codemap.store.paths()
 
 
@@ -158,7 +158,7 @@ def test_configured_fastidentity_state_is_excluded_from_codemap(
 ) -> None:
     _write(tmp_path, "src/owner.py", "def visible_owner(): return 1\n")
     with CodeMap(tmp_path, state_dir=tmp_path / ".fastidentity") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         assert "src/owner.py" in codemap.store.paths()
         assert not any(
             path.startswith(".fastidentity/") for path in codemap.store.paths()
@@ -229,12 +229,12 @@ def test_project_provider_name_does_not_decide_generation_freshness(
     provider = _SemanticProjectProvider(provider_name, bind_generation=bind_generation)
     with CodeMap(tmp_path) as codemap:
         codemap.project_graph_providers = (provider,)
-        codemap.sync()
+        codemap.index.sync()
         codemap.enrich_projects((provider_name,))
         assert codemap._evidence_fresh("project", provider_name) == (True, None)
 
         _write(tmp_path, "source.py", "VALUE = 2\n")
-        codemap.sync(["source.py"])
+        codemap.index.sync(["source.py"])
         fresh, reason = codemap._evidence_fresh("project", provider_name)
 
     assert fresh is expected_fresh
@@ -270,7 +270,7 @@ def test_declared_project_capabilities_survive_provider_rename(
             and candidate.topology_manifest == ".hashmarks-project-links.toml"
         )
         provider.name = provider_name
-        codemap.sync()
+        codemap.index.sync()
         codemap.enrich_projects(("npm-package-graph", provider_name))
 
         _write(tmp_path, "contract.json", '{"v":2}\n')

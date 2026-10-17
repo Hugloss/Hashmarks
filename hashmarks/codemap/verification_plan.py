@@ -189,7 +189,7 @@ class VerificationPlanMixin:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         rel = normalize_relative_path(path, allow_root=False)
-        if not self._path_admitted_for_analysis(rel):
+        if not self.files.is_admitted(rel):
             return {
                 "schema": "hashmarks.verification-plan.v1",
                 "path": rel,

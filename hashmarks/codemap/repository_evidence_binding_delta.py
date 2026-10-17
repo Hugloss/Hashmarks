@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, cast
 
 from hashmarks.operation_contract import operation_schema
 
+from .repository_observation import packet_digest
+
 if TYPE_CHECKING:
     from .engine import CodeMap
 
@@ -462,7 +464,7 @@ class RepositoryEvidenceBindingDeltaMixin:
                 else None
             ),
         }
-        return "sha256:" + self._packet_digest(
+        return "sha256:" + packet_digest(
             "hashmarks.repository-evidence-binding-definition.v1",
             definition_payload,
         )
@@ -477,7 +479,7 @@ class RepositoryEvidenceBindingDeltaMixin:
             key: row.get(key)
             for key in ("binding_id", "evidence", "dependencies", "relationships")
         }
-        expected_observation_identity = "sha256:" + self._packet_digest(
+        expected_observation_identity = "sha256:" + packet_digest(
             "hashmarks.repository-evidence-binding-observation.v1",
             binding_payload,
         )
@@ -498,7 +500,7 @@ class RepositoryEvidenceBindingDeltaMixin:
         ):
             raise ValueError(f"{name} must be a repository evidence bindings packet")
         identity = packet.get("bindings_identity")
-        expected_identity = "sha256:" + self._packet_digest(
+        expected_identity = "sha256:" + packet_digest(
             operation_schema("repository_evidence", "observation"),
             {key: value for key, value in packet.items() if key != "bindings_identity"},
         )
@@ -547,7 +549,7 @@ class RepositoryEvidenceBindingDeltaMixin:
         if (
             not before_repository
             or before_repository != after_repository
-            or before_repository != self._repository_packet_identity()
+            or before_repository != self.reads.repository_identity()
         ):
             raise ValueError("repository evidence bindings repository-mismatch")
         before_observer = self._observer_identity(before)
@@ -594,7 +596,7 @@ class RepositoryEvidenceBindingDeltaMixin:
             "authority": "repository-intelligence-only",
             "execution_effect": "none",
         }
-        payload["delta_identity"] = "sha256:" + self._packet_digest(
+        payload["delta_identity"] = "sha256:" + packet_digest(
             REPOSITORY_BINDING_DELTA_SCHEMA, payload
         )
         return payload

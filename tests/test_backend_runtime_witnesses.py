@@ -65,7 +65,7 @@ def runtime_specimen(tmp_path: Path) -> RuntimeSpecimen:
     )
     frame = assert_object(assert_array(capture["frames"])[0])
     with CodeMap(source, state_dir=tmp_path / "index") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.correlate_evidence(
             [
                 {

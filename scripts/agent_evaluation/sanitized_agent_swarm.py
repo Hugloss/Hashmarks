@@ -93,7 +93,7 @@ def run(
     started = time.perf_counter()
     with CodeMap(repo) as codemap:
         sync_started = time.perf_counter()
-        codemap.sync()
+        codemap.index.sync()
         sync_ms = (time.perf_counter() - sync_started) * 1000.0
         frozen: list[dict[str, Any]] = []
         with ThreadPoolExecutor(max_workers=workers) as pool:

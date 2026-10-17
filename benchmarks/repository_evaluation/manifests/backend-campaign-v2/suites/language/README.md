@@ -39,6 +39,14 @@ cancellation, batch nack, logging-token reset and aggregate-string compilation.
 Their original workflow checks and source/native nominations remain intact;
 capability-19 semantic review is separate from those earlier capability roles.
 
+All twelve workflows now have explicit native fact oracles. Four Python entries
+previously had source/native binding checks without executable per-target fact
+witnesses. Their eight before/after native targets now have exact independently
+source-frozen path, declaration token/line and current-member binding checks,
+plus a no-negative-evidence authority check. Native nominations, tasks, corpus
+membership and review flags are unchanged. This strengthens capture qualification;
+it does not complete language-parity review or qualify capability 18.
+
 Reserve these three additional problems for final heldout use. Their source
 bodies and expected regression assertions were not inspected during intake:
 

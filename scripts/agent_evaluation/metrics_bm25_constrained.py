@@ -102,7 +102,7 @@ def collect(root: Path, limit: int = 20) -> dict[str, object]:
         public = json.load(open(pub))["tasks"]
         rows = []
         with CodeMap(ws) as cm:
-            cm.sync()
+            cm.index.sync()
             idx = FieldedBM25Index.build(cm)
             for task, secret in zip(public, hidden, strict=False):
                 rows.append(_task_report(cm, idx, task, secret, limit=limit))

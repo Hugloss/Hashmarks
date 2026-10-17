@@ -97,7 +97,7 @@ def test_ninth_source_start_changes_observed_structural_ambiguity(
 ) -> None:
     task, hits = _fixture(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         monkeypatch.setattr(
             codemap, "find_task", lambda _task, *, limit=20: hits[:limit]
         )
@@ -131,7 +131,7 @@ def test_unselected_graph_bound_and_stale_competitor_remain_visible(
 ) -> None:
     task, hits = _fixture(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         monkeypatch.setattr(
             codemap, "find_task", lambda _task, *, limit=20: hits[:limit]
         )
@@ -155,7 +155,7 @@ def test_unselected_graph_bound_and_stale_competitor_remain_visible(
             "ownership_relation_graph",
             _graph,
         )
-        codemap.sync(["src/route_09.py"])
+        codemap.index.sync(["src/route_09.py"])
         before = codemap.task_action_map(task, limit=9)
         assert before["structural_starts"]["observed_owners"] == [
             "src/owner_a.py",

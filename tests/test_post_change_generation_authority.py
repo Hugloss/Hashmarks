@@ -27,15 +27,15 @@ def _install_competing_writer(
     other: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    original_sync = reader.sync
+    original_sync = reader.index.sync
 
     def racing_sync(paths: list[str] | None = None) -> None:
         result = original_sync(paths)
         other.write_text("def other(): return 'new'\n", encoding="utf-8")
-        writer.sync(["src/other.py"])
+        writer.index.sync(["src/other.py"])
         return result
 
-    monkeypatch.setattr(reader, "sync", racing_sync)
+    monkeypatch.setattr(reader.index, "sync", racing_sync)
 
 
 @pytest.mark.parametrize(
@@ -59,7 +59,7 @@ def test_post_sync_composition_rejects_competing_generation(
         CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as reader,
         CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as writer,
     ):
-        reader.sync()
+        reader.index.sync()
         source.write_text("def widget(): return 'new'\n", encoding="utf-8")
         _install_competing_writer(reader, writer, other, monkeypatch)
 
@@ -82,7 +82,7 @@ def test_post_change_delta_rejects_competing_generation_after_sync(
         CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as reader,
         CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as writer,
     ):
-        reader.sync()
+        reader.index.sync()
         previous = reader.task_evidence(task)
         source.write_text("def widget(): return 'new'\n", encoding="utf-8")
         _install_competing_writer(reader, writer, other, monkeypatch)
@@ -131,9 +131,9 @@ def test_declared_freshness_rebind_rejects_competing_generation(
         CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as reader,
         CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as writer,
     ):
-        reader.sync()
+        reader.index.sync()
         reader.enrich_projects(("npm-package-graph", "declared-project-links"))
-        original_sync = reader.sync
+        original_sync = reader.index.sync
 
         def racing_sync(paths: list[str] | None = None) -> None:
             result = original_sync(paths)
@@ -141,10 +141,10 @@ def test_declared_freshness_rebind_rejects_competing_generation(
                 "def other(): return 'new'\n",
                 encoding="utf-8",
             )
-            writer.sync(["src/other.py"])
+            writer.index.sync(["src/other.py"])
             return result
 
-        monkeypatch.setattr(reader, "sync", racing_sync)
+        monkeypatch.setattr(reader.index, "sync", racing_sync)
         (tmp_path / "contract.json").write_text('{"v":2}\n', encoding="utf-8")
 
         with pytest.raises(
@@ -162,13 +162,13 @@ def test_project_enrichment_rejects_stale_expected_generation(tmp_path: Path) ->
         CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as reader,
         CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as writer,
     ):
-        reader.sync()
+        reader.index.sync()
         expected_generation = reader.store.generation()
         (tmp_path / "src" / "other.py").write_text(
             "def other(): return 'new'\n",
             encoding="utf-8",
         )
-        writer.sync(["src/other.py"])
+        writer.index.sync(["src/other.py"])
 
         with pytest.raises(
             RuntimeError,

@@ -31,7 +31,7 @@ def test_diagnostic_words_retrieve_their_enclosing_callable(tmp_path: Path) -> N
     _repository(tmp_path)
     task = "A reserved attribute causes a warning during instance construction."
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map(task)
         packets = [
             codemap.task_evidence(task),
@@ -60,7 +60,7 @@ def test_lexical_disclosure_requires_current_source_visibility(
         )
     task = "A reserved attribute causes a warning during instance construction."
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         if invalidity == "changed":
             source.write_text("def replacement(): return None\n")
         elif invalidity == "deleted":
@@ -89,7 +89,7 @@ def test_lexical_lookup_uses_closest_callable_and_ignores_signature_only_matches
         "    attribute = True\n"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         rows = codemap.store.lexical_declaration_candidates(
             [("reserved", "attribute")], ["reserved", "attribute"]
         )
@@ -109,7 +109,7 @@ def test_denied_declarations_cannot_exhaust_the_lookup_bound(tmp_path: Path) -> 
         '[[rule]]\npattern = "a_hidden.py"\nvisibility = "deny"\n'
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         rows = codemap.store.lexical_declaration_candidates(
             [("reserved", "attribute")], ["reserved", "attribute"], limit=1
         )
@@ -122,7 +122,7 @@ def test_lexical_hint_keeps_literal_precedence_and_survives_every_format(
     _repository(tmp_path)
     task = "A reserved attribute causes a warning during instance construction."
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         for mode in ("default", "initial"):
             packet = codemap.task_evidence(task, result_mode=mode)
             for format in FORMATS:
@@ -147,7 +147,7 @@ def test_lexical_query_rejects_unbounded_or_noninteger_limits(
 ) -> None:
     _repository(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(ValueError, match="limit"):
             codemap.store.lexical_declaration_candidates(
                 [("reserved", "attribute")], ["reserved", "attribute"], limit=limit

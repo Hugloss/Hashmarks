@@ -18,7 +18,7 @@ from hashmarks.codemap.static_python_interface_declarations import (
 
 def _observe(repo: Path, *, paths: tuple[str, ...] = ("service.py",)) -> dict:
     with CodeMap(repo) as cm:
-        cm.sync()
+        cm.index.sync()
         return cm.discover_repository_declarations(
             [StaticPythonInterfaceDeclarations(paths=paths)]
         )
@@ -127,13 +127,13 @@ def test_replay_is_deterministic_and_source_mutation_changes_observation(
     source = tmp_path / "service.py"
     source.write_text('@app.get("/v1")\ndef handler():\n    pass\n')
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         provider = StaticPythonInterfaceDeclarations(paths=("service.py",))
         original = cm.discover_repository_declarations([provider])
         replay = cm.discover_repository_declarations([provider])
         assert original["observation_identity"] == replay["observation_identity"]
         source.write_text('@app.get("/v2")\ndef handler():\n    pass\n')
-        cm.sync(["service.py"])
+        cm.index.sync(["service.py"])
         newer: Any = cm.discover_repository_declarations(
             [provider], previous_observation=original
         )
@@ -203,7 +203,7 @@ def test_multifile_interfaces_edit_rename_delete_and_reopen_without_replay(
     )
     provider = StaticPythonInterfaceDeclarations(paths=("api.py", "tools.py"))
     with CodeMap(root, state_dir=state) as cm:
-        cm.sync()
+        cm.index.sync()
         before: Any = cm.discover_repository_declarations([provider])
         assert len(_interface_values(before)) == 3
         assert {row["literal_argument"] for row in _interface_values(before)} == {
@@ -226,7 +226,7 @@ def test_multifile_interfaces_edit_rename_delete_and_reopen_without_replay(
             RepositoryDeclarationProviderError, match="input changed while reading"
         ):
             cm.discover_repository_declarations([provider], previous_observation=before)
-        cm.sync(["api.py"])
+        cm.index.sync(["api.py"])
         changed: Any = cm.discover_repository_declarations(
             [provider], previous_observation=before
         )
@@ -237,7 +237,7 @@ def test_multifile_interfaces_edit_rename_delete_and_reopen_without_replay(
         }
         assert changed["delta_from_previous"]["declarations"]["changed_groups"]
         api.rename(root / "routes.py")
-        cm.sync(["api.py", "routes.py"])
+        cm.index.sync(["api.py", "routes.py"])
         renamed: Any = cm.discover_repository_declarations(
             [
                 StaticPythonInterfaceDeclarations(
@@ -260,7 +260,7 @@ def test_multifile_interfaces_edit_rename_delete_and_reopen_without_replay(
         ]
         assert _interface_values(cm.discover_repository_declarations([])) == []
         (root / "tools.py").unlink()
-        cm.sync(["tools.py"])
+        cm.index.sync(["tools.py"])
         deleted: Any = cm.discover_repository_declarations(
             [provider], previous_observation=tools
         )
@@ -321,7 +321,7 @@ def test_interface_input_bounds_and_invalid_syntax_fail_without_publishing(
     }[boundary]
     (tmp_path / "service.py").write_text(source)
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         with pytest.raises(RepositoryDeclarationProviderError):
             cm.discover_repository_declarations(
                 [StaticPythonInterfaceDeclarations(paths=("service.py",))]

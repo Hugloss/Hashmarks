@@ -27,8 +27,8 @@ def test_aliased_package_init_reexport_resolves_underlying_owner(
     _write(tmp_path, "tests/test_a.py", "from pkg import Public\n")
 
     with _codemap(tmp_path) as codemap:
-        codemap.sync()
-        owners, ambiguous = codemap._resolve_import_owner_evidence(
+        codemap.index.sync()
+        owners, ambiguous = codemap._imports._resolve_import_owner_evidence(
             "tests/test_a.py", "pkg.Public"
         )
 
@@ -43,8 +43,8 @@ def test_chained_reexport_resolves_leaf_owner(tmp_path: Path) -> None:
     _write(tmp_path, "tests/test_a.py", "from pkg import Public\n")
 
     with _codemap(tmp_path) as codemap:
-        codemap.sync()
-        owners, ambiguous = codemap._resolve_import_owner_evidence(
+        codemap.index.sync()
+        owners, ambiguous = codemap._imports._resolve_import_owner_evidence(
             "tests/test_a.py", "pkg.Public"
         )
 
@@ -57,8 +57,8 @@ def test_namespace_package_import_keeps_exact_module_identity(tmp_path: Path) ->
     _write(tmp_path, "tests/test_a.py", "from ns.pkg.impl import Public\n")
 
     with _codemap(tmp_path) as codemap:
-        codemap.sync()
-        owners, ambiguous = codemap._resolve_import_owner_evidence(
+        codemap.index.sync()
+        owners, ambiguous = codemap._imports._resolve_import_owner_evidence(
             "tests/test_a.py", "ns.pkg.impl.Public"
         )
 
@@ -72,9 +72,11 @@ def test_relative_and_absolute_import_forms_resolve_identically(tmp_path: Path) 
     _write(tmp_path, "pkg/use.py", "from .impl import Public\n")
 
     with _codemap(tmp_path) as codemap:
-        codemap.sync()
-        relative = codemap._resolve_import_paths("pkg/use.py", ".impl.Public")
-        absolute = codemap._resolve_import_paths("pkg/use.py", "pkg.impl.Public")
+        codemap.index.sync()
+        relative = codemap._imports._resolve_import_paths("pkg/use.py", ".impl.Public")
+        absolute = codemap._imports._resolve_import_paths(
+            "pkg/use.py", "pkg.impl.Public"
+        )
 
     assert relative == ["pkg/impl.py"]
     assert absolute == relative
@@ -91,8 +93,8 @@ def test_multiple_reexport_leaves_fail_closed(tmp_path: Path) -> None:
     _write(tmp_path, "tests/test_a.py", "from pkg import Public\n")
 
     with _codemap(tmp_path) as codemap:
-        codemap.sync()
-        owners, ambiguous = codemap._resolve_import_owner_evidence(
+        codemap.index.sync()
+        owners, ambiguous = codemap._imports._resolve_import_owner_evidence(
             "tests/test_a.py", "pkg.Public"
         )
 

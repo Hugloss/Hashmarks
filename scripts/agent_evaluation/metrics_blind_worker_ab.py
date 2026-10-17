@@ -228,7 +228,7 @@ def run_worker(
     codemap = None
     if strategy in {"hashmarks", "entry-points", "ambiguity-reviewer"}:
         codemap = CodeMap(workspace)
-        codemap.sync()
+        codemap.index.sync()
     try:
         # Workers are intentionally unable to consume expected_* fields.
         for row in tasks:

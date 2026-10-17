@@ -48,7 +48,7 @@ def _provider(*, projected: bool) -> StaticPythonInterfaceDeclarations:
 
 def _observe(root: Path, *, projected: bool) -> dict:
     with CodeMap(root) as cm:
-        cm.sync()
+        cm.index.sync()
         return cm.discover_repository_declarations([_provider(projected=projected)])
 
 
@@ -175,7 +175,7 @@ def test_c08_explicit_opt_in_preserves_prior_pair_packet_and_identity(
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         prior = cm.discover_repository_declarations(
             [
                 StaticPythonInterfaceDeclarations(
@@ -234,7 +234,7 @@ def test_c08_named_receiver_scope_and_missing_candidate_are_unknown(
 def test_c08_mutation_rebinds_literal_sites_on_new_revision(tmp_path: Path) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         original = cm.discover_repository_declarations([_provider(projected=True)])
         source = tmp_path / "client.py"
         source.write_text(
@@ -243,7 +243,7 @@ def test_c08_mutation_rebinds_literal_sites_on_new_revision(tmp_path: Path) -> N
             ),
             encoding="utf-8",
         )
-        cm.sync(["client.py"])
+        cm.index.sync(["client.py"])
         changed = cm.discover_repository_declarations(
             [_provider(projected=True)],
             previous_observation=original,

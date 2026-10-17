@@ -714,6 +714,57 @@ class WorkspaceMapQueryMixin:
             result.append(value)
         return result
 
+    def declaration_context_candidates(
+        self,
+        groups: Sequence[Sequence[str]],
+        paths: Sequence[str],
+        *,
+        limit: int = 32,
+    ) -> list[dict[str, object]]:
+        """Find bounded callable hints whose declared context adds query terms.
+
+        Substring prefixes are a coarse SQL prefilter only. The retrieval owner
+        qualifies identifier parts before using a row; this is not resolution or
+        an exhaustive declaration/absence observation.
+        """
+        if TYPE_CHECKING:
+            self = cast("WorkspaceMapStore", self)
+        if type(limit) is not int or not 1 <= limit <= 32:
+            raise ValueError("declaration context limit must be between 1 and 32")
+        if len(groups) > 32 or any(len(group) > 32 for group in groups):
+            raise ValueError("declaration context requires bounded query groups")
+        if len(paths) > 64:
+            raise ValueError("declaration context requires at most 64 paths")
+        if not groups or not paths:
+            return []
+        prefixes = [
+            sorted({term.lower()[:5] for term in group if term}) for group in groups
+        ]
+        self._count_read("declaration_context_candidates")
+        with self._lock:
+            rows = self._db.execute(
+                """WITH query_terms AS (
+                    SELECT g.key group_index,t.value token
+                    FROM json_each(?) g,json_each(g.value) t
+                )
+                SELECT s.*,f.evidence_visibility,
+                    COUNT(DISTINCT q.group_index) context_matches,
+                    COUNT(DISTINCT CASE WHEN instr(lower(s.name),q.token)>0
+                        THEN q.group_index END) own_matches
+                FROM symbol s JOIN file_map f ON f.path=s.path
+                JOIN query_terms q ON instr(
+                    lower(s.qualname || ' ' || s.signature),q.token)>0
+                WHERE s.path IN (SELECT value FROM json_each(?))
+                    AND s.kind IN ('function','method')
+                    AND f.evidence_visibility IN ('source','outline')
+                GROUP BY s.path,s.qualname,s.start_line,s.end_line
+                HAVING context_matches>=2 AND context_matches>own_matches
+                ORDER BY context_matches DESC,s.path,s.start_line,s.qualname
+                LIMIT ?""",
+                (json.dumps(prefixes), json.dumps(list(paths)), limit),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def lexical_candidates(self, tokens: list[str], limit: int = 500) -> list[dict]:
         if TYPE_CHECKING:
             self = cast("WorkspaceMapStore", self)

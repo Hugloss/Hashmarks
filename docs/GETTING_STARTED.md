@@ -117,7 +117,7 @@ from pathlib import Path
 from hashmarks import CodeMap
 
 with CodeMap(Path(".")) as codemap:
-    codemap.sync()
+    codemap.index.sync()
     capsule = codemap.orient()
     hits = codemap.find_task("where is cache invalidation owned?", limit=10)
 

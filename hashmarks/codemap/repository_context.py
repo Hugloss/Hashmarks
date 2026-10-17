@@ -8,7 +8,7 @@ from hashmarks.operation_contract import operation_schema, validate_operation_re
 from hashmarks.paths import normalize_relative_path
 
 from .context_defaults import REPOSITORY_CONTEXT_DEFAULTS
-from .decision_session import decision_scoped
+from .decision_session import ReadScopeOwner, decision_scoped
 from .model import (
     ContextDisclosure,
     ContextItem,
@@ -43,14 +43,14 @@ class _ContextItemState:
     item_index: dict[tuple[str, str | None], int]
 
 
-class ContextPlanningMixin:
+class ContextPlanningMixin(ReadScopeOwner):
     def _resolve_edge(self, edge: dict) -> dict:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         value = dict(edge)
         target = str(value.get("target", ""))
         resolved_paths = (
-            self._resolve_import_paths(str(value.get("path", "")), target)
+            self._imports._resolve_import_paths(str(value.get("path", "")), target)
             if value.get("kind") == "import"
             else []
         )
@@ -73,7 +73,7 @@ class ContextPlanningMixin:
     def deps(self, query: str) -> dict[str, object]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        self._ensure_map_ready()
+        self.reads.ready()
         matches = self.store.symbol(query)
         if matches:
             visible_matches = [
@@ -82,7 +82,7 @@ class ContextPlanningMixin:
                 if EvidenceVisibility(str(match["evidence_visibility"]))
                 is not EvidenceVisibility.DENY
             ]
-            edge_map = self._session_edges_from_many(
+            edge_map = self.reads.edges_from_many(
                 [
                     (str(match["path"]), str(match["qualname"]))
                     for match in visible_matches
@@ -106,7 +106,7 @@ class ContextPlanningMixin:
             return {
                 "schema": "hashmarks.deps.v1",
                 "query": query,
-                **self._query_freshness_fields(),
+                **self.reads.freshness_fields(),
                 "edges": [self._resolve_edge(row) for row in rows],
                 "native_edges": native_rows,
                 "native_file_edges": [
@@ -116,11 +116,11 @@ class ContextPlanningMixin:
                 ],
             }
         rel = normalize_relative_path(query, allow_root=False)
-        self._ensure_path_current(rel)
+        self.source.ensure_current(rel)
         return {
             "schema": "hashmarks.deps.v1",
             "query": query,
-            **self._query_freshness_fields(),
+            **self.reads.freshness_fields(),
             "edges": [self._resolve_edge(row) for row in self.store.edges_from(rel)],
             "native_edges": self._fresh_native_edges_from(rel),
             "native_file_edges": self._fresh_native_file_edges_from(rel),
@@ -130,7 +130,7 @@ class ContextPlanningMixin:
     def refs(self, query: str) -> dict[str, object]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        self._ensure_map_ready()
+        self.reads.ready()
         rows = [
             row
             for row in self.store.refs(query)
@@ -138,9 +138,7 @@ class ContextPlanningMixin:
             is not EvidenceVisibility.DENY
         ]
         native_rows = self._fresh_native_refs(query)
-        native_file_rows = self._session_file_rows(
-            str(row["path"]) for row in native_rows
-        )
+        native_file_rows = self.reads.file_rows(str(row["path"]) for row in native_rows)
         native = [
             row
             for row in native_rows
@@ -151,7 +149,7 @@ class ContextPlanningMixin:
         return {
             "schema": "hashmarks.refs.v1",
             "query": query,
-            **self._query_freshness_fields(),
+            **self.reads.freshness_fields(),
             "references": rows,
             "native_references": native,
         }
@@ -160,10 +158,10 @@ class ContextPlanningMixin:
     def orient(self, *, max_areas: int = 12) -> dict[str, object]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        self._ensure_map_ready()
+        self.reads.ready()
         stats = self.store.stats()
         areas = list(self.store.top_level_counts().items())[:max_areas]
-        generation, identity_generation, stale = self._generation_status()
+        generation, identity_generation, stale = self.reads.generation_status()
         result: dict[str, object] = {
             "schema": operation_schema("repository_context"),
             "workspace": str(self.workspace),
@@ -182,32 +180,6 @@ class ContextPlanningMixin:
             "guidance": "Use find/outline/symbol/deps before reading full files.",
         }
         return validate_operation_response("repository_context", result)
-
-    def _source_slice(
-        self, path: str, start: int, end: int, *, qualname: str | None = None
-    ) -> str:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        self._ensure_path_current(path)
-        row = self._session_file_row(path)
-        if row is None:
-            raise FileNotFoundError(path)
-        visibility = EvidenceVisibility(str(row["evidence_visibility"]))
-        if visibility is not EvidenceVisibility.SOURCE:
-            raise PermissionError(
-                f"source body is not visible under the evidence policy: {path}"
-            )
-        if qualname is not None:
-            current = self.store.symbol_at(path, qualname)
-            if current is not None:
-                start = int(current["start_line"])
-                end = int(current["end_line"])
-        lines = (
-            (self.workspace / path)
-            .read_text(encoding="utf-8", errors="replace")
-            .splitlines()
-        )
-        return "\n".join(lines[start - 1 : end])
 
     def _context_freshness_warnings(self, stale: bool | None) -> tuple[str, ...]:
         if TYPE_CHECKING:
@@ -245,7 +217,7 @@ class ContextPlanningMixin:
             "retrieval_protocol": "hashmarks.progressive-context.v0.10.14",
             "workspace_fingerprint": self.store.meta("workspace_fingerprint", "") or "",
             "codemap_generation": generation,
-            "policy_fingerprint": self.policy.fingerprint(),
+            "policy_fingerprint": self.files.policy_fingerprint(),
             "query": query,
             "token_budget": token_budget,
             "limit": limit,
@@ -390,13 +362,13 @@ class ContextPlanningMixin:
             raise ValueError(
                 f"invalid context disclosure {disclosure!r}; expected one of: {allowed}"
             ) from exc
-        self._ensure_map_ready()
-        generation, _identity_generation, stale = self._generation_status()
+        self.reads.ready()
+        generation, _identity_generation, stale = self.reads.generation_status()
         key = (
             "context-flight.v1",
             self.store.meta("workspace_fingerprint", "") or "",
             generation,
-            self.policy.fingerprint(),
+            self.files.policy_fingerprint(),
             query,
             int(token_budget),
             int(limit),
@@ -589,7 +561,7 @@ class ContextPlanningMixin:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         evidence_hits = [hit for hit in hits[:4] if hit.qualname is not None]
-        evidence_edge_map = self._session_edges_from_many(
+        evidence_edge_map = self.reads.edges_from_many(
             [(hit.path, str(hit.qualname)) for hit in evidence_hits], limit_per_seed=12
         )
         edge_rows = [
@@ -604,7 +576,7 @@ class ContextPlanningMixin:
             for _, raw_edge in edge_rows
             if str(raw_edge.get("target", ""))
         ]
-        dependency_rows = self._session_exact_symbol_candidates(
+        dependency_rows = self.reads.exact_symbol_candidates(
             dependency_shorts, limit=max(12, min(500, len(set(dependency_shorts)) * 3))
         )
         deps_by_short: dict[str, list[dict]] = {}
@@ -680,7 +652,7 @@ class ContextPlanningMixin:
                 continue
             current = items[index]
             try:
-                body = self._source_slice(
+                body = self.source.slice(
                     hit.path, hit.start_line, hit.end_line, qualname=hit.qualname
                 )
             except (OSError, PermissionError):
@@ -744,7 +716,7 @@ class ContextPlanningMixin:
         confidence = (
             "high" if best >= 70 else "medium" if best >= 30 else "insufficient"
         )
-        generation, identity_generation, stale = self._generation_status()
+        generation, identity_generation, stale = self.reads.generation_status()
         return _ContextPackMetadata(
             query=query,
             token_budget=token_budget,
@@ -847,3 +819,38 @@ class ContextPlanningMixin:
             items=context_items,
             warnings=freshness_warnings,
         )
+
+    def _instruction_seed_paths(
+        self,
+        query: str,
+        *,
+        seed_limit: int,
+    ) -> tuple[list[str], str]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        try:
+            rel = normalize_relative_path(query, allow_root=False)
+        except ValueError:
+            rel = None
+        candidate = None if rel is None else self.workspace / rel
+        if rel is not None and candidate is not None and candidate.exists():
+            return [rel], "explicit-path"
+
+        seed_paths: list[str] = []
+        for hit in self.find_task(query, limit=seed_limit):
+            if hit.path not in seed_paths:
+                seed_paths.append(hit.path)
+        return seed_paths, "task-retrieval"
+
+    @decision_scoped
+    def repository_instruction_scope(
+        self, query: str, *, seed_limit: int = 8
+    ) -> dict[str, object]:
+        """Compose selected instruction paths without moving retrieval into Source."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        if seed_limit < 1:
+            raise ValueError("seed_limit must be >= 1")
+        self.reads.ready()
+        paths, basis = self._instruction_seed_paths(query, seed_limit=seed_limit)
+        return self.source.instruction_scope(paths, query=query, scope_source=basis)

@@ -85,7 +85,7 @@ class RelationshipsMixin:
     ) -> None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        for path in self._resolve_import_paths(seed_path, target)[:4]:
+        for path in self._imports._resolve_import_paths(seed_path, target)[:4]:
             self._adjacency_admit(
                 state, path, seed_rank, seed_path, "imports", confidence
             )
@@ -122,7 +122,7 @@ class RelationshipsMixin:
     ) -> None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        edge_map = self._session_edges_for_paths_many(
+        edge_map = self.reads.edges_for_paths_many(
             [seed.path for seed in primary], limit_per_path=per_seed_edge_limit
         )
         for seed_rank, seed in enumerate(primary, 1):
@@ -171,7 +171,7 @@ class RelationshipsMixin:
             self = cast("CodeMap", self)
         if not state.symbolic_targets:
             return
-        resolved = self._session_exact_symbol_candidates(
+        resolved = self.reads.exact_symbol_candidates(
             sorted(state.symbolic_targets),
             limit=max(160, min(5000, len(state.symbolic_targets) * 32)),
         )
@@ -234,7 +234,7 @@ class RelationshipsMixin:
     ) -> None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        rows = self._session_file_rows(path for path, *_ in state.pending_admissions)
+        rows = self.reads.file_rows(path for path, *_ in state.pending_admissions)
         for candidate in state.pending_admissions:
             file_row = rows.get(candidate[0])
             if file_row is not None:
@@ -288,7 +288,7 @@ class RelationshipsMixin:
             self = cast("CodeMap", self)
         primary: list[SearchHit] = []
         for path in sorted(paths):
-            row = self._session_file_row(path)
+            row = self.reads.file_row(path)
             if row is None:
                 continue
             visibility = EvidenceVisibility(str(row["evidence_visibility"]))
@@ -509,7 +509,7 @@ class RelationshipsMixin:
             self = cast("CodeMap", self)
         authority_rows: list[dict[str, object]] = []
         for path in primary_paths[:4]:
-            value = self.repository_instruction_scope(path)
+            value = self.source.instruction_scope(path, query=path)
             for row in value["authority"]:
                 if not isinstance(row, dict):
                     continue

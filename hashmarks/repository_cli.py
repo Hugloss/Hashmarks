@@ -305,7 +305,7 @@ def _repository_declarations_code(args: Namespace) -> int:
 
 
 def _map_sync(args: Namespace) -> int:
-    result = _call_codemap(args, lambda codemap: codemap.sync(args.path or None))
+    result = _call_codemap(args, lambda codemap: codemap.index.sync(args.path or None))
     _print(result.as_dict())
     return 0
 
@@ -372,7 +372,8 @@ def _map_cache_invalidation_ownership(args: Namespace) -> int:
 
 def _map_clean(args: Namespace) -> int:
     value = _call_codemap(
-        args, lambda codemap: codemap.clean(shared_artifacts=args.shared_artifacts)
+        args,
+        lambda codemap: codemap.index.clean(shared_artifacts=args.shared_artifacts),
     )
     _print(value)
     return 0
@@ -390,7 +391,7 @@ def _map_watch(args: Namespace) -> int:
         sys.stdout.flush()
 
     with _codemap(args) as codemap:
-        codemap.watch_forever(debounce_seconds=args.debounce, on_update=on_update)
+        codemap.index.watch_forever(debounce_seconds=args.debounce, on_update=on_update)
     return 0
 
 
@@ -436,7 +437,7 @@ def _map_orient(args: Namespace) -> int:
 
 
 def _outline(args: Namespace) -> int:
-    value = _call_codemap(args, lambda codemap: codemap.outline(args.path))
+    value = _call_codemap(args, lambda codemap: codemap.source.outline(args.path))
     _print_operation("outline", value)
     return 0
 
@@ -453,7 +454,7 @@ def _find_code(args: Namespace) -> int:
 def _grep_code(args: Namespace) -> int:
     value = _call_codemap(
         args,
-        lambda codemap: codemap.grep(
+        lambda codemap: codemap.source.grep(
             args.query, limit=args.limit, context_lines=args.context
         ),
     )
@@ -473,14 +474,14 @@ def _structural_code(args: Namespace) -> int:
 
 
 def _symbol_code(args: Namespace) -> int:
-    value = _call_codemap(args, lambda codemap: codemap.symbol(args.query))
+    value = _call_codemap(args, lambda codemap: codemap.source.symbol(args.query))
     _print_operation("symbol", value)
     return 0
 
 
 def _source_code(args: Namespace) -> int:
     value = _call_codemap(
-        args, lambda codemap: codemap.source(args.query, token_budget=args.budget)
+        args, lambda codemap: codemap.source.read(args.query, token_budget=args.budget)
     )
     _print_operation("source", value)
     return 0
@@ -672,8 +673,8 @@ def _source_observation_code(args: Namespace) -> int:
     requested = validated_source_lines(args.line or ())
 
     def observe(codemap: CodeMap) -> object:
-        codemap.sync([args.path])
-        return codemap.source_observation(
+        codemap.index.sync([args.path])
+        return codemap.source.observe(
             args.path,
             lines=requested,
             anchor_context_lines=1 if requested else 0,

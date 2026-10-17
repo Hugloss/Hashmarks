@@ -10,7 +10,7 @@ protection sufficiency, exploitability, or execution permission.
 from hashmarks import CodeMap, validate_repository_intelligence_evidence
 
 with CodeMap(".") as codemap:
-    codemap.sync()
+    codemap.index.sync()
     findings = codemap.repository_findings(["src/cleanup.py"])
     observation = findings["resource_lifecycle"]
     checked = validate_repository_intelligence_evidence(observation)

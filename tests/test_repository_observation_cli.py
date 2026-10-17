@@ -87,7 +87,7 @@ def observation_inputs(
         },
     ]
     with CodeMap(root, state_dir=state) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packets = [observe_case(codemap, case) for case in cases]
         correlation = packets[-1]
         assert correlation["causation"] == "not-inferred"

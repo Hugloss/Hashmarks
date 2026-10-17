@@ -41,7 +41,7 @@ def test_derived_query_words_find_declared_parameters_and_same_named_methods(
     )
     task = "Investigate record validation failing when the backend does not supply its rule name."
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map(task)
         packets = [
             codemap.task_evidence(task),
@@ -104,7 +104,7 @@ def test_declaration_context_disambiguates_multiword_retrieval_hints(
     )
     task = "Compiling a record aggregation expression fails when the backend does not supply its function name."
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map(task)
         packets = [
             codemap.task_evidence(task),

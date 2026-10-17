@@ -104,7 +104,7 @@ def verify_cold_warm_semantic_equivalence(
             state_dir=state_dir,
             artifact_db=artifact_db,
         ) as codemap:
-            codemap.sync()
+            codemap.index.sync()
             clear_ast_cache()
             cold = _run_query(codemap, query, task, limit)
             warm = _run_query(codemap, query, task, limit)

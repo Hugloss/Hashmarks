@@ -129,7 +129,7 @@ def _hashmarks_worker(
     started = time.perf_counter()
     with CodeMap(workspace) as cm:
         t0 = time.perf_counter()
-        sync = cm.sync()
+        sync = cm.index.sync()
         cold_ms = (time.perf_counter() - t0) * 1000
         for task in tasks:
             q = task["query"]

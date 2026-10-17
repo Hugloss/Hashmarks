@@ -13,7 +13,7 @@ def test_action_ambiguity_explains_plausibility_and_discriminator_without_secret
         "from src.widget import widget\ndef test_widget(): assert widget() == 1\n"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map("widget implementation test", limit=20)
     ambiguity = action["ambiguity"]
     assert ambiguity["schema"] == "hashmarks.action-ambiguity.v2"
@@ -36,7 +36,7 @@ def test_decision_packet_carries_ambiguity_only_when_scout_needs_it(
         "def test_widget(): assert True\n"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.task_decision_packet("widget implementation test", limit=20)
     if (
         packet["discrimination"]["needed"]

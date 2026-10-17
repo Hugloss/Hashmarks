@@ -132,7 +132,7 @@ def executable_acceptance_suite(
 
     root = Path(workspace)
     with CodeMap(root) as codemap:
-        sync = codemap.sync()
+        sync = codemap.index.sync()
         action = codemap.task_action_map(task, limit=limit)
         first = codemap.task_decision_packet(task, limit=limit)
         second = codemap.task_decision_packet(task, limit=limit)

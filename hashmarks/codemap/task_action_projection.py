@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, cast
 from hashmarks.operation_contract import operation_response, operation_schema
 
 from ..ownership_decision import bounded_presentation_contract
-from .decision_session import decision_scoped, diagnostic_producer
+from .decision_session import ReadScopeOwner, decision_scoped, diagnostic_producer
 from .model import EvidenceVisibility
 from .repository_domains import RepositoryDomain
 from .task_action_owner_resolution import TaskActionOwnerResolutionMixin
@@ -41,11 +41,24 @@ class TaskActionOptions:
 TASK_ACTION_DEFAULT_OPTIONS = TaskActionOptions()
 
 
-class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
+class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin, ReadScopeOwner):
     @operation_response("task_action_map")
-    @decision_scoped
     @diagnostic_producer
     def task_action_map(
+        self,
+        task: str,
+        *,
+        limit: int = TASK_ACTION_DEFAULT_OPTIONS.limit,
+        per_role: int = TASK_ACTION_DEFAULT_OPTIONS.per_role,
+    ) -> TaskActionMap:
+        """Reconcile task evidence before its generation-bound observation."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        self._prepare_task_observation(task, limit)
+        return self._observe_task_action_map(task, limit=limit, per_role=per_role)
+
+    @decision_scoped
+    def _observe_task_action_map(
         self,
         task: str,
         *,
@@ -83,15 +96,18 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
     ) -> tuple[tuple[int, str, int, int] | None, TaskActionMap | None]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        if self._decision_session_depth <= 0:
+        if self.reads.depth <= 0:
             return None, None
-        generation = int(self._decision_session_generation or self.store.generation())
+        if self._task_action_reuse.scope is not self.reads.scope:
+            self._task_action_reuse.entries.clear()
+            self._task_action_reuse.scope = self.reads.scope
+        generation = int(self.reads.generation or self.store.generation())
         action_key = (generation, task, int(limit), int(per_role))
-        cached = self._decision_task_action_cache.get(action_key)
+        cached = self._task_action_reuse.entries.get(action_key)
         if cached is not None:
-            self._decision_session_stats["task_action_hit"] += 1
+            self.reads.count("task_action_hit")
             return action_key, deepcopy(cached)
-        self._decision_session_stats["task_action_miss"] += 1
+        self.reads.count("task_action_miss")
         return action_key, None
 
     def _task_action_map_context(self, task: str, limit: int) -> _TaskActionMapContext:
@@ -109,7 +125,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             self._task_action_row(hit, rank, failed, cues, strong_config_cues)
             for rank, hit in enumerate(hits, 1)
         ]
-        self._session_preload_symbols([str(row.get("path") or "") for row in rows])
+        self.reads.preload_symbols([str(row.get("path") or "") for row in rows])
         return _TaskActionMapContext(
             hits=hits,
             rows=rows,
@@ -337,7 +353,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             if (
                 isinstance(edit_path, str)
                 and edit_path
-                and not self._indexed_path_current(edit_path)
+                and not self.index.is_current(edit_path)
             ):
                 edit = None
                 structural_owner = None
@@ -537,7 +553,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         if len(self._task_recent_authority_paths) > 256:
             self._task_recent_authority_paths.clear()
         if action_key is not None:
-            self._decision_task_action_cache[action_key] = deepcopy(result)
+            self._task_action_reuse.entries[action_key] = deepcopy(result)
 
     @staticmethod
     def _task_action_first_role(

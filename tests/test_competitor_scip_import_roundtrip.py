@@ -80,11 +80,11 @@ def test_metadata_survives_native_index_reopen_and_is_not_graph_authority(
     path = _write_index(tmp_path)
     database = tmp_path / "native.sqlite3"
     with CodeMap(tmp_path, artifact_db=database) as cm:
-        cm.sync()
+        cm.index.sync()
         cm.import_scip(path)
         original = _read_source_metadata(cm)
     with CodeMap(tmp_path, artifact_db=database) as cm:
-        cm.sync()
+        cm.index.sync()
         reopened = _read_source_metadata(cm)
     assert reopened == original
     assert original["declaration"]["documentation"] == ["Implementation documentation"]

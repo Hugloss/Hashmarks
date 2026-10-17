@@ -6,10 +6,21 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
+    from .decision_session import ReadScope
     from .model import SearchHit
     from .ownership_relation_types import StructuralOwnerResolution, StructuralStarts
     from .repository_domains import RepositoryDomain
-    from .task_evidence_types import VerificationRelevance
+    from .task_evidence_types import TaskActionMap, VerificationRelevance
+
+
+@dataclass
+class _TaskActionReuse:
+    """Disposable task action reuse bound to one read scope."""
+
+    scope: ReadScope | None = None
+    entries: dict[tuple[int, str, int, int], TaskActionMap] = field(
+        default_factory=dict
+    )
 
 
 @dataclass(frozen=True)

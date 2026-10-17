@@ -132,7 +132,7 @@ def collect(
     started = time.perf_counter()
     rows = []
     with CodeMap(workspace) as codemap:
-        sync = codemap.sync()
+        sync = codemap.index.sync()
         full_tokens = {
             str(row["path"]): int(row["full_tokens"])
             for row in (codemap.store.outline(path) for path in codemap.store.paths())

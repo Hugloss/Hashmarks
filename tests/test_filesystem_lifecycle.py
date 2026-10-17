@@ -26,7 +26,7 @@ def _repository(root: Path, source: str) -> None:
 def _observe(root: Path, source: str) -> dict:
     _repository(root, source)
     with CodeMap(root) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         return codemap.repository_findings(["cleanup.py"])
 
 
@@ -157,7 +157,7 @@ def test_bounded_discovery_retains_accounting_without_negative_evidence(
         tmp_path, "import os\ndef cleanup(name):\n os.stat(name)\n os.rmdir(name)\n"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         bounds = replace(DEFAULT_BOUNDS, observations=0)
         packet = FilesystemLifecycleAnalyzer(codemap, bounds).analyze(["cleanup.py"])
     assert packet["observations"] == []
@@ -169,7 +169,7 @@ def test_bounded_discovery_retains_accounting_without_negative_evidence(
 def test_invalid_and_missing_sources_are_accounted_for(tmp_path: Path) -> None:
     _repository(tmp_path, "def invalid(:\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = FilesystemLifecycleAnalyzer(codemap).analyze(
             ["cleanup.py", "missing.py"]
         )
@@ -204,7 +204,7 @@ def test_public_surfaces_preserve_lifecycle_and_freshness(tmp_path: Path) -> Non
     source = "import os\ndef cleanup(name):\n os.stat(name)\n os.rmdir(name)\n"
     _repository(tmp_path, source)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         findings = codemap.repository_findings(["cleanup.py"])
         locality = codemap.structural_locality("cleanup.py::cleanup")
         task = codemap.task_evidence("inspect cleanup.py cleanup")
@@ -231,13 +231,13 @@ def test_reopen_uses_current_source_not_prior_observations(tmp_path: Path) -> No
     )
     state = tmp_path / ".state"
     with CodeMap(tmp_path, state_dir=state) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         assert assert_object(codemap.repository_findings()["resource_lifecycle"])[
             "observations"
         ]
     _repository(tmp_path, "def cleanup(name):\n return name\n")
     with CodeMap(tmp_path, state_dir=state) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         assert (
             assert_object(codemap.repository_findings()["resource_lifecycle"])[
                 "observations"
@@ -326,7 +326,7 @@ def test_bounds_cannot_be_relabelled_complete(tmp_path: Path) -> None:
         tmp_path, "import os\ndef cleanup(name):\n os.stat(name)\n os.rmdir(name)\n"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = FilesystemLifecycleAnalyzer(
             codemap, replace(DEFAULT_BOUNDS, observations=0)
         ).analyze(["cleanup.py"])
@@ -345,7 +345,7 @@ def test_call_budget_covers_repeated_helper_contexts(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = FilesystemLifecycleAnalyzer(
             codemap, replace(DEFAULT_BOUNDS, calls_per_symbol=2)
         ).analyze(["cleanup.py"])

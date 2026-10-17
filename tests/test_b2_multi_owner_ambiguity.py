@@ -42,7 +42,7 @@ def test_dual_live_task_local_owners_require_discrimination(tmp_path: Path) -> N
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map(
             "Fix quartz_dual transform behavior across both active product paths"
         )
@@ -77,7 +77,7 @@ def test_multiple_task_local_tests_for_same_candidate_remain_unproven(
         )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map("Fix quartz_single transform behavior")
         packet = codemap.task_decision_packet("Fix quartz_single transform behavior")
 

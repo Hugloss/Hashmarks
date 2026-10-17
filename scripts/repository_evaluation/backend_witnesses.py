@@ -234,11 +234,17 @@ def stage_fact_witnesses(
             "declaration_oracles",
             "python_backend_paths",
         ),
+        ("structural", "structural_observations", "structural_oracles", None),
     ):
         inputs = workflow.get(input_key, {}).get(stage)
         oracle = rule.get(oracle_key, {}).get(stage)
         if inputs is None or oracle is None:
             continue
+        paths = (
+            inputs[path_key]
+            if path_key is not None
+            else [label["path"] for label in oracle["source_labels"]]
+        )
         bindings = tuple(
             {
                 "repository": workflow["repository"],
@@ -247,7 +253,7 @@ def stage_fact_witnesses(
                     confined_file(source, path), domain=FILE_DOMAIN
                 ).hash,
             }
-            for path in sorted(set(inputs[path_key]))
+            for path in sorted(set(paths))
         )
         scope = f"/cases/{workflow['id']}/{oracle_key}/{stage}"
         context = FactObservation(

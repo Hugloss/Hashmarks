@@ -31,12 +31,12 @@ def test_context_is_opt_in_and_does_not_change_location_identity(
         "def f():\n    value = 'needle'\n    return value\n", encoding="utf-8"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        legacy = codemap.source_observation("sample.py", literal="needle")
-        explicit_zero = codemap.source_observation(
+        codemap.index.sync()
+        legacy = codemap.source.observe("sample.py", literal="needle")
+        explicit_zero = codemap.source.observe(
             "sample.py", literal="needle", context_lines=0
         )
-        contextual = codemap.source_observation(
+        contextual = codemap.source.observe(
             "sample.py", literal="needle", context_lines=1
         )
     assert legacy == explicit_zero
@@ -83,10 +83,8 @@ def test_long_physical_lines_clip_without_losing_match_or_unicode_columns(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        packet = codemap.source_observation(
-            "example.py", literal="needle", context_lines=1
-        )
+        codemap.index.sync()
+        packet = codemap.source.observe("example.py", literal="needle", context_lines=1)
     hit = assert_array(packet["occurrences"])[0]
     assert assert_object(hit)["column"] == 2001  # Unicode codepoints, not UTF-8 bytes
     rows = assert_object(hit)["context_excerpt"]
@@ -111,8 +109,8 @@ def test_crlf_boundary_and_first_last_lines_do_not_invent_extra_lines(
 ) -> None:
     (tmp_path / "a.py").write_bytes(b"needle\r\nother\r\nneedle\r\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        packet = codemap.source_observation("a.py", literal="needle", context_lines=1)
+        codemap.index.sync()
+        packet = codemap.source.observe("a.py", literal="needle", context_lines=1)
     first, last = assert_array(packet["occurrences"])
     assert [
         x["line"] for x in assert_records(assert_object(first)["context_excerpt"])
@@ -141,9 +139,9 @@ def test_scoped_context_reuses_member_admission_and_preserves_native_counts(
     (tmp_path / "a.py").write_text("one\nneedle\ntwo\n", encoding="utf-8")
     (tmp_path / "b.py").write_text("three\nneedle\nfour\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        original = codemap.scoped_source_occurrences(["a.py", "b.py"], "needle")
-        contextual = codemap.scoped_source_occurrences(
+        codemap.index.sync()
+        original = codemap.source.scoped_occurrences(["a.py", "b.py"], "needle")
+        contextual = codemap.source.scoped_occurrences(
             ["a.py", "b.py"], "needle", context_lines=1
         )
     assert original["observed_match_count"] == contextual["observed_match_count"] == 2
@@ -170,15 +168,13 @@ def test_context_never_escapes_denied_oversized_or_unreconciled_members(
     path = tmp_path / "sample.py"
     path.write_text("value = 'needle'\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        denied = codemap.source_observation(".env", literal="needle", context_lines=1)
-        oversized = codemap.source_observation(
+        codemap.index.sync()
+        denied = codemap.source.observe(".env", literal="needle", context_lines=1)
+        oversized = codemap.source.observe(
             "sample.py", literal="needle", context_lines=1, max_bytes=2
         )
         path.write_text("value = 'changed'\n", encoding="utf-8")
-        stale = codemap.source_observation(
-            "sample.py", literal="needle", context_lines=1
-        )
+        stale = codemap.source.observe("sample.py", literal="needle", context_lines=1)
     for result in (denied, oversized, stale):
         assert result["occurrences"] == []
         assert result["negative_evidence"] == "not-admissible"
@@ -191,15 +187,15 @@ def test_invalid_context_fails_before_source_observation(
 ) -> None:
     (tmp_path / "sample.py").write_text("needle\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(ValueError, match="context_lines"):
-            codemap.source_observation(
+            codemap.source.observe(
                 "sample.py",
                 literal="needle",
                 context_lines=cast(int, bad),  # type: ignore[arg-type]
             )
         with pytest.raises(ValueError, match="context_lines"):
-            codemap.scoped_source_occurrences(
+            codemap.source.scoped_occurrences(
                 ["sample.py"],
                 "needle",
                 context_lines=cast(int, bad),  # type: ignore[arg-type]
@@ -211,14 +207,14 @@ def test_source_line_keywords_remain_supported_but_typos_fail_early(
 ) -> None:
     (tmp_path / "sample.py").write_text("needle\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(TypeError, match="unexpected source observation keyword"):
-            codemap.source_observation(
+            codemap.source.observe(
                 "sample.py",
                 literal="needle",
                 context_line=1,  # type: ignore[call-arg]
             )
-        observed = codemap.source_observation(
+        observed = codemap.source.observe(
             "sample.py", literal="needle", lines=(1,), context_lines=1
         )
     assert observed["requested_lines"] == [1]
@@ -241,9 +237,9 @@ def test_context_requires_literal_and_does_not_read_file_for_preview(
     path = tmp_path / "a.py"
     path.write_text("x = 1\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(ValueError, match="requires a literal"):
-            codemap.source_observation("a.py", context_lines=1)
+            codemap.source.observe("a.py", context_lines=1)
 
 
 def test_mcp_context_is_bounded_and_structured_projection_keeps_source_pointer(

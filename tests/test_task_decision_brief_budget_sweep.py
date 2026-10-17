@@ -21,7 +21,7 @@ def test_decision_brief_budget_sweep_finds_smallest_safe_agent_budget(
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         sweep = codemap.task_decision_brief_budget_sweep(
             "change widget",
             budgets=(1, 32, 64, 128, 256, 512),
@@ -44,7 +44,7 @@ def test_unsafe_budget_exposes_missing_roles_instead_of_false_qualification(
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         sweep = codemap.task_decision_brief_budget_sweep(
             "widget implementation test", budgets=(1, 512)
         )

@@ -7,9 +7,10 @@ from typing import TYPE_CHECKING, cast
 from hashmarks.paths import normalize_relative_path
 
 from .change_impact import ChangeImpactOptions
-from .decision_session import diagnostic_producer
+from .decision_session import ReadScopeOwner, diagnostic_producer
 from .evidence_freshness import freshness_state
 from .project_impact_codec import expand_project_impact
+from .repository_observation import packet_digest
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -39,7 +40,7 @@ FRESHNESS_MAP_DEFAULT_OPTIONS = FreshnessMapOptions()
 FRESHNESS_MAP_SCHEMA = "hashmarks.evidence-freshness-map.v1"
 
 
-class EvidenceFreshnessMapMixin:
+class EvidenceFreshnessMapMixin(ReadScopeOwner):
     """Derived freshness projection over existing repository-intelligence facts.
 
     This surface owns no freshness state. It samples the existing generation,
@@ -51,7 +52,7 @@ class EvidenceFreshnessMapMixin:
     def _freshness_identity(self, kind: str, payload: object) -> str:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        return "sha256:" + self._packet_digest(
+        return "sha256:" + packet_digest(
             f"hashmarks.evidence-freshness.{kind}.v1",
             payload,
         )
@@ -80,7 +81,7 @@ class EvidenceFreshnessMapMixin:
         ]
         revisions: list[dict[str, object]] = []
         for path in paths:
-            file_row = self._session_file_row(path)
+            file_row = self.reads.file_row(path)
             revisions.append(
                 {
                     "path": path,
@@ -109,7 +110,7 @@ class EvidenceFreshnessMapMixin:
         if not isinstance(repository, Mapping):
             raise ValueError("previous_map.repository must be an object")
         repository_identity = str(repository.get("repository_identity") or "")
-        if repository_identity != self._repository_packet_identity():
+        if repository_identity != self.reads.repository_identity():
             raise ValueError("previous_map repository-mismatch")
         task_identity = str(previous_map.get("task_identity") or "")
         if task_identity != expected_task_identity:
@@ -402,10 +403,10 @@ class EvidenceFreshnessMapMixin:
             limit=options.limit,
             candidate_limit=16,
         )
-        generation, identity_generation, stale = self._generation_status()
+        generation, identity_generation, stale = self.reads.generation_status()
         scope = _FreshnessScope(
-            repository_identity=self._repository_packet_identity(),
-            task_identity=self._packet_digest("hashmarks.task.v1", {"task": task}),
+            repository_identity=self.reads.repository_identity(),
+            task_identity=packet_digest("hashmarks.task.v1", {"task": task}),
             continuity_state=freshness_state(stale),
         )
 

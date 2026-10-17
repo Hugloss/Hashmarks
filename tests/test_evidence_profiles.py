@@ -38,7 +38,7 @@ def test_profiles_share_one_snapshot_identity_and_are_deterministic(
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         profiles = {
             name: codemap.repository_intelligence_profile(
                 "Fix widget accepted response behavior",
@@ -71,7 +71,7 @@ def test_profiles_share_one_snapshot_identity_and_are_deterministic(
 def test_profile_density_contract_preserves_authoritative_facts(tmp_path: Path) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         compact = codemap.repository_intelligence_profile(
             "Fix widget accepted response behavior",
             ["src/owner.py"],
@@ -106,7 +106,7 @@ def test_profile_density_contract_preserves_authoritative_facts(tmp_path: Path) 
 def test_audit_profile_contains_exact_snapshot(tmp_path: Path) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         snapshot = codemap.repository_intelligence_snapshot(
             "Fix widget accepted response behavior",
             ["src/owner.py"],
@@ -139,7 +139,7 @@ def test_profile_applies_typed_impact_bounds(tmp_path: Path) -> None:
 def test_invalid_profile_fails_closed(tmp_path: Path) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(ValueError, match="profile must be one of"):
             codemap.repository_intelligence_profile(
                 "Fix widget accepted response behavior",

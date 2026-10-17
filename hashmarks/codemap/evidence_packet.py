@@ -17,7 +17,7 @@ from hashmarks.operation_contract import (
 )
 
 from .configuration_evidence import ConfigurationEvidenceMixin
-from .decision_session import decision_scoped
+from .decision_session import ReadScopeOwner, decision_scoped
 from .evidence_decision_packet import (
     TASK_DECISION_DEFAULT_OPTIONS,
     DecisionPacketMixin,
@@ -25,6 +25,7 @@ from .evidence_decision_packet import (
 from .evidence_freshness import freshness_state
 from .model import EvidenceVisibility, SearchHit
 from .python_ast import estimate_tokens
+from .repository_observation import packet_digest
 from .task_action_projection import TASK_ACTION_DEFAULT_OPTIONS
 from .task_evidence_discrimination import (
     STRUCTURAL_SELECTION_BASIS,
@@ -109,6 +110,7 @@ class TaskEvidencePacketMixin(
     TaskEvidenceScopedMethodMixin,
     ConfigurationEvidenceMixin,
     DecisionPacketMixin,
+    ReadScopeOwner,
 ):
     @staticmethod
     def _task_decision_anchor(value: object) -> dict[str, object] | None:
@@ -121,8 +123,24 @@ class TaskEvidencePacketMixin(
         return row
 
     @operation_response("task_decision_brief")
-    @decision_scoped
     def task_decision_brief(
+        self,
+        task: str,
+        *,
+        limit: int = TASK_DECISION_DEFAULT_OPTIONS.limit,
+        per_role: int = TASK_DECISION_DEFAULT_OPTIONS.per_role,
+        token_budget: int = TASK_DECISION_DEFAULT_OPTIONS.token_budget,
+    ) -> dict[str, object]:
+        """Reconcile task evidence before its generation-bound observation."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        self._prepare_task_observation(task, limit)
+        return self._observe_task_decision_brief(
+            task, limit=limit, per_role=per_role, token_budget=token_budget
+        )
+
+    @decision_scoped
+    def _observe_task_decision_brief(
         self,
         task: str,
         *,
@@ -395,7 +413,7 @@ class TaskEvidencePacketMixin(
             return current
         matches = [
             symbol
-            for symbol in self._session_symbols_for_path(path)
+            for symbol in self.reads.symbols_for_path(path)
             if str(symbol.get("name") or "") == name
         ]
         return matches[0] if len(matches) == 1 else None
@@ -441,7 +459,7 @@ class TaskEvidencePacketMixin(
         """Return current source-disclosure policy for one already-selected path."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        file_row = self._session_file_row(path)
+        file_row = self.reads.file_row(path)
         if file_row is None:
             return None
         try:
@@ -489,7 +507,7 @@ class TaskEvidencePacketMixin(
             self = cast("CodeMap", self)
         assert evidence.start is not None and evidence.end is not None
         try:
-            body = self._source_slice(
+            body = self.source.slice(
                 evidence.path,
                 evidence.start,
                 evidence.end,
@@ -713,7 +731,7 @@ class TaskEvidencePacketMixin(
             self = cast("CodeMap", self)
         edit = action.get("edit")
         edit = edit if isinstance(edit, dict) else None
-        generation, identity_generation, stale = self._generation_status()
+        generation, identity_generation, stale = self.reads.generation_status()
         freshness, freshness_reason = self._task_evidence_freshness(
             generation, selection_generation, stale, verification_stale
         )
@@ -725,7 +743,7 @@ class TaskEvidencePacketMixin(
         if freshness == "current":
             result["freshness_proof"] = "proven"
         if edit is not None and edit.get("path"):
-            file_row = self._session_file_row(str(edit["path"]))
+            file_row = self.reads.file_row(str(edit["path"]))
             if file_row is not None and file_row["file_digest"]:
                 # This is Hashmarks' domain-separated canonical file-content
                 # digest, not an ad-hoc mtime or raw filesystem revision.
@@ -935,7 +953,7 @@ class TaskEvidencePacketMixin(
         if not isinstance(verify, Mapping) or not verify.get("path"):
             return False
         path = str(verify["path"])
-        indexed = self._session_file_row(path)
+        indexed = self.reads.file_row(path)
         if indexed is None or not indexed["file_digest"]:
             return True
         try:
@@ -1100,7 +1118,7 @@ class TaskEvidencePacketMixin(
             "provenance": draft["provenance"],
             "freshness": draft["freshness"],
             "evidence_packet_identity": "sha256:"
-            + self._packet_digest(operation_schema("task_evidence"), draft),
+            + packet_digest(operation_schema("task_evidence"), draft),
         }
 
     @staticmethod
@@ -1176,7 +1194,7 @@ class TaskEvidencePacketMixin(
         if token_budget < 1:
             raise ValueError("token_budget must be >= 1")
         reconciled_task_paths = set(self._reconcile_cached_task_paths(task, limit))
-        with self.decision_session():
+        with self.reads.session():
             action = self.task_action_map(
                 task,
                 limit=limit,

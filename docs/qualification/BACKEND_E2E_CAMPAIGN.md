@@ -1,11 +1,26 @@
 # Backend E2E campaign
 
+**Development sequencing:** the active
+[canonical component rewrite](../plans/CANONICAL_COMPONENT_REWRITE_PLAN.md)
+comes first, with breaking Python APIs and explicit owners. Implementation is
+in progress under the user's explicit instruction.
+This broad campaign is retained as follow-on research qualification; its
+unchanged all-capability requirements do not gate each owner-sized repair.
+
 This is Hashmarks development qualification, not product execution or
 certification authority. The target is independently supported 5/5 evidence
 for all twenty backend capabilities. Current corpus membership is not a claim
 that those capabilities have passed.
 
-## Expected membership
+The active successor corpus is
+`benchmarks/repository_evaluation/manifests/backend-campaign-v2/campaign.json`:
+89 workflow entries, 59 distinct upstream problems, eight suites. The selected-call
+catalog contributes twelve capability-specific views of existing problems across
+three repositories. Its source oracles and witness membership are supplied;
+independent review and full qualification remain open. Current gaps and exact
+repair evidence are maintained in [the remaining plan](BACKEND_E2E_REMAINING_PLAN.md).
+
+## Historical baseline membership
 
 The frozen campaign is
 `benchmarks/repository_evaluation/manifests/backend-campaign-v1/campaign.json`.
@@ -29,6 +44,17 @@ fill those rows. Their precise problems, semantic oracles and transport proof
 must be admitted before they contribute.
 
 ## Observation contracts
+
+### Bounded call-collection presentation ownership note
+
+Observed repository evidence: the node, direct-call and unresolved/external-call
+collections already admitted by Structural Locality. Authority source: the
+existing CodeMap packet, with exact native collection references and member
+counts. Freshness/completeness behavior: preserve every member and qualifier
+within the producer's existing bounds; empty collections do not establish
+repository or runtime absence. Existing owner extended: evidence presentation.
+Consumer/execution responsibility not acquired: runtime dispatch, path inference,
+edit selection, test execution or sufficiency. Decision: OBSERVER.
 
 ### Candidate verification disclosure ownership note
 
@@ -130,8 +156,9 @@ Local measurements and logs belong under `.hashmarks/backend-e2e/remaining-work/
 Historical reports remain unchanged. A renderer-only replay is an iteration
 measurement and must be followed by actual API/CLI/official-MCP acquisition.
 
-Initial transport now optionally wraps the existing v1 string table in bounded
-zlib/base64 when the complete encoding is smaller. The semantic packet identity
+Initial transport compresses semantic JSON directly using bounded zlib/base64
+when smaller; the v1 string table remains the uncompressed fallback. Decoders also
+accept historical compressed string tables. The semantic packet identity
 is computed from the unchanged decoded facts, never compression bytes. Decoders
 retain uncompressed v1 support and reject invalid sizes, truncated streams and
 trailing/concatenated data. Payloads above the compression allocation bound use

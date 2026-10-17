@@ -37,9 +37,9 @@ class EvidenceFreshnessMixin:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         path = self.workspace / relpath
-        decision = self.policy.decide(relpath)
+        decision = self.files.decide(relpath)
         return (
-            self._path_admitted_for_analysis(relpath)
+            self.files.is_admitted(relpath)
             and decision.evidence_visibility.value != "deny"
             and not path.is_symlink()
         )
@@ -327,7 +327,7 @@ class EvidenceFreshnessMixin:
             self = cast("CodeMap", self)
         rows = self.store.native_refs(query, limit=limit)
         for path in sorted({str(row["path"]) for row in rows}):
-            self._ensure_path_current(path)
+            self.source.ensure_current(path)
         return qualify_scip_reference_rows(
             self,
             [
@@ -342,7 +342,7 @@ class EvidenceFreshnessMixin:
     ) -> list[dict]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        self._ensure_path_current(path)
+        self.source.ensure_current(path)
         return qualify_scip_reference_rows(
             self,
             [

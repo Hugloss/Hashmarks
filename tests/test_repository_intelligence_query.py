@@ -38,7 +38,7 @@ def test_query_facade_delegates_without_changing_producer_semantics(
 ) -> None:
     _source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         expected = {
             "change-intelligence": codemap.change_intelligence_brief(
                 task, ["src/owner.py"]
@@ -85,10 +85,10 @@ def test_query_facade_delegates_without_changing_producer_semantics(
 def test_query_facade_delta_matches_direct_delta(tmp_path: Path) -> None:
     source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         previous = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
         source.write_text("def widget(): return 'new'\n", encoding="utf-8")
-        codemap.sync(["src/owner.py"])
+        codemap.index.sync(["src/owner.py"])
         direct = codemap.repository_intelligence_delta(
             task,
             ["src/owner.py"],
@@ -111,7 +111,7 @@ def test_query_facade_delta_matches_direct_delta(tmp_path: Path) -> None:
 def test_query_facade_is_deterministic_and_fails_closed(tmp_path: Path) -> None:
     _source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         first = codemap.repository_intelligence_query("profile", task, ["src/owner.py"])
         second = codemap.repository_intelligence_query(
             "profile", task, ["src/owner.py"]

@@ -4,6 +4,39 @@ Hashmarks is pre-1.0, but public releases still need an explicit contract so imp
 
 ## What is public
 
+The component rewrite in
+[`CANONICAL_COMPONENT_REWRITE_PLAN.md`](../plans/CANONICAL_COMPONENT_REWRITE_PLAN.md)
+is an explicitly breaking Python contract revision. Migrated operations move to
+their named components and their flat root methods are removed without aliases.
+First-party callers migrate with each owner; a partially migrated development
+tree is not a released dual API. Serialized evidence meaning, independent source
+oracles, freshness and authority do not change merely because a Python call moves.
+
+`CodeMap.files` is already a read-only `RepositoryFiles` reference. The component
+can be constructed without CodeMap or storage, canonicalizes its workspace and
+explicit policy path once, and retains lexical member/symlink admission rules.
+The old private admission facade methods are removed.
+
+Index operations now use `CodeMap.index.sync()`, `.preflight()`, `.clean()` and
+`.watch_forever()`. The old flat root operations and private ingestion methods
+are removed. `RepositoryIndex` can be constructed from Files, borrowed stores,
+the observation source and a range producer without CodeMap or upper evidence
+owners. The optional `CodeMap(..., range_provider=...)` construction argument
+injects the narrow `SourceRangeProvider` contract; producer replacement is no
+longer performed by changing a root field after construction.
+
+Read sessions now use `CodeMap.reads.session()` and yield an immutable
+`ReadScope`, rather than the facade. Diagnostics and counters use
+`CodeMap.reads.diagnostics()` and `.stats()`. Root session/query-cache helpers are
+removed. Generation drift still fails closed; task freshness preparation belongs
+to task entry points rather than a method-name dispatcher inside the read owner.
+
+Source operations use `CodeMap.source.outline()`, `.symbol()`, `.read()`, `.grep()`,
+`.observe()`, `.scoped_occurrences()` and `.scoped_literals()`. The source component
+owns qualified member/range reads and returns detached public outline symbols.
+Its instruction-scope primitive consumes explicit paths. Query-based instruction
+seed selection remains Context composition, above Source and retrieval.
+
 The supported Python API is:
 
 1. names exported by `hashmarks.__all__`, including the lazily exposed `CodeMap`;
@@ -28,6 +61,15 @@ The local read-only MCP tools `dependency_codemap` and `repository_declarations`
 The documented `RepositoryDeclarationProvider`, `RepositoryDeclarationProviderContext`, `RepositoryDeclarationProviderResult`, `RepositoryDeclarationProviderError`, and `CodeMap.discover_repository_declarations()` surface is also supported Python API. The provider context exposes bounded admitted-path enumeration via `paths(prefix)`, plus revision-bound `exists`, `read_bytes`, and `read_text`; it intentionally does not expose a raw repository filesystem path. Discovery uses the `hashmarks.repository-declaration-discovery.v1` and `hashmarks.repository-declaration-discovery-delta.v1` wrapper schemas. Providers are explicitly supplied Python objects; ambient entry-point loading and arbitrary provider execution inside MCP are not part of the public contract.
 
 `CodeMap.task_evidence()` is the supported role-separated task-evidence API. Its default schema is `hashmarks.task-evidence.v5`: bounded retrieval, explicit-target evidence, ownership, verification, related evidence, freshness and provenance are distinct authority domains. Initial responses use `hashmarks.task-evidence-initial.v2` and retain the same facts through the initial packet codec; presentation bounds do not establish repository absence or ownership uniqueness.
+
+CodeMap service clients require canonical replies to be JSON objects with the
+expected operation schema. The existing service route definitions supply the
+semantic operation and response key. Malformed objects, other operation schemas
+and arrays of key/value pairs are rejected with `RuntimeError`. Unknown fields
+and literal null/boolean/numeric values are preserved. Internal `find_task` replies
+require an array of objects and retain its order; an empty bounded array carries
+no repository-negative authority. Service handlers also reject non-object replies
+before serialization.
 
 The current task-action, task-evidence, initial-envelope, and post-change response shapes are declared once in `hashmarks.codemap.task_evidence_types`. These `TypedDict` contracts preserve ordinary dictionary/JSON responses; they describe field structure, not repository authority. Default and initial calls have distinct return types. Nullable evidence remains nullable and conditional fields remain optional. Ownership hops and bounded graph projections share `hashmarks.codemap.ownership_relation_types`; trace and authority records are owned by `hashmarks.ownership_decision`. Service-client responses use these same shapes and validate their required fields and nested structure at the JSON boundary, preserving additional producer evidence. MCP Python calls retain the default/initial return distinction. Available and unavailable verification plans have separate typed shapes.
 
@@ -69,6 +111,13 @@ Importable implementation submodules under `hashmarks.*` are **not automatically
 Development material under `scripts/agent_evaluation/`, `benchmarks/agent_evaluation/`, and `tests/` is measurement/evidence infrastructure, not installed product API.
 
 ## Pre-1.0 contract evolution
+
+Structural Locality presentation uses collection findings for its bounded node,
+edge, unresolved-call and external-call arrays. Their `details` preserve the whole
+native array, `source_refs` identify that collection, and `native_item_count`
+counts its members. Finding counts for these kinds count collections. The native
+Structural Locality response and its authority/bounds retain their existing
+contract; see [Structural Locality](STRUCTURAL_LOCALITY.md).
 
 Existing findings, structural-locality and resolved-owner task-evidence surfaces
 may carry the additive `resource_lifecycle` observation documented in
@@ -114,7 +163,18 @@ and one returned source-position hint. These are disclosure bounds, not semantic
 completeness or failure-owner proof. Explicit locators retain precedence and
 edit/verification selection remains independently owned.
 
-Such a locator may carry `direct_call_declarations`, containing up to four
+When there is no diagnostic source-position hint, a natural-language query may
+instead disclose one `bounded-declaration-context` callable. Its indexed class
+name and signature must add matching identifier terms beyond its own name. The
+lookup uses the existing sixty-four-file lexical pool before the twelve-path
+shortlist, at most thirty-two distinct query groups and thirty-two declaration
+candidates. SQL substring prefixes only prefilter candidates; identifier parts
+must qualify the match. Current source or outline visibility is required, and
+explicit locators retain precedence. The two-supplement and requested result
+bounds are unchanged. A class/signature match establishes neither behavioral
+ownership nor runtime identity, test relevance or complete search coverage.
+
+A `bounded-lexical-source-position` locator may carry `direct_call_declarations`, containing up to four
 same-file callable targets from at most sixty-four direct indexed calls. The
 existing structural-locality resolver must qualify each target; nested callable
 calls, shadowed names and transitive targets are excluded. Exact target spans,
@@ -122,16 +182,29 @@ call positions, source revision, generation, omissions and unqualified-call coun
 remain visible in every format. Runtime invocation remains unestablished and no
 negative-evidence authority is granted.
 
-Source-candidate test disclosure also retains task words in a candidate's directory
-before considering the union of declared names throughout its module. It derives
-that ordering from existing path and task-anchor facts. Qualified reference and
-filename evidence retain their ordering, and the selected verifier and edit owner
-are unchanged. A directory match establishes no test relationship or sufficiency.
+Source-candidate test disclosure preserves source namespace locality before task
+words in a test directory. Declaration overlap is measured within one indexed
+test, rather than combining unrelated names throughout a large module. At least
+two words from an already observed source declaration may also retain a matching
+test when the task paraphrases that declaration. This spelling overlap stays
+source-local lexical disclosure and establishes no reference. A specific
+matching test breaks an otherwise equal lexical tie. These are disclosure facts,
+never uniqueness or relationship proof. Candidate pools from the first three
+source locators share the bounded reply, alongside canonical task candidates.
+Scores relative to different sources are not compared to decide that order.
+The selected verifier and edit owner remain unchanged.
 
 Initial compact declaration tables bind their scope through the finding's exact
 `source_refs[0]` plus the declaration-family key. Table row references append
 `/declarations/<i>` in native order. This avoids repeating that pointer inside
 each table; the complete native context, qualifiers and row values are retained.
+Compact tables expose structured `metadata`, `common`, `prefix`, `columns`,
+`extras` and `rows`, avoiding quoted JSON inside text. Text rendering retains its
+readable scope tables. The initial wire codec emits `json+zlib` for compressible
+semantic data and retains the uncompressed `json-string-table.v1` fallback.
+Decoders also accept existing `json-string-table.v1+zlib` packets. All compressed
+forms have the same 1 MiB allocation bound, exact decoded-byte count, stream
+closure and semantic identity checks; direct JSON also rejects duplicate keys.
 
 Observed repository fact/evidence: distinct same-named callable declarations in
 one selected repository file.

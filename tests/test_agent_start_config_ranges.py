@@ -27,7 +27,7 @@ def _repo(root: Path, filename: str, content: str) -> None:
 
 def _start(root: Path, query: str, *, token_budget: int = 128) -> dict[str, object]:
     with CodeMap(root) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         return codemap.task_evidence(query, token_budget=token_budget)
 
 

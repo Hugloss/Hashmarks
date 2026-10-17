@@ -50,7 +50,7 @@ def test_task_specific_symbol_anchor_beats_sibling_contract_noise(
     from hashmarks.codemap import CodeMap
 
     with CodeMap(combined) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         task = public_payload["tasks"][1]
         packet = codemap.task_decision_packet(task["query"], token_budget=512)
     truth = {r["id"]: r for r in secret_payload["tasks"]}[task["id"]]
@@ -86,6 +86,6 @@ def test_explicit_policy_uses_task_namespace_not_sibling_policy(tmp_path: Path) 
     from hashmarks.codemap import CodeMap
 
     with CodeMap(repo) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.task_decision_packet(task["query"], token_budget=512)
     assert packet["edit"]["path"] == truth[task["id"]]["expected_edit_path"]

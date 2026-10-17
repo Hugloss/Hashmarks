@@ -16,6 +16,7 @@ from hashmarks.codemap.repository_delta import (
 from hashmarks.codemap.repository_intelligence_query import (
     RepositoryIntelligenceQueryOptions,
 )
+from hashmarks.codemap.repository_observation import packet_digest
 from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
 
 if TYPE_CHECKING:
@@ -55,7 +56,7 @@ def test_snapshot_contains_path_symbols_dependencies_and_repository_evidence(
 ) -> None:
     _source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         snapshot = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
     assert snapshot["schema"] == "hashmarks.repository-intelligence-snapshot.v1"
     paths = assert_object(snapshot["paths"])
@@ -73,10 +74,10 @@ def test_repository_delta_is_smaller_and_exactly_reconstructs_current_snapshot(
 ) -> None:
     source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         previous = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
         source.write_text("def widget(): return 'new'\n", encoding="utf-8")
-        codemap.sync(["src/owner.py"])
+        codemap.index.sync(["src/owner.py"])
         delta = codemap.repository_intelligence_delta(
             task, ["src/owner.py"], previous_snapshot=previous
         )
@@ -115,12 +116,12 @@ def test_repository_delta_reports_dependency_change(tmp_path: Path) -> None:
     )
     task = "change route widget behavior and verify route test"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         previous = codemap.repository_intelligence_snapshot(task, ["src/route.py"])
         route.write_text(
             "from src.b import widget\ndef route(): return widget()\n", encoding="utf-8"
         )
-        codemap.sync(["src/route.py"])
+        codemap.index.sync(["src/route.py"])
         delta = codemap.repository_intelligence_delta(
             task, ["src/route.py"], previous_snapshot=previous
         )
@@ -155,7 +156,7 @@ def test_repository_delta_does_not_promote_name_similarity_to_move_identity(
     )
     task = "change widget and verify widget test"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         previous = codemap.repository_intelligence_snapshot(
             task, ["src/left.py", "src/right.py"]
         )
@@ -163,7 +164,7 @@ def test_repository_delta_does_not_promote_name_similarity_to_move_identity(
         right.write_text(
             "def helper(): return 2\ndef widget(): return 1\n", encoding="utf-8"
         )
-        codemap.sync(["src/left.py", "src/right.py"])
+        codemap.index.sync(["src/left.py", "src/right.py"])
         delta = codemap.repository_intelligence_delta(
             task, ["src/left.py", "src/right.py"], previous_snapshot=previous
         )
@@ -197,16 +198,16 @@ def test_repository_delta_rejects_foreign_repository_other_task_and_wrong_schema
     _source_a, task = _repo(a)
     _source_b, _ = _repo(b)
     with CodeMap(a) as ca:
-        ca.sync()
+        ca.index.sync()
         previous = ca.repository_intelligence_snapshot(task, ["src/owner.py"])
     with CodeMap(b) as cb:
-        cb.sync()
+        cb.index.sync()
         with pytest.raises(ValueError, match="repository-mismatch"):
             cb.repository_intelligence_delta(
                 task, ["src/owner.py"], previous_snapshot=previous
             )
     with CodeMap(a) as ca:
-        ca.sync()
+        ca.index.sync()
         with pytest.raises(ValueError, match="task-mismatch"):
             ca.repository_intelligence_delta(
                 "different task", ["src/owner.py"], previous_snapshot=previous
@@ -220,7 +221,7 @@ def test_repository_delta_rejects_foreign_repository_other_task_and_wrong_schema
 def test_repository_delta_rejects_tampered_retained_snapshot(tmp_path: Path) -> None:
     _source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         previous = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
         assert_object(assert_object(previous["paths"])["src/owner.py"])[
             "member_state"
@@ -277,7 +278,7 @@ def test_repository_snapshot_exposes_observer_and_explicit_completeness(
 ) -> None:
     _source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         snapshot = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
 
     assert assert_text(assert_object(snapshot["observer"])["identity"]).startswith(
@@ -296,13 +297,13 @@ def test_repository_delta_keeps_observer_change_separate_from_repository_change(
 ) -> None:
     _source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         previous = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
         previous["observer"] = {
             **assert_object(previous["observer"]),
             "identity": "sha256:older-observer",
         }
-        previous["snapshot_identity"] = "sha256:" + codemap._packet_digest(
+        previous["snapshot_identity"] = "sha256:" + packet_digest(
             "hashmarks.repository-intelligence-snapshot.v1",
             {
                 key: value
@@ -324,7 +325,7 @@ def test_snapshot_relationship_rows_have_stable_identity_and_provenance(
 ) -> None:
     _source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         first = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
         second = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
 
@@ -349,7 +350,7 @@ def test_relationship_identity_does_not_turn_provenance_into_semantic_delta(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         previous = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
         dependencies = assert_records(
             assert_object(assert_object(previous["paths"])["src/owner.py"])[
@@ -361,7 +362,7 @@ def test_relationship_identity_does_not_turn_provenance_into_semantic_delta(
             "source": "older-compatible-observer",
             "path": "src/owner.py",
         }
-        previous["snapshot_identity"] = "sha256:" + codemap._packet_digest(
+        previous["snapshot_identity"] = "sha256:" + packet_digest(
             "hashmarks.repository-intelligence-snapshot.v1",
             {
                 key: value
@@ -558,7 +559,7 @@ def test_verification_relationship_has_provider_identity_without_sufficiency_cla
 ) -> None:
     _source, _task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         relationship = codemap.verification_relationship_evidence(
             relation_kind="behavioral-verification",
             source="src/owner.py",
@@ -580,7 +581,7 @@ def test_verification_relationship_identity_is_deterministic_and_policy_free(
 ) -> None:
     _source, _task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         first = codemap.verification_relationship_evidence(
             source="src/owner.py",
             target="tests/test_owner.py",
@@ -604,7 +605,7 @@ def test_verification_relationship_identity_is_deterministic_and_policy_free(
 def test_verification_relationship_rejects_blank_relation_kind(tmp_path: Path) -> None:
     _source, _task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(ValueError, match="relationship kind must be nonblank"):
             codemap.verification_relationship_evidence(
                 source="src/owner.py",
@@ -620,7 +621,7 @@ def test_verification_relationship_rejects_policy_classifications(
 ) -> None:
     _source, _task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(ValueError, match="unsupported verification relationship"):
             codemap.verification_relationship_evidence(
                 relation_kind="behavioral-verification",

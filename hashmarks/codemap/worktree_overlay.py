@@ -114,9 +114,9 @@ class WorktreeOverlay:
         changed = self._normalize_paths(changed_paths)
         if not changed:
             raise ValueError("changed_paths must not be empty")
-        with self.base.decision_session():
+        with self.base.reads.session():
             base_generation, base_fingerprint = self._base_authority()
-            result = self.overlay.sync(changed)
+            result = self.overlay.index.sync(changed)
         self._changed = changed
         self._stats = OverlayStats(
             worker_id=self.worker_id,
@@ -139,7 +139,7 @@ class WorktreeOverlay:
     def _require_bound_base(self) -> OverlayStats:
         if self._stats is None:
             raise RuntimeError("overlay has not been synced")
-        self.base._ensure_map_ready()
+        self.base.reads.ready()
         generation, fingerprint = self._base_authority()
         if (
             generation != self._stats.base_generation
@@ -154,7 +154,7 @@ class WorktreeOverlay:
     def find_task(self, task: str, *, limit: int = 20) -> tuple[SearchHit, ...]:
         stats = self._require_bound_base()
         changed = set(self._changed)
-        with self.base.decision_session(expected_generation=stats.base_generation):
+        with self.base.reads.session(expected_generation=stats.base_generation):
             overlay_hits = list(self.overlay.find_task(task, limit=limit))
             base_hits = [
                 hit

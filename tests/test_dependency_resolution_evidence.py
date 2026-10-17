@@ -187,7 +187,7 @@ def test_v3_refuses_obsolete_v2_schema(tmp_path: Path) -> None:
     snapshot["schema"] = "hashmarks.dependency-resolution.v2"
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(
             ValueError,
             match="dependency resolution schema must be hashmarks.dependency-resolution.v3",
@@ -201,7 +201,7 @@ def test_v3_rejects_non_dependency_relationship_kind(tmp_path: Path, kind: str) 
     assert_object(assert_array(snapshot["relationships"])[0])["kind"] = kind
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(
             ValueError, match=f"unsupported dependency relationship kind: {kind}"
         ):
@@ -210,7 +210,7 @@ def test_v3_rejects_non_dependency_relationship_kind(tmp_path: Path, kind: str) 
 
 def test_v3_replay_rejects_non_dependency_relationship_kind(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         tampered = copy.deepcopy(observation)
         assert_object(assert_array(tampered["relationships"])[0])["kind"] = (
@@ -233,7 +233,7 @@ def test_v3_distinguishes_inventory_membership_from_graph_reachability(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.dependency_resolution_evidence(_snapshot_v3())
 
     inventory_nodes = {
@@ -252,7 +252,7 @@ def test_v3_separates_component_selection_and_observation_identity(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         first = codemap.dependency_resolution_evidence(_snapshot_v3())
         changed = _snapshot_v3()
         changed["module_ownership"] = [
@@ -274,7 +274,7 @@ def test_v3_public_consumers_revalidate_qualified_observation(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         assert observation["root_evidence"]
         reopened = json.loads(json.dumps(observation))
@@ -310,11 +310,11 @@ def test_v3_queries_reject_foreign_repository_observation(tmp_path: Path) -> Non
     source.mkdir()
     consumer.mkdir()
     with CodeMap(source) as source_map:
-        source_map.sync()
+        source_map.index.sync()
         observation = source_map.dependency_resolution_evidence(_snapshot_v3())
 
     with CodeMap(consumer) as consumer_map:
-        consumer_map.sync()
+        consumer_map.index.sync()
         with pytest.raises(ValueError, match="repository binding mismatch"):
             consumer_map.dependency_resolution_queries(
                 observation, [{"operation": "inventory"}]
@@ -323,10 +323,10 @@ def test_v3_queries_reject_foreign_repository_observation(tmp_path: Path) -> Non
 
 def test_v3_queries_reject_stale_repository_generation(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         (tmp_path / "new.py").write_text("VALUE = 1\n", encoding="utf-8")
-        codemap.sync(["new.py"])
+        codemap.index.sync(["new.py"])
         with pytest.raises(ValueError, match="repository binding mismatch"):
             codemap.dependency_resolution_queries(
                 observation, [{"operation": "inventory"}]
@@ -337,7 +337,7 @@ def test_v3_revalidation_rejects_unqualified_coverage_claim(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         tampered = copy.deepcopy(observation)
         assert_array(tampered["coverage"]).append(
@@ -357,7 +357,7 @@ def test_v3_revalidation_rejects_unqualified_coverage_claim(
 
 def test_v3_revalidation_binds_root_evidence_sources(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         tampered = copy.deepcopy(observation)
         assert_object(assert_array(tampered["root_evidence"])[0])[
@@ -388,7 +388,7 @@ def test_v3_identity_separates_semantics_from_producer_provenance(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         original = codemap.dependency_resolution_evidence(base)
         other_producer = codemap.dependency_resolution_evidence(provenance)
         other_scope = codemap.dependency_resolution_evidence(semantic_scope)
@@ -420,7 +420,7 @@ def test_v3_derivation_authority_is_traceable_without_history_store(
         assert_object(source)["producer_digest"] = "sha256:" + "a" * 64
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(snapshot)
         derivation = codemap.dependency_resolution_derivation_authority(observation)
 
@@ -469,12 +469,12 @@ def test_v3_derivation_authority_accepts_caller_retained_old_endpoint(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         original_binding = copy.deepcopy(observation["repository_binding"])
 
         (tmp_path / "later.py").write_text("VALUE = 1\n", encoding="utf-8")
-        codemap.sync(["later.py"])
+        codemap.index.sync(["later.py"])
 
         derivation = codemap.dependency_resolution_derivation_authority(observation)
 
@@ -492,7 +492,7 @@ def test_v3_derivation_identity_changes_with_adapter_semantics_only(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.dependency_resolution_evidence(before_raw)
         after = codemap.dependency_resolution_evidence(after_raw)
         before_derivation = codemap.dependency_resolution_derivation_authority(before)
@@ -514,7 +514,7 @@ def test_v3_derivation_authority_requires_explicit_adapter_semantics(
     assert_object(snapshot["producer"]).pop("adapter_semantics")
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(snapshot)
         with pytest.raises(ValueError, match="adapter semantics must be a string"):
             codemap.dependency_resolution_derivation_authority(observation)
@@ -524,7 +524,7 @@ def test_v3_derivation_authority_revalidates_observation_before_projection(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         tampered = copy.deepcopy(observation)
         assert_object(assert_array(tampered["evidence_sources"])[0])["source_id"] = (
@@ -539,7 +539,7 @@ def test_v3_opaque_empty_semantic_scope_is_valid(tmp_path: Path) -> None:
     snapshot = _snapshot_v3()
     snapshot["scope"] = {}
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.dependency_resolution_evidence(snapshot)
     assert packet["scope"] == {}
 
@@ -585,7 +585,7 @@ def test_v3_each_coverage_domain_is_independent_of_source_completeness(
         ],
     }
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         partial = codemap.dependency_resolution_evidence(snapshot)
         snapshot["coverage"][0]["completeness"] = "complete"
         complete = codemap.dependency_resolution_evidence(snapshot)
@@ -610,7 +610,7 @@ def test_v3_negative_evidence_is_scoped_by_context_and_coverage_kind(
     assert_object(assert_array(changed["coverage"])[1])["completeness"] = "incomplete"
     assert_object(assert_array(changed["coverage"])[1])["truncation"] = "truncated"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.dependency_resolution_evidence(changed)
 
     states = {
@@ -650,7 +650,7 @@ def test_v3_refuses_unknown_authority_contract_fields(
         assert_object(assert_array(changed["coverage"])[0])[field] = "unexpected"
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(ValueError, match="unknown dependency .* field"):
             codemap.dependency_resolution_evidence(changed)
 
@@ -684,7 +684,7 @@ def test_v3_refuses_non_string_typed_fields(
         assert_object(assert_array(changed["relationships"])[0])[field] = value
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(ValueError, match=message):
             codemap.dependency_resolution_evidence(changed)
 
@@ -695,7 +695,7 @@ def test_v3_rejects_dangling_evidence_source_reference(tmp_path: Path) -> None:
         "missing"
     ]
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(ValueError, match="dangling relationship evidence source"):
             codemap.dependency_resolution_evidence(changed)
 
@@ -704,7 +704,7 @@ def test_v3_delta_reports_selection_inventory_and_relationship_change(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.dependency_resolution_evidence(_snapshot_v3())
         changed = _snapshot_v3()
         assert_object(assert_array(changed["selections"])[1])["version"] = "2"
@@ -740,7 +740,7 @@ def test_v3_relationship_parent_change_is_not_selection_change(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.dependency_resolution_evidence(before_snapshot)
         after = codemap.dependency_resolution_evidence(after_snapshot)
         delta = codemap.dependency_resolution_delta(before, after)
@@ -784,7 +784,7 @@ def test_v3_rejects_module_owner_outside_observed_context(tmp_path: Path) -> Non
     ]
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(ValueError, match="module owner context not selected"):
             codemap.dependency_resolution_evidence(changed)
 
@@ -804,7 +804,7 @@ def test_v3_module_ownership_preserves_ambiguous_maven_module(
     ]
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(snapshot)
 
     ownership = assert_array(observation["module_ownership"])[0]
@@ -821,11 +821,11 @@ def test_v3_repository_correspondence_refuses_foreign_repository_binding(
     target.mkdir()
 
     with CodeMap(source) as source_map:
-        source_map.sync()
+        source_map.index.sync()
         observation = source_map.dependency_resolution_evidence(_snapshot_v3())
 
     with CodeMap(target) as target_map:
-        target_map.sync()
+        target_map.index.sync()
         with pytest.raises(
             ValueError,
             match="dependency observation repository binding mismatch",
@@ -841,10 +841,10 @@ def test_v3_repository_correlation_refuses_stale_generation(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         (tmp_path / "changed.py").write_text("value = 1\n")
-        codemap.sync()
+        codemap.index.sync()
 
         with pytest.raises(
             ValueError,
@@ -876,7 +876,7 @@ def test_v3_dependency_correlation_refuses_unknown_fields(
     payload: dict[str, object],
 ) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         with pytest.raises(ValueError, match="unknown dependency correlation"):
             codemap.dependency_evidence_correlation(observation, payload)
@@ -912,7 +912,7 @@ def test_v3_dependency_correlation_preserves_contextual_ownership(
         },
     ]
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(snapshot)
         packet = codemap.dependency_evidence_correlation(
             observation,
@@ -1027,7 +1027,7 @@ def test_v3_dependency_correlation_without_context_preserves_cross_context_ambig
         },
     ]
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(snapshot)
         packet = codemap.dependency_evidence_correlation(
             observation,
@@ -1086,7 +1086,7 @@ def test_import_correspondence_selects_most_specific_owner_per_context(
         },
     ]
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(snapshot)
         compile_result = codemap.dependency_import_correspondence(
             observation,
@@ -1149,7 +1149,7 @@ def test_import_correspondence_does_not_fall_back_from_observed_empty_exact_row(
     }
     snapshot["module_ownership"] = [parent]
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         fallback = codemap.dependency_resolution_evidence(snapshot)
         fallback_result = codemap.dependency_import_correspondence(
             fallback,
@@ -1231,7 +1231,7 @@ def test_dependency_correlation_identity_ignores_request_and_anchor_order(
     }
     second = {"module": "inventory", "context": "compile", "anchors": []}
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(snapshot)
         forward = codemap.dependency_evidence_correlation(
             observation, {"correlations": [first, second]}
@@ -1296,9 +1296,9 @@ def test_v3_repository_binding_tracks_current_codemap_generation(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.dependency_resolution_evidence(_snapshot_v3())
-        expected_identity = codemap._repository_packet_identity()
+        expected_identity = codemap.reads.repository_identity()
         expected_generation = codemap.store.generation()
 
     binding = packet["repository_binding"]
@@ -1313,7 +1313,7 @@ def test_v3_graph_query_refuses_node_outside_requested_context(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         with pytest.raises(
             ValueError,
@@ -1335,7 +1335,7 @@ def test_v3_graph_query_refuses_target_outside_requested_context(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         with pytest.raises(
             ValueError,
@@ -1361,7 +1361,7 @@ def test_v3_dependency_query_refuses_unknown_request_field(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         with pytest.raises(
             ValueError,
@@ -1426,7 +1426,7 @@ def test_v3_dependency_query_rejects_operation_irrelevant_fields(
     field: str,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         with pytest.raises(
             ValueError,
@@ -1484,7 +1484,7 @@ def test_v3_dependency_query_rejects_non_string_identifiers(
     tmp_path: Path, query_request: dict[str, object], field: str
 ) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         with pytest.raises(ValueError, match=f"{field} must be a string"):
             codemap.dependency_resolution_queries(observation, [query_request])
@@ -1503,7 +1503,7 @@ def test_v3_dependency_query_rejects_coerced_bounds(
     request[field] = value
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         with pytest.raises(ValueError, match=f"{field} must be a positive integer"):
             codemap.dependency_resolution_queries(observation, [request])
@@ -1539,7 +1539,7 @@ def test_v3_multicontext_graph_query_requires_explicit_context(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(changed)
         with pytest.raises(
             ValueError,
@@ -1578,7 +1578,7 @@ def test_v3_graph_query_reports_conditional_relationship_omission(
         request["target_id"] = "library@1"
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(changed)
         result = assert_array(
             codemap.dependency_resolution_queries(observation, [request])["results"]
@@ -1622,7 +1622,7 @@ def test_v3_graph_query_does_not_traverse_marker_qualified_selection(
         request["target_id"] = "library@1"
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(changed)
         result = assert_array(
             codemap.dependency_resolution_queries(observation, [request])["results"]
@@ -1650,7 +1650,7 @@ def test_v3_isolated_conditional_selection_cannot_prove_graph_absence(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(changed)
         results = codemap.dependency_resolution_queries(
             observation,
@@ -1698,7 +1698,7 @@ def test_v3_depth_bound_precedes_conditional_edge_omission(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(changed)
         result = assert_array(
             codemap.dependency_resolution_queries(
@@ -1733,7 +1733,7 @@ def test_v3_zero_length_path_does_not_consume_conditional_edges(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(changed)
         result = assert_array(
             codemap.dependency_resolution_queries(
@@ -1764,7 +1764,7 @@ def test_v3_zero_length_identity_query_preserves_conditional_selection(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(changed)
         result = assert_array(
             codemap.dependency_resolution_queries(
@@ -1805,7 +1805,7 @@ def test_v3_conditional_duplicate_does_not_weaken_unconditional_topology(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(changed)
         result = assert_array(
             codemap.dependency_resolution_queries(
@@ -1844,7 +1844,7 @@ def test_v3_duplicate_unconditional_edges_do_not_duplicate_node_paths(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(changed)
         result = assert_array(
             codemap.dependency_resolution_queries(
@@ -1870,7 +1870,7 @@ def test_v3_bounded_queries_report_dependencies_paths_and_contexts(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         packet = codemap.dependency_resolution_queries(
             observation,
@@ -1917,7 +1917,7 @@ def test_v3_contexts_query_exposes_incomplete_context_evidence(
     assert_object(selection_runtime)["truncation"] = "truncated"
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(changed)
         packet = codemap.dependency_resolution_queries(
             observation,
@@ -1936,7 +1936,7 @@ def test_v3_reachability_absence_requires_complete_context_coverage(
     assert_object(assert_array(changed["coverage"])[1])["completeness"] = "incomplete"
     assert_object(assert_array(changed["coverage"])[1])["truncation"] = "truncated"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(changed)
         packet = codemap.dependency_resolution_queries(
             observation,
@@ -1998,7 +1998,7 @@ def test_v3_query_exposes_depth_omission_instead_of_silent_partial_result(
         }
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(changed)
         packet = codemap.dependency_resolution_queries(
             observation,
@@ -2036,7 +2036,7 @@ def test_v3_repository_input_revision_requires_string_sha256(
     (tmp_path / "dependency.lock").write_text("content\n")
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(
             ValueError,
             match="member_revision must be lowercase sha256 hex",
@@ -2048,13 +2048,13 @@ def test_v3_repository_input_change_is_observation_only(tmp_path: Path) -> None:
     dependency_input = tmp_path / "dependency.lock"
     dependency_input.write_text("before\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         snapshot = _snapshot_v3()
         snapshot["repository_inputs"] = [{"path": "dependency.lock"}]
         before = codemap.dependency_resolution_evidence(snapshot)
 
         dependency_input.write_text("after\n")
-        codemap.sync()
+        codemap.index.sync()
         after = codemap.dependency_resolution_evidence(snapshot)
         delta = codemap.dependency_resolution_delta(before, after)
 
@@ -2087,7 +2087,7 @@ def test_v3_module_ownership_change_is_observation_only(tmp_path: Path) -> None:
         }
     ]
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.dependency_resolution_evidence(before_snapshot)
         after = codemap.dependency_resolution_evidence(after_snapshot)
         delta = codemap.dependency_resolution_delta(before, after)
@@ -2104,7 +2104,7 @@ def test_v3_provenance_change_does_not_masquerade_as_resolution_change(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.dependency_resolution_evidence(_snapshot_v3())
         changed = _snapshot_v3()
         assert_object(assert_array(changed["evidence_sources"])[0])[
@@ -2149,7 +2149,7 @@ def test_v3_contextual_module_ownership_preserves_independent_observations(
         },
     ]
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.dependency_resolution_evidence(changed)
 
     assert [
@@ -2184,7 +2184,7 @@ def test_v3_explicit_empty_complete_module_ownership_is_negative_evidence(
         }
     ]
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(snapshot)
         result = assert_array(
             codemap.dependency_resolution_queries(
@@ -2234,7 +2234,7 @@ def test_v3_explicit_empty_unknown_module_ownership_is_not_negative_evidence(
         }
     ]
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(snapshot)
         result = assert_array(
             codemap.dependency_resolution_queries(
@@ -2352,7 +2352,7 @@ def test_v3_source_kind_is_opaque_when_semantic_authorities_are_explicit(
         "module_ownership": [],
     }
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.dependency_resolution_evidence(snapshot)
 
     assert assert_object(packet["producer"])["kind"] == "fixture-resolver"
@@ -2400,7 +2400,7 @@ def test_v3_equivalent_producer_packets_have_query_and_delta_parity(
     ]
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.dependency_resolution_evidence(original)
         after = codemap.dependency_resolution_evidence(translated)
         before_queries = codemap.dependency_resolution_queries(before, requests)
@@ -2483,7 +2483,7 @@ def test_v3_module_owner_absence_requires_complete_ownership_coverage(
         }
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(changed)
         packet = codemap.dependency_resolution_queries(
             observation,
@@ -2515,7 +2515,7 @@ def test_v3_module_owner_absence_requires_complete_ownership_coverage(
 
 def test_v3_dependency_query_exact_result_bound_is_complete(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         packet = codemap.dependency_resolution_queries(
             observation,
@@ -2566,7 +2566,7 @@ def test_v3_dependency_query_reports_result_bound_when_result_is_omitted(
         }
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(changed)
         packet = codemap.dependency_resolution_queries(
             observation,
@@ -2590,7 +2590,7 @@ def test_v3_context_query_rejects_context_argument_instead_of_ignoring_it(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         with pytest.raises(
             ValueError,
@@ -2630,7 +2630,7 @@ def test_v3_context_query_includes_selection_context_without_inventory_or_edge(
         assert_object(assert_array(changed["selections"])[1])["evidence_sources"]
     ).append("tree:optional")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(changed)
         packet = codemap.dependency_resolution_queries(
             observation,
@@ -2668,7 +2668,7 @@ def test_v3_inventory_absence_requires_complete_inventory_coverage(
         }
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(changed)
         packet = codemap.dependency_resolution_queries(
             observation,
@@ -2722,7 +2722,7 @@ def test_v3_unscoped_module_absence_requires_coverage_for_every_context(
         }
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(changed)
         packet = codemap.dependency_resolution_queries(
             observation,
@@ -2761,7 +2761,7 @@ def test_v3_unscoped_module_absence_is_admissible_when_all_contexts_complete(
             }
         )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(changed)
         packet = codemap.dependency_resolution_queries(
             observation,
@@ -2788,7 +2788,7 @@ def test_v3_graph_query_completeness_requires_complete_resolution_coverage(
     )
     assert_object(runtime_coverage)["completeness"] = "incomplete"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(changed)
         packet = codemap.dependency_resolution_queries(
             observation,
@@ -2831,7 +2831,7 @@ def test_v3_empty_graph_queries_expose_negative_evidence_authority(
     )
     assert_object(runtime_coverage)["completeness"] = "incomplete"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(changed)
         packet = codemap.dependency_resolution_queries(
             observation,
@@ -2931,7 +2931,7 @@ def test_v3_path_query_exact_result_bound_does_not_claim_omission(
         ]
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(changed)
         result = assert_array(
             codemap.dependency_resolution_queries(
@@ -2976,7 +2976,7 @@ def test_v3_path_query_reports_result_bound_only_when_a_path_is_omitted(
         ]
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(changed)
         result = assert_array(
             codemap.dependency_resolution_queries(
@@ -3062,7 +3062,7 @@ def test_v3_query_visit_accounting_never_exceeds_declared_bound(
         request["target_id"] = "inventory-only@1"
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(_visit_limit_snapshot())
         result = assert_array(
             codemap.dependency_resolution_queries(observation, [request])["results"]
@@ -3098,7 +3098,7 @@ def test_v3_complete_module_ownership_cannot_exceed_incomplete_source(
         }
     ]
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(
             ValueError, match="module ownership exceeds evidence source"
         ):
@@ -3129,7 +3129,7 @@ def test_v3_complete_module_ownership_cannot_be_backed_only_by_unknown_source(
         }
     ]
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(
             ValueError, match="module ownership exceeds evidence source"
         ):
@@ -3152,7 +3152,7 @@ def test_v3_complete_coverage_can_combine_complete_sources(tmp_path: Path) -> No
         assert_object(assert_array(snapshot["coverage"])[0])["evidence_sources"]
     ).append("tree:compile:second")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.dependency_resolution_evidence(snapshot)
 
     coverage = next(
@@ -3172,7 +3172,7 @@ def test_v3_unknown_coverage_can_reference_complete_source_without_strengthening
     assert_object(assert_array(snapshot["coverage"])[0])["completeness"] = "unknown"
     assert_object(assert_array(snapshot["coverage"])[0])["truncation"] = "unknown"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.dependency_resolution_evidence(snapshot)
 
     coverage = next(
@@ -3187,7 +3187,7 @@ def test_v3_unknown_coverage_can_reference_complete_source_without_strengthening
 
 def test_v3_reachability_rejects_unknown_target_node(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         with pytest.raises(ValueError, match="unknown dependency query target_id"):
             codemap.dependency_resolution_queries(
@@ -3204,7 +3204,7 @@ def test_v3_reachability_rejects_unknown_target_node(tmp_path: Path) -> None:
 
 def test_v3_paths_rejects_unknown_target_node(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         with pytest.raises(ValueError, match="unknown dependency query target_id"):
             codemap.dependency_resolution_queries(
@@ -3221,7 +3221,7 @@ def test_v3_paths_rejects_unknown_target_node(tmp_path: Path) -> None:
 
 def test_v3_contexts_rejects_unknown_node(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         with pytest.raises(ValueError, match="unknown dependency query node_id"):
             codemap.dependency_resolution_queries(
@@ -3232,7 +3232,7 @@ def test_v3_contexts_rejects_unknown_node(tmp_path: Path) -> None:
 
 def test_v3_queries_reject_unknown_context_filter(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         for request in (
             {
@@ -3249,7 +3249,7 @@ def test_v3_queries_reject_unknown_context_filter(tmp_path: Path) -> None:
 
 def test_v3_component_unknown_identity_is_authoritative_absence(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         packet = codemap.dependency_resolution_queries(
             observation,
@@ -3273,7 +3273,7 @@ def test_v3_component_absence_requires_complete_selection_coverage(
         if assert_object(row)["kind"] != "selection"
     ]
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(snapshot)
         result = assert_array(
             codemap.dependency_resolution_queries(
@@ -3290,7 +3290,7 @@ def test_v3_component_present_identity_does_not_claim_negative_evidence(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         packet = codemap.dependency_resolution_queries(
             observation,
@@ -3309,7 +3309,7 @@ def test_v3_component_absence_remains_authoritative_with_incomplete_resolution_c
     assert_object(assert_array(changed["coverage"])[1])["completeness"] = "incomplete"
     assert_object(assert_array(changed["coverage"])[1])["truncation"] = "truncated"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(changed)
         packet = codemap.dependency_resolution_queries(
             observation,
@@ -3328,7 +3328,7 @@ def test_v3_component_result_limit_does_not_weaken_exact_identity_lookup(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         packet = codemap.dependency_resolution_queries(
             observation,
@@ -3353,7 +3353,7 @@ def test_v3_component_without_selection_is_rejected(tmp_path: Path) -> None:
         {"component_id": "orphan", "name": "orphan", "ecosystem": "test"}
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(ValueError, match="component has no dependency selection"):
             codemap.dependency_resolution_evidence(snapshot)
 
@@ -3371,7 +3371,7 @@ def test_v3_multiple_selections_for_one_component_remain_valid(tmp_path: Path) -
         }
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.dependency_resolution_evidence(snapshot)
 
     library_nodes = {
@@ -3402,7 +3402,7 @@ def test_v3_selection_without_any_context_is_rejected(tmp_path: Path) -> None:
         and assert_object(row)["target"] != "library@1"
     ]
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(ValueError, match="selection context must not be empty"):
             codemap.dependency_resolution_evidence(snapshot)
 
@@ -3411,7 +3411,7 @@ def test_v3_root_requires_evidence_source_provenance(tmp_path: Path) -> None:
     snapshot = _snapshot_v3()
     assert_object(assert_array(snapshot["roots"])[0])["evidence_sources"] = []
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(ValueError, match="root must reference evidence source"):
             codemap.dependency_resolution_evidence(snapshot)
 
@@ -3422,7 +3422,7 @@ def test_v3_root_rejects_incompatible_evidence_source_context(tmp_path: Path) ->
         "tree:runtime"
     ]
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(
             ValueError, match="incompatible root evidence source context"
         ):
@@ -3449,7 +3449,7 @@ def test_v3_root_provenance_changes_observation_not_resolution_identity(
     ]
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.dependency_resolution_evidence(baseline)
         after = codemap.dependency_resolution_evidence(changed)
 
@@ -3471,7 +3471,7 @@ def test_v3_selection_requires_provenance_for_each_observed_context(
     assert_object(library)["evidence_sources"] = ["tree:compile"]
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(
             ValueError,
             match="selection context lacks selection evidence authority: library@1:runtime",
@@ -3490,7 +3490,7 @@ def test_v3_complete_resolution_graph_can_have_selected_nodes_without_root(
     ]
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(changed)
         result = assert_array(
             codemap.dependency_resolution_queries(
@@ -3515,7 +3515,7 @@ def test_v3_unscoped_inventory_absence_requires_coverage_for_every_context(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         packet = codemap.dependency_resolution_queries(
             observation,
@@ -3549,7 +3549,7 @@ def test_v3_empty_complete_graph_and_inventory_preserve_negative_evidence(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(changed)
         results = codemap.dependency_resolution_queries(
             observation,
@@ -3595,7 +3595,7 @@ def test_v3_inventory_requires_resolved_inventory_evidence_authority(
     ]
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(
             ValueError,
             match="inventory requires resolved-inventory evidence authority",
@@ -3622,7 +3622,7 @@ def test_v3_module_ownership_requires_module_ownership_evidence_authority(
     ]
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(
             ValueError,
             match="module ownership requires module-ownership evidence authority",
@@ -3647,7 +3647,7 @@ def test_v3_selection_requires_selection_evidence_authority(
     assert_object(selection_coverage)["evidence_sources"] = ["tree:compile"]
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(
             ValueError,
             match="selection requires selection evidence authority",
@@ -3662,7 +3662,7 @@ def test_v3_rejects_producer_specific_coverage_kind(tmp_path: Path) -> None:
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(
             ValueError,
             match="unsupported dependency coverage kind: maven-dependency-tree",
@@ -3682,7 +3682,7 @@ def test_v3_complete_graph_coverage_refuses_inventory_only_source_authority(
     ]
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(
             ValueError,
             match="resolution-graph coverage requires resolution-graph evidence authority",
@@ -3709,7 +3709,7 @@ def test_v3_relationship_refuses_inventory_only_source_authority(
     ]
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(
             ValueError,
             match="relationship requires resolution-graph evidence authority",
@@ -3734,7 +3734,7 @@ def test_v3_root_refuses_inventory_only_source_authority(tmp_path: Path) -> None
     ]
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(
             ValueError,
             match="root requires resolution-graph evidence authority",
@@ -3754,7 +3754,7 @@ def test_v3_complete_inventory_coverage_refuses_graph_only_source_authority(
     ]
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(
             ValueError,
             match="resolved-inventory coverage requires resolved-inventory evidence authority",
@@ -3795,7 +3795,7 @@ def test_v3_every_cited_source_must_support_its_fact_or_coverage(
         assert_object(assert_array(snapshot[family])[index])["evidence_sources"]
     ).append(unsupported)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(ValueError, match=message):
             codemap.dependency_resolution_evidence(snapshot)
 
@@ -3814,7 +3814,7 @@ def test_v3_mixed_module_ownership_sources_do_not_borrow_authority(
         }
     ]
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(
             ValueError, match="module ownership requires module-ownership"
         ):
@@ -3837,7 +3837,7 @@ def test_v3_mixed_selection_sources_do_not_borrow_authority(tmp_path: Path) -> N
         assert_object(assert_array(snapshot["selections"])[0])["evidence_sources"]
     ).append("ownership-only:compile")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(
             ValueError, match="selection requires selection evidence authority"
         ):
@@ -3851,10 +3851,10 @@ def test_v3_delta_reports_cross_repository_identity_change(tmp_path: Path) -> No
     right.mkdir()
 
     with CodeMap(left) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.dependency_resolution_evidence(_snapshot_v3())
     with CodeMap(right) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         after = codemap.dependency_resolution_evidence(_snapshot_v3())
 
     delta = CodeMap.dependency_resolution_delta(before, after)

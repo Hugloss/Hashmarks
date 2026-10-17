@@ -73,7 +73,7 @@ def _check_repository_intelligence() -> None:
                     "installed RepositoryIdentity produced an empty hash"
                 )
         with CodeMap(root) as codemap:
-            result = codemap.sync()
+            result = codemap.index.sync()
             if result.discovered < 1:
                 raise RuntimeError(
                     "installed CodeMap did not discover the smoke repository"

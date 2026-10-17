@@ -70,7 +70,7 @@ class TaskEvidenceRetrievalMixin:
                 continue
             for hit in hits[:2]:
                 if (
-                    self.policy.decide(hit.path).evidence_visibility
+                    self.files.decide(hit.path).evidence_visibility
                     is EvidenceVisibility.DENY
                 ):
                     continue
@@ -79,7 +79,7 @@ class TaskEvidenceRetrievalMixin:
             if len(rare_paths) >= 4:
                 break
         paths.extend(path for path in rare_paths[:4] if path not in paths)
-        lexical = self._session_lexical_file_candidates(terms, limit=64)
+        lexical = self.reads.lexical_file_candidates(terms, limit=64)
         code_paths = [
             str(row["path"])
             for row in lexical
@@ -200,7 +200,7 @@ class TaskEvidenceRetrievalMixin:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         scored: list[tuple[int, int, float, str, Mapping[str, object]]] = []
-        for symbol in self._session_symbols_for_path(path):
+        for symbol in self.reads.symbols_for_path(path):
             name = str(symbol.get("name") or "")
             score = self._task_evidence_symbol_relevance(
                 name, query_tokens, frequencies, total
@@ -305,7 +305,7 @@ class TaskEvidenceRetrievalMixin:
             )
             for word in re.findall(r"[A-Za-z]+", query.lower())
         )
-        total, frequencies = self._session_lexical_document_frequencies(terms)
+        total, frequencies = self.reads.lexical_document_frequencies(terms)
         scoped = self._task_evidence_scoped_method_supplement(
             task, query_tokens, frequencies, total, existing_keys
         )
@@ -319,13 +319,13 @@ class TaskEvidenceRetrievalMixin:
             if (
                 visibility is None
                 or visibility is EvidenceVisibility.DENY
-                or self.policy.decide(path).evidence_visibility
+                or self.files.decide(path).evidence_visibility
                 is EvidenceVisibility.DENY
-                or not self._indexed_path_current(path)
+                or not self.index.is_current(path)
             ):
                 continue
             eligible.append((path, visibility))
-        self._session_preload_symbols([path for path, _ in eligible])
+        self.reads.preload_symbols([path for path, _ in eligible])
         test_edit = self._task_action_cues(task).explicit_test_edit
         scored_rows: list[
             tuple[bool, int, int, float, int, str, dict[str, object]]
@@ -377,8 +377,66 @@ class TaskEvidenceRetrievalMixin:
             + [row[6] for row in scored_rows[: 2 - int(scoped is not None)]],
             self._task_evidence_lexical_supplement(
                 task, query_tokens, frequencies, total, test_edit=test_edit
+            )
+            or self._task_evidence_context_supplement(
+                terms, query_tokens, frequencies, total, test_edit=test_edit
             ),
         )
+
+    def _task_evidence_context_supplement(
+        self,
+        terms: Sequence[str],
+        query_tokens: Sequence[tuple[str, ...]],
+        frequencies: Mapping[str, int],
+        total: int,
+        *,
+        test_edit: bool,
+    ) -> dict[str, object] | None:
+        """Disclose a callable using its class/signature, never runtime ownership."""
+        codemap = cast("CodeMap", self)
+        paths = [
+            str(row["path"])
+            for row in codemap.reads.lexical_file_candidates(terms, limit=64)
+            if row.get("language") not in {"text", "markdown"}
+            and (
+                test_edit
+                or RepositoryDomain.TEST
+                not in classify_repository_path(str(row["path"]))
+            )
+            and codemap._task_evidence_declaration_visible(str(row["path"]))
+            and codemap.index.is_current(str(row["path"]))
+        ]
+        # Use the same bounded file pool before its twelve-path presentation
+        # shortlist. Do not hydrate every symbol in every broad file match.
+        rows = codemap.store.declaration_context_candidates(
+            list(dict.fromkeys(group for group in query_tokens if group))[:32], paths
+        )
+        eligible: list[tuple[int, float, str, str, dict[str, object]]] = []
+        for symbol in rows:
+            path, name = str(symbol["path"]), str(symbol["name"])
+            context = str(symbol["qualname"]) + " " + str(symbol["signature"])
+            matches = self._task_evidence_natural_match_count(context, query_tokens)
+            if matches < 2 or matches <= self._task_evidence_natural_match_count(
+                name, query_tokens
+            ):
+                continue
+            score = self._task_evidence_symbol_relevance(
+                context, query_tokens, frequencies, total
+            )
+            visibility = codemap._task_evidence_visibility(path)
+            if visibility is None or visibility is EvidenceVisibility.DENY:
+                continue
+            row = self._task_evidence_supplement_row(
+                path, symbol, score=score, visibility=visibility
+            )
+            row["retrieval_supplement"] = "bounded-declaration-context"
+            row["score_basis"] = "natural-declaration-context-relevance"
+            eligible.append((-matches, -score, path, str(symbol["qualname"]), row))
+        eligible.sort(key=lambda row: row[:4])
+        for _, _, path, _, row in eligible:
+            if codemap.index.is_current(path):
+                return row
+        return None
 
     @classmethod
     def _task_evidence_combine_natural_supplements(
@@ -389,6 +447,11 @@ class TaskEvidenceRetrievalMixin:
         if lexical is None:
             return natural
         lexical_key = cls._task_evidence_requested_locator_key(lexical)
+        if lexical.get("retrieval_supplement") == "bounded-declaration-context" and any(
+            cls._task_evidence_requested_locator_key(row) == lexical_key
+            for row in natural
+        ):
+            return natural
         # A callable name is a stronger declaration hint than a class name.
         # Preserve the best existing callable and disclose one source position.
         named = next(
@@ -456,9 +519,9 @@ class TaskEvidenceRetrievalMixin:
             path = str(symbol["path"])
             if (
                 codemap._task_evidence_visibility(path) is not EvidenceVisibility.SOURCE
-                or codemap.policy.decide(path).evidence_visibility
+                or codemap.files.decide(path).evidence_visibility
                 is not EvidenceVisibility.SOURCE
-                or not codemap._indexed_path_current(path)
+                or not codemap.index.is_current(path)
             ):
                 continue
             raw_matched = symbol["matched_terms"]
@@ -496,15 +559,49 @@ class TaskEvidenceRetrievalMixin:
             )
         eligible.sort(key=lambda row: row[:4])
         for _, _, path, _, row in eligible:
-            if codemap._indexed_path_current(path):
+            if codemap.index.is_current(path):
                 return row
         return None
+
+    def _task_evidence_covered_supplements(
+        self,
+        rows: Sequence[Mapping[str, object]],
+        natural: Sequence[Mapping[str, object]],
+    ) -> set[tuple[str, str]]:
+        """Recognize hints already disclosed by the leading bounded class scope."""
+        codemap = cast("CodeMap", self)
+        if not rows or not natural:
+            return set()
+        path = str(rows[0].get("path") or "")
+        if not codemap._task_evidence_declaration_visible(
+            path
+        ) or not codemap.index.is_current(path):
+            return set()
+        parent = codemap._task_evidence_retrieved_class_scope(path, rows[0])
+        if parent is None:
+            return set()
+        context = codemap._task_evidence_class_declarations(path, parent)
+        declarations = context["declarations"]
+        assert isinstance(declarations, list)
+        declared = {
+            (path, str(row["symbol"]))
+            for row in declarations
+            if isinstance(row, Mapping)
+        }
+        return {
+            key
+            for row in natural
+            if row.get("retrieval_supplement") == "bounded-natural-language"
+            and (key := self._task_evidence_requested_locator_key(row)) in declared
+            and key != self._task_evidence_requested_locator_key(rows[0])
+        }
 
     def _task_evidence_order_supplements(
         self,
         retrieval: TaskRetrievalDraft,
         requested_keys: set[tuple[str, str]],
         natural: Sequence[Mapping[str, object]],
+        covered: set[tuple[str, str]],
     ) -> None:
         """Order disclosure hints independently from edit/verification authority."""
         natural_names = {
@@ -523,7 +620,8 @@ class TaskEvidenceRetrievalMixin:
         lexical_keys = {
             self._task_evidence_requested_locator_key(row)
             for row in natural
-            if row.get("retrieval_supplement") == "bounded-lexical-source-position"
+            if row.get("retrieval_supplement")
+            in {"bounded-lexical-source-position", "bounded-declaration-context"}
         }
         if requested_keys:
             keys, ordering = (
@@ -541,6 +639,7 @@ class TaskEvidenceRetrievalMixin:
             )
         else:
             return
+        keys -= covered
         retrieval["results"] = sorted(
             retrieval["results"],
             key=lambda row: self._task_evidence_requested_locator_key(row) not in keys,
@@ -566,8 +665,11 @@ class TaskEvidenceRetrievalMixin:
         # A structural file/class owner is not a reason to hide an explicitly
         # named declaration. Reuse exact identity resolution for locators only;
         # these rows never change the independently selected edit/test owner.
-        explicit = result["explicit_target"]
-        literal_path = explicit["path"] if explicit["basis"] == "literal-path" else None
+        literal_path = (
+            result["explicit_target"]["path"]
+            if result["explicit_target"]["basis"] == "literal-path"
+            else None
+        )
         exact, exact_complete, exact_terms = self._task_evidence_requested_identifiers(
             task, literal_path, canonical_rank=len(current) + 1
         )
@@ -616,6 +718,9 @@ class TaskEvidenceRetrievalMixin:
             [*current, *supplements],
             limit=limit,
         )
+        existing_keys.update(
+            self._task_evidence_requested_locator_key(row) for row in supplements
+        )
         supplements.extend(
             [
                 row
@@ -624,7 +729,14 @@ class TaskEvidenceRetrievalMixin:
             ][: 2 - len(supplements)]
         )
         retrieval["results"] = current
-        self._task_evidence_order_supplements(retrieval, requested_keys, natural)
+        covered = (
+            set()
+            if requested_keys
+            else self._task_evidence_covered_supplements(current, natural)
+        )
+        self._task_evidence_order_supplements(
+            retrieval, requested_keys, natural, covered
+        )
         current = retrieval["results"]
         if exact_terms or literal_path:
             retrieval["exact_identifier_supplements"] = {
@@ -651,7 +763,9 @@ class TaskEvidenceRetrievalMixin:
                 )
                 else "canonical-then-bounded-natural-language"
             )
-        self._task_evidence_order_supplements(retrieval, requested_keys, natural)
+        self._task_evidence_order_supplements(
+            retrieval, requested_keys, natural, covered
+        )
         self._task_evidence_attach_class_declarations(result)
         self._task_evidence_attach_enclosing_functions(result)
         self._task_evidence_attach_direct_call_declarations(result)
@@ -695,7 +809,7 @@ class TaskEvidenceRetrievalMixin:
             self = cast("CodeMap", self)
         if not self._task_evidence_declaration_visible(
             path
-        ) or not self._indexed_path_current(path):
+        ) or not self.index.is_current(path):
             return []
         # Retain common identifiers and private-member syntax for disclosure.
         # The action owner keeps its stricter rules for ownership admission.
@@ -708,7 +822,7 @@ class TaskEvidenceRetrievalMixin:
         }
         symbols = [
             symbol
-            for symbol in self._session_symbols_for_path(path)
+            for symbol in self.reads.symbols_for_path(path)
             if terms.intersection(
                 str(symbol.get(key) or "").lower() for key in ("name", "qualname")
             )

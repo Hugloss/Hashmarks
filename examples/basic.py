@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 workspace = Path(".").resolve()
 
 with CodeMap(workspace) as codemap:
-    result = codemap.sync()
+    result = codemap.index.sync()
     log_command_output(logger, "generation:", result.generation)
 
     log_command_output(logger, "\norientation:")

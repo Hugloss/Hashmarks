@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING, cast
 
 from hashmarks.operation_contract import operation_schema
 
+from .repository_observation import packet_digest
+
 if TYPE_CHECKING:
     from .engine import CodeMap
 
@@ -45,7 +47,7 @@ class EvidenceCorrelationReplayMixin:
             if isinstance(repository, Mapping)
             else ""
         )
-        if repository_identity != self._repository_packet_identity():
+        if repository_identity != self.reads.repository_identity():
             raise ValueError(f"{label} correlation repository-mismatch")
         self._validate_binding_delta_input(
             repository_evidence, name=f"{label} repository"
@@ -60,7 +62,7 @@ class EvidenceCorrelationReplayMixin:
         identity_payload = dict(packet)
         identity_payload.pop("correlation_identity", None)
         identity_payload.pop("delta_from_previous", None)
-        expected_identity = "sha256:" + self._packet_digest(
+        expected_identity = "sha256:" + packet_digest(
             _CORRELATION_SCHEMA,
             identity_payload,
         )
@@ -96,9 +98,7 @@ class EvidenceCorrelationReplayMixin:
             include_relationships=include,
             relationship_limit_per_path=limit or 100,
         )
-        expected_definition = "sha256:" + self._packet_digest(
-            _DEFINITION_DOMAIN, definition
-        )
+        expected_definition = "sha256:" + packet_digest(_DEFINITION_DOMAIN, definition)
         if packet.get("evidence_definition_identity") != expected_definition:
             raise ValueError(f"{label} evidence_definition_identity mismatch")
         if not _json_equal(

@@ -40,7 +40,7 @@ def repository(tmp_path: Path) -> Iterator[CodeMap]:
         state_dir=tmp_path / "state",
         artifact_db=tmp_path / "artifacts.sqlite3",
     ) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         yield codemap
 
 
@@ -80,12 +80,12 @@ def test_frozen_local_vectors_retain_unknown_and_ambiguous_evidence(
 def test_line_move_comparison_has_identical_core_and_mcp_evidence(
     repository: CodeMap,
 ) -> None:
-    before_source: Any = repository.source_observation("app/service.py", lines=[4])
+    before_source: Any = repository.source.observe("app/service.py", lines=[4])
     before = _diagnostic(before_source, 4)
     path = repository.workspace / "app/service.py"
     path.write_bytes(b"\n" + path.read_bytes())
-    repository.sync()
-    after_source: Any = repository.source_observation("app/service.py", lines=[5])
+    repository.index.sync()
+    after_source: Any = repository.source.observe("app/service.py", lines=[5])
     after = _diagnostic(after_source, 5)
     expected: Any = repository.diagnostic_observation_delta(
         before, after, before_source=before_source, after_source=after_source
@@ -132,7 +132,7 @@ def test_line_move_comparison_has_identical_core_and_mcp_evidence(
 def test_old_locations_do_not_become_exact_current_source_after_changes(
     repository: CodeMap, change: str
 ) -> None:
-    before: Any = repository.source_observation("app/service.py", lines=[4])
+    before: Any = repository.source.observe("app/service.py", lines=[4])
     path = repository.workspace / "app/service.py"
     if change == "rename":
         path.rename(path.with_name("renamed.py"))
@@ -140,7 +140,7 @@ def test_old_locations_do_not_become_exact_current_source_after_changes(
         path.unlink()
     else:
         path.write_text("def replacement():\n    return 42\n", encoding="utf-8")
-    repository.sync()
+    repository.index.sync()
     packet: Any = repository.correlate_evidence(
         claim_bundle(
             {
@@ -154,7 +154,7 @@ def test_old_locations_do_not_become_exact_current_source_after_changes(
     )
     anchor = packet["bundles"][0]["anchors"][0]
     assert anchor["source_equivalence"]["state"] != "proven"
-    current: Any = repository.source_observation("app/service.py")
+    current: Any = repository.source.observe("app/service.py")
     result: Any = repository.diagnostic_source_revision_evidence(
         _diagnostic(before, 4), [current]
     )
@@ -166,14 +166,14 @@ def test_line_endings_and_encoding_remain_exact_member_evidence(
     repository: CodeMap,
 ) -> None:
     path = repository.workspace / "app/encoded.py"
-    before: Any = repository.source_observation("app/encoded.py", lines=[2])
+    before: Any = repository.source.observe("app/encoded.py", lines=[2])
     assert (
         before["member"]["member_revision"] == hash_file(path, domain=FILE_DOMAIN).hash
     )
     assert b"\r\n" in path.read_bytes()
     path.write_bytes(path.read_bytes().replace(b"\r\n", b"\n"))
-    repository.sync()
-    after: Any = repository.source_observation("app/encoded.py", lines=[2])
+    repository.index.sync()
+    after: Any = repository.source.observe("app/encoded.py", lines=[2])
     assert before["member"]["member_revision"] != after["member"]["member_revision"]
     assert (
         before["line_anchors"][0]["line_sha256"]
@@ -207,7 +207,7 @@ def test_alias_reexport_call_chain_and_verifier_correspondence(
 def test_observer_visibility_changes_are_not_repository_edits(
     repository: CodeMap,
 ) -> None:
-    source: Any = repository.source_observation("app/service.py")
+    source: Any = repository.source.observe("app/service.py")
     before = _diagnostic(source, 4)
     after = deepcopy(before)
     after["diagnostics"] = []
@@ -239,7 +239,7 @@ def test_local_lock_observations_preserve_versions_and_repository_binding(
     lock.write_bytes(
         lock.read_bytes().replace(b"version = '1.0.0'", b"version = '2.0.0'")
     )
-    repository.sync()
+    repository.index.sync()
     after: Any = repository.dependency_resolution_evidence(
         uv_lock_dependency_observation(
             lock=lock.read_bytes(),
@@ -273,7 +273,7 @@ def test_local_lock_observations_preserve_versions_and_repository_binding(
 def test_source_packet_revision_and_bounds_converge_through_cli_and_mcp(
     repository: CodeMap,
 ) -> None:
-    core: Any = repository.source_observation(
+    core: Any = repository.source.observe(
         "app/service.py", lines=[4], anchor_context_lines=1
     )
     surface = HashmarksMcpSurface(
@@ -329,14 +329,14 @@ def test_replay_rejects_substitution_and_does_not_persist_claims(
 
 
 def test_current_claim_cannot_repair_a_stale_index(repository: CodeMap) -> None:
-    before: Any = repository.source_observation("app/service.py", lines=[4])
+    before: Any = repository.source.observe("app/service.py", lines=[4])
     path = repository.workspace / "app/service.py"
     path.write_bytes(b"\n" + path.read_bytes())
     producer_claim = deepcopy(before)
     producer_claim["member"]["member_revision"] = hash_file(
         path, domain=FILE_DOMAIN
     ).hash
-    current = repository.source_observation("app/service.py", lines=[4])
+    current = repository.source.observe("app/service.py", lines=[4])
     result: Any = repository.diagnostic_source_revision_evidence(
         _diagnostic(producer_claim, 4), [current]
     )
@@ -355,7 +355,7 @@ def test_declared_and_locked_versions_have_evidence_without_a_winner(
     lock.write_bytes(
         lock.read_bytes().replace(b"version = '1.0.0'", b"version = '2.0.0'")
     )
-    repository.sync()
+    repository.index.sync()
     locked = next(
         row["version"]
         for row in tomllib.loads(lock.read_text())["package"]
@@ -421,7 +421,7 @@ def test_registered_mcp_tool_transports_paired_source_observations(
     pytest.importorskip("mcp", reason="optional official MCP SDK unavailable")
     from hashmarks.mcp_server import build_server
 
-    source: Any = repository.source_observation("app/service.py", lines=[4])
+    source: Any = repository.source.observe("app/service.py", lines=[4])
     diagnostic = _diagnostic(source, 4)
     expected = repository.diagnostic_observation_delta(
         diagnostic, diagnostic, before_source=source, after_source=source
@@ -474,7 +474,7 @@ def test_changed_test_source_replaces_exact_caller_correspondence(
         "def test_replacement():\n    assert handle_request()\n",
         encoding="utf-8",
     )
-    repository.sync()
+    repository.index.sync()
     after: Any = repository.structural_locality(target)
     owner = next(row for row in after["nodes"] if row["symbol_id"] == target)
     callers = {row["path"] for row in owner["exact_callers"]}

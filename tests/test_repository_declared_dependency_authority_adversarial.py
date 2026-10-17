@@ -31,7 +31,7 @@ def test_equal_dependency_bytes_at_new_path_are_definition_change_not_observatio
     binding = [_binding("consumer", "owner.py")]
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.repository_evidence_bindings(
             binding,
             dependency_paths={"consumer": ["dep-a.lock"]},
@@ -108,7 +108,7 @@ def test_shared_declared_dependency_affects_only_bindings_that_declared_it(
     }
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.repository_evidence_bindings(
             bindings,
             dependency_paths=dependencies,
@@ -116,7 +116,7 @@ def test_shared_declared_dependency_affects_only_bindings_that_declared_it(
         )
 
         shared.write_text("two\n", encoding="utf-8")
-        codemap.sync(["shared.lock"])
+        codemap.index.sync(["shared.lock"])
         after = codemap.repository_evidence_bindings(
             bindings,
             dependency_paths=dependencies,

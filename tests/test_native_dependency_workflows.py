@@ -54,11 +54,11 @@ def test_maven_manifest_replacement_stale_bindings_and_downstream_transitions(
         root, source, materialize_dependency(root, source), scenario
     )
     with CodeMap(root, state_dir=state) as cm:
-        cm.sync()
+        cm.index.sync()
         before: Any = cm.dependency_resolution_evidence(original)
         after_source = native_dependency_corpus / "maven" / scenario / "after"
         materialize_dependency(root, after_source)
-        cm.sync()
+        cm.index.sync()
         stale: Any = cm.dependency_resolution_evidence(original)
         mismatches = {
             row["path"]
@@ -162,7 +162,7 @@ def test_uv_workspace_changes_observe_selection_and_preserve_unknown_module_owne
         assert (root / "packages/orphan/pyproject.toml").exists() == orphan
         raw = dependency_capture("uv", source, input_revisions(root, paths))
         with CodeMap(root, state_dir=state) as cm:
-            cm.sync()
+            cm.index.sync()
             current: Any = cm.dependency_resolution_evidence(raw)
             library = next(
                 row
@@ -197,7 +197,7 @@ def test_uv_workspace_changes_observe_selection_and_preserve_unknown_module_owne
                     assert delta["components_removed"] == ["workspace-orphan"]
                 assert_projection(delta, "dependency_codemap", "compare")
         with CodeMap(root, state_dir=tmp_path / ("fresh-" + name)) as cm:
-            cm.sync()
+            cm.index.sync()
             assert semantic_dependency_fields(
                 cm.dependency_resolution_evidence(raw)
             ) == semantic_dependency_fields(current)

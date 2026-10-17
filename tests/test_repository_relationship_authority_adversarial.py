@@ -47,11 +47,11 @@ def test_relationship_fact_change_is_path_shared_but_range_impact_stays_local(
     (tmp_path / "unrelated.py").write_text("OTHER = 1\n", encoding="utf-8")
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.repository_evidence_bindings(_bindings())
 
         source.write_text("from beta import VALUE\nKEEP = 1\n", encoding="utf-8")
-        codemap.sync(["source.py"])
+        codemap.index.sync(["source.py"])
         after = codemap.repository_evidence_bindings(_bindings())
         delta = codemap.repository_evidence_binding_delta(before, after)
         coverage = codemap.repository_evidence_coverage(
@@ -123,14 +123,14 @@ def test_relationship_locator_move_stays_separate_and_does_not_leak_bindings(
     ]
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.repository_evidence_bindings(bindings)
 
         source.write_text(
             "PAD = 0\nfrom dependency import VALUE\nKEEP = 1\n",
             encoding="utf-8",
         )
-        codemap.sync(["source.py"])
+        codemap.index.sync(["source.py"])
         after = codemap.repository_evidence_bindings(bindings)
         delta = codemap.repository_evidence_binding_delta(before, after)
         coverage = codemap.repository_evidence_coverage(

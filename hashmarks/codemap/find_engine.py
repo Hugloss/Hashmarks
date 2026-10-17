@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, cast
 from hashmarks.freshness import freshness_state
 from hashmarks.operation_contract import operation_schema, validate_operation_response
 
-from .decision_session import decision_scoped
+from .decision_session import ReadScopeOwner, decision_scoped
 from .model import EvidenceVisibility, SearchHit
 from .query_primitives import _WORD_RE, _query_terms
 from .query_router import QueryRoute, route_query
@@ -144,7 +144,7 @@ def _find_claim_fields(
     }
 
 
-class FindEngineMixin:
+class FindEngineMixin(ReadScopeOwner):
     def query_route(self, query: str) -> QueryRoute:
         """Return the deterministic retrieval route without executing search."""
         return route_query(query)
@@ -170,7 +170,7 @@ class FindEngineMixin:
             self = cast("CodeMap", self)
         evidence = self._find_evidence(query, limit=limit)
         route = self.query_route(query)
-        generation, identity_generation, stale = self._generation_status()
+        generation, identity_generation, stale = self.reads.generation_status()
         freshness = freshness_state(stale)
         claims = _find_claim_fields(
             query,
@@ -195,14 +195,14 @@ class FindEngineMixin:
     def _find_evidence(self, query: str, *, limit: int) -> _FindEvidence:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        self._ensure_map_ready()
+        self.reads.ready()
         if not query.strip():
             raise ValueError("query must not be empty")
         key = (
             "find.v1",
             self.store.meta("workspace_fingerprint", "") or "",
             self.store.generation(),
-            self.policy.fingerprint(),
+            self.files.policy_fingerprint(),
             query,
             int(limit),
         )
@@ -228,7 +228,7 @@ class FindEngineMixin:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         bound = max(100, ctx.limit * 8)
-        rows = self._session_exact_symbol_candidates(ctx.terms, limit=bound)
+        rows = self.reads.exact_symbol_candidates(ctx.terms, limit=bound)
         if len(rows) >= bound:
             ctx.bound_reasons.add("find-exact-symbol-limit")
         for row in rows:
@@ -243,9 +243,7 @@ class FindEngineMixin:
         bound = max(80, ctx.limit * 6)
         if len(ctx.terms) > 16:
             ctx.bound_reasons.add("find-lexical-term-limit")
-        lexical_files = self._session_lexical_file_candidates(
-            ctx.terms[:16], limit=bound
-        )
+        lexical_files = self.reads.lexical_file_candidates(ctx.terms[:16], limit=bound)
         if len(lexical_files) >= bound:
             ctx.bound_reasons.add("find-lexical-file-limit")
         term_count = max(1, len(ctx.terms))
@@ -277,7 +275,7 @@ class FindEngineMixin:
         bridge_rows: list[dict[str, object]] = []
         bridge_count: dict[str, int] = {}
         bound = max(1000, ctx.limit * 150)
-        symbol_rows = self._session_symbols_for_paths(candidate_paths, limit=bound)
+        symbol_rows = self.reads.symbols_for_paths(candidate_paths, limit=bound)
         if len(symbol_rows) >= bound:
             ctx.bound_reasons.add("find-lexical-symbol-limit")
         for raw_row in symbol_rows:
@@ -388,7 +386,7 @@ class FindEngineMixin:
         if not ctx.route.native_definitions:
             return
         native_rows = self._find_native_rows(ctx)
-        file_rows = self._session_file_rows(str(row["path"]) for row in native_rows)
+        file_rows = self.reads.file_rows(str(row["path"]) for row in native_rows)
         for row in native_rows:
             mapped = file_rows.get(str(row["path"]))
             if mapped is None:
@@ -465,10 +463,10 @@ class FindEngineMixin:
         if not ctx.route.caller_expansion:
             return
         seed_names = self._find_caller_seed_names(ctx, candidates, bridge_rows)
-        refs_by_seed = self._session_refs_many(seed_names, limit_per_target=30)
+        refs_by_seed = self.reads.refs_many(seed_names, limit_per_target=30)
         if any(len(rows) >= 30 for rows in refs_by_seed.values()):
             ctx.bound_reasons.add("find-caller-reference-limit")
-        caller_files = self._session_file_rows(self._find_caller_paths(refs_by_seed))
+        caller_files = self.reads.file_rows(self._find_caller_paths(refs_by_seed))
         for seed_name in seed_names:
             self._find_merge_caller_seed(
                 candidates, refs_by_seed.get(seed_name, ()), caller_files
@@ -556,7 +554,7 @@ class FindEngineMixin:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         targets: set[str] = set()
-        edges_by_seed = self._session_edges_from_many(seed_keys, limit_per_seed=24)
+        edges_by_seed = self.reads.edges_from_many(seed_keys, limit_per_seed=24)
         if any(len(rows) >= 24 for rows in edges_by_seed.values()):
             bound_reasons.add("find-semantic-edge-limit")
         for seed_key in seed_keys:
@@ -580,9 +578,7 @@ class FindEngineMixin:
         if not targets:
             return protected
         bound = max(24, len(targets) * 8)
-        related_rows = self._session_exact_symbol_candidates(
-            sorted(targets), limit=bound
-        )
+        related_rows = self.reads.exact_symbol_candidates(sorted(targets), limit=bound)
         if len(related_rows) >= bound:
             bound_reasons.add("find-semantic-target-limit")
         for related in related_rows:

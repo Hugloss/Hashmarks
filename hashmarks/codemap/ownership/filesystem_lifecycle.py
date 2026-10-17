@@ -88,9 +88,7 @@ class FilesystemLifecycleAnalyzer:
         if path in self.modules:
             return self.modules[path]
         self.modules[path] = None
-        member, raw = self.codemap._repository_member_observation(
-            path, include_bytes=True
-        )
+        member, raw = self.codemap.source.member(path, include_bytes=True)
         if member["state"] != "known-present" or raw is None:
             self._failure(path, str(member.get("reason") or member["state"]))
             return None
@@ -145,9 +143,9 @@ class FilesystemLifecycleAnalyzer:
         root = target.split(".")[0]
         if root not in {"os", "pathlib"}:
             return None
-        if self.codemap._resolve_import_paths(
+        if self.codemap._imports._resolve_import_paths(
             path, root
-        ) or self.codemap._python_import_identity_ambiguous(path, root):
+        ) or self.codemap._imports._python_import_identity_ambiguous(path, root):
             return None
         return target
 
@@ -166,7 +164,7 @@ class FilesystemLifecycleAnalyzer:
         mutated = self._mutated_api(module.snapshot.tree, root)
         if mutated:
             self._failure(path, "source-visible-api-rebinding")
-        kind, targets = self.codemap._python_export_binding(path, root)
+        kind, targets = self.codemap._imports._python_export_binding(path, root)
         if kind not in {"module", "reexport"}:
             return None
         if len(targets) != 1 or mutated:
@@ -195,20 +193,22 @@ class FilesystemLifecycleAnalyzer:
     def _reexport_api(
         self, path: str, target: str, seen: set[tuple[str, str]]
     ) -> str | None:
-        owners = self.codemap._resolve_import_paths(path, target)
+        owners = self.codemap._imports._resolve_import_paths(path, target)
         if (
-            self.codemap._python_import_identity_ambiguous(path, target)
+            self.codemap._imports._python_import_identity_ambiguous(path, target)
             or len(owners) != 1
         ):
             return None
         owner = owners[0]
-        if self.codemap.policy.decide(owner).evidence_visibility.value != "source":
+        if self.codemap.files.decide(owner).evidence_visibility.value != "source":
             return None
-        row = self.codemap._session_file_row(owner)
+        row = self.codemap.reads.file_row(owner)
         module_name = str(row.get("module_name") or "") if row else ""
         absolute = target
         if target.startswith("."):
-            absolute = self.codemap._python_relative_module_candidate(path, target)
+            absolute = self.codemap._imports._python_relative_module_candidate(
+                path, target
+            )
         suffix = absolute.removeprefix(module_name + ".")
         if suffix == absolute:
             return None
@@ -240,7 +240,7 @@ class FilesystemLifecycleAnalyzer:
             return None
         target_key = (str(resolved["path"]), str(resolved["qualname"]))
         if (
-            self.codemap.policy.decide(target_key[0]).evidence_visibility.value
+            self.codemap.files.decide(target_key[0]).evidence_visibility.value
             != "source"
         ):
             return None
@@ -254,7 +254,7 @@ class FilesystemLifecycleAnalyzer:
     def _current(self, path: str, module: _Module) -> bool:
         # Metadata only detects drift of the already content-bound snapshot;
         # it never supplies source identity or freshness authority itself.
-        if isinstance(self.codemap._repository_member_source(path), dict):
+        if isinstance(self.codemap.source._repository_member_source(path), dict):
             return False
         try:
             info = (self.codemap.workspace / path).stat()
@@ -280,7 +280,7 @@ class FilesystemLifecycleAnalyzer:
                 str(row["path"])
                 for row in self.codemap.store.all_file_rows()
                 if row["language"] == "python"
-                and self.codemap.policy.decide(
+                and self.codemap.files.decide(
                     str(row["path"])
                 ).evidence_visibility.value
                 != "deny"
@@ -326,7 +326,7 @@ class FilesystemLifecycleAnalyzer:
         ]
         for path in drifted:
             self._failure(path, "source-changed-during-observation")
-        generation, _, stale = self.codemap._generation_status()
+        generation, _, stale = self.codemap.reads.generation_status()
         unresolved = _unique([*analyzer.unresolved, *self.failures])
         truncated = len(candidates) < len(scope) or len(retained) < len(observations)
         truncated = truncated or any(
@@ -396,7 +396,7 @@ class FilesystemLifecycleAnalyzer:
         return {
             "schema": SCHEMA,
             "repository_identity": "sha256:"
-            + self.codemap._workspace_fingerprint_from_store(),
+            + self.codemap.index._workspace_fingerprint_from_store(),
             "generation": generation,
             "stale": stale,
             "producer": {

@@ -71,10 +71,37 @@ def _compressible_initial() -> dict[str, Any]:
     return packet
 
 
+def _legacy_compressed_initial() -> dict[str, Any]:
+    packet = {
+        "schema": "hashmarks.task-evidence-initial.v2",
+        "source_evidence_identity": "sha256:source",
+        "facts": ["0", 0, False, None, 0.0, "💚é"],
+    }
+    packet["evidence_packet_identity"] = initial_packet_identity(packet)
+    wire = json.loads(json.dumps(encode_initial_packet(packet)))
+    assert wire["encoding"]["kind"] == "json-string-table.v1"
+    payload = json.dumps(
+        {"strings": wire["encoding"]["strings"], "data": wire["data"]},
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode()
+    wire["encoding"] = {
+        "kind": "json-string-table.v1+zlib",
+        "decoded_bytes": len(payload),
+    }
+    wire["data"] = base64.b64encode(zlib.compress(payload)).decode("ascii")
+    assert decode_initial_packet(wire) == packet
+    return wire
+
+
+def test_legacy_compressed_initial_remains_readable() -> None:
+    _legacy_compressed_initial()
+
+
 def test_compressed_initial_preserves_identity_types_and_all_records() -> None:
     packet = _compressible_initial()
     encoded = encode_initial_packet(packet)
-    assert encoded["encoding"]["kind"] == "json-string-table.v1+zlib"
+    assert encoded["encoding"]["kind"] == "json+zlib"
     decoded = decode_initial_packet(json.loads(json.dumps(encoded)))
     assert decoded == packet
     assert decoded["evidence_packet_identity"] == packet["evidence_packet_identity"]
@@ -101,8 +128,15 @@ def test_compressed_initial_preserves_identity_types_and_all_records() -> None:
         "changed-identity",
     ],
 )
-def test_compressed_initial_rejects_corrupt_or_unbounded_payload(mutation: str) -> None:
-    encoded = json.loads(json.dumps(encode_initial_packet(_compressible_initial())))
+@pytest.mark.parametrize("legacy", [False, True])
+def test_compressed_initial_rejects_corrupt_or_unbounded_payload(
+    mutation: str, legacy: bool
+) -> None:
+    encoded = (
+        _legacy_compressed_initial()
+        if legacy
+        else json.loads(json.dumps(encode_initial_packet(_compressible_initial())))
+    )
     raw = base64.b64decode(encoded["data"])
     if mutation == "bool-size":
         encoded["encoding"]["decoded_bytes"] = True
@@ -120,6 +154,36 @@ def test_compressed_initial_rejects_corrupt_or_unbounded_payload(mutation: str) 
         encoded["data"] = base64.b64encode(raw + zlib.compress(b"{}")).decode("ascii")
     else:
         encoded["evidence_packet_identity"] = "sha256:changed"
+    with pytest.raises(ValueError, match="initial"):
+        decode_initial_packet(encoded)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        b'{"facts":[],"facts":[]}',
+        b'{"facts":[{"nested":false,"nested":false}]}',
+        b'{"schema":"shadow"}',
+        b"[]",
+    ],
+)
+def test_direct_json_initial_rejects_duplicate_keys_headers_and_nonobjects(
+    payload: bytes,
+) -> None:
+    encoded = json.loads(json.dumps(encode_initial_packet(_compressible_initial())))
+    encoded["encoding"]["decoded_bytes"] = len(payload)
+    encoded["data"] = base64.b64encode(zlib.compress(payload)).decode("ascii")
+    semantic = json.loads(payload)
+    if isinstance(semantic, dict) and "facts" in semantic:
+        # A permissive parser would produce exactly these facts and pass the
+        # identity check. Duplicate-key rejection must independently stop it.
+        encoded["evidence_packet_identity"] = initial_packet_identity(
+            {
+                "schema": encoded["schema"],
+                "source_evidence_identity": encoded["source_evidence_identity"],
+                **semantic,
+            }
+        )
     with pytest.raises(ValueError, match="initial"):
         decode_initial_packet(encoded)
 
@@ -243,7 +307,7 @@ def test_initial_profile_preserves_authority_and_source_identity(
         "from src.a import widget\ndef test_widget():\n    assert widget() == 1\n"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         native = cast("dict[str, Any]", codemap.task_evidence("Fix widget"))
         before = deepcopy(native)
         initial = initial_task_evidence(native)
@@ -324,7 +388,7 @@ def test_initial_class_table_keeps_future_fields_and_preserves_source_packet(
         "class ChannelBackend:\n    def subscribe(self): pass\n"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = cast("dict[str, Any]", codemap.task_evidence("Inspect ChannelBackend"))
     context = next(
         row["class_declarations"]
@@ -358,7 +422,7 @@ def test_initial_disclosure_keeps_admitted_owner_and_verification_alternatives(
             f"def test_widget_{index}(): assert widget() == 1\n"
         )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = cast("dict[str, Any]", codemap.task_evidence("Inspect owner.py."))
     assert packet["ownership"]["owner"]["path"] == "owner.py"
     rows = packet["retrieval"]["results"]

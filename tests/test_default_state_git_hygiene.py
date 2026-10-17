@@ -45,7 +45,7 @@ def test_default_hashmarks_state_does_not_dirty_git_workspace(tmp_path: Path) ->
     repo = _tracked_repo(tmp_path)
 
     with CodeMap(repo) as codemap:
-        codemap.sync()
+        codemap.index.sync()
 
     assert (repo / ".hashmarks" / ".gitignore").read_text(encoding="utf-8") == "*\n"
     assert _git(repo, "status", "--short").stdout == ""

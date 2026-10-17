@@ -164,7 +164,7 @@ def export_cases(repo: Path, manifest: dict[str, object]) -> dict[str, object]:
     cases = _cases(manifest)  # Fail malformed requests before index work.
     result: list[dict[str, object]] = []
     with CodeMap(repo) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         for case in cases:
             settings = {
                 "paths": tuple(case["paths"]),

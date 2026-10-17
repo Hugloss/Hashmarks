@@ -17,7 +17,7 @@ def test_verification_plan_derives_pytest_argv_without_shell_guess(
         "[tool.pytest.ini_options]\ntestpaths=['tests']\n"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         plan = codemap.verification_plan("tests/test_widget.py", symbol="test_widget")
     assert plan["available"] is True
     assert "runner" in plan
@@ -40,7 +40,7 @@ def test_verification_plan_refuses_non_test_source(tmp_path: Path) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "src" / "widget.py").write_text("def widget():\n    pass\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         plan = codemap.verification_plan("src/widget.py")
     assert plan["available"] is False
     assert "reason" in plan
@@ -55,7 +55,7 @@ def test_verification_plan_derives_go_package_argv(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         plan = codemap.verification_plan("tests/widget_test.go")
     assert plan["available"] is True
     assert "runner" in plan
@@ -77,7 +77,7 @@ def test_verification_plan_derives_typescript_project_argv(tmp_path: Path) -> No
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         plan = codemap.verification_plan("tests/widget.test.ts")
     assert plan["available"] is True
     assert "runner" in plan
@@ -95,7 +95,7 @@ def test_verification_plan_derives_native_node_test_argv(tmp_path: Path) -> None
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         plan = codemap.verification_plan("tests/widget.test.js")
     assert plan["available"] is True
     assert "runner" in plan

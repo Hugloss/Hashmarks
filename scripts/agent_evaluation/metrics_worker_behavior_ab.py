@@ -45,7 +45,7 @@ def _entry_state(
         value = source.task_entry_points(query, limit=limit)
     else:
         with CodeMap(source) as codemap:
-            codemap.sync()
+            codemap.index.sync()
             value = codemap.task_entry_points(query, limit=limit)
     recommended = [row for row in value.get("recommended", []) if isinstance(row, dict)]
     ambiguity = value.get("ambiguity", {})
@@ -93,7 +93,7 @@ def run_worker(
         raise ValueError("public tasks must be a list")
     rows = []
     with CodeMap(workspace) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         for row in tasks:
             if not isinstance(row, dict) or set(row) - {"id", "query"}:
                 raise ValueError("worker input may contain only id and query")

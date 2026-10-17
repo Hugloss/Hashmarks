@@ -62,7 +62,7 @@ def _source_observation(codemap: CodeMap, inputs: dict[str, Any]) -> dict[str, o
     context, lines, anchors = _source_context_request(
         inputs.get("context_lines", 0), literal=None, result_mode="member"
     )
-    return codemap.source_observation(
+    return codemap.source.observe(
         paths[0], context_lines=context, lines=lines, anchor_context_lines=anchors
     )
 

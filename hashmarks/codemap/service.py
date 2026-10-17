@@ -9,7 +9,7 @@ import socketserver
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeGuard
 
 from hashmarks.client import default_runtime_dir
 from hashmarks.evidence_presentation import validate_presentation
@@ -243,11 +243,12 @@ def default_codemap_socket(workspace: str | Path) -> Path:
 
 _UNIX_STREAM_SERVER = getattr(socketserver, "UnixStreamServer", None)
 
-if _UNIX_STREAM_SERVER is not None:
+if TYPE_CHECKING or _UNIX_STREAM_SERVER is not None:
 
-    class _Server(_UNIX_STREAM_SERVER):
+    class _Server(socketserver.UnixStreamServer):
         allow_reuse_address = False
         request_queue_size = 128
+        codemap_service: CodeMapService
 
 else:
 
@@ -257,7 +258,10 @@ else:
 
 class _Handler(socketserver.StreamRequestHandler):
     def handle(self) -> None:
-        service: CodeMapService = self.server.codemap_service  # type: ignore[attr-defined]
+        server = self.server
+        if not isinstance(server, _Server):
+            raise RuntimeError("CodeMap handler requires its service server")
+        service = server.codemap_service
         raw = self.rfile.readline(MAX_REQUEST + 1)
         if len(raw) > MAX_REQUEST:
             service._write(
@@ -266,6 +270,16 @@ class _Handler(socketserver.StreamRequestHandler):
             return
         response = dispatch_json_request(raw, service.dispatch)
         service._write(self.wfile, response)
+
+
+class _ResponseWriter(Protocol):
+    def write(self, data: bytes, /) -> object: ...
+
+    def flush(self) -> None: ...
+
+
+def _is_wire_object(value: object) -> TypeGuard[dict[str, object]]:
+    return isinstance(value, dict) and all(isinstance(key, str) for key in value)
 
 
 class CodeMapService:
@@ -292,7 +306,7 @@ class CodeMapService:
         self._initial_sync_ms = 0.0
 
     @staticmethod
-    def _write(stream: object, response: dict[str, object]) -> None:
+    def _write(stream: _ResponseWriter, response: dict[str, object]) -> None:
         payload = (
             json.dumps(response, separators=(",", ":"), sort_keys=True) + "\n"
         ).encode("utf-8")
@@ -373,7 +387,7 @@ class CodeMapService:
         import time
 
         started = time.perf_counter()
-        result = self._map().sync()
+        result = self._map().index.sync()
         elapsed = (time.perf_counter() - started) * 1000.0
         self._syncs += 1
         return {"ok": True, "elapsed_ms": elapsed, "result": result.as_dict()}
@@ -782,6 +796,8 @@ class CodeMapService:
 
         self._requests += 1
         response = handler(request)
+        if not _is_wire_object(response):
+            raise RuntimeError("CodeMap service handler must return a JSON object")
         route.validate_response(response)
         return response
 
@@ -814,11 +830,11 @@ class CodeMapService:
         with CodeMap(self.workspace) as codemap:
             self._codemap = codemap
             started = time.perf_counter()
-            codemap.sync()
+            codemap.index.sync()
             self._initial_sync_ms = (time.perf_counter() - started) * 1000.0
             self._syncs = 1
             server = _Server(str(self.socket_path), _Handler)
-            server.codemap_service = self  # type: ignore[attr-defined]
+            server.codemap_service = self
             self._server = server
             try:
                 with contextlib.suppress(OSError):
@@ -892,6 +908,18 @@ class CodeMapServiceClient:
             )
         return response
 
+    def _canonical_payload(self, op: str, **payload: object) -> dict[str, object]:
+        """Qualify a semantic reply using the existing route/schema authority."""
+        route = _SERVICE_ROUTES[op]
+        if route.operation is None or route.response_key is None:
+            raise RuntimeError(f"CodeMap service route {op} is not semantic")
+        response = self.request(op, **payload)
+        return dict(
+            validate_operation_response(
+                route.operation, response.get(route.response_key)
+            )
+        )
+
     def status(self) -> dict[str, Any]:
         return self.request("status")
 
@@ -902,15 +930,13 @@ class CodeMapServiceClient:
         self, paths: tuple[str, ...] | list[str] | None = None
     ) -> dict[str, Any]:
         payload = {} if paths is None else {"paths": list(paths)}
-        return dict(
-            self.request("repository_findings", **payload)["repository_findings"]
-        )
+        return self._canonical_payload("repository_findings", **payload)
 
     def concurrency_risk_findings(
         self, paths: tuple[str, ...] | list[str] | None = None
     ) -> dict[str, Any]:
         payload = {} if paths is None else {"paths": list(paths)}
-        return dict(self.request("concurrency_risk", **payload)["concurrency_risk"])
+        return self._canonical_payload("concurrency_risk", **payload)
 
     def verification_ownership_graph(
         self,
@@ -919,13 +945,11 @@ class CodeMapServiceClient:
         limit: int = VERIFICATION_RELEVANCE_DEFAULTS.limit,
         candidate_limit: int = VERIFICATION_RELEVANCE_DEFAULTS.candidate_limit,
     ) -> dict[str, Any]:
-        return dict(
-            self.request(
-                "verification_ownership",
-                task=task,
-                limit=limit,
-                candidate_limit=candidate_limit,
-            )["verification_ownership"]
+        return self._canonical_payload(
+            "verification_ownership",
+            task=task,
+            limit=limit,
+            candidate_limit=candidate_limit,
         )
 
     def repository_ownership_graph(
@@ -933,34 +957,38 @@ class CodeMapServiceClient:
     ) -> dict[str, Any]:
         """Return repository ownership evidence over the stable v0.11 wire contract."""
         payload = {} if paths is None else {"paths": list(paths)}
-        return dict(
-            self.request("authority_ownership", **payload)["authority_ownership"]
-        )
+        return self._canonical_payload("authority_ownership", **payload)
 
     def cache_ownership_findings(
         self, paths: tuple[str, ...] | list[str] | None = None
     ) -> dict[str, Any]:
         payload = {} if paths is None else {"paths": list(paths)}
-        return dict(self.request("cache_ownership", **payload)["cache_ownership"])
+        return self._canonical_payload("cache_ownership", **payload)
 
     def cache_invalidation_ownership_graph(
         self, paths: tuple[str, ...] | list[str] | None = None
     ) -> dict[str, Any]:
         payload = {} if paths is None else {"paths": list(paths)}
-        return dict(
-            self.request("cache_invalidation_ownership", **payload)[
-                "cache_invalidation_ownership"
-            ]
-        )
+        return self._canonical_payload("cache_invalidation_ownership", **payload)
 
     def import_ownership_findings(
         self, paths: tuple[str, ...] | list[str] | None = None
     ) -> dict[str, Any]:
         payload = {} if paths is None else {"paths": list(paths)}
-        return dict(self.request("import_ownership", **payload)["import_ownership"])
+        return self._canonical_payload("import_ownership", **payload)
 
     def find_task(self, task: str, *, limit: int = 20) -> list[dict[str, Any]]:
-        return list(self.request("find_task", task=task, limit=limit)["hits"])
+        hits = self.request("find_task", task=task, limit=limit).get("hits")
+        if not isinstance(hits, list):
+            raise RuntimeError("invalid find_task service response: expected an array")
+        rows: list[dict[str, object]] = []
+        for hit in hits:
+            if not _is_wire_object(hit):
+                raise RuntimeError(
+                    "invalid find_task service response: expected objects"
+                )
+            rows.append(hit)
+        return rows
 
     def task_action_map(
         self,
@@ -985,13 +1013,11 @@ class CodeMapServiceClient:
         limit: int = VERIFICATION_RELEVANCE_DEFAULTS.limit,
         candidate_limit: int = VERIFICATION_RELEVANCE_DEFAULTS.candidate_limit,
     ) -> dict[str, Any]:
-        return dict(
-            self.request(
-                "verification_relevance",
-                task=task,
-                limit=limit,
-                candidate_limit=candidate_limit,
-            )["verification_relevance"]
+        return self._canonical_payload(
+            "verification_relevance",
+            task=task,
+            limit=limit,
+            candidate_limit=candidate_limit,
         )
 
     def ownership_relation_graph(
@@ -1018,14 +1044,12 @@ class CodeMapServiceClient:
         per_role: int = TASK_DECISION_DEFAULT_OPTIONS.per_role,
         token_budget: int = TASK_DECISION_DEFAULT_OPTIONS.token_budget,
     ) -> dict[str, Any]:
-        return dict(
-            self.request(
-                "task_decision_packet",
-                task=task,
-                limit=limit,
-                per_role=per_role,
-                token_budget=token_budget,
-            )["decision_packet"]
+        return self._canonical_payload(
+            "task_decision_packet",
+            task=task,
+            limit=limit,
+            per_role=per_role,
+            token_budget=token_budget,
         )
 
     def task_decision_brief(
@@ -1036,14 +1060,12 @@ class CodeMapServiceClient:
         per_role: int = TASK_DECISION_DEFAULT_OPTIONS.per_role,
         token_budget: int = TASK_DECISION_DEFAULT_OPTIONS.token_budget,
     ) -> dict[str, Any]:
-        return dict(
-            self.request(
-                "task_decision_brief",
-                task=task,
-                limit=limit,
-                per_role=per_role,
-                token_budget=token_budget,
-            )["decision_brief"]
+        return self._canonical_payload(
+            "task_decision_brief",
+            task=task,
+            limit=limit,
+            per_role=per_role,
+            token_budget=token_budget,
         )
 
     def task_action_brief(
@@ -1059,7 +1081,7 @@ class CodeMapServiceClient:
         payload: dict[str, Any] = {"task": task, "limit": limit, "per_role": per_role}
         if token_budget is not None:
             payload["token_budget"] = token_budget
-        return dict(self.request("task_action_brief", **payload)["task_action_brief"])
+        return self._canonical_payload("task_action_brief", **payload)
 
     def task_evidence(
         self,
@@ -1091,14 +1113,12 @@ class CodeMapServiceClient:
         limit: int = TASK_DECISION_DEFAULT_OPTIONS.limit,
         per_role: int = TASK_DECISION_DEFAULT_OPTIONS.per_role,
     ) -> dict[str, Any]:
-        return dict(
-            self.request(
-                "task_decision_brief_budget_sweep",
-                task=task,
-                budgets=list(budgets),
-                limit=limit,
-                per_role=per_role,
-            )["budget_sweep"]
+        return self._canonical_payload(
+            "task_decision_brief_budget_sweep",
+            task=task,
+            budgets=list(budgets),
+            limit=limit,
+            per_role=per_role,
         )
 
     def repository_intelligence_query(
@@ -1130,11 +1150,7 @@ class CodeMapServiceClient:
             payload["previous_map"] = options.previous_map
         if options.previous_snapshot is not None:
             payload["previous_snapshot"] = options.previous_snapshot
-        result = dict(
-            self.request("repository_intelligence_query", **payload)[
-                "repository_intelligence_query"
-            ]
-        )
+        result = self._canonical_payload("repository_intelligence_query", **payload)
         if options.presentation != "none":
             projection = result.get("presentation")
             if (
@@ -1155,18 +1171,16 @@ class CodeMapServiceClient:
         per_role: int = CHANGE_IMPACT_DEFAULT_REQUEST.per_role,
         options: ChangeImpactOptions = CHANGE_IMPACT_DEFAULT_REQUEST.options,
     ) -> dict[str, Any]:
-        return dict(
-            self.request(
-                "task_change_impact",
-                task=task,
-                changed_paths=list(changed_paths),
-                limit=limit,
-                per_role=per_role,
-                impact_limit_per_surface=options.impact_limit_per_surface,
-                max_depth=options.max_depth,
-                project_impact_limit=options.project_impact_limit,
-                project_impact_encoding=options.project_impact_encoding,
-            )["task_change_impact"]
+        return self._canonical_payload(
+            "task_change_impact",
+            task=task,
+            changed_paths=list(changed_paths),
+            limit=limit,
+            per_role=per_role,
+            impact_limit_per_surface=options.impact_limit_per_surface,
+            max_depth=options.max_depth,
+            project_impact_limit=options.project_impact_limit,
+            project_impact_encoding=options.project_impact_encoding,
         )
 
     def task_post_change_delta(
@@ -1198,17 +1212,15 @@ class CodeMapServiceClient:
         *,
         options: PostChangeOptions = POST_CHANGE_DEFAULT_OPTIONS,
     ) -> dict[str, Any]:
-        return dict(
-            self.request(
-                "refresh_after_change_delta",
-                task=task,
-                changed_paths=list(changed_paths),
-                previous_edit_path=options.previous_edit_path,
-                previous_verify_path=options.previous_verify_path,
-                limit=options.limit,
-                per_role=options.per_role,
-                token_budget=options.token_budget,
-            )["refresh_delta"]
+        return self._canonical_payload(
+            "refresh_after_change_delta",
+            task=task,
+            changed_paths=list(changed_paths),
+            previous_edit_path=options.previous_edit_path,
+            previous_verify_path=options.previous_verify_path,
+            limit=options.limit,
+            per_role=options.per_role,
+            token_budget=options.token_budget,
         )
 
     def refresh_after_change_brief(
@@ -1220,15 +1232,13 @@ class CodeMapServiceClient:
         per_role: int = POST_CHANGE_DEFAULT_OPTIONS.per_role,
         token_budget: int = POST_CHANGE_DEFAULT_OPTIONS.token_budget,
     ) -> dict[str, Any]:
-        return dict(
-            self.request(
-                "refresh_after_change_brief",
-                task=task,
-                changed_paths=list(changed_paths),
-                limit=limit,
-                per_role=per_role,
-                token_budget=token_budget,
-            )["refresh_brief"]
+        return self._canonical_payload(
+            "refresh_after_change_brief",
+            task=task,
+            changed_paths=list(changed_paths),
+            limit=limit,
+            per_role=per_role,
+            token_budget=token_budget,
         )
 
     def refresh_after_change(
@@ -1240,15 +1250,13 @@ class CodeMapServiceClient:
         per_role: int = POST_CHANGE_DEFAULT_OPTIONS.per_role,
         token_budget: int = POST_CHANGE_DEFAULT_OPTIONS.token_budget,
     ) -> dict[str, Any]:
-        return dict(
-            self.request(
-                "refresh_after_change",
-                task=task,
-                changed_paths=list(changed_paths),
-                limit=limit,
-                per_role=per_role,
-                token_budget=token_budget,
-            )["refresh"]
+        return self._canonical_payload(
+            "refresh_after_change",
+            task=task,
+            changed_paths=list(changed_paths),
+            limit=limit,
+            per_role=per_role,
+            token_budget=token_budget,
         )
 
     def stop(self) -> None:

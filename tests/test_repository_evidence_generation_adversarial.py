@@ -28,14 +28,14 @@ def test_unrelated_repository_generation_change_preserves_binding_observation(
     unrelated.write_text("VALUE = 1\n", encoding="utf-8")
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.repository_evidence_bindings(
             _binding(),
             include_relationships=False,
         )
 
         unrelated.write_text("VALUE = 2\n", encoding="utf-8")
-        codemap.sync(["unrelated.py"])
+        codemap.index.sync(["unrelated.py"])
         after = codemap.repository_evidence_bindings(
             _binding(),
             include_relationships=False,

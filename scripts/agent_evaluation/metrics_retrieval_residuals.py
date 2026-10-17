@@ -69,7 +69,7 @@ def collect(root: Path, limit: int = 20) -> dict[str, object]:
         hidden = _load_corpus(corpus)
         rows = []
         with CodeMap(ws) as cm:
-            cm.sync()
+            cm.index.sync()
             for task, secret in zip(public, hidden, strict=False):
                 rows.append(_task_report(cm, task, secret, limit=limit))
         reports.append(

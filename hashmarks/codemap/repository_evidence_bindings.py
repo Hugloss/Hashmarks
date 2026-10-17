@@ -11,8 +11,9 @@ from hashmarks.file_store import UnstableFileError
 from hashmarks.operation_contract import operation_schema
 from hashmarks.paths import normalize_relative_path
 
-from .decision_session import decision_scoped
+from .decision_session import ReadScopeOwner, decision_scoped
 from .evidence_freshness import freshness_state
+from .repository_observation import evidence_identity, packet_digest
 
 if TYPE_CHECKING:
     from .engine import CodeMap
@@ -64,7 +65,7 @@ class _BindingObservationRequest:
     stamps: dict[str, tuple[int, ...]] = field(default_factory=dict)
 
 
-class RepositoryEvidenceBindingsMixin:
+class RepositoryEvidenceBindingsMixin(ReadScopeOwner):
     """Observe opaque consumer bindings to exact repository evidence.
 
     This surface owns repository facts only. Binding identifiers are opaque;
@@ -119,7 +120,7 @@ class RepositoryEvidenceBindingsMixin:
     def _observe_span(self, span: EvidenceSpan) -> dict[str, object]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        member, raw = self._repository_member_observation(span.path, include_bytes=True)
+        member, raw = self.source.member(span.path, include_bytes=True)
         base: dict[str, object] = {
             "scope": "lines",
             "path": span.path,
@@ -178,7 +179,7 @@ class RepositoryEvidenceBindingsMixin:
     def _observe_reference(self, ref: EvidenceReference) -> dict[str, object]:
         if isinstance(ref, EvidenceSpan):
             return self._observe_span(ref)
-        member, _raw = self._repository_member_observation(ref.path)
+        member, _raw = self.source.member(ref.path)
         return {
             "scope": "member",
             **member,
@@ -191,7 +192,7 @@ class RepositoryEvidenceBindingsMixin:
         self = cast("CodeMap", self)
         if not isinstance(ref, EvidenceSpan):
             return self._observe_reference(ref)
-        source = self._repository_member_source(ref.path)
+        source = self.source._repository_member_source(ref.path)
         if isinstance(source, dict):
             return self._observe_reference(ref)
         stamp = _binding_member_stamp(source.path)
@@ -243,7 +244,7 @@ class RepositoryEvidenceBindingsMixin:
                 if row.get("state") == "known-present" and row.get("path")
             }
         )
-        edges = self._session_edges_for_paths_many(paths, limit_per_path=limit_per_path)
+        edges = self.reads.edges_for_paths_many(paths, limit_per_path=limit_per_path)
         relationships: list[dict[str, object]] = []
         for path in paths:
             for edge in edges.get(path, ()):
@@ -263,7 +264,7 @@ class RepositoryEvidenceBindingsMixin:
                             if edge.get("line") is not None
                             else {}
                         ),
-                        "identity": self._evidence_identity(
+                        "identity": evidence_identity(
                             "hashmarks.relationship-evidence.v1", fact
                         ),
                         "provenance": {
@@ -336,10 +337,7 @@ class RepositoryEvidenceBindingsMixin:
             raise ValueError(
                 f"binding request exceeds {_MAX_UNIQUE_PATHS} unique paths"
             )
-        dependencies = [
-            self._repository_member_observation(path)[0]
-            for path in declared_dependencies
-        ]
+        dependencies = [self.source.member(path)[0] for path in declared_dependencies]
         definition_payload = {
             "binding_id": binding_id,
             "evidence": [self._reference_definition(ref) for ref in references],
@@ -376,12 +374,12 @@ class RepositoryEvidenceBindingsMixin:
         return {
             **binding_payload,
             "binding_definition_identity": "sha256:"
-            + self._packet_digest(
+            + packet_digest(
                 "hashmarks.repository-evidence-binding-definition.v1",
                 definition_payload,
             ),
             "binding_observation_identity": "sha256:"
-            + self._packet_digest(
+            + packet_digest(
                 "hashmarks.repository-evidence-binding-observation.v1",
                 binding_payload,
             ),
@@ -423,7 +421,7 @@ class RepositoryEvidenceBindingsMixin:
                 + ", ".join(sorted(unknown_dependency_bindings))
             )
 
-        generation, identity_generation, stale = self._generation_status()
+        generation, identity_generation, stale = self.reads.generation_status()
         request = _BindingObservationRequest(
             dependency_paths=dependency_paths or {},
             relationship_limit_per_path=relationship_limit_per_path,
@@ -439,8 +437,8 @@ class RepositoryEvidenceBindingsMixin:
             "schema": operation_schema("repository_evidence", "observation"),
             "observer": self._repository_observer_packet(),
             "repository": {
-                "repository_identity": self._repository_packet_identity(),
-                "source_identity": self._source_packet_identity(
+                "repository_identity": self.reads.repository_identity(),
+                "source_identity": self.source.packet_identity(
                     generation=generation,
                     identity_generation=identity_generation,
                     stale=stale,
@@ -458,7 +456,7 @@ class RepositoryEvidenceBindingsMixin:
             "authority": "repository-intelligence-only",
             "execution_effect": "none",
         }
-        payload["bindings_identity"] = "sha256:" + self._packet_digest(
+        payload["bindings_identity"] = "sha256:" + packet_digest(
             operation_schema("repository_evidence", "observation"), payload
         )
         return payload

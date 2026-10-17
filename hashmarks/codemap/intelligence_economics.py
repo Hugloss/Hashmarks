@@ -5,7 +5,8 @@ from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, cast
 
 from .change_impact import ChangeImpactOptions
-from .decision_session import diagnostic_producer
+from .decision_session import ReadScopeOwner, diagnostic_producer
+from .repository_observation import packet_digest
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -20,7 +21,7 @@ INTELLIGENCE_ECONOMICS_DEFAULT_OPTIONS = ChangeImpactOptions(
 )
 
 
-class IntelligenceEconomicsMixin:
+class IntelligenceEconomicsMixin(ReadScopeOwner):
     """Deterministic economics of Hashmarks-owned repository-intelligence evidence.
 
     Measurements are derived only from repository-intelligence artifacts Hashmarks
@@ -164,7 +165,7 @@ class IntelligenceEconomicsMixin:
                 ),
             }
 
-        payload["receipt_identity"] = "sha256:" + self._packet_digest(
+        payload["receipt_identity"] = "sha256:" + packet_digest(
             INTELLIGENCE_ECONOMICS_SCHEMA,
             payload,
         )

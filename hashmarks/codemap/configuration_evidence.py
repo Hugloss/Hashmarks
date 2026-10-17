@@ -407,7 +407,7 @@ class ConfigurationEvidenceMixin:
         # If this changes the CodeMap generation, task_evidence marks the
         # packet stale rather than pretending the earlier ownership decision
         # remained generation-bound.
-        self._ensure_path_current(path)
+        self.source.ensure_current(path)
         try:
             source = (self.workspace / path).read_text(encoding="utf-8")
         except (OSError, PermissionError, FileNotFoundError):

@@ -21,7 +21,7 @@ def test_brief_preserves_action_and_verification_without_verbose_candidates(
         "from src.engine import widget\ndef test_widget(): assert widget() == 'new'\n"
     )
     with CodeMap(tmp_path) as c:
-        c.sync()
+        c.index.sync()
         full = c.task_decision_packet("widget implementation test")
         brief = c.task_decision_brief("widget implementation test")
     assert assert_object(brief["edit"])["path"] == assert_object(full["edit"])["path"]
@@ -47,7 +47,7 @@ def test_brief_deduplicates_contract_when_edit_is_contract(tmp_path: Path) -> No
         "def test_policy(): assert True\n"
     )
     with CodeMap(tmp_path) as c:
-        c.sync()
+        c.index.sync()
         brief = c.task_decision_brief("change policy config test")
     if brief["edit"] and brief.get("contract"):
         assert (
@@ -69,7 +69,7 @@ def test_decision_brief_keeps_ambiguous_candidate_out_of_edit_authority(
         "def test_publish(): assert True\n", encoding="utf-8"
     )
     with CodeMap(tmp_path) as c:
-        c.sync()
+        c.index.sync()
         packet = c.task_decision_packet("Fix publish_result")
         brief = c.task_decision_brief("Fix publish_result")
 

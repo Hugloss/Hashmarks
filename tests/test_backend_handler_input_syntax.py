@@ -79,7 +79,7 @@ def _fixture() -> str:
 def test_shared_input_oracle_and_default_declaration_identity(tmp_path: Path) -> None:
     _write(tmp_path, _fixture())
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         default = _provider(cm, enabled=False)
         explicit = _provider(cm, enabled=True)
         changed = _change(cm)
@@ -153,7 +153,7 @@ def test_positional_defaults_and_keyword_kinds_are_not_inferred(tmp_path: Path) 
         "    return None\n",
     )
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         result = _input(_change(cm))
     params = assert_records(result["parameters"])
     assert [x["kind"] for x in params] == [
@@ -187,7 +187,7 @@ def test_default_literals_never_disclose_values_and_dynamic_stays_unknown(
         "    return None\n",
     )
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         result = _input(_change(cm))
     params = assert_records(result["parameters"])
     assert params[0]["default"] == {
@@ -209,7 +209,7 @@ def test_annotated_unknown_metadata_keeps_scope_unresolved(tmp_path: Path) -> No
         "    return value\n",
     )
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         result = _input(_change(cm))
     sites = assert_object(assert_records(result["parameters"])[0]["annotated_metadata"])
     assert sites["observed_count"] == 5
@@ -230,7 +230,7 @@ def test_overbound_signature_fails_selected_provider_but_not_change_impact(
         f"@router.get('/items')\ndef handler({parameters}):\n    return None\n",
     )
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         with pytest.raises((ValueError, RepositoryDeclarationProviderError)):
             _provider(cm, enabled=True)
         result = _input(_change(cm))
@@ -251,7 +251,7 @@ def test_strict_opt_in_flag_rejected_before_source_reads(flag: object) -> None:
 def test_decorated_class_cannot_claim_handler_parameters(tmp_path: Path) -> None:
     _write(tmp_path, "@router.get('/items')\nclass Handler:\n    pass\n")
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         result = _input(_change(cm))
     assert result["state"] == "not-a-function-declaration"
     assert result["coverage"] == "unknown"
@@ -266,7 +266,7 @@ def test_source_visibility_prevents_signature_literal_disclosure(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         result = _change(cm)
     row = assert_records(
         assert_object(result["changed_line_evidence"])["observations"]

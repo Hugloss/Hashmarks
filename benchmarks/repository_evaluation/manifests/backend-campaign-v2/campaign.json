@@ -126,7 +126,7 @@
       ]
     },
     {
-      "grader_sha256": "63b074001905835ca42a2e55a194e4c8c222c9d9aaec3eb8ed08510072eb6342",
+      "grader_sha256": "27982182fe9d89a51196d5eb3a0c05cb78963b8cfc49289734351d30cf14be77",
       "id": "backend-language-v2",
       "suite_file": "suites/language/suite.json",
       "suite_sha256": "c1cd54d9b27f914007bb067c61e8a1ba18a11e88190a4d9828ac57e17cd7d65f",
@@ -155,6 +155,26 @@
         "sqlalchemy-aggregate-strings",
         "sqlalchemy-custom-metadata-warning",
         "sqlalchemy-forwardref-diagnostic"
+      ]
+    },
+    {
+      "grader_sha256": "d7500354f915e59759960361e475d497770c14585880b88922634afb6077713c",
+      "id": "backend-path-v2",
+      "suite_file": "suites/path/suite.json",
+      "suite_sha256": "77955acc5b3bf5215dd9f1872b2667036af87332b67b7897137a7cba19402d1d",
+      "workflow_ids": [
+        "sqlalchemy-failed-begin",
+        "sqlalchemy-pickle-extra-criteria",
+        "faststream-middleware-enter-error",
+        "aiokafka-commit-unknown-member",
+        "aiokafka-commit-timeout",
+        "aiokafka-commit-refresh-order",
+        "aiokafka-join-autocommit-error",
+        "faststream-ack-cancellation",
+        "faststream-ack-error",
+        "faststream-empty-batch-publisher",
+        "sqlalchemy-bulk-begin-flushing",
+        "sqlalchemy-prepare-failure-rollback"
       ]
     }
   ]

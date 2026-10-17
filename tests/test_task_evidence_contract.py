@@ -53,7 +53,7 @@ def samples(tmp_path_factory: pytest.TempPathFactory) -> _Samples:
     root = tmp_path_factory.mktemp("task-contract")
     _repo(root)
     with _codemap(root) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.task_evidence(_TASK)
         return _Samples(
             graph=codemap.ownership_relation_graph(_TASK, "tests/test_owner.py"),
@@ -296,7 +296,7 @@ def test_dictionary_input_contract_rejects_read_only_mapping_before_sync(
 ) -> None:
     _repo(tmp_path)
     with _codemap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.task_evidence(_TASK)
         proxy = MappingProxyType(packet)
         (tmp_path / "owner.py").write_text("def widget(value): return value.lower()\n")

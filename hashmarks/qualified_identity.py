@@ -40,12 +40,16 @@ def qualified_import_identity(
     # contributes ownership authority must be reconciled against current bytes
     # before an identity can be issued. This is especially important without a
     # live watcher, where a deleted leaf can otherwise remain in the durable map.
-    codemap._ensure_map_ready()
-    codemap._ensure_path_current(source_path)
-    owners, ambiguous = codemap._resolve_import_owner_evidence(source_path, target)
+    codemap.reads.ready()
+    codemap.source.ensure_current(source_path)
+    owners, ambiguous = codemap._imports._resolve_import_owner_evidence(
+        source_path, target
+    )
     for owner in tuple(owners):
-        codemap._ensure_path_current(str(owner))
-    owners, ambiguous = codemap._resolve_import_owner_evidence(source_path, target)
+        codemap.source.ensure_current(str(owner))
+    owners, ambiguous = codemap._imports._resolve_import_owner_evidence(
+        source_path, target
+    )
     owner_paths = sorted(dict.fromkeys(str(path) for path in owners))
     symbol = target.lstrip(".").rsplit(".", 1)[-1]
     status = "ambiguous" if ambiguous else "resolved" if owner_paths else "unresolved"

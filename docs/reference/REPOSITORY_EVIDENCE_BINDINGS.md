@@ -22,7 +22,7 @@ bindings = [
 ]
 
 with CodeMap(".") as codemap:
-    codemap.sync()
+    codemap.index.sync()
     packet = codemap.repository_evidence_bindings(
         bindings,
         dependency_paths={

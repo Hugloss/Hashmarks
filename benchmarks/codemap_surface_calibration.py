@@ -470,10 +470,10 @@ def evaluate(
         "candidates_miss": 0,
     }
     for offset in range(0, len(corpus), session_batch_size):
-        with codemap.decision_session():
+        with codemap.reads.session():
             for item in corpus[offset : offset + session_batch_size]:
                 state.add(_evaluate_task(codemap, item))
-            session_stats = codemap.decision_session_stats()
+            session_stats = codemap.reads.stats()
             for key, value in session_stats.items():
                 session_totals[key] = session_totals.get(key, 0) + int(value)
     return _evaluation_result(state, len(corpus), session_batch_size, session_totals)
@@ -605,7 +605,7 @@ def evaluate_existing_group(
         raise ValueError("corpus must be a JSON list")
     with CodeMap(workspace, state_dir=state_dir, artifact_db=artifact_db) as codemap:
         generation = codemap.store.generation()
-        repository_identity = codemap._repository_packet_identity()
+        repository_identity = codemap.reads.repository_identity()
         manifest = build_manifest(
             corpus,
             repository_identity=repository_identity,
@@ -738,8 +738,8 @@ def _build_baseline(
     shutil.rmtree(state_dir, ignore_errors=True)
     started = time.perf_counter()
     with CodeMap(workspace, state_dir=state_dir, artifact_db=artifact_db) as codemap:
-        preflight = codemap.index_preflight()
-        sync = codemap.sync()
+        preflight = codemap.index.preflight()
+        sync = codemap.index.sync()
         decision = evaluate(codemap, corpus)
     cold_seconds = time.perf_counter() - started
     database = state_dir / "codemap.sqlite3"

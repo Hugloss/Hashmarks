@@ -113,7 +113,7 @@ class _Collector(ast.NodeVisitor):
 
     def _symbol_record(
         self,
-        node: ast.AST,
+        node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef,
         kind: str,
         qualname: str,
         signature: str,
@@ -151,7 +151,12 @@ class _Collector(ast.NodeVisitor):
                     EdgeRecord(qualname, "parameter-type", target, line, "annotation")
                 )
 
-    def _annotation_edges(self, node: ast.AST, qualname: str, start: int) -> None:
+    def _annotation_edges(
+        self,
+        node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef,
+        qualname: str,
+        start: int,
+    ) -> None:
         if isinstance(node, ast.ClassDef):
             for base in node.bases:
                 for target in _annotation_targets(base):
@@ -173,8 +178,20 @@ class _Collector(ast.NodeVisitor):
             self._symbol_record(node, kind, qualname, signature, (start, end))
         )
         self._annotation_edges(node, qualname, start)
+        # Definition expressions belong to the surrounding scope. A decorator,
+        # default or base expression is not a call made by the declared body.
+        for field, value in ast.iter_fields(node):
+            if field == "body":
+                continue
+            if isinstance(value, list):
+                for item in value:
+                    if isinstance(item, ast.AST):
+                        self.visit(item)
+            elif isinstance(value, ast.AST):
+                self.visit(value)
         self.stack.append(node.name)
-        self.generic_visit(node)
+        for statement in node.body:
+            self.visit(statement)
         self.stack.pop()
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:

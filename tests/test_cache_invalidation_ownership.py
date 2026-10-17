@@ -16,7 +16,7 @@ def test_cache_invalidation_resolves_local_alias_to_exact_owner(tmp_path: Path) 
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         graph = codemap.cache_invalidation_ownership_graph()
     edge = next(e for e in graph["edges"] if e["relation"] == "invalidates-cache")
     assert graph["schema"] == "hashmarks.cache-invalidation-ownership.v1"
@@ -35,7 +35,7 @@ def test_cache_invalidation_resolves_imported_symbol_alias(tmp_path: Path) -> No
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         graph = codemap.cache_invalidation_ownership_graph(["consumer.py"])
     edge = graph["edges"][0]
     assert edge["source"] == "invalidator:consumer.py:invalidate"
@@ -54,7 +54,7 @@ def test_cache_invalidation_resolves_module_alias_without_same_name_guess(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         graph = codemap.cache_invalidation_ownership_graph(["consumer.py"])
     assert len(graph["edges"]) == 1
     edge = graph["edges"][0]
@@ -71,7 +71,7 @@ def test_cache_invalidation_resolves_relative_import(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         graph = codemap.cache_invalidation_ownership_graph(["pkg/consumer.py"])
     assert graph["edges"][0]["target"] == "cache:pkg/state.py:CACHE"
 
@@ -86,7 +86,7 @@ def test_cache_invalidation_does_not_attach_unqualified_same_name(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         graph = codemap.cache_invalidation_ownership_graph(["other.py"])
     assert graph["edges"] == []
     assert graph["summary"]["owners_without_resolved_invalidator"] == 1
@@ -103,7 +103,7 @@ def test_cache_invalidation_resolves_decorator_cache_clear(tmp_path: Path) -> No
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         graph = codemap.cache_invalidation_ownership_graph(["maintenance.py"])
     edge = graph["edges"][0]
     assert edge["target"] == "cache:pkg/memo.py:value"
@@ -137,7 +137,7 @@ def test_cache_invalidation_imported_symbol_shadowed_by_parameter_is_not_authori
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         graph = codemap.cache_invalidation_ownership_graph(["consumer.py"])
     assert graph["edges"] == []
 
@@ -152,7 +152,7 @@ def test_cache_invalidation_module_alias_shadowed_by_local_is_not_authority(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         graph = codemap.cache_invalidation_ownership_graph(["consumer.py"])
     assert graph["edges"] == []
 
@@ -167,6 +167,6 @@ def test_cache_invalidation_function_local_alias_to_import_remains_resolvable(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         graph = codemap.cache_invalidation_ownership_graph(["consumer.py"])
     assert graph["edges"][0]["target"] == "cache:pkg/state.py:CACHE"

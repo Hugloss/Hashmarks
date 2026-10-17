@@ -78,7 +78,7 @@ def _capture(path: Path, *, method: str, revision: str | None = None) -> dict:
 
 def _claim(root: Path, capture: dict, *, subject: str) -> tuple[dict, dict]:
     with CodeMap(root) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.structural_locality(
             f"src.py::{subject}",
             result_mode="relationships",
@@ -198,7 +198,7 @@ def test_source_site_authority_cannot_be_forged_with_recomputed_digests(
 
 def _source_binding(root: Path, *, include_relationships: bool = False) -> dict:
     with CodeMap(root) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         return codemap.repository_evidence_bindings(
             [
                 {

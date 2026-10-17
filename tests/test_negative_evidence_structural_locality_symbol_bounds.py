@@ -73,7 +73,7 @@ def authority(value):
     )
 
     with _codemap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         _install_hidden_same_name_candidate(codemap, monkeypatch)
         packet = codemap.structural_locality(
             "pkg/core.py::authority",
@@ -172,7 +172,7 @@ def authority(value):
     )
 
     with _codemap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         original = codemap.store.visible_symbol_candidates
         worker_rows = [dict(row) for row in original("Worker", limit=10)]
         assert len(worker_rows) == 1

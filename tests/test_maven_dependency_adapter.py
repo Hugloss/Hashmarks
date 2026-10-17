@@ -113,7 +113,7 @@ def test_maven_adapter_does_not_infer_complete_coverage_from_bytes(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(raw)
         missing_component = codemap.dependency_resolution_queries(
             observation,
@@ -165,7 +165,7 @@ def test_maven_selection_coverage_requires_all_supplied_sources_complete(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(raw)
         missing = codemap.dependency_resolution_queries(
             observation,
@@ -218,7 +218,7 @@ def test_maven_adapter_preserves_inventory_topology_and_module_ambiguity(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(raw)
 
     inventory = {row["node_id"] for row in observation["inventory"]}
@@ -249,7 +249,7 @@ def test_maven_adapter_keeps_context_separate_from_effective_scope(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(raw)
 
     edge = observation["relationships"][0]
@@ -270,7 +270,7 @@ def test_maven_adapter_preserves_classifier_as_selection_identity(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(raw)
 
     assert [row["node_id"] for row in observation["selections"]] == [
@@ -356,7 +356,7 @@ def test_maven_adapter_relationship_change_is_not_selection_change(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.dependency_resolution_evidence(before_raw)
         after = codemap.dependency_resolution_evidence(after_raw)
         delta = codemap.dependency_resolution_delta(before, after)
@@ -381,7 +381,7 @@ def test_maven_adapter_preserves_inventory_without_module_metadata(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(raw)
 
     assert [row["node_id"] for row in observation["inventory"]] == [
@@ -407,7 +407,7 @@ def test_maven_adapter_does_not_overclaim_module_ownership_completeness(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(raw)
 
     coverage = {
@@ -438,7 +438,7 @@ def test_maven_pom_inventory_does_not_make_module_coverage_incomplete(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(raw)
 
     coverage = {
@@ -461,7 +461,7 @@ def test_maven_duplicate_inventory_rows_do_not_overclaim_module_completeness(
     raw = _complete_maven_observation(trees={}, inventories={"test": inventory})
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(raw)
 
     coverage = {
@@ -482,7 +482,7 @@ def test_maven_duplicate_module_annotation_cannot_hide_unannotated_inventory(
     raw = _complete_maven_observation(trees={}, inventories={"test": inventory})
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(raw)
 
     coverage = {
@@ -502,7 +502,7 @@ def test_maven_conflicting_duplicate_module_annotations_preserve_ambiguity(
     raw = _complete_maven_observation(trees={}, inventories={"test": inventory})
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(raw)
 
     ownership = {
@@ -599,7 +599,7 @@ def test_maven_header_only_inventory_is_complete_empty_evidence(
         trees={}, inventories={"test": b"The following files have been resolved:\n"}
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(raw)
         result = codemap.dependency_resolution_queries(
             observation,
@@ -618,7 +618,7 @@ def test_maven_genuine_none_marker_is_complete_empty_evidence(
         inventories={"test": b"The following files have been resolved:\n   none\n"},
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(raw)
     assert observation["inventory"] == []
     assert {

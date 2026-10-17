@@ -42,8 +42,8 @@ def test_codemap_sync_does_not_claim_daemon_generation_if_generation_moves(
                 dirty_path_count=0,
             )
 
-        monkeypatch.setattr(codemap, "_daemon_observation", sample)
-        result = codemap.sync()
+        monkeypatch.setattr(codemap._observation_source, "observe", sample)
+        result = codemap.index.sync()
         assert result.identity_generation is None
         assert any("generation changed" in warning for warning in result.warnings)
         assert codemap.store.meta("identity_generation") == ""
@@ -63,7 +63,7 @@ def test_codemap_never_follows_source_symlinks_outside_workspace(
     except (OSError, NotImplementedError):
         pytest.skip("symlinks unavailable")
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        result = codemap.sync()
+        result = codemap.index.sync()
         assert result.discovered == 0
         assert codemap.store.file_row("leak.py") is None
         assert not codemap.find("outside_secret")
@@ -73,7 +73,7 @@ def test_incremental_file_to_symlink_removes_old_codemap_row(tmp_path: Path) -> 
     target = tmp_path / "real.py"
     target.write_text("def original():\n    return 1\n", encoding="utf-8")
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         assert codemap.store.file_row("real.py") is not None
         outside = tmp_path.parent / f"{tmp_path.name}-replacement.py"
         outside.write_text("def outside():\n    return 2\n", encoding="utf-8")
@@ -82,7 +82,7 @@ def test_incremental_file_to_symlink_removes_old_codemap_row(tmp_path: Path) -> 
             target.symlink_to(outside)
         except (OSError, NotImplementedError):
             pytest.skip("symlinks unavailable")
-        result = codemap.sync(["real.py"])
+        result = codemap.index.sync(["real.py"])
         assert result.removed == 1
         assert codemap.store.file_row("real.py") is None
 
@@ -100,7 +100,7 @@ def test_custom_state_dir_inside_workspace_is_never_indexed(tmp_path: Path) -> N
         state_dir=custom,
         artifact_db=tmp_path / "artifacts.sqlite3",
     ) as codemap:
-        result = codemap.sync()
+        result = codemap.index.sync()
         assert result.discovered == 3
         assert codemap.store.file_row("control-state/should_not_exist.py") is None
 
@@ -110,7 +110,7 @@ def test_index_denial_policy_purges_previous_shared_artifact(tmp_path: Path) -> 
     source.write_text("def previously_allowed():\n    return 1\n", encoding="utf-8")
     artifact_db = tmp_path / "shared.sqlite3"
     with CodeMap(tmp_path, artifact_db=artifact_db) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         row = codemap.store.file_row("private.py")
         assert row is not None
         key = str(row["artifact_key"])
@@ -121,7 +121,7 @@ def test_index_denial_policy_purges_previous_shared_artifact(tmp_path: Path) -> 
         encoding="utf-8",
     )
     with CodeMap(tmp_path, artifact_db=artifact_db) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         assert codemap.store.file_row("private.py") is None
         assert codemap.artifacts.get(key) is None
 
@@ -140,9 +140,9 @@ def test_interrupted_sync_rolls_back_candidate_generation(
         def explode(*args, **kwargs) -> None:
             raise RuntimeError("synthetic interruption")
 
-        monkeypatch.setattr(codemap, "_parse_or_reuse", explode)
+        monkeypatch.setattr(codemap.index, "_parse_or_reuse", explode)
         with pytest.raises(RuntimeError, match="synthetic interruption"):
-            codemap.sync()
+            codemap.index.sync()
         assert codemap.status()["build"]["state"] == "NEVER_SYNCED"
         assert codemap.store.generation() == 0
         assert codemap.store.paths() == set()

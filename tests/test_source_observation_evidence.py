@@ -16,6 +16,8 @@ from hashmarks.codemap.repository_delta import (
     RepositoryDeltaMixin,
     RepositoryGenerationBinding,
 )
+from hashmarks.codemap.repository_source import RepositorySource
+from hashmarks.codemap.source_line_correspondence import source_shape
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -25,8 +27,8 @@ def test_exact_member_occurrences_and_physical_source_shape(tmp_path: Path) -> N
     path = tmp_path / "example.py"
     path.write_bytes(b"def example():\r\n    first = 'needle'\n    return 'needle'\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        packet = codemap.source_observation(
+        codemap.index.sync()
+        packet = codemap.source.observe(
             "example.py", literal="needle", long_line_threshold=10
         )
     assert packet["schema"] == "hashmarks.source-observation.v1"
@@ -57,9 +59,9 @@ def test_truncated_occurrences_do_not_claim_complete_or_absent(tmp_path: Path) -
         "def test():\n    return 'hit hit hit'\n", encoding="utf-8"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        packet = codemap.source_observation("example.py", literal="hit", limit=1)
-        absent = codemap.source_observation("example.py", literal="unseen")
+        codemap.index.sync()
+        packet = codemap.source.observe("example.py", literal="hit", limit=1)
+        absent = codemap.source.observe("example.py", literal="unseen")
     assert packet["observed_match_count"] == 3
     assert len(assert_array(packet["occurrences"])) == 1
     assert packet["truncation"] == "truncated"
@@ -80,8 +82,8 @@ def test_python_token_kinds_distinguish_comment_identifier_and_literal(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        rows = codemap.source_observation("example.py", literal="needle")
+        codemap.index.sync()
+        rows = codemap.source.observe("example.py", literal="needle")
     assert [row["occurrence_kind"] for row in assert_records(rows["occurrences"])] == [
         "identifier",
         "comment",
@@ -97,7 +99,7 @@ def test_preflight_coverage_does_not_invent_pruned_member_counts(
     excluded.mkdir()
     (excluded / "secret.js").write_text("ignored\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        packet = codemap.index_preflight()
+        packet = codemap.index.preflight()
     coverage = assert_object(packet["observation_coverage"])
     assert coverage["scope"] == "discovered-policy-admitted-indexable-members"
     assert "node_modules" in assert_array(coverage["known_pruned_directory_classes"])
@@ -112,10 +114,10 @@ def test_changed_unreconciled_member_never_returns_old_source_hits(
     path = tmp_path / "example.py"
     path.write_text("def example(): return 'old'\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        before = codemap.source_observation("example.py", literal="old")
+        codemap.index.sync()
+        before = codemap.source.observe("example.py", literal="old")
         path.write_text("def example(): return 'new'\n", encoding="utf-8")
-        after = codemap.source_observation("example.py", literal="old")
+        after = codemap.source.observe("example.py", literal="old")
     assert before["observed_match_count"] == 1
     assert after["availability"] == "unavailable"
     assert assert_object(after["member"])["state"] == "unknown"
@@ -127,9 +129,9 @@ def test_denied_and_oversized_members_return_no_source(tmp_path: Path) -> None:
     (tmp_path / ".env").write_text("SECRET=private\n", encoding="utf-8")
     (tmp_path / "big.py").write_text("x = '" + "y" * 1024 + "'\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        denied = codemap.source_observation(".env", literal="private")
-        oversized = codemap.source_observation("big.py", literal="y", max_bytes=32)
+        codemap.index.sync()
+        denied = codemap.source.observe(".env", literal="private")
+        oversized = codemap.source.observe("big.py", literal="y", max_bytes=32)
     assert denied["occurrences"] == []
     assert denied["source_shape"] is None
     assert denied["negative_evidence"] == "not-admissible"
@@ -139,9 +141,7 @@ def test_denied_and_oversized_members_return_no_source(tmp_path: Path) -> None:
 
 
 def test_binary_invalid_utf8_and_source_shape_are_distinct() -> None:
-    shape = RepositoryDeltaMixin._source_shape(
-        b"\xef\xbb\xbfA\r\n" + b"a" * 30, long_line_threshold=10
-    )
+    shape = source_shape(b"\xef\xbb\xbfA\r\n" + b"a" * 30, long_line_threshold=10)
     assert shape["utf8_bom"] is True
     assert shape["physical_lines"] == 2
     assert shape["crlf_terminators"] == 1
@@ -165,16 +165,16 @@ def test_source_observation_rejects_invalid_bounds(
         with pytest.raises(ValueError):
             if argument == "literal":
                 assert isinstance(value, str)
-                codemap.source_observation("source.py", literal=value)
+                codemap.source.observe("source.py", literal=value)
             else:
                 assert isinstance(value, int)
                 if argument == "limit":
-                    codemap.source_observation("source.py", limit=value)
+                    codemap.source.observe("source.py", limit=value)
                 elif argument == "max_bytes":
-                    codemap.source_observation("source.py", max_bytes=value)
+                    codemap.source.observe("source.py", max_bytes=value)
                 else:
                     assert argument == "long_line_threshold"
-                    codemap.source_observation("source.py", long_line_threshold=value)
+                    codemap.source.observe("source.py", long_line_threshold=value)
 
 
 def _observation(
@@ -251,8 +251,8 @@ def test_scoped_occurrences_have_exact_member_provenance_and_stable_order(
     )
     (tmp_path / "unrelated.py").write_text("needle = 3\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        packet = codemap.scoped_source_occurrences(
+        codemap.index.sync()
+        packet = codemap.source.scoped_occurrences(
             ["beta.py", "alpha.py", "alpha.py"], "needle"
         )
     assert packet["schema"] == "hashmarks.scoped-source-occurrences.v1"
@@ -287,8 +287,8 @@ def test_scoped_absence_never_becomes_repository_wide_absence(
     (tmp_path / "inside.py").write_text("x = 1\n", encoding="utf-8")
     (tmp_path / "outside.py").write_text("needle = 1\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        packet = codemap.scoped_source_occurrences(["inside.py"], "needle")
+        codemap.index.sync()
+        packet = codemap.source.scoped_occurrences(["inside.py"], "needle")
     assert packet["observed_match_count"] == 0
     assert packet["exact_match_count"] == 0
     assert packet["source_coverage"] == "complete"
@@ -303,8 +303,8 @@ def test_scoped_result_limit_does_not_change_exact_observed_counts(
     (tmp_path / "a.py").write_text("x = 'hit hit hit'\n", encoding="utf-8")
     (tmp_path / "b.py").write_text("y = 'hit hit'\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        packet = codemap.scoped_source_occurrences(["a.py", "b.py"], "hit", limit=1)
+        codemap.index.sync()
+        packet = codemap.source.scoped_occurrences(["a.py", "b.py"], "hit", limit=1)
     assert len(assert_array(packet["occurrences"])) == 1
     assert packet["observed_match_count"] == 5
     assert packet["exact_match_count"] == 5
@@ -321,8 +321,8 @@ def test_scoped_visibility_and_pruning_keep_coverage_unknown(tmp_path: Path) -> 
     nested.mkdir()
     (nested / "hidden.py").write_text("needle=hidden\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        packet = codemap.scoped_source_occurrences(
+        codemap.index.sync()
+        packet = codemap.source.scoped_occurrences(
             ["safe.py", ".env", "node_modules/hidden.py"], "needle"
         )
     assert packet["observed_match_count"] == 1
@@ -341,8 +341,8 @@ def test_scoped_total_byte_budget_fails_closed_without_reading_next_member(
     (tmp_path / "a.py").write_text("x = 'hit'\n", encoding="utf-8")
     (tmp_path / "b.py").write_text("y = 'hit'\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        packet = codemap.scoped_source_occurrences(
+        codemap.index.sync()
+        packet = codemap.source.scoped_occurrences(
             ["a.py", "b.py"], "hit", max_total_bytes=10
         )
     assert packet["observed_source_bytes"] == 10
@@ -360,10 +360,10 @@ def test_scoped_member_edit_fails_closed_before_reindex(tmp_path: Path) -> None:
     source = tmp_path / "changed.py"
     source.write_text("x = 'old'\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        before = codemap.scoped_source_occurrences(["changed.py"], "old")
+        codemap.index.sync()
+        before = codemap.source.scoped_occurrences(["changed.py"], "old")
         source.write_text("x = 'new'\n", encoding="utf-8")
-        after = codemap.scoped_source_occurrences(["changed.py"], "old")
+        after = codemap.source.scoped_occurrences(["changed.py"], "old")
     assert before["exact_match_count"] == 1
     assert after["exact_match_count"] is None
     assert after["source_coverage"] == "unknown"
@@ -376,7 +376,7 @@ def test_scoped_source_rejects_invalid_scope_before_observation(
 ) -> None:
     with CodeMap(tmp_path) as codemap:
         with pytest.raises(ValueError):
-            codemap.scoped_source_occurrences(paths, "needle")
+            codemap.source.scoped_occurrences(paths, "needle")
 
 
 def test_scoped_scope_identity_is_stable_across_request_order(
@@ -385,9 +385,9 @@ def test_scoped_scope_identity_is_stable_across_request_order(
     (tmp_path / "a.py").write_text("needle = 1\n", encoding="utf-8")
     (tmp_path / "b.py").write_text("needle = 2\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        first = codemap.scoped_source_occurrences(["b.py", "a.py"], "needle")
-        second = codemap.scoped_source_occurrences(["a.py", "b.py"], "needle")
+        codemap.index.sync()
+        first = codemap.source.scoped_occurrences(["b.py", "a.py"], "needle")
+        second = codemap.source.scoped_occurrences(["a.py", "b.py"], "needle")
     assert first["observation_identity"] == second["observation_identity"]
 
 
@@ -525,24 +525,26 @@ def test_literal_set_reuses_one_member_read_and_qualifies_each_literal(
         "def another_zip():\n    return ZIP_DEFLATED\n", encoding="utf-8"
     )
     reads: list[str] = []
-    original = CodeMap._bounded_source_observation
+    original = RepositorySource._bounded_source_observation
 
     def observing_read(
-        self: CodeMap, path: str, max_bytes: int
+        self: RepositorySource, path: str, max_bytes: int
     ) -> tuple[dict[str, object], bytes | None]:
         reads.append(path)
         return original(self, path, max_bytes)
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        monkeypatch.setattr(CodeMap, "_bounded_source_observation", observing_read)
-        first = codemap.scoped_source_literals(
+        codemap.index.sync()
+        monkeypatch.setattr(
+            RepositorySource, "_bounded_source_observation", observing_read
+        )
+        first = codemap.source.scoped_literals(
             ["b.py", "a.py", "a.py"],
             ["ZipInfo", "ZIP_DEFLATED", "not-present"],
         )
         reads_first = list(reads)
         reads.clear()
-        second = codemap.scoped_source_literals(
+        second = codemap.source.scoped_literals(
             ["a.py", "b.py"], ["not-present", "ZIP_DEFLATED", "ZipInfo"]
         )
 
@@ -579,8 +581,8 @@ def test_literal_set_balances_display_and_retains_exact_counts(tmp_path: Path) -
         "left left left left right right\n", encoding="utf-8"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        packet = codemap.scoped_source_literals(
+        codemap.index.sync()
+        packet = codemap.source.scoped_literals(
             ["mod.py"], ["right", "left", "absent"], limit=2
         )
     assert [hit["literal"] for hit in assert_records(packet["occurrences"])] == [
@@ -611,8 +613,8 @@ def test_literal_set_denied_member_never_claims_qualified_absence(
     (tmp_path / "safe.py").write_text("ZipInfo\n", encoding="utf-8")
     (tmp_path / ".env").write_text("SECRET=ZIP_DEFLATED\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        packet = codemap.scoped_source_literals(
+        codemap.index.sync()
+        packet = codemap.source.scoped_literals(
             ["safe.py", ".env"], ["ZipInfo", "ZIP_DEFLATED", "absent"]
         )
     assert packet["observed_match_count"] == 1
@@ -633,12 +635,12 @@ def test_literal_set_byte_limit_and_edited_member_fail_closed(tmp_path: Path) ->
     first.write_text("one\n", encoding="utf-8")
     other.write_text("two\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        bounded = codemap.scoped_source_literals(
+        codemap.index.sync()
+        bounded = codemap.source.scoped_literals(
             ["a.py", "b.py"], ["one", "two"], max_total_bytes=4
         )
         first.write_text("changed\n", encoding="utf-8")
-        mismatched = codemap.scoped_source_literals(["a.py"], ["one", "absent"])
+        mismatched = codemap.source.scoped_literals(["a.py"], ["one", "absent"])
     assert bounded["observed_source_bytes"] == 4
     assert bounded["source_coverage"] == "unknown"
     assert assert_object(assert_array(bounded["member_observations"])[1])["reason"] == (
@@ -659,12 +661,12 @@ def test_literal_set_rejects_invalid_literals_before_member_read(
 ) -> None:
     (tmp_path / "a.py").write_text("a", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(ValueError):
-            codemap.scoped_source_literals(["a.py"], literals)
+            codemap.source.scoped_literals(["a.py"], literals)
 
 
 def test_literal_set_rejects_bad_source_paths_before_read(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
         with pytest.raises(ValueError):
-            codemap.scoped_source_literals(["../elsewhere.py"], ["a"])
+            codemap.source.scoped_literals(["../elsewhere.py"], ["a"])

@@ -52,14 +52,14 @@ class TaskActionOwnerResolutionMixin:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         path = normalize_relative_path(token, allow_root=False)
-        row = self._session_file_row(path)
+        row = self.reads.file_row(path)
         # Missing index rows do not prove absence. Only the canonical member
         # owner can admit punctuation fallback for an absent literal filename.
         if row is None and token.endswith("."):
-            member = self._repository_member_source(path)
+            member = self.source._repository_member_source(path)
             if isinstance(member, dict) and member.get("state") == "known-absent":
                 path = normalize_relative_path(token.rstrip("."), allow_root=False)
-                row = self._session_file_row(path)
+                row = self.reads.file_row(path)
         return path, row
 
     @staticmethod
@@ -102,7 +102,7 @@ class TaskActionOwnerResolutionMixin:
             )
             if visibility is EvidenceVisibility.DENY:
                 continue
-            if not self._indexed_path_current(path):
+            if not self.index.is_current(path):
                 continue
             paths.append(path)
         return tuple(dict.fromkeys(paths))
@@ -251,7 +251,7 @@ class TaskActionOwnerResolutionMixin:
             self = cast("CodeMap", self)
         best: tuple[int, dict[str, object]] | None = None
         path = str(row.get("path") or "")
-        for symbol in self._session_symbols_for_path(path):
+        for symbol in self.reads.symbols_for_path(path):
             name = str(symbol.get("name") or "")
             symbol_terms = set(
                 _query_terms(
@@ -429,13 +429,13 @@ class TaskActionOwnerResolutionMixin:
             "graph_bound_reasons": [],
             "status": "unresolved",
         }
-        if not self._indexed_path_current(path):
+        if not self.index.is_current(path):
             entry["status"] = "stale"
             return entry, None
         graph = self.ownership_relation_graph(request.task, path, max_depth=3)
         resolved = self._structural_owner_from_graph(graph, path)
         owner = str((resolved or {}).get("path") or "")
-        current = bool(owner and self._indexed_path_current(owner))
+        current = bool(owner and self.index.is_current(owner))
         entry["graph_completeness"] = graph["completeness"]
         entry["graph_bound_reasons"] = list(graph.get("search_bound_reasons") or [])
         entry["owner_path"] = list(graph.get("owner_path") or [])

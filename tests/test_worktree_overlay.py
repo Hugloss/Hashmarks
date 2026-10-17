@@ -28,7 +28,7 @@ def test_overlay_indexes_only_changed_paths_and_reuses_base_artifacts(
     shutil.copytree(base_dir, worktree)
     (worktree / "src" / "engine.py").write_text("def target():\n    return 99\n")
     with CodeMap(base_dir) as base:
-        base.sync()
+        base.index.sync()
         with WorktreeOverlay(base, worktree, worker_id="agent-a") as overlay:
             stats = overlay.sync(["src/engine.py"])
             hits = overlay.find_task("target engine", limit=10)
@@ -53,7 +53,7 @@ def test_overlays_are_worker_isolated(tmp_path: Path) -> None:
     (a / "src" / "engine.py").write_text("def alpha_only():\n    return 1\n")
     (b / "src" / "engine.py").write_text("def beta_only():\n    return 1\n")
     with CodeMap(base_dir) as base:
-        base.sync()
+        base.index.sync()
         with (
             WorktreeOverlay(base, a, worker_id="agent-a") as oa,
             WorktreeOverlay(base, b, worker_id="agent-b") as ob,
@@ -73,7 +73,7 @@ def test_overlays_are_worker_isolated(tmp_path: Path) -> None:
 def test_overlay_rejects_base_workspace_and_parent_escape(tmp_path: Path) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as base:
-        base.sync()
+        base.index.sync()
         try:
             WorktreeOverlay(base, tmp_path, worker_id="same")
         except ValueError:
@@ -92,14 +92,14 @@ def test_overlay_rejects_later_base_generation_until_explicit_resync(
     (worktree / "src" / "engine.py").write_text("def worker_target():\n    return 99\n")
 
     with CodeMap(base_dir) as base:
-        base.sync()
+        base.index.sync()
         with WorktreeOverlay(base, worktree, worker_id="agent-a") as overlay:
             initial = overlay.sync(["src/engine.py"])
 
             (base_dir / "src" / "helper.py").write_text(
                 "def base_two_only():\n    return 22\n"
             )
-            base.sync(["src/helper.py"])
+            base.index.sync(["src/helper.py"])
 
             with pytest.raises(
                 WorktreeOverlayBaseChangedError,
@@ -123,7 +123,7 @@ def test_overlay_rejects_generation_only_base_advance(tmp_path: Path) -> None:
     (worktree / "src" / "engine.py").write_text("def worker_target():\n    return 99\n")
 
     with CodeMap(base_dir) as base:
-        base.sync()
+        base.index.sync()
         with WorktreeOverlay(base, worktree, worker_id="agent-a") as overlay:
             stats = overlay.sync(["src/engine.py"])
             fingerprint = stats.base_workspace_fingerprint
@@ -150,7 +150,7 @@ def test_overlay_rejects_base_generation_change_during_fused_read(
     (worktree / "src" / "engine.py").write_text("def worker_target():\n    return 99\n")
 
     with CodeMap(base_dir) as base:
-        base.sync()
+        base.index.sync()
         with WorktreeOverlay(base, worktree, worker_id="agent-a") as overlay:
             overlay.sync(["src/engine.py"])
             original_find = overlay.overlay.find_task

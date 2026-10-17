@@ -34,10 +34,10 @@ def test_setuptools_src_layout_uses_import_identity_not_repository_prefix(
         "from pkg.api import run\ndef test_run(): assert run() == 1\n",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         row = codemap.store.file_row("src/pkg/api.py")
         affected = codemap.affected("src/pkg/api.py", max_depth=2)
-        owners, ambiguous = codemap._resolve_import_owner_evidence(
+        owners, ambiguous = codemap._imports._resolve_import_owner_evidence(
             "tests/test_api.py", "pkg.api.run"
         )
     assert row is not None and row["module_name"] == "pkg.api"
@@ -60,8 +60,8 @@ def test_relative_import_in_setuptools_src_layout_uses_configured_module_root(
         tmp_path, "src/pkg/use.py", "from .api import run\ndef use(): return run()\n"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        owners, ambiguous = codemap._resolve_import_owner_evidence(
+        codemap.index.sync()
+        owners, ambiguous = codemap._imports._resolve_import_owner_evidence(
             "src/pkg/use.py", ".api.run"
         )
     assert owners == ["src/pkg/api.py"]
@@ -75,7 +75,7 @@ def test_unconfigured_src_namespace_keeps_src_as_module_identity(
     _write(tmp_path, "src/m0.py", "def run(): return 1\n")
     _write(tmp_path, "src/m1.py", "from src.m0 import run\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         row = codemap.store.file_row("src/m0.py")
         affected = codemap.affected("src/m0.py", max_depth=2)
     assert row is not None and row["module_name"] == "src.m0"
@@ -90,7 +90,7 @@ def test_source_root_configuration_change_reprojects_reused_module_identity(
     _write(tmp_path, "src/pkg/use.py", "from pkg.api import run\n")
     state = tmp_path / ".state"
     with CodeMap(tmp_path, state_dir=state) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.store.file_row("src/pkg/api.py")
         assert before is not None and before["module_name"] == "src.pkg.api"
     _write(
@@ -99,7 +99,7 @@ def test_source_root_configuration_change_reprojects_reused_module_identity(
         '[project]\nname="demo"\nversion="0"\n[tool.setuptools.package-dir]\n""="src"\n',
     )
     with CodeMap(tmp_path, state_dir=state) as codemap:
-        result = codemap.sync()
+        result = codemap.index.sync()
         after = codemap.store.file_row("src/pkg/api.py")
         affected = codemap.affected("src/pkg/api.py", max_depth=2)
     assert result.parsed_artifacts == 1
@@ -130,9 +130,9 @@ def test_duplicate_configured_import_identity_is_ambiguous_and_not_reverse_owned
         "from shared.api import run\ndef test_run(): assert run() == 1\n",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         paths = codemap.store.module_paths("shared.api")
-        owners, ambiguous = codemap._resolve_import_owner_evidence(
+        owners, ambiguous = codemap._imports._resolve_import_owner_evidence(
             "tests/test_consumer.py", "shared.api.run"
         )
         affected_a = codemap.affected("services/a/src/shared/api.py", max_depth=2)
@@ -159,15 +159,15 @@ def test_duplicate_import_identity_becomes_unique_after_one_owner_removed(
     _write(tmp_path, "consumer.py", "from shared.api import run\n")
     state = tmp_path / ".state"
     with CodeMap(tmp_path, state_dir=state) as codemap:
-        codemap.sync()
-        owners, ambiguous = codemap._resolve_import_owner_evidence(
+        codemap.index.sync()
+        owners, ambiguous = codemap._imports._resolve_import_owner_evidence(
             "consumer.py", "shared.api.run"
         )
         assert owners == [] and ambiguous is True
     (tmp_path / "services/b/src/shared/api.py").unlink()
     with CodeMap(tmp_path, state_dir=state) as codemap:
-        codemap.sync()
-        owners, ambiguous = codemap._resolve_import_owner_evidence(
+        codemap.index.sync()
+        owners, ambiguous = codemap._imports._resolve_import_owner_evidence(
             "consumer.py", "shared.api.run"
         )
         affected = codemap.affected("services/a/src/shared/api.py", max_depth=1)
@@ -187,7 +187,7 @@ def test_nested_project_pyproject_scopes_src_root_to_project_directory(
     _write(tmp_path, "services/a/src/pkg/api.py", "def run(): return 1\n")
     _write(tmp_path, "services/a/src/pkg/use.py", "from pkg.api import run\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         row = codemap.store.file_row("services/a/src/pkg/api.py")
         affected = codemap.affected("services/a/src/pkg/api.py", max_depth=1)
     assert row is not None and row["module_name"] == "pkg.api"
@@ -208,9 +208,9 @@ def test_nested_projects_exposing_same_import_identity_remain_ambiguous(
         )
     _write(tmp_path, "consumer.py", "from shared.api import run\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         paths = codemap.store.module_paths("shared.api")
-        owners, ambiguous = codemap._resolve_import_owner_evidence(
+        owners, ambiguous = codemap._imports._resolve_import_owner_evidence(
             "consumer.py", "shared.api.run"
         )
     assert paths == ["services/a/src/shared/api.py", "services/b/src/shared/api.py"]
@@ -229,7 +229,7 @@ def test_same_service_targeted_pyproject_change_refreshes_import_roots(
     _write(tmp_path, "services/a/src/pkg/api.py", "def run(): return 1\n")
     _write(tmp_path, "services/a/src/pkg/use.py", "from pkg.api import run\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.store.file_row("services/a/src/pkg/api.py")
         assert before is not None and before["module_name"] == "services.a.src.pkg.api"
         _write(
@@ -237,7 +237,7 @@ def test_same_service_targeted_pyproject_change_refreshes_import_roots(
             "services/a/pyproject.toml",
             '[project]\nname="service-a"\nversion="0"\n[tool.setuptools.package-dir]\n""="src"\n',
         )
-        codemap.sync(paths=["services/a/pyproject.toml", "services/a/src/pkg"])
+        codemap.index.sync(paths=["services/a/pyproject.toml", "services/a/src/pkg"])
         after = codemap.store.file_row("services/a/src/pkg/api.py")
         affected = codemap.affected("services/a/src/pkg/api.py", max_depth=1)
     assert after is not None and after["module_name"] == "pkg.api"
@@ -263,10 +263,10 @@ def test_uv_workspace_exclude_does_not_create_false_import_ambiguity(
         )
     _write(tmp_path, "consumer.py", "from shared.api import run\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         app = codemap.store.file_row("packages/app/src/shared/api.py")
         legacy = codemap.store.file_row("packages/legacy/src/shared/api.py")
-        owners, ambiguous = codemap._resolve_import_owner_evidence(
+        owners, ambiguous = codemap._imports._resolve_import_owner_evidence(
             "consumer.py", "shared.api.run"
         )
     assert app is not None and app["module_name"] == "shared.api"
@@ -287,7 +287,7 @@ def test_targeted_pyproject_change_reprojects_python_without_explicit_source_pat
     )
     _write(tmp_path, "services/a/src/pkg/api.py", "def run(): return 1\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.store.file_row("services/a/src/pkg/api.py")
         assert before is not None and before["module_name"] == "services.a.src.pkg.api"
         _write(
@@ -295,7 +295,7 @@ def test_targeted_pyproject_change_reprojects_python_without_explicit_source_pat
             "services/a/pyproject.toml",
             '[project]\nname="service-a"\nversion="0"\n[tool.setuptools.package-dir]\n""="src"\n',
         )
-        result = codemap.sync(paths=["services/a/pyproject.toml"])
+        result = codemap.index.sync(paths=["services/a/pyproject.toml"])
         after = codemap.store.file_row("services/a/src/pkg/api.py")
     assert result.discovered == 2
     assert after is not None and after["module_name"] == "pkg.api"
@@ -317,7 +317,7 @@ def test_uv_workspace_membership_change_reprojects_existing_member_files(
         )
         _write(tmp_path, f"packages/{member}/src/pkg/api.py", "def run(): return 1\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.store.file_row("packages/b/src/pkg/api.py")
         assert before is not None and before["module_name"] == "packages.b.src.pkg.api"
         _write(
@@ -325,7 +325,7 @@ def test_uv_workspace_membership_change_reprojects_existing_member_files(
             "pyproject.toml",
             """[project]\nname="root"\nversion="0"\n[tool.uv.workspace]\nmembers=["packages/a", "packages/b"]\n""",
         )
-        codemap.sync(paths=["pyproject.toml"])
+        codemap.index.sync(paths=["pyproject.toml"])
         after = codemap.store.file_row("packages/b/src/pkg/api.py")
         paths = codemap.store.module_paths("pkg.api")
     assert after is not None and after["module_name"] == "pkg.api"
@@ -349,14 +349,14 @@ def test_uv_workspace_member_move_root_only_sync_discovers_new_and_drops_ghost_o
     )
     _write(tmp_path, "packages/a/src/pkg/api.py", "def run(): return 1\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         shutil.move(str(tmp_path / "packages/a"), str(tmp_path / "packages/b"))
         _write(
             tmp_path,
             "pyproject.toml",
             """[project]\nname="root"\nversion="0"\n[tool.uv.workspace]\nmembers=["packages/b"]\n""",
         )
-        result = codemap.sync(paths=["pyproject.toml"])
+        result = codemap.index.sync(paths=["pyproject.toml"])
         old = codemap.store.file_row("packages/a/src/pkg/api.py")
         new = codemap.store.file_row("packages/b/src/pkg/api.py")
         paths = codemap.store.module_paths("pkg.api")
@@ -382,7 +382,7 @@ def test_uv_workspace_member_removal_reprojects_files_without_deleting_repositor
         )
         _write(tmp_path, f"packages/{member}/src/pkg/api.py", "def run(): return 1\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         assert codemap.store.module_paths("pkg.api") == [
             "packages/a/src/pkg/api.py",
             "packages/b/src/pkg/api.py",
@@ -392,7 +392,7 @@ def test_uv_workspace_member_removal_reprojects_files_without_deleting_repositor
             "pyproject.toml",
             """[project]\nname="root"\nversion="0"\n[tool.uv.workspace]\nmembers=["packages/a"]\n""",
         )
-        result = codemap.sync(paths=["pyproject.toml"])
+        result = codemap.index.sync(paths=["pyproject.toml"])
         removed_member = codemap.store.file_row("packages/b/src/pkg/api.py")
         paths = codemap.store.module_paths("pkg.api")
     assert result.discovered == 2
@@ -420,7 +420,7 @@ def test_uv_member_source_root_move_pyproject_only_sync_drops_ghost_and_discover
     )
     _write(tmp_path, "packages/a/src/pkg/api.py", "def run(): return 1\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         shutil.move(
             str(tmp_path / "packages/a/src"), str(tmp_path / "packages/a/python")
         )
@@ -429,7 +429,7 @@ def test_uv_member_source_root_move_pyproject_only_sync_drops_ghost_and_discover
             "packages/a/pyproject.toml",
             """[project]\nname="a"\nversion="0"\n[tool.setuptools.package-dir]\n""="python"\n""",
         )
-        result = codemap.sync(paths=["packages/a/pyproject.toml"])
+        result = codemap.index.sync(paths=["packages/a/pyproject.toml"])
         old = codemap.store.file_row("packages/a/src/pkg/api.py")
         new = codemap.store.file_row("packages/a/python/pkg/api.py")
         paths = codemap.store.module_paths("pkg.api")
@@ -454,9 +454,9 @@ def test_uv_member_manifest_deletion_revokes_packaging_import_authority(
     )
     _write(tmp_path, "packages/a/src/pkg/api.py", "def run(): return 1\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         (tmp_path / "packages/a/pyproject.toml").unlink()
-        result = codemap.sync(paths=["packages/a/pyproject.toml"])
+        result = codemap.index.sync(paths=["packages/a/pyproject.toml"])
         row = codemap.store.file_row("packages/a/src/pkg/api.py")
         paths = codemap.store.module_paths("pkg.api")
     assert result.discovered == 1
@@ -490,9 +490,13 @@ def test_uv_workspace_namespace_portions_are_distinct_modules_not_duplicate_owne
         "from company.alpha.api import alpha\nfrom company.beta.api import beta\n",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        a = codemap._resolve_import_paths("consumer.py", "company.alpha.api.alpha")
-        b = codemap._resolve_import_paths("consumer.py", "company.beta.api.beta")
+        codemap.index.sync()
+        a = codemap._imports._resolve_import_paths(
+            "consumer.py", "company.alpha.api.alpha"
+        )
+        b = codemap._imports._resolve_import_paths(
+            "consumer.py", "company.beta.api.beta"
+        )
         assert codemap.store.module_paths("company.alpha.api") == [
             "packages/a/src/company/alpha/api.py"
         ]
@@ -524,12 +528,12 @@ def test_uv_workspace_same_namespace_concrete_module_duplicate_fails_closed(
         )
     _write(tmp_path, "consumer.py", "from company.shared.api import run\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         paths = codemap.store.module_paths("company.shared.api")
-        resolved = codemap._resolve_import_paths(
+        resolved = codemap._imports._resolve_import_paths(
             "consumer.py", "company.shared.api.run"
         )
-        ambiguous = codemap._python_import_identity_ambiguous(
+        ambiguous = codemap._imports._python_import_identity_ambiguous(
             "consumer.py", "company.shared.api.run"
         )
     assert paths == [
@@ -559,7 +563,7 @@ def test_uv_workspace_transition_reprojection_does_not_scan_all_persisted_rows(
                 tmp_path, f"packages/{member}/src/pkg/m{index}.py", f"VALUE = {index}\n"
             )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
 
         def forbidden() -> Never:
             raise AssertionError(
@@ -572,7 +576,7 @@ def test_uv_workspace_transition_reprojection_does_not_scan_all_persisted_rows(
             "pyproject.toml",
             """[project]\nname="root"\nversion="0"\n[tool.uv.workspace]\nmembers=["packages/a", "packages/b"]\n""",
         )
-        result = codemap.sync(paths=["pyproject.toml"])
+        result = codemap.index.sync(paths=["pyproject.toml"])
         row = codemap.store.file_row("packages/b/src/pkg/m10.py")
     assert result.discovered == 21
     assert row is not None and row["module_name"] == "pkg.m10"

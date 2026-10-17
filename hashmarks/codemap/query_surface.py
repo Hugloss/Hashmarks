@@ -1,17 +1,16 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from hashmarks.operation_contract import operation_response, operation_schema
 from hashmarks.paths import normalize_relative_path
 
-from .decision_session import decision_scoped
+from .decision_session import ReadScopeOwner, decision_scoped
 from .model import EvidenceVisibility
-from .python_ast import estimate_tokens
-from .query_primitives import _WORD_RE
 from .repository_domains import RepositoryDomain, classify_repository_path
+from .watch_continuity import watch_status_projection
 
 if TYPE_CHECKING:
     from .engine import CodeMap
@@ -25,21 +24,6 @@ _CHANGE_IMPACT_SURFACES = (
     "orientation",
     "other",
 )
-
-
-def _instruction_scope(authority: str) -> str:
-    parent = Path(authority).parent.as_posix()
-    return "." if parent in {"", "."} else parent
-
-
-def _instruction_applies(authority: str, target: str) -> bool:
-    scope = _instruction_scope(authority)
-    return scope == "." or target == scope or target.startswith(scope + "/")
-
-
-def _instruction_specificity(authority: str) -> int:
-    scope = _instruction_scope(authority)
-    return 0 if scope == "." else len(Path(scope).parts)
 
 
 def _change_impact_roles(path: str) -> tuple[str, ...]:
@@ -99,224 +83,16 @@ class _ChangeImpactAccumulator:
             self.seen.add(key)
 
 
-class QuerySurfaceMixin:
-    def _grep_candidate_match(
-        self,
-        candidate: dict[str, object],
-        *,
-        lowered: str,
-        tokens: list[str],
-        context_lines: int,
-    ) -> dict[str, object] | None:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        path = str(candidate["path"])
-        visibility = EvidenceVisibility(str(candidate["evidence_visibility"]))
-        if visibility is not EvidenceVisibility.SOURCE:
-            return None
-        self._ensure_path_current(path)
-        try:
-            lines = (
-                (self.workspace / path)
-                .read_text(encoding="utf-8", errors="replace")
-                .splitlines()
-            )
-        except OSError:
-            return None
-        line_value = candidate["line"]
-        assert isinstance(line_value, int)
-        line_no = line_value
-        if line_no < 1 or line_no > len(lines):
-            return None
-        line = lines[line_no - 1]
-        if lowered not in line.lower() and not all(
-            token in line.lower() for token in tokens
-        ):
-            return None
-        start = max(1, line_no - max(0, context_lines))
-        end = min(len(lines), line_no + max(0, context_lines))
-        return {
-            "path": path,
-            "line": line_no,
-            "range": [start, end],
-            "content": "\n".join(lines[start - 1 : end]),
-            "evidence_visibility": visibility.value,
-        }
-
-    @operation_response("grep")
-    @decision_scoped
-    def grep(
-        self, query: str, *, limit: int = 50, context_lines: int = 0
-    ) -> dict[str, object]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        self._ensure_map_ready()
-        raw = query.strip()
-        if not raw:
-            raise ValueError("query must not be empty")
-        tokens = [token.lower() for token in _WORD_RE.findall(raw) if len(token) >= 2]
-        candidates = self.store.lexical_candidates(tokens, limit=max(limit * 10, 100))
-        matches: list[dict[str, object]] = []
-        lowered = raw.lower()
-        for candidate in candidates:
-            match = self._grep_candidate_match(
-                dict(candidate),
-                lowered=lowered,
-                tokens=tokens,
-                context_lines=context_lines,
-            )
-            if match is None:
-                continue
-            matches.append(match)
-            if len(matches) >= limit:
-                break
-        generation, identity_generation, stale = self._generation_status()
-        return {
-            "schema": operation_schema("grep"),
-            "query": query,
-            "generation": generation,
-            "identity_generation": identity_generation,
-            "stale": stale,
-            "matches": matches,
-        }
-
-    @operation_response("symbol")
-    @decision_scoped
-    def symbol(self, query: str) -> dict[str, object]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        self._ensure_map_ready()
-        matches = self.store.symbol(query)
-        if not matches:
-            raise KeyError(f"symbol not found: {query}")
-        visible = [
-            row
-            for row in matches
-            if EvidenceVisibility(str(row["evidence_visibility"]))
-            is not EvidenceVisibility.DENY
-        ]
-        if not visible:
-            raise PermissionError(f"symbol exists but agent context is denied: {query}")
-        return {
-            "schema": operation_schema("symbol"),
-            "query": query,
-            **self._query_freshness_fields(),
-            "matches": visible,
-        }
-
-    def _source_visible_matches(
-        self,
-        query: str,
-    ) -> list[dict[str, object]]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        if "::" in query:
-            raw_path, qualname = query.split("::", 1)
-            path = normalize_relative_path(raw_path, allow_root=False)
-            self._ensure_path_current(path)
-            match = self.store.symbol_at(path, qualname)
-            matches = [] if match is None else [match]
-        else:
-            matches = self.store.symbol(query)
-        visible = [
-            dict(row)
-            for row in matches
-            if EvidenceVisibility(str(row["evidence_visibility"]))
-            is not EvidenceVisibility.DENY
-        ]
-        if not visible:
-            raise KeyError(f"symbol not found: {query}")
-        return visible
-
-    def _source_current_content(
-        self,
-        query: str,
-        row: dict[str, object],
-    ) -> tuple[str, str, dict[str, object], str]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        path = str(row["path"])
-        qualname = str(row["qualname"])
-        self._ensure_path_current(path)
-        current_row = self.store.symbol_at(path, qualname)
-        if current_row is None:
-            raise KeyError(f"symbol changed or disappeared during refresh: {query}")
-        current = dict(current_row)
-        visibility = EvidenceVisibility(str(current["evidence_visibility"]))
-        if visibility is not EvidenceVisibility.SOURCE:
-            raise PermissionError(f"source body is not agent-visible: {path}")
-        content = self._source_slice(
-            path,
-            int(current["start_line"]),
-            int(current["end_line"]),
-            qualname=qualname,
-        )
-        return path, qualname, current, content
-
-    @operation_response("source")
-    @decision_scoped
-    def source(self, query: str, *, token_budget: int = 4000) -> dict[str, object]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        self._ensure_map_ready()
-        if token_budget < 16:
-            raise ValueError("token budget must be at least 16")
-        visible = self._source_visible_matches(query)
-        if len(visible) > 1 and "::" not in query:
-            return {
-                "schema": operation_schema("source"),
-                "query": query,
-                "ambiguous": True,
-                "matches": [
-                    {
-                        "symbol_id": f"{row['path']}::{row['qualname']}",
-                        "path": row["path"],
-                        "qualname": row["qualname"],
-                        "signature": row["signature"],
-                    }
-                    for row in visible[:20]
-                ],
-            }
-
-        path, qualname, current, body = self._source_current_content(query, visible[0])
-        tokens = estimate_tokens(body)
-        if tokens > token_budget:
-            return {
-                "schema": operation_schema("source"),
-                "query": query,
-                "symbol_id": f"{path}::{qualname}",
-                "path": path,
-                "qualname": qualname,
-                "signature": current["signature"],
-                "lines": [current["start_line"], current["end_line"]],
-                "estimated_tokens": tokens,
-                "budget": token_budget,
-                "too_large": True,
-                "guidance": "Use outline/deps or raise the explicit source budget.",
-            }
-        return {
-            "schema": operation_schema("source"),
-            "query": query,
-            "symbol_id": f"{path}::{qualname}",
-            "path": path,
-            "qualname": qualname,
-            "signature": current["signature"],
-            "lines": [current["start_line"], current["end_line"]],
-            "estimated_tokens": tokens,
-            "budget": token_budget,
-            "too_large": False,
-            "content": body,
-        }
-
+class QuerySurfaceMixin(ReadScopeOwner):
     @operation_response("projects")
     @decision_scoped
     def projects(self) -> dict[str, object]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        self._ensure_map_ready()
+        self.reads.ready()
         return {
             "schema": operation_schema("projects"),
-            **self._query_freshness_fields(),
+            **self.reads.freshness_fields(),
             "projects": self._fresh_project_nodes(),
             "edges": self._fresh_project_edges(),
             "native_file_edges": self._fresh_native_file_edges(),
@@ -333,7 +109,7 @@ class QuerySurfaceMixin:
         """Syntax-aware search through an optional local ast-grep authority."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        self._ensure_map_ready()
+        self.reads.ready()
         raw, warnings = self.structural_search_provider.search(
             self.workspace, pattern, language=language, limit=max(limit * 4, limit)
         )
@@ -348,7 +124,7 @@ class QuerySurfaceMixin:
                 )
             except ValueError:
                 continue
-            mapped = self._session_file_row(rel)
+            mapped = self.reads.file_row(rel)
             if mapped is None:
                 continue
             visibility = EvidenceVisibility(str(mapped["evidence_visibility"]))
@@ -377,7 +153,7 @@ class QuerySurfaceMixin:
                 break
         return {
             "schema": operation_schema("structural"),
-            **self._query_freshness_fields(),
+            **self.reads.freshness_fields(),
             "pattern": pattern,
             "available": self.structural_search_provider.available,
             "provider": self.structural_search_provider.status().as_dict(),
@@ -442,7 +218,7 @@ class QuerySurfaceMixin:
     def affected(self, query: str, *, max_depth: int = 12) -> dict[str, object]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        self._ensure_map_ready()
+        self.reads.ready()
         roots = self._affected_roots(query)
         levels, seen = self._affected_levels(roots, max_depth=max_depth)
         affected = sorted(seen - roots)
@@ -460,7 +236,7 @@ class QuerySurfaceMixin:
         return {
             "schema": operation_schema("affected"),
             "query": query,
-            **self._query_freshness_fields(),
+            **self.reads.freshness_fields(),
             "roots": sorted(roots),
             "affected_files": affected,
             "tests": tests,
@@ -484,130 +260,6 @@ class QuerySurfaceMixin:
             "tests": value["tests"],
             "affected_files": value["affected_files"],
             "evidence": value["evidence"],
-        }
-
-    def _instruction_seed_paths(
-        self,
-        query: str,
-        *,
-        seed_limit: int,
-    ) -> tuple[list[str], str]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        try:
-            rel = normalize_relative_path(query, allow_root=False)
-        except ValueError:
-            rel = None
-        candidate = None if rel is None else self.workspace / rel
-        if rel is not None and candidate is not None and candidate.exists():
-            return [rel], "explicit-path"
-
-        seed_paths: list[str] = []
-        for hit in self.find_task(query, limit=seed_limit):
-            if hit.path not in seed_paths:
-                seed_paths.append(hit.path)
-        return seed_paths, "task-retrieval"
-
-    @staticmethod
-    def _instruction_authority_projection(
-        seed_paths: list[str],
-        indexed_authority: dict[str, dict[str, object]],
-        authority_paths: set[str],
-    ) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
-        chains: list[dict[str, object]] = []
-        merged: dict[str, dict[str, object]] = {}
-        for seed in seed_paths:
-            applicable = [
-                path for path in authority_paths if _instruction_applies(path, seed)
-            ]
-            applicable.sort(
-                key=lambda path: (
-                    _instruction_specificity(path),
-                    0 if Path(path).name == "AGENTS.md" else 1,
-                    path,
-                )
-            )
-            chain: list[dict[str, object]] = []
-            for order, path in enumerate(applicable):
-                row = indexed_authority[path]
-                entry: dict[str, object] = {
-                    "path": path,
-                    "scope": _instruction_scope(path),
-                    "specificity": _instruction_specificity(path),
-                    "kind": (
-                        "override"
-                        if Path(path).name == "AGENTS.override.md"
-                        else "agents"
-                    ),
-                    "precedence": order,
-                    "evidence_visibility": str(row.get("evidence_visibility") or ""),
-                }
-                chain.append(entry)
-                previous = merged.get(path)
-                if previous is None:
-                    merged[path] = {**entry, "applies_to": [seed]}
-                    continue
-                applies_to = previous["applies_to"]
-                if isinstance(applies_to, list) and seed not in applies_to:
-                    applies_to.append(seed)
-            chains.append({"path": seed, "authority": chain})
-
-        ordered = sorted(
-            merged.values(),
-            key=lambda row: (
-                cast(int, row["specificity"]),
-                0 if row["kind"] == "agents" else 1,
-                str(row["path"]),
-            ),
-        )
-        return chains, ordered
-
-    @decision_scoped
-    def repository_instruction_scope(
-        self, query: str, *, seed_limit: int = 8
-    ) -> dict[str, object]:
-        """Resolve mechanically applicable repository instruction files for task scopes.
-
-        Authority discovery is deliberately narrower than retrieval: only
-        ``AGENTS.md`` and ``AGENTS.override.md`` files already indexed by
-        CodeMap participate. Root authority applies repository-wide; nested
-        authority applies only beneath its directory. A local override wins
-        over ``AGENTS.md`` at the same scope and deeper scopes are more
-        specific. The API reports paths and precedence only; it never parses
-        instructions or changes ``find``/``find_task`` ranking.
-        """
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        if seed_limit < 1:
-            raise ValueError("seed_limit must be >= 1")
-        self._ensure_map_ready()
-        rows = self.store.repository_instruction_file_rows()
-        indexed_authority = {str(row["path"]): dict(row) for row in rows}
-        authority_paths = {
-            path
-            for path in indexed_authority
-            if Path(path).name in {"AGENTS.md", "AGENTS.override.md"}
-        }
-        seed_paths, source = self._instruction_seed_paths(
-            query,
-            seed_limit=seed_limit,
-        )
-        chains, ordered = self._instruction_authority_projection(
-            seed_paths,
-            indexed_authority,
-            authority_paths,
-        )
-        return {
-            "schema": "hashmarks.codemap-scoped-authority.v1",
-            "query": query,
-            **self._query_freshness_fields(),
-            "scope_source": source,
-            "seed_paths": seed_paths,
-            "authority": ordered,
-            "chains": chains,
-            "precedence": "deeper scope wins; AGENTS.override.md wins over AGENTS.md at the same scope",
-            "evidence": "indexed repository path hierarchy only; no semantic authority inference",
-            "ranking_effect": "none",
         }
 
     @staticmethod
@@ -728,4 +380,75 @@ class QuerySurfaceMixin:
             },
             "evidence": str(value["evidence"]) + "; plus bounded task graph adjacency",
             "authority": "advisory-navigation-only",
+        }
+
+    @decision_scoped
+    def derived_graph(self, path: str | None = None) -> dict[str, object]:
+        """Expose dependency-tracked derived CodeMap surfaces for diagnostics.
+
+        Retrieval does not consume this graph yet; 0.10.8 records identities and
+        dependencies only so later invalidation work has a measured foundation.
+        """
+        self = cast("CodeMap", self)
+        self.reads.ready()
+        normalized = (
+            None if path is None else normalize_relative_path(path, allow_root=False)
+        )
+        if normalized is not None:
+            self.source.ensure_current(normalized)
+        nodes = self.store.derived_nodes(normalized)
+        return {
+            "schema": "hashmarks.codemap-derived-graph.v1",
+            "generation": self.store.generation(),
+            "path": normalized,
+            "nodes": nodes,
+        }
+
+    def status(self) -> dict[str, object]:
+        self = cast("CodeMap", self)
+        watch_record = self.index.watch_continuity()
+        generation, identity_generation, stale = (
+            self.reads.generation_status_with_watch(None, watch_record)
+        )
+        return {
+            "schema": "hashmarks.codemap-status.v1",
+            "workspace": str(self.workspace),
+            "state_dir": str(self.state_dir),
+            "generation": generation,
+            "identity_generation_at_sync": identity_generation,
+            "daemon_generation_changed": stale,
+            "workspace_fingerprint": self.store.meta("workspace_fingerprint"),
+            "last_sync_unix": None
+            if self.store.meta("last_sync_unix") is None
+            else float(self.store.meta("last_sync_unix") or 0),
+            "artifact_db": str(self.artifacts.db_path),
+            "artifact_count": self.artifacts.count(),
+            "build": self.index._codemap_build_state(),
+            "last_index_economics": (
+                json.loads(self.store.meta("sync.economics") or "null")
+                if self.store.meta("sync.economics")
+                else None
+            ),
+            "precision_providers": [
+                self.index.range_provider.status().as_dict(),
+                self.structural_search_provider.status().as_dict(),
+                {
+                    "name": self.typescript_resolver.name,
+                    "available": self.typescript_resolver.detect(self.workspace),
+                    "version": None,
+                    "detail": None,
+                },
+                *[
+                    {
+                        "name": provider.name,
+                        "available": provider.detect(self.workspace),
+                        "version": None,
+                        "detail": None,
+                    }
+                    for provider in self.project_graph_providers
+                ],
+            ],
+            "native_evidence": self._native_evidence_status(),
+            "watcher": watch_status_projection(watch_record),
+            **self.store.stats(),
         }

@@ -78,7 +78,7 @@ class CacheOwnershipAnalyzer:
                 )
             )
 
-        generation, identity_generation, stale = codemap._generation_status()
+        generation, identity_generation, stale = codemap.reads.generation_status()
         risky = sum(1 for f in findings if f["import_identity_risk"])
         unresolved = sum(1 for f in findings if f["invalidation"] == "not-proven")
         return {

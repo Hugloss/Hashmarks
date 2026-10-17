@@ -9,6 +9,8 @@ from hashmarks.observation import ObservationState
 from hashmarks.operation_contract import operation_schema
 from hashmarks.paths import normalize_relative_path
 
+from .repository_observation import packet_digest
+
 if TYPE_CHECKING:
     from .engine import CodeMap
 
@@ -387,7 +389,7 @@ class RepositoryEvidenceCoverageMixin:
                 "binding_delta must be a repository evidence binding delta"
             )
         delta_identity = binding_delta.get("delta_identity")
-        expected_delta_identity = "sha256:" + self._packet_digest(
+        expected_delta_identity = "sha256:" + packet_digest(
             operation_schema("evidence_comparison", "bindings"),
             {
                 key: value
@@ -438,7 +440,7 @@ class RepositoryEvidenceCoverageMixin:
             if isinstance(repository, Mapping)
             else ""
         )
-        if repository_identity != self._repository_packet_identity():
+        if repository_identity != self.reads.repository_identity():
             raise ValueError("bindings_packet repository-mismatch")
         if binding_delta is not None:
             self._validate_coverage_binding_delta(
@@ -602,7 +604,7 @@ class RepositoryEvidenceCoverageMixin:
             "authority": "repository-intelligence-only",
             "execution_effect": "none",
         }
-        payload["coverage_identity"] = "sha256:" + self._packet_digest(
+        payload["coverage_identity"] = "sha256:" + packet_digest(
             operation_schema("repository_evidence", "coverage"), payload
         )
         return payload

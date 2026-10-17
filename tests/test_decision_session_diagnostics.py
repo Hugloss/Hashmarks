@@ -28,8 +28,8 @@ def test_opt_in_decision_session_diagnostics_reports_composition_and_reuse(
 ) -> None:
     task, paths = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        with codemap.decision_session(diagnostics=True):
+        codemap.index.sync()
+        with codemap.reads.session(diagnostics=True):
             codemap.change_intelligence_brief(task, paths)
             codemap.evidence_freshness_map(task, paths)
             snapshot = codemap.repository_intelligence_snapshot(task, paths)
@@ -38,7 +38,7 @@ def test_opt_in_decision_session_diagnostics_reports_composition_and_reuse(
             codemap.repository_intelligence_delta(
                 task, paths, previous_snapshot=snapshot
             )
-        receipt = codemap.decision_session_diagnostics()
+        receipt = codemap.reads.diagnostics()
 
     assert receipt is not None
     assert receipt["schema"] == "hashmarks.decision-session-diagnostics.v1"
@@ -66,12 +66,12 @@ def test_diagnostics_classifies_duplicate_semantic_producer_requests(
 ) -> None:
     task, _ = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        with codemap.decision_session(diagnostics=True):
+        codemap.index.sync()
+        with codemap.reads.session(diagnostics=True):
             codemap.task_action_map(task)
             codemap.task_action_map(task)
             codemap.task_action_map(task, limit=21)
-        receipt = codemap.decision_session_diagnostics()
+        receipt = codemap.reads.diagnostics()
 
     assert receipt is not None
     action = receipt["producers"]["task_action_map"]
@@ -85,12 +85,12 @@ def test_diagnostics_classifies_duplicate_semantic_producer_requests(
 def test_diagnostics_are_opt_in_and_do_not_change_output(tmp_path: Path) -> None:
     task, paths = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         plain = codemap.change_intelligence_brief(task, paths)
-        assert codemap.decision_session_diagnostics() is None
-        with codemap.decision_session(diagnostics=True):
+        assert codemap.reads.diagnostics() is None
+        with codemap.reads.session(diagnostics=True):
             observed = codemap.change_intelligence_brief(task, paths)
-        receipt = codemap.decision_session_diagnostics()
+        receipt = codemap.reads.diagnostics()
 
     assert observed == plain
     assert receipt is not None
@@ -99,13 +99,13 @@ def test_diagnostics_are_opt_in_and_do_not_change_output(tmp_path: Path) -> None
 def test_diagnostics_receipt_is_detached_from_internal_state(tmp_path: Path) -> None:
     task, _ = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        with codemap.decision_session(diagnostics=True):
+        codemap.index.sync()
+        with codemap.reads.session(diagnostics=True):
             codemap.task_action_map(task)
-        first = codemap.decision_session_diagnostics()
+        first = codemap.reads.diagnostics()
         assert first is not None
         first["producers"].clear()
-        second = codemap.decision_session_diagnostics()
+        second = codemap.reads.diagnostics()
 
     assert second is not None
     assert "task_action_map" in second["producers"]

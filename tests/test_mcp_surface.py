@@ -17,6 +17,7 @@ from hashmarks.codemap.change_impact import (
     ChangeImpactOptions,
 )
 from hashmarks.codemap.evidence_packet import TASK_EVIDENCE_DEFAULT_OPTIONS
+from hashmarks.codemap.repository_observation import packet_digest
 from hashmarks.file_store import UnstableFileError
 from hashmarks.mcp_contract import tool_contract
 from hashmarks.mcp_surface import HashmarksMcpSurface, McpSurfaceError
@@ -1285,7 +1286,7 @@ def test_mcp_correlation_preserves_core_authority_and_completeness(
         }
     ]
     with CodeMap(repo) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         core = codemap.correlate_evidence(bundles, include_relationships=False)
     surface = HashmarksMcpSurface(str(repo), state_dir=str(tmp_path / "mcp-state"))
     try:
@@ -1329,7 +1330,7 @@ def test_mcp_correlation_rejects_recomputed_outer_identity_over_tampered_nested_
         tampered["repository_evidence"]["bindings"][0]["binding_id"] = (
             "repository-evidence:forged"
         )
-        tampered["correlation_identity"] = "sha256:" + surface._map._packet_digest(
+        tampered["correlation_identity"] = "sha256:" + packet_digest(
             "hashmarks.evidence-correlation.v2",
             {
                 key: value

@@ -304,7 +304,7 @@ from hashmarks import CodeMap
 workspace = Path(".").resolve()
 
 with CodeMap(workspace) as codemap:
-    codemap.sync()
+    codemap.index.sync()
 
     print(codemap.orient())
 
@@ -323,7 +323,7 @@ with CodeMap(workspace) as codemap:
 from hashmarks import CodeMap
 
 with CodeMap(".") as codemap:
-    codemap.sync()
+    codemap.index.sync()
     before = codemap.repository_evidence_bindings(
         [
             {

@@ -65,7 +65,7 @@ def test_go_test_file_is_classified_as_verification_surface(tmp_path: Path) -> N
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         brief = codemap.task_action_brief("Change Ember731 accepted response")
     assert brief["verify"] == ["go", "test", "./route"]
 
@@ -83,6 +83,6 @@ def test_javascript_test_file_is_classified_as_verification_surface(
         "import test from 'node:test';\n// Ember731\n", encoding="utf-8"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         brief = codemap.task_action_brief("Change Ember731 accepted response")
     assert brief["verify"] == ["node", "--test", "tests/ember.test.js"]

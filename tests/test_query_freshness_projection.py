@@ -10,7 +10,7 @@ def _rewrite_without_observer(tmp_path: Path) -> tuple[Path, Path]:
     source.write_text("def old_owner():\n    return 1\n", encoding="utf-8")
     state = repo / ".state"
     with CodeMap(repo, state_dir=state) as codemap:
-        codemap.sync()
+        codemap.index.sync()
     source.write_text("def new_owner():\n    return 2\n", encoding="utf-8")
     return repo, state
 
@@ -21,7 +21,7 @@ def test_symbol_exposes_unknown_freshness_after_unsignaled_rewrite(
     repo, state = _rewrite_without_observer(tmp_path)
     with CodeMap(repo, state_dir=state) as codemap:
         assert codemap.status()["daemon_generation_changed"] is None
-        value = codemap.symbol("old_owner")
+        value = codemap.source.symbol("old_owner")
     assert value["stale"] is None
     assert value["generation"] >= 1
     assert value["identity_generation"] is None
@@ -39,9 +39,9 @@ def test_structured_persisted_queries_share_freshness_authority(tmp_path: Path) 
     )
     state = repo / ".state"
     with CodeMap(repo, state_dir=state) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         values = [
-            codemap.symbol("target"),
+            codemap.source.symbol("target"),
             codemap.deps("caller"),
             codemap.refs("target"),
             codemap.affected("src/b.py"),
@@ -60,6 +60,6 @@ def test_exact_outline_still_revalidates_path_without_global_observer(
 ) -> None:
     repo, state = _rewrite_without_observer(tmp_path)
     with CodeMap(repo, state_dir=state) as codemap:
-        value = codemap.outline("src/app.py")
+        value = codemap.source.outline("src/app.py")
     assert value["symbols"][0]["name"] == "new_owner"
     assert value["stale"] is None

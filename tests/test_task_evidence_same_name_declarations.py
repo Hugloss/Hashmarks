@@ -58,7 +58,7 @@ def test_same_name_context_preserves_source_and_unknown_runtime_in_every_format(
 ) -> None:
     source = _repository(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map(_TASK)
         packets = [
             codemap.task_evidence(_TASK),
@@ -119,7 +119,7 @@ def test_same_name_context_accounts_for_bounded_alternatives(tmp_path: Path) -> 
         )
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.task_evidence(_TASK)
     context = _context(packet)
     assert (
@@ -143,7 +143,7 @@ def test_stale_or_denied_source_cannot_supply_same_name_declarations(
             '[[rule]]\npattern = "backend.py"\nvisibility = "deny"\n'
         )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         codemap.task_evidence(_TASK)
         if invalidity == "changed":
             source.write_text(

@@ -16,7 +16,7 @@ def test_post_change_refresh_is_changed_path_scoped_and_regenerates_packet(
         "def test_target():\n    assert True\n"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.task_decision_packet(
             "target implementation test", token_budget=256
         )
@@ -44,7 +44,7 @@ def test_refresh_delta_omits_unchanged_action_anchors(tmp_path: Path) -> None:
         "from pkg.engine import target\ndef test_target(): assert target(1) == 2\n"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         source.write_text("def target(value: int) -> int:\n    return value + 1\n")
         delta = codemap.refresh_after_change_delta(
             "target implementation test",

@@ -64,7 +64,7 @@ def test_native_typescript_claims_move_remove_and_add_without_inferred_edges(
         for endpoint in ("before", "moved", "after", "before"):
             source = native_scip_corpus / "typescript" / endpoint
             materialize_scip(root, source)
-            cm.sync()
+            cm.index.sync()
             import_native_scip(cm, source)
             packets.append(_observe(cm))
     before, moved, removed, added = packets
@@ -95,7 +95,7 @@ def test_native_typescript_method_reference_flag_is_not_a_call_or_inverse(
     source = native_scip_corpus / "typescript" / "before"
     materialize_scip(root, source)
     with CodeMap(root, state_dir=tmp_path / "state") as cm:
-        cm.sync()
+        cm.index.sync()
         import_native_scip(cm, source)
         method = _observe(cm, "src/engine.ts::normalize")
         with pytest.raises(KeyError, match="symbol not found"):
@@ -124,7 +124,7 @@ def test_native_scip_parameters_do_not_manufacture_definition_ambiguity(
     path = "src/engine.py" if language == "python" else "src/engine.ts"
     name = "normalize_widget" if language == "python" else "normalize"
     with CodeMap(root, state_dir=tmp_path / "state") as cm:
-        cm.sync()
+        cm.index.sync()
         import_native_scip(cm, source)
         definitions = cm.store.native_definitions_for_path(path, name=name)
         parameters = cm.store.native_definitions_for_path(path, name="value")
@@ -141,7 +141,7 @@ def test_native_scip_duplicate_method_names_remain_ambiguous(
     source = native_scip_corpus / "typescript" / "ambiguous"
     materialize_scip(root, source)
     with CodeMap(root, state_dir=tmp_path / "state") as cm:
-        cm.sync()
+        cm.index.sync()
         import_native_scip(cm, source)
         with pytest.raises(KeyError, match="ambiguous"):
             _observe(cm, "src/engine.ts::normalize")
@@ -156,7 +156,7 @@ def test_native_only_relationship_subject_cannot_cross_changed_visibility(
     source = native_scip_corpus / "typescript" / "before"
     materialize_scip(root, source)
     with CodeMap(root, state_dir=tmp_path / "state") as cm:
-        cm.sync()
+        cm.index.sync()
         import_native_scip(cm, source)
         assert len(_claims(_observe(cm, "src/engine.ts::normalize"))) == 2
         (root / ".hashmarks-context.toml").write_text(
@@ -173,7 +173,7 @@ def test_native_python_empty_claims_become_unavailable_before_reindex_and_reopen
     source = native_scip_corpus / "python" / "before"
     materialize_scip(root, source)
     with CodeMap(root, state_dir=state) as cm:
-        cm.sync()
+        cm.index.sync()
         import_native_scip(cm, source)
         previous: object = cm.task_evidence(TASK)
         assert previous["semantic_relationships"]["observed_relationship_count"] == 0
@@ -196,7 +196,7 @@ def test_native_python_empty_claims_become_unavailable_before_reindex_and_reopen
     with CodeMap(root, state_dir=state) as reopened:
         restored: object = reopened.task_evidence(TASK)
     with CodeMap(root, state_dir=tmp_path / "fresh") as fresh:
-        fresh.sync()
+        fresh.index.sync()
         import_native_scip(fresh, source)
         rebuilt: object = fresh.task_evidence(TASK)
     for packet in (current, restored, rebuilt):
@@ -214,11 +214,11 @@ def test_native_typescript_stale_index_is_not_current_or_replayed_after_deletion
     source = native_scip_corpus / "typescript" / "before"
     materialize_scip(root, source)
     with CodeMap(root, state_dir=state) as cm:
-        cm.sync()
+        cm.index.sync()
         import_native_scip(cm, source)
         before = _observe(cm)
         materialize_scip(root, native_scip_corpus / "typescript" / "after")
-        cm.sync(["src/engine.ts"])
+        cm.index.sync(["src/engine.ts"])
         stale = _observe(cm)
         with pytest.raises(KeyError, match="stale"):
             _observe(cm, "src/engine.ts::normalize")
@@ -229,7 +229,7 @@ def test_native_typescript_stale_index_is_not_current_or_replayed_after_deletion
         assert comparison["producer_deltas"][0]["facts"]["removed"] == []
         assert_projection(comparison, "evidence_comparison", "relationships")
         (root / "src" / "engine.ts").unlink()
-        cm.sync(["src/engine.ts"])
+        cm.index.sync(["src/engine.ts"])
         current: object = cm.task_evidence(
             "Change Engine in src/engine.ts to document its behavior."
         )

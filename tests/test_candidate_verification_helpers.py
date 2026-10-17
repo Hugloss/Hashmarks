@@ -48,7 +48,7 @@ def test_source_candidate_follows_fixture_module_to_the_importing_test(
 ) -> None:
     _repository(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map(_TASK)
         packet = codemap.task_evidence(_TASK)
         initial = read_initial_projection(
@@ -101,7 +101,7 @@ def test_fixture_module_cannot_supply_an_unqualified_reference(
             helper.read_text().replace("from service", "from alternative")
         )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         if invalidity == "stale":
             codemap.task_evidence(_TASK)
             helper.write_text("def persist_request(repository): return None\n")
@@ -127,7 +127,7 @@ def test_established_edit_owner_keeps_reference_backed_test_candidates(
         "def persist_request(repository): return FixtureRepository()\n"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map(_TASK)
         packet = codemap.task_evidence(_TASK)
     assert action["admitted_edit"] is not None
@@ -167,7 +167,7 @@ def test_source_reference_fanout_preserves_the_observed_behavior_test(
         )
     task = "Inspect the message source for a batch nack seek in Stream.nack. Source: service.py"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map(task)
         packet = codemap.task_evidence(task)
     assert any(

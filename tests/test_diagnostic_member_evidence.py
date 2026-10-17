@@ -12,6 +12,7 @@ from hashmarks.codemap.repository_delta import (
     RepositoryDeltaMixin,
     RepositoryGenerationBinding,
 )
+from hashmarks.codemap.repository_observation import packet_digest
 from hashmarks.digest import FILE_DOMAIN, hash_bytes
 from hashmarks.evidence_presentation import present_repository_evidence
 from hashmarks.mcp_surface import HashmarksMcpSurface, McpSurfaceError
@@ -65,8 +66,8 @@ def test_delayed_publication_keeps_its_captured_revision(tmp_path: Path) -> None
         source_provenance={"owner.py": _provenance(6)},
     )
     with CodeMap(tmp_path) as cm:
-        cm.sync()
-        current: object = cm.source_observation("owner.py")
+        cm.index.sync()
+        current: object = cm.source.observe("owner.py")
     compared: object = RepositoryDeltaMixin.diagnostic_source_revision_evidence(
         packet, [current]
     )
@@ -97,8 +98,8 @@ def test_unsaved_buffer_uses_exact_utf8_without_normalization(tmp_path: Path) ->
         source_provenance={"owner.py": _provenance()},
     )
     with CodeMap(tmp_path) as cm:
-        cm.sync()
-        source: object = cm.source_observation("owner.py")
+        cm.index.sync()
+        source: object = cm.source.observe("owner.py")
     compared: object = RepositoryDeltaMixin.diagnostic_source_revision_evidence(
         packet, [source]
     )
@@ -409,11 +410,11 @@ def _correlation(root: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, objec
     )
     (root / "other.py").write_text("def f():\n    return 2\nf()\n", encoding="utf-8")
     with CodeMap(root) as cm:
-        cm.sync()
+        cm.index.sync()
         # Supply current identity capability at its native boundary; retain real
         # indexed imports, symbol resolution, canonical bindings and identities.
         monkeypatch.setattr(
-            cm, "_generation_status", lambda: (cm.store.generation(), None, False)
+            cm.reads, "generation_status", lambda: (cm.store.generation(), None, False)
         )
         return cm.correlate_evidence(
             [
@@ -487,20 +488,17 @@ def test_stale_or_foreign_relationship_evidence_never_hides_diagnostic_changes(
         from hashmarks.codemap.evidence_verification import VerificationMixin
 
         native = correlation["repository_evidence"]
-        native["bindings_identity"] = "sha256:" + VerificationMixin._packet_digest(
+        native["bindings_identity"] = "sha256:" + packet_digest(
             native["schema"],
             {key: value for key, value in native.items() if key != "bindings_identity"},
         )
-        correlation["correlation_identity"] = (
-            "sha256:"
-            + VerificationMixin._packet_digest(
-                correlation["schema"],
-                {
-                    key: value
-                    for key, value in correlation.items()
-                    if key != "correlation_identity"
-                },
-            )
+        correlation["correlation_identity"] = "sha256:" + packet_digest(
+            correlation["schema"],
+            {
+                key: value
+                for key, value in correlation.items()
+                if key != "correlation_identity"
+            },
         )
     delta: object = RepositoryDeltaMixin.diagnostic_observation_delta(
         _observe([], binding=binding),

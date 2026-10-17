@@ -26,7 +26,7 @@ def repository(tmp_path: Path) -> Iterator[CodeMap]:
         state_dir=tmp_path / "state",
         artifact_db=tmp_path / "artifacts.sqlite3",
     ) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         yield codemap
 
 
@@ -64,7 +64,7 @@ def test_distinct_consumer_bindings_share_one_snapshot_but_no_mutable_output(
     assert first["bindings"][1]["evidence"][0]["member_revision"] != "consumer-change"
     source = repository.workspace / "app/service.py"
     source.write_bytes(b"\n" + source.read_bytes())
-    repository.sync()
+    repository.index.sync()
     after: Any = repository.repository_evidence_bindings(
         _bindings(), include_relationships=False
     )
@@ -105,7 +105,7 @@ def test_alias_spelling_never_overrides_shadowing_ambiguity_or_missing_import(
     repository: CodeMap, source: str
 ) -> None:
     (repository.workspace / "app/service.py").write_text(source, encoding="utf-8")
-    repository.sync()
+    repository.index.sync()
     packet: Any = repository.structural_locality("app/service.py::handle_request")
     assert {row["symbol_id"] for row in packet["nodes"]} == {
         "app/service.py::handle_request"
@@ -149,7 +149,7 @@ def test_reexport_walk_uses_final_declaration_identity(
         "def handle_request():\n    return read_config()\n",
         encoding="utf-8",
     )
-    repository.sync()
+    repository.index.sync()
     packet: Any = repository.structural_locality("app/service.py::handle_request")
     targets = {row["resolved_symbol_id"] for row in packet["edges"]}
     assert targets == {expected}
@@ -171,6 +171,6 @@ def test_hidden_intermediate_facade_cannot_prove_an_exact_call(tmp_path: Path) -
         encoding="utf-8",
     )
     with CodeMap(root, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet: Any = codemap.structural_locality("app/service.py::handle_request")
     assert all(row["resolved_symbol_id"] is None for row in packet["edges"])

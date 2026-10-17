@@ -493,7 +493,7 @@ groups = [
 ]
 
 with CodeMap(".") as codemap:
-    codemap.sync()
+    codemap.index.sync()
     packet = codemap.repository_declarations(groups)
 ~~~
 
@@ -533,7 +533,7 @@ class MyProvider:
 
 
 with CodeMap(".") as codemap:
-    codemap.sync()
+    codemap.index.sync()
     packet = codemap.discover_repository_declarations([MyProvider()])
 ~~~
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import time
 from pathlib import Path
@@ -18,7 +19,7 @@ from .scip_import import (
 from .scip_relationship_adapter import scip_import_provenance
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable, Mapping
+    from collections.abc import Callable, Iterable, Mapping, Sequence
     from typing import Any
 
     from .engine import CodeMap
@@ -70,7 +71,9 @@ class EvidenceGraphMixin:
         ]
         return {candidate for candidate in candidates if candidate in known_paths}
 
-    def _file_graph(self) -> dict[str, set[str]]:
+    def _file_graph(
+        self, *, native_edges: Sequence[Mapping[str, object]]
+    ) -> dict[str, set[str]]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         rows = [dict(row) for row in self.store.all_file_rows()]
@@ -98,7 +101,7 @@ class EvidenceGraphMixin:
                 )
             graph.setdefault(source, set()).update(targets)
 
-        for edge in self._fresh_native_file_edges():
+        for edge in native_edges:
             source = str(edge["source"])
             target = str(edge["target"])
             if source in graph and target in graph:
@@ -134,7 +137,7 @@ class EvidenceGraphMixin:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         ordered_frontier = sorted(frontier)
-        rows = [self._session_file_row(path) for path in ordered_frontier]
+        rows = [self.reads.file_row(path) for path in ordered_frontier]
         modules_by_path = {
             path: str(row.get("module_name") or "")
             for path, row in zip(ordered_frontier, rows, strict=True)
@@ -175,7 +178,7 @@ class EvidenceGraphMixin:
         """
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        root_rows = [self._session_file_row(path) for path in sorted(roots)]
+        root_rows = [self.reads.file_row(path) for path in sorted(roots)]
         if any(
             row is None
             or str(row.get("language") or "") != "python"
@@ -207,18 +210,36 @@ class EvidenceGraphMixin:
             frontier = nxt
         return levels
 
+    def _invalidate_file_graph_cache(self) -> None:
+        """Retire relationship reuse after repository or provider publication."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        self._reverse_file_graph_cache = None
+
     def _reverse_file_graph(self) -> dict[str, set[str]]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         generation = self.store.generation()
+        # Source/manifest drift can disqualify native edges without publishing
+        # another index generation. Qualify before a hit and build from that
+        # same observed input, rather than letting indexing clear this cache.
+        native_edges = self._fresh_native_file_edges()
+        native_basis = hashlib.sha256(
+            json.dumps(
+                native_edges,
+                sort_keys=True,
+                separators=(",", ":"),
+                allow_nan=False,
+            ).encode("utf-8")
+        ).digest()
         cached = self._reverse_file_graph_cache
-        if cached is not None and cached[0] == generation:
-            return cached[1]
+        if cached is not None and cached[0] == generation and cached[1] == native_basis:
+            return cached[2]
         reverse: dict[str, set[str]] = {}
-        for source, targets in self._file_graph().items():
+        for source, targets in self._file_graph(native_edges=native_edges).items():
             for target in targets:
                 reverse.setdefault(target, set()).add(source)
-        self._reverse_file_graph_cache = (generation, reverse)
+        self._reverse_file_graph_cache = (generation, native_basis, reverse)
         return reverse
 
     def _query_paths(self, query: str) -> set[str]:
@@ -228,7 +249,7 @@ class EvidenceGraphMixin:
             rel = normalize_relative_path(query, allow_root=False)
         except ValueError:
             rel = ""
-        if rel and self._session_file_row(rel) is not None:
+        if rel and self.reads.file_row(rel) is not None:
             return {rel}
         return {
             str(row["path"])
@@ -243,7 +264,7 @@ class EvidenceGraphMixin:
         """Import admitted native records and their direct producer claims atomically."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        self._ensure_map_ready()
+        self.reads.ready()
         raw_path = Path(path)
         if not raw_path.is_absolute():
             raw_path = self.workspace / raw_path
@@ -293,12 +314,12 @@ class EvidenceGraphMixin:
         metadata = metadata_raw if isinstance(metadata_raw, dict) else {}
         freshness = metadata.get("freshness_manifests") or ()
         manifests = (manifest, *(str(value) for value in freshness))
-        if any(self._visible_repository_file(value) is None for value in manifests):
+        if any(self.files.visible_file(value) is None for value in manifests):
             return False
         root = str(self._project_node_value(node, "root") or "").strip("/")
         if root in {"", "."}:
             return True
-        return self._repository_scope_has_visible_file(root)
+        return self.files.has_visible_file(root)
 
     def _admitted_external_project_ids(self, producer: str) -> set[str]:
         if TYPE_CHECKING:
@@ -359,7 +380,7 @@ class EvidenceGraphMixin:
             )
             if (
                 provider.topology_manifest is not None
-                and self._visible_repository_file(provider.topology_manifest) is None
+                and self.files.visible_file(provider.topology_manifest) is None
             ):
                 nodes = ()
                 edges = ()
@@ -555,7 +576,7 @@ class EvidenceGraphMixin:
             )
             if publication_generation is not None:
                 self.store.set_meta("project_graph_last_sync_unix", str(time.time()))
-        self._reverse_file_graph_cache = None
+        self._invalidate_file_graph_cache()
         return {
             "schema": "hashmarks.codemap-project-enrichment.v1",
             "generation": (

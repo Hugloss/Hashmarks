@@ -40,6 +40,32 @@ For a static call such as `helper(...)`, Hashmarks resolves the target only when
 
 The same rule applies to caller evidence. A candidate caller that cannot be proven to target the selected symbol remains unresolved. `exact_caller_count` is therefore safe as positive evidence (for example, two exact callers prove at least two callers) but must not be interpreted as global caller-set completeness or as proof that a symbol is single-use.
 
+Each Python call keeps its indexed lexical source. Calls inside a nested function
+or method belong to that declaration, and do not become direct calls of its
+enclosing function. Decorator, default and class-base expressions belong to the
+surrounding definition scope; they are not calls made by the declared body.
+The per-symbol call limit applies after selecting that source's own calls.
+Passing a callback to a task group does not establish an invocation edge, and
+two observed direct edges do not establish a transitive shortcut or runtime path.
+
+Import qualification uses the exact callable's lexical scope, including enclosing
+function bindings. Another class's same-named method or an unrelated nested body
+cannot shadow that import. Actual argument, assignment, function, class and
+closure bindings preserve unresolved identity; duplicate declarations in the
+same qualified scope also remain unresolved.
+
+Structured, compact and text presentation preserve the complete, already bounded
+`nodes`, `edges`, `unresolved_calls` and `external_or_unindexed_calls` collections.
+Each collection is one finding: `details` is its native array, `source_refs`
+identifies that array in the native packet, and `native_item_count` gives its
+member count. Append an array index to that reference to locate a member.
+The family's observed/omitted finding counts count collections for these kinds;
+they do not count call edges. This removes repeated per-edge metadata without
+applying another display cutoff to admitted segments or gaps. Other presentation
+sections retain their existing bounds. Native traversal bounds, source qualifiers
+and unresolved identity continue to define the observation scope. An empty
+observed collection does not establish repository-wide or runtime absence.
+
 For Python class methods, `self.member(...)` and `cls.member(...)` may be promoted to an exact call only when the containing method/class is statically known and the member has one unambiguous owner through the local/import-resolved class inheritance graph. Competing inherited owners, unsupported/dynamic bases, or receiver shapes other than proven `self`/`cls` remain unresolved or external evidence rather than being guessed.
 
 ## Forwarding-only syntax

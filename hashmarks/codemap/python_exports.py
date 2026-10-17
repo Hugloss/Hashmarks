@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
 
@@ -97,6 +98,41 @@ def _writes_name(node: ast.AST, name: str) -> bool:
     ):
         return True
     return any(_writes_name(child, name) for child in _binding_children(node))
+
+
+def python_function_scope_binds(
+    definitions: Mapping[str, tuple[ast.FunctionDef | ast.AsyncFunctionDef, ...]],
+    qualname: str,
+    name: str,
+) -> bool:
+    """Preserve local/closure shadowing before admitting module import identity.
+
+    Unrelated methods and nested bodies cannot rebind this callable's names.
+    Duplicate declarations or an unknown callable scope remain unresolved.
+    """
+    parts = qualname.split(".")
+    for depth in range(1, len(parts) + 1):
+        functions = definitions.get(".".join(parts[:depth]), ())
+        if not functions and depth < len(parts):
+            continue
+        if len(functions) != 1:
+            return True
+        function = functions[0]
+        arguments = [
+            *function.args.posonlyargs,
+            *function.args.args,
+            *function.args.kwonlyargs,
+        ]
+        arguments.extend(
+            arg
+            for arg in (function.args.vararg, function.args.kwarg)
+            if arg is not None
+        )
+        if any(argument.arg == name for argument in arguments) or any(
+            _writes_name(statement, name) for statement in function.body
+        ):
+            return True
+    return False
 
 
 def _statement_export_binding(node: ast.stmt, name: str) -> _ExportBinding | None:

@@ -4,14 +4,11 @@ import os
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import TYPE_CHECKING, cast
 
-from hashmarks.paths import normalize_relative_path
+from hashmarks.paths import canonical_host_path, normalize_relative_path
 
 from .model import EvidenceVisibility
-
-if TYPE_CHECKING:
-    from .engine import CodeMap
+from .policy import ContextPolicy, PolicyDecision
 
 _PRUNE_DIRS = {
     ".git",
@@ -49,11 +46,59 @@ class _AdmittedRepositoryFile:
     visibility: EvidenceVisibility
 
 
-class RepositoryFileDiscoveryMixin:
-    """Canonical admission and traversal for repository-owned file surfaces."""
+class RepositoryFiles:
+    """Own repository admission, visible traversal and the loaded context policy.
+
+    Dependencies are canonical workspace/control paths, never a CodeMap facade,
+    index, database, parser or consumer. This component owns its policy state;
+    callers reconcile their derived evidence when refresh_policy reports change.
+    """
+
+    def __init__(
+        self,
+        workspace: str | Path,
+        *,
+        internal_state_path: str | None = None,
+        policy_path: Path | None = None,
+    ) -> None:
+        self._workspace = canonical_host_path(workspace)
+        self._internal_state_path = internal_state_path
+        self._policy_path = (
+            None
+            if policy_path is None
+            else canonical_host_path(self._workspace / policy_path)
+        )
+        self._policy = ContextPolicy.load(self._workspace, self._policy_path)
+
+    @property
+    def workspace(self) -> Path:
+        return self._workspace
+
+    @property
+    def internal_state_path(self) -> str | None:
+        return self._internal_state_path
+
+    def decide(self, path: str) -> PolicyDecision:
+        return self._policy.decide(path)
+
+    def policy_fingerprint(self) -> str:
+        return self._policy.fingerprint()
+
+    def refresh_policy(self) -> bool:
+        """Observe the configured policy; report semantic change without indexing."""
+        current = ContextPolicy.load(self._workspace, self._policy_path)
+        if current.fingerprint() == self._policy.fingerprint():
+            return False
+        self._policy = current
+        return True
+
+    def is_internal(self, rel: str) -> bool:
+        clean = normalize_relative_path(rel, allow_root=True)
+        state = self._internal_state_path
+        return bool(state and (clean == state or clean.startswith(state + "/")))
 
     @staticmethod
-    def _repository_discovery_coverage(admitted_count: int) -> dict[str, object]:
+    def discovery_coverage(admitted_count: int) -> dict[str, object]:
         """Project known admission scope without enumerating excluded members."""
         return {
             "scope": "discovered-policy-admitted-indexable-members",
@@ -67,43 +112,36 @@ class RepositoryFileDiscoveryMixin:
         }
 
     def _inside_nested_repository(self, rel: str) -> bool:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        directory = self.workspace
+        directory = self._workspace
         for part in PurePosixPath(rel).parts:
             directory /= part
             if (directory / ".git").exists():
                 return True
         return False
 
-    def _path_admitted_for_analysis(self, rel: str) -> bool:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+    def is_admitted(self, rel: str) -> bool:
+        rel = normalize_relative_path(rel, allow_root=True)
         return (
-            not self._internal_path(rel)
+            not self.is_internal(rel)
             and not _is_pruned_relative_path(rel)
             and not self._inside_nested_repository(rel)
-            and self.policy.decide(rel).index
+            and self.decide(rel).index
         )
 
-    def _workspace_relative_path(self, path: Path) -> str | None:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+    def relative_path(self, path: Path) -> str | None:
         try:
-            value = path.relative_to(self.workspace).as_posix()
+            value = path.relative_to(self._workspace).as_posix()
         except ValueError:
             return None
         return "" if value == "." else value
 
     def _prune_discovery_dirs(self, root_path: Path, dirs: list[str]) -> None:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        root_rel = self._workspace_relative_path(root_path) or ""
+        root_rel = self.relative_path(root_path) or ""
         dirs[:] = sorted(
             name
             for name in dirs
             if name not in _PRUNE_DIRS
-            and not self._internal_path(f"{root_rel}/{name}".strip("/"))
+            and not self.is_internal(f"{root_rel}/{name}".strip("/"))
             and not (root_path / name / ".git").exists()
         )
 
@@ -111,14 +149,12 @@ class RepositoryFileDiscoveryMixin:
         self,
         path: Path,
     ) -> _AdmittedRepositoryFile | None:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         if path.is_symlink() or not path.is_file():
             return None
-        rel = self._workspace_relative_path(path)
-        if rel is None or not rel or not self._path_admitted_for_analysis(rel):
+        rel = self.relative_path(path)
+        if rel is None or not rel or not self.is_admitted(rel):
             return None
-        decision = self.policy.decide(rel)
+        decision = self.decide(rel)
         return _AdmittedRepositoryFile(
             rel=rel,
             path=path,
@@ -126,13 +162,11 @@ class RepositoryFileDiscoveryMixin:
         )
 
     def _repository_walk_root(self, prefix: str) -> Path | None:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         rel = normalize_relative_path(prefix, allow_root=True)
-        root = self.workspace if not rel else self.workspace / rel
+        root = self._workspace if not rel else self._workspace / rel
         if root.is_symlink():
             return None
-        if rel and not self._path_admitted_for_analysis(rel):
+        if rel and not self.is_admitted(rel):
             return None
         return root
 
@@ -140,8 +174,6 @@ class RepositoryFileDiscoveryMixin:
         self,
         root: Path,
     ) -> Iterator[_AdmittedRepositoryFile]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         for current_root, dirs, files in os.walk(
             root,
             topdown=True,
@@ -154,7 +186,7 @@ class RepositoryFileDiscoveryMixin:
                 if item is not None:
                     yield item
 
-    def _iter_admitted_repository_files(
+    def iter_files(
         self,
         prefix: str = "",
     ) -> Iterator[_AdmittedRepositoryFile]:
@@ -169,22 +201,20 @@ class RepositoryFileDiscoveryMixin:
         if root.is_dir():
             yield from self._iter_admitted_directory_files(root)
 
-    def _visible_repository_file(
+    def visible_file(
         self,
         relpath: str,
     ) -> _AdmittedRepositoryFile | None:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         try:
             rel = normalize_relative_path(relpath, allow_root=False)
         except ValueError:
             return None
-        item = self._admitted_repository_file(self.workspace / rel)
+        item = self._admitted_repository_file(self._workspace / rel)
         if item is None or item.visibility is EvidenceVisibility.DENY:
             return None
         return item
 
-    def _visible_repository_manifests(
+    def visible_manifests(
         self,
         filename: str,
     ) -> tuple[Path, ...]:
@@ -193,16 +223,16 @@ class RepositoryFileDiscoveryMixin:
             raise ValueError("manifest filename must be a basename")
         return tuple(
             item.path
-            for item in self._iter_admitted_repository_files()
+            for item in self.iter_files()
             if item.path.name == name and item.visibility is not EvidenceVisibility.DENY
         )
 
-    def _repository_scope_has_visible_file(self, prefix: str) -> bool:
+    def has_visible_file(self, prefix: str) -> bool:
         try:
             rel = normalize_relative_path(prefix, allow_root=True)
         except ValueError:
             return False
-        for item in self._iter_admitted_repository_files(rel):
+        for item in self.iter_files(rel):
             if item.visibility is not EvidenceVisibility.DENY:
                 return True
         return False

@@ -72,9 +72,9 @@ def test_incremental_sync_overlapping_requested_prefixes_preserves_stale_removal
     (tmp_path / "src/other.py").write_text("VALUE = 3\n", encoding="utf-8")
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         (tmp_path / "src/pkg/a.py").unlink()
-        result = codemap.sync(["src/pkg", "src", "src/pkg/a.py", "src/pkg"])
+        result = codemap.index.sync(["src/pkg", "src", "src/pkg/a.py", "src/pkg"])
 
         assert result.removed == 1
         assert "src/pkg/a.py" not in codemap.store.paths()

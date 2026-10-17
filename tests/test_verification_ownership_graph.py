@@ -13,7 +13,7 @@ def test_verification_ownership_keeps_unobserved_owner_scope_unknown(
 ) -> None:
     (tmp_path / "backend.py").write_text("def unrelated():\n    return 1\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         graph = codemap.verification_ownership_graph(
             "Inspect an unknown qx_helix_root task"
         )
@@ -62,7 +62,7 @@ def test_verification_summary_preserves_scope_and_hidden_alternatives(
         "search_bound_reasons": [] if admissible else ["direct-reverse-ref-limit"],
     }
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         # Supply the existing semantic owner's observation to the public graph
         # projection; this test does not nominate edit/verification authority.
         monkeypatch.setattr(
@@ -88,7 +88,7 @@ def test_task_test_match_bounds_do_not_establish_absence(tmp_path: Path) -> None
             "def test_reset_token():\n    assert True\n"
         )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map("Fix reset_token")
         relevance_before = deepcopy(action["verification_relevance"])
         packet = codemap.task_evidence("Fix reset_token")
@@ -120,7 +120,7 @@ def test_task_test_matches_preserve_unresolved_ownership_and_selection(
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(source)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.task_evidence("Fix reset_token")
     assert packet["ownership"]["owner"] is None
     relevance = packet["verification"]["relevance"]
@@ -163,7 +163,7 @@ def test_lexical_verification_scouts_do_not_claim_references_or_replace_verifier
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(source)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.task_evidence(
             "Change transform in src/internals/pipeline.py for redelivery ordering",
             limit=3,
@@ -216,7 +216,7 @@ def test_module_alias_verifier_preserves_export_owner_identity(
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(source)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.task_evidence("Change handle in src/pkg/a.py")
     relevance = packet["verification"]["relevance"]
     verifier = next(
@@ -247,7 +247,7 @@ def test_indirect_verification_reference_requires_the_correct_import_owner(
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.task_evidence("Change normalize_widget in src/owner.py")
     assert packet["ownership"]["owner"] is not None
     assert packet["ownership"]["owner"]["path"] == "src/owner.py"
@@ -279,7 +279,7 @@ def test_verification_ownership_is_evidence_only_and_bounded(tmp_path: Path) -> 
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         graph = codemap.verification_ownership_graph(
             "change calculate behavior", limit=10
         )
@@ -315,7 +315,7 @@ def test_verification_ownership_v2_links_direct_verifier_to_edit_authority(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         graph = codemap.verification_ownership_graph(
             "change calculate behavior", limit=10
         )
@@ -352,7 +352,7 @@ def test_verification_ownership_v2_does_not_link_wording_only_verifier(
         "def test_calculate_contract():\n assert True\n", encoding="utf-8"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         graph = codemap.verification_ownership_graph(
             "change calculate widget behavior", limit=10
         )
@@ -375,7 +375,7 @@ def test_dead_verifier_reference_cannot_claim_edit_coverage(tmp_path: Path) -> N
         "if False:\n    from src.owner import ember_snow\n\ndef test_owner():\n    assert True\n"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         graph = codemap.verification_ownership_graph(
             "Fix ember_snow implementation and verify behavior"
         )
@@ -420,7 +420,7 @@ def test_symbol_scoped_edit_does_not_link_sibling_verifier(tmp_path: Path) -> No
         "launch_manifest_foundation"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map(task, limit=20)
         graph = codemap.verification_ownership_graph(task, limit=20)
 
@@ -481,7 +481,7 @@ def test_unique_direct_verifier_outranks_indirect_and_canonical_candidates(
         "without changing behavior"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         relevance = codemap.verification_relevance(task, limit=20, candidate_limit=16)
 
     selected = relevance["selected"]
@@ -531,7 +531,7 @@ def test_module_alias_call_is_direct_verifier_for_exact_owner(tmp_path: Path) ->
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         relevance = codemap.verification_relevance(
             "Change policy.evaluate behavior", limit=20, candidate_limit=16
         )
@@ -572,7 +572,7 @@ def test_dead_module_alias_call_cannot_claim_direct_verification(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         relevance = codemap.verification_relevance(
             "Change policy.evaluate behavior", limit=20, candidate_limit=16
         )
@@ -695,7 +695,7 @@ def test_module_alias_call_uses_the_existing_reexport_authority(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         relevance = codemap.verification_relevance(
             "Change owner.target behavior", limit=20, candidate_limit=16
         )
@@ -749,7 +749,7 @@ def test_module_alias_local_override_cannot_claim_reexported_owner(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         relevance = codemap.verification_relevance(
             "Change owner.target behavior", limit=20, candidate_limit=16
         )

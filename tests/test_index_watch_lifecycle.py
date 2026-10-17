@@ -35,7 +35,7 @@ class _FakeWatcher:
 
 
 def _watch_owner(codemap: CodeMap) -> types.ModuleType:
-    return importlib.import_module(codemap.watch_forever.__module__)
+    return importlib.import_module(codemap.index.watch_forever.__module__)
 
 
 def _watch_record(codemap: CodeMap) -> WatchContinuityRecord:
@@ -80,9 +80,9 @@ def test_watch_forever_starts_observer_before_initial_sync_and_stops_cleanly(
 
         monkeypatch.setattr(owner, "create_default_watcher", fake_factory)
         monkeypatch.setattr(owner.time, "sleep", stop_after_initial)
-        monkeypatch.setattr(codemap, "sync", fake_sync)
+        monkeypatch.setattr(codemap.index, "sync", fake_sync)
 
-        codemap.watch_forever(
+        codemap.index.watch_forever(
             debounce_seconds=0.01,
             on_update=lambda result, paths: updates.append((result, list(paths))),
         )
@@ -146,9 +146,9 @@ def test_watch_forever_unknown_observation_forces_full_reconciliation(
 
         monkeypatch.setattr(owner, "create_default_watcher", fake_factory)
         monkeypatch.setattr(owner.time, "sleep", drive_unknown_then_stop)
-        monkeypatch.setattr(codemap, "sync", fake_sync)
+        monkeypatch.setattr(codemap.index, "sync", fake_sync)
 
-        codemap.watch_forever(
+        codemap.index.watch_forever(
             debounce_seconds=0.01,
             on_update=lambda result, paths: updates.append((result, list(paths))),
         )
@@ -205,9 +205,9 @@ def test_watch_forever_incremental_callback_reconciles_observed_paths(
 
         monkeypatch.setattr(owner, "create_default_watcher", fake_factory)
         monkeypatch.setattr(owner.time, "sleep", drive_update_then_stop)
-        monkeypatch.setattr(codemap, "sync", fake_sync)
+        monkeypatch.setattr(codemap.index, "sync", fake_sync)
 
-        codemap.watch_forever(
+        codemap.index.watch_forever(
             on_update=lambda result, paths: updates.append((result, list(paths)))
         )
 

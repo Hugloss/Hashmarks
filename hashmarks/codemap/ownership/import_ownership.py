@@ -42,7 +42,7 @@ class ImportOwnershipAnalyzer:
 
         findings: list[dict[str, object]] = []
         for rel in sorted(set(candidates)):
-            codemap._ensure_path_current(rel)
+            codemap.source.ensure_current(rel)
             source_path = codemap.workspace / rel
             try:
                 snapshot = read_python_ast(source_path, errors="replace")
@@ -61,7 +61,7 @@ class ImportOwnershipAnalyzer:
                 )
             )
 
-        generation, identity_generation, stale = codemap._generation_status()
+        generation, identity_generation, stale = codemap.reads.generation_status()
         warnings = sum(1 for finding in findings if finding["severity"] == "warning")
         advisories = len(findings) - warnings
         return {

@@ -62,7 +62,7 @@ def test_task_change_impact_composes_owner_path_and_verification(
 ) -> None:
     task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         start = codemap.task_evidence(task)
         assert _task_candidate_path(start) == "src/case/engine.py"
         (tmp_path / "src/case/engine.py").write_text(
@@ -100,7 +100,7 @@ def test_task_change_impact_config_root_is_typed_and_gets_verification(
     tasks = json.loads(public.read_text(encoding="utf-8"))["tasks"]
     config_task = next(row for row in tasks if row["id"] == "hard-004")
     with CodeMap(repo) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         start = codemap.task_evidence(config_task["query"])
         candidate_path = _task_candidate_path(start)
         assert candidate_path.endswith("policy.toml")
@@ -134,7 +134,7 @@ def test_task_change_impact_bounded_fanout_never_claims_complete_impact(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         impact = codemap.task_change_impact(
             "change shared implementation",
             ["src/core.py"],
@@ -148,7 +148,7 @@ def test_task_change_impact_bounded_fanout_never_claims_complete_impact(
 def test_task_change_impact_bounds_surfaces(tmp_path: Path) -> None:
     task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         impact = codemap.task_change_impact(
             task,
             ["src/case/engine.py"],
@@ -169,7 +169,7 @@ def test_task_change_impact_never_discloses_denied_path(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         impact = codemap.task_change_impact(task, ["src/case/engine.py"])
     encoded = json.dumps(impact, sort_keys=True)
     assert "src/case/route.py" not in encoded
@@ -328,7 +328,7 @@ def test_task_change_impact_reconstructs_same_package_go_owner_chain(
     )
     task = "Change CobaltRidgeAlpha accepted response from old to new"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         start = codemap.task_evidence(task)
         assert _task_candidate_path(start) == "engine/engine.go"
         assert _task_verification_path(start) == "route/cobaltridgealpha_test.go"
@@ -383,7 +383,7 @@ def test_exact_import_resolution_avoids_whole_file_map_materialization(
         encoding="utf-8",
     )
     with CodeMap(ts_root) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         monkeypatch.setattr(
             codemap.store,
             "all_file_rows",
@@ -391,9 +391,9 @@ def test_exact_import_resolution_avoids_whole_file_map_materialization(
                 AssertionError("whole file map must not be materialized")
             ),
         )
-        assert codemap._resolve_import_paths("src/route.ts", "./engine.js") == [
-            "src/engine.ts"
-        ]
+        assert codemap._imports._resolve_import_paths(
+            "src/route.ts", "./engine.js"
+        ) == ["src/engine.ts"]
 
     go_root = tmp_path / "go"
     (go_root / "engine").mkdir(parents=True)
@@ -409,7 +409,7 @@ def test_exact_import_resolution_avoids_whole_file_map_materialization(
         encoding="utf-8",
     )
     with CodeMap(go_root) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         monkeypatch.setattr(
             codemap.store,
             "all_file_rows",
@@ -417,7 +417,7 @@ def test_exact_import_resolution_avoids_whole_file_map_materialization(
                 AssertionError("whole file map must not be materialized")
             ),
         )
-        assert codemap._resolve_import_paths(
+        assert codemap._imports._resolve_import_paths(
             "route/route.go", "example.local/demo/engine"
         ) == ["engine/engine.go"]
 
@@ -454,7 +454,7 @@ def test_task_change_impact_declared_project_provenance_and_shared_input_refresh
     )
     fake_maven_wrapper(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         codemap.enrich_projects(
             ("npm-package-graph", "maven-pom-graph", "declared-project-links")
         )
@@ -527,7 +527,7 @@ def test_task_change_impact_project_provenance_is_bounded(tmp_path: Path) -> Non
         "".join(links), encoding="utf-8"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
         impact = codemap.task_change_impact(
             "root value change",
@@ -579,7 +579,7 @@ def test_project_impact_limit_is_independent_and_reports_truncation(
         "".join(links), encoding="utf-8"
     )
     with CodeMap(root, artifact_db=root / "artifacts.sqlite3") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
         (root / "p0/src/index.ts").write_text(
             "export const value = 99;\n", encoding="utf-8"
@@ -628,7 +628,7 @@ def test_declared_shared_input_refresh_rebinds_freshness_without_recollecting_to
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
         provider = next(
             p
@@ -676,7 +676,7 @@ def test_declared_topology_change_recollects_provider(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
         provider = next(
             p
@@ -735,7 +735,7 @@ def test_unreported_shared_input_change_does_not_rebind_stale_project_evidence(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
         (tmp_path / "contract.json").write_text('{"v":2}\n', encoding="utf-8")
         impact = codemap.task_change_impact("backend changed", ["backend/value.ts"])
@@ -770,7 +770,7 @@ def test_task_change_impact_compact_project_provenance_round_trips(
         "".join(links), encoding="utf-8"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
         verbose = codemap.task_change_impact(
             "root value change",
@@ -820,7 +820,7 @@ def test_task_change_impact_compact_preserves_multiple_edges_from_one_project(
 
     changed = ["root-a/value.ts", "root-b/value.ts"]
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
         verbose = codemap.task_change_impact(
             "both roots changed",
@@ -853,7 +853,7 @@ def test_task_change_impact_rejects_unknown_project_impact_encoding(
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         try:
             codemap.task_change_impact(
                 "ember",
@@ -892,7 +892,7 @@ def test_task_change_impact_rejects_invalid_bounds_before_refresh(
 def test_task_change_impact_never_erases_reported_missing_path(tmp_path: Path) -> None:
     task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         impact = codemap.task_change_impact(
             task,
             ["src/case/engine.py", "src/case/deleted.py"],
@@ -918,7 +918,7 @@ def test_stylesheet_changed_evidence_is_accounted_as_source(
     stylesheet = tmp_path / f"src/case/theme{suffix}"
     stylesheet.write_text(".widget { display: block; }\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         impact = codemap.task_change_impact(task, [stylesheet.relative_to(tmp_path)])
 
     assert (

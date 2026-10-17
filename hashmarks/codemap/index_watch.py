@@ -17,7 +17,7 @@ from .watch_continuity import (
 )
 
 if TYPE_CHECKING:
-    from .engine import CodeMap
+    from .indexing_lifecycle import RepositoryIndex
     from .model import SyncResult
 
 
@@ -33,7 +33,7 @@ class WatchLeaseLostError(RuntimeError):
 class _IndexWatchSession:
     """Mutable reconciliation state shared by watcher callbacks and the loop."""
 
-    codemap: CodeMap
+    index: RepositoryIndex
     on_update: Callable[[SyncResult, list[str]], None] | None
     tracker: ChangeTracker = field(default_factory=ChangeTracker)
     update_lock: threading.RLock = field(default_factory=threading.RLock)
@@ -47,13 +47,13 @@ class _IndexWatchSession:
             fence=fence,
             heartbeat_unix=time.time(),
             active=active,
-            codemap_generation=self.codemap.store.generation(),
+            codemap_generation=self.index.store.generation(),
         )
 
     def acquire(self) -> None:
         with self.update_lock:
             for _ in range(8):
-                raw = self.codemap.store.meta(WATCH_CONTINUITY_META)
+                raw = self.index.store.meta(WATCH_CONTINUITY_META)
                 current = WatchContinuityRecord.from_json(raw)
                 if current is not None and current.lease_live():
                     raise WatchLeaseHeldError(
@@ -62,7 +62,7 @@ class _IndexWatchSession:
                     )
                 fence = 1 if current is None else current.fence + 1
                 record = self._record(fence=fence, active=True)
-                if self.codemap.store.compare_and_set_meta(
+                if self.index.store.compare_and_set_meta(
                     WATCH_CONTINUITY_META,
                     expected=raw,
                     value=record.to_json(),
@@ -75,7 +75,7 @@ class _IndexWatchSession:
         with self.update_lock:
             if self.fence is None:
                 raise RuntimeError("CodeMap watch continuity lease is not acquired")
-            raw = self.codemap.store.meta(WATCH_CONTINUITY_META)
+            raw = self.index.store.meta(WATCH_CONTINUITY_META)
             current = WatchContinuityRecord.from_json(raw)
             if (
                 current is None
@@ -87,7 +87,7 @@ class _IndexWatchSession:
                     "CodeMap watch continuity lease was replaced by another owner"
                 )
             record = self._record(fence=self.fence, active=active)
-            if not self.codemap.store.compare_and_set_meta(
+            if not self.index.store.compare_and_set_meta(
                 WATCH_CONTINUITY_META,
                 expected=raw,
                 value=record.to_json(),
@@ -107,7 +107,7 @@ class _IndexWatchSession:
     def reconcile(self, paths: list[str]) -> None:
         with self.update_lock:
             before = self.tracker.snapshot()
-            result = self.codemap.sync(
+            result = self.index.sync(
                 None if before.state is ObservationState.UNKNOWN else paths
             )
             self.tracker.mark_reconciled(expected_generation=before.generation)
@@ -144,7 +144,7 @@ class IndexWatchMixin:
         """
 
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryIndex", self)
         session = _IndexWatchSession(self, on_update)
         session.acquire()
         watcher = None

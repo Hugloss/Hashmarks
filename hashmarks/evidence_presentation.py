@@ -742,6 +742,21 @@ def _locality(
         shape="record",
         assertion="producer_claim",
     )
+    # The observer already bounds these collections. Project each collection
+    # once so a second per-finding limit cannot hide admitted segments or gaps.
+    for key, family in (
+        ("nodes", "repository_structure"),
+        ("edges", "relationship"),
+        ("unresolved_calls", "relationship"),
+        ("external_or_unindexed_calls", "relationship"),
+    ):
+        if key not in packet:
+            continue
+        field_ref = (*ref, key)
+        rows = _collection_rows(packet[key], "records", field_ref)
+        finding = p.add(family, key, packet[key], field_ref, ctx)
+        if finding:
+            finding["native_item_count"] = len(rows)
     supplied = packet.get("supplied_relationship_observation")
     if isinstance(supplied, Mapping):
         p.project(supplied, (*ref, "supplied_relationship_observation"), ctx)
@@ -751,10 +766,6 @@ def _locality(
         ref,
         ctx,
         (
-            ("nodes", "repository_structure", "records"),
-            ("edges", "relationship", "records"),
-            ("unresolved_calls", "relationship", "records"),
-            ("external_or_unindexed_calls", "relationship", "records"),
             ("verification_paths", "verification", "values"),
             ("dimensions", "evidence_measurement", "record"),
         ),

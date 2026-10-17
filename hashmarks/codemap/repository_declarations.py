@@ -22,6 +22,7 @@ from .repository_declaration_contract import (
     normalize_request,
 )
 from .repository_declaration_delta import declaration_delta
+from .repository_observation import packet_digest
 
 if TYPE_CHECKING:
     from .engine import CodeMap
@@ -43,7 +44,7 @@ class RepositoryDeclarationsMixin:
         """Identify the provider-declared semantic subject independently of location."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        return "sha256:" + self._packet_digest(
+        return "sha256:" + packet_digest(
             "hashmarks.repository-declaration-semantic-subject.v1",
             {
                 "semantic_namespace": semantic_namespace,
@@ -61,7 +62,7 @@ class RepositoryDeclarationsMixin:
         """Identify one provider-declared semantic role inside a subject."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        return "sha256:" + self._packet_digest(
+        return "sha256:" + packet_digest(
             "hashmarks.repository-declaration-semantic-role.v1",
             {
                 "semantic_subject_identity": semantic_subject_identity,
@@ -163,12 +164,12 @@ class RepositoryDeclarationsMixin:
         return {
             **projected,
             "declaration_definition_identity": "sha256:"
-            + self._packet_digest(
+            + packet_digest(
                 "hashmarks.repository-declaration-definition.v1",
                 definition,
             ),
             "declaration_observation_identity": "sha256:"
-            + self._packet_digest(
+            + packet_digest(
                 "hashmarks.repository-declaration-observation.v1",
                 observation,
             ),
@@ -256,12 +257,12 @@ class RepositoryDeclarationsMixin:
         return {
             **observation_payload,
             "group_definition_identity": "sha256:"
-            + self._packet_digest(
+            + packet_digest(
                 "hashmarks.repository-declaration-group-definition.v1",
                 definition_payload,
             ),
             "group_observation_identity": "sha256:"
-            + self._packet_digest(
+            + packet_digest(
                 "hashmarks.repository-declaration-group-observation.v1",
                 observation_payload,
             ),
@@ -275,7 +276,7 @@ class RepositoryDeclarationsMixin:
             for key, value in packet.items()
             if key not in {"observation_identity", "delta_from_previous"}
         }
-        return "sha256:" + self._packet_digest(_SCHEMA, payload)
+        return "sha256:" + packet_digest(_SCHEMA, payload)
 
     def _validate_declaration_packet_contract(
         self,
@@ -441,11 +442,11 @@ class RepositoryDeclarationsMixin:
             semantic_subject_identity=semantic_subject_identity,
             binding=binding,
         )
-        expected_definition = "sha256:" + self._packet_digest(
+        expected_definition = "sha256:" + packet_digest(
             "hashmarks.repository-declaration-definition.v1",
             definition,
         )
-        expected_observation = "sha256:" + self._packet_digest(
+        expected_observation = "sha256:" + packet_digest(
             "hashmarks.repository-declaration-observation.v1",
             observation,
         )
@@ -554,11 +555,11 @@ class RepositoryDeclarationsMixin:
         if raw_group.get("absence") != observation_payload["absence"]:
             raise ValueError(f"{name} declaration absence mismatch")
 
-        expected_definition = "sha256:" + self._packet_digest(
+        expected_definition = "sha256:" + packet_digest(
             "hashmarks.repository-declaration-group-definition.v1",
             definition_payload,
         )
-        expected_observation = "sha256:" + self._packet_digest(
+        expected_observation = "sha256:" + packet_digest(
             "hashmarks.repository-declaration-group-observation.v1",
             observation_payload,
         )
@@ -661,7 +662,7 @@ class RepositoryDeclarationsMixin:
             name="previous declaration observation",
         )
         repository = cast("Mapping[str, object]", previous["repository"])
-        if repository.get("repository_identity") != self._repository_packet_identity():
+        if repository.get("repository_identity") != self.reads.repository_identity():
             raise ValueError("previous declaration observation repository-mismatch")
 
     def repository_declarations(

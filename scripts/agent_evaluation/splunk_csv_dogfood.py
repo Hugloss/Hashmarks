@@ -1032,7 +1032,7 @@ def correlate(
     if not isinstance(bundle, dict):
         raise ValueError("dogfood report has no bundle")
     with CodeMap(workspace) as codemap:
-        sync = codemap.sync()
+        sync = codemap.index.sync()
         packet = codemap.correlate_evidence(
             [bundle],
             path_mappings=path_mappings,

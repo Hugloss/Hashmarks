@@ -14,7 +14,7 @@ def test_refs_many_high_frequency_symbol_keeps_deterministic_bounded_prefix(
             "from shared import f\n" + f"def local_{i}():\n    return f()\n"
         )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         rows = codemap.store.refs_many(["shared.f", "other.f"], limit_per_target=1024)
         assert len(rows["shared.f"]) == 1024
         assert rows["shared.f"] == rows["other.f"]
@@ -41,7 +41,7 @@ def test_paths_under_is_segment_safe_for_exact_and_descendant_ranges(
     (tmp_path / "src0/not_child.py").write_text("VALUE = 5\n")
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         assert codemap.store.paths_under("src") == {
             "src/a.py",
             "src/pkg/b.py",
@@ -59,7 +59,7 @@ def test_has_files_is_exact_and_independent_of_other_surface_counts(
     (tmp_path / "src/a.py").write_text("VALUE = 1\n")
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         assert codemap.store.has_files() is False
-        codemap.sync()
+        codemap.index.sync()
         assert codemap.store.has_files() is True
         codemap.store.delete_paths(["src/a.py"])
         assert codemap.store.has_files() is False
@@ -83,7 +83,7 @@ def test_search_candidates_match_repository_fields_in_stable_order(
     )
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         first = codemap.store.search_candidates("needle", limit=20)
         second = codemap.store.search_candidates("needle", limit=20)
 
@@ -114,7 +114,7 @@ def test_scoped_references_filter_paths_before_row_bound(tmp_path: Path) -> None
         "from owner import Thing\ndef test_thing(): Thing()\n"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         raw = codemap.store.refs_many(["Thing"], limit_per_target=2)["Thing"]
         assert all(row["path"] != target for row in raw)
         scoped = codemap.store.refs_many_for_paths(

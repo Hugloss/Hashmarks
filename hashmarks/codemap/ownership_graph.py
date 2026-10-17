@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, cast
 from hashmarks.operation_contract import operation_response, operation_schema
 from hashmarks.paths import normalize_relative_path
 
-from .decision_session import decision_scoped
+from .decision_session import ReadScopeOwner, decision_scoped
 from .model import EvidenceVisibility, SearchHit
 from .ownership_relation_defaults import OWNERSHIP_RELATION_DEFAULT_OPTIONS
 from .ownership_relation_types import (
@@ -25,7 +25,16 @@ from .query_router import QueryRoute, route_query
 from .repository_domains import RepositoryDomain, classify_repository_path
 
 if TYPE_CHECKING:
+    from .decision_session import ReadScope
     from .engine import CodeMap
+
+
+@dataclass
+class _OwnershipImportReuse:
+    """Disposable ownership import reuse bound to one read scope."""
+
+    scope: ReadScope | None = None
+    entries: dict[tuple[int, str, str], tuple[str, ...]] = field(default_factory=dict)
 
 
 @dataclass
@@ -48,7 +57,7 @@ class _OwnershipExpansion:
     frontier: list[tuple[str, int, tuple[str, ...]]]
 
 
-class OwnershipGraphMixin:
+class OwnershipGraphMixin(ReadScopeOwner):
     @staticmethod
     def _entry_role_domains() -> dict[str, tuple[RepositoryDomain, ...]]:
         return {
@@ -72,7 +81,7 @@ class OwnershipGraphMixin:
         if role != "implementation" or not task_terms:
             return 0
         evidence_terms: set[str] = set()
-        for symbol in self._session_symbols_for_path(path)[:64]:
+        for symbol in self.reads.symbols_for_path(path)[:64]:
             for field in ("name", "qualname", "signature"):
                 evidence_terms.update(_query_terms(str(symbol.get(field) or "")))
         return len(task_terms.intersection(evidence_terms))
@@ -392,7 +401,7 @@ class OwnershipGraphMixin:
                 str(symbol.get(key) or "").lower()
                 for key in ("name", "qualname", "signature")
             )
-            for symbol in self._session_symbols_for_path(path)
+            for symbol in self.reads.symbols_for_path(path)
         )
         row_text = " ".join(
             [
@@ -478,7 +487,7 @@ class OwnershipGraphMixin:
             return None, {}
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        self._session_preload_symbols(
+        self.reads.preload_symbols(
             [str(row["path"]) for role in explicit_roles for row in role_rows[role]]
         )
         role_anchor_tokens: dict[str, list[str]] = {}
@@ -613,7 +622,7 @@ class OwnershipGraphMixin:
     def _ownership_evidence_visible(self, path: str) -> bool:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        file_row = self._session_file_row(path)
+        file_row = self.reads.file_row(path)
         if file_row is None:
             return False
         try:
@@ -631,7 +640,7 @@ class OwnershipGraphMixin:
         if current is not None:
             return current
         domains = [domain.value for domain in classify_repository_path(path)]
-        symbols = self._session_symbols_for_path(path)
+        symbols = self.reads.symbols_for_path(path)
         if len(symbols) > 12:
             state.search_bound_reasons.add("node-symbol-limit")
         symbol_terms: set[str] = set()
@@ -675,7 +684,7 @@ class OwnershipGraphMixin:
             self = cast("CodeMap", self)
         return [
             candidate
-            for candidate in self._resolve_import_paths(source_path, target)
+            for candidate in self._imports._resolve_import_paths(source_path, target)
             if self._ownership_evidence_visible(candidate)
         ]
 
@@ -685,19 +694,19 @@ class OwnershipGraphMixin:
         if not target:
             return []
         cache_key: tuple[int, str, str] | None = None
-        if (
-            self._decision_session_depth > 0
-            and self._decision_session_generation is not None
-        ):
-            cache_key = (self._decision_session_generation, source_path, target)
-            cached = self._decision_ownership_import_paths_cache.get(cache_key)
+        if self.reads.depth > 0 and self.reads.generation is not None:
+            if self._ownership_import_reuse.scope is not self.reads.scope:
+                self._ownership_import_reuse.entries.clear()
+                self._ownership_import_reuse.scope = self.reads.scope
+            cache_key = (self.reads.generation, source_path, target)
+            cached = self._ownership_import_reuse.entries.get(cache_key)
             if cached is not None:
-                self._decision_session_stats["ownership_import_paths_hit"] += 1
+                self.reads.count("ownership_import_paths_hit")
                 return list(cached)
-            self._decision_session_stats["ownership_import_paths_miss"] += 1
+            self.reads.count("ownership_import_paths_miss")
         result = self._uncached_exact_ownership_import_paths(source_path, target)
         if cache_key is not None:
-            self._decision_ownership_import_paths_cache[cache_key] = tuple(result)
+            self._ownership_import_reuse.entries[cache_key] = tuple(result)
         return result
 
     def _uncached_exact_ownership_import_paths(
@@ -705,20 +714,22 @@ class OwnershipGraphMixin:
     ) -> list[str]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        source_row = self._session_file_row(source_path)
+        source_row = self.reads.file_row(source_path)
         language = None if source_row is None else str(source_row["language"] or "")
         if language != "python":
             return self._visible_resolved_import_paths(source_path, target)
-        candidates = self._python_import_module_candidates(source_path, target)
+        candidates = self._imports._python_import_module_candidates(source_path, target)
         if candidates:
-            direct = self._session_module_paths(candidates[0])
+            direct = self.reads.module_paths(candidates[0])
             if direct:
                 return (
                     [path for path in direct if self._ownership_evidence_visible(path)]
                     if len(direct) == 1
                     else []
                 )
-        resolved, unresolved = self._resolve_import_owner_evidence(source_path, target)
+        resolved, unresolved = self._imports._resolve_import_owner_evidence(
+            source_path, target
+        )
         return (
             []
             if unresolved
@@ -772,7 +783,7 @@ class OwnershipGraphMixin:
         if not call_shorts:
             return {}
         symbol_limit = max(12, min(5000, 12 * len(call_shorts)))
-        call_symbols = self._session_exact_symbol_candidates(
+        call_symbols = self.reads.exact_symbol_candidates(
             call_shorts, limit=symbol_limit + 1
         )
         if len(call_symbols) > symbol_limit:
@@ -962,15 +973,17 @@ class OwnershipGraphMixin:
             self = cast("CodeMap", self)
         modules: set[str] = set()
         for path, _, _ in expandable:
-            source_row = self._session_file_row(path)
+            source_row = self.reads.file_row(path)
             if source_row is None or str(source_row.get("language") or "") != "python":
                 continue
             for target in self._ownership_import_targets(edge_map.get(path, ())):
-                candidates = self._python_import_module_candidates(path, target)
+                candidates = self._imports._python_import_module_candidates(
+                    path, target
+                )
                 if candidates:
                     modules.add(candidates[0])
         if len(modules) >= 2:
-            self._session_preload_module_paths(modules)
+            self.reads.preload_module_paths(modules)
 
     def _expand_ownership_level(
         self,
@@ -984,8 +997,8 @@ class OwnershipGraphMixin:
         if not expandable:
             return []
         paths = [path for path, _, _ in expandable]
-        self._session_file_rows(paths)
-        probed_edge_map = self._session_edges_for_paths_many(paths, limit_per_path=101)
+        self.reads.file_rows(paths)
+        probed_edge_map = self.reads.edges_for_paths_many(paths, limit_per_path=101)
         edge_map = {}
         for path in paths:
             path_edges = list(probed_edge_map.get(path, ()))
@@ -1179,7 +1192,7 @@ class OwnershipGraphMixin:
             self = cast("CodeMap", self)
         start = normalize_relative_path(start_path, allow_root=False)
         max_depth = max(1, min(int(max_depth), 4))
-        start_row = self._session_file_row(start)
+        start_row = self.reads.file_row(start)
         if (
             start_row is not None
             and EvidenceVisibility(str(start_row["evidence_visibility"]))

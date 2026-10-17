@@ -26,7 +26,7 @@ def test_qualified_reference_beyond_global_short_name_prefix_remains_direct(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         global_prefix = codemap.store.refs_many(["f"], limit_per_target=1024)["f"]
         assert not any(row["path"] == "tests/test_target.py" for row in global_prefix)
         relevance = codemap.verification_relevance(
@@ -63,7 +63,7 @@ def test_targeted_tail_uses_full_module_identity_when_leaf_names_collide(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observed: list[str] = []
         original = codemap.store.refs_matching_target_suffix
 
@@ -103,7 +103,7 @@ def test_literal_repository_path_is_not_replaced_by_structural_neighbor(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map("change pkg/target.py run behavior", limit=20)
 
     assert action["edit"] is not None

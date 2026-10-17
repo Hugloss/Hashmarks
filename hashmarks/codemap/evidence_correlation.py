@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, cast
 from hashmarks.operation_contract import validate_operation_response
 from hashmarks.paths import normalize_relative_path
 
-from .decision_session import decision_scoped
+from .decision_session import ReadScopeOwner, decision_scoped
 from .evidence_correlation_replay import (
     _CORRELATION_SCHEMA,
     _DEFINITION_DOMAIN,
@@ -21,6 +21,7 @@ from .evidence_correlation_replay import (
     CORRELATION_REQUEST_MAX_BYTES,
     EvidenceCorrelationReplayMixin,
 )
+from .repository_observation import packet_digest
 
 if TYPE_CHECKING:
     from .engine import CodeMap
@@ -364,7 +365,7 @@ def _binding_id(evidence: Sequence[Mapping[str, object]]) -> str:
     return "external-evidence:" + digest
 
 
-class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin):
+class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin, ReadScopeOwner):
     """Correlate bounded external claims to canonical repository evidence.
 
     External claims remain claims. The implementation resolves them into the
@@ -501,7 +502,7 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin):
                 path_origin,
                 path_origin,
             )
-        member, _raw = self._repository_member_observation(repository_path)
+        member, _raw = self.source.member(repository_path)
         if member.get("state") != "known-present":
             return _Resolution(
                 "unresolved",
@@ -576,7 +577,7 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin):
         raw_bound_exhausted = len(rows) > _MAX_MODULE_CANDIDATES
         admitted: list[str] = []
         for path in rows:
-            member, _raw = self._repository_member_observation(path)
+            member, _raw = self.source.member(path)
             if member.get("state") == "known-present":
                 admitted.append(path)
         candidates = tuple(admitted[:_MAX_MODULE_CANDIDATES])
@@ -618,7 +619,7 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin):
     ) -> _Resolution | None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        row = self._session_file_row(path)
+        row = self.reads.file_row(path)
         observed = "" if row is None else str(row.get("module_name") or "")
         if observed == module:
             return None
@@ -1423,7 +1424,7 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin):
             mappings=mappings,
         )
         packet["correspondence"] = self._cross_bundle_correspondence(prepared)
-        packet["correlation_identity"] = "sha256:" + self._packet_digest(
+        packet["correlation_identity"] = "sha256:" + packet_digest(
             _CORRELATION_SCHEMA,
             {
                 key: value
@@ -1498,7 +1499,7 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin):
         packet: dict[str, object] = {
             "schema": _CORRELATION_SCHEMA,
             "evidence_definition_identity": "sha256:"
-            + self._packet_digest(
+            + packet_digest(
                 _DEFINITION_DOMAIN,
                 definition,
             ),
@@ -1524,7 +1525,7 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin):
                 "max_anchors": _MAX_TOTAL_ANCHORS,
             },
         }
-        packet["correlation_identity"] = "sha256:" + self._packet_digest(
+        packet["correlation_identity"] = "sha256:" + packet_digest(
             _CORRELATION_SCHEMA,
             packet,
         )
@@ -1553,7 +1554,7 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin):
             after,
             repository_delta,
         )
-        payload["delta_identity"] = "sha256:" + self._packet_digest(
+        payload["delta_identity"] = "sha256:" + packet_digest(
             _DELTA_SCHEMA,
             payload,
         )

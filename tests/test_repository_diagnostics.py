@@ -183,7 +183,7 @@ def test_find_task_prefix_is_stable_through_agent_surface(tmp_path: Path) -> Non
     with CodeMap(
         root, state_dir=state, artifact_db=state / "artifacts.sqlite3"
     ) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         five = [hit.path for hit in codemap.find_task(task, limit=5)]
         ten = [hit.path for hit in codemap.find_task(task, limit=10)]
         twenty = [hit.path for hit in codemap.find_task(task, limit=20)]

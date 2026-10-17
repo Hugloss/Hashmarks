@@ -16,6 +16,7 @@ from hashmarks.paths import normalize_relative_path
 
 from .change_impact import ChangeImpactMixin
 from .evidence_packet import TASK_EVIDENCE_DEFAULT_OPTIONS
+from .repository_observation import packet_digest
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -173,7 +174,7 @@ class PostChangeMixin(ChangeImpactMixin):
             self = cast("CodeMap", self)
         revisions: dict[str, str | None] = {}
         for path in paths:
-            row = self._session_file_row(path)
+            row = self.reads.file_row(path)
             revisions[path] = (
                 None
                 if row is None or not row["file_digest"]
@@ -190,7 +191,7 @@ class PostChangeMixin(ChangeImpactMixin):
             self = cast("CodeMap", self)
         changes: list[TaskPathChange] = []
         for path in paths:
-            row = self._session_file_row(path)
+            row = self.reads.file_row(path)
             after_revision = (
                 None
                 if row is None or not row["file_digest"]
@@ -227,10 +228,10 @@ class PostChangeMixin(ChangeImpactMixin):
         reasons: list[str] = []
         if (
             str(receipt.get("repository_identity") or "")
-            != self._repository_packet_identity()
+            != self.reads.repository_identity()
         ):
             reasons.append("repository-mismatch")
-        expected_task = self._packet_digest("hashmarks.task.v1", {"task": task})
+        expected_task = packet_digest("hashmarks.task.v1", {"task": task})
         if str(receipt.get("task_identity") or "") != expected_task:
             reasons.append("task-mismatch")
         if receipt.get("codemap_generation") != generation_before:
@@ -242,7 +243,7 @@ class PostChangeMixin(ChangeImpactMixin):
             )
         packet_identity = previous_evidence.get("evidence_packet_identity")
         packet_schema = str(previous_evidence.get("schema") or "")
-        expected_packet_identity = "sha256:" + self._packet_digest(
+        expected_packet_identity = "sha256:" + packet_digest(
             packet_schema,
             {
                 key: value
@@ -298,7 +299,7 @@ class PostChangeMixin(ChangeImpactMixin):
         )
         if not isinstance(previous_candidate, str) or not previous_revision:
             return "unbound", previous_revision
-        row = self._session_file_row(previous_candidate)
+        row = self.reads.file_row(previous_candidate)
         indexed_before = (
             None if row is None or not row["file_digest"] else str(row["file_digest"])
         )
@@ -429,8 +430,8 @@ class PostChangeMixin(ChangeImpactMixin):
                 previous_provenance,
             )
         )
-        sync_result = self.sync(normalized)
-        with self.decision_session(expected_generation=sync_result.generation):
+        sync_result = self.index.sync(normalized)
+        with self.reads.session(expected_generation=sync_result.generation):
             current, provenance, ownership_status = self._post_change_current_evidence(
                 task,
                 limit=limit,
@@ -507,8 +508,8 @@ class PostChangeMixin(ChangeImpactMixin):
                 "changed_paths must contain at least one repository-relative path"
             )
         before = self.store.generation()
-        sync_result = self.sync(normalized)
-        with self.decision_session(expected_generation=sync_result.generation):
+        sync_result = self.index.sync(normalized)
+        with self.reads.session(expected_generation=sync_result.generation):
             brief = self.task_decision_brief(
                 task,
                 limit=options.limit,
@@ -579,9 +580,9 @@ class PostChangeMixin(ChangeImpactMixin):
             )
         before = self.store.generation()
         started = time.perf_counter()
-        sync_result = self.sync(normalized)
+        sync_result = self.index.sync(normalized)
         refresh_ms = (time.perf_counter() - started) * 1000.0
-        with self.decision_session(expected_generation=sync_result.generation):
+        with self.reads.session(expected_generation=sync_result.generation):
             brief = self.task_decision_brief(
                 task,
                 limit=limit,
@@ -628,9 +629,9 @@ class PostChangeMixin(ChangeImpactMixin):
             )
         before = self.store.generation()
         started = time.perf_counter()
-        sync_result = self.sync(normalized)
+        sync_result = self.index.sync(normalized)
         refresh_ms = (time.perf_counter() - started) * 1000.0
-        with self.decision_session(expected_generation=sync_result.generation):
+        with self.reads.session(expected_generation=sync_result.generation):
             packet = self.task_decision_packet(
                 task,
                 limit=limit,

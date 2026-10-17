@@ -68,7 +68,7 @@ def _verification_state(
         hits = source.find_task(query + " test verification", limit=limit)
     else:
         with CodeMap(source) as codemap:
-            codemap.sync()
+            codemap.index.sync()
             hits = codemap.find_task(query + " test verification", limit=limit)
     candidates = [hit.path for hit in hits]
     target = next((path for path in candidates if _is_test_path(path)), None)
@@ -139,7 +139,7 @@ def run_worker(
         raise ValueError("unsupported public task input")
     rows = []
     with CodeMap(workspace) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         for row in payload.get("tasks", []):
             if not isinstance(row, dict) or set(row) - {"id", "query"}:
                 raise ValueError("worker input may contain only id and query")

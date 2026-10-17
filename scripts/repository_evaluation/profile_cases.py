@@ -81,7 +81,7 @@ def _profile_bound(value: object, default: int) -> int:
 
 def _run_action(codemap: CodeMap, case: Mapping[str, object]) -> tuple[int, str]:
     started = time.perf_counter_ns()
-    with codemap.decision_session():
+    with codemap.reads.session():
         if str(case.get("operation") or "task_action_map") == "task_action_map":
             action = codemap.task_action_map(
                 str(case.get("task") or ""),
@@ -118,7 +118,7 @@ def profile_cases(
         with CodeMap(
             workspace, state_dir=state, artifact_db=state / "artifacts.sqlite3"
         ) as codemap:
-            codemap.sync()
+            codemap.index.sync()
             repo_identity = repository_content_identity(
                 workspace, excluded_paths=(codemap.state_dir,)
             )
@@ -246,8 +246,8 @@ def paired_profile_cases(
                 workspace_b, state_dir=sb, artifact_db=sb / "artifacts.sqlite3"
             ) as b,
         ):
-            a.sync()
-            b.sync()
+            a.index.sync()
+            b.index.sync()
             aid = repository_content_identity(
                 workspace_a, excluded_paths=(a.state_dir,)
             )

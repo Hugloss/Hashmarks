@@ -69,7 +69,7 @@ def _capture(repo: Path, result: object) -> dict:
 
 def _observed(repo: Path, capture: dict) -> dict:
     with CodeMap(repo) as cm:
-        cm.sync()
+        cm.index.sync()
         return cm.structural_locality(
             "source.py::target",
             result_mode="relationships",
@@ -327,7 +327,7 @@ def test_rehashed_hover_claim_cannot_masquerade_as_relationship(
     source = native_lsp_corpus / "python" / "hover"
     materialize_scip(root, source)
     with CodeMap(root) as cm:
-        cm.sync()
+        cm.index.sync()
         packets: list[Any] = [
             cm.structural_locality(
                 "src/source.py::target",

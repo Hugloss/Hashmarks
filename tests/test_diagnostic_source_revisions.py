@@ -42,8 +42,8 @@ def _diagnostic(
 def _source(tmp_path: Path) -> dict[str, object]:
     (tmp_path / "src.py").write_text("print(missing)\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        return codemap.source_observation("src.py")
+        codemap.index.sync()
+        return codemap.source.observe("src.py")
 
 
 def _project(
@@ -103,8 +103,8 @@ def test_changed_source_revision_is_not_reported_as_current(
     )
     (tmp_path / "src.py").write_text("print(changed)\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        current = codemap.source_observation("src.py")
+        codemap.index.sync()
+        current = codemap.source.observe("src.py")
     result = _project(observed, current)
     assert result["different_count"] == 1
     assert result["rows"][0]["state"] == "different"
@@ -315,8 +315,8 @@ def test_partial_literal_source_observation_does_not_prove_revision(
 ) -> None:
     (tmp_path / "src.py").write_text("hit hit hit\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        source = codemap.source_observation("src.py", literal="hit", limit=1)
+        codemap.index.sync()
+        source = codemap.source.observe("src.py", literal="hit", limit=1)
     observation = _diagnostic(
         source_revisions={"src.py": source["member"]["member_revision"]}
     )

@@ -60,8 +60,8 @@ def collect(*, files: int = 1000, budget: int = 1000) -> dict[str, object]:
         with CodeMap(root, artifact_db=artifact_db) as codemap:
             syncs = {}
             seconds = {}
-            syncs["cold"], seconds["cold_sync"] = _timed(codemap.sync)
-            syncs["hot"], seconds["hot_sync"] = _timed(codemap.sync)
+            syncs["cold"], seconds["cold_sync"] = _timed(codemap.index.sync)
+            syncs["hot"], seconds["hot_sync"] = _timed(codemap.index.sync)
             hits, seconds["find"] = _timed(
                 lambda: codemap.find("CriticalAuthFlow expired token", limit=10)
             )
@@ -78,7 +78,7 @@ def collect(*, files: int = 1000, budget: int = 1000) -> dict[str, object]:
                 encoding="utf-8",
             )
             syncs["edit"], seconds["one_file_reindex"] = _timed(
-                lambda: codemap.sync([target_path])
+                lambda: codemap.index.sync([target_path])
             )
             stats = codemap.status()
 

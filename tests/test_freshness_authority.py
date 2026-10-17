@@ -33,7 +33,7 @@ def test_find_claim_admission_consumes_canonical_freshness(
     )
 
     with CodeMap(repo) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         monkeypatch.setattr(
             find_engine_module,
             "freshness_state",

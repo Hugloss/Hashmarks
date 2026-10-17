@@ -26,7 +26,7 @@ def repository(tmp_path: Path) -> Iterator[CodeMap]:
     with CodeMap(
         root, state_dir=tmp_path / "state", artifact_db=tmp_path / "artifacts.sqlite3"
     ) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         yield codemap
 
 
@@ -83,13 +83,13 @@ def test_ambiguous_diagnostic_preserves_both_repository_candidates(
 def test_current_repository_does_not_rebind_diagnostic_to_edited_source(
     repository: CodeMap,
 ) -> None:
-    before = repository.source_observation("src/service.py", lines=[2])
+    before = repository.source.observe("src/service.py", lines=[2])
     original_revision = assert_text(assert_object(before["member"])["member_revision"])
     (repository.workspace / "src/service.py").write_text(
         "def handle_request():\n    return 'edited'\n", encoding="utf-8"
     )
-    repository.sync()
-    current = repository.source_observation("src/service.py", lines=[2])
+    repository.index.sync()
+    current = repository.source.observe("src/service.py", lines=[2])
     current_revision = assert_text(assert_object(current["member"])["member_revision"])
     assert current_revision != original_revision
     assert current["generation"] != before["generation"]

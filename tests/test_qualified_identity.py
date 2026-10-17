@@ -27,7 +27,7 @@ def test_equivalent_relative_and_absolute_imports_share_qualified_identity(
     _write(tmp_path, "pkg/impl.py", "class Public: pass\n")
     _write(tmp_path, "pkg/use.py", "from .impl import Public\n")
     with _map(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         relative = qualified_import_identity(
             codemap, source_path="pkg/use.py", target=".impl.Public"
         )
@@ -44,7 +44,7 @@ def test_reexport_alias_identity_is_stable_across_reopen(tmp_path: Path) -> None
     _write(tmp_path, "pkg/impl.py", "class Internal: pass\n")
     _write(tmp_path, "tests/test_a.py", "from pkg import Public\n")
     with _map(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         first = qualified_import_identity(
             codemap, source_path="tests/test_a.py", target="pkg.Public"
         )
@@ -65,7 +65,7 @@ def test_ambiguous_reexport_has_no_qualified_identity(tmp_path: Path) -> None:
     _write(tmp_path, "pkg/b.py", "class Public: pass\n")
     _write(tmp_path, "tests/test_a.py", "from pkg import Public\n")
     with _map(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         result = qualified_import_identity(
             codemap, source_path="tests/test_a.py", target="pkg.Public"
         )
@@ -91,7 +91,7 @@ def test_cross_repository_shared_input_identity_binds_projects_and_content(
 ) -> None:
     _shared_repo(tmp_path)
     with _map(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
         first = qualified_shared_input_identity(codemap, relpath="contract.json")
         second = qualified_shared_input_identity(codemap, relpath="contract.json")
@@ -109,7 +109,7 @@ def test_shared_input_change_is_stale_until_authoritative_refresh_then_rebinds(
 ) -> None:
     _shared_repo(tmp_path)
     with _map(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
         before = qualified_shared_input_identity(codemap, relpath="contract.json")
         _write(tmp_path, "contract.json", '{"v":2}\n')
@@ -129,7 +129,7 @@ def test_shared_input_change_during_identity_read_fails_closed(
 ) -> None:
     _shared_repo(tmp_path)
     with _map(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
         before = qualified_shared_input_identity(codemap, relpath="contract.json")
         original_digest = codemap._manifest_digest
@@ -157,7 +157,7 @@ def test_shared_input_change_during_identity_read_fails_closed(
 def test_undeclared_shared_input_fails_closed(tmp_path: Path) -> None:
     _write(tmp_path, "contract.json", "{}\n")
     with _map(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         result = qualified_shared_input_identity(codemap, relpath="contract.json")
     assert result["status"] == "unresolved"
     assert result["qualified_identity"] is None
@@ -170,7 +170,7 @@ def test_deleted_import_owner_cannot_retain_false_unique_qualified_identity(
     _write(tmp_path, "pkg/impl.py", "class Public: pass\n")
     _write(tmp_path, "tests/test_a.py", "from pkg import Public\n")
     with _map(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = qualified_import_identity(
             codemap, source_path="tests/test_a.py", target="pkg.Public"
         )
@@ -192,7 +192,7 @@ def test_qualified_import_identity_is_independent_of_consumer_path(
     _write(tmp_path, "a/use.py", "from pkg.impl import Public\n")
     _write(tmp_path, "b/use.py", "from pkg.impl import Public\n")
     with _map(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         first = qualified_import_identity(
             codemap, source_path="a/use.py", target="pkg.impl.Public"
         )
@@ -215,7 +215,7 @@ def test_public_reexport_alias_identity_stays_distinct_from_internal_symbol(
         "from pkg import Public\nfrom pkg.impl import Internal\n",
     )
     with _map(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         public = qualified_import_identity(
             codemap, source_path="tests/use.py", target="pkg.Public"
         )
@@ -234,7 +234,7 @@ def test_qualified_import_identity_cycle_fails_closed(tmp_path: Path) -> None:
     _write(tmp_path, "pkg/b.py", "from .a import Public\n")
     _write(tmp_path, "tests/use.py", "from pkg import Public\n")
     with _map(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         result = qualified_import_identity(
             codemap, source_path="tests/use.py", target="pkg.Public"
         )
@@ -250,7 +250,7 @@ def test_qualified_import_identity_rebinds_unsynced_facade_retarget(
     _write(tmp_path, "pkg/b.py", "class Public: pass\n")
     _write(tmp_path, "tests/use.py", "from pkg import Public\n")
     with _map(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = qualified_import_identity(
             codemap, source_path="tests/use.py", target="pkg.Public"
         )

@@ -7,7 +7,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from .decision_session import decision_scoped
+from .decision_session import ReadScopeOwner, decision_scoped
 from .model import EvidenceVisibility, SearchHit
 from .query_primitives import (
     _TASK_EVIDENCE_FAMILIES,
@@ -125,28 +125,12 @@ _TASK_SCOPE_EXPANSIONS: tuple[tuple[frozenset[str], tuple[str, ...]], ...] = (
 )
 
 
-class TaskRetrievalMixin:
-    _TASK_CACHE_PREFLIGHT_METHODS = frozenset(
-        {
-            "task_action_map",
-            "task_decision_brief",
-            "task_decision_packet",
-        }
-    )
-
-    def _decision_preflight(
-        self, method_name: str, args: tuple[object, ...], kwargs: dict[str, object]
-    ) -> None:
-        """Reconcile known stale task evidence before authority is sampled."""
-        if method_name not in self._TASK_CACHE_PREFLIGHT_METHODS or not args:
+class TaskRetrievalMixin(ReadScopeOwner):
+    def _prepare_task_observation(self, task: str, limit: int) -> None:
+        """Task-owned freshness preparation, before a read scope is sampled."""
+        if not isinstance(task, str) or type(limit) is not int or limit < 1:
             return
-        task = args[0]
-        if not isinstance(task, str):
-            return
-        raw_limit = kwargs.get("limit", 20)
-        if type(raw_limit) is not int or raw_limit < 1:
-            return
-        self._reconcile_cached_task_paths(task, raw_limit, probe_on_miss=True)
+        self._reconcile_cached_task_paths(task, limit, probe_on_miss=True)
 
     def _remember_task_resurrection_paths(
         self,
@@ -176,9 +160,9 @@ class TaskRetrievalMixin:
         # repository discovery. Byte changes and file->symlink transitions are
         # exact-path changes and stay path-scoped.
         if any(not (self.workspace / path).exists() for path in stale_paths):
-            self.sync()
+            self.index.sync()
         else:
-            self.sync(stale_paths)
+            self.index.sync(stale_paths)
 
     def _task_resurrection_paths(
         self, recent_paths: tuple[str, ...]
@@ -189,10 +173,10 @@ class TaskRetrievalMixin:
             sorted(
                 path
                 for path in recent_paths
-                if self._path_admitted_for_analysis(path)
+                if self.files.is_admitted(path)
                 and (self.workspace / path).is_file()
                 and not (self.workspace / path).is_symlink()
-                and not self._indexed_path_current(path)
+                and not self.index.is_current(path)
             )
         )
 
@@ -203,7 +187,7 @@ class TaskRetrievalMixin:
             self = cast("CodeMap", self)
         restored = self._task_resurrection_paths(recent_paths)
         if restored:
-            self.sync(restored)
+            self.index.sync(restored)
         return restored
 
     def _reconcile_cached_task_paths(
@@ -211,7 +195,7 @@ class TaskRetrievalMixin:
     ) -> tuple[str, ...]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        if self._decision_session_depth > 0:
+        if self.reads.depth > 0 or self.store.meta("sync.build_state") == "BUILDING":
             return ()
         generation = self.store.generation()
         key = (generation, task, int(limit))
@@ -237,9 +221,7 @@ class TaskRetrievalMixin:
             *authority_paths,
         }
         active_stale = tuple(
-            sorted(
-                path for path in active_paths if not self._indexed_path_current(path)
-            )
+            sorted(path for path in active_paths if not self.index.is_current(path))
         )
         # The preflight may be the first decision for this task after an
         # unsignaled disappearance. Preserve only stale task-local paths before
@@ -530,7 +512,7 @@ class TaskRetrievalMixin:
             if low not in words:
                 words.append(low)
                 original[low] = raw
-        total, frequencies = self._session_lexical_document_frequencies(words)
+        total, frequencies = self.reads.lexical_document_frequencies(words)
 
         ranked = sorted(
             (term for term in words if term in frequencies),
@@ -675,7 +657,7 @@ class TaskRetrievalMixin:
             self = cast("CodeMap", self)
         normalized = token.lower()
         row_limit = max(8, min(32, limit * 2))
-        file_rows = self._session_lexical_file_candidates([normalized], limit=row_limit)
+        file_rows = self.reads.lexical_file_candidates([normalized], limit=row_limit)
         path_rows = self.store.path_candidates([normalized], limit=row_limit)
         if bound_reasons is not None and (
             len(file_rows) >= row_limit or len(path_rows) >= row_limit
@@ -749,7 +731,7 @@ class TaskRetrievalMixin:
         ]
         if len(terms) < 2:
             return ()
-        total_docs, frequencies = self._session_lexical_document_frequencies(terms)
+        total_docs, frequencies = self.reads.lexical_document_frequencies(terms)
         max_documents = max(12, min(64, int(max(total_docs, 1) * 0.25)))
         rare_terms = [
             term for term in terms if 0 < int(frequencies.get(term, 0)) <= max_documents
@@ -774,9 +756,7 @@ class TaskRetrievalMixin:
         if len(selected_terms) < 2:
             return None
         row_limit = max(32, min(96, limit * 4))
-        rows = self._session_lexical_file_candidates(
-            list(selected_terms), limit=row_limit
-        )
+        rows = self.reads.lexical_file_candidates(list(selected_terms), limit=row_limit)
         if bound_reasons is not None and len(rows) >= row_limit:
             bound_reasons.add("task-island-candidate-limit")
         island = [row for row in rows if _integer_value(row.get("matches")) >= 2]
@@ -918,13 +898,13 @@ class TaskRetrievalMixin:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         if ensure_ready:
-            self._ensure_map_ready()
+            self.reads.ready()
         generation = self.store.generation()
         key = (generation, task, int(limit))
         cached = self._task_result_cache.get(key)
-        if self._decision_session_depth > 0:
+        if self.reads.depth > 0:
             stat = "task_result_hit" if cached is not None else "task_result_miss"
-            self._decision_session_stats[stat] += 1
+            self.reads.count(stat)
         return key, cached
 
     def _task_find_trim_cache(self, generation: int) -> None:
@@ -1005,7 +985,7 @@ class TaskRetrievalMixin:
             return None
         if cue_words.intersection(self._task_broad_authority_cues()):
             return None
-        _total_docs, frequencies = self._session_lexical_document_frequencies(
+        _total_docs, frequencies = self.reads.lexical_document_frequencies(
             [token.lower() for token in fast_tokens[:4]]
         )
         for token in fast_tokens:
@@ -1084,9 +1064,7 @@ class TaskRetrievalMixin:
         specs = self._task_sequence_specs(views, limit)
         rows: list[tuple[tuple[SearchHit, ...], float]] = []
         session_scope = (
-            nullcontext(self)
-            if self._decision_session_depth > 0
-            else self.decision_session()
+            nullcontext(self) if self.reads.depth > 0 else self.reads.session()
         )
         with session_scope:
             for view, weight, view_fetch in specs:
@@ -1145,7 +1123,7 @@ class TaskRetrievalMixin:
     ) -> None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        rows = self._session_exact_symbol_candidates(raw_tokens, limit=64)
+        rows = self.reads.exact_symbol_candidates(raw_tokens, limit=64)
         if len(rows) >= 64:
             bound_reasons.add("task-exact-anchor-limit")
         token_order = {token.lower(): index for index, token in enumerate(raw_tokens)}
@@ -1279,9 +1257,7 @@ class TaskRetrievalMixin:
             bound_reasons.add("task-natural-term-input-limit")
         if not candidates:
             return ()
-        total, frequencies = self._session_lexical_document_frequencies(
-            list(candidates)
-        )
+        total, frequencies = self.reads.lexical_document_frequencies(list(candidates))
         ranked = sorted(
             (term for term in candidates if 0 < int(frequencies.get(term, 0)) <= 8),
             key=lambda term: self._task_query_term_score(
@@ -1512,7 +1488,7 @@ class TaskRetrievalMixin:
         """Fail closed when retrieval evidence no longer matches workspace bytes."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        return tuple(hit for hit in hits if self._indexed_path_current(hit.path))
+        return tuple(hit for hit in hits if self.index.is_current(hit.path))
 
     def _find_task_evidence_impl(  # noqa: C901, PLR0912, PLR0914, PLR0915
         self, task: str, *, limit: int = 20, ensure_ready: bool = True

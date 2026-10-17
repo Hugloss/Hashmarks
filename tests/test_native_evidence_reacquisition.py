@@ -50,7 +50,7 @@ def test_reacquisition_preserves_definition_but_observes_current_change(
     (root / "dependency.py").write_text("def target():\n    return 1\n")
     (root / "other.py").write_text("def other():\n    return 2\n")
     with CodeMap(root, state_dir=state) as cm:
-        cm.sync()
+        cm.index.sync()
         before: Any = cm.repository_evidence_bindings(
             [
                 {
@@ -76,7 +76,7 @@ def test_reacquisition_preserves_definition_but_observes_current_change(
     assert reference["current_freshness_proven"] is False
     _change_input(root, change)
     with CodeMap(root, state_dir=state) as cm:
-        cm.sync()
+        cm.index.sync()
         after = requery(cm, reference)
         delta: Any = cm.repository_evidence_binding_delta(before, after)
     old, new = before["bindings"][0], after["bindings"][0]
@@ -108,6 +108,6 @@ def test_reacquisition_preserves_definition_but_observes_current_change(
     elif change == "delete":
         assert all(row["state"] == "known-absent" for row in new["evidence"])
     with CodeMap(root, state_dir=tmp_path / "fresh") as cm:
-        cm.sync()
+        cm.index.sync()
         rebuilt = requery(cm, reference)
     assert rebuilt["bindings"] == after["bindings"]

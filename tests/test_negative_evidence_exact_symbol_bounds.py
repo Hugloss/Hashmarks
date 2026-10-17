@@ -42,7 +42,7 @@ def _canonical_test_hit() -> SearchHit:
 def _install_bounded_exact_index(
     codemap: CodeMap, monkeypatch: pytest.MonkeyPatch, *, visible: bool
 ) -> None:
-    original = codemap._session_exact_symbol_candidates
+    original = codemap.reads.exact_symbol_candidates
     actual = list(original(["collision_owner"], limit=10))
     by_path = {str(row.get("path") or ""): dict(row) for row in actual}
     first = by_path["src/a.py"]
@@ -60,7 +60,7 @@ def _install_bounded_exact_index(
             return probe[:limit]
         return original(names, limit=limit)
 
-    monkeypatch.setattr(codemap, "_session_exact_symbol_candidates", exact_symbols)
+    monkeypatch.setattr(codemap.reads, "exact_symbol_candidates", exact_symbols)
     monkeypatch.setattr(
         codemap,
         "find_task",
@@ -75,7 +75,7 @@ def test_exact_symbol_bound_cannot_manufacture_unique_owner(
     _write_duplicate_owners(tmp_path)
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         _install_bounded_exact_index(codemap, monkeypatch, visible=True)
         task = "Refactor collision_owner without changing behavior"
         context = codemap._task_action_map_context(task, 1)
@@ -114,7 +114,7 @@ def test_exact_symbol_bound_cannot_become_no_exact_owner_then_structural_fallbac
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         _install_bounded_exact_index(codemap, monkeypatch, visible=False)
         task = "Refactor collision_owner without changing behavior"
         context = codemap._task_action_map_context(task, 1)
@@ -149,7 +149,7 @@ def test_complete_exact_symbol_search_can_still_resolve_unique_owner(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = codemap.task_action_map(
             "Refactor collision_owner without changing behavior",
             limit=1,
@@ -177,7 +177,7 @@ def test_literal_path_remains_independent_authority_when_symbol_index_is_bounded
     _write_duplicate_owners(tmp_path)
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         _install_bounded_exact_index(codemap, monkeypatch, visible=True)
         action = codemap.task_action_map(
             "Change src/a.py collision_owner behavior",
@@ -207,7 +207,7 @@ def test_skipped_exact_identifier_search_cannot_claim_negative_or_unique_evidenc
         '[project]\nname = "demo"\nversion = "0.1"\n', encoding="utf-8"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         calls = []
         original = codemap._task_action_exact_identifier_edit_candidates
 

@@ -14,6 +14,7 @@ from .codemap.diagnostic_observation import (
 from .codemap.diagnostic_provenance import diagnostic_member_claims
 from .codemap.diagnostic_source_revision import (
     DIAGNOSTIC_SOURCE_REVISION_EVIDENCE_SCHEMA,
+    EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA,
     normalize_source_revision_claims,
     validated_diagnostic_source_revision_evidence,
 )
@@ -23,7 +24,6 @@ from .codemap.filesystem_lifecycle_contract import (
 from .codemap.filesystem_lifecycle_contract import (
     validate_lifecycle_observation,
 )
-from .codemap.repository_delta import EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA
 from .codemap.semantic_relationship_delta import validate_relationship_delta
 from .codemap.semantic_relationship_model import (
     DELTA_SCHEMA as RELATIONSHIP_DELTA_SCHEMA,

@@ -65,7 +65,7 @@ def _inject_failures(
     packets: list[dict[str, object]] = []
     provenance: list[dict[str, object]] = []
     with CodeMap(workspace) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         for task in hidden_tasks:
             task_id = str(task.get("id") or task.get("query") or "")
             query = str(task.get("query") or "")
@@ -156,7 +156,7 @@ def _recovery_action(
         return failed_target, "repeat-prior-edit", 0
     if policy == "fresh-research":
         with CodeMap(workspace) as fresh:
-            fresh.sync()
+            fresh.index.sync()
             hits = list(fresh.find_task(query, limit=limit))
         return (
             hits[0].path if hits else None,
@@ -186,7 +186,7 @@ def run_worker(
     }
     rows: list[dict[str, object]] = []
     with CodeMap(workspace) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         for row in tasks:
             if not isinstance(row, dict) or set(row) - allowed:
                 raise ValueError(

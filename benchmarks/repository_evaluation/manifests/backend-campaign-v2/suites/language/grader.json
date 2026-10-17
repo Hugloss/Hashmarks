@@ -373,6 +373,158 @@
           }
         }
       },
+      "native_oracles": {
+        "after": {
+          "aiokafka/consumer/group_coordinator.py::GroupCoordinator._commit_refresh_routine": {
+            "checks": [
+              {
+                "id": "native-exact-target",
+                "pointer": "/target",
+                "predicate": "equals",
+                "source_paths": [
+                  "aiokafka/consumer/group_coordinator.py"
+                ],
+                "value": "aiokafka/consumer/group_coordinator.py::GroupCoordinator._commit_refresh_routine"
+              },
+              {
+                "id": "native-current-member",
+                "pointer": "/observations/*",
+                "predicate": "includes_scoped_record",
+                "source_paths": [
+                  "aiokafka/consumer/group_coordinator.py"
+                ],
+                "value": {
+                  "pointer": "/source_bindings/*",
+                  "record": {
+                    "claimed_revision": "325000eab2cc4774a2b999136c406a9c7fb62873b8c734d2261586845d4cc6bb",
+                    "observed_revision": "325000eab2cc4774a2b999136c406a9c7fb62873b8c734d2261586845d4cc6bb",
+                    "path": "aiokafka/consumer/group_coordinator.py",
+                    "state": "matching"
+                  },
+                  "scope": {
+                    "freshness": "current",
+                    "negative_evidence_admissible": false
+                  }
+                }
+              },
+              {
+                "authority_check": true,
+                "id": "native-does-not-negate",
+                "pointer": "/negative_evidence_admissible",
+                "predicate": "equals",
+                "source_paths": [
+                  "aiokafka/consumer/group_coordinator.py"
+                ],
+                "value": false
+              }
+            ],
+            "definition_checks": [
+              {
+                "id": "native-definition-path",
+                "pointer": "/path",
+                "predicate": "equals",
+                "source_paths": [
+                  "aiokafka/consumer/group_coordinator.py"
+                ],
+                "value": "aiokafka/consumer/group_coordinator.py"
+              },
+              {
+                "id": "native-definition-name",
+                "pointer": "/symbol",
+                "predicate": "equals",
+                "source_paths": [
+                  "aiokafka/consumer/group_coordinator.py"
+                ],
+                "value": "_commit_refresh_routine"
+              },
+              {
+                "id": "native-definition-line",
+                "pointer": "/declaration_line",
+                "predicate": "equals",
+                "source_paths": [
+                  "aiokafka/consumer/group_coordinator.py"
+                ],
+                "value": 710
+              }
+            ]
+          }
+        },
+        "before": {
+          "aiokafka/consumer/group_coordinator.py::GroupCoordinator._commit_refresh_routine": {
+            "checks": [
+              {
+                "id": "native-exact-target",
+                "pointer": "/target",
+                "predicate": "equals",
+                "source_paths": [
+                  "aiokafka/consumer/group_coordinator.py"
+                ],
+                "value": "aiokafka/consumer/group_coordinator.py::GroupCoordinator._commit_refresh_routine"
+              },
+              {
+                "id": "native-current-member",
+                "pointer": "/observations/*",
+                "predicate": "includes_scoped_record",
+                "source_paths": [
+                  "aiokafka/consumer/group_coordinator.py"
+                ],
+                "value": {
+                  "pointer": "/source_bindings/*",
+                  "record": {
+                    "claimed_revision": "14101ef48f186fa314dcc635c832dee23bebed228f073d7a7bf9cd2990e099c9",
+                    "observed_revision": "14101ef48f186fa314dcc635c832dee23bebed228f073d7a7bf9cd2990e099c9",
+                    "path": "aiokafka/consumer/group_coordinator.py",
+                    "state": "matching"
+                  },
+                  "scope": {
+                    "freshness": "current",
+                    "negative_evidence_admissible": false
+                  }
+                }
+              },
+              {
+                "authority_check": true,
+                "id": "native-does-not-negate",
+                "pointer": "/negative_evidence_admissible",
+                "predicate": "equals",
+                "source_paths": [
+                  "aiokafka/consumer/group_coordinator.py"
+                ],
+                "value": false
+              }
+            ],
+            "definition_checks": [
+              {
+                "id": "native-definition-path",
+                "pointer": "/path",
+                "predicate": "equals",
+                "source_paths": [
+                  "aiokafka/consumer/group_coordinator.py"
+                ],
+                "value": "aiokafka/consumer/group_coordinator.py"
+              },
+              {
+                "id": "native-definition-name",
+                "pointer": "/symbol",
+                "predicate": "equals",
+                "source_paths": [
+                  "aiokafka/consumer/group_coordinator.py"
+                ],
+                "value": "_commit_refresh_routine"
+              },
+              {
+                "id": "native-definition-line",
+                "pointer": "/declaration_line",
+                "predicate": "equals",
+                "source_paths": [
+                  "aiokafka/consumer/group_coordinator.py"
+                ],
+                "value": 710
+              }
+            ]
+          }
+        }
+      },
       "review_basis": "The exact clear() call moves before _maybe_refresh_commit_offsets in source. This is physical source order, not a runtime happens-before claim. Existing commit-refresh tests are relevant but are not claimed to cover this race.",
       "source_labels": {
         "after": [
@@ -829,6 +981,158 @@
             "sha256": "42b2d6a399a0f9f80d9cdd92a88c7c1bc0e2f3e60ec6d9c8941e7c2ad4c8b1ec",
             "start_line": 958,
             "symbol": "GroupCoordinator._do_commit_offsets"
+          }
+        }
+      },
+      "native_oracles": {
+        "after": {
+          "aiokafka/consumer/group_coordinator.py::GroupCoordinator._do_commit_offsets": {
+            "checks": [
+              {
+                "id": "native-exact-target",
+                "pointer": "/target",
+                "predicate": "equals",
+                "source_paths": [
+                  "aiokafka/consumer/group_coordinator.py"
+                ],
+                "value": "aiokafka/consumer/group_coordinator.py::GroupCoordinator._do_commit_offsets"
+              },
+              {
+                "id": "native-current-member",
+                "pointer": "/observations/*",
+                "predicate": "includes_scoped_record",
+                "source_paths": [
+                  "aiokafka/consumer/group_coordinator.py"
+                ],
+                "value": {
+                  "pointer": "/source_bindings/*",
+                  "record": {
+                    "claimed_revision": "43bfad5f32a98561b7e9203f087b4156c080f3054519e08c105ae08b0abf01a3",
+                    "observed_revision": "43bfad5f32a98561b7e9203f087b4156c080f3054519e08c105ae08b0abf01a3",
+                    "path": "aiokafka/consumer/group_coordinator.py",
+                    "state": "matching"
+                  },
+                  "scope": {
+                    "freshness": "current",
+                    "negative_evidence_admissible": false
+                  }
+                }
+              },
+              {
+                "authority_check": true,
+                "id": "native-does-not-negate",
+                "pointer": "/negative_evidence_admissible",
+                "predicate": "equals",
+                "source_paths": [
+                  "aiokafka/consumer/group_coordinator.py"
+                ],
+                "value": false
+              }
+            ],
+            "definition_checks": [
+              {
+                "id": "native-definition-path",
+                "pointer": "/path",
+                "predicate": "equals",
+                "source_paths": [
+                  "aiokafka/consumer/group_coordinator.py"
+                ],
+                "value": "aiokafka/consumer/group_coordinator.py"
+              },
+              {
+                "id": "native-definition-name",
+                "pointer": "/symbol",
+                "predicate": "equals",
+                "source_paths": [
+                  "aiokafka/consumer/group_coordinator.py"
+                ],
+                "value": "_do_commit_offsets"
+              },
+              {
+                "id": "native-definition-line",
+                "pointer": "/declaration_line",
+                "predicate": "equals",
+                "source_paths": [
+                  "aiokafka/consumer/group_coordinator.py"
+                ],
+                "value": 958
+              }
+            ]
+          }
+        },
+        "before": {
+          "aiokafka/consumer/group_coordinator.py::GroupCoordinator._do_commit_offsets": {
+            "checks": [
+              {
+                "id": "native-exact-target",
+                "pointer": "/target",
+                "predicate": "equals",
+                "source_paths": [
+                  "aiokafka/consumer/group_coordinator.py"
+                ],
+                "value": "aiokafka/consumer/group_coordinator.py::GroupCoordinator._do_commit_offsets"
+              },
+              {
+                "id": "native-current-member",
+                "pointer": "/observations/*",
+                "predicate": "includes_scoped_record",
+                "source_paths": [
+                  "aiokafka/consumer/group_coordinator.py"
+                ],
+                "value": {
+                  "pointer": "/source_bindings/*",
+                  "record": {
+                    "claimed_revision": "cfc33a80f84134a818d14333a19af77ed4bed551368fc8a7da16c83557dce173",
+                    "observed_revision": "cfc33a80f84134a818d14333a19af77ed4bed551368fc8a7da16c83557dce173",
+                    "path": "aiokafka/consumer/group_coordinator.py",
+                    "state": "matching"
+                  },
+                  "scope": {
+                    "freshness": "current",
+                    "negative_evidence_admissible": false
+                  }
+                }
+              },
+              {
+                "authority_check": true,
+                "id": "native-does-not-negate",
+                "pointer": "/negative_evidence_admissible",
+                "predicate": "equals",
+                "source_paths": [
+                  "aiokafka/consumer/group_coordinator.py"
+                ],
+                "value": false
+              }
+            ],
+            "definition_checks": [
+              {
+                "id": "native-definition-path",
+                "pointer": "/path",
+                "predicate": "equals",
+                "source_paths": [
+                  "aiokafka/consumer/group_coordinator.py"
+                ],
+                "value": "aiokafka/consumer/group_coordinator.py"
+              },
+              {
+                "id": "native-definition-name",
+                "pointer": "/symbol",
+                "predicate": "equals",
+                "source_paths": [
+                  "aiokafka/consumer/group_coordinator.py"
+                ],
+                "value": "_do_commit_offsets"
+              },
+              {
+                "id": "native-definition-line",
+                "pointer": "/declaration_line",
+                "predicate": "equals",
+                "source_paths": [
+                  "aiokafka/consumer/group_coordinator.py"
+                ],
+                "value": 958
+              }
+            ]
           }
         }
       },
@@ -2471,6 +2775,158 @@
           }
         }
       },
+      "native_oracles": {
+        "after": {
+          "faststream/middlewares/acknowledgement/middleware.py::_AcknowledgementMiddleware.__aexit__": {
+            "checks": [
+              {
+                "id": "native-exact-target",
+                "pointer": "/target",
+                "predicate": "equals",
+                "source_paths": [
+                  "faststream/middlewares/acknowledgement/middleware.py"
+                ],
+                "value": "faststream/middlewares/acknowledgement/middleware.py::_AcknowledgementMiddleware.__aexit__"
+              },
+              {
+                "id": "native-current-member",
+                "pointer": "/observations/*",
+                "predicate": "includes_scoped_record",
+                "source_paths": [
+                  "faststream/middlewares/acknowledgement/middleware.py"
+                ],
+                "value": {
+                  "pointer": "/source_bindings/*",
+                  "record": {
+                    "claimed_revision": "41b4e020a435182e84e3c1c3da0be89906ce7f6bdced039e85902d1c033139c6",
+                    "observed_revision": "41b4e020a435182e84e3c1c3da0be89906ce7f6bdced039e85902d1c033139c6",
+                    "path": "faststream/middlewares/acknowledgement/middleware.py",
+                    "state": "matching"
+                  },
+                  "scope": {
+                    "freshness": "current",
+                    "negative_evidence_admissible": false
+                  }
+                }
+              },
+              {
+                "authority_check": true,
+                "id": "native-does-not-negate",
+                "pointer": "/negative_evidence_admissible",
+                "predicate": "equals",
+                "source_paths": [
+                  "faststream/middlewares/acknowledgement/middleware.py"
+                ],
+                "value": false
+              }
+            ],
+            "definition_checks": [
+              {
+                "id": "native-definition-path",
+                "pointer": "/path",
+                "predicate": "equals",
+                "source_paths": [
+                  "faststream/middlewares/acknowledgement/middleware.py"
+                ],
+                "value": "faststream/middlewares/acknowledgement/middleware.py"
+              },
+              {
+                "id": "native-definition-name",
+                "pointer": "/symbol",
+                "predicate": "equals",
+                "source_paths": [
+                  "faststream/middlewares/acknowledgement/middleware.py"
+                ],
+                "value": "__aexit__"
+              },
+              {
+                "id": "native-definition-line",
+                "pointer": "/declaration_line",
+                "predicate": "equals",
+                "source_paths": [
+                  "faststream/middlewares/acknowledgement/middleware.py"
+                ],
+                "value": 80
+              }
+            ]
+          }
+        },
+        "before": {
+          "faststream/middlewares/acknowledgement/middleware.py::_AcknowledgementMiddleware.__aexit__": {
+            "checks": [
+              {
+                "id": "native-exact-target",
+                "pointer": "/target",
+                "predicate": "equals",
+                "source_paths": [
+                  "faststream/middlewares/acknowledgement/middleware.py"
+                ],
+                "value": "faststream/middlewares/acknowledgement/middleware.py::_AcknowledgementMiddleware.__aexit__"
+              },
+              {
+                "id": "native-current-member",
+                "pointer": "/observations/*",
+                "predicate": "includes_scoped_record",
+                "source_paths": [
+                  "faststream/middlewares/acknowledgement/middleware.py"
+                ],
+                "value": {
+                  "pointer": "/source_bindings/*",
+                  "record": {
+                    "claimed_revision": "359db625e2aa07c20b773a19fdb3954a68191f72ae95be25bb59f2f3fb22111d",
+                    "observed_revision": "359db625e2aa07c20b773a19fdb3954a68191f72ae95be25bb59f2f3fb22111d",
+                    "path": "faststream/middlewares/acknowledgement/middleware.py",
+                    "state": "matching"
+                  },
+                  "scope": {
+                    "freshness": "current",
+                    "negative_evidence_admissible": false
+                  }
+                }
+              },
+              {
+                "authority_check": true,
+                "id": "native-does-not-negate",
+                "pointer": "/negative_evidence_admissible",
+                "predicate": "equals",
+                "source_paths": [
+                  "faststream/middlewares/acknowledgement/middleware.py"
+                ],
+                "value": false
+              }
+            ],
+            "definition_checks": [
+              {
+                "id": "native-definition-path",
+                "pointer": "/path",
+                "predicate": "equals",
+                "source_paths": [
+                  "faststream/middlewares/acknowledgement/middleware.py"
+                ],
+                "value": "faststream/middlewares/acknowledgement/middleware.py"
+              },
+              {
+                "id": "native-definition-name",
+                "pointer": "/symbol",
+                "predicate": "equals",
+                "source_paths": [
+                  "faststream/middlewares/acknowledgement/middleware.py"
+                ],
+                "value": "__aexit__"
+              },
+              {
+                "id": "native-definition-line",
+                "pointer": "/declaration_line",
+                "predicate": "equals",
+                "source_paths": [
+                  "faststream/middlewares/acknowledgement/middleware.py"
+                ],
+                "value": 79
+              }
+            ]
+          }
+        }
+      },
       "review_basis": "The patch adds an explicit asyncio.CancelledError case. New Kafka cancellation tests and shared consume coverage distinguish cancellation from normal message completion. Before-stage source review nominates TestAckPolicy.test_commit_called_in_middleware_on_error: it includes ACK and REJECT_ON_ERROR, raises a handler Exception and asserts commit was awaited. This is existing ordinary-error acknowledgement coverage, not cancellation/redelivery proof. The original shared consume file remains context. The after test starts an interrupted handler, restarts the broker and asserts the payload is redelivered. Exact test ranges bind both stages; runtime outcomes remain outside observer authority.",
       "source_labels": {
         "after": [
@@ -2943,6 +3399,158 @@
             "sha256": "bd209d5a05ef377cd0d21854e96849998bf14dcbeb25bc4f3f56f8eb81809e6a",
             "start_line": 56,
             "symbol": "KafkaMessage.nack"
+          }
+        }
+      },
+      "native_oracles": {
+        "after": {
+          "faststream/confluent/message.py::KafkaMessage.nack": {
+            "checks": [
+              {
+                "id": "native-exact-target",
+                "pointer": "/target",
+                "predicate": "equals",
+                "source_paths": [
+                  "faststream/confluent/message.py"
+                ],
+                "value": "faststream/confluent/message.py::KafkaMessage.nack"
+              },
+              {
+                "id": "native-current-member",
+                "pointer": "/observations/*",
+                "predicate": "includes_scoped_record",
+                "source_paths": [
+                  "faststream/confluent/message.py"
+                ],
+                "value": {
+                  "pointer": "/source_bindings/*",
+                  "record": {
+                    "claimed_revision": "cb40d00f8bfadfbb869794406fe64999c2510c95a92de4ae35f9a70bbf7b8856",
+                    "observed_revision": "cb40d00f8bfadfbb869794406fe64999c2510c95a92de4ae35f9a70bbf7b8856",
+                    "path": "faststream/confluent/message.py",
+                    "state": "matching"
+                  },
+                  "scope": {
+                    "freshness": "current",
+                    "negative_evidence_admissible": false
+                  }
+                }
+              },
+              {
+                "authority_check": true,
+                "id": "native-does-not-negate",
+                "pointer": "/negative_evidence_admissible",
+                "predicate": "equals",
+                "source_paths": [
+                  "faststream/confluent/message.py"
+                ],
+                "value": false
+              }
+            ],
+            "definition_checks": [
+              {
+                "id": "native-definition-path",
+                "pointer": "/path",
+                "predicate": "equals",
+                "source_paths": [
+                  "faststream/confluent/message.py"
+                ],
+                "value": "faststream/confluent/message.py"
+              },
+              {
+                "id": "native-definition-name",
+                "pointer": "/symbol",
+                "predicate": "equals",
+                "source_paths": [
+                  "faststream/confluent/message.py"
+                ],
+                "value": "nack"
+              },
+              {
+                "id": "native-definition-line",
+                "pointer": "/declaration_line",
+                "predicate": "equals",
+                "source_paths": [
+                  "faststream/confluent/message.py"
+                ],
+                "value": 59
+              }
+            ]
+          }
+        },
+        "before": {
+          "faststream/confluent/message.py::KafkaMessage.nack": {
+            "checks": [
+              {
+                "id": "native-exact-target",
+                "pointer": "/target",
+                "predicate": "equals",
+                "source_paths": [
+                  "faststream/confluent/message.py"
+                ],
+                "value": "faststream/confluent/message.py::KafkaMessage.nack"
+              },
+              {
+                "id": "native-current-member",
+                "pointer": "/observations/*",
+                "predicate": "includes_scoped_record",
+                "source_paths": [
+                  "faststream/confluent/message.py"
+                ],
+                "value": {
+                  "pointer": "/source_bindings/*",
+                  "record": {
+                    "claimed_revision": "9130e047f529e2be24792c00deec72824831672b90029a3ad4c490fdad50062d",
+                    "observed_revision": "9130e047f529e2be24792c00deec72824831672b90029a3ad4c490fdad50062d",
+                    "path": "faststream/confluent/message.py",
+                    "state": "matching"
+                  },
+                  "scope": {
+                    "freshness": "current",
+                    "negative_evidence_admissible": false
+                  }
+                }
+              },
+              {
+                "authority_check": true,
+                "id": "native-does-not-negate",
+                "pointer": "/negative_evidence_admissible",
+                "predicate": "equals",
+                "source_paths": [
+                  "faststream/confluent/message.py"
+                ],
+                "value": false
+              }
+            ],
+            "definition_checks": [
+              {
+                "id": "native-definition-path",
+                "pointer": "/path",
+                "predicate": "equals",
+                "source_paths": [
+                  "faststream/confluent/message.py"
+                ],
+                "value": "faststream/confluent/message.py"
+              },
+              {
+                "id": "native-definition-name",
+                "pointer": "/symbol",
+                "predicate": "equals",
+                "source_paths": [
+                  "faststream/confluent/message.py"
+                ],
+                "value": "nack"
+              },
+              {
+                "id": "native-definition-line",
+                "pointer": "/declaration_line",
+                "predicate": "equals",
+                "source_paths": [
+                  "faststream/confluent/message.py"
+                ],
+                "value": 56
+              }
+            ]
           }
         }
       },

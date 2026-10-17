@@ -33,7 +33,7 @@ def emit(
     trace_dir.mkdir(parents=True, exist_ok=True)
     paths: list[Path] = []
     with CodeMap(repo) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         for task in public:
             events = []
             started = time.perf_counter_ns()

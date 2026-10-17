@@ -150,7 +150,7 @@ def test_native_hover_accepts_exact_protocol_responses_without_edges(
     materialize_scip(root, source)
     capture = lsp_capture(root, source, name)
     with CodeMap(root) as cm:
-        cm.sync()
+        cm.index.sync()
         packet = observe(cm, root, source, name)
     row = assert_hover_capture(packet, capture)
     assert row["freshness"] == "current"
@@ -172,7 +172,7 @@ def test_native_hover_unsaved_buffer_and_document_reopen_preserve_authority(
     old_capture = lsp_capture(root, source, "hover-disk")
     changed_capture = lsp_capture(root, source, "hover-buffer")
     with CodeMap(root) as cm:
-        cm.sync()
+        cm.index.sync()
         before = observe(cm, root, source, "hover-disk")
         old = assert_hover_capture(before, old_capture)
         unsaved = observe(cm, root, source, "hover-buffer")
@@ -212,7 +212,7 @@ def test_native_hover_save_delta_and_codemap_reopen_do_not_replay(
     old_capture = lsp_capture(root, source, "hover-disk")
     changed_capture = lsp_capture(root, source, "hover-buffer")
     with CodeMap(root, state_dir=state) as cm:
-        cm.sync()
+        cm.index.sync()
         before = observe(cm, root, source, "hover-disk")
         old = assert_hover_capture(before, old_capture)
 
@@ -225,7 +225,7 @@ def test_native_hover_save_delta_and_codemap_reopen_do_not_replay(
             ),
             encoding="utf-8",
         )
-        cm.sync()
+        cm.index.sync()
         after = observe(cm, root, source, "hover-buffer")
         saved = assert_hover_capture(after, changed_capture)
         assert saved["freshness"] == "current"
@@ -262,7 +262,7 @@ def test_native_hover_save_delta_and_codemap_reopen_do_not_replay(
         assert_projection(delta, "evidence_comparison", "relationships")
         _assert_hover_formats(after, changed_capture)
     with CodeMap(root, state_dir=state) as cm:
-        cm.sync()
+        cm.index.sync()
         current = cm.structural_locality(
             "src/source.py::target", result_mode="relationships"
         )
@@ -282,7 +282,7 @@ def test_native_lsp_cross_file_call_identity_direction_and_ranges(
     source = native_lsp_corpus / "python" / "before"
     materialize_scip(root, source)
     with CodeMap(root) as cm:
-        cm.sync()
+        cm.index.sync()
         packet = observe(cm, root, source, name)
     (claim,) = assert_records(lsp_row(packet)["claims"])
     assert assert_object(claim["basis"])["direction"] == direction
@@ -319,7 +319,7 @@ def test_native_lsp_body_query_and_duplicate_names_do_not_qualify_selected_subje
     source = native_lsp_corpus / "python" / "before"
     materialize_scip(root, source)
     with CodeMap(root) as cm:
-        cm.sync()
+        cm.index.sync()
         for name, expected in [
             ("body-definition", "src/callee.py::target"),
             ("duplicate-definition", "src/other.py::target"),
@@ -365,7 +365,7 @@ def test_native_lsp_references_preserve_declaration_scope_and_unresolved_uses(
     source = native_lsp_corpus / "python" / "before"
     materialize_scip(root, source)
     with CodeMap(root) as cm:
-        cm.sync()
+        cm.index.sync()
         packet = observe(
             cm, root, source, "references-" + str(include_declaration).lower()
         )
@@ -400,7 +400,7 @@ def test_native_lsp_buffer_lifetime_never_strengthens_disk_correspondence(
     source = native_lsp_corpus / "python" / "before"
     materialize_scip(root, source)
     with CodeMap(root, state_dir=tmp_path / "state") as cm:
-        cm.sync()
+        cm.index.sync()
         changed = observe(cm, root, source, "open-buffer")
         reopened = observe(cm, root, source, "reopened-buffer")
     (old,) = assert_records(lsp_row(changed)["claims"])
@@ -445,7 +445,7 @@ def test_native_lsp_disk_edit_rename_delete_and_reopen_do_not_replay(
     materialize_scip(root, source)
     (root / "unrelated.py").write_text("UNCHANGED = True\n")
     with CodeMap(root, state_dir=state) as cm:
-        cm.sync()
+        cm.index.sync()
         before = observe(cm, root, source, "incoming")
         (root / "src/callee.py").write_text("def target():\n    return 55\n")
         stale = observe(cm, root, source, "incoming")
@@ -461,7 +461,7 @@ def test_native_lsp_disk_edit_rename_delete_and_reopen_do_not_replay(
         materialize_scip(root, moved_source)
         assert not (root / "src/callee.py").exists()
         assert (root / "unrelated.py").exists()
-        cm.sync()
+        cm.index.sync()
         moved = observe(cm, root, moved_source, "incoming")
         assert (
             assert_records(
@@ -491,7 +491,7 @@ def test_native_lsp_disk_edit_rename_delete_and_reopen_do_not_replay(
     materialize_scip(root, source)
     for directory in (state, tmp_path / "fresh"):
         with CodeMap(root, state_dir=directory) as cm:
-            cm.sync()
+            cm.index.sync()
             current = observe(cm, root, source, "incoming")
             assert assert_object(current["producer_correspondence"]) == assert_object(
                 before["producer_correspondence"]
@@ -522,7 +522,7 @@ def test_native_only_typescript_method_accepts_genuine_lsp_without_lexical_promo
     source = native_lsp_corpus / "typescript" / state
     materialize_scip(root, source)
     with CodeMap(root) as cm:
-        cm.sync()
+        cm.index.sync()
         import_native_scip(cm, native_scip_corpus / "typescript" / state)
         packet = observe(cm, root, source, "method-definition")
         with pytest.raises(KeyError):
@@ -572,7 +572,7 @@ def test_genuine_scip_lsp_claims_preserve_unknown_encoding_and_independent_claim
     source = native_lsp_corpus / "typescript" / "ambiguous"
     materialize_scip(root, source)
     with CodeMap(root) as cm:
-        cm.sync()
+        cm.index.sync()
         import_native_scip(cm, native_scip_corpus / "typescript" / "ambiguous")
         with pytest.raises(KeyError, match="ambiguous"):
             cm.structural_locality(
@@ -619,7 +619,7 @@ def test_native_typescript_navigation_preserves_scope_and_external_call(
     source = native_lsp_corpus / "typescript" / "before"
     materialize_scip(root, source)
     with CodeMap(root) as cm:
-        cm.sync()
+        cm.index.sync()
         import_native_scip(cm, native_scip_corpus / "typescript" / "before")
         packet = observe(cm, root, source, name)
         prepared = observe(cm, root, source, "prepare-method")

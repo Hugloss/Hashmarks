@@ -9,8 +9,10 @@ from hashmarks.freshness import freshness_state
 from hashmarks.operation_contract import operation_schema, validate_operation_response
 from hashmarks.paths import normalize_relative_path
 
+from .repository_observation import evidence_identity
+
 if TYPE_CHECKING:
-    from .engine import CodeMap
+    from .repository_source import RepositorySource
 
 
 @dataclass(slots=True)
@@ -71,7 +73,7 @@ class ScopedSourceLiteralsMixin:
     ) -> tuple[dict[str, object], dict[str, list[dict[str, object]]], int]:
         """Observe one canonical byte capture for every requested literal."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositorySource", self)
         empty: dict[str, list[dict[str, object]]] = {
             literal: [] for literal in state.literals
         }
@@ -171,7 +173,7 @@ class ScopedSourceLiteralsMixin:
         selected_literals = self._validated_literal_set(literals)
         selected_paths = self._validated_literal_paths(paths)
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositorySource", self)
         for literal in selected_literals:
             self._validate_source_observation(literal, limit, max_member_bytes, 2_000)
         return selected_paths, selected_literals
@@ -226,8 +228,8 @@ class ScopedSourceLiteralsMixin:
 
     def _literal_set_result(self, state: _LiteralSetState) -> dict[str, object]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        generation, identity_generation, stale = self._generation_status()
+            self = cast("RepositorySource", self)
+        generation, identity_generation, stale = self.reads.generation_status()
         coverage = state.complete and generation == state.start_generation
         freshness = freshness_state(stale) if coverage else "stale"
         selected = state.selected_hits()
@@ -271,14 +273,14 @@ class ScopedSourceLiteralsMixin:
             "authority": "repository-evidence-only",
             "execution_effect": "none",
         }
-        result["observation_identity"] = self._evidence_identity(
+        result["observation_identity"] = evidence_identity(
             operation_schema("source_observation", "literals"), result
         )
         return validate_operation_response(
             "source_observation", result, mode="literals"
         )
 
-    def scoped_source_literals(
+    def scoped_literals(
         self,
         paths: Sequence[str],
         literals: Sequence[str],
@@ -290,7 +292,7 @@ class ScopedSourceLiteralsMixin:
     ) -> dict[str, object]:
         """One stable source read per member, with qualified per-literal counts."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositorySource", self)
         selected_paths, selected_literals = self._literal_set_request(
             paths, literals, limit, max_total_bytes, max_member_bytes, context_lines
         )

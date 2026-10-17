@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterator
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from contract_assertions import assert_object
 
 from hashmarks.codemap import service as service_module
 from hashmarks.codemap.post_change import PostChangeOptions
@@ -82,6 +84,136 @@ def test_client_request_rejects_error_responses(
     assert sock.closed
 
 
+@pytest.mark.parametrize(
+    "payload",
+    [
+        [["schema", operation_schema("repository_findings")], ["freshness", "current"]],
+        {"schema": "legacy.repository-findings.v0", "freshness": "current"},
+        {"freshness": "current"},
+    ],
+)
+def test_semantic_client_rejects_coercible_or_wrong_schema_payloads(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, payload: object
+) -> None:
+    raw = json.dumps({"ok": True, "repository_findings": payload}).encode() + b"\n"
+    sock = _FakeSocket([raw])
+    monkeypatch.setattr(service_module.socket, "socket", lambda *_args: sock)
+    with pytest.raises(RuntimeError, match="non-object|schema drift"):
+        service_module.CodeMapServiceClient(tmp_path).repository_findings()
+    assert sock.closed
+
+
+def test_semantic_client_preserves_native_unknown_fields_and_literal_types(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    native = {
+        "schema": operation_schema("repository_findings"),
+        "freshness": "unknown",
+        "future": {"false": False, "zero": 0, "unknown": None},
+    }
+    raw = json.dumps({"ok": True, "repository_findings": native}).encode() + b"\n"
+    sock = _FakeSocket([raw])
+    monkeypatch.setattr(service_module.socket, "socket", lambda *_args: sock)
+    observed = service_module.CodeMapServiceClient(tmp_path).repository_findings()
+    assert observed == native
+    future = assert_object(observed["future"])
+    assert future["false"] is False
+    assert type(future["zero"]) is int and future["zero"] == 0
+    assert future["unknown"] is None
+    assert sock.closed
+
+
+@pytest.mark.parametrize(
+    "hits", [{"path": "owner.py"}, ["owner.py"], [["path", "owner.py"]]]
+)
+def test_find_task_client_rejects_non_record_hit_arrays(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, hits: object
+) -> None:
+    raw = json.dumps({"ok": True, "hits": hits}).encode() + b"\n"
+    sock = _FakeSocket([raw])
+    monkeypatch.setattr(service_module.socket, "socket", lambda *_args: sock)
+    with pytest.raises(RuntimeError, match="invalid find_task service response"):
+        service_module.CodeMapServiceClient(tmp_path).find_task("owner")
+    assert sock.closed
+
+
+def test_find_task_client_preserves_hit_order_and_empty_results(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for hits in (
+        [{"path": "b.py", "future": None}, {"path": "a.py", "future": False}],
+        [],
+    ):
+        raw = json.dumps({"ok": True, "hits": hits}).encode() + b"\n"
+        sock = _FakeSocket([raw])
+        monkeypatch.setattr(
+            service_module.socket, "socket", lambda *_args, _sock=sock: _sock
+        )
+        assert service_module.CodeMapServiceClient(tmp_path).find_task("owner") == hits
+        assert sock.closed
+
+
+def test_service_rejects_non_object_handler_result(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    service = service_module.CodeMapService(tmp_path)
+    monkeypatch.setattr(service, "_status_response", lambda _request: [["ok", True]])
+    with pytest.raises(RuntimeError, match="handler must return a JSON object"):
+        service.dispatch({"protocol": service_module.PROTOCOL, "op": "status"})
+
+
+@pytest.mark.parametrize(
+    ("method", "response_key", "arguments"),
+    [
+        ("repository_findings", "repository_findings", ()),
+        ("concurrency_risk_findings", "concurrency_risk", ()),
+        ("verification_ownership_graph", "verification_ownership", ("inspect",)),
+        ("repository_ownership_graph", "authority_ownership", ()),
+        ("cache_ownership_findings", "cache_ownership", ()),
+        ("cache_invalidation_ownership_graph", "cache_invalidation_ownership", ()),
+        ("import_ownership_findings", "import_ownership", ()),
+        ("verification_relevance", "verification_relevance", ("inspect",)),
+        ("task_decision_packet", "decision_packet", ("inspect",)),
+        ("task_decision_brief", "decision_brief", ("inspect",)),
+        ("task_action_brief", "task_action_brief", ("inspect",)),
+        ("task_decision_brief_budget_sweep", "budget_sweep", ("inspect",)),
+        (
+            "repository_intelligence_query",
+            "repository_intelligence_query",
+            ("profile", "inspect", ["owner.py"]),
+        ),
+        ("task_change_impact", "task_change_impact", ("inspect", ["owner.py"])),
+        ("refresh_after_change_delta", "refresh_delta", ("inspect", ["owner.py"])),
+        ("refresh_after_change_brief", "refresh_brief", ("inspect", ["owner.py"])),
+        ("refresh_after_change", "refresh", ("inspect", ["owner.py"])),
+    ],
+)
+def test_semantic_client_rejects_other_registered_operation_schema(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    method: str,
+    response_key: str,
+    arguments: tuple[object, ...],
+) -> None:
+    raw = (
+        json.dumps(
+            {
+                "ok": True,
+                response_key: {"schema": operation_schema("repository_context")},
+            }
+        ).encode()
+        + b"\n"
+    )
+    sock = _FakeSocket([raw])
+    monkeypatch.setattr(service_module.socket, "socket", lambda *_args: sock)
+    client = service_module.CodeMapServiceClient(tmp_path)
+    operation = getattr(client, method)
+    assert callable(operation)
+    with pytest.raises(RuntimeError, match="schema drift"):
+        operation(*arguments)
+    assert sock.closed
+
+
 def test_client_request_retries_blocked_local_connect(
     tmp_path: Path, fake_socket: _FakeSocket
 ) -> None:
@@ -104,7 +236,7 @@ def test_client_serializes_typed_query_and_refresh_options(
             if operation == "repository_intelligence_query"
             else "refresh_delta"
         )
-        return {key: {"schema": "test"}}
+        return {key: {"schema": operation_schema(operation)}}
 
     monkeypatch.setattr(client, "request", request)
     client.repository_intelligence_query(
@@ -261,9 +393,9 @@ def test_service_route_classification_fails_closed() -> None:
             response_key="payload",
         )
     with pytest.raises(ValueError, match="unsupported service route classification"):
-        service_module._ServiceRoute(
-            handler_name="_fixture",
-            classification="implicit",  # type: ignore[arg-type]
+        replace(
+            service_module._internal_service_route("_fixture"),
+            classification="implicit",
         )
 
 

@@ -260,7 +260,7 @@ class WorkContextMixin:
         terms = symbolic_task_terms(task)
         if not terms:
             return symbolic_nomination_record(task=task, terms=(), candidates=())
-        candidates = self._session_exact_symbol_candidates(terms, limit=96)
+        candidates = self.reads.exact_symbol_candidates(terms, limit=96)
         return symbolic_nomination_record(
             task=task,
             terms=terms,

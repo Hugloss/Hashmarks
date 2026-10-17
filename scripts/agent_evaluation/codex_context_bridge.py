@@ -20,7 +20,7 @@ def packet(
     workspace: Path, query: str, *, mode: str, limit: int = 20
 ) -> dict[str, object]:
     with CodeMap(workspace) as cm:
-        cm.sync()
+        cm.index.sync()
         entry = cm.task_entry_points(query, limit=limit)
         rec = [r for r in entry.get("recommended", []) if isinstance(r, dict)]
         ambiguity = (

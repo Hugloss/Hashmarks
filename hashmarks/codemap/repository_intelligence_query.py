@@ -12,6 +12,7 @@ from hashmarks.operation_contract import operation_response, operation_schema
 from .change_impact import ChangeImpactOptions
 from .evidence_verification import VerificationMixin
 from .freshness_map import FreshnessMapOptions
+from .repository_observation import packet_digest
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -187,7 +188,7 @@ def repository_query_response(
         envelope["presentation"] = present_repository_evidence(
             result, format=presentation
         )
-    envelope["query_identity"] = "sha256:" + VerificationMixin._packet_digest(
+    envelope["query_identity"] = "sha256:" + packet_digest(
         operation_schema("repository_intelligence_query"), envelope
     )
     return envelope

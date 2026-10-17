@@ -16,8 +16,10 @@ def _owners(root: Path, target: str = "pkg.Public") -> tuple[list[str], bool]:
         root, "tests/test_public.py", f"from pkg import {target.rsplit('.', 1)[-1]}\n"
     )
     with CodeMap(root) as codemap:
-        codemap.sync()
-        return codemap._resolve_import_owner_evidence("tests/test_public.py", target)
+        codemap.index.sync()
+        return codemap._imports._resolve_import_owner_evidence(
+            "tests/test_public.py", target
+        )
 
 
 def test_reexport_cycle_remains_unresolved(tmp_path: Path) -> None:
@@ -45,8 +47,8 @@ def test_relative_import_above_repository_root_has_no_owner(tmp_path: Path) -> N
     _write(tmp_path, "pkg/use.py", "from ...impl import Public\n")
     _write(tmp_path, "pkg/impl.py", "class Public: pass\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        owners = codemap._resolve_import_paths("pkg/use.py", "...impl.Public")
+        codemap.index.sync()
+        owners = codemap._imports._resolve_import_paths("pkg/use.py", "...impl.Public")
 
     assert owners == []
 
@@ -141,7 +143,10 @@ def test_top_level_export_binding_authority(
 ) -> None:
     _write(tmp_path, "pkg/__init__.py", source + "\n")
     with CodeMap(tmp_path) as codemap:
-        assert codemap._python_export_binding("pkg/__init__.py", "Public") == binding
+        assert (
+            codemap._imports._python_export_binding("pkg/__init__.py", "Public")
+            == binding
+        )
 
 
 def test_reexport_target_bound_preserves_order_and_deduplicates(tmp_path: Path) -> None:
@@ -149,7 +154,7 @@ def test_reexport_target_bound_preserves_order_and_deduplicates(tmp_path: Path) 
     statements.extend(f"from .module{index} import Public" for index in range(18))
     _write(tmp_path, "pkg/__init__.py", "\n".join(statements))
     with CodeMap(tmp_path) as codemap:
-        targets = codemap._python_reexport_targets("pkg/__init__.py", "Public")
+        targets = codemap._imports._python_reexport_targets("pkg/__init__.py", "Public")
     assert targets == [".first.Internal"] + [
         f".module{index}.Public" for index in range(15)
     ]

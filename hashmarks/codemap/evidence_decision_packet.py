@@ -7,8 +7,9 @@ from typing import TYPE_CHECKING, cast
 
 from hashmarks.operation_contract import operation_response, operation_schema
 
-from .decision_session import incomplete_decision_scoped
+from .decision_session import ReadScopeOwner, incomplete_decision_scoped
 from .evidence_verification import _VerificationSelectionState
+from .repository_observation import packet_digest
 
 if TYPE_CHECKING:
     from .engine import CodeMap
@@ -79,7 +80,7 @@ class _DecisionPacketTiming:
         }
 
 
-class DecisionPacketMixin:
+class DecisionPacketMixin(ReadScopeOwner):
     @staticmethod
     def _decision_packet_candidates(
         action: Mapping[str, object],
@@ -170,10 +171,10 @@ class DecisionPacketMixin:
         """Bind packet evidence to repository, task, context and verification selection."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        generation, identity_generation, stale = self._generation_status()
-        task_identity = self._packet_digest("hashmarks.task.v1", {"task": task})
-        context_digest = self._packet_digest("hashmarks.work-context.v1", work_context)
-        verification_digest = self._packet_digest(
+        generation, identity_generation, stale = self.reads.generation_status()
+        task_identity = packet_digest("hashmarks.task.v1", {"task": task})
+        context_digest = packet_digest("hashmarks.work-context.v1", work_context)
+        verification_digest = packet_digest(
             "hashmarks.verification-plan.v1", verification
         )
         verification_membership, source_identity, selection_envelope = (
@@ -193,8 +194,8 @@ class DecisionPacketMixin:
             source_identity,
             selection_envelope,
         )
-        repository_identity = self._repository_packet_identity()
-        decision_generation = self._packet_digest(
+        repository_identity = self.reads.repository_identity()
+        decision_generation = packet_digest(
             "hashmarks.decision-generation.v1",
             {
                 "repository_identity": repository_identity,
@@ -228,8 +229,24 @@ class DecisionPacketMixin:
         )
 
     @operation_response("task_decision_packet")
-    @incomplete_decision_scoped
     def task_decision_packet(
+        self,
+        task: str,
+        *,
+        limit: int = TASK_DECISION_DEFAULT_OPTIONS.limit,
+        per_role: int = TASK_DECISION_DEFAULT_OPTIONS.per_role,
+        token_budget: int = TASK_DECISION_DEFAULT_OPTIONS.token_budget,
+    ) -> dict[str, object]:
+        """Reconcile task evidence before its generation-bound observation."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        self._prepare_task_observation(task, limit)
+        return self._observe_task_decision_packet(
+            task, limit=limit, per_role=per_role, token_budget=token_budget
+        )
+
+    @incomplete_decision_scoped
+    def _observe_task_decision_packet(
         self,
         task: str,
         *,
@@ -252,7 +269,7 @@ class DecisionPacketMixin:
         verify = (
             action.get("verify") if isinstance(action.get("verify"), dict) else None
         )
-        build = self._codemap_build_state()
+        build = self.index._codemap_build_state()
         discrimination = self._decision_packet_discrimination(
             action=action,
             verify=verify,
@@ -298,10 +315,10 @@ class DecisionPacketMixin:
             "evidence_surfaces": {
                 "edit": None
                 if edit is None
-                else self._index_surface_for_path(str(edit.get("path") or "")),
+                else self.index._index_surface_for_path(str(edit.get("path") or "")),
                 "verify": None
                 if verify is None
-                else self._index_surface_for_path(str(verify.get("path") or "")),
+                else self.index._index_surface_for_path(str(verify.get("path") or "")),
             },
             "contract": action.get("contract"),
             "ownership_resolution": action.get("ownership_resolution"),
@@ -330,7 +347,5 @@ class DecisionPacketMixin:
             "consumer_action": "external",
             "ranking_effect": "none",
             "discovery_effect": action.get("discovery_effect", "none"),
-            "decision_metrics": timing.as_payload(
-                session_active=self._decision_session_depth > 0
-            ),
+            "decision_metrics": timing.as_payload(session_active=self.reads.depth > 0),
         }

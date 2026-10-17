@@ -267,7 +267,7 @@ def compact_initial_declarations(groups: list[dict[str, Any]]) -> None:
     """Render lexical scopes once; the native packet retains the exact records."""
     from hashmarks.evidence_declaration_text import (
         declaration_common_qualifiers,
-        declaration_scope_text,
+        declaration_scope_table,
     )
 
     for group in groups:
@@ -305,11 +305,7 @@ def compact_initial_declarations(groups: list[dict[str, Any]]) -> None:
                 if isinstance(context, dict):
                     # The finding's exact source_ref and this family key bind
                     # the table; repeating the full pointer adds no source fact.
-                    details[family] = "\n".join(
-                        declaration_scope_text(
-                            context, "", shared=shared, label="Scope"
-                        )
-                    )
+                    details[family] = declaration_scope_table(context, shared=shared)
 
 
 def compact_initial_verification_qualifiers(groups: list[dict[str, Any]]) -> None:

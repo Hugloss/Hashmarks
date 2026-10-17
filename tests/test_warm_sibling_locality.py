@@ -85,7 +85,7 @@ def test_repetitive_warm_repository_keeps_edit_and_verify_in_task_namespace(
 ) -> None:
     tasks = _build_repetitive_repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         for task in tasks:
             action = cast(
                 dict[str, Any],
@@ -108,7 +108,7 @@ def test_rare_identifier_component_is_preserved_before_generic_siblings(
     tasks = _build_repetitive_repo(tmp_path, count=12)
     target = tasks[-1]
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         hits = codemap.find_task(target["query"], limit=20)
     paths = [hit.path for hit in hits]
     assert target["verify"] in paths
@@ -123,7 +123,7 @@ def test_unique_identifier_anchor_excludes_generic_contract_sibling_owners(
     target = tasks[0]
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         action = cast(
             dict[str, Any],
             codemap.task_action_map(target["query"], limit=20, per_role=3),

@@ -105,7 +105,7 @@ def test_denied_nested_npm_manifest_is_not_parsed_or_projected(tmp_path: Path) -
     )
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         enriched = codemap.enrich_projects(("npm-package-graph",))
 
     ids = {row["project_id"] for row in enriched["projects"]}
@@ -127,9 +127,9 @@ def test_native_project_nodes_and_edges_are_filtered_by_repository_admission(
     _deny_private(tmp_path)
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         codemap.project_graph_providers = (
-            _NativeProjectProvider(codemap._visible_repository_manifests),
+            _NativeProjectProvider(codemap.files.visible_manifests),
         )
         enriched = codemap.enrich_projects(("fixture-native-projects",))
         stored_ids = {
@@ -164,10 +164,10 @@ def test_denied_support_manifest_prevents_project_evidence_persistence(
     _deny_private(tmp_path)
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         codemap.project_graph_providers = (
             _NativeProjectProvider(
-                codemap._visible_repository_manifests,
+                codemap.files.visible_manifests,
                 include_denied_freshness=True,
             ),
         )
@@ -207,7 +207,7 @@ def test_project_graph_allow_to_deny_converges_without_denied_residue(
     )
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.enrich_projects(("npm-package-graph",))
         assert {row["project_id"] for row in before["projects"]} == {
             "npm:root",
@@ -249,7 +249,7 @@ def test_denied_declared_project_links_do_not_activate_or_parse(
     )
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         enriched = codemap.enrich_projects(("declared-project-links",))
 
     assert enriched["projects"] == []
@@ -272,7 +272,7 @@ def test_targeted_python_import_root_refresh_ignores_denied_pyproject(
     (package / "mod.py").write_text("VALUE = 1\n", encoding="utf-8")
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.store.file_row("nested/src/pkg/mod.py")
         assert before is not None
         assert before["module_name"] == "pkg.mod"
@@ -281,7 +281,7 @@ def test_targeted_python_import_root_refresh_ignores_denied_pyproject(
             '[[rule]]\npattern = "nested/pyproject.toml"\nvisibility = "deny"\n',
             encoding="utf-8",
         )
-        codemap.sync(["nested/pyproject.toml"])
+        codemap.index.sync(["nested/pyproject.toml"])
         after = codemap.store.file_row("nested/src/pkg/mod.py")
 
     assert after is not None

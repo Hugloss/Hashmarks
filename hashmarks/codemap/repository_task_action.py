@@ -74,7 +74,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
                 str(symbol.get(key) or "").lower()
                 for key in ("name", "qualname", "signature")
             )
-            for symbol in self._session_symbols_for_path(str(row.get("path") or ""))
+            for symbol in self.reads.symbols_for_path(str(row.get("path") or ""))
         )
         return f"{metadata} {symbols}"
 
@@ -259,7 +259,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         )
         if existing is not None:
             return existing
-        file_row = self._session_file_row(owner_path)
+        file_row = self.reads.file_row(owner_path)
         # A bounded file relationship nominates a path, not a declaration.
         # Selecting the file's first symbol would manufacture symbol authority
         # unrelated to the relationship that produced this candidate.
@@ -413,8 +413,8 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         )
         if existing is not None:
             return existing
-        file_row = self._session_file_row(selected_path)
-        symbols = self._session_symbols_for_path(selected_path)
+        file_row = self.reads.file_row(selected_path)
+        symbols = self.reads.symbols_for_path(selected_path)
         symbol = symbols[0] if symbols else {}
         projected = {
             "path": selected_path,
@@ -505,7 +505,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             or not symbol_names
         ):
             return None
-        refs = self._session_refs_many(sorted(symbol_names), limit_per_target=128)
+        refs = self.reads.refs_many(sorted(symbol_names), limit_per_target=128)
         for symbol_name in sorted(symbol_names):
             for ref in refs.get(symbol_name, ()):
                 source_path = self._task_action_proven_source_import(ref, path)
@@ -540,7 +540,9 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             or RepositoryDomain.SOURCE not in source_domains
         ):
             return None
-        owners, ambiguous = self._resolve_import_owner_evidence(source_path, target)
+        owners, ambiguous = self._imports._resolve_import_owner_evidence(
+            source_path, target
+        )
         if not ambiguous and list(dict.fromkeys(owners)) == [owner_path]:
             return source_path
         return None
@@ -566,7 +568,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         indexed, complete = self._task_action_exact_symbol_index_window(
             tuple(sorted(plain_tokens))
         )
-        indexed_file_rows = self._session_file_rows(
+        indexed_file_rows = self.reads.file_rows(
             str(symbol.get("path") or "") for symbol in indexed
         )
         exact_paths: dict[str, set[str]] = {}
@@ -624,7 +626,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             and RepositoryDomain.SCRIPT.value not in domains
         ):
             return None
-        file_row = self._session_file_row(path)
+        file_row = self.reads.file_row(path)
         if not isinstance(file_row, Mapping) or (
             str(file_row.get("evidence_visibility") or "")
             == EvidenceVisibility.DENY.value
@@ -665,7 +667,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             )
         )
         module_aliases = self._task_action_path_module_aliases(path)
-        file_row = self._session_file_row(path)
+        file_row = self.reads.file_row(path)
         module_name = (
             str(file_row.get("module_name") or "").lower()
             if isinstance(file_row, Mapping)
@@ -690,7 +692,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             self = cast("CodeMap", self)
         if not names:
             return [], True
-        probe = self._session_exact_symbol_candidates(
+        probe = self.reads.exact_symbol_candidates(
             names, limit=_EXACT_IDENTIFIER_INDEX_LIMIT + 1
         )
         return (
@@ -776,13 +778,13 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         if direct:
             return None, True
         module, exported_name = term.rsplit(".", 1)
-        facades = self._session_module_paths(module)
+        facades = self.reads.module_paths(module)
         if not facades:
             return None, True
         if len(facades) != 1:
             return None, False
         facade = facades[0]
-        owners, unresolved = self._resolve_import_owner_evidence(facade, term)
+        owners, unresolved = self._imports._resolve_import_owner_evidence(facade, term)
         if unresolved:
             return None, False
         leaves = [path for path in owners if path != facade]
@@ -791,7 +793,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         symbol = next(
             (
                 row
-                for row in self._session_symbols_for_path(leaves[0])
+                for row in self.reads.symbols_for_path(leaves[0])
                 if str(row.get("name") or "").lower() == exported_name.lower()
             ),
             None,
@@ -1003,7 +1005,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
                 continue
             matches = [
                 symbol
-                for symbol in self._session_symbols_for_path(path)
+                for symbol in self.reads.symbols_for_path(path)
                 if str(symbol.get("name") or "").lower() in terms
                 or str(symbol.get("qualname") or "").lower() in terms
                 or self._task_action_qualified_identifier_matches_symbol(
@@ -1172,7 +1174,9 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             target = str(edge.get("target") or "")
             if not target:
                 continue
-            owners, ambiguous = self._resolve_import_owner_evidence(source_path, target)
+            owners, ambiguous = self._imports._resolve_import_owner_evidence(
+                source_path, target
+            )
             if not ambiguous and list(dict.fromkeys(owners)) == [selected_path]:
                 return True
         return False

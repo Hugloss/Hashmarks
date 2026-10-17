@@ -41,7 +41,7 @@ class ConcurrencyRiskAnalyzer:
                 )
             )
 
-        generation, identity_generation, stale = codemap._generation_status()
+        generation, identity_generation, stale = codemap.reads.generation_status()
         return {
             "schema": operation_schema("concurrency_risk"),
             "generation": generation,

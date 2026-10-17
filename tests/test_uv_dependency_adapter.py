@@ -40,7 +40,7 @@ def test_uv_lock_adapter_preserves_selection_source_and_factual_delta(
     after_raw = uv_lock_dependency_observation(lock=_lock("2.0.0"))
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.dependency_resolution_evidence(before_raw)
         after = codemap.dependency_resolution_evidence(after_raw)
         delta = codemap.dependency_resolution_delta(before, after)
@@ -71,7 +71,7 @@ def test_uv_lock_adapter_preserves_relationship_and_inventory_change(
     after_raw = uv_lock_dependency_observation(lock=_lock("2.0.0"))
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.dependency_resolution_evidence(before_raw)
         after = codemap.dependency_resolution_evidence(after_raw)
         delta = codemap.dependency_resolution_delta(before, after)
@@ -142,7 +142,7 @@ def test_uv_lock_adapter_includes_every_committed_lock_dependency_group(
     assert len(assert_array(raw["evidence_sources"])) == 1
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(raw)
         root_id = next(
             row["node_id"]
@@ -392,7 +392,7 @@ source = { virtual = "." }
 """
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.dependency_resolution_evidence(
             uv_lock_dependency_observation(lock=base.encode())
         )
@@ -438,7 +438,7 @@ source = { virtual = "." }
 """
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.dependency_resolution_evidence(
             uv_lock_dependency_observation(lock=before_lock)
         )

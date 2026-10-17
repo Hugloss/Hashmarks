@@ -137,7 +137,7 @@ def test_core_presentation_does_not_replace_snapshot_or_mutate_producer(
 ) -> None:
     repo = _repo(tmp_path)
     with CodeMap(repo) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         snapshot = codemap.repository_intelligence_snapshot(
             "Explain target", ["src/alpha.py"]
         )

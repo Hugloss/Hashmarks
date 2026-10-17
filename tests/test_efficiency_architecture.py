@@ -222,7 +222,7 @@ def test_symbols_for_paths_many_matches_per_path_prefixes(tmp_path: Path) -> Non
         encoding="utf-8",
     )
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         expected = {
             path: codemap.store.symbols_for_path(path)[:2] for path in ("a.py", "b.py")
         }
@@ -245,21 +245,21 @@ def test_decision_session_exact_symbol_cache_reuses_larger_prefix(
         encoding="utf-8",
     )
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
-        codemap.sync()
-        with codemap.decision_session():
-            broad = codemap._session_exact_symbol_candidates(
+        codemap.index.sync()
+        with codemap.reads.session():
+            broad = codemap.reads.exact_symbol_candidates(
                 ["AlphaOwner", "BetaOwner", "GammaOwner"], limit=20
             )
-            narrow = codemap._session_exact_symbol_candidates(
+            narrow = codemap.reads.exact_symbol_candidates(
                 ["GammaOwner", "AlphaOwner", "BetaOwner", "AlphaOwner"], limit=2
             )
-            stats = codemap.decision_session_stats()
+            stats = codemap.reads.stats()
         assert narrow == broad[:2]
         assert stats.get("store_exact_symbol_candidates") == 1
         assert stats.get("exact_symbols_miss") == 1
         assert stats.get("exact_symbols_hit") == 1
-        assert codemap._decision_exact_symbols_cache == {}
-        assert codemap._decision_module_paths_cache == {}
+        assert codemap.reads._exact_symbols_cache == {}
+        assert codemap.reads._module_paths_cache == {}
 
 
 def test_decision_session_caches_missing_file_rows_and_detaches_sessions(
@@ -269,16 +269,16 @@ def test_decision_session_caches_missing_file_rows_and_detaches_sessions(
 
     (tmp_path / "owner.py").write_text("value = 1\n", encoding="utf-8")
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
-        codemap.sync()
-        with codemap.decision_session():
-            first = codemap._session_file_rows(["owner.py", "missing.py", "owner.py"])
-            second = codemap._session_file_rows(["missing.py", "owner.py"])
-            stats = codemap.decision_session_stats()
+        codemap.index.sync()
+        with codemap.reads.session():
+            first = codemap.reads.file_rows(["owner.py", "missing.py", "owner.py"])
+            second = codemap.reads.file_rows(["missing.py", "owner.py"])
+            stats = codemap.reads.stats()
         assert set(first) == {"owner.py"}
         assert second == first
         assert stats["file_row_miss"] == 2
         assert stats["file_row_hit"] == 2
-        assert codemap._decision_file_row_cache == {}
+        assert codemap.reads._file_row_cache == {}
 
 
 def test_decision_session_reuses_graph_prefixes_and_file_rows(tmp_path: Path) -> None:
@@ -293,20 +293,20 @@ def test_decision_session_reuses_graph_prefixes_and_file_rows(tmp_path: Path) ->
         encoding="utf-8",
     )
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
-        codemap.sync()
-        with codemap.decision_session():
-            rows = codemap._session_file_rows(["owner.py", "test_owner.py"])
+        codemap.index.sync()
+        with codemap.reads.session():
+            rows = codemap.reads.file_rows(["owner.py", "test_owner.py"])
             assert set(rows) == {"owner.py", "test_owner.py"}
-            assert codemap._session_file_row("owner.py") is not None
+            assert codemap.reads.file_row("owner.py") is not None
 
-            refs_wide = codemap._session_refs_many(["Owner"], limit_per_target=20)
-            refs_narrow = codemap._session_refs_many(["Owner"], limit_per_target=1)
+            refs_wide = codemap.reads.refs_many(["Owner"], limit_per_target=20)
+            refs_narrow = codemap.reads.refs_many(["Owner"], limit_per_target=1)
             assert refs_narrow["Owner"] == refs_wide["Owner"][:1]
 
-            edges_wide = codemap._session_edges_from_many(
+            edges_wide = codemap.reads.edges_from_many(
                 [("owner.py", "Owner.work")], limit_per_seed=20
             )
-            edges_narrow = codemap._session_edges_from_many(
+            edges_narrow = codemap.reads.edges_from_many(
                 [("owner.py", "Owner.work")], limit_per_seed=1
             )
             assert (
@@ -314,14 +314,14 @@ def test_decision_session_reuses_graph_prefixes_and_file_rows(tmp_path: Path) ->
                 == edges_wide[("owner.py", "Owner.work")][:1]
             )
 
-            by_path_wide = codemap._session_edges_for_paths_many(
+            by_path_wide = codemap.reads.edges_for_paths_many(
                 ["owner.py"], limit_per_path=20
             )
-            by_path_narrow = codemap._session_edges_for_paths_many(
+            by_path_narrow = codemap.reads.edges_for_paths_many(
                 ["owner.py"], limit_per_path=1
             )
             assert by_path_narrow["owner.py"] == by_path_wide["owner.py"][:1]
-            stats = codemap.decision_session_stats()
+            stats = codemap.reads.stats()
 
         assert stats.get("store_file_rows") == 1
         assert stats.get("store_file_row", 0) == 0
@@ -331,9 +331,9 @@ def test_decision_session_reuses_graph_prefixes_and_file_rows(tmp_path: Path) ->
         assert stats.get("refs_hit") == 1
         assert stats.get("edges_from_hit") == 1
         assert stats.get("edges_for_path_hit") == 1
-        assert codemap._decision_refs_cache == {}
-        assert codemap._decision_edges_from_cache == {}
-        assert codemap._decision_edges_for_path_cache == {}
+        assert codemap.reads._refs_cache == {}
+        assert codemap.reads._edges_from_cache == {}
+        assert codemap.reads._edges_for_path_cache == {}
 
 
 def test_reverse_reference_identity_is_canonicalized_by_target_short(
@@ -350,7 +350,7 @@ def test_reverse_reference_identity_is_canonicalized_by_target_short(
         encoding="utf-8",
     )
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         unqualified = codemap.store.refs("Owner", limit=20)
         qualified = codemap.store.refs("owner.Owner", limit=20)
         assert qualified == unqualified
@@ -363,10 +363,10 @@ def test_reverse_reference_identity_is_canonicalized_by_target_short(
         assert grouped["Owner"] == grouped["owner.Owner"] == grouped["pkg.other.Owner"]
         assert counters == {"refs_many": 1}
 
-        with codemap.decision_session():
-            first = codemap._session_refs_many(["owner.Owner"], limit_per_target=20)
-            second = codemap._session_refs_many(["pkg.other.Owner"], limit_per_target=5)
-            stats = codemap.decision_session_stats()
+        with codemap.reads.session():
+            first = codemap.reads.refs_many(["owner.Owner"], limit_per_target=20)
+            second = codemap.reads.refs_many(["pkg.other.Owner"], limit_per_target=5)
+            stats = codemap.reads.stats()
         assert second["pkg.other.Owner"] == first["owner.Owner"][:5]
         assert stats.get("store_refs_many") == 1
         assert stats.get("refs_miss") == 1
@@ -387,15 +387,15 @@ def test_decision_symbol_preload_uses_complete_multi_path_evidence(
         encoding="utf-8",
     )
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         expected_dense = codemap.store.symbols_for_path("dense.py")
         expected_later = codemap.store.symbols_for_path("later.py")
         codemap.store.reset_read_counters()
-        with codemap.decision_session():
-            codemap._session_preload_symbols(["dense.py", "later.py"])
-            dense = codemap._session_symbols_for_path("dense.py")
-            later = codemap._session_symbols_for_path("later.py")
-            stats = codemap.decision_session_stats()
+        with codemap.reads.session():
+            codemap.reads.preload_symbols(["dense.py", "later.py"])
+            dense = codemap.reads.symbols_for_path("dense.py")
+            later = codemap.reads.symbols_for_path("later.py")
+            stats = codemap.reads.stats()
         assert [row["qualname"] for row in dense] == [
             row["qualname"] for row in expected_dense
         ]
@@ -422,7 +422,7 @@ def test_module_paths_many_matches_individual_and_session_preload(
         "def helper():\n    return 1\n", encoding="utf-8"
     )
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         modules = [
             "pkg.owner.Owner",
             "pkg.owner",
@@ -437,18 +437,18 @@ def test_module_paths_many_matches_individual_and_session_preload(
         assert codemap.store.read_counters() == {"module_paths_many": 1}
 
         codemap.store.reset_read_counters()
-        with codemap.decision_session():
-            codemap._session_preload_module_paths(modules)
+        with codemap.reads.session():
+            codemap.reads.preload_module_paths(modules)
             resolved = {
-                module: codemap._session_module_paths(module) for module in modules
+                module: codemap.reads.module_paths(module) for module in modules
             }
-            stats = codemap.decision_session_stats()
+            stats = codemap.reads.stats()
         assert resolved == expected
         assert stats.get("store_module_paths_many") == 1
         assert stats.get("store_module_paths", 0) == 0
         assert stats.get("module_paths_miss") == len(set(modules))
         assert stats.get("module_paths_hit") == len(modules)
-        assert codemap._decision_module_paths_cache == {}
+        assert codemap.reads._module_paths_cache == {}
 
 
 def test_tooling_does_not_parse_direct_path_read_text_without_ast_cache() -> None:

@@ -13,7 +13,7 @@ def test_sql_is_indexed_as_editable_source_evidence(tmp_path: Path) -> None:
         "def test_ember_731():\n    pass\n", encoding="utf-8"
     )
     with CodeMap(tmp_path) as c:
-        c.sync()
+        c.index.sync()
         action = c.task_action_map("Change ember_731 SQL label")
     assert action["edit"] is not None
     assert action["edit"]["path"] == "queries/ember_731.sql"
@@ -25,7 +25,7 @@ def test_lexical_file_candidates_count_distinct_terms_not_occurrences(
     (tmp_path / "many.txt").write_text("alpha alpha alpha beta\n", encoding="utf-8")
     (tmp_path / "one.txt").write_text("alpha\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         rows = codemap.store.lexical_file_candidates(["alpha", "beta"], limit=10)
     by_path = {str(row["path"]): int(row["matches"]) for row in rows}
     assert by_path["many.txt"] == 2
@@ -39,16 +39,16 @@ def test_lexical_scope_is_preserved_before_bounds_and_across_session_cache(
     (tmp_path / "first.txt").write_text("cleanup\n")
     (tmp_path / "second.txt").write_text("cleanup\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        with codemap.decision_session():
-            unscoped = codemap._session_lexical_file_candidates(["cleanup"], limit=1)
-            second = codemap._session_lexical_file_candidates(
+        codemap.index.sync()
+        with codemap.reads.session():
+            unscoped = codemap.reads.lexical_file_candidates(["cleanup"], limit=1)
+            second = codemap.reads.lexical_file_candidates(
                 ["cleanup"], limit=1, paths=["second.txt"]
             )
-            empty = codemap._session_lexical_file_candidates(
+            empty = codemap.reads.lexical_file_candidates(
                 ["cleanup"], limit=1, paths=[]
             )
-            first = codemap._session_lexical_file_candidates(
+            first = codemap.reads.lexical_file_candidates(
                 ["cleanup"], limit=1, paths=["first.txt"]
             )
     assert [row["path"] for row in unscoped] == ["first.txt"]

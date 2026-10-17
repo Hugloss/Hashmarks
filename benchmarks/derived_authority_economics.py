@@ -264,7 +264,7 @@ def measure_real_producer_economics(
         state_dir = root / "state"
         workspace.mkdir()
         with CodeMap(workspace, state_dir=state_dir) as codemap:
-            codemap.sync()
+            codemap.index.sync()
             for producer, transitions in _REAL_TRANSITIONS.items():
                 state_names = sorted({state for pair in transitions for state in pair})
                 states = {
@@ -482,7 +482,7 @@ def _explicit_operation_metrics(
     iterations: int,
 ) -> dict[str, object]:
     repository_observation_calls = 0
-    original_observer = codemap._repository_member_observation
+    original_observer = codemap.source.member
 
     def counted_observer(relpath: str, *, include_bytes: bool = False) -> object:
         nonlocal repository_observation_calls
@@ -592,7 +592,7 @@ def measure_derived_authority_economics(
     with tempfile.TemporaryDirectory(prefix="hashmarks-derived-authority-") as raw_root:
         workspace, state_dir = _fixture(Path(raw_root), scale)
         with CodeMap(workspace, state_dir=state_dir) as codemap:
-            codemap.sync()
+            codemap.index.sync()
             packets = _qualify_packets(codemap, scale)
             baselines = _baseline_outputs(codemap, packets)
             state_bytes_before = _directory_bytes(state_dir)

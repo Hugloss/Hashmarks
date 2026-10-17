@@ -40,7 +40,7 @@ def _changed_shared_member(
         include_relationships=False,
     )
     (root / "shared.py").write_text("ONE\ntwo\n", encoding="utf-8")
-    codemap.sync(["shared.py"])
+    codemap.index.sync(["shared.py"])
     after = codemap.repository_evidence_bindings(
         _bindings(),
         include_relationships=False,
@@ -91,7 +91,7 @@ def test_incomplete_change_set_keeps_exact_precision_binding_local(
     (tmp_path / "outside.py").write_text("outside\n", encoding="utf-8")
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before, after, delta = _changed_shared_member(codemap, tmp_path)
         coverage = codemap.repository_evidence_coverage(
             after,
@@ -113,7 +113,7 @@ def test_incomplete_repository_observation_keeps_same_precision_split(
     (tmp_path / "outside.py").write_text("outside\n", encoding="utf-8")
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before, after, delta = _changed_shared_member(codemap, tmp_path)
         observation = RepositoryObservation(
             state=ObservationState.DIRTY,
@@ -144,7 +144,7 @@ def test_coverage_prepares_each_binding_scope_once(tmp_path: Path) -> None:
     (tmp_path / "shared.py").write_text("one\ntwo\n", encoding="utf-8")
     (tmp_path / "other.py").write_text("other\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         bindings = codemap.repository_evidence_bindings(
             _bindings(), include_relationships=False
         )

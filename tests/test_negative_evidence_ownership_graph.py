@@ -75,7 +75,7 @@ def test_edge_bound_cannot_become_structural_owner_absence(
     probed_edges = [{"kind": "other"} for _ in range(101)]
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
 
         def edges_many(
             paths: list[str], *, limit_per_path: int
@@ -84,7 +84,7 @@ def test_edge_bound_cannot_become_structural_owner_absence(
             assert limit_per_path == 101
             return {"src/start.py": probed_edges[:limit_per_path]}
 
-        monkeypatch.setattr(codemap, "_session_edges_for_paths_many", edges_many)
+        monkeypatch.setattr(codemap.reads, "edges_for_paths_many", edges_many)
         graph = codemap.ownership_relation_graph(
             "change target behavior",
             "src/start.py",
@@ -131,7 +131,7 @@ def test_symbol_candidate_bound_is_observed_before_ownership_filtering(
             assert limit == 13
             return symbols[:limit]
 
-        monkeypatch.setattr(codemap, "_session_exact_symbol_candidates", exact_symbols)
+        monkeypatch.setattr(codemap.reads, "exact_symbol_candidates", exact_symbols)
         symbol_map = codemap._ownership_symbol_map(state, expandable, edge_map)
 
     assert len(symbol_map["target"]) == 12

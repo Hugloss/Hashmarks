@@ -81,7 +81,7 @@ def test_cross_file_declarations_preserve_exact_evidence_and_equivalence(
     ]
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.repository_declarations([_group(declarations)])
 
     group = assert_array(packet["groups"])[0]
@@ -135,7 +135,7 @@ def test_differing_declarations_are_reported_without_precedence(
     ]
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.repository_declarations([_group(declarations)])
 
     comparison = assert_object(assert_array(packet["groups"])[0])["comparison"]
@@ -156,7 +156,7 @@ def test_absence_requires_complete_untruncated_semantic_coverage(
     expected = ["owner-a", "owner-b"]
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         unknown = codemap.repository_declarations(
             [
                 _group(
@@ -200,7 +200,7 @@ def test_semantic_role_does_not_create_expected_membership_or_absence(
     group = _group([declaration], expected=[])
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.repository_declarations([group])
 
     projected = assert_array(packet["groups"])[0]
@@ -235,7 +235,7 @@ def test_ambiguous_correspondence_never_becomes_a_conflict_or_equivalence(
     ]
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.repository_declarations(
             [_group(declarations, correspondence_state="ambiguous")]
         )
@@ -258,7 +258,7 @@ def test_semantic_namespace_is_required_and_prevents_cross_namespace_collision(
     missing_namespace.pop("semantic_namespace")
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(ValueError, match="semantic_namespace"):
             codemap.repository_declarations([missing_namespace])
         first_group = _group(declaration)
@@ -291,7 +291,7 @@ def test_semantic_subject_identity_is_independent_of_group_label_and_locator(
     )
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         first = codemap.repository_declarations([first_group])
         second = codemap.repository_declarations([second_group])
 
@@ -334,7 +334,7 @@ def test_scope_is_part_of_definition_identity_and_prevents_cross_context_merging
     declaration = [_declaration("runtime", "runtime.yaml", "3.12")]
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         linux = codemap.repository_declarations(
             [_group(declaration, scope={"platform": "linux"})]
         )
@@ -385,7 +385,7 @@ def test_declaration_delta_separates_value_change_from_group_definition(
     ]
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.repository_declarations([_group(before_declarations)])
         after = codemap.repository_declarations(
             [_group(after_declarations)],
@@ -437,7 +437,7 @@ def test_declaration_delta_uses_canonical_json_value_identity(
     source.write_text("value = 1\n", encoding="utf-8")
     role = {"kind": "project-intent", "identity": "value"}
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.repository_declarations(
             [
                 _group(
@@ -505,7 +505,7 @@ def test_previous_declaration_packet_is_revalidated_before_delta(
     declarations = [_declaration("a", "a.toml", "1")]
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.repository_declarations([_group(declarations)])
         assert_object(assert_object(assert_array(before["groups"])[0])["concept"])[
             "identity"
@@ -528,7 +528,7 @@ def test_previous_declaration_rejects_resigned_nested_repository_evidence_tamper
     declarations = [_declaration("a", "a.toml", "1")]
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.repository_declarations([_group(declarations)])
         evidence = before["repository_evidence"]
         assert_object(
@@ -558,7 +558,7 @@ def test_fail_closed_unknown_fields_and_invalid_complete_coverage(
     bad["invented_policy"] = "prefer-first"
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(ValueError, match="unknown fields"):
             codemap.repository_declarations([bad])
         with pytest.raises(ValueError, match="complete declaration coverage requires"):
@@ -580,7 +580,7 @@ def test_definition_identity_binds_exact_evidence_definition(tmp_path: Path) -> 
     after_group = _group([_declaration("runtime", "runtime.txt", "3.12", line=2)])
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.repository_declarations([before_group])
         after = codemap.repository_declarations(
             [after_group],
@@ -616,7 +616,7 @@ def test_semantic_subject_delta_correlates_group_label_change_without_history(
     after_group = _group(declaration, group_id="request-b")
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.repository_declarations([before_group])
         after = codemap.repository_declarations(
             [after_group],
@@ -671,13 +671,13 @@ def test_semantic_role_correlates_child_change_across_request_label_renames(
     )
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.repository_declarations([before_group])
         moved = repo / "container" / "Dockerfile"
         moved.parent.mkdir()
         (repo / "Dockerfile").replace(moved)
         moved.write_text("python = 3.13\n", encoding="utf-8")
-        codemap.sync(["Dockerfile", "container/Dockerfile"])
+        codemap.index.sync(["Dockerfile", "container/Dockerfile"])
         after_group = _group(
             [
                 _declaration(
@@ -797,7 +797,7 @@ def test_semantic_role_identity_is_scoped_by_semantic_subject(
     }
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         first = codemap.repository_declarations([first_group])
         second = codemap.repository_declarations([second_group])
 
@@ -845,7 +845,7 @@ def test_semantic_role_change_is_remove_add_not_guessed_rename(
     )
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.repository_declarations([before_group])
         after = codemap.repository_declarations(
             [after_group],
@@ -895,7 +895,7 @@ def test_unchanged_duplicate_semantic_roles_do_not_manufacture_delta(
     )
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.repository_declarations([group])
         after = codemap.repository_declarations(
             [group],
@@ -929,7 +929,7 @@ def test_semantic_role_delta_preserves_duplicate_role_ambiguity(
     )
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.repository_declarations([before_group])
         after = codemap.repository_declarations(
             [after_group],
@@ -979,7 +979,7 @@ def test_one_sided_duplicate_semantic_roles_remain_ambiguous(
     )
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.repository_declarations([base])
         added = codemap.repository_declarations(
             [duplicates], previous_observation=before
@@ -1047,7 +1047,7 @@ def test_semantic_role_requires_non_empty_object(
     declaration["semantic_role"] = semantic_role
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(
             ValueError,
             match="semantic_role must be a non-empty object",
@@ -1069,7 +1069,7 @@ def test_semantic_subject_delta_preserves_duplicate_subject_ambiguity(
     ]
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.repository_declarations([before_group])
         after = codemap.repository_declarations(
             after_groups,
@@ -1105,7 +1105,7 @@ def test_one_sided_duplicate_semantic_subjects_remain_ambiguous(
     ]
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         empty = codemap.repository_declarations([])
         added = codemap.repository_declarations(
             duplicate_groups, previous_observation=empty
@@ -1153,7 +1153,7 @@ def test_semantic_subject_change_is_explicit_in_delta(tmp_path: Path) -> None:
     after_group["concept"] = {"kind": "runtime-compatibility", "identity": "pypy"}
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.repository_declarations([before_group])
         after = codemap.repository_declarations(
             [after_group],
@@ -1195,7 +1195,7 @@ def test_group_definition_identity_binds_coverage_scope(tmp_path: Path) -> None:
     assert_object(org_scope["coverage"])["scope"] = {"registry": "organization"}
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         team = codemap.repository_declarations([team_scope])
         organization = codemap.repository_declarations([org_scope])
 
@@ -1245,7 +1245,7 @@ def test_contract_is_format_and_concept_neutral(
     group["concept"] = concept
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.repository_declarations([group])
 
     assert assert_object(assert_array(packet["groups"])[0])["concept"] == concept
@@ -1267,7 +1267,7 @@ def test_encoded_request_budget_fails_closed_before_repository_projection(
     group["concept"] = {"opaque": "x" * 1_048_576}
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(ValueError, match="groups exceeds .* encoded bytes"):
             codemap.repository_declarations([group])
 
@@ -1284,7 +1284,7 @@ def test_resolved_provider_value_with_missing_evidence_cannot_create_conflict(
     ]
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.repository_declarations([_group(declarations)])
 
     group = assert_array(packet["groups"])[0]
@@ -1321,7 +1321,7 @@ def test_unsupported_declaration_evidence_cannot_create_equivalence(
     ]
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.repository_declarations([_group(declarations)])
 
     group = assert_array(packet["groups"])[0]
@@ -1367,7 +1367,7 @@ def test_declaration_claims_require_provenance_and_distinct_ambiguity(
     empty_concept["concept"] = {}
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(ValueError, match="correspondence.basis"):
             codemap.repository_declarations([missing_basis])
         with pytest.raises(ValueError, match="coverage.provenance"):
@@ -1395,7 +1395,7 @@ def test_ambiguous_candidate_order_does_not_change_observation_identity(
         return _group([declaration])
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         first = codemap.repository_declarations([ambiguous(["b", "a"])])
         second = codemap.repository_declarations([ambiguous(["a", "b"])])
 
@@ -1418,7 +1418,7 @@ def test_expected_membership_exposes_unexpected_current_declaration(
     ]
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         packet = codemap.repository_declarations([_group(declarations, expected=["a"])])
 
     assert assert_object(assert_array(packet["groups"])[0])["absence"] == {
@@ -1441,11 +1441,11 @@ def test_previous_declaration_packet_from_foreign_repository_fails_closed(
     group = _group([_declaration("owner", "owner.yaml", "team-a")])
 
     with CodeMap(left, state_dir=tmp_path / "left-state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         previous = codemap.repository_declarations([group])
 
     with CodeMap(right, state_dir=tmp_path / "right-state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(
             ValueError,
             match="previous declaration observation repository-mismatch",

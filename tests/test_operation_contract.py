@@ -388,11 +388,11 @@ _FIXED_MODE_CORE_BOUNDARIES = {
     ),
     "post_change": ("hashmarks/codemap/post_change.py", "task_post_change_delta"),
     "projects": ("hashmarks/codemap/query_surface.py", "projects"),
-    "outline": ("hashmarks/codemap/engine.py", "outline"),
-    "grep": ("hashmarks/codemap/query_surface.py", "grep"),
+    "outline": ("hashmarks/codemap/repository_source.py", "outline"),
+    "grep": ("hashmarks/codemap/repository_source.py", "grep"),
     "structural": ("hashmarks/codemap/query_surface.py", "structural"),
-    "symbol": ("hashmarks/codemap/query_surface.py", "symbol"),
-    "source": ("hashmarks/codemap/query_surface.py", "source"),
+    "symbol": ("hashmarks/codemap/repository_source.py", "symbol"),
+    "source": ("hashmarks/codemap/repository_source.py", "read"),
     "affected": ("hashmarks/codemap/query_surface.py", "affected"),
     "tests": ("hashmarks/codemap/query_surface.py", "tests"),
     "context": ("hashmarks/codemap/model.py", "ContextPack.as_dict"),
@@ -559,7 +559,7 @@ def test_core_repository_context_rejects_its_own_schema_drift(
         lambda _operation: "hashmarks.wrong.v1",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(RuntimeError, match="operation response schema drift"):
             codemap.orient()
 
@@ -575,7 +575,7 @@ def test_core_find_rejects_its_own_schema_drift(
         lambda _operation: "hashmarks.wrong.v1",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(RuntimeError, match="operation response schema drift"):
             codemap.find_packet("widget")
 
@@ -591,7 +591,7 @@ def test_core_task_evidence_rejects_its_own_schema_drift(
         lambda _operation: "hashmarks.wrong.v1",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(RuntimeError, match="operation response schema drift"):
             codemap.task_evidence(task)
 
@@ -607,7 +607,7 @@ def test_core_change_impact_rejects_its_own_schema_drift(
         lambda _operation: "hashmarks.wrong.v1",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(RuntimeError, match="operation response schema drift"):
             codemap.task_change_impact(task, ["src/owner.py"])
 
@@ -641,7 +641,7 @@ def test_core_correlation_rejects_its_own_schema_drift(
         }
     ]
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(RuntimeError, match="operation response schema drift"):
             codemap.correlate_evidence(
                 bundles,
@@ -655,7 +655,7 @@ def test_core_post_change_rejects_its_own_schema_drift(
 ) -> None:
     source, task = _fixed_mode_repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         previous = codemap.task_evidence(task)
         source.write_text("def widget(): return 'new'\n", encoding="utf-8")
 

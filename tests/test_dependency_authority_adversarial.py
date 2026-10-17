@@ -104,12 +104,12 @@ def test_uv_repository_input_path_move_preserves_resolution_and_source_bytes(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.dependency_resolution_evidence(before_raw)
 
         old_path.unlink()
         new_path.write_bytes(lock)
-        codemap.sync(["before/uv.lock", "after/uv.lock"])
+        codemap.index.sync(["before/uv.lock", "after/uv.lock"])
         after = codemap.dependency_resolution_evidence(after_raw)
         delta = codemap.dependency_resolution_delta(before, after)
 
@@ -150,7 +150,7 @@ def test_identical_repository_input_bytes_keep_distinct_path_authority(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observation = codemap.dependency_resolution_evidence(raw)
         derivation = codemap.dependency_resolution_derivation_authority(observation)
 
@@ -183,7 +183,7 @@ def test_evidence_source_disappearance_degrades_qualification_not_semantics(
         row["completeness"] = "incomplete"
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.dependency_resolution_evidence(before_raw)
         after = codemap.dependency_resolution_evidence(after_raw)
         delta = codemap.dependency_resolution_delta(before, after)

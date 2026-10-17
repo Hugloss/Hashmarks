@@ -4,8 +4,9 @@ from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, cast
 
 from .change_impact import ChangeImpactOptions
-from .decision_session import diagnostic_producer
+from .decision_session import ReadScopeOwner, diagnostic_producer
 from .evidence_freshness import freshness_state
+from .repository_observation import packet_digest
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -17,7 +18,7 @@ if TYPE_CHECKING:
 CHANGE_INTELLIGENCE_SCHEMA = "hashmarks.change-intelligence-brief.v1"
 
 
-class ChangeIntelligenceMixin:
+class ChangeIntelligenceMixin(ReadScopeOwner):
     """Compact product projection over existing change/selection authority."""
 
     def _change_brief_rows(self, raw_changed: object) -> list[dict[str, object]]:
@@ -36,7 +37,7 @@ class ChangeIntelligenceMixin:
             if not isinstance(row, dict):
                 continue
             path = str(row.get("path") or "")
-            file_row = self._session_file_row(path)
+            file_row = self.reads.file_row(path)
             revision = (
                 None
                 if file_row is None or not file_row["file_digest"]
@@ -90,7 +91,7 @@ class ChangeIntelligenceMixin:
             limit=limit,
             candidate_limit=16,
         )
-        generation, identity_generation, stale = self._generation_status()
+        generation, identity_generation, stale = self.reads.generation_status()
         ownership = action.get("ownership_resolution")
         ownership_projection = None
         if isinstance(ownership, dict):
@@ -106,8 +107,8 @@ class ChangeIntelligenceMixin:
         payload: dict[str, object] = {
             "schema": CHANGE_INTELLIGENCE_SCHEMA,
             "repository": {
-                "repository_identity": self._repository_packet_identity(),
-                "source_identity": self._source_packet_identity(
+                "repository_identity": self.reads.repository_identity(),
+                "source_identity": self.source.packet_identity(
                     generation=generation,
                     identity_generation=identity_generation,
                     stale=stale,
@@ -116,7 +117,7 @@ class ChangeIntelligenceMixin:
                 "identity_generation": identity_generation,
                 "stale": stale is not False,
             },
-            "task_identity": self._packet_digest("hashmarks.task.v1", {"task": task}),
+            "task_identity": packet_digest("hashmarks.task.v1", {"task": task}),
             "changed": changed,
             "affected": surfaces,
             "ownership": ownership_projection,
@@ -140,7 +141,7 @@ class ChangeIntelligenceMixin:
         }
         if "project_impact" in impact:
             payload["project_impact"] = impact["project_impact"]
-        payload["brief_identity"] = "sha256:" + self._packet_digest(
+        payload["brief_identity"] = "sha256:" + packet_digest(
             CHANGE_INTELLIGENCE_SCHEMA,
             payload,
         )

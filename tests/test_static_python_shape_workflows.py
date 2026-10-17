@@ -116,7 +116,7 @@ def handler_packet(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
     root = fixture / "repo"
     _materialize(root)
     with CodeMap(root, state_dir=fixture / "state") as cm:
-        cm.sync()
+        cm.index.sync()
         return cm.discover_repository_declarations([_provider()])
 
 
@@ -126,7 +126,7 @@ def test_body_only_edit_has_exact_value_and_revision_deltas(
     root, state = handler_repository
     source = root / "api.py"
     with CodeMap(root, state_dir=state) as cm:
-        cm.sync()
+        cm.index.sync()
         before: dict[str, Any] = cm.discover_repository_declarations([_provider()])
         snapshot = deepcopy(before)
         _assert_source_bound(before, "api.py", {(2, 5), (6, 9), (7, 7), (8, 8)})
@@ -135,7 +135,7 @@ def test_body_only_edit_has_exact_value_and_revision_deltas(
             cm.discover_repository_declarations(
                 [_provider()], previous_observation=before
             )
-        cm.sync(["api.py"])
+        cm.index.sync(["api.py"])
         after: dict[str, Any] = cm.discover_repository_declarations(
             [_provider()], previous_observation=before
         )
@@ -186,7 +186,7 @@ def test_dynamic_return_cannot_reuse_previous_literal_keys(
 ) -> None:
     root, state = handler_repository
     with CodeMap(root, state_dir=state) as cm:
-        cm.sync()
+        cm.index.sync()
         before: dict[str, Any] = cm.discover_repository_declarations([_provider()])
         snapshot = deepcopy(before)
         (root / "api.py").write_text(
@@ -198,7 +198,7 @@ def test_dynamic_return_cannot_reuse_previous_literal_keys(
             cm.discover_repository_declarations(
                 [_provider()], previous_observation=before
             )
-        cm.sync(["api.py"])
+        cm.index.sync(["api.py"])
         after: dict[str, Any] = cm.discover_repository_declarations(
             [_provider()], previous_observation=before
         )
@@ -222,10 +222,10 @@ def test_rename_delete_reopen_and_opt_out_do_not_replay_handler_facts(
     root, state = handler_repository
     selected = _provider(paths=("routes.py", "tools.py"))
     with CodeMap(root, state_dir=state) as cm:
-        cm.sync()
+        cm.index.sync()
         before: dict[str, Any] = cm.discover_repository_declarations([_provider()])
         (root / "api.py").rename(root / "routes.py")
-        cm.sync(["api.py", "routes.py"])
+        cm.index.sync(["api.py", "routes.py"])
         renamed: dict[str, Any] = cm.discover_repository_declarations(
             [_provider(paths=("api.py", "routes.py", "tools.py"))],
             previous_observation=before,
@@ -264,7 +264,7 @@ def test_rename_delete_reopen_and_opt_out_do_not_replay_handler_facts(
         )
         (root / "routes.py").unlink()
         (root / "tools.py").unlink()
-        cm.sync(["routes.py", "tools.py"])
+        cm.index.sync(["routes.py", "tools.py"])
         deleted: dict[str, Any] = cm.discover_repository_declarations(
             [selected], previous_observation=before
         )

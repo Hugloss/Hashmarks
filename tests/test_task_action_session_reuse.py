@@ -33,7 +33,7 @@ def test_identical_task_action_requests_reuse_one_session_composition(
 ) -> None:
     task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         calls = 0
         original = codemap.find_task
 
@@ -43,10 +43,10 @@ def test_identical_task_action_requests_reuse_one_session_composition(
             return original(*args, **kwargs)
 
         monkeypatch.setattr(codemap, "find_task", counted)
-        with codemap.decision_session():
+        with codemap.reads.session():
             first = codemap.task_action_map(task, limit=20, per_role=3)
             second = codemap.task_action_map(task, limit=20, per_role=3)
-            stats = codemap.decision_session_stats()
+            stats = codemap.reads.stats()
 
         assert second == first
         assert calls == 1
@@ -60,7 +60,7 @@ def test_task_action_reuse_key_includes_task_limit_and_per_role(
 ) -> None:
     task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         calls = 0
         original = codemap.find_task
 
@@ -70,13 +70,13 @@ def test_task_action_reuse_key_includes_task_limit_and_per_role(
             return original(*args, **kwargs)
 
         monkeypatch.setattr(codemap, "find_task", counted)
-        with codemap.decision_session():
+        with codemap.reads.session():
             codemap.task_action_map(task, limit=20, per_role=3)
             codemap.task_action_map(task + " safely", limit=20, per_role=3)
             codemap.task_action_map(task, limit=21, per_role=3)
             codemap.task_action_map(task, limit=20, per_role=4)
             codemap.task_action_map(task, limit=20, per_role=3)
-            stats = codemap.decision_session_stats()
+            stats = codemap.reads.stats()
 
         assert calls == 4
         assert stats["task_action_miss"] == 4
@@ -86,8 +86,8 @@ def test_task_action_reuse_key_includes_task_limit_and_per_role(
 def test_cached_task_action_isolated_from_caller_mutation(tmp_path: Path) -> None:
     task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        with codemap.decision_session():
+        codemap.index.sync()
+        with codemap.reads.session():
             first = codemap.task_action_map(task)
             original_canonical = list(first["canonical"])
             first["canonical"].clear()
@@ -104,7 +104,7 @@ def test_task_action_cache_is_not_reused_across_decision_sessions(
 ) -> None:
     task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         calls = 0
         original = codemap.find_task
 
@@ -114,10 +114,10 @@ def test_task_action_cache_is_not_reused_across_decision_sessions(
             return original(*args, **kwargs)
 
         monkeypatch.setattr(codemap, "find_task", counted)
-        with codemap.decision_session():
+        with codemap.reads.session():
             codemap.task_action_map(task)
             codemap.task_action_map(task)
-        with codemap.decision_session():
+        with codemap.reads.session():
             codemap.task_action_map(task)
 
         assert calls == 2

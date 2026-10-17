@@ -159,7 +159,7 @@ def qualify(iterations: int = 5) -> dict[str, Any]:
             state_dir=base / "state",
             artifact_db=base / "artifacts.sqlite3",
         ) as codemap:
-            codemap.sync()
+            codemap.index.sync()
             cases = run_vectors(codemap, manifest)
             economics = binding_economics(codemap, iterations)
             quality = correspondence_quality(codemap, manifest)

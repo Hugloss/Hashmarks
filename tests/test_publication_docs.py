@@ -17,7 +17,7 @@ def test_codemap_maintainer_guide_maps_internal_ownership_and_request_flows() ->
     for section in (
         "## Responsibility map",
         "## Trace common requests before reading everything",
-        "### `CodeMap.sync()`",
+        "### `CodeMap.index.sync()`",
         "### `CodeMap.repository_ownership_graph()`",
         "## How to choose where new code belongs",
         "## Reading strategy for a new maintainer",

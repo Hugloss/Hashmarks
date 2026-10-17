@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from contract_assertions import assert_array, assert_object, assert_records, assert_text
+
 from hashmarks.codemap import (
     RepositoryDeclarationProviderContext,
     RepositoryDeclarationProviderResult,
@@ -250,13 +252,20 @@ class _PairCorrespondenceProvider:
 
 
 def _groups(packet: dict[str, object]) -> dict[str, dict[str, object]]:
-    return {row["group_id"]: row for row in packet["declarations"]["groups"]}
+    return {
+        assert_text(row["group_id"]): row
+        for row in assert_records(assert_object(packet["declarations"])["groups"])
+    }
 
 
 def _bindings(packet: dict[str, object]) -> dict[str, dict[str, object]]:
     return {
-        row["binding_id"]: row
-        for row in packet["declarations"]["repository_evidence"]["bindings"]
+        assert_text(row["binding_id"]): row
+        for row in assert_records(
+            assert_object(assert_object(packet["declarations"])["repository_evidence"])[
+                "bindings"
+            ]
+        )
     }
 
 
@@ -264,7 +273,10 @@ def _correlation_declarations(
     packet: dict[str, object],
 ) -> dict[str, dict[str, object]]:
     group = _groups(packet)["cross-provider-owner"]
-    return {row["declaration_id"]: row for row in group["declarations"]}
+    return {
+        assert_text(row["declaration_id"]): row
+        for row in assert_records(group["declarations"])
+    }
 
 
 def _cross_provider_packets(
@@ -284,13 +296,13 @@ def _cross_provider_packets(
     correlation = _CrossProviderCorrespondenceProvider()
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         baseline = codemap.discover_repository_declarations(
             [provider_a, provider_b, correlation]
         )
 
         (repo / "owner-b.txt").write_text("owner: team-b\n", encoding="utf-8")
-        codemap.sync(["owner-b.txt"])
+        codemap.index.sync(["owner-b.txt"])
         differing = codemap.discover_repository_declarations(
             [provider_a, provider_b, correlation],
             previous_observation=baseline,
@@ -334,11 +346,16 @@ def _assert_baseline_identity_separation(packet: dict[str, object]) -> None:
     )
 
     source_roles = {
-        source_a["declarations"][0]["semantic_declaration_identity"],
-        source_b["declarations"][0]["semantic_declaration_identity"],
+        assert_object(assert_records(source_a["declarations"])[0])[
+            "semantic_declaration_identity"
+        ],
+        assert_object(assert_records(source_b["declarations"])[0])[
+            "semantic_declaration_identity"
+        ],
     }
     correlation_roles = {
-        row["semantic_declaration_identity"] for row in correlation["declarations"]
+        row["semantic_declaration_identity"]
+        for row in assert_records(correlation["declarations"])
     }
     assert len(source_roles) == 2
     assert source_roles.isdisjoint(correlation_roles)
@@ -346,7 +363,7 @@ def _assert_baseline_identity_separation(packet: dict[str, object]) -> None:
         "state": "equivalent",
         "distinct_values": ["team-a"],
     }
-    assert packet["declarations"]["winner"] == "not-selected"
+    assert assert_object(packet["declarations"])["winner"] == "not-selected"
 
 
 def _assert_cross_provider_value_change_is_local(
@@ -356,42 +373,46 @@ def _assert_cross_provider_value_change_is_local(
     before = _groups(baseline)
     after = _groups(differing)
     assert (
-        before["provider-a-owner"]["group_observation_identity"]
-        == after["provider-a-owner"]["group_observation_identity"]
+        assert_object(before["provider-a-owner"])["group_observation_identity"]
+        == assert_object(after["provider-a-owner"])["group_observation_identity"]
     )
     assert (
-        before["provider-b-owner"]["semantic_subject_identity"]
-        == after["provider-b-owner"]["semantic_subject_identity"]
+        assert_object(before["provider-b-owner"])["semantic_subject_identity"]
+        == assert_object(after["provider-b-owner"])["semantic_subject_identity"]
     )
     assert (
-        before["cross-provider-owner"]["semantic_subject_identity"]
-        == after["cross-provider-owner"]["semantic_subject_identity"]
+        assert_object(before["cross-provider-owner"])["semantic_subject_identity"]
+        == assert_object(after["cross-provider-owner"])["semantic_subject_identity"]
     )
-    assert after["cross-provider-owner"]["comparison"] == {
+    assert assert_object(after["cross-provider-owner"])["comparison"] == {
         "state": "differing",
         "distinct_values": ["team-a", "team-b"],
     }
 
-    provider_delta = differing["delta_from_previous"]["providers"]
+    provider_delta = assert_object(differing["delta_from_previous"])["providers"]
     assert provider_delta == {
         "added": [],
         "removed": [],
         "changed": ["correlation-provider", "provider-b"],
     }
     changed_groups = {
-        row["group_id"]: row
-        for row in differing["delta_from_previous"]["declarations"]["changed_groups"]
+        assert_text(row["group_id"]): row
+        for row in assert_records(
+            assert_object(
+                assert_object(differing["delta_from_previous"])["declarations"]
+            )["changed_groups"]
+        )
     }
     assert set(changed_groups) == {
         "cross-provider-owner",
         "provider-b-owner",
     }
-    assert changed_groups["provider-b-owner"]["value_changed_declaration_ids"] == [
-        "owner"
-    ]
-    assert changed_groups["cross-provider-owner"]["value_changed_declaration_ids"] == [
-        "right-owner"
-    ]
+    assert assert_object(changed_groups["provider-b-owner"])[
+        "value_changed_declaration_ids"
+    ] == ["owner"]
+    assert assert_object(changed_groups["cross-provider-owner"])[
+        "value_changed_declaration_ids"
+    ] == ["right-owner"]
 
 
 def _assert_correspondence_ambiguity_does_not_rewrite_sources(
@@ -402,27 +423,31 @@ def _assert_correspondence_ambiguity_does_not_rewrite_sources(
     after = _groups(ambiguous)
     for group_id in ("provider-a-owner", "provider-b-owner"):
         assert (
-            before[group_id]["group_observation_identity"]
-            == after[group_id]["group_observation_identity"]
+            assert_object(before[group_id])["group_observation_identity"]
+            == assert_object(after[group_id])["group_observation_identity"]
         )
 
     correlation = after["cross-provider-owner"]
-    assert correlation["correspondence"]["state"] == "ambiguous"
+    assert assert_object(correlation["correspondence"])["state"] == "ambiguous"
     assert correlation["comparison"] == {
         "state": "ambiguous",
         "reason": "correspondence-not-uniquely-declared",
         "distinct_values": [],
     }
-    assert ambiguous["delta_from_previous"]["providers"] == {
+    assert assert_object(ambiguous["delta_from_previous"])["providers"] == {
         "added": [],
         "removed": [],
         "changed": [],
     }
-    changed = ambiguous["delta_from_previous"]["declarations"]["changed_groups"]
+    changed = assert_records(
+        assert_object(assert_object(ambiguous["delta_from_previous"])["declarations"])[
+            "changed_groups"
+        ]
+    )
     assert [row["group_id"] for row in changed] == ["cross-provider-owner"]
-    assert changed[0]["correspondence_changed"] is True
-    assert changed[0]["comparison_changed"] is True
-    assert changed[0]["value_changed_declaration_ids"] == []
+    assert assert_object(changed[0])["correspondence_changed"] is True
+    assert assert_object(changed[0])["comparison_changed"] is True
+    assert assert_object(changed[0])["value_changed_declaration_ids"] == []
 
 
 def _assert_removing_correlation_preserves_source_authority(
@@ -434,23 +459,23 @@ def _assert_removing_correlation_preserves_source_authority(
     assert set(after) == {"provider-a-owner", "provider-b-owner"}
     for group_id in after:
         assert (
-            before[group_id]["group_observation_identity"]
-            == after[group_id]["group_observation_identity"]
+            assert_object(before[group_id])["group_observation_identity"]
+            == assert_object(after[group_id])["group_observation_identity"]
         )
 
-    delta = removed["delta_from_previous"]
+    delta = assert_object(removed["delta_from_previous"])
     assert delta["providers"] == {
         "added": [],
         "removed": ["correlation-provider"],
         "changed": [],
     }
-    declaration_delta = delta["declarations"]
+    declaration_delta = assert_object(delta["declarations"])
     assert declaration_delta["removed_group_ids"] == ["cross-provider-owner"]
     assert declaration_delta["added_group_ids"] == []
     assert declaration_delta["changed_groups"] == []
-    subjects = declaration_delta["semantic_subjects"]
+    subjects = assert_object(declaration_delta["semantic_subjects"])
     assert subjects["removed"] == [
-        before["cross-provider-owner"]["semantic_subject_identity"]
+        assert_object(before["cross-provider-owner"])["semantic_subject_identity"]
     ]
     assert subjects["added"] == []
     assert subjects["changed"] == []
@@ -458,14 +483,20 @@ def _assert_removing_correlation_preserves_source_authority(
 
     old_correlation = _correlation_declarations(ambiguous)
     source_binding_ids = {
-        after["provider-a-owner"]["declarations"][0]["binding_id"],
-        after["provider-b-owner"]["declarations"][0]["binding_id"],
+        assert_object(
+            assert_records(assert_object(after["provider-a-owner"])["declarations"])[0]
+        )["binding_id"],
+        assert_object(
+            assert_records(assert_object(after["provider-b-owner"])["declarations"])[0]
+        )["binding_id"],
     }
-    binding_delta = declaration_delta["repository_evidence"]["bindings"]
-    assert set(binding_delta["preserved"]) == source_binding_ids
-    assert set(binding_delta["removed"]) == {
-        old_correlation["left-owner"]["binding_id"],
-        old_correlation["right-owner"]["binding_id"],
+    binding_delta = assert_object(
+        assert_object(declaration_delta["repository_evidence"])["bindings"]
+    )
+    assert set(assert_array(binding_delta["preserved"])) == source_binding_ids
+    assert set(assert_array(binding_delta["removed"])) == {
+        assert_object(old_correlation["left-owner"])["binding_id"],
+        assert_object(old_correlation["right-owner"])["binding_id"],
     }
     assert binding_delta["added"] == []
     assert binding_delta["changed"] == []
@@ -528,13 +559,13 @@ def _nontransitive_correspondence_packets(
     )
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         chain = codemap.discover_repository_declarations(
             [provider_a, provider_b, provider_c, ab, bc]
         )
 
         (repo / "owner-b.txt").write_text("owner: team-b\n", encoding="utf-8")
-        codemap.sync(["owner-b.txt"])
+        codemap.index.sync(["owner-b.txt"])
         middle_changed = codemap.discover_repository_declarations(
             [provider_a, provider_b, provider_c, ab, bc],
             previous_observation=chain,
@@ -559,11 +590,11 @@ def _assert_no_transitive_ac_claim(packet: dict[str, object]) -> None:
     }
     assert "correspondence-ac" not in groups
     assert len({group["semantic_subject_identity"] for group in groups.values()}) == 5
-    assert groups["correspondence-ab"]["comparison"] == {
+    assert assert_object(groups["correspondence-ab"])["comparison"] == {
         "state": "equivalent",
         "distinct_values": ["team-a"],
     }
-    assert groups["correspondence-bc"]["comparison"] == {
+    assert assert_object(groups["correspondence-bc"])["comparison"] == {
         "state": "equivalent",
         "distinct_values": ["team-a"],
     }
@@ -580,20 +611,20 @@ def _assert_middle_change_stays_on_explicit_edges(
 
     for group_id in ("provider-a-owner", "provider-c-owner"):
         assert (
-            before_groups[group_id]["group_observation_identity"]
-            == after_groups[group_id]["group_observation_identity"]
+            assert_object(before_groups[group_id])["group_observation_identity"]
+            == assert_object(after_groups[group_id])["group_observation_identity"]
         )
 
-    assert after_groups["correspondence-ab"]["comparison"] == {
+    assert assert_object(after_groups["correspondence-ab"])["comparison"] == {
         "state": "differing",
         "distinct_values": ["team-a", "team-b"],
     }
-    assert after_groups["correspondence-bc"]["comparison"] == {
+    assert assert_object(after_groups["correspondence-bc"])["comparison"] == {
         "state": "differing",
         "distinct_values": ["team-a", "team-b"],
     }
 
-    provider_delta = after["delta_from_previous"]["providers"]
+    provider_delta = assert_object(after["delta_from_previous"])["providers"]
     assert provider_delta == {
         "added": [],
         "removed": [],
@@ -601,18 +632,28 @@ def _assert_middle_change_stays_on_explicit_edges(
     }
     changed_groups = {
         row["group_id"]
-        for row in after["delta_from_previous"]["declarations"]["changed_groups"]
+        for row in assert_records(
+            assert_object(assert_object(after["delta_from_previous"])["declarations"])[
+                "changed_groups"
+            ]
+        )
     }
     assert changed_groups == {
         "correspondence-ab",
         "correspondence-bc",
         "provider-b-owner",
     }
-    subjects = after["delta_from_previous"]["declarations"]["semantic_subjects"]
+    subjects = assert_object(
+        assert_object(assert_object(after["delta_from_previous"])["declarations"])[
+            "semantic_subjects"
+        ]
+    )
     assert subjects["added"] == []
     assert subjects["removed"] == []
     assert subjects["ambiguous"] == []
-    assert {row["current_group_id"] for row in subjects["changed"]} == changed_groups
+    assert {
+        row["current_group_id"] for row in assert_records(subjects["changed"])
+    } == changed_groups
 
 
 def _assert_ac_exists_only_after_explicit_provider(
@@ -624,8 +665,8 @@ def _assert_ac_exists_only_after_explicit_provider(
     assert set(after_groups) == set(before_groups) | {"correspondence-ac"}
     for group_id in before_groups:
         assert (
-            before_groups[group_id]["group_observation_identity"]
-            == after_groups[group_id]["group_observation_identity"]
+            assert_object(before_groups[group_id])["group_observation_identity"]
+            == assert_object(after_groups[group_id])["group_observation_identity"]
         )
 
     ac = after_groups["correspondence-ac"]
@@ -634,20 +675,22 @@ def _assert_ac_exists_only_after_explicit_provider(
         "state": "equivalent",
         "distinct_values": ["team-a"],
     }
-    assert after["delta_from_previous"]["providers"] == {
+    assert assert_object(after["delta_from_previous"])["providers"] == {
         "added": ["correlation-ac"],
         "removed": [],
         "changed": [],
     }
 
-    delta = after["delta_from_previous"]["declarations"]
+    delta = assert_object(assert_object(after["delta_from_previous"])["declarations"])
     assert delta["added_group_ids"] == ["correspondence-ac"]
     assert delta["removed_group_ids"] == []
     assert delta["changed_groups"] == []
-    assert delta["semantic_subjects"]["added"] == [ac["semantic_subject_identity"]]
-    assert delta["semantic_subjects"]["removed"] == []
-    assert delta["semantic_subjects"]["changed"] == []
-    assert delta["semantic_subjects"]["ambiguous"] == []
+    assert assert_object(delta["semantic_subjects"])["added"] == [
+        ac["semantic_subject_identity"]
+    ]
+    assert assert_object(delta["semantic_subjects"])["removed"] == []
+    assert assert_object(delta["semantic_subjects"])["changed"] == []
+    assert assert_object(delta["semantic_subjects"])["ambiguous"] == []
 
 
 def test_explicit_correspondence_chain_never_creates_transitive_edge(
@@ -692,7 +735,7 @@ def _referential_isolation_packets(
     )
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         baseline = codemap.discover_repository_declarations(
             [provider_a, provider_b, correlation]
         )
@@ -723,55 +766,65 @@ def _assert_named_source_removal_does_not_cascade(
     after = _groups(source_removed)
     assert set(after) == {"provider-a-owner", "correspondence-ab"}
     assert (
-        before["provider-a-owner"]["group_observation_identity"]
-        == after["provider-a-owner"]["group_observation_identity"]
+        assert_object(before["provider-a-owner"])["group_observation_identity"]
+        == assert_object(after["provider-a-owner"])["group_observation_identity"]
     )
     assert (
-        before["correspondence-ab"]["group_observation_identity"]
-        == after["correspondence-ab"]["group_observation_identity"]
+        assert_object(before["correspondence-ab"])["group_observation_identity"]
+        == assert_object(after["correspondence-ab"])["group_observation_identity"]
     )
-    assert after["correspondence-ab"]["comparison"] == {
+    assert assert_object(after["correspondence-ab"])["comparison"] == {
         "state": "equivalent",
         "distinct_values": ["team-a"],
     }
 
-    delta = source_removed["delta_from_previous"]
+    delta = assert_object(source_removed["delta_from_previous"])
     assert delta["providers"] == {
         "added": [],
         "removed": ["provider-b"],
         "changed": [],
     }
-    declarations = delta["declarations"]
+    declarations = assert_object(delta["declarations"])
     assert declarations["removed_group_ids"] == ["provider-b-owner"]
     assert declarations["added_group_ids"] == []
     assert declarations["changed_groups"] == []
 
-    subjects = declarations["semantic_subjects"]
+    subjects = assert_object(declarations["semantic_subjects"])
     assert subjects["removed"] == [
-        before["provider-b-owner"]["semantic_subject_identity"]
+        assert_object(before["provider-b-owner"])["semantic_subject_identity"]
     ]
     assert subjects["added"] == []
     assert subjects["changed"] == []
     assert subjects["ambiguous"] == []
 
     before_correlation = {
-        row["declaration_id"]: row
-        for row in before["correspondence-ab"]["declarations"]
+        assert_text(row["declaration_id"]): row
+        for row in assert_records(
+            assert_object(before["correspondence-ab"])["declarations"]
+        )
     }
     after_correlation = {
-        row["declaration_id"]: row for row in after["correspondence-ab"]["declarations"]
+        assert_text(row["declaration_id"]): row
+        for row in assert_records(
+            assert_object(after["correspondence-ab"])["declarations"]
+        )
     }
-    bindings = declarations["repository_evidence"]["bindings"]
-    assert before_correlation["left-owner"]["binding_id"] in bindings["preserved"]
-    assert before_correlation["right-owner"]["binding_id"] in bindings["preserved"]
-    assert (
-        before_correlation["right-owner"]["binding_id"]
-        == after_correlation["right-owner"]["binding_id"]
+    bindings = assert_object(
+        assert_object(declarations["repository_evidence"])["bindings"]
     )
+    assert assert_object(before_correlation["left-owner"])[
+        "binding_id"
+    ] in assert_array(bindings["preserved"])
+    assert assert_object(before_correlation["right-owner"])[
+        "binding_id"
+    ] in assert_array(bindings["preserved"])
     assert (
-        before["provider-b-owner"]["declarations"][0]["binding_id"]
-        in bindings["removed"]
+        assert_object(before_correlation["right-owner"])["binding_id"]
+        == assert_object(after_correlation["right-owner"])["binding_id"]
     )
+    assert assert_object(
+        assert_records(assert_object(before["provider-b-owner"])["declarations"])[0]
+    )["binding_id"] in assert_array(bindings["removed"])
 
 
 def _assert_unknown_provider_name_is_opaque_basis_metadata(
@@ -782,34 +835,37 @@ def _assert_unknown_provider_name_is_opaque_basis_metadata(
     after = _groups(unknown_basis)
     assert set(after) == set(before)
     assert (
-        before["provider-a-owner"]["group_observation_identity"]
-        == after["provider-a-owner"]["group_observation_identity"]
+        assert_object(before["provider-a-owner"])["group_observation_identity"]
+        == assert_object(after["provider-a-owner"])["group_observation_identity"]
     )
 
     correlation = after["correspondence-ab"]
     assert (
-        correlation["correspondence"]["basis"]["right_provider"] == "provider-missing"
+        assert_object(assert_object(correlation["correspondence"])["basis"])[
+            "right_provider"
+        ]
+        == "provider-missing"
     )
     assert correlation["comparison"] == {
         "state": "equivalent",
         "distinct_values": ["team-a"],
     }
     assert (
-        before["correspondence-ab"]["semantic_subject_identity"]
+        assert_object(before["correspondence-ab"])["semantic_subject_identity"]
         == correlation["semantic_subject_identity"]
     )
 
-    delta = unknown_basis["delta_from_previous"]
+    delta = assert_object(unknown_basis["delta_from_previous"])
     assert delta["providers"] == {
         "added": [],
         "removed": [],
         "changed": [],
     }
-    changed = delta["declarations"]["changed_groups"]
+    changed = assert_records(assert_object(delta["declarations"])["changed_groups"])
     assert [row["group_id"] for row in changed] == ["correspondence-ab"]
-    assert changed[0]["correspondence_changed"] is True
-    assert changed[0]["value_changed_declaration_ids"] == []
-    assert changed[0]["semantic_subject_changed"] is False
+    assert assert_object(changed[0])["correspondence_changed"] is True
+    assert assert_object(changed[0])["value_changed_declaration_ids"] == []
+    assert assert_object(changed[0])["semantic_subject_changed"] is False
 
 
 def _assert_source_restore_does_not_rewire_correlation(
@@ -824,29 +880,31 @@ def _assert_source_restore_does_not_rewire_correlation(
         "correspondence-ab",
     }
     assert (
-        before["correspondence-ab"]["group_observation_identity"]
-        == after["correspondence-ab"]["group_observation_identity"]
+        assert_object(before["correspondence-ab"])["group_observation_identity"]
+        == assert_object(after["correspondence-ab"])["group_observation_identity"]
     )
-    assert after["correspondence-ab"]["correspondence"]["basis"]["right_provider"] == (
-        "provider-missing"
-    )
+    assert assert_object(
+        assert_object(assert_object(after["correspondence-ab"])["correspondence"])[
+            "basis"
+        ]
+    )["right_provider"] == ("provider-missing")
 
-    delta = source_restored["delta_from_previous"]
+    delta = assert_object(source_restored["delta_from_previous"])
     assert delta["providers"] == {
         "added": ["provider-b"],
         "removed": [],
         "changed": [],
     }
-    declarations = delta["declarations"]
+    declarations = assert_object(delta["declarations"])
     assert declarations["added_group_ids"] == ["provider-b-owner"]
     assert declarations["removed_group_ids"] == []
     assert declarations["changed_groups"] == []
-    assert declarations["semantic_subjects"]["added"] == [
-        after["provider-b-owner"]["semantic_subject_identity"]
+    assert assert_object(declarations["semantic_subjects"])["added"] == [
+        assert_object(after["provider-b-owner"])["semantic_subject_identity"]
     ]
-    assert declarations["semantic_subjects"]["removed"] == []
-    assert declarations["semantic_subjects"]["changed"] == []
-    assert declarations["semantic_subjects"]["ambiguous"] == []
+    assert assert_object(declarations["semantic_subjects"])["removed"] == []
+    assert assert_object(declarations["semantic_subjects"])["changed"] == []
+    assert assert_object(declarations["semantic_subjects"])["ambiguous"] == []
 
 
 def test_correspondence_basis_names_never_become_foreign_keys(
@@ -899,7 +957,7 @@ def _direction_reversal_packets(
     )
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.discover_repository_declarations(
             [provider_a, provider_b, forward]
         )
@@ -911,7 +969,10 @@ def _direction_reversal_packets(
 
 
 def _role_rows(group: dict[str, object]) -> dict[str, dict[str, object]]:
-    return {row["semantic_role"]["kind"]: row for row in group["declarations"]}
+    return {
+        assert_text(assert_object(row["semantic_role"])["kind"]): row
+        for row in assert_records(group["declarations"])
+    }
 
 
 def _assert_pair_identity_and_reversed_roles(
@@ -929,14 +990,34 @@ def _assert_pair_identity_and_reversed_roles(
     assert set(before_roles) == set(after_roles) == {"left-source", "right-source"}
     for role in ("left-source", "right-source"):
         assert (
-            before_roles[role]["semantic_declaration_identity"]
-            == after_roles[role]["semantic_declaration_identity"]
+            assert_object(before_roles[role])["semantic_declaration_identity"]
+            == assert_object(after_roles[role])["semantic_declaration_identity"]
         )
 
-    assert before_roles["left-source"]["producer"]["source_provider"] == "provider-a"
-    assert before_roles["right-source"]["producer"]["source_provider"] == "provider-b"
-    assert after_roles["left-source"]["producer"]["source_provider"] == "provider-b"
-    assert after_roles["right-source"]["producer"]["source_provider"] == "provider-a"
+    assert (
+        assert_object(assert_object(before_roles["left-source"])["producer"])[
+            "source_provider"
+        ]
+        == "provider-a"
+    )
+    assert (
+        assert_object(assert_object(before_roles["right-source"])["producer"])[
+            "source_provider"
+        ]
+        == "provider-b"
+    )
+    assert (
+        assert_object(assert_object(after_roles["left-source"])["producer"])[
+            "source_provider"
+        ]
+        == "provider-b"
+    )
+    assert (
+        assert_object(assert_object(after_roles["right-source"])["producer"])[
+            "source_provider"
+        ]
+        == "provider-a"
+    )
 
 
 def _assert_explicit_pair_reversal(
@@ -957,20 +1038,20 @@ def _assert_explicit_pair_reversal(
     after_pair = after_groups["correspondence-ab"]
     _assert_pair_identity_and_reversed_roles(before_pair, after_pair)
 
-    delta = after["delta_from_previous"]
+    delta = assert_object(after["delta_from_previous"])
     assert delta["providers"] == {
         "added": [],
         "removed": [],
         "changed": [],
     }
-    declaration_delta = delta["declarations"]
+    declaration_delta = assert_object(delta["declarations"])
     assert declaration_delta["added_group_ids"] == []
     assert declaration_delta["removed_group_ids"] == []
-    assert [row["group_id"] for row in declaration_delta["changed_groups"]] == [
-        "correspondence-ab"
-    ]
+    assert [
+        row["group_id"] for row in assert_records(declaration_delta["changed_groups"])
+    ] == ["correspondence-ab"]
 
-    changed = declaration_delta["changed_groups"][0]
+    changed = assert_records(declaration_delta["changed_groups"])[0]
     assert changed["semantic_subject_changed"] is False
     assert changed["definition_changed"] is True
     assert changed["definition_changed_declaration_ids"] == [
@@ -984,24 +1065,27 @@ def _assert_explicit_pair_reversal(
         ["left-owner", "right-owner"] if values_change else []
     )
 
-    subjects = declaration_delta["semantic_subjects"]
+    subjects = assert_object(declaration_delta["semantic_subjects"])
     assert subjects["added"] == []
     assert subjects["removed"] == []
     assert subjects["ambiguous"] == []
-    assert len(subjects["changed"]) == 1
-    subject_change = subjects["changed"][0]
+    assert len(assert_array(subjects["changed"])) == 1
+    subject_change = assert_records(subjects["changed"])[0]
     assert (
         subject_change["semantic_subject_identity"]
         == before_pair["semantic_subject_identity"]
     )
     assert subject_change["group_id_changed"] is False
 
-    semantic_delta = subject_change["semantic_declarations"]
+    semantic_delta = assert_object(subject_change["semantic_declarations"])
     assert semantic_delta["added"] == []
     assert semantic_delta["removed"] == []
     assert semantic_delta["ambiguous"] == []
-    assert len(semantic_delta["changed"]) == 2
-    assert {row["semantic_role"]["kind"] for row in semantic_delta["changed"]} == {
+    assert len(assert_array(semantic_delta["changed"])) == 2
+    assert {
+        assert_object(row["semantic_role"])["kind"]
+        for row in assert_records(semantic_delta["changed"])
+    } == {
         "left-source",
         "right-source",
     }

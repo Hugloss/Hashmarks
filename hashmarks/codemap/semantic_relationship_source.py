@@ -73,17 +73,17 @@ class RelationshipSourceResolver:
         self.members: dict[str, tuple[dict[str, Any], bytes | None]] = {}
 
     def admitted(self, path: str) -> bool:
-        row = self.codemap._session_file_row(path)
+        row = self.codemap.reads.file_row(path)
         return (
             row is not None
             and row.get("evidence_visibility") != "deny"
-            and self.codemap._path_admitted_for_analysis(path)
-            and self.codemap.policy.decide(path).evidence_visibility.value != "deny"
+            and self.codemap.files.is_admitted(path)
+            and self.codemap.files.decide(path).evidence_visibility.value != "deny"
         )
 
     def member(self, path: str) -> tuple[dict[str, Any], bytes | None]:
         if path not in self.members:
-            self.members[path] = self.codemap._bounded_source_observation(
+            self.members[path] = self.codemap.source._bounded_source_observation(
                 path, 1_048_576
             )
         return self.members[path]
@@ -174,7 +174,7 @@ class RelationshipSourceResolver:
         rows = [
             row
             for row in cast(
-                "list[dict[str, Any]]", self.codemap._session_symbols_for_path(path)
+                "list[dict[str, Any]]", self.codemap.reads.symbols_for_path(path)
             )
             if int(row["start_line"]) == position["line"] + 1
             and (name is None or row["name"] == name)

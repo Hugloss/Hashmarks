@@ -54,14 +54,14 @@ def _capture(
     file = tmp_path / "src.py"
     file.write_text(old, encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        before_source = codemap.source_observation("src.py", lines=[old_line])
+        codemap.index.sync()
+        before_source = codemap.source.observe("src.py", lines=[old_line])
         before = _diagnostics(
             int(before_source["generation"]), old_line, column=columns[0]
         )
         file.write_text(new, encoding="utf-8")
-        codemap.sync()
-        after_source = codemap.source_observation("src.py", lines=[new_line])
+        codemap.index.sync()
+        after_source = codemap.source.observe("src.py", lines=[new_line])
         after = _diagnostics(
             int(after_source["generation"]), new_line, column=columns[1]
         )
@@ -102,14 +102,14 @@ def test_source_line_correspondence_respects_explicit_producer_revisions(
     file = tmp_path / "src.py"
     file.write_text("def example():\n    print(missing)\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        before_source = codemap.source_observation("src.py", lines=[2])
+        codemap.index.sync()
+        before_source = codemap.source.observe("src.py", lines=[2])
         before = _diagnostics(int(before_source["generation"]), 2)
         file.write_text(
             "def example():\n    other = 1\n    print(missing)\n", encoding="utf-8"
         )
-        codemap.sync()
-        after_source = codemap.source_observation("src.py", lines=[3])
+        codemap.index.sync()
+        after_source = codemap.source.observe("src.py", lines=[3])
         after = _diagnostics(int(after_source["generation"]), 3)
     packet, source = (
         (before, before_source) if endpoint == "before" else (after, after_source)
@@ -183,8 +183,8 @@ def test_missing_or_blank_line_anchor_fails_closed(tmp_path: Path) -> None:
     file = tmp_path / "src.py"
     file.write_text("x = 1\n\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        packet = codemap.source_observation("src.py", lines=[2, 500])
+        codemap.index.sync()
+        packet = codemap.source.observe("src.py", lines=[2, 500])
     assert packet["availability"] == "observed"
     assert packet["line_coverage"] == "unknown"
     assert [row["state"] for row in packet["line_anchors"]] == ["unknown", "unknown"]
@@ -194,8 +194,8 @@ def test_source_line_anchor_is_exact_revision_bound_and_unique(tmp_path: Path) -
     path = tmp_path / "src.py"
     path.write_bytes(b"a = 1\r\nb = 2\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        packet = codemap.source_observation("src.py", lines=[1, 2])
+        codemap.index.sync()
+        packet = codemap.source.observe("src.py", lines=[1, 2])
     assert packet["line_coverage"] == "complete"
     assert packet["completeness"] == "complete"
     assert len(packet["line_anchors"]) == 2
@@ -216,18 +216,18 @@ def test_source_line_scope_is_rejected_before_read(
 ) -> None:
     with CodeMap(tmp_path) as codemap:
         with pytest.raises(ValueError, match="lines"):
-            codemap.source_observation("src.py", lines=lines)
+            codemap.source.observe("src.py", lines=lines)
 
 
 def test_unsupported_or_stale_member_has_no_source_anchors(tmp_path: Path) -> None:
     path = tmp_path / "src.py"
     path.write_text("original = 1\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        before = codemap.source_observation("src.py", lines=[1])
+        codemap.index.sync()
+        before = codemap.source.observe("src.py", lines=[1])
         path.write_text("replaced = 1\n", encoding="utf-8")
-        stale = codemap.source_observation("src.py", lines=[1])
-        denied = codemap.source_observation(".env", lines=[1])
+        stale = codemap.source.observe("src.py", lines=[1])
+        denied = codemap.source.observe(".env", lines=[1])
     assert len(before["line_anchors"]) == 1
     assert stale["line_anchors"] == []
     assert stale["line_coverage"] == "unknown"

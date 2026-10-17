@@ -24,14 +24,10 @@ def test_opt_in_line_context_preserves_legacy_anchors_and_identity(
 ) -> None:
     (tmp_path / "example.py").write_bytes(b"before\r\nneedle\r\nafter\r\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        old = codemap.source_observation("example.py", lines=(2,))
-        zero = codemap.source_observation(
-            "example.py", lines=(2,), anchor_context_lines=0
-        )
-        new = codemap.source_observation(
-            "example.py", lines=(2,), anchor_context_lines=1
-        )
+        codemap.index.sync()
+        old = codemap.source.observe("example.py", lines=(2,))
+        zero = codemap.source.observe("example.py", lines=(2,), anchor_context_lines=0)
+        new = codemap.source.observe("example.py", lines=(2,), anchor_context_lines=1)
     assert old == zero
     assert assert_object(assert_array(old["line_anchors"])[0])["state"] == "observed"
     assert "context_excerpt" not in assert_object(assert_array(old["line_anchors"])[0])
@@ -66,8 +62,8 @@ def test_line_context_clips_long_unicode_lines_without_changing_byte_anchor(
         "before\n" + "ö" * 400 + "needle\n" + "after\n", encoding="utf-8"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        packet = codemap.source_observation(
+        codemap.index.sync()
+        packet = codemap.source.observe(
             "example.py", lines=(2,), anchor_context_lines=1
         )
     anchor = assert_array(packet["line_anchors"])[0]
@@ -91,8 +87,8 @@ def test_unknown_blank_and_out_of_range_lines_never_get_excerpts(
 ) -> None:
     (tmp_path / "example.py").write_text("head\n\nfoot\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        packet = codemap.source_observation(
+        codemap.index.sync()
+        packet = codemap.source.observe(
             "example.py", lines=(2, 4, 3), anchor_context_lines=1
         )
     assert [row["line"] for row in assert_records(packet["line_anchors"])] == [2, 3, 4]
@@ -118,18 +114,14 @@ def test_denied_unreconciled_oversized_and_invalid_utf8_never_expose_context(
     path.write_text("needle\n", encoding="utf-8")
     (tmp_path / "bad.py").write_bytes(b"invalid=\xff\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        denied = codemap.source_observation(".env", lines=(1,), anchor_context_lines=1)
-        oversized = codemap.source_observation(
+        codemap.index.sync()
+        denied = codemap.source.observe(".env", lines=(1,), anchor_context_lines=1)
+        oversized = codemap.source.observe(
             "sample.py", lines=(1,), anchor_context_lines=1, max_bytes=1
         )
-        invalid = codemap.source_observation(
-            "bad.py", lines=(1,), anchor_context_lines=1
-        )
+        invalid = codemap.source.observe("bad.py", lines=(1,), anchor_context_lines=1)
         path.write_text("different\n", encoding="utf-8")
-        stale = codemap.source_observation(
-            "sample.py", lines=(1,), anchor_context_lines=1
-        )
+        stale = codemap.source.observe("sample.py", lines=(1,), anchor_context_lines=1)
     for packet in (denied, oversized, invalid, stale):
         assert packet["line_anchors"] == []
         assert packet["line_coverage"] == "unknown"
@@ -142,7 +134,7 @@ def test_invalid_native_line_context_fails_before_source_read(
 ) -> None:
     with CodeMap(tmp_path) as codemap:
         with pytest.raises(ValueError, match="anchor_context_lines"):
-            codemap.source_observation(
+            codemap.source.observe(
                 "not-present.py",
                 lines=(1,),
                 anchor_context_lines=cast(int, bad),  # type: ignore[arg-type]
@@ -152,9 +144,9 @@ def test_invalid_native_line_context_fails_before_source_read(
 def test_line_context_requires_explicit_bounded_lines(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
         with pytest.raises(ValueError, match="requires 1 to 8"):
-            codemap.source_observation("not-present.py", anchor_context_lines=1)
+            codemap.source.observe("not-present.py", anchor_context_lines=1)
         with pytest.raises(ValueError, match="requires 1 to 8"):
-            codemap.source_observation(
+            codemap.source.observe(
                 "not-present.py", lines=tuple(range(1, 10)), anchor_context_lines=1
             )
 

@@ -50,7 +50,7 @@ def test_body_context_reuses_existing_provider_oracle_and_exact_index(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         plain = cm.task_change_impact(TASK, [PATH])
         augmented = _change(cm)
         provider = cm.discover_repository_declarations(
@@ -106,7 +106,7 @@ def test_body_context_excludes_nested_scopes_and_preserves_dynamic_returns(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         body = assert_object(_association(_change(cm))["handler_body_context"])
     assert body["literal_dictionary_returns"] == [
         {
@@ -131,7 +131,7 @@ def test_body_context_bounded_sites_and_explicit_omission(
     source += '    return {"fallback": True}\n'
     (tmp_path / PATH).write_text(source, encoding="utf-8")
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         body = assert_object(_association(_change(cm))["handler_body_context"])
     assert body["state"] == "bounded-direct-handler-body-syntax"
     assert body["return_sites_observed"] == 13
@@ -152,7 +152,7 @@ def test_body_site_overflow_degrades_locally_without_dropping_handler(
     )
     (tmp_path / PATH).write_text(source, encoding="utf-8")
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         association = _association(_change(cm))
     assert association["subject"] == "service.py::handler"
     assert assert_object(association["decorator_context"])["state"] == (
@@ -174,7 +174,7 @@ def test_decorated_class_does_not_become_a_function_response_oracle(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         association = _association(_change(cm))
     assert association["subject"] == "service.py::Handler"
     body = assert_object(association["handler_body_context"])
@@ -196,7 +196,7 @@ def test_handler_body_literals_never_exposed_under_restricted_visibility(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         impact = _change(cm)
     assert "secret_return_key" not in json.dumps(impact)
     assert "secret_access_key" not in json.dumps(impact)
