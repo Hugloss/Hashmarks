@@ -49,10 +49,181 @@ request-local walks now belong to that independent component, and old root
 resolver methods are removed. The control-path preparation value in `engine.py`
 keeps canonical path preparation with the composition root. The focused import
 ring passed **148 tests**, with scoped Ty/Pyright clean; the complete preserved
-integration ring plus import component tests passed **687 tests**. Native evidence,
-Relationships and Structure remain unfinished in CR-03.
+integration ring plus import component tests passed **687 tests**.
 
-Continue with CR-02 locality accounting and CR-03's remaining owner group.
+Native publication and freshness qualification now belong to independently
+constructed `RepositoryNativeEvidence`, exposed as `repo.native`. The engine
+Vitest back-reference is removed; native producers have explicit injection at
+their boundary. Source-bound SCIP/LSP adapters receive Source, read queries and
+store directly instead of a CodeMap back-pointer. All retired root native
+operations are removed, including migrated capture, CLI and identity consumers.
+The native ring passed **250 tests**, including all native LSP change tests,
+SCIP source correspondence and real CLI/MCP transport. Modified native owners
+and the direct component tests pass scoped Ty/Pyright. See
+`cr03-native-final.xml`, `cr03-native-ty.log` and `cr03-native-pyright.log`.
+The preserved broader ring plus direct component tests passed **691 tests**.
+Independent extraction of `cr03-native/source.zip` (SHA-256
+`a9caf78b8ee76c3fab4006ec22c670e16f04da8f3ada8ee420bcc29b213dad7e`)
+passed the same **250-test native ring**, with asserted import origin and observer
+`sha256:4bc1b7ed17a1706c5eacfeb286ef1c8ebe5512e817664f4e467711b54c57fe9d`.
+Source compileall and preflight passed.
+
+CR-03's remaining production boundaries are now implemented. Independent
+`RepositoryRelationships` owns dependency/reference/project/affected/test queries
+and reverse-cache state; task adjacency remains explicitly task composition.
+`RepositoryStructure` owns structural search, qualified direct-call/locality and
+related test-path facts. Its filesystem lifecycle analyzer consumes Structure,
+with no CodeMap back-pointer or higher verification dependency. Pure packet
+comparison moved to `structural_locality_delta.py`; typed node values and the
+unchanged serialization identity live in `structural_locality_model.py`.
+This is DECOMPOSE MULTIPLE RESPONSIBILITIES for the original live/comparison
+module, with the same schemas, identities, source bounds and exceptions.
+
+- Relationship ring: **226 PASS**; independent extracted ring: **174 PASS**.
+  The broader run exposed one structural assertion pointing to the retired
+  query module; after moving its owner location, all **121 boundary tests** pass.
+- Structural ring: **252 PASS**. The preserved integration membership plus all
+  direct component tests passed **698 tests** (`cr03-integration.xml`). All
+  migrated native/relationship/structural owners and their direct component
+  tests pass scoped Ty/Pyright. Source compileall and preflight pass.
+- Genuine metadata/sender public workflows pass all ten gates each, including
+  initial size and evidence; freshly regenerated native workflows pass all ten
+  gates each, including reopen/staleness. Both reports bind observer
+  `sha256:c26cb051f6f2d9e0f585cb9543d8424b06647e917cb3d9ffd72edcc0caf112c5`.
+  See `cr03-public/summary.json` and `cr03-native-workflows/summary.json`.
+  Aggregate status is INCOMPLETE for the explicitly selected two-workflow scope.
+- Current configured full typing is still red: **2,029 Ty diagnostics /
+  1,992 Pyright errors and one warning**. See `cr03-full-ty.log` and
+  `cr03-full-pyright.log`; scoped clean results do not replace this requirement.
+- Exact candidate ZIP: `cr03/source.zip`, SHA-256
+  `ff68995226a6c22481f96f48d6b60360bc2af047de399abffde3fb3222c93aa6`.
+  Independent extracted integration passed **697 tests**, with one deselection.
+  The Git-index membership test
+  remains proved in the real-worktree ring, as with the foundation extraction.
+
+CR-04's Search and Context production boundaries are implemented.
+`RepositorySearch` owns find/task retrieval, query single-flight and the three
+bounded retrieval/freshness memos. Tasks now submit observed contributing paths
+through `remember_paths` rather than writing those caches. Find evidence carries
+its normalized route into presentation. Replay/explanation lives in Search's
+`retrieval_diagnostics.py`, because replay temporarily invalidates/restores that
+same cache; the method mapping below reflects this ownership correction.
+`RepositoryContext` owns disclosure assembly and single-flight, borrows the
+existing ContextCache and composes lower Search/Source/Relationships. Stateless
+action-anchor projection moved from Ownership to `WorkContextProjection`; its
+tests no longer bypass a CodeMap constructor with `object.__new__`.
+
+- Search ring: **274 PASS**. The preserved integration membership plus all
+  eleven component files passed **706 tests** (`cr04-integration.xml`). Public
+  find/context/overlay and retrieval tests passed **94 tests**. Migrated Search/
+  Context owners and direct component tests pass scoped Ty/Pyright.
+- Genuine metadata/sender public and freshly acquired native workflows again
+  pass all ten selected gates each, under observer
+  `sha256:f21a4c50235e5ee133523670760bc28dadcd0687bf71d4ce49767c97f757ab0c`.
+  Reports are `cr04-public-workflows/summary.json` and
+  `cr04-native-workflows/summary.json`. Full-campaign qualification remains
+  INCOMPLETE, as required for this two-workflow scope.
+- `cr04-final/source.zip`, SHA-256
+  `98eef4d1de7678c6e10986a96454d487e924cb6a366784359855cf5b89d2fa3d`,
+  passed **738 tests** in an independent extraction, with one Git-only test
+  deselected after its real-worktree proof. Import origin and observer identity
+  were asserted. Source compileall and preflight passed.
+- The loop-efficiency guard was vacuous because it scanned retired methods in
+  `engine.py`. It now names all current owners and requires each guarded method
+  to exist. The strengthened guard and explicit Search/Context failure-cleanup
+  tests pass in the worktree (**22 tests**). The refreshed artifact at
+  `cr04-qualified/source.zip`, SHA-256
+  `f6bab2b3520908e0d80264387abe89e3dfd27339ee2d6475954fcb9e57474994`,
+  passed **72 tests** from independent extraction, including the stronger guards,
+  cleanup/retry, actual CLI/MCP and overlay paths. Production observer identity
+  remains the same `f21a4c…` candidate; see `cr04-qualified-extracted.xml`.
+- A frozen real Python repository workload has identical returned evidence,
+  parsed/reused artifact counts, instrumented store/primitive counts, traced SQL
+  statement counts across all four borrowed SQLite connections, stable-byte
+  reads and AST-cache observations in cold/warm/incremental phases. See
+  `cr04-economics/summary.json`. This is one comparable corpus, not a timing or
+  broad performance result.
+- Current configured full typing remains red: **2,025 Ty diagnostics /
+  1,986 Pyright errors and one warning** (`cr04-full-*.log`).
+
+CR-05's core boundaries are implemented as `RepositoryOwnership`,
+`RepositoryVerification` and `RepositoryTasks`. Ownership's nomination and final
+proof now live in `ownership_nomination.py` and `ownership_candidate_*.py`;
+Tasks orchestrates explicit values. Analyzers accept Source/Imports and exact
+query capabilities rather than an owner/root bag. The filesystem lifecycle
+analyzer receives four narrow inputs, including one typed direct-call resolver.
+Verification's `for_owner` consumes a frozen request with normalized task data,
+nominee status and exact active read-scope binding; it never calls Tasks.
+Task convenience views and receipts share a scoped `TaskObservation`. Selected/
+recent authority freshness is now task-owned, separately from Search's retrieval
+freshness; Source owns the shared reconciliation mechanics. Retired core root
+methods and state are removed.
+
+- Core handoff/adversarial ring passed **130 tests**, independent new component
+  ring **10 tests**, and preserved integration plus all fourteen component files
+  **718 tests**. Actual public MCP/verification/direct-boundary ring passed
+  **81 tests**. Scoped Ty/Pyright for the new owners and direct tests are clean.
+- A wider verifier ring reproduced three defects on the frozen parent: late
+  source-local disclosure replaced owner-bound reference facts. The generic
+  merge repair preserves those existing facts and records direct/indirect
+  observations within their own source basis. The repaired ring passed
+  **91 tests**; `cr05-verifier-parent-probe.xml` retains the baseline failures.
+  No oracle, expected relationship, size ceiling or authority gate was weakened.
+- Both selected genuine metadata/sender public workflows and freshly acquired
+  native workflows pass all ten gates each under observer
+  `sha256:2cf349ad88cbc4eb33dd831d0fa0447c0bb464b6deec3df6c9320b0b30a2d733`.
+  See `cr05-public-workflows/summary.json` and
+  `cr05-native-workflows/summary.json`. Aggregate status remains INCOMPLETE for
+  the explicitly selected two-workflow scope.
+- `cr05/source.zip`, SHA-256
+  `151f4d1226db06d4892a9a8da7e42bb1ff8b4deae43532e1297ff271dffb61a0`,
+  passed **717 tests** from independent extraction, with the one Git-only
+  assertion proved in the real worktree. Source compileall and preflight pass.
+- Current configured full typing is still red: **1,989 Ty diagnostics /
+  1,948 Pyright errors and one warning** (`cr05-full-*.log`).
+
+CR-06's packet/brief implementation now belongs to `RepositoryTasks`, including
+its inherited retrieval, scoped-source and configuration disclosure stages.
+CodeMap no longer inherits those domain implementations, and all their typed
+inputs/casts target Tasks. Tasks now borrows Context and obtains its Source from
+the supplied Search owner, avoiding a second independently supplied Source.
+Default/initial/decision/action views consume its existing scoped observation;
+main packet assembly no longer retrieves the same canonical task result again.
+Native relationship composition receives the actual Structure owner. Retired
+root packet methods and implementation paths are removed without aliases.
+
+- Packet/initial/brief/v5 ring: **86 PASS**. Actual public/default/operation/
+  service/MCP ring: **136 PASS**. Extended brief/verification/transport ring:
+  **125 PASS**. Independent task component covers default/initial owner authority,
+  freshness, selected verifier, a brief receipt and observation reuse.
+- Preserved integration plus all fourteen component files: **719 PASS**.
+  `cr06/source.zip`, SHA-256
+  `da94e2909e1422245724f35a23b8d42dc835ea0316c9b0a1f95db0775bfd66ff`,
+  passed **718 tests** from independent extraction, with one Git-only deselection
+  after real-worktree proof. Source compileall and preflight pass.
+- Both metadata/sender public workflows and freshly acquired native workflows
+  again pass all ten gates each, including the unchanged initial evidence/size
+  targets. Reports bind observer
+  `sha256:bc9544f3c909a8bffa63b6ffc707ddd662d48be300e489266ef7f34f37308fdf`:
+  `cr06-public-workflows/summary.json` and `cr06-native-workflows/summary.json`.
+  Aggregate status remains INCOMPLETE for the selected two-workflow scope.
+- Additional class-level callers found by the full typing inventory now name
+  Index/Source/Ownership/Verification/Tasks directly, including the benchmark-only
+  surface classifier and public operation profiler. Their focused ring passed
+  **65 tests**. The refreshed test/caller artifact at
+  `cr06-qualified/source.zip`, SHA-256
+  `e620eb9fc9a1a8fed3cbf0d18e241461ab73d32ac9fbda9e2787e6c3926f0a01`,
+  passed **108 tests** from independent extraction. Product observer is unchanged.
+  The final private-owner counter annotation was corrected subsequently.
+- Packet-family scoped Ty/Pyright is clean. Full project typing remains red;
+  the checkpoint inventories are **1,979 Ty diagnostics / 1,938 Pyright errors
+  and one warning**, recorded in `cr06-full-ty-checkpoint.log` and
+  `cr06-full-pyright-checkpoint.log`.
+
+Continue with CR-07 Bindings/Correlation, CR-08 Declarations/Dependencies and the
+remaining owner families. Complete structural-locality/read-binding/lifecycle
+qualification and full project typing still remain mandatory before the final
+twenty-capability corpus/oracle/witness campaign can claim 5/5.
 Use `.hashmarks/canonical-component-rewrite/` for the retained evidence. Earlier
 `cr02-index-v2` extraction failures remain historical; three test call sites and
 one repository-Git-only proof requirement were corrected in later qualification.
@@ -235,14 +406,14 @@ make one class or one new file per old mixin.
 | `DecisionScope` / `repo.reads` | `decision_session.py` | One generation-bound read scope, lower query reuse and diagnostics; Index/read queries and observation source, never task or presentation owners |
 | `RepositorySource` / `repo.source` | **Proposed** `repository_source.py`; existing source primitives remain mechanisms | Qualified member/range/outline/symbol/grep/source observations and their visibility; Files, Index read/reconcile capability, stable bytes and DecisionScope |
 | `RepositoryImports` / internal | `import_resolution.py` | Qualified import/alias/re-export identity; published index projection, read queries and Files/Source where already required |
-| `RepositoryNativeEvidence` / `repo.native` | **Proposed** `native_evidence.py`, reusing `evidence_freshness.py` and producer adapters | Native import/enrichment, provenance/freshness qualification and capability observations; Files, Source, Index publication facts, store transaction mechanism and narrow producers |
+| `RepositoryNativeEvidence` / `repo.native` | `native_evidence.py`, reusing internal `evidence_freshness.py` and producer adapters | Native import/enrichment, provenance/freshness qualification and capability observations; Files, Source, Index publication facts, store transaction mechanism and narrow producers |
 | `RepositoryRelationships` / `repo.relationships` | `evidence_graph.py`, `relationships.py` | Existing imports/calls/references/project/affected relationships and reverse-cache validity; qualified Imports/Native evidence, indexed queries, DecisionScope |
 | `RepositoryStructure` / `repo.structure` | `structural_locality.py` | Existing bounded structural search/locality/direct-call evidence; Source, Imports, qualified native inputs, read queries and structural search provider |
 | `RepositorySearch` / `repo.search` | `find_engine.py`, `task_retrieval.py` | Candidate retrieval and its own caches/single-flight; normalized query primitives, Source, Relationships, read queries and DecisionScope |
 | `RepositoryContext` / `repo.context` | `repository_context.py`, `work_context.py` | Context construction and progressive disclosure/economics over selected candidates; Search, Source, Relationships, ContextCache and DecisionScope |
-| `RepositoryOwnership` / `repo.ownership` | `ownership_analysis.py`, `ownership_graph.py`, existing `ownership/` modules and owner-resolution algorithms | Repository ownership/risk observations and task-candidate qualification; Imports, Source, Relationships, Structure and supplied candidate/evidence values |
+| `RepositoryOwnership` / `repo.ownership` | `ownership_analysis.py`, `ownership_graph.py`, `ownership_nomination.py`, `ownership_candidate_*.py`, existing `ownership/` modules | Repository ownership/risk observations and task-candidate qualification; Imports, Source, Relationships, Structure and supplied candidate/evidence values |
 | `RepositoryVerification` / `repo.verification` | `evidence_verification.py`, `verification_ownership.py`, `verification_plan.py`, `verification_explanation.py` | Relevance and declared test-plan facts for supplied owner/test evidence; Source, Imports, Relationships, indexed queries and value-level ownership facts; no task-component back-reference |
-| `RepositoryTasks` / `repo.tasks` | `repository_task_action.py`, `task_action_projection.py`, `evidence_packet.py`, `evidence_decision_packet.py` | Task-local composition of retrieval, owner evidence, verification and bounded packets; explicit lower components and existing pure projections |
+| `RepositoryTasks` / `repo.tasks` | `repository_tasks.py`, `task_action_projection.py`, `task_entry_points.py`, `task_freshness.py`, `task_verification.py`, `task_receipts.py`, `evidence_packet.py`, `evidence_decision_packet.py` | Task-local composition of retrieval, owner evidence, verification and bounded packets; explicit lower components and existing pure projections |
 | `RepositoryBindings` / `repo.bindings` | `repository_evidence_bindings.py`, `repository_evidence_coverage.py`, `repository_evidence_binding_delta.py` | Consumer-declared evidence scope and factual binding/coverage/delta; Source, Relationships, existing endpoint-delta primitives |
 | `RepositoryCorrelation` / `repo.correlation` | `evidence_correlation.py` | External claim-to-source correspondence; Source, Bindings and indexed queries; no causal or execution authority |
 | `RepositoryDeclarations` / `repo.declarations` | `repository_declarations.py`, discovery/derivation modules | Provider-owned declaration claims, explicit correspondence, qualified values/absence and deltas; Files, Source, Bindings, domain validators and caller-selected providers |
@@ -445,7 +616,8 @@ namespace. Pure module functions and model types stay with their semantic owner.
 | `structural`, `structural_locality` | `structure.search`, `structure.locality` |
 | `find`, `find_packet`, `query_route`, `find_task`, `formulate_task_query`, `task_query_views` | `search.find`, `search.packet`, `search.query_route`, `search.find_task`, `search.formulate_task_query`, `search.task_query_views` |
 | `context`, `orient`, `task_context`, `task_context_plan` | `context.build`, `context.orient`, `context.task`, `context.task_plan` |
-| `work_context`, `work_context_budget_sweep`, `explain_task_retrieval`, `retrieval_stability` | `context.work`, `context.budget_sweep`, `context.explain_retrieval`, `context.retrieval_stability` |
+| `work_context`, `work_context_budget_sweep` | `context.work`, `context.budget_sweep` |
+| `explain_task_retrieval`, `retrieval_stability` | `search.explain_retrieval`, `search.retrieval_stability`; replay owns temporary invalidation/restoration of the Search cache |
 | `repository_findings`, `repository_ownership_graph`, `ownership_relation_graph` | `ownership.findings`, `ownership.repository_graph`, `ownership.relations` |
 | `cache_ownership_findings`, `cache_invalidation_ownership_graph`, `concurrency_risk_findings`, `import_ownership_findings` | `ownership.cache_findings`, `ownership.cache_invalidation_graph`, `ownership.concurrency_findings`, `ownership.import_findings` |
 | `task_entry_points`, `task_action_map`, `task_decision_packet` | `tasks.entry_points`, `tasks.action_map`, `tasks.decision_packet` |
@@ -753,8 +925,9 @@ do not construct Tasks or Verification; metadata facts stay early and bounded.
 KEEP COHESIVE for the current `hashmarks.ownership_decision` proof model and
 neutral verification-plan derivation.
 
-**Files:** `repository_task_action.py`, `task_action_projection.py`,
-`task_action_owner_resolution.py`, `task_action_evidence.py`,
+**Files:** `repository_tasks.py`, `task_action_projection.py`,
+`ownership_candidates.py`, `ownership_nomination.py`,
+`ownership_candidate_resolution.py`, `ownership_candidate_evidence.py`,
 `task_action_types.py`, `ownership_analysis.py`, `ownership_graph.py`,
 `ownership/`, `evidence_verification.py`, `verification_ownership.py`,
 `verification_explanation.py`, `verification_plan.py`, `task_evidence_types.py`.
@@ -997,6 +1170,11 @@ existing direct-owner/boundary tests. Keep guards narrow and behavior-driven.
 3. Keep functional guards for stale native cache hits, read/parse interleaving,
    denied bytes, ambiguous owner/test identity and projection-bound changes.
    Architectural shape cannot substitute for those assertions.
+   Exercise independently constructed components across two workspaces and
+   read scopes with identical relative filenames. Qualify their input-binding
+   contract: mismatched Source/store/native inputs must not blend repository
+   authority. Check the supported shared-store/concurrent-reader case before
+   choosing identity checks; do not introduce a global admission manager.
 4. Confirm every introduced operation/stage has a direct owning test and complete
    structural locality for its declared measurement scope. Capture comparable
    pre/post complexity/dependency/query/parse observations, not a LOC-only win.

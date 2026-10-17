@@ -292,7 +292,7 @@ def _freeze_task_packet(
     with CodeMap(repo, artifact_db=repo / "artifacts.sqlite3") as codemap:
         started = time.perf_counter_ns()
         codemap.index.sync()
-        codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
+        codemap.native.enrich_projects(("npm-package-graph", "declared-project-links"))
         setup_ns = time.perf_counter_ns() - started
         changed = repo / task["changed"]
         if task["kind"] == "shared-input":

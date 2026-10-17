@@ -11,7 +11,7 @@ from hashmarks import CodeMap, validate_repository_intelligence_evidence
 
 with CodeMap(".") as codemap:
     codemap.index.sync()
-    findings = codemap.repository_findings(["src/cleanup.py"])
+    findings = codemap.ownership.findings(["src/cleanup.py"])
     observation = findings["resource_lifecycle"]
     checked = validate_repository_intelligence_evidence(observation)
 ```

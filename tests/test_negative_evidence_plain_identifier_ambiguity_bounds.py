@@ -57,11 +57,14 @@ def test_bounded_plain_identifier_scan_cannot_hide_duplicate_owner(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         _bounded_plain_probe(codemap, monkeypatch)
-        context = codemap._task_action_map_context(task, 1)
-        evidence = codemap._task_action_exact_identifier_edit_candidates(
-            task, context.rows, context.failed
-        )
-        action = codemap.task_action_map(task, limit=1, per_role=1)
+        with codemap.reads.session() as _task_read_scope:
+            context = codemap.ownership.observe_candidates(
+                codemap.tasks._task_observation(task, 1), 1
+            )
+            evidence = codemap.ownership._task_action_exact_identifier_edit_candidates(
+                task, context.rows, context.failed
+            )
+            action = codemap.tasks.action_map(task, limit=1, per_role=1)
 
     assert evidence.candidates == []
     assert evidence.search_complete is False
@@ -88,11 +91,14 @@ def test_complete_plain_identifier_scan_can_prove_duplicate_ambiguity(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        context = codemap._task_action_map_context(task, 20)
-        evidence = codemap._task_action_exact_identifier_edit_candidates(
-            task, context.rows, context.failed
-        )
-        action = codemap.task_action_map(task, limit=20)
+        with codemap.reads.session() as _task_read_scope:
+            context = codemap.ownership.observe_candidates(
+                codemap.tasks._task_observation(task, 20), 20
+            )
+            evidence = codemap.ownership._task_action_exact_identifier_edit_candidates(
+                task, context.rows, context.failed
+            )
+            action = codemap.tasks.action_map(task, limit=20)
 
     assert {row["path"] for row in evidence.candidates} == {
         "src/a.py",
@@ -113,10 +119,13 @@ def test_complete_plain_identifier_scan_can_leave_generic_name_unpromoted(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        context = codemap._task_action_map_context(task, 20)
-        evidence = codemap._task_action_exact_identifier_edit_candidates(
-            task, context.rows, context.failed
-        )
+        with codemap.reads.session() as _task_read_scope:
+            context = codemap.ownership.observe_candidates(
+                codemap.tasks._task_observation(task, 20), 20
+            )
+            evidence = codemap.ownership._task_action_exact_identifier_edit_candidates(
+                task, context.rows, context.failed
+            )
 
     assert evidence.candidates == []
     assert evidence.search_complete is True
@@ -162,7 +171,7 @@ def test_explicit_identifier_authority_is_independent_of_plain_scan_bound(
 
         monkeypatch.setattr(codemap.reads, "exact_symbol_candidates", exact_symbols)
         task = "Refactor explicit_owner_name and resolve behavior"
-        action = codemap.task_action_map(task, limit=1, per_role=1)
+        action = codemap.tasks.action_map(task, limit=1, per_role=1)
 
     assert action["edit"]["path"] == "src/owner.py"
     assert action["owner_basis"] in {"exact-symbol", "unique-exact-symbol"}

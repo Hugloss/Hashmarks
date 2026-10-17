@@ -44,7 +44,7 @@ def test_compact_tables_recover_all_locators_qualifiers_and_future_fields(
         codemap.index.sync()
         wire = cast(
             "dict[str, Any]",
-            codemap.task_evidence(
+            codemap.tasks.evidence(
                 "Inspect Worker.update in répository.py", result_mode="initial"
             ),
         )

@@ -28,8 +28,8 @@ def _delta_and_coverage(
     before: dict[str, object],
     after: dict[str, object],
 ) -> tuple[dict[str, object], dict[str, object]]:
-    delta = codemap.repository_evidence_binding_delta(before, after)
-    coverage = codemap.repository_evidence_coverage(
+    delta = codemap.bindings.delta(before, after)
+    coverage = codemap.bindings.coverage(
         after,
         changed_paths=[],
         change_set_complete=True,
@@ -67,11 +67,11 @@ def test_duplicate_locator_multiplicity_is_definition_topology_not_content_chang
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        single = codemap.repository_evidence_bindings(
+        single = codemap.bindings.observe(
             _lines_binding(),
             include_relationships=False,
         )
-        duplicated = codemap.repository_evidence_bindings(
+        duplicated = codemap.bindings.observe(
             _lines_binding(duplicate=True),
             include_relationships=False,
         )
@@ -115,11 +115,11 @@ def test_lines_to_member_scope_switch_is_definition_not_repository_content_chang
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        lines = codemap.repository_evidence_bindings(
+        lines = codemap.bindings.observe(
             _lines_binding(),
             include_relationships=False,
         )
-        member = codemap.repository_evidence_bindings(
+        member = codemap.bindings.observe(
             _member_binding(),
             include_relationships=False,
         )

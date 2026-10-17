@@ -53,7 +53,7 @@ def test_query_facade_delegates_without_changing_producer_semantics(
             "cross-repository": codemap.cross_repository_evidence_packet(
                 task, ["src/owner.py"]
             ),
-            "verification-explanation": codemap.explain_verification_selection(
+            "verification-explanation": codemap.tasks.explain_verification_selection(
                 task, "tests/test_owner.py"
             ),
         }

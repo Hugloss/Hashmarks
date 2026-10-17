@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import ast
 import posixpath
 from collections import deque
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from pathlib import Path, PurePosixPath
+from typing import TYPE_CHECKING
 
 from hashmarks.python_ast_cache import read_python_ast
 
@@ -196,6 +195,36 @@ class RepositoryImports:
         self.workspace = files.workspace
 
     """Own repository import/re-export identity resolution for CodeMap evidence."""
+
+    def module_for_path(self, path: str) -> str | None:
+        target = PurePosixPath(path)
+        if target.suffix not in {".py", ".pyi"}:
+            return None
+        parts = list(target.parts)
+        if not parts:
+            return None
+        if target.stem == "__init__":
+            parts = parts[:-1]
+        else:
+            parts[-1] = target.stem
+        if not parts:
+            return None
+        # Package components above a non-top-level module must be backed by
+        # __init__.py/__init__.pyi; otherwise do not invent import identity.
+        if len(parts) > 1 and not self._python_package_chain_exists(parts[:-1]):
+            return None
+        return ".".join(parts)
+
+    def _python_package_chain_exists(self, packages: list[str]) -> bool:
+        current = PurePosixPath()
+        for package in packages:
+            current = current / package
+            if not (
+                (self.workspace / current / "__init__.py").is_file()
+                or (self.workspace / current / "__init__.pyi").is_file()
+            ):
+                return False
+        return True
 
     def _python_call_reference_candidates(
         self, row: Mapping[str, object], limit: int

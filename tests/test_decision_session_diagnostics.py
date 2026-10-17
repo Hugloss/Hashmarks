@@ -68,9 +68,9 @@ def test_diagnostics_classifies_duplicate_semantic_producer_requests(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         with codemap.reads.session(diagnostics=True):
-            codemap.task_action_map(task)
-            codemap.task_action_map(task)
-            codemap.task_action_map(task, limit=21)
+            codemap.tasks.action_map(task)
+            codemap.tasks.action_map(task)
+            codemap.tasks.action_map(task, limit=21)
         receipt = codemap.reads.diagnostics()
 
     assert receipt is not None
@@ -101,7 +101,7 @@ def test_diagnostics_receipt_is_detached_from_internal_state(tmp_path: Path) -> 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         with codemap.reads.session(diagnostics=True):
-            codemap.task_action_map(task)
+            codemap.tasks.action_map(task)
         first = codemap.reads.diagnostics()
         assert first is not None
         first["producers"].clear()

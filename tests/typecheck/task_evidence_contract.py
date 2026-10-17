@@ -32,32 +32,32 @@ from hashmarks.mcp_surface import HashmarksMcpSurface
 
 
 def check_task_evidence_types(codemap: CodeMap, mode: str) -> None:
-    action = codemap.task_action_map("change owner")
+    action = codemap.tasks.action_map("change owner")
     assert_type(action, TaskActionMap)
     assert_type(action["ownership_authority"]["owner_resolved"], bool)
     assert_type(action["ownership_authority"]["evidence_state"]["proven"], bool)
     assert_type(action["ownership_authority"]["proof_scope"], str | None)
     assert_type(action["edit"], TaskCandidate | None)
 
-    packet = codemap.task_evidence("change owner")
+    packet = codemap.tasks.evidence("change owner")
     assert_type(packet, TaskEvidencePacket)
     assert_type(packet["ownership"]["owner"], TaskCandidate | None)
     assert_type(packet["retrieval"]["results"], list[RetrievalLocator])
     assert_type(packet["retrieval"]["bounds"]["canonical_truncation"], str)
     assert_type(packet["freshness"]["state"], str)
     assert_type(
-        codemap.task_evidence("change owner", result_mode="default"),
+        codemap.tasks.evidence("change owner", result_mode="default"),
         TaskEvidencePacket,
     )
-    initial = codemap.task_evidence("change owner", result_mode="initial")
+    initial = codemap.tasks.evidence("change owner", result_mode="initial")
     assert_type(initial, InitialTaskEvidenceEnvelope)
     decode_initial_packet(initial)
     assert_type(
-        codemap.task_evidence("change owner", result_mode=mode),
+        codemap.tasks.evidence("change owner", result_mode=mode),
         TaskEvidencePacket | InitialTaskEvidenceEnvelope,
     )
     assert_type(
-        codemap._task_evidence_discrimination_next_read(action),
+        codemap.tasks._task_evidence_discrimination_next_read(action),
         DiscriminationRead | None,
     )
     assert_type(

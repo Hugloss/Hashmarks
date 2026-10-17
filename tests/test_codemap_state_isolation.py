@@ -66,7 +66,7 @@ def test_codemap_never_follows_source_symlinks_outside_workspace(
         result = codemap.index.sync()
         assert result.discovered == 0
         assert codemap.store.file_row("leak.py") is None
-        assert not codemap.find("outside_secret")
+        assert not codemap.search.find("outside_secret")
 
 
 def test_incremental_file_to_symlink_removes_old_codemap_row(tmp_path: Path) -> None:
@@ -149,5 +149,5 @@ def test_interrupted_sync_rolls_back_candidate_generation(
 
     with CodeMap(tmp_path, artifact_db=artifact_db) as reopened:
         assert reopened.status()["build"]["state"] == "NEVER_SYNCED"
-        assert reopened.find("run")[0].path == "src/app.py"
+        assert reopened.search.find("run")[0].path == "src/app.py"
         assert reopened.status()["build"]["complete"] is True

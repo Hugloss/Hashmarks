@@ -88,24 +88,24 @@ def test_relationship_observation_enable_disable_is_non_comparable_not_fact_chan
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        not_requested = codemap.repository_evidence_bindings(
+        not_requested = codemap.bindings.observe(
             _binding(),
             include_relationships=False,
         )
-        observed = codemap.repository_evidence_bindings(
+        observed = codemap.bindings.observe(
             _binding(),
             relationship_limit_per_path=8,
         )
-        disabled_again = codemap.repository_evidence_bindings(
+        disabled_again = codemap.bindings.observe(
             _binding(),
             include_relationships=False,
         )
 
-        enabled_delta = codemap.repository_evidence_binding_delta(
+        enabled_delta = codemap.bindings.delta(
             not_requested,
             observed,
         )
-        enabled_coverage = codemap.repository_evidence_coverage(
+        enabled_coverage = codemap.bindings.coverage(
             observed,
             changed_paths=[],
             change_set_complete=True,
@@ -113,11 +113,11 @@ def test_relationship_observation_enable_disable_is_non_comparable_not_fact_chan
             binding_delta_before=not_requested,
         )
 
-        disabled_delta = codemap.repository_evidence_binding_delta(
+        disabled_delta = codemap.bindings.delta(
             observed,
             disabled_again,
         )
-        disabled_coverage = codemap.repository_evidence_coverage(
+        disabled_coverage = codemap.bindings.coverage(
             disabled_again,
             changed_paths=[],
             change_set_complete=True,
@@ -149,19 +149,19 @@ def test_observer_change_keeps_relationship_facts_unknown_but_member_change_visi
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.repository_evidence_bindings(_binding())
+        before = codemap.bindings.observe(_binding())
 
         source.write_text("from beta import VALUE\nKEEP = 1\n", encoding="utf-8")
         codemap.index.sync(["source.py"])
-        after = codemap.repository_evidence_bindings(_binding())
+        after = codemap.bindings.observe(_binding())
         after["observer"] = {
             **assert_object(after["observer"]),
             "identity": "sha256:" + "a" * 64,
         }
         _resign_packet(codemap, after)
 
-        delta = codemap.repository_evidence_binding_delta(before, after)
-        coverage = codemap.repository_evidence_coverage(
+        delta = codemap.bindings.delta(before, after)
+        coverage = codemap.bindings.coverage(
             after,
             changed_paths=["source.py"],
             change_set_complete=True,

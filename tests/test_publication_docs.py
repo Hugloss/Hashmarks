@@ -18,7 +18,7 @@ def test_codemap_maintainer_guide_maps_internal_ownership_and_request_flows() ->
         "## Responsibility map",
         "## Trace common requests before reading everything",
         "### `CodeMap.index.sync()`",
-        "### `CodeMap.repository_ownership_graph()`",
+        "### `CodeMap.ownership.repository_graph()`",
         "## How to choose where new code belongs",
         "## Reading strategy for a new maintainer",
     ):
@@ -98,7 +98,7 @@ def test_public_docs_expose_repository_evidence_binding_contract() -> None:
 
     assert "reference/REPOSITORY_EVIDENCE_BINDINGS.md" in docs
     assert "Repository evidence bindings" in readme
-    assert "repository_evidence_bindings()" in stability
+    assert "CodeMap.bindings.observe()" in stability
     assert "hashmarks.repository-evidence-bindings.v1" in stability
     assert "## Repository evidence bindings" in observer
     for schema in (

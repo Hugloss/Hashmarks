@@ -13,7 +13,7 @@ from hashmarks.evidence_context import describe_evidence_binding_reacquisition
 
 def requery(cm: CodeMap, reference: dict[str, object]) -> dict[str, object]:
     query = reference["requery"]
-    return cm.repository_evidence_bindings(
+    return cm.bindings.observe(
         [{"binding_id": query["binding_id"], "evidence": query["evidence"]}],
         dependency_paths={query["binding_id"]: query["dependency_paths"]},
         include_relationships=query["include_relationships"],
@@ -51,7 +51,7 @@ def test_reacquisition_preserves_definition_but_observes_current_change(
     (root / "other.py").write_text("def other():\n    return 2\n")
     with CodeMap(root, state_dir=state) as cm:
         cm.index.sync()
-        before: Any = cm.repository_evidence_bindings(
+        before: Any = cm.bindings.observe(
             [
                 {
                     "binding_id": "consumer:source",
@@ -78,7 +78,7 @@ def test_reacquisition_preserves_definition_but_observes_current_change(
     with CodeMap(root, state_dir=state) as cm:
         cm.index.sync()
         after = requery(cm, reference)
-        delta: Any = cm.repository_evidence_binding_delta(before, after)
+        delta: Any = cm.bindings.delta(before, after)
     old, new = before["bindings"][0], after["bindings"][0]
     assert old["binding_definition_identity"] == new["binding_definition_identity"]
     assert old["binding_observation_identity"] != new["binding_observation_identity"]

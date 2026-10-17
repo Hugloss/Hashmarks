@@ -36,7 +36,7 @@ def test_setuptools_src_layout_uses_import_identity_not_repository_prefix(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         row = codemap.store.file_row("src/pkg/api.py")
-        affected = codemap.affected("src/pkg/api.py", max_depth=2)
+        affected = codemap.relationships.affected("src/pkg/api.py", max_depth=2)
         owners, ambiguous = codemap._imports._resolve_import_owner_evidence(
             "tests/test_api.py", "pkg.api.run"
         )
@@ -77,7 +77,7 @@ def test_unconfigured_src_namespace_keeps_src_as_module_identity(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         row = codemap.store.file_row("src/m0.py")
-        affected = codemap.affected("src/m0.py", max_depth=2)
+        affected = codemap.relationships.affected("src/m0.py", max_depth=2)
     assert row is not None and row["module_name"] == "src.m0"
     assert "src/m1.py" in assert_array(affected["affected_files"])
 
@@ -101,7 +101,7 @@ def test_source_root_configuration_change_reprojects_reused_module_identity(
     with CodeMap(tmp_path, state_dir=state) as codemap:
         result = codemap.index.sync()
         after = codemap.store.file_row("src/pkg/api.py")
-        affected = codemap.affected("src/pkg/api.py", max_depth=2)
+        affected = codemap.relationships.affected("src/pkg/api.py", max_depth=2)
     assert result.parsed_artifacts == 1
     assert result.reused_artifacts >= 2
     assert after is not None and after["module_name"] == "pkg.api"
@@ -135,8 +135,12 @@ def test_duplicate_configured_import_identity_is_ambiguous_and_not_reverse_owned
         owners, ambiguous = codemap._imports._resolve_import_owner_evidence(
             "tests/test_consumer.py", "shared.api.run"
         )
-        affected_a = codemap.affected("services/a/src/shared/api.py", max_depth=2)
-        affected_b = codemap.affected("services/b/src/shared/api.py", max_depth=2)
+        affected_a = codemap.relationships.affected(
+            "services/a/src/shared/api.py", max_depth=2
+        )
+        affected_b = codemap.relationships.affected(
+            "services/b/src/shared/api.py", max_depth=2
+        )
     assert paths == ["services/a/src/shared/api.py", "services/b/src/shared/api.py"]
     assert owners == []
     assert ambiguous is True
@@ -170,7 +174,9 @@ def test_duplicate_import_identity_becomes_unique_after_one_owner_removed(
         owners, ambiguous = codemap._imports._resolve_import_owner_evidence(
             "consumer.py", "shared.api.run"
         )
-        affected = codemap.affected("services/a/src/shared/api.py", max_depth=1)
+        affected = codemap.relationships.affected(
+            "services/a/src/shared/api.py", max_depth=1
+        )
     assert owners == ["services/a/src/shared/api.py"]
     assert ambiguous is False
     assert "consumer.py" in assert_array(affected["affected_files"])
@@ -189,7 +195,9 @@ def test_nested_project_pyproject_scopes_src_root_to_project_directory(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         row = codemap.store.file_row("services/a/src/pkg/api.py")
-        affected = codemap.affected("services/a/src/pkg/api.py", max_depth=1)
+        affected = codemap.relationships.affected(
+            "services/a/src/pkg/api.py", max_depth=1
+        )
     assert row is not None and row["module_name"] == "pkg.api"
     assert "services/a/src/pkg/use.py" in assert_array(affected["affected_files"])
 
@@ -239,7 +247,9 @@ def test_same_service_targeted_pyproject_change_refreshes_import_roots(
         )
         codemap.index.sync(paths=["services/a/pyproject.toml", "services/a/src/pkg"])
         after = codemap.store.file_row("services/a/src/pkg/api.py")
-        affected = codemap.affected("services/a/src/pkg/api.py", max_depth=1)
+        affected = codemap.relationships.affected(
+            "services/a/src/pkg/api.py", max_depth=1
+        )
     assert after is not None and after["module_name"] == "pkg.api"
     assert "services/a/src/pkg/use.py" in assert_array(affected["affected_files"])
 

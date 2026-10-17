@@ -3,14 +3,12 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
 from hashmarks.operation_contract import operation_schema
 
+from .evidence_correlation_model import CorrelationValues
 from .repository_observation import packet_digest
-
-if TYPE_CHECKING:
-    from .engine import CodeMap
 
 _MAX_TOTAL_ANCHORS = 256
 CORRELATION_REQUEST_MAX_BYTES = 1_048_576
@@ -27,57 +25,31 @@ def _json_equal(left: object, right: object) -> bool:
     ) == json.dumps(right, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 
-class EvidenceCorrelationReplayMixin:
-    def _validate_correlation_packet(
-        self,
-        packet: Mapping[str, object],
-        *,
-        label: str,
-    ) -> None:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        if packet.get("schema") != _CORRELATION_SCHEMA:
-            raise ValueError(f"{label} must be a {_CORRELATION_SCHEMA} packet")
-        repository_evidence = packet.get("repository_evidence")
-        if not isinstance(repository_evidence, Mapping):
-            raise ValueError("correlation packets must contain repository_evidence")
-        repository = repository_evidence.get("repository")
-        repository_identity = (
-            str(repository.get("repository_identity") or "")
-            if isinstance(repository, Mapping)
-            else ""
-        )
-        if repository_identity != self.reads.repository_identity():
-            raise ValueError(f"{label} correlation repository-mismatch")
-        self._validate_binding_delta_input(
-            repository_evidence, name=f"{label} repository"
-        )
-        supplied_identity = packet.get("correlation_identity")
-        if not isinstance(supplied_identity, str) or not _SHA256.fullmatch(
-            supplied_identity
-        ):
-            raise ValueError(
-                f"{label} correlation_identity must use sha256:<64 lowercase hex characters>"
-            )
-        identity_payload = dict(packet)
-        identity_payload.pop("correlation_identity", None)
-        identity_payload.pop("delta_from_previous", None)
-        expected_identity = "sha256:" + packet_digest(
-            _CORRELATION_SCHEMA,
-            identity_payload,
-        )
-        if supplied_identity != expected_identity:
-            raise ValueError(
-                f"{label} correlation_identity does not match packet content"
-            )
+def _json_size(value: object, *, label: str) -> int:
+    try:
+        encoded = json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{label} must contain JSON-compatible values") from exc
+    return len(encoded)
 
-        self._validate_correlation_projections(packet, label=label)
 
+def validate_previous_correlation_size(packet: Mapping[str, object]) -> None:
+    size = _json_size(packet, label="previous correlation")
+    if size > CORRELATION_PACKET_MAX_BYTES:
+        raise ValueError(
+            f"previous correlation exceeds {CORRELATION_PACKET_MAX_BYTES} encoded bytes"
+        )
+
+
+class CorrelationPacketValidation(CorrelationValues):
     def _validate_correlation_projections(
         self, packet: Mapping[str, object], *, label: str
     ) -> None:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         self._validate_correlation_contract(packet, label=label)
         bundles = packet.get("bundles")
         mappings = packet.get("path_mappings")
@@ -183,8 +155,6 @@ class EvidenceCorrelationReplayMixin:
         limit: int | None,
         label: str,
     ) -> None:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         rows = self._correlation_binding_rows(repository_evidence)
         referenced: set[str] = set()
         for bundle in bundles:
@@ -211,8 +181,6 @@ class EvidenceCorrelationReplayMixin:
         limit: int | None,
         label: str,
     ) -> str:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         binding_id = anchor.get("repository_evidence_binding_id")
         if not isinstance(binding_id, str) or binding_id not in rows:
             raise ValueError(f"{label} correlation anchor binding mismatch")
@@ -251,7 +219,7 @@ class EvidenceCorrelationReplayMixin:
             not isinstance(row, Mapping) for row in evidence
         ):
             raise ValueError(f"{label} correlation binding evidence is invalid")
-        expected = EvidenceCorrelationReplayMixin._anchor_reference_definitions(
+        expected = CorrelationPacketValidation._anchor_reference_definitions(
             claims, resolution, label=label
         )
         actual = [
@@ -272,7 +240,7 @@ class EvidenceCorrelationReplayMixin:
         *,
         label: str,
     ) -> list[dict[str, object]]:
-        path, line = EvidenceCorrelationReplayMixin._anchor_path_line(
+        path, line = CorrelationPacketValidation._anchor_path_line(
             claims, resolution, label=label
         )
         if path is not None and line is not None:
@@ -284,13 +252,13 @@ class EvidenceCorrelationReplayMixin:
         modules = resolution.get("module_candidates")
         if path is not None and isinstance(symbol, Mapping):
             return [
-                EvidenceCorrelationReplayMixin._symbol_reference_definition(
+                CorrelationPacketValidation._symbol_reference_definition(
                     symbol, label=label
                 )
             ]
         if isinstance(candidates, list) and candidates:
             return [
-                EvidenceCorrelationReplayMixin._symbol_reference_definition(
+                CorrelationPacketValidation._symbol_reference_definition(
                     row, label=label
                 )
                 for row in candidates
@@ -316,7 +284,7 @@ class EvidenceCorrelationReplayMixin:
             raise ValueError(f"{label} correlation anchor path is invalid")
         if line is not None and (type(line) is not int or line < 1):
             raise ValueError(f"{label} correlation anchor line is invalid")
-        return path, cast("int | None", line)
+        return path, line
 
     @staticmethod
     def _symbol_reference_definition(row: object, *, label: str) -> dict[str, object]:

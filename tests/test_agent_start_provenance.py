@@ -46,7 +46,7 @@ def test_task_evidence_exposes_compact_selection_source_revision_and_unknown_fre
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        start = codemap.task_evidence(_task(), token_budget=512)
+        start = codemap.tasks.evidence(_task(), token_budget=512)
 
     with CodeMap(tmp_path) as codemap:
         row = codemap.store.file_row("src/engine.py")
@@ -73,7 +73,7 @@ def test_task_evidence_maps_generation_bound_continuity_to_current(
         monkeypatch.setattr(
             codemap.reads, "generation_status", lambda: (generation, 71, False)
         )
-        start = codemap.task_evidence(_task(), token_budget=512)
+        start = codemap.tasks.evidence(_task(), token_budget=512)
 
     provenance = start["provenance"]
     assert provenance["freshness"] == "current"
@@ -92,7 +92,7 @@ def test_task_evidence_reports_stale_when_continuity_reports_change(
         monkeypatch.setattr(
             codemap.reads, "generation_status", lambda: (generation, 72, True)
         )
-        start = codemap.task_evidence(_task(), token_budget=512)
+        start = codemap.tasks.evidence(_task(), token_budget=512)
 
     assert _freshness(start)["state"] == "stale"
     assert start["provenance"]["freshness"] == "stale"
@@ -106,7 +106,7 @@ def test_task_evidence_marks_action_stale_if_selected_source_refresh_changes_gen
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        original = codemap._task_evidence_evidence_item
+        original = codemap.tasks._task_evidence_evidence_item
 
         def mutate_then_project(
             row: dict[str, object], *, role: str, token_budget: int, task: str = ""
@@ -119,9 +119,9 @@ def test_task_evidence_marks_action_stale_if_selected_source_refresh_changes_gen
             return original(row, role=role, token_budget=token_budget, task=task)
 
         monkeypatch.setattr(
-            codemap, "_task_evidence_evidence_item", mutate_then_project
+            codemap.tasks, "_task_evidence_evidence_item", mutate_then_project
         )
-        start = codemap.task_evidence(_task(), token_budget=512)
+        start = codemap.tasks.evidence(_task(), token_budget=512)
 
     assert _freshness(start)["state"] == "stale"
     provenance = start["provenance"]
@@ -149,7 +149,7 @@ def test_config_projection_provenance_stays_post_selection(tmp_path: Path) -> No
     policy = next(repo.glob("src/*/policy.toml")).relative_to(repo).as_posix()
     with CodeMap(repo) as codemap:
         codemap.index.sync()
-        start = codemap.task_evidence(f"{task['query']} in {policy}", token_budget=512)
+        start = codemap.tasks.evidence(f"{task['query']} in {policy}", token_budget=512)
 
     assert _ownership(start)["candidate"]["path"].endswith("policy.toml")
     assert _ownership(start)["source_evidence"]["representation"] == "config-key-range"
@@ -165,7 +165,7 @@ def test_task_evidence_context_identity_is_budget_independent_and_revision_bound
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         starts = [
-            codemap.task_evidence(_task(), token_budget=budget)
+            codemap.tasks.evidence(_task(), token_budget=budget)
             for budget in (1, 32, 512)
         ]
         identities = {str(start["provenance"]["context_identity"]) for start in starts}
@@ -176,7 +176,7 @@ def test_task_evidence_context_identity_is_budget_independent_and_revision_bound
             "def cobalt_value() -> str:\n    return 'new-revision'\n", encoding="utf-8"
         )
         codemap.index.sync()
-        changed = codemap.task_evidence(_task(), token_budget=32)
+        changed = codemap.tasks.evidence(_task(), token_budget=32)
     assert changed["provenance"]["context_identity"] not in identities
 
 
@@ -186,12 +186,12 @@ def test_task_evidence_context_identity_changes_with_freshness_authority(
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        unknown = codemap.task_evidence(_task(), token_budget=32)
+        unknown = codemap.tasks.evidence(_task(), token_budget=32)
         generation = codemap.store.generation()
         monkeypatch.setattr(
             codemap.reads, "generation_status", lambda: (generation, 91, False)
         )
-        current = codemap.task_evidence(_task(), token_budget=32)
+        current = codemap.tasks.evidence(_task(), token_budget=32)
     assert unknown["provenance"]["freshness"] == "unknown"
     assert current["provenance"]["freshness"] == "current"
     assert (
@@ -209,7 +209,7 @@ def test_task_evidence_marks_stale_when_selected_verification_contents_change_af
         (tmp_path / "tests" / "test_engine.py").write_text(
             "def test_unrelated():\n    assert True\n", encoding="utf-8"
         )
-        start = codemap.task_evidence(_task(), token_budget=512)
+        start = codemap.tasks.evidence(_task(), token_budget=512)
     assert _freshness(start)["state"] == "stale"
     assert _verification(start)["selected"]["path"] == "tests/test_engine.py"
     assert start["provenance"]["freshness"] == "stale"
@@ -227,7 +227,7 @@ def test_task_evidence_marks_stale_when_selected_verification_is_deleted_after_s
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         (tmp_path / "tests" / "test_engine.py").unlink()
-        start = codemap.task_evidence(_task(), token_budget=512)
+        start = codemap.tasks.evidence(_task(), token_budget=512)
     assert _freshness(start)["state"] == "stale"
     assert "freshness_reason" in start["provenance"]
     assert (
@@ -245,7 +245,7 @@ def test_task_evidence_marks_stale_when_selected_verification_is_renamed_after_s
         (tmp_path / "tests" / "test_engine.py").rename(
             tmp_path / "tests" / "test_engine_renamed.py"
         )
-        start = codemap.task_evidence(_task(), token_budget=512)
+        start = codemap.tasks.evidence(_task(), token_budget=512)
     assert _freshness(start)["state"] == "stale"
     assert "freshness_reason" in start["provenance"]
     assert (
@@ -260,7 +260,7 @@ def test_task_evidence_closing_fence_catches_verification_mutation_during_packet
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        original = codemap._task_evidence_evidence_item
+        original = codemap.tasks._task_evidence_evidence_item
 
         def mutate_verification_then_project(
             row: dict[str, object], *, role: str, token_budget: int, task: str = ""
@@ -271,9 +271,11 @@ def test_task_evidence_closing_fence_catches_verification_mutation_during_packet
             return original(row, role=role, token_budget=token_budget, task=task)
 
         monkeypatch.setattr(
-            codemap, "_task_evidence_evidence_item", mutate_verification_then_project
+            codemap.tasks,
+            "_task_evidence_evidence_item",
+            mutate_verification_then_project,
         )
-        start = codemap.task_evidence(_task(), token_budget=512)
+        start = codemap.tasks.evidence(_task(), token_budget=512)
     assert _freshness(start)["state"] == "stale"
     assert "freshness_reason" in start["provenance"]
     assert (

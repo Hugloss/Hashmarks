@@ -24,7 +24,7 @@ def test_canonical_fixture_preserves_expected_top_file(tmp_path: Path) -> None:
     for repo, task in _cases(tmp_path / "fixture"):
         with CodeMap(repo) as codemap:
             codemap.index.sync()
-            results = codemap.find(assert_text(task["query"]), limit=5)
+            results = codemap.search.find(assert_text(task["query"]), limit=5)
         checked += 1
         paths = [str(row.path) for row in results]
         expected_files = [
@@ -48,11 +48,15 @@ def test_canonical_fixture_keeps_search_deterministic_across_rebuild(
     query = "OrderService submit_order implementation"
     with CodeMap(repo) as codemap:
         codemap.index.sync()
-        first = [(row.path, row.name, row.kind) for row in codemap.find(query, limit=8)]
+        first = [
+            (row.path, row.name, row.kind)
+            for row in codemap.search.find(query, limit=8)
+        ]
     with CodeMap(repo) as rebuilt_map:
         rebuilt_map.index.sync()
         rebuilt = [
-            (row.path, row.name, row.kind) for row in rebuilt_map.find(query, limit=8)
+            (row.path, row.name, row.kind)
+            for row in rebuilt_map.search.find(query, limit=8)
         ]
     assert first == rebuilt
 
@@ -66,8 +70,10 @@ def test_canonical_fixture_irrelevant_query_terms_do_not_erase_owner_file(
     repo = repos["python-orders"]
     with CodeMap(repo) as codemap:
         codemap.index.sync()
-        baseline = codemap.find("OrderService submit_order implementation", limit=8)
-        mutated = codemap.find(
+        baseline = codemap.search.find(
+            "OrderService submit_order implementation", limit=8
+        )
+        mutated = codemap.search.find(
             "OrderService submit_order implementation unrelated_observation_marker",
             limit=8,
         )

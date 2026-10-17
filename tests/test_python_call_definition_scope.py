@@ -22,9 +22,9 @@ def test_function_header_calls_belong_to_definition_scope(
         "    return callback\n"
     )
     with CodeMap(tmp_path) as codemap:
-        outer = codemap.structural_locality("worker.py::owner")
-        callback = codemap.structural_locality("worker.py::owner.callback")
-        leaf = codemap.structural_locality("worker.py::leaf", max_depth=0)
+        outer = codemap.structure.locality("worker.py::owner")
+        callback = codemap.structure.locality("worker.py::owner.callback")
+        leaf = codemap.structure.locality("worker.py::leaf", max_depth=0)
     assert {
         (row["line"], row["resolved_symbol_id"])
         for row in assert_records(outer["edges"])
@@ -51,8 +51,8 @@ def test_class_header_calls_belong_to_definition_scope(tmp_path: Path) -> None:
         "    return Worker\n"
     )
     with CodeMap(tmp_path) as codemap:
-        outer = codemap.structural_locality("worker.py::owner")
-        worker = codemap.structural_locality("worker.py::owner.Worker")
+        outer = codemap.structure.locality("worker.py::owner")
+        worker = codemap.structure.locality("worker.py::owner.Worker")
     assert {
         row["line"]
         for row in assert_records(outer["edges"])

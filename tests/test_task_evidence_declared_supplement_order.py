@@ -36,10 +36,12 @@ def test_already_declared_supplement_preserves_initial_canonical_source_diversit
     task = _repository(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(task)
-        canonical = list(dict.fromkeys(hit.path for hit in codemap.find_task(task)))[:3]
+        action = codemap.tasks.action_map(task)
+        canonical = list(
+            dict.fromkeys(hit.path for hit in codemap.search.find_task(task))
+        )[:3]
         assert set(canonical) == {"client.py", "listener.py", "state.py"}
-        packet = codemap.task_evidence(task)
+        packet = codemap.tasks.evidence(task)
     initial = packet["retrieval"]["results"][:3]
     assert set(canonical) <= {row["path"] for row in initial}
     assert packet["ownership"]["owner"] == action["admitted_edit"]
@@ -60,7 +62,7 @@ def test_explicit_method_keeps_initial_precedence(tmp_path: Path) -> None:
     task = _repository(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_evidence(
+        packet = codemap.tasks.evidence(
             task + " Inspect client.py::CatalogClient.force_metadata_update."
         )
     assert (
@@ -85,7 +87,7 @@ def test_method_outside_disclosed_class_bound_keeps_its_own_slot(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_evidence(task)
+        packet = codemap.tasks.evidence(task)
     assert "CatalogClient.force_metadata_update" in {
         row.get("symbol") for row in packet["retrieval"]["results"][:3]
     }

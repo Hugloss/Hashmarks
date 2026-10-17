@@ -40,7 +40,7 @@ def _owner_request(codemap: CodeMap, task: str) -> _TaskActionOwnerResolutionReq
                 explicit_edit_surface_selected=False,
             ),
         ),
-        discrimination=codemap._task_action_discrimination_state(task, []),
+        discrimination=codemap.ownership._task_action_discrimination_state(task, []),
         limit=1,
     )
 
@@ -65,7 +65,9 @@ def test_owner_resolution_recovers_unique_exact_symbol_without_retrieval_rows(
     task = "cancel_queued_admission expected_sequence"
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        owner = codemap._task_action_resolve_owner(_owner_request(codemap, task))
+        owner = codemap.ownership._task_action_resolve_owner(
+            _owner_request(codemap, task)
+        )
 
     assert owner.edit is not None
     assert owner.edit["path"] == "backend/runtime/executor_pool.py"
@@ -82,7 +84,9 @@ def test_owner_resolution_keeps_duplicate_exact_symbols_unresolved(
     task = "fix cancel_queued_admission"
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        owner = codemap._task_action_resolve_owner(_owner_request(codemap, task))
+        owner = codemap.ownership._task_action_resolve_owner(
+            _owner_request(codemap, task)
+        )
 
     assert owner.edit is None
     assert owner.basis is None
@@ -102,8 +106,11 @@ def test_owner_resolution_marks_literal_path_as_stronger_than_retrieval_order(
     task = "optimize src/worker.py"
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        context = codemap._task_action_map_context(task, 20)
-        selection = codemap._task_action_surface_owner_state(task, context, 20, 3)
+        with codemap.reads.session() as _task_read_scope:
+            context = codemap.ownership.observe_candidates(
+                codemap.tasks._task_observation(task, 20), 20
+            )
+            selection = codemap.ownership.nominate(task, context, 20, 3)
 
     assert selection.edit is not None
     assert selection.edit["path"] == "src/worker.py"
@@ -138,8 +145,11 @@ def test_owner_resolution_marks_structural_repository_owner(
     task = "Fix ember accepted response behavior owner"
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        context = codemap._task_action_map_context(task, 20)
-        selection = codemap._task_action_surface_owner_state(task, context, 20, 3)
+        with codemap.reads.session() as _task_read_scope:
+            context = codemap.ownership.observe_candidates(
+                codemap.tasks._task_observation(task, 20), 20
+            )
+            selection = codemap.ownership.nominate(task, context, 20, 3)
 
     assert selection.edit is not None
     assert selection.edit["path"] == "src/case/engine.py"
@@ -149,7 +159,7 @@ def test_owner_resolution_marks_structural_repository_owner(
 def test_unique_exact_owner_does_not_enter_weaker_structural_resolution(
     tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
-    from hashmarks.codemap.ownership_graph import OwnershipGraphMixin
+    from hashmarks.codemap.ownership_graph import RepositoryOwnership
 
     _write(
         tmp_path,
@@ -163,7 +173,7 @@ def test_unique_exact_owner_does_not_enter_weaker_structural_resolution(
         raise AssertionError("exact owner must terminate before structural resolution")
 
     monkeypatch.setattr(
-        OwnershipGraphMixin,
+        RepositoryOwnership,
         "_structural_owner_candidate",
         forbidden,
     )
@@ -172,7 +182,7 @@ def test_unique_exact_owner_does_not_enter_weaker_structural_resolution(
         codemap.index.sync()
         action = cast(
             dict[str, Any],
-            codemap.task_action_map(
+            codemap.tasks.action_map(
                 "change cancel_queued_admission",
                 limit=1,
                 per_role=1,
@@ -202,7 +212,7 @@ def test_exact_owner_cannot_be_displaced_by_contract_projection(
         codemap.index.sync()
         action = cast(
             dict[str, Any],
-            codemap.task_action_map(
+            codemap.tasks.action_map(
                 "Change PublicationAuthority contract",
                 limit=20,
                 per_role=3,
@@ -246,7 +256,7 @@ def test_requested_edit_target_owns_dependency_identifier_evidence(
         codemap.index.sync()
         action = cast(
             dict[str, Any],
-            codemap.task_action_map(
+            codemap.tasks.action_map(
                 "Fix publish_result so it uses AuthorityReceipt.canonical_identity",
                 limit=20,
             ),
@@ -267,7 +277,7 @@ def test_requested_edit_target_role_survives_dependency_first_wording(
         codemap.index.sync()
         action = cast(
             dict[str, Any],
-            codemap.task_action_map(
+            codemap.tasks.action_map(
                 "Use AuthorityReceipt.canonical_identity in publish_result",
                 limit=20,
             ),
@@ -288,7 +298,7 @@ def test_requested_edit_role_does_not_hide_true_duplicate_target_ambiguity(
         codemap.index.sync()
         action = cast(
             dict[str, Any],
-            codemap.task_action_map(
+            codemap.tasks.action_map(
                 "Fix publish_result so it uses AuthorityReceipt.canonical_identity",
                 limit=20,
             ),
@@ -313,7 +323,7 @@ def test_requested_edit_role_is_stable_across_dependency_phrasings(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         actions = [
-            cast(dict[str, Any], codemap.task_action_map(task, limit=20))
+            cast(dict[str, Any], codemap.tasks.action_map(task, limit=20))
             for task in tasks
         ]
 
@@ -333,7 +343,7 @@ def test_two_requested_exact_edit_targets_remain_ambiguous(tmp_path: Path) -> No
         codemap.index.sync()
         action = cast(
             dict[str, Any],
-            codemap.task_action_map(
+            codemap.tasks.action_map(
                 "Change publish_result and store_result",
                 limit=20,
             ),

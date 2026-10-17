@@ -54,11 +54,11 @@ def test_authority():
     )
 
     with _codemap(tmp_path) as codemap:
-        packet = codemap.structural_locality(
+        packet = codemap.structure.locality(
             "pkg/core.py::authority",
             max_depth=3,
         )
-        packet_without_refresh = codemap.structural_locality(
+        packet_without_refresh = codemap.structure.locality(
             "pkg/core.py::authority",
             max_depth=3,
             refresh=False,
@@ -123,7 +123,7 @@ def authority(value):
     )
 
     with _codemap(tmp_path) as codemap:
-        packet = codemap.structural_locality(
+        packet = codemap.structure.locality(
             "pkg/core.py::authority",
             max_depth=3,
         )
@@ -153,7 +153,7 @@ def authority(value):
 """.lstrip(),
     )
     with _codemap(tmp_path) as codemap:
-        before = codemap.structural_locality(
+        before = codemap.structure.locality(
             "pkg/core.py::authority",
             max_depth=3,
         )
@@ -171,7 +171,7 @@ def authority(value):
     return helper(value)
 """.lstrip(),
         )
-        after = codemap.structural_locality(
+        after = codemap.structure.locality(
             "pkg/core.py::authority",
             max_depth=3,
         )
@@ -194,7 +194,7 @@ def test_structural_locality_requires_exact_symbol_identity(tmp_path: Path) -> N
     _write(tmp_path, "pkg/core.py", "def authority():\n    return 1\n")
     with _codemap(tmp_path) as codemap:
         try:
-            codemap.structural_locality("authority")
+            codemap.structure.locality("authority")
         except ValueError as exc:
             assert "path::qualname" in str(exc)
         else:
@@ -221,7 +221,7 @@ def authority(client, value):
     )
 
     with _codemap(tmp_path) as codemap:
-        packet = codemap.structural_locality(
+        packet = codemap.structure.locality(
             "pkg/core.py::authority",
             max_depth=2,
         )
@@ -259,7 +259,7 @@ def authority():
     )
 
     with _codemap(tmp_path) as codemap:
-        packet = codemap.structural_locality("pkg/core.py::authority")
+        packet = codemap.structure.locality("pkg/core.py::authority")
 
     assert assert_object(packet["dimensions"])["unresolved_call_count"] == 1
     unresolved = assert_object(assert_array(packet["unresolved_calls"])[0])
@@ -285,7 +285,7 @@ def authority(helper, value):
     )
 
     with _codemap(tmp_path) as codemap:
-        packet = codemap.structural_locality(
+        packet = codemap.structure.locality(
             "pkg/core.py::authority",
             max_depth=2,
         )
@@ -305,9 +305,9 @@ def test_structural_locality_delta_rejects_tampered_packet_identity(
 ) -> None:
     _write(tmp_path, "pkg/core.py", "def authority():\n    return 1\n")
     with _codemap(tmp_path) as codemap:
-        before = codemap.structural_locality("pkg/core.py::authority")
+        before = codemap.structure.locality("pkg/core.py::authority")
         _write(tmp_path, "pkg/core.py", "def authority():\n    return 2\n")
-        after = codemap.structural_locality("pkg/core.py::authority")
+        after = codemap.structure.locality("pkg/core.py::authority")
 
     tampered = dict(after)
     tampered["repository_identity"] = "sha256:tampered"
@@ -334,7 +334,7 @@ def test_structural_locality_exact_callers_are_positive_reuse_evidence(
     )
 
     with _codemap(tmp_path) as codemap:
-        packet = codemap.structural_locality(
+        packet = codemap.structure.locality(
             "pkg/shared.py::helper",
             max_depth=0,
         )
@@ -371,7 +371,7 @@ def authority(value):
     )
 
     with _codemap(tmp_path) as codemap:
-        packet = codemap.structural_locality(
+        packet = codemap.structure.locality(
             "pkg/core.py::authority",
             max_depth=2,
         )
@@ -403,7 +403,7 @@ def authority(Worker, value):
     )
 
     with _codemap(tmp_path) as codemap:
-        packet = codemap.structural_locality(
+        packet = codemap.structure.locality(
             "pkg/core.py::authority",
             max_depth=2,
         )
@@ -453,7 +453,7 @@ def authority(gaps, payload, seen, observations_path):
     )
 
     with _codemap(tmp_path) as codemap:
-        packet = codemap.structural_locality(
+        packet = codemap.structure.locality(
             "pkg/core.py::authority",
             max_depth=2,
         )
@@ -492,7 +492,7 @@ def test_structural_locality_imported_data_method_is_external_not_repository_amb
     )
 
     with _codemap(tmp_path) as codemap:
-        packet = codemap.structural_locality(
+        packet = codemap.structure.locality(
             "pkg/core.py::authority",
             max_depth=2,
         )
@@ -525,7 +525,7 @@ def test_structural_locality_imported_class_alias_resolves_exact_member(
     )
 
     with _codemap(tmp_path) as codemap:
-        packet = codemap.structural_locality(
+        packet = codemap.structure.locality(
             "pkg/core.py::authority",
             max_depth=2,
         )
@@ -555,12 +555,12 @@ class Worker:
     )
 
     with _codemap(tmp_path) as codemap:
-        packet = codemap.structural_locality(
+        packet = codemap.structure.locality(
             "pkg/core.py::Worker.authority",
             max_depth=2,
         )
 
-        helper = codemap.structural_locality(
+        helper = codemap.structure.locality(
             "pkg/core.py::Worker._normalize",
             max_depth=0,
         )
@@ -597,7 +597,7 @@ class Worker:
     )
 
     with _codemap(tmp_path) as codemap:
-        packet = codemap.structural_locality(
+        packet = codemap.structure.locality(
             "pkg/core.py::Worker.build",
             max_depth=2,
         )
@@ -636,12 +636,12 @@ class Worker(Base):
     )
 
     with _codemap(tmp_path) as codemap:
-        packet = codemap.structural_locality(
+        packet = codemap.structure.locality(
             "pkg/core.py::Worker.authority",
             max_depth=2,
         )
 
-        helper = codemap.structural_locality(
+        helper = codemap.structure.locality(
             "pkg/base.py::Base._normalize",
             max_depth=0,
         )
@@ -683,7 +683,7 @@ class Worker(First, Second):
     )
 
     with _codemap(tmp_path) as codemap:
-        packet = codemap.structural_locality(
+        packet = codemap.structure.locality(
             "pkg/core.py::Worker.authority",
             max_depth=2,
         )
@@ -721,7 +721,7 @@ class Worker(Base):
     )
 
     with _codemap(tmp_path) as codemap:
-        packet = codemap.structural_locality(
+        packet = codemap.structure.locality(
             "pkg/core.py::Worker.authority", max_depth=2
         )
 
@@ -756,7 +756,7 @@ class Worker(First, Second):
     )
 
     with _codemap(tmp_path) as codemap:
-        packet = codemap.structural_locality(
+        packet = codemap.structure.locality(
             "pkg/core.py::Worker.authority", max_depth=2
         )
 
@@ -785,7 +785,7 @@ class Worker(ExternalBase):
     )
 
     with _codemap(tmp_path) as codemap:
-        packet = codemap.structural_locality(
+        packet = codemap.structure.locality(
             "pkg/core.py::Worker.authority", max_depth=2
         )
 
@@ -822,7 +822,7 @@ class Worker(KnownBase, ExternalBase):
     )
 
     with _codemap(tmp_path) as codemap:
-        packet = codemap.structural_locality(
+        packet = codemap.structure.locality(
             "pkg/core.py::Worker.authority", max_depth=2
         )
 

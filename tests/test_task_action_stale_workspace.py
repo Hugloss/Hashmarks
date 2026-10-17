@@ -24,11 +24,11 @@ def test_deleted_edit_owner_cannot_remain_safe_action_without_watcher(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.task_action_map("fix calculate_total")
+        before = codemap.tasks.action_map("fix calculate_total")
         assert before["edit"] is not None
         assert before["edit"]["path"] == "src/foo.py"
         (tmp_path / "src/foo.py").unlink()
-        after = codemap.task_action_map("fix calculate_total")
+        after = codemap.tasks.action_map("fix calculate_total")
     assert after["edit"] is None
     assert after["ownership_authority"]["owner_resolved"] is False
 
@@ -45,13 +45,13 @@ def test_rewritten_edit_owner_cannot_reuse_stale_symbol_evidence(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         assert (
-            assert_present(codemap.task_action_map("fix calculate_total")["edit"])[
+            assert_present(codemap.tasks.action_map("fix calculate_total")["edit"])[
                 "path"
             ]
             == "src/foo.py"
         )
         _write(tmp_path, "src/foo.py", "def unrelated(): return 2\n")
-        after = codemap.task_action_map("fix calculate_total")
+        after = codemap.tasks.action_map("fix calculate_total")
     assert after["edit"] is None
     assert after["ownership_authority"]["owner_resolved"] is False
 
@@ -67,7 +67,7 @@ def test_cold_map_rejects_module_only_owner_when_imported_symbol_is_gone(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map("fix calculate_total")
+        action = codemap.tasks.action_map("fix calculate_total")
     assert action["edit"] is None
     assert action["ownership_authority"]["owner_resolved"] is False
 
@@ -83,13 +83,13 @@ def test_changed_projected_owner_reconciles_before_cached_authority_is_reused(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.task_action_map("fix calculate_total")
+        before = codemap.tasks.action_map("fix calculate_total")
         _write(
             tmp_path,
             "src/foo.py",
             "def calculate_total(): return 1\n# harmless change\n",
         )
-        after = codemap.task_action_map("fix calculate_total")
+        after = codemap.tasks.action_map("fix calculate_total")
     assert before["edit"] is not None
     assert before["edit"]["path"] == "src/foo.py"
     assert after["edit"] is not None
@@ -117,7 +117,7 @@ def test_unsignaled_owner_rename_converges_to_cold_truth(tmp_path: Path) -> None
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         assert (
-            assert_present(codemap.task_action_map("fix calculate_total")["edit"])[
+            assert_present(codemap.tasks.action_map("fix calculate_total")["edit"])[
                 "path"
             ]
             == "src/foo.py"
@@ -128,7 +128,7 @@ def test_unsignaled_owner_rename_converges_to_cold_truth(tmp_path: Path) -> None
             "tests/test_foo.py",
             "from src.bar import calculate_total\ndef test_total(): assert calculate_total()==1\n",
         )
-        live = codemap.task_action_map("fix calculate_total")
+        live = codemap.tasks.action_map("fix calculate_total")
     assert live["edit"] is not None
     assert live["edit"]["path"] == "src/bar.py"
 
@@ -149,7 +149,7 @@ def test_unsignaled_module_package_transition_converges(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         assert (
-            assert_present(codemap.task_action_map("fix calculate_total")["edit"])[
+            assert_present(codemap.tasks.action_map("fix calculate_total")["edit"])[
                 "path"
             ]
             == before_path
@@ -159,7 +159,7 @@ def test_unsignaled_module_package_transition_converges(
         if parent != tmp_path / "src" and parent.exists():
             parent.rmdir()
         _write(tmp_path, after_path, "def calculate_total(): return 1\n")
-        live = codemap.task_action_map("fix calculate_total")
+        live = codemap.tasks.action_map("fix calculate_total")
     assert live["edit"] is not None
     assert live["edit"]["path"] == after_path
 
@@ -176,15 +176,15 @@ def test_unsignaled_aba_owner_restoration_reconciles_from_recent_authority(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         assert (
-            assert_present(codemap.task_action_map("fix calculate_total")["edit"])[
+            assert_present(codemap.tasks.action_map("fix calculate_total")["edit"])[
                 "path"
             ]
             == "src/foo.py"
         )
         _write(tmp_path, "src/foo.py", "def unrelated(): return 2\n")
-        assert codemap.task_action_map("fix calculate_total")["edit"] is None
+        assert codemap.tasks.action_map("fix calculate_total")["edit"] is None
         _write(tmp_path, "src/foo.py", "def calculate_total(): return 1\n")
-        restored = codemap.task_action_map("fix calculate_total")
+        restored = codemap.tasks.action_map("fix calculate_total")
     assert restored["edit"] is not None
     assert restored["edit"]["path"] == "src/foo.py"
 
@@ -201,7 +201,7 @@ def test_unsignaled_rename_reconciliation_retires_obsolete_history(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         assert (
-            assert_present(codemap.task_action_map("fix calculate_total")["edit"])[
+            assert_present(codemap.tasks.action_map("fix calculate_total")["edit"])[
                 "path"
             ]
             == "src/foo.py"
@@ -221,14 +221,14 @@ def test_unsignaled_rename_reconciliation_retires_obsolete_history(
             "from src.bar import calculate_total\ndef test_total(): assert calculate_total()==1\n",
         )
         assert (
-            assert_present(codemap.task_action_map("fix calculate_total")["edit"])[
+            assert_present(codemap.tasks.action_map("fix calculate_total")["edit"])[
                 "path"
             ]
             == "src/bar.py"
         )
         for _ in range(3):
             assert (
-                assert_present(codemap.task_action_map("fix calculate_total")["edit"])[
+                assert_present(codemap.tasks.action_map("fix calculate_total")["edit"])[
                     "path"
                 ]
                 == "src/bar.py"
@@ -246,24 +246,27 @@ def test_unsignaled_rename_converges_after_task_cache_pressure(tmp_path: Path) -
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         assert (
-            assert_present(codemap.task_action_map("fix calculate_total")["edit"])[
+            assert_present(codemap.tasks.action_map("fix calculate_total")["edit"])[
                 "path"
             ]
             == "src/foo.py"
         )
         for index in range(270):
-            codemap.task_action_map(f"noise_{index}_target")
-        assert ("fix calculate_total", 20) not in codemap._task_recent_authority_paths
+            codemap.tasks.action_map(f"noise_{index}_target")
+        assert (
+            "fix calculate_total",
+            20,
+        ) not in codemap.tasks._task_recent_authority_paths
         (tmp_path / "src/foo.py").rename(tmp_path / "src/bar.py")
         _write(
             tmp_path,
             "tests/test_foo.py",
             "from src.bar import calculate_total\ndef test_total(): assert calculate_total()==1\n",
         )
-        live = codemap.task_action_map("fix calculate_total")
+        live = codemap.tasks.action_map("fix calculate_total")
     with CodeMap(tmp_path) as cold:
         cold.index.sync()
-        expected = cold.task_action_map("fix calculate_total")
+        expected = cold.tasks.action_map("fix calculate_total")
     assert live["edit"] is not None
     assert live["edit"]["path"] == "src/bar.py"
     assert expected["edit"] is not None
@@ -286,16 +289,16 @@ def test_unsignaled_delete_recreate_recovers_first_task_decision_after_disappear
         codemap.index.sync()
         # No warm task-action history exists before the unsignaled deletion.
         (tmp_path / "src/foo.py").unlink()
-        assert codemap.task_action_map("fix calculate_total")["edit"] is None
+        assert codemap.tasks.action_map("fix calculate_total")["edit"] is None
         (tmp_path / "src/foo.py").write_bytes(original)
-        restored = codemap.task_action_map("fix calculate_total")
+        restored = codemap.tasks.action_map("fix calculate_total")
     with CodeMap(
         tmp_path,
         state_dir=tmp_path / ".cold-state",
         artifact_db=tmp_path / "cold-artifacts.sqlite3",
     ) as cold:
         cold.index.sync()
-        expected = cold.task_action_map("fix calculate_total")
+        expected = cold.tasks.action_map("fix calculate_total")
     assert restored["edit"] is not None
     assert expected["edit"] is not None
     assert restored["edit"]["path"] == expected["edit"]["path"] == "src/foo.py"
@@ -322,12 +325,12 @@ def test_unsignaled_file_symlink_file_transition_recovers_without_following_syml
             source.symlink_to(outside)
         except (OSError, NotImplementedError):
             pytest.skip("symlinks unavailable")
-        during = codemap.task_action_map("fix calculate_total")
+        during = codemap.tasks.action_map("fix calculate_total")
         assert during["edit"] is None
         assert codemap.store.file_row("src/foo.py") is None
         source.unlink()
         source.write_bytes(original)
-        restored = codemap.task_action_map("fix calculate_total")
+        restored = codemap.tasks.action_map("fix calculate_total")
     assert restored["edit"] is not None
     assert restored["edit"]["path"] == "src/foo.py"
     assert restored["ownership_authority"]["owner_resolved"] is True
@@ -355,12 +358,12 @@ def test_missing_resurrection_tombstone_does_not_poll_repository_and_recovers_pa
 
         monkeypatch.setattr(codemap.index, "sync", counted_sync)
         source.unlink()
-        assert codemap.task_action_map("fix calculate_total")["edit"] is None
+        assert codemap.tasks.action_map("fix calculate_total")["edit"] is None
         for _ in range(3):
-            assert codemap.task_action_map("fix calculate_total")["edit"] is None
+            assert codemap.tasks.action_map("fix calculate_total")["edit"] is None
         source.write_bytes(original)
         assert (
-            assert_present(codemap.task_action_map("fix calculate_total")["edit"])[
+            assert_present(codemap.tasks.action_map("fix calculate_total")["edit"])[
                 "path"
             ]
             == "src/foo.py"
@@ -382,11 +385,14 @@ def test_delete_recreate_resurrection_survives_recent_authority_cache_pressure(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         for index in range(256):
-            codemap.task_action_map(f"noise_{index}_target")
+            codemap.tasks.action_map(f"noise_{index}_target")
         source.unlink()
-        assert codemap.task_action_map("fix calculate_total")["edit"] is None
-        assert ("fix calculate_total", 20) in codemap._task_recent_authority_paths
+        assert codemap.tasks.action_map("fix calculate_total")["edit"] is None
+        assert (
+            "fix calculate_total",
+            20,
+        ) in codemap.tasks._task_recent_authority_paths
         source.write_bytes(original)
-        restored = codemap.task_action_map("fix calculate_total")
+        restored = codemap.tasks.action_map("fix calculate_total")
     assert restored["edit"] is not None
     assert restored["edit"]["path"] == "src/foo.py"

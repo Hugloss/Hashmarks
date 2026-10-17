@@ -64,7 +64,7 @@ def _freeze_packets(
         sync_ms = (time.perf_counter() - sync_started) * 1000.0
         for task in tasks:
             started = time.perf_counter()
-            packet = codemap.task_evidence(
+            packet = codemap.tasks.evidence(
                 str(task["query"]), token_budget=token_budget
             )
             first_ms = (time.perf_counter() - started) * 1000.0
@@ -109,7 +109,7 @@ def _freeze_packets(
         # before SECRET is opened and without altering the frozen decisions.
         for row, task in zip(frozen, tasks, strict=True):
             started = time.perf_counter()
-            repeated = codemap.task_evidence(
+            repeated = codemap.tasks.evidence(
                 str(task["query"]), token_budget=token_budget
             )
             row["cached_warm_ms"] = (time.perf_counter() - started) * 1000.0

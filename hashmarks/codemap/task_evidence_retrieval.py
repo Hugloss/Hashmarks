@@ -12,7 +12,7 @@ from .repository_domains import RepositoryDomain, classify_repository_path
 from .task_retrieval import TaskRetrievalMixin
 
 if TYPE_CHECKING:
-    from .engine import CodeMap
+    from .repository_tasks import RepositoryTasks
     from .task_evidence_types import TaskEvidenceDraft, TaskRetrievalDraft
 
 
@@ -46,7 +46,7 @@ class TaskEvidenceRetrievalMixin:
         bound_reasons: set[str],
     ) -> list[str]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         paths = list(
             dict.fromkeys(
                 str(row.get("path"))
@@ -54,14 +54,14 @@ class TaskEvidenceRetrievalMixin:
                 if isinstance(row.get("path"), str) and row.get("path")
             )
         )[:16]
-        salient = self._task_salient_natural_terms(
+        salient = self.search._task_salient_natural_terms(
             task,
             limit=6,
             bound_reasons=bound_reasons,
         )
         rare_paths: list[str] = []
         for term in salient:
-            hits = self._task_component_hits(
+            hits = self.search._task_component_hits(
                 term,
                 bound_reasons,
                 include_signature=True,
@@ -198,7 +198,7 @@ class TaskEvidenceRetrievalMixin:
         total: int,
     ) -> list[tuple[int, int, float, Mapping[str, object]]]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         scored: list[tuple[int, int, float, str, Mapping[str, object]]] = []
         for symbol in self.reads.symbols_for_path(path):
             name = str(symbol.get("name") or "")
@@ -279,7 +279,7 @@ class TaskEvidenceRetrievalMixin:
         limit: int,
     ) -> list[dict[str, object]]:
         """Add bounded retrieval-only evidence without changing action authority."""
-        self = cast("CodeMap", self)
+        self = cast("RepositoryTasks", self)
         if limit < 10:
             return []
         existing_keys = {
@@ -290,7 +290,7 @@ class TaskEvidenceRetrievalMixin:
             for row in existing
         }
         query = self._task_evidence_retrieval_query(task)
-        terms, _truncated = self._task_natural_term_candidates(
+        terms, _truncated = self.search._task_natural_term_candidates(
             query, include_derivations=True
         )
         if not terms:
@@ -298,7 +298,7 @@ class TaskEvidenceRetrievalMixin:
         query_tokens = tuple(
             tuple(
                 variant
-                for variant in self._task_natural_term_variants(
+                for variant in self.search._task_natural_term_variants(
                     word, include_derivations=True
                 )
                 if variant in terms
@@ -326,7 +326,7 @@ class TaskEvidenceRetrievalMixin:
                 continue
             eligible.append((path, visibility))
         self.reads.preload_symbols([path for path, _ in eligible])
-        test_edit = self._task_action_cues(task).explicit_test_edit
+        test_edit = self.ownership._task_action_cues(task).explicit_test_edit
         scored_rows: list[
             tuple[bool, int, int, float, int, str, dict[str, object]]
         ] = []
@@ -393,7 +393,7 @@ class TaskEvidenceRetrievalMixin:
         test_edit: bool,
     ) -> dict[str, object] | None:
         """Disclose a callable using its class/signature, never runtime ownership."""
-        codemap = cast("CodeMap", self)
+        codemap = cast("RepositoryTasks", self)
         paths = [
             str(row["path"])
             for row in codemap.reads.lexical_file_candidates(terms, limit=64)
@@ -502,7 +502,7 @@ class TaskEvidenceRetrievalMixin:
         test_edit: bool,
     ) -> dict[str, object] | None:
         """Retrieve an indexed diagnostic/source position, never a failure owner."""
-        codemap = cast("CodeMap", self)
+        codemap = cast("RepositoryTasks", self)
         if not {
             "error",
             "exception",
@@ -569,7 +569,7 @@ class TaskEvidenceRetrievalMixin:
         natural: Sequence[Mapping[str, object]],
     ) -> set[tuple[str, str]]:
         """Recognize hints already disclosed by the leading bounded class scope."""
-        codemap = cast("CodeMap", self)
+        codemap = cast("RepositoryTasks", self)
         if not rows or not natural:
             return set()
         path = str(rows[0].get("path") or "")
@@ -654,7 +654,7 @@ class TaskEvidenceRetrievalMixin:
         limit: int,
     ) -> None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         retrieval = result.get("retrieval")
         if not isinstance(retrieval, dict):
             return
@@ -779,14 +779,16 @@ class TaskEvidenceRetrievalMixin:
         canonical_rank: int,
     ) -> tuple[list[dict[str, object]], bool, tuple[str, ...]]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         terms = tuple(
             term
-            for term in self._task_action_exact_identifier_terms(task)
+            for term in self.ownership._task_action_exact_identifier_terms(task)
             if "." in term
         )
-        exact, complete = self._task_action_qualified_identifier_index_evidence(
-            terms, set(), canonical_rank=canonical_rank
+        exact, complete = (
+            self.ownership._task_action_qualified_identifier_index_evidence(
+                terms, set(), canonical_rank=canonical_rank
+            )
         )
         if literal_path is None:
             return exact, complete, terms
@@ -806,7 +808,7 @@ class TaskEvidenceRetrievalMixin:
     ) -> list[dict[str, object]]:
         """Disclose literal name matches within the caller's file, never owners."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         if not self._task_evidence_declaration_visible(
             path
         ) or not self.index.is_current(path):

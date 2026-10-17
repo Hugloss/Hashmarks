@@ -41,7 +41,7 @@ def test_owner_chain_reuse_keeps_sync_currentness_check(tmp_path: Path) -> None:
         codemap.index.sync()
         relation_calls = 0
         sync_calls = 0
-        original_relation = codemap.ownership_relation_graph
+        original_relation = codemap.ownership.relations
         original_sync = codemap.index.sync
 
         def counted_relation(*args: Any, **kwargs: Any) -> Any:
@@ -54,7 +54,7 @@ def test_owner_chain_reuse_keeps_sync_currentness_check(tmp_path: Path) -> None:
             sync_calls += 1
             return original_sync(*args, **kwargs)
 
-        codemap.ownership_relation_graph = counted_relation
+        codemap.ownership.relations = counted_relation
         codemap.index.sync = counted_sync
         with codemap.reads.session(diagnostics=True):
             first = codemap.task_change_impact(task, paths)
@@ -88,14 +88,14 @@ def test_owner_chain_reuse_does_not_cross_decision_sessions(tmp_path: Path) -> N
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         relation_calls = 0
-        original_relation = codemap.ownership_relation_graph
+        original_relation = codemap.ownership.relations
 
         def counted_relation(*args: Any, **kwargs: Any) -> Any:
             nonlocal relation_calls
             relation_calls += 1
             return original_relation(*args, **kwargs)
 
-        codemap.ownership_relation_graph = counted_relation
+        codemap.ownership.relations = counted_relation
         with codemap.reads.session():
             codemap.task_change_impact(task, paths)
             codemap.task_change_impact(task, paths)
@@ -110,7 +110,7 @@ def test_owner_chain_cached_result_is_detached(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         with codemap.reads.session():
-            action = codemap.task_action_map(task)
+            action = codemap.tasks.action_map(task)
             state = codemap._change_impact_surface_state(
                 tuple(paths),
                 max_depth=4,
@@ -134,7 +134,7 @@ def test_owner_chain_reconstruction_failure_keeps_selected_paths(
         def unavailable(*_args: Any, **_kwargs: Any) -> Never:
             raise ValueError("owner evidence unavailable")
 
-        monkeypatch.setattr(codemap, "ownership_relation_graph", unavailable)
+        monkeypatch.setattr(codemap.ownership, "relations", unavailable)
         action = {
             "edit": {"path": paths[0]},
             "verify": {"path": "route/cobaltridgealpha_test.go"},

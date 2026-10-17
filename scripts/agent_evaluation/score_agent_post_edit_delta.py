@@ -100,7 +100,7 @@ def _freeze_task_evidence(
         for task in tasks:
             task_id = str(task["id"])
             query = str(task["query"])
-            previous = codemap.task_evidence(query, token_budget=token_budget)
+            previous = codemap.tasks.evidence(query, token_budget=token_budget)
             candidate = _task_candidate(previous)
             edit_path = (
                 str(candidate.get("path") or "") if candidate is not None else ""
@@ -117,7 +117,7 @@ def _freeze_task_evidence(
                 token_budget=token_budget,
             )
             delta_ms = (time.perf_counter() - started) * 1000.0
-            refreshed = codemap.task_evidence(query, token_budget=token_budget)
+            refreshed = codemap.tasks.evidence(query, token_budget=token_budget)
             frozen.append(
                 {
                     "id": task_id,

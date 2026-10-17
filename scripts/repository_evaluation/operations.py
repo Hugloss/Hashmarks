@@ -73,10 +73,10 @@ def observe_case(codemap: CodeMap, case: Mapping[str, object]) -> dict[str, obje
     raw_inputs = case.get("inputs")
     inputs: dict[str, Any] = dict(raw_inputs) if isinstance(raw_inputs, dict) else {}
     operations = {
-        "task_evidence": lambda: codemap.task_evidence(**inputs),
-        "structural_locality": lambda: codemap.structural_locality(**inputs),
+        "task_evidence": lambda: codemap.tasks.evidence(**inputs),
+        "structural_locality": lambda: codemap.structure.locality(**inputs),
         "source_observation": lambda: _source_observation(codemap, inputs),
-        "correlate_evidence": lambda: codemap.correlate_evidence(**inputs),
+        "correlate_evidence": lambda: codemap.correlation.observe(**inputs),
         "repository_declarations": lambda: _declarations(codemap, inputs),
         "change_impact": lambda: _change_impact(codemap, inputs),
         "post_change": lambda: codemap.task_post_change_delta(**inputs),

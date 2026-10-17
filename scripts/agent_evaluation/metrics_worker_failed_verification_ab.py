@@ -70,7 +70,7 @@ def _inject_failures(
             task_id = str(task.get("id") or task.get("query") or "")
             query = str(task.get("query") or "")
             expected = {str(value) for value in task.get("expected_files") or ()}
-            hits = list(codemap.find_task(query, limit=limit))
+            hits = list(codemap.search.find_task(query, limit=limit))
             injected = next(
                 (
                     (rank, hit.path)
@@ -137,7 +137,7 @@ def _guided_recovery(
 
     # Conservative fallback: re-run canonical retrieval and exclude only the path
     # that has direct negative verification evidence. No hidden answer is used.
-    hits = list(codemap.find_task(query, limit=limit))
+    hits = list(codemap.search.find_task(query, limit=limit))
     for rank, hit in enumerate(hits, 1):
         if hit.path != failed_target:
             return hit.path, "canonical-research-excluding-failed-target", rank
@@ -157,7 +157,7 @@ def _recovery_action(
     if policy == "fresh-research":
         with CodeMap(workspace) as fresh:
             fresh.index.sync()
-            hits = list(fresh.find_task(query, limit=limit))
+            hits = list(fresh.search.find_task(query, limit=limit))
         return (
             hits[0].path if hits else None,
             "fresh-canonical-top1",

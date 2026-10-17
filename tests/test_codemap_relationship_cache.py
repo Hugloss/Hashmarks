@@ -27,7 +27,9 @@ def test_reverse_relationship_cache_matches_fresh_after_transition(
         artifact_db=tmp_path / "artifacts.sqlite3",
     ) as codemap:
         codemap.index.sync()
-        assert codemap.affected("owner.ts")["affected_files"] == ["consumer.ts"]
+        assert codemap.relationships.affected("owner.ts")["affected_files"] == [
+            "consumer.ts"
+        ]
         if transition == "modify":
             (workspace / "consumer.ts").write_text("import { other } from './other';\n")
         elif transition == "add":
@@ -41,14 +43,14 @@ def test_reverse_relationship_cache_matches_fresh_after_transition(
                 "[[rule]]\npattern = 'consumer.ts'\nindex = false\n"
             )
         codemap.index.sync()
-        actual = codemap.affected("owner.ts")["affected_files"]
+        actual = codemap.relationships.affected("owner.ts")["affected_files"]
         with CodeMap(
             workspace,
             state_dir=tmp_path / "fresh",
             artifact_db=tmp_path / "fresh-artifacts.sqlite3",
         ) as fresh:
             fresh.index.sync()
-            expected = fresh.affected("owner.ts")["affected_files"]
+            expected = fresh.relationships.affected("owner.ts")["affected_files"]
         assert actual == expected
         assert actual == (
             {"add": ["added.ts", "consumer.ts"], "rename": ["renamed.ts"]}.get(
@@ -68,7 +70,7 @@ def test_reverse_queries_reuse_graph_and_no_change_sync_revalidates(
         artifact_db=tmp_path / "artifacts.sqlite3",
     ) as codemap:
         codemap.index.sync()
-        build = codemap._file_graph
+        build = codemap.relationships._file_graph
         builds = 0
 
         def measured_graph(
@@ -78,13 +80,15 @@ def test_reverse_queries_reuse_graph_and_no_change_sync_revalidates(
             builds += 1
             return build(native_edges=native_edges)
 
-        monkeypatch.setattr(codemap, "_file_graph", measured_graph)
-        first = codemap.affected("owner.ts")
-        second = codemap.affected("owner.ts")
+        monkeypatch.setattr(codemap.relationships, "_file_graph", measured_graph)
+        first = codemap.relationships.affected("owner.ts")
+        second = codemap.relationships.affected("owner.ts")
         assert first["affected_files"] == second["affected_files"] == ["consumer.ts"]
         assert builds == 1
         codemap.index.sync()
-        assert codemap.affected("owner.ts")["affected_files"] == ["consumer.ts"]
+        assert codemap.relationships.affected("owner.ts")["affected_files"] == [
+            "consumer.ts"
+        ]
         assert builds == 1
 
 
@@ -103,11 +107,13 @@ def test_native_qualification_changes_revalidate_without_index_publication(
         codemap.index.sync()
         generation = codemap.store.generation()
         monkeypatch.setattr(
-            codemap, "_fresh_native_file_edges", lambda: qualified_edges
+            codemap.native, "_fresh_native_file_edges", lambda: qualified_edges
         )
-        assert codemap.affected("owner.ts")["affected_files"] == ["consumer.ts"]
+        assert codemap.relationships.affected("owner.ts")["affected_files"] == [
+            "consumer.ts"
+        ]
         qualified_edges.clear()
-        assert codemap.affected("owner.ts")["affected_files"] == []
+        assert codemap.relationships.affected("owner.ts")["affected_files"] == []
         assert codemap.store.generation() == generation
 
 
@@ -122,10 +128,12 @@ def test_clear_and_rebuild_cannot_reuse_old_relationship_authority(
         artifact_db=tmp_path / "artifacts.sqlite3",
     ) as codemap:
         codemap.index.sync()
-        assert codemap.affected("owner.ts")["affected_files"] == ["consumer.ts"]
+        assert codemap.relationships.affected("owner.ts")["affected_files"] == [
+            "consumer.ts"
+        ]
         generation = codemap.store.generation()
         codemap.index.clean()
         (workspace / "consumer.ts").write_text("import { other } from './other';\n")
         codemap.index.sync()
-        assert codemap.affected("owner.ts")["affected_files"] == []
+        assert codemap.relationships.affected("owner.ts")["affected_files"] == []
         assert codemap.store.generation() > generation

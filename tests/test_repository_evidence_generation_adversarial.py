@@ -29,20 +29,20 @@ def test_unrelated_repository_generation_change_preserves_binding_observation(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.repository_evidence_bindings(
+        before = codemap.bindings.observe(
             _binding(),
             include_relationships=False,
         )
 
         unrelated.write_text("VALUE = 2\n", encoding="utf-8")
         codemap.index.sync(["unrelated.py"])
-        after = codemap.repository_evidence_bindings(
+        after = codemap.bindings.observe(
             _binding(),
             include_relationships=False,
         )
 
-        delta = codemap.repository_evidence_binding_delta(before, after)
-        coverage = codemap.repository_evidence_coverage(
+        delta = codemap.bindings.delta(before, after)
+        coverage = codemap.bindings.coverage(
             after,
             changed_paths=["unrelated.py"],
             change_set_complete=True,

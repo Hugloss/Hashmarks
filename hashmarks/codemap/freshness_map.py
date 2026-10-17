@@ -4,11 +4,11 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.freshness import freshness_state
 from hashmarks.paths import normalize_relative_path
 
 from .change_impact import ChangeImpactOptions
 from .decision_session import ReadScopeOwner, diagnostic_producer
-from .evidence_freshness import freshness_state
 from .project_impact_codec import expand_project_impact
 from .repository_observation import packet_digest
 
@@ -237,7 +237,7 @@ class EvidenceFreshnessMapMixin(ReadScopeOwner):
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         member = normalize_relative_path(raw_member, allow_root=False)
-        explanation = self.explain_verification_selection(
+        explanation = self.tasks.explain_verification_selection(
             task,
             member,
             limit=limit,
@@ -291,7 +291,7 @@ class EvidenceFreshnessMapMixin(ReadScopeOwner):
         dependencies: list[dict[str, object]] = []
         dependency_state = "current"
         for producer in producers:
-            fresh, reason = self._evidence_fresh("project", producer)
+            fresh, reason = self.native._evidence_fresh("project", producer)
             if not fresh:
                 dependency_state = "stale"
             dependencies.append(
@@ -388,7 +388,7 @@ class EvidenceFreshnessMapMixin(ReadScopeOwner):
                 project_impact_encoding="compact",
             ),
         )
-        action = self.task_action_map(
+        action = self.tasks.action_map(
             task,
             limit=options.limit,
             per_role=options.per_role,
@@ -397,7 +397,7 @@ class EvidenceFreshnessMapMixin(ReadScopeOwner):
             action.get("verify") if isinstance(action.get("verify"), Mapping) else None
         )
         selected_member = str(verify.get("path") or "") if verify else ""
-        selected_explanation = self.explain_verification_selection(
+        selected_explanation = self.tasks.explain_verification_selection(
             task,
             selected_member or None,
             limit=options.limit,

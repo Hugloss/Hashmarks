@@ -32,18 +32,18 @@ def test_equal_dependency_bytes_at_new_path_are_definition_change_not_observatio
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.repository_evidence_bindings(
+        before = codemap.bindings.observe(
             binding,
             dependency_paths={"consumer": ["dep-a.lock"]},
             include_relationships=False,
         )
-        after = codemap.repository_evidence_bindings(
+        after = codemap.bindings.observe(
             binding,
             dependency_paths={"consumer": ["dep-b.lock"]},
             include_relationships=False,
         )
-        delta = codemap.repository_evidence_binding_delta(before, after)
-        coverage = codemap.repository_evidence_coverage(
+        delta = codemap.bindings.delta(before, after)
+        coverage = codemap.bindings.coverage(
             after,
             changed_paths=[],
             change_set_complete=True,
@@ -109,7 +109,7 @@ def test_shared_declared_dependency_affects_only_bindings_that_declared_it(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.repository_evidence_bindings(
+        before = codemap.bindings.observe(
             bindings,
             dependency_paths=dependencies,
             include_relationships=False,
@@ -117,13 +117,13 @@ def test_shared_declared_dependency_affects_only_bindings_that_declared_it(
 
         shared.write_text("two\n", encoding="utf-8")
         codemap.index.sync(["shared.lock"])
-        after = codemap.repository_evidence_bindings(
+        after = codemap.bindings.observe(
             bindings,
             dependency_paths=dependencies,
             include_relationships=False,
         )
-        delta = codemap.repository_evidence_binding_delta(before, after)
-        coverage = codemap.repository_evidence_coverage(
+        delta = codemap.bindings.delta(before, after)
+        coverage = codemap.bindings.coverage(
             after,
             changed_paths=["shared.lock"],
             change_set_complete=True,

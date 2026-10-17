@@ -39,7 +39,7 @@ def _task_report(
 ) -> dict[str, object]:
     query = task["query"]
     expected = set(secret.get("expected_files") or ())
-    entry = cm.task_entry_points(query, limit=limit)
+    entry = cm.tasks.entry_points(query, limit=limit)
     recommended = [row for row in entry.get("recommended", []) if isinstance(row, dict)]
     hashmarks_first = str(recommended[0].get("path") or "") if recommended else None
     scores = {hit.path: hit.score for hit in idx.search(query, limit=100)}

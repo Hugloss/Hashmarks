@@ -9,7 +9,7 @@ import pytest
 from contract_assertions import assert_array, assert_object, assert_records
 
 from hashmarks.codemap import CodeMap
-from hashmarks.codemap.structural_locality import structural_locality_delta
+from hashmarks.codemap.structural_locality_delta import structural_locality_delta
 from hashmarks.evidence_presentation import (
     present_repository_evidence,
     presentation_response,
@@ -61,7 +61,7 @@ def _scip(root: Path, relations: list[dict[str, object]]) -> Path:
 
 
 def _relations(codemap: CodeMap) -> dict[str, object]:
-    packet = codemap.structural_locality("code.py::Impl", refresh=False)
+    packet = codemap.structure.locality("code.py::Impl", refresh=False)
     return assert_object(packet["native_semantic_relationships"])
 
 
@@ -84,8 +84,8 @@ def test_scip_relationship_flags_are_direct_and_provenance_bound(
     )
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as cm:
         cm.index.sync()
-        cm.import_scip(index)
-        packet = cm.structural_locality("code.py::Impl", refresh=False)
+        cm.native.import_scip(index)
+        packet = cm.structure.locality("code.py::Impl", refresh=False)
         relations = assert_object(packet["native_semantic_relationships"])
         assert relations["authority"] == "scip-producer-claim-only"
         assert relations["producer_bindings"] == ["scip-python:test"]
@@ -164,13 +164,13 @@ def test_scip_relationship_claims_are_excluded_after_source_changes(
     index = _scip(tmp_path, [{"symbol": _BASE, "isImplementation": True}])
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as cm:
         cm.index.sync()
-        cm.import_scip(index)
+        cm.native.import_scip(index)
         (tmp_path / "code.py").write_text(
             "class Base:\n    pass\n\nclass Impl(Base):\n    pass\n\n# changed\n",
             encoding="utf-8",
         )
         cm.index.sync(["code.py"])
-        stale = cm.structural_locality("code.py::Impl", refresh=False)
+        stale = cm.structure.locality("code.py::Impl", refresh=False)
         stale_relations = assert_object(stale["native_semantic_relationships"])
         assert stale_relations["producer_bindings"] == []
         assert stale_relations["relationships"] == []
@@ -193,14 +193,14 @@ def test_scip_relationship_truncation_and_reimport_replacement(
     )
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as cm:
         cm.index.sync()
-        cm.import_scip(index)
+        cm.native.import_scip(index)
         observed = _relations(cm)
         assert observed["truncated"] is True
         assert len(assert_array(observed["relationships"])) == 64
         assert observed["negative_evidence_admissible"] is False
 
         _scip(tmp_path, [])
-        cm.import_scip(index)
+        cm.native.import_scip(index)
         replacement = _relations(cm)
         assert replacement["truncated"] is False
         assert replacement["relationships"] == []
@@ -225,8 +225,8 @@ def test_scip_relationship_target_reports_ambiguous_candidates(
     index.write_text(json.dumps(value), encoding="utf-8")
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as cm:
         cm.index.sync()
-        cm.import_scip(index)
-        packet = cm.structural_locality("code.py::Impl")
+        cm.native.import_scip(index)
+        packet = cm.structure.locality("code.py::Impl")
     relations = assert_object(packet["native_semantic_relationships"])
     resolution = assert_records(relations["target_resolutions"])[0]
     assert resolution["state"] == "ambiguous-candidates"
@@ -244,7 +244,7 @@ def test_scip_relationship_packet_explains_missing_provider_observation(
     _repository(tmp_path)
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as cm:
         cm.index.sync()
-        packet = cm.structural_locality("code.py::Impl")
+        packet = cm.structure.locality("code.py::Impl")
     relations = assert_object(packet["native_semantic_relationships"])
     assert (
         assert_object(relations["observation_coverage"])["state"]
@@ -262,16 +262,16 @@ def test_scip_relationship_publication_rolls_back_atomically(
     index = _scip(tmp_path, [{"symbol": _BASE, "isImplementation": True}])
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as cm:
         cm.index.sync()
-        cm.import_scip(index)
+        cm.native.import_scip(index)
         before = _relations(cm)
         _scip(tmp_path, [{"symbol": _BASE, "isDefinition": True}])
 
         def fail_snapshot(*args: object, **kwargs: object) -> None:
             raise RuntimeError("snapshot failure")
 
-        monkeypatch.setattr(cm, "_record_evidence_snapshot", fail_snapshot)
+        monkeypatch.setattr(cm.native, "_record_evidence_snapshot", fail_snapshot)
         with pytest.raises(RuntimeError, match="snapshot failure"):
-            cm.import_scip(index)
+            cm.native.import_scip(index)
         assert _relations(cm) == before
 
 
@@ -282,8 +282,8 @@ def test_scip_relation_claim_delta_requires_same_untruncated_producer(
     index = _scip(tmp_path, [{"symbol": _BASE, "isImplementation": True}])
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as cm:
         cm.index.sync()
-        cm.import_scip(index)
-        before = cm.structural_locality("code.py::Impl")
+        cm.native.import_scip(index)
+        before = cm.structure.locality("code.py::Impl")
 
         (tmp_path / "code.py").write_text(
             "class Base:\n    pass\n\nclass Impl(Base):\n    pass\n\n# revision\n",
@@ -291,8 +291,8 @@ def test_scip_relation_claim_delta_requires_same_untruncated_producer(
         )
         cm.index.sync(["code.py"])
         _scip(tmp_path, [{"symbol": _BASE, "isTypeDefinition": True}])
-        cm.import_scip(index)
-        after = cm.structural_locality("code.py::Impl")
+        cm.native.import_scip(index)
+        after = cm.structure.locality("code.py::Impl")
         delta = structural_locality_delta(before, after)
         assert delta["native_relationships_comparable"] is True
         assert any(
@@ -340,9 +340,9 @@ def test_scip_relation_claim_delta_requires_same_untruncated_producer(
         }
         # Recompute packet identity: malformed or incomplete endpoint may not
         # gain a qualified semantic absence claim via the delta projection.
-        from hashmarks.codemap.structural_locality import _identity
+        from hashmarks.codemap.structural_locality_model import locality_identity
 
-        incomplete["evidence_identity"] = _identity(
+        incomplete["evidence_identity"] = locality_identity(
             {k: v for k, v in incomplete.items() if k != "evidence_identity"}
         )
         unavailable = structural_locality_delta(before, incomplete)
@@ -357,14 +357,14 @@ def test_scip_relationship_delta_requires_comparable_exact_endpoints(
     index = _scip(tmp_path, [{"symbol": _BASE, "isImplementation": True}])
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as cm:
         cm.index.sync()
-        cm.import_scip(index)
-        before = cm.structural_locality("code.py::Impl")
+        cm.native.import_scip(index)
+        before = cm.structure.locality("code.py::Impl")
         after = dict(before)
         after["target"] = "code.py::Base"
         after["repository_identity"] = "sha256:different-repository-observation"
-        from hashmarks.codemap.structural_locality import _identity
+        from hashmarks.codemap.structural_locality_model import locality_identity
 
-        after["evidence_identity"] = _identity(
+        after["evidence_identity"] = locality_identity(
             {key: value for key, value in after.items() if key != "evidence_identity"}
         )
         delta = structural_locality_delta(before, after)

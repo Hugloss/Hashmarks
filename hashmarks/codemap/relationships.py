@@ -1,9 +1,15 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, TypedDict, cast
 
+from hashmarks.paths import normalize_relative_path
+
+from .change_relationship_projection import (
+    ChangeRelationshipObservation,
+    project_change_relationships,
+)
 from .model import EvidenceVisibility, SearchHit
 from .python_ast import identifier_terms
 from .query_primitives import _query_terms
@@ -12,21 +18,35 @@ from .repository_domains import classify_repository_path
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from .engine import CodeMap
+    from .repository_tasks import RepositoryTasks
 
 
 @dataclass
 class _TaskAdjacencyState:
     primary_paths: set[str]
-    tokens: list[str]
+    tokens: Sequence[str]
     raw_query: str
     relation_weight: dict[str, float]
     symbolic_targets: dict[str, list[tuple[int, str, str, str]]]
     pending_admissions: list[tuple[str, int, str, str, str]]
-    candidates: dict[str, dict[str, object]]
+    candidates: dict[str, _AdjacencyCandidate]
 
 
-class RelationshipsMixin:
+class _AdjacencyProvenance(TypedDict):
+    seed_path: str
+    seed_rank: int
+    relation: str
+    confidence: str
+
+
+class _AdjacencyCandidate(TypedDict):
+    path: str
+    score: float
+    domains: list[str]
+    provenance: list[_AdjacencyProvenance]
+
+
+class TaskRelationshipsMixin:
     """Bounded task adjacency and relationship projections."""
 
     @staticmethod
@@ -84,14 +104,14 @@ class RelationshipsMixin:
         confidence: str,
     ) -> None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        for path in self._imports._resolve_import_paths(seed_path, target)[:4]:
+            self = cast("RepositoryTasks", self)
+        for path in self.imports._resolve_import_paths(seed_path, target)[:4]:
             self._adjacency_admit(
                 state, path, seed_rank, seed_path, "imports", confidence
             )
 
     @staticmethod
-    def _adjacency_symbol_short(target: str, tokens: list[str]) -> str | None:
+    def _adjacency_symbol_short(target: str, tokens: Sequence[str]) -> str | None:
         short = target.rsplit(".", 1)[-1].strip()
         if not short:
             return None
@@ -121,16 +141,18 @@ class RelationshipsMixin:
         per_seed_edge_limit: int,
     ) -> None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         edge_map = self.reads.edges_for_paths_many(
             [seed.path for seed in primary], limit_per_path=per_seed_edge_limit
         )
         for seed_rank, seed in enumerate(primary, 1):
             for edge in edge_map.get(seed.path, ()):
                 self._adjacency_static_edge(state, edge, seed_rank, seed.path)
-            for edge in self._fresh_native_file_edges_from(seed.path)[
-                :per_seed_edge_limit
-            ]:
+            for (
+                edge
+            ) in self.repository_relationships.native._fresh_native_file_edges_from(
+                seed.path
+            )[:per_seed_edge_limit]:
                 target = str(edge.get("target") or "")
                 if target:
                     confidence = str(edge.get("confidence") or "native")
@@ -168,14 +190,16 @@ class RelationshipsMixin:
 
     def _resolve_adjacency_symbols(self, state: _TaskAdjacencyState) -> None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         if not state.symbolic_targets:
             return
         resolved = self.reads.exact_symbol_candidates(
             sorted(state.symbolic_targets),
             limit=max(160, min(5000, len(state.symbolic_targets) * 32)),
         )
-        rows_by_alias = self._adjacency_symbol_rows(resolved, state.symbolic_targets)
+        rows_by_alias = self._adjacency_symbol_rows(
+            resolved, set(state.symbolic_targets)
+        )
         for alias, target_rows in rows_by_alias.items():
             self._admit_resolved_adjacency_alias(state, alias, target_rows)
 
@@ -187,7 +211,7 @@ class RelationshipsMixin:
         file_row: Mapping[str, object],
     ) -> None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         path, seed_rank, seed_path, relation, confidence = candidate
         row = dict(file_row)
         if (
@@ -195,7 +219,7 @@ class RelationshipsMixin:
             is EvidenceVisibility.DENY
         ):
             return
-        base_score = self._score(
+        base_score = self.search._score(
             task,
             {"row_type": "file", **row},
             tokens=state.tokens,
@@ -206,7 +230,7 @@ class RelationshipsMixin:
             + state.relation_weight.get(relation, 20.0)
             + (28.0 / (1.0 + seed_rank))
         )
-        provenance = {
+        provenance: _AdjacencyProvenance = {
             "seed_path": seed_path,
             "seed_rank": seed_rank,
             "relation": relation,
@@ -233,7 +257,7 @@ class RelationshipsMixin:
         self, task: str, state: _TaskAdjacencyState
     ) -> None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         rows = self.reads.file_rows(path for path, *_ in state.pending_admissions)
         for candidate in state.pending_admissions:
             file_row = rows.get(candidate[0])
@@ -241,7 +265,9 @@ class RelationshipsMixin:
                 self._score_adjacency_row(task, state, candidate, file_row)
 
     @staticmethod
-    def _candidate_matches_seed(candidate: dict[str, object], seed_rank: int) -> bool:
+    def _candidate_matches_seed(
+        candidate: Mapping[str, object], seed_rank: int
+    ) -> bool:
         provenance = candidate.get("provenance")
         if not isinstance(provenance, list):
             return False
@@ -252,7 +278,10 @@ class RelationshipsMixin:
 
     @classmethod
     def _seed_adjacency_rows(
-        cls, primary: object, ordered: list[object], per_seed_result_limit: int
+        cls,
+        primary: Iterable[SearchHit],
+        ordered: Sequence[_AdjacencyCandidate],
+        per_seed_result_limit: int,
     ) -> list[dict[str, object]]:
         result: list[dict[str, object]] = []
         for seed_rank, seed in enumerate(primary, 1):
@@ -285,7 +314,7 @@ class RelationshipsMixin:
         This avoids reinterpreting a repository path as free-text task input.
         """
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         primary: list[SearchHit] = []
         for path in sorted(paths):
             row = self.reads.file_row(path)
@@ -333,7 +362,7 @@ class RelationshipsMixin:
             ),
         }
 
-    def task_graph_adjacency(
+    def graph_adjacency(
         self,
         task: str,
         *,
@@ -344,11 +373,11 @@ class RelationshipsMixin:
     ) -> dict[str, object]:
         """Return bounded one-hop graph evidence adjacent to canonical task hits."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         self._validate_adjacency_bounds(
             seed_limit, limit, per_seed_edge_limit, per_seed_result_limit
         )
-        primary = self.find_task(task, limit=seed_limit)
+        primary = self.search.find_task(task, limit=seed_limit)
         state = _TaskAdjacencyState(
             {hit.path for hit in primary},
             _query_terms(task),
@@ -398,14 +427,14 @@ class RelationshipsMixin:
         self, task: str, impact_limit_per_surface: int
     ) -> tuple[dict[str, list[dict[str, object]]], str | None]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         try:
-            impact = self.change_impact(
+            impact = self._observe_change_relationships(
                 task, max_depth=2, limit_per_surface=impact_limit_per_surface
             )
         except KeyError:
             return {}, "no-proven-impact-root"
-        return impact["surfaces"], None  # type: ignore[return-value]
+        return impact["surfaces"], None
 
     @staticmethod
     def _append_relationship(
@@ -458,7 +487,10 @@ class RelationshipsMixin:
         relationships: list[dict[str, object]],
         seen: set[tuple[str, str, str]],
     ) -> None:
-        for row in adjacency.get("adjacent", []):
+        rows = adjacency.get("adjacent", [])
+        if not isinstance(rows, list):
+            raise TypeError("adjacency observations must contain a list of candidates")
+        for row in rows:
             if not isinstance(row, dict):
                 continue
             provenance = row.get("provenance")
@@ -506,11 +538,14 @@ class RelationshipsMixin:
         seen: set[tuple[str, str, str]],
     ) -> list[dict[str, object]]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         authority_rows: list[dict[str, object]] = []
         for path in primary_paths[:4]:
             value = self.source.instruction_scope(path, query=path)
-            for row in value["authority"]:
+            authority = value["authority"]
+            if not isinstance(authority, list):
+                raise TypeError("instruction authority observations must be a list")
+            for row in authority:
                 if not isinstance(row, dict):
                     continue
                 authority_path = str(row.get("path") or "")
@@ -549,7 +584,7 @@ class RelationshipsMixin:
             counts[layer] = counts.get(layer, 0) + 1
         return counts
 
-    def task_relationships(
+    def relationships(
         self,
         task: str,
         *,
@@ -559,13 +594,13 @@ class RelationshipsMixin:
     ) -> dict[str, object]:
         """Return bounded cross-layer repository relationships for one task."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         self._validate_relationship_bounds(
             seed_limit, adjacency_limit, impact_limit_per_surface
         )
-        primary = self.find_task(task, limit=seed_limit)
+        primary = self.search.find_task(task, limit=seed_limit)
         primary_paths = [hit.path for hit in primary]
-        adjacency = self.task_graph_adjacency(
+        adjacency = self.graph_adjacency(
             task, seed_limit=seed_limit, limit=adjacency_limit
         )
         impact_surfaces, impact_error = self._relationship_impact_surfaces(
@@ -600,3 +635,53 @@ class RelationshipsMixin:
             "ranking_effect": "none",
             "authority_effect": "advisory-navigation-only",
         }
+
+    def _change_impact_adjacency(
+        self,
+        query: str,
+        roots: set[str],
+        *,
+        limit_per_surface: int,
+    ) -> dict[str, object]:
+        if TYPE_CHECKING:
+            self = cast("RepositoryTasks", self)
+        adjacency_limit = max(12, limit_per_surface * 2)
+        exact_path_roots = self.repository_relationships._query_paths(query)
+        if len(exact_path_roots) == 1 and exact_path_roots == roots:
+            try:
+                normalized_query = normalize_relative_path(query, allow_root=False)
+            except ValueError:
+                normalized_query = ""
+            if normalized_query in roots:
+                return self._path_graph_adjacency(
+                    query,
+                    roots,
+                    limit=adjacency_limit,
+                )
+        return self.graph_adjacency(
+            query,
+            seed_limit=min(12, max(4, limit_per_surface)),
+            limit=adjacency_limit,
+        )
+
+    def _observe_change_relationships(
+        self, query: str, *, max_depth: int = 4, limit_per_surface: int = 20
+    ) -> ChangeRelationshipObservation:
+        if TYPE_CHECKING:
+            self = cast("RepositoryTasks", self)
+        if limit_per_surface < 1:
+            raise ValueError("limit_per_surface must be >= 1")
+        value = self.repository_relationships.affected(query, max_depth=max_depth)
+        raw_roots = value["roots"]
+        assert isinstance(raw_roots, list)
+        roots = set(map(str, raw_roots))
+        adjacency = self._change_impact_adjacency(
+            query, roots, limit_per_surface=limit_per_surface
+        )
+        return project_change_relationships(
+            query,
+            value,
+            adjacency,
+            max_depth=max_depth,
+            limit_per_surface=limit_per_surface,
+        )

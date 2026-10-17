@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from contract_assertions import assert_object, is_available_plan
 
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.evidence_verification import RepositoryVerification
 from hashmarks.python_ast_cache import PythonAstSnapshot
 
 if TYPE_CHECKING:
@@ -48,10 +49,10 @@ def test_verification_relevance_recovers_local_test_outside_canonical_top20(
     task, expected = _build_repetitive_verification_repo(tmp_path, distractors=40)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(task, limit=20)
+        action = codemap.tasks.action_map(task, limit=20)
         verify = action["verify"]
         assert verify is not None
-        plan = codemap.verification_plan(
+        plan = codemap.verification.plan(
             verify["path"],
             symbol=verify.get("verification_test_symbol"),
         )
@@ -92,7 +93,7 @@ def test_verification_relevance_preserves_canonical_choice_when_reference_eviden
         )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map("widget implementation test", limit=20)
+        action = codemap.tasks.action_map("widget implementation test", limit=20)
 
     relevance = action["verification_relevance"]
     assert relevance["selection_changed"] is False
@@ -107,7 +108,9 @@ def test_public_verification_relevance_is_bounded(tmp_path: Path) -> None:
     task, expected = _build_repetitive_verification_repo(tmp_path, distractors=30)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        relevance = codemap.verification_relevance(task, limit=20, candidate_limit=3)
+        relevance = codemap.tasks.verification_relevance(
+            task, limit=20, candidate_limit=3
+        )
 
     assert relevance["schema"] == "hashmarks.verification-relevance.v1"
     assert relevance["selected"] is not None
@@ -154,8 +157,8 @@ def test_unique_indirect_active_verifier_overrides_stale_direct_legacy_decoys(
     task = "Fix src.case.engine.ember_snow accepted response implementation and verify behavior"
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(task, limit=20)
-        packet = codemap.task_decision_packet(task, limit=20)
+        action = codemap.tasks.action_map(task, limit=20)
+        packet = codemap.tasks.decision_packet(task, limit=20)
 
     assert action["edit"] is not None
     assert action["edit"]["path"] == "src/case/engine.py"
@@ -191,7 +194,7 @@ def test_reexported_active_symbol_keeps_exact_owner_identity(tmp_path: Path) -> 
         )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(
+        action = codemap.tasks.action_map(
             "Fix src.case.engine.ember_snow accepted response implementation and verify behavior",
             limit=20,
         )
@@ -214,7 +217,7 @@ def test_aliased_import_preserves_underlying_owner_identity(tmp_path: Path) -> N
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(
+        action = codemap.tasks.action_map(
             "Fix ember_snow implementation and verify behavior", limit=20
         )
     assert action["edit"] is not None
@@ -273,7 +276,7 @@ def test_two_hop_reexport_keeps_unique_underlying_owner_identity(
         )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(
+        action = codemap.tasks.action_map(
             "Fix src.case.engine.ember_snow accepted response implementation and verify behavior",
             limit=20,
         )
@@ -313,7 +316,7 @@ def test_two_hop_alias_chain_keeps_unique_underlying_owner_identity(
         )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(
+        action = codemap.tasks.action_map(
             "Fix src.case.engine.ember_snow accepted response implementation and verify behavior",
             limit=20,
         )
@@ -346,7 +349,7 @@ def test_star_reexport_keeps_name_scoped_unique_owner_identity(tmp_path: Path) -
         )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(
+        action = codemap.tasks.action_map(
             "Fix src.case.engine.ember_snow accepted response implementation and verify behavior",
             limit=20,
         )
@@ -386,11 +389,11 @@ def test_same_symbol_across_multiple_live_packages_fails_closed(
         )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(
+        action = codemap.tasks.action_map(
             "Fix ember_snow accepted response implementation and verify behavior",
             limit=20,
         )
-        packet = codemap.task_decision_packet(
+        packet = codemap.tasks.decision_packet(
             "Fix ember_snow accepted response implementation and verify behavior",
             limit=20,
         )
@@ -436,8 +439,8 @@ def test_reexport_chain_beyond_bound_fails_closed_instead_of_stale_verifier(
     task = "Fix src.case.engine.ember_snow accepted response implementation and verify behavior"
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(task, limit=20)
-        packet = codemap.task_decision_packet(task, limit=20)
+        action = codemap.tasks.action_map(task, limit=20)
+        packet = codemap.tasks.decision_packet(task, limit=20)
     assert action["edit"] is not None
     assert action["edit"]["path"] == "src/case/engine.py"
     assert "qualified_identity_ambiguous" in action["verification_relevance"]
@@ -482,7 +485,7 @@ def _verification_reference_case(
     (tmp_path / "tests" / "test_owner.py").write_text(verifier_source)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        relevance = codemap.verification_relevance(
+        relevance = codemap.tasks.verification_relevance(
             "Fix ember_snow implementation and verify behavior", limit=20
         )
     return next(
@@ -554,7 +557,7 @@ def test_verification_reference_index_invalidates_when_source_changes(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        first = codemap.verification_relevance(
+        first = codemap.tasks.verification_relevance(
             "Fix ember_snow implementation and verify behavior", limit=20
         )
         first_row = next(
@@ -570,7 +573,7 @@ def test_verification_reference_index_invalidates_when_source_changes(
             "def test_owner():\n"
             "    assert True\n"
         )
-        second = codemap.verification_relevance(
+        second = codemap.tasks.verification_relevance(
             "Fix ember_snow implementation and verify behavior", limit=20
         )
         second_row = next(
@@ -587,17 +590,17 @@ def test_verification_candidate_projection_samples_pytest_config_once(
 ) -> None:
     task, _ = _build_repetitive_verification_repo(tmp_path, distractors=80)
     calls = 0
-    original = CodeMap._pytest_declared
+    original = RepositoryVerification._pytest_declared
 
-    def counted(self: CodeMap) -> object:
+    def counted(self: RepositoryVerification) -> object:
         nonlocal calls
         calls += 1
         return original(self)
 
-    monkeypatch.setattr(CodeMap, "_pytest_declared", counted)
+    monkeypatch.setattr(RepositoryVerification, "_pytest_declared", counted)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(task, limit=20)
+        action = codemap.tasks.action_map(task, limit=20)
 
     assert "candidate_count" in action["verification_relevance"]
     assert action["verification_relevance"]["candidate_count"] == 81
@@ -629,7 +632,7 @@ def test_verification_reference_projection_reads_each_candidate_snapshot_once(
     monkeypatch.setattr(verification_module, "read_python_ast", counted)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(task, limit=20)
+        action = codemap.tasks.action_map(task, limit=20)
 
     assert "candidate_count" in action["verification_relevance"]
     candidate_count = action["verification_relevance"]["candidate_count"]
@@ -653,7 +656,7 @@ def test_file_target_keeps_module_declarations_visible_after_many_nested_helpers
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_evidence("Inspect src/owner.py.")
+        packet = codemap.tasks.evidence("Inspect src/owner.py.")
     relevance = packet["verification"]["relevance"]
     candidate = next(row for row in relevance["candidates"] if row["path"] == expected)
     assert "direct_reference" in candidate
@@ -689,7 +692,7 @@ def test_indirect_test_scope_keeps_import_identity_and_incomplete_bounds(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_evidence("Inspect src/owner.py.")
+        packet = codemap.tasks.evidence("Inspect src/owner.py.")
     relevance = packet["verification"]["relevance"]
     actual = next(
         row for row in relevance["candidates"] if row["path"] == "tests/test_actual.py"

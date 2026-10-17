@@ -36,10 +36,10 @@ def test_import_resolution_has_one_explicit_owner() -> None:
         root / "hashmarks/codemap/import_resolution.py", "RepositoryImports"
     )
     graph = _class_methods(
-        root / "hashmarks/codemap/evidence_graph.py", "EvidenceGraphMixin"
+        root / "hashmarks/codemap/evidence_graph.py", "RepositoryRelationships"
     )
     ownership = _class_methods(
-        root / "hashmarks/codemap/ownership_graph.py", "OwnershipGraphMixin"
+        root / "hashmarks/codemap/ownership_graph.py", "RepositoryOwnership"
     )
 
     assert resolver >= _IMPORT_RESOLUTION_METHODS

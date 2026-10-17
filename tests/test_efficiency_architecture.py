@@ -3,6 +3,8 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+from hashmarks.python_ast_cache import read_python_ast
+
 ROOT = Path(__file__).parents[1]
 
 
@@ -87,23 +89,26 @@ def test_lru_cache_ownership_is_module_level_or_explicit_static_pure_wrapper() -
 
 
 def test_hot_codemap_loops_do_not_issue_known_row_at_a_time_store_reads() -> None:
-    path = ROOT / "hashmarks" / "codemap" / "engine.py"
-    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     guarded = {
-        "_find_impl",
-        "ownership_relation_graph",
-        "task_graph_adjacency",
-        "deps",
-        "refs",
-        "_context_impl",
+        "find_engine.py": {"_find_compose"},
+        "ownership_graph.py": {"relations"},
+        "relationships.py": {"graph_adjacency"},
+        "evidence_graph.py": {"deps", "refs"},
+        "repository_context.py": {"_context_impl"},
     }
+    functions: list[ast.FunctionDef] = []
+    for filename, names in guarded.items():
+        tree = read_python_ast(ROOT / "hashmarks/codemap" / filename).tree
+        selected = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef) and node.name in names
+        ]
+        assert {node.name for node in selected} == names, filename
+        functions.extend(selected)
     row_reads = {"file_row", "edges_from", "refs", "symbols_named"}
     violations: list[str] = []
-    for fn in [
-        n
-        for n in ast.walk(tree)
-        if isinstance(n, ast.FunctionDef) and n.name in guarded
-    ]:
+    for fn in functions:
         for loop in [
             n
             for n in ast.walk(fn)
@@ -179,7 +184,9 @@ def test_bounded_rerank_topn_matches_reference_full_sort(tmp_path: Path) -> None
         ordered = sorted(
             rows,
             key=lambda row: (
-                -codemap._candidate_prescore(query, row, tokens=tokens, raw_query=raw),
+                -codemap.search._candidate_prescore(
+                    query, row, tokens=tokens, raw_query=raw
+                ),
                 str(row.get("path", "")),
                 str(row.get("qualname", "")),
             ),
@@ -204,7 +211,7 @@ def test_bounded_rerank_topn_matches_reference_full_sort(tmp_path: Path) -> None
             reference.append(row)
             if len(reference) >= rerank_limit:
                 break
-        actual = codemap._bounded_rerank_rows(
+        actual = codemap.search._bounded_rerank_rows(
             query, tuple(rows), limit=limit, tokens=tokens
         )
     assert list(actual) == reference

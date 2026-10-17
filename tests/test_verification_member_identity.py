@@ -7,6 +7,8 @@ from pathlib import Path
 import pytest
 
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.query_router import normalize_task_query
+from hashmarks.codemap.verification_relevance_model import VerificationRequest
 
 
 def _repository(root: Path, verifier: str) -> None:
@@ -40,7 +42,9 @@ def test_unqualified_or_conflicting_method_receiver_is_not_direct_evidence(
     _repository(tmp_path, verifier)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        relevance = codemap.verification_relevance("Inspect Message.nack in alpha.py")
+        relevance = codemap.tasks.verification_relevance(
+            "Inspect Message.nack in alpha.py"
+        )
     candidate = next(
         row
         for row in relevance["candidates"]
@@ -67,7 +71,9 @@ def test_explicit_import_and_member_scope_qualify_the_static_reference(
     _repository(tmp_path, verifier)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        relevance = codemap.verification_relevance("Inspect Message.nack in alpha.py")
+        relevance = codemap.tasks.verification_relevance(
+            "Inspect Message.nack in alpha.py"
+        )
     candidate = next(
         row
         for row in relevance["candidates"]
@@ -90,7 +96,9 @@ def test_unknown_method_receivers_cannot_make_a_known_verifier_unique(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        relevance = codemap.verification_relevance("Inspect Message.nack in alpha.py")
+        relevance = codemap.tasks.verification_relevance(
+            "Inspect Message.nack in alpha.py"
+        )
     assert relevance.get("negative_evidence_admissible") is False
     assert relevance.get("qualified_identity_ambiguous") is True
     assert "unique" not in relevance["selection_reason"]
@@ -120,12 +128,17 @@ def test_instance_method_spelling_does_not_reference_an_unrelated_module_functio
     (tmp_path / "tests/test_delivery.py").write_text(verifier)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        relevance = codemap._verification_relevance(
-            "Inspect emit in alpha.py",
-            edit={"path": "alpha.py", "name": "emit", "qualname": "emit"},
-            current_verify=None,
-            rows=[],
-        )
+        with codemap.reads.session() as _task_read_scope:
+            relevance = codemap.verification.for_owner(
+                VerificationRequest(
+                    _task_read_scope,
+                    normalize_task_query("Inspect emit in alpha.py"),
+                    "nominated",
+                    {"path": "alpha.py", "name": "emit", "qualname": "emit"},
+                    None,
+                    tuple([]),
+                )
+            )
     candidate = next(
         row
         for row in relevance["candidates"]
@@ -155,7 +168,7 @@ def test_explicit_module_function_reference_retains_its_authority(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        relevance = codemap.verification_relevance("Inspect emit in alpha.py")
+        relevance = codemap.tasks.verification_relevance("Inspect emit in alpha.py")
     candidate = next(
         row
         for row in relevance["candidates"]
@@ -180,7 +193,7 @@ def test_indirect_member_proof_cannot_strengthen_an_unused_direct_import(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        relevance = codemap.verification_relevance("Inspect emit in alpha.py")
+        relevance = codemap.tasks.verification_relevance("Inspect emit in alpha.py")
     candidate = next(
         row
         for row in relevance["candidates"]

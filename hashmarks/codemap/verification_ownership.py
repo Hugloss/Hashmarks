@@ -11,12 +11,10 @@ from typing import TYPE_CHECKING, TypedDict, cast
 
 from hashmarks.operation_contract import operation_response, operation_schema
 
-from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
-
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from .engine import CodeMap
+    from .evidence_verification import RepositoryVerification
     from .task_evidence_types import TaskVerificationPlan
 
 
@@ -146,7 +144,7 @@ class VerificationOwnershipMixin:
     def _verification_owner_row(
         self, item: dict[str, object], edit_paths: list[str]
     ) -> _VerificationOwner | None:
-        self = cast("CodeMap", self)
+        self = cast("RepositoryVerification", self)
         path = item.get("path")
         if not isinstance(path, str):
             return None
@@ -155,7 +153,7 @@ class VerificationOwnershipMixin:
             "path": path,
             "score": item.get("score"),
             "reason": item.get("reason"),
-            "plan": self.verification_plan(
+            "plan": self.plan(
                 path,
                 symbol=cast("str | None", item.get("name")),
                 qualname=cast("str | None", item.get("qualname")),
@@ -215,22 +213,17 @@ class VerificationOwnershipMixin:
         return unowned, ambiguous
 
     @operation_response("verification_ownership")
-    def verification_ownership_graph(
+    def relationship_evidence(
         self,
         task: str,
-        *,
-        limit: int = VERIFICATION_RELEVANCE_DEFAULTS.limit,
-        candidate_limit: int = VERIFICATION_RELEVANCE_DEFAULTS.candidate_limit,
+        action: Mapping[str, object],
+        relevance: Mapping[str, object],
+        authority: dict[str, object] | None,
     ) -> dict[str, object]:
-        """Expose verification owners and their evidence-backed edit-authority links."""
+        """Compose supplied edit authority with qualified verifier observations."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        relevance = self.verification_relevance(
-            task, limit=limit, candidate_limit=candidate_limit
-        )
-        action = self.task_action_map(task, limit=limit)
+            self = cast("RepositoryVerification", self)
         edit_paths = sorted(set(self._verification_edit_paths(action)))
-        authority = self.repository_ownership_graph(edit_paths) if edit_paths else None
         edit_authorities = self._edit_authorities(
             edit_paths, authority, action.get("ownership_resolution")
         )

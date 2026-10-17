@@ -43,7 +43,7 @@ def _repo(
 
 def _prepare(codemap: CodeMap) -> None:
     codemap.index.sync()
-    codemap.enrich_projects(
+    codemap.native.enrich_projects(
         ("npm-package-graph", "maven-pom-graph", "declared-project-links")
     )
 
@@ -136,7 +136,7 @@ def test_cross_repository_packet_service_roundtrip(
             time.sleep(0.01)
     try:
         client.sync()
-        service._map().enrich_projects(
+        service._map().native.enrich_projects(
             ("npm-package-graph", "maven-pom-graph", "declared-project-links")
         )
         packet = client.repository_intelligence_query(

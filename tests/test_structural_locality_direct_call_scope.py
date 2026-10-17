@@ -21,9 +21,9 @@ def test_nested_callback_calls_are_not_direct_calls_of_its_enclosing_function(
         "    return callback\n"
     )
     with CodeMap(tmp_path) as codemap:
-        outer = codemap.structural_locality("worker.py::owner")
-        callback = codemap.structural_locality("worker.py::owner.callback")
-        leaf = codemap.structural_locality("worker.py::leaf", max_depth=0)
+        outer = codemap.structure.locality("worker.py::owner")
+        callback = codemap.structure.locality("worker.py::owner.callback")
+        leaf = codemap.structure.locality("worker.py::leaf", max_depth=0)
     assert outer["edges"] == []
     assert {row["symbol_id"] for row in assert_records(outer["nodes"])} == {
         "worker.py::owner"
@@ -47,8 +47,8 @@ def test_calls_in_nested_class_methods_keep_their_actual_caller(tmp_path: Path) 
         "    return Worker\n"
     )
     with CodeMap(tmp_path) as codemap:
-        outer = codemap.structural_locality("worker.py::owner")
-        method = codemap.structural_locality("worker.py::owner.Worker.run")
+        outer = codemap.structure.locality("worker.py::owner")
+        method = codemap.structure.locality("worker.py::owner.Worker.run")
     assert outer["edges"] == []
     assert {
         (row["source_symbol_id"], row["resolved_symbol_id"])
@@ -65,7 +65,7 @@ def test_direct_call_remains_a_single_segment_without_transitive_shortcut(
         "def owner():\n    return callback()\n"
     )
     with CodeMap(tmp_path) as codemap:
-        packet = codemap.structural_locality("worker.py::owner")
+        packet = codemap.structure.locality("worker.py::owner")
     assert {
         (row["source_symbol_id"], row["resolved_symbol_id"])
         for row in assert_records(packet["edges"])
@@ -83,9 +83,7 @@ def test_nested_calls_do_not_consume_the_enclosing_call_limit(tmp_path: Path) ->
         "    return leaf()\n"
     )
     with CodeMap(tmp_path) as codemap:
-        packet = codemap.structural_locality(
-            "worker.py::owner", call_limit_per_symbol=1
-        )
+        packet = codemap.structure.locality("worker.py::owner", call_limit_per_symbol=1)
     assert [
         (row["source_symbol_id"], row["line"], row["resolved_symbol_id"])
         for row in assert_records(packet["edges"])

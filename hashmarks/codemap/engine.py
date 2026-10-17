@@ -9,10 +9,6 @@ from hashmarks.client import (
     prepare_default_state_dir,
 )
 from hashmarks.file_store import FileDigestStore
-from hashmarks.native_vitest import (  # noqa: F401 - evidence_graph uses these engine module attributes
-    collect_vitest_vite_graph,
-    local_vitest,
-)
 from hashmarks.paths import canonical_host_path
 
 from .change_impact import _ImpactOwnerReuse
@@ -26,13 +22,11 @@ from .decision_session import (
 from .dependency_resolution_delta import DependencyResolutionDeltaMixin
 from .dependency_resolution_derivation import DependencyResolutionDerivationMixin
 from .dependency_resolution_evidence import DependencyResolutionEvidenceMixin
-from .evidence_correlation import EvidenceCorrelationMixin
-from .evidence_freshness import EvidenceFreshnessMixin
-from .evidence_graph import EvidenceGraphMixin
-from .evidence_packet import TaskEvidencePacketMixin
+from .evidence_correlation import RepositoryCorrelation
+from .evidence_graph import RepositoryRelationships
 from .evidence_profiles import EvidenceProfilesMixin
-from .evidence_verification import VerificationMixin
-from .find_engine import FindEngineMixin, _FindEvidence
+from .evidence_verification import RepositoryVerification
+from .find_engine import RepositorySearch
 from .freshness_map import EvidenceFreshnessMapMixin
 from .import_resolution import RepositoryImports
 from .indexing_lifecycle import (
@@ -40,25 +34,17 @@ from .indexing_lifecycle import (
     RepositoryIndex,
 )
 from .intelligence_economics import IntelligenceEconomicsMixin
-from .model import (
-    ContextPack,
-)
-from .ownership_analysis import OwnershipAnalysisMixin
-from .ownership_graph import OwnershipGraphMixin, _OwnershipImportReuse
+from .native_evidence import RepositoryNativeEvidence
+from .ownership_graph import RepositoryOwnership
 from .post_change import PostChangeMixin
-from .project_graph import default_project_graph_providers
 from .providers import SourceRangeProvider, TreeSitterRangeProvider
-from .pyright_type_server import PyrightTypeServerProvider
 from .query_surface import QuerySurfaceMixin
-from .relationships import RelationshipsMixin
-from .repository_context import ContextPlanningMixin
+from .repository_context import RepositoryContext
 from .repository_declaration_derivation import RepositoryDeclarationDerivationMixin
 from .repository_declaration_discovery import RepositoryDeclarationDiscoveryMixin
 from .repository_declarations import RepositoryDeclarationsMixin
 from .repository_delta import RepositoryDeltaMixin, _SnapshotReuse
-from .repository_evidence_binding_delta import RepositoryEvidenceBindingDeltaMixin
-from .repository_evidence_bindings import RepositoryEvidenceBindingsMixin
-from .repository_evidence_coverage import RepositoryEvidenceCoverageMixin
+from .repository_evidence_bindings import RepositoryBindings
 from .repository_file_discovery import RepositoryFiles
 from .repository_index_store import (
     ArtifactStore,
@@ -68,16 +54,8 @@ from .repository_index_store import (
 from .repository_intelligence_query import RepositoryIntelligenceQueryMixin
 from .repository_observation import RepositoryObservationSource
 from .repository_source import RepositorySource
-from .repository_task_action import TaskActionMixin
-from .singleflight import SingleFlight
-from .structural_locality import StructuralLocalityMixin
-from .structural_search import AstGrepSearchProvider
-from .task_action_types import _TaskActionReuse
-from .task_retrieval import TaskRetrievalMixin, _TaskRetrievalResult
-from .typescript_resolver import TypeScriptResolverProvider
-from .verification_explanation import VerificationExplanationMixin
-from .verification_plan import VerificationPlanMixin
-from .work_context import WorkContextMixin
+from .repository_tasks import RepositoryTasks
+from .structural_locality import RepositoryStructure
 
 # Generic repository evidence families. These are query-formulation hints only:
 # they never name project-specific files, never grant authority, and are emitted
@@ -128,17 +106,12 @@ class _CodeMapPaths:
 
 
 class CodeMap(
-    TaskEvidencePacketMixin,
     DependencyResolutionDeltaMixin,
     DependencyResolutionDerivationMixin,
     DependencyResolutionEvidenceMixin,
     ChangeIntelligenceMixin,
     EvidenceFreshnessMapMixin,
     RepositoryDeltaMixin,
-    EvidenceCorrelationMixin,
-    RepositoryEvidenceBindingsMixin,
-    RepositoryEvidenceBindingDeltaMixin,
-    RepositoryEvidenceCoverageMixin,
     EvidenceProfilesMixin,
     CrossRepositoryEvidenceMixin,
     RepositoryIntelligenceQueryMixin,
@@ -146,22 +119,8 @@ class CodeMap(
     RepositoryDeclarationDiscoveryMixin,
     RepositoryDeclarationsMixin,
     IntelligenceEconomicsMixin,
-    VerificationExplanationMixin,
     PostChangeMixin,
-    TaskActionMixin,
-    VerificationPlanMixin,
-    VerificationMixin,
-    RelationshipsMixin,
-    EvidenceFreshnessMixin,
-    EvidenceGraphMixin,
-    ContextPlanningMixin,
-    OwnershipAnalysisMixin,
-    StructuralLocalityMixin,
     QuerySurfaceMixin,
-    WorkContextMixin,
-    TaskRetrievalMixin,
-    OwnershipGraphMixin,
-    FindEngineMixin,
     ReadScopeOwner,
 ):
     """Derived repository-intelligence map.
@@ -203,9 +162,7 @@ class CodeMap(
             internal_state_path=paths.internal_state_path,
             policy_path=paths.policy_path,
         )
-        self.context_cache = ContextCache(self.state_dir)
-        self._find_flight: SingleFlight[_FindEvidence] = SingleFlight()
-        self._context_flight: SingleFlight[ContextPack] = SingleFlight()
+        self._context_cache = ContextCache(self.state_dir)
         # Optional structural precision lives entirely in the CodeMap lane.
         # Missing tree-sitter support is expected and never affects Identity.
         range_producer = (
@@ -220,30 +177,6 @@ class CodeMap(
             observation_source=self._observation_source,
             max_index_bytes=max_index_bytes,
         )
-        self.structural_search_provider = AstGrepSearchProvider(self.workspace)
-        self.project_graph_providers = default_project_graph_providers(
-            self.files.visible_manifests
-        )
-        self.typescript_resolver = TypeScriptResolverProvider()
-        self.pyright_type_server = PyrightTypeServerProvider()
-        self._reverse_file_graph_cache: (
-            tuple[int, bytes, dict[str, set[str]]] | None
-        ) = None
-        # Canonical task retrieval is composed by multiple additive CodeMap surfaces.
-        # Keep a small generation-bound result cache so those surfaces reuse the exact
-        # same selected evidence instead of replaying 2-3 query lanes each time.
-        self._task_result_cache: dict[tuple[int, str, int], _TaskRetrievalResult] = {}
-        # Structural ownership may select an authority path that is not present in
-        # the canonical retrieval rows. Remember those selected paths separately
-        # so an unsignaled byte change is reconciled before the next decision.
-        self._task_authority_paths_cache: dict[
-            tuple[int, str, int], tuple[str, ...]
-        ] = {}
-        # Retain a bounded task-local history of authority-contributing paths.
-        # This is freshness evidence only: it lets a later ABA restoration or
-        # path replacement be reconciled even after an intermediate decision
-        # became unsafe and no longer selected the old owner.
-        self._task_recent_authority_paths: dict[tuple[str, int], tuple[str, ...]] = {}
         self._reads = DecisionScope(self.index, self.store, self._observation_source)
         self._source = RepositorySource(
             self.files, self.index, self.reads, self.store, self.file_store
@@ -251,10 +184,34 @@ class CodeMap(
         self._imports = RepositoryImports(
             self.files, self.source, self.reads, self.store
         )
+        self._native = RepositoryNativeEvidence(
+            self.files, self.source, self.reads, self.store
+        )
+        self._relationships = RepositoryRelationships(
+            self.source, self.reads, self.store, self._imports, self.native
+        )
+        self._structure = RepositoryStructure(
+            self.source, self._imports, self.native, self.relationships
+        )
+        self._search = RepositorySearch(self.source, self.native)
+        self._context = RepositoryContext(
+            self.source, self.search, self.relationships, self._context_cache
+        )
+        self._ownership = RepositoryOwnership(
+            self.source, self._imports, self.structure, self.search
+        )
+        self._verification = RepositoryVerification(self.source, self._imports)
+        self._tasks = RepositoryTasks(
+            self.search,
+            self.ownership,
+            self.verification,
+            self.relationships,
+            self.context,
+        )
+        self._bindings = RepositoryBindings(self.source)
+        self._correlation = RepositoryCorrelation(self.source, self.bindings)
         self._snapshot_reuse = _SnapshotReuse()
-        self._task_action_reuse = _TaskActionReuse()
         self._impact_owner_reuse = _ImpactOwnerReuse()
-        self._ownership_import_reuse = _OwnershipImportReuse()
 
     @property
     def files(self) -> RepositoryFiles:
@@ -272,6 +229,46 @@ class CodeMap(
     def source(self) -> RepositorySource:
         return self._source
 
+    @property
+    def native(self) -> RepositoryNativeEvidence:
+        return self._native
+
+    @property
+    def relationships(self) -> RepositoryRelationships:
+        return self._relationships
+
+    @property
+    def structure(self) -> RepositoryStructure:
+        return self._structure
+
+    @property
+    def search(self) -> RepositorySearch:
+        return self._search
+
+    @property
+    def context(self) -> RepositoryContext:
+        return self._context
+
+    @property
+    def ownership(self) -> RepositoryOwnership:
+        return self._ownership
+
+    @property
+    def verification(self) -> RepositoryVerification:
+        return self._verification
+
+    @property
+    def tasks(self) -> RepositoryTasks:
+        return self._tasks
+
+    @property
+    def bindings(self) -> RepositoryBindings:
+        return self._bindings
+
+    @property
+    def correlation(self) -> RepositoryCorrelation:
+        return self._correlation
+
     def __enter__(self) -> CodeMap:
         return self
 
@@ -284,7 +281,7 @@ class CodeMap(
         self.close()
 
     def close(self) -> None:
-        self.context_cache.close()
+        self._context_cache.close()
         self.store.close()
         self.artifacts.close()
         self.file_store.close()

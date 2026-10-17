@@ -63,10 +63,10 @@ def collect(*, files: int = 1000, budget: int = 1000) -> dict[str, object]:
             syncs["cold"], seconds["cold_sync"] = _timed(codemap.index.sync)
             syncs["hot"], seconds["hot_sync"] = _timed(codemap.index.sync)
             hits, seconds["find"] = _timed(
-                lambda: codemap.find("CriticalAuthFlow expired token", limit=10)
+                lambda: codemap.search.find("CriticalAuthFlow expired token", limit=10)
             )
             pack, seconds["context"] = _timed(
-                lambda: codemap.context(
+                lambda: codemap.context.build(
                     "CriticalAuthFlow expired token", token_budget=budget, limit=10
                 )
             )

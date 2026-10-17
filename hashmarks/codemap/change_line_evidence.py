@@ -193,7 +193,7 @@ def observe_changed_line_spans(
         except UnicodeDecodeError:
             rows.append(_unavailable(span, member, "not-utf8-text"))
             continue
-        line_count = len(codemap._physical_lines(raw))
+        line_count = len(codemap.bindings._physical_lines(raw))
         if span["end_line"] > line_count:
             rows.append(_unavailable(span, member, "span-outside-current-source"))
             continue

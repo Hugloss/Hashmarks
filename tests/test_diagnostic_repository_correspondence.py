@@ -31,7 +31,7 @@ def repository(tmp_path: Path) -> Iterator[CodeMap]:
 
 
 def _correlate(repository: CodeMap, anchor: dict[str, object]) -> dict[str, object]:
-    return repository.correlate_evidence(
+    return repository.correlation.observe(
         [
             {
                 "bundle_id": "synthetic-diagnostic",

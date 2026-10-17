@@ -11,7 +11,7 @@ def test_node_test_verification_plan_is_bounded(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        plan = codemap.verification_plan("tests/ember.test.js")
+        plan = codemap.verification.plan("tests/ember.test.js")
     assert plan["available"] is True
     assert "runner" in plan
     assert plan["runner"] == "node-test"
@@ -28,7 +28,7 @@ def test_typescript_verification_plan_uses_existing_tsconfig(tmp_path: Path) -> 
         "export const expected: 'ember' = 'ember';\n", encoding="utf-8"
     )
     with CodeMap(tmp_path) as codemap:
-        plan = codemap.verification_plan("tests/ember.test.ts")
+        plan = codemap.verification.plan("tests/ember.test.ts")
     assert plan["available"] is True
     assert "runner" in plan
     assert plan["runner"] == "typescript-compiler"
@@ -44,7 +44,7 @@ def test_local_vitest_takes_precedence_for_typescript(tmp_path: Path) -> None:
         "test('ember', () => {});\n", encoding="utf-8"
     )
     with CodeMap(tmp_path) as codemap:
-        plan = codemap.verification_plan("tests/ember.test.ts")
+        plan = codemap.verification.plan("tests/ember.test.ts")
     assert plan["available"] is True
     assert "runner" in plan
     assert plan["runner"] == "vitest"
@@ -66,7 +66,7 @@ def test_go_test_file_is_classified_as_verification_surface(tmp_path: Path) -> N
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        brief = codemap.task_action_brief("Change Ember731 accepted response")
+        brief = codemap.tasks.action_brief("Change Ember731 accepted response")
     assert brief["verify"] == ["go", "test", "./route"]
 
 
@@ -84,5 +84,5 @@ def test_javascript_test_file_is_classified_as_verification_surface(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        brief = codemap.task_action_brief("Change Ember731 accepted response")
+        brief = codemap.tasks.action_brief("Change Ember731 accepted response")
     assert brief["verify"] == ["node", "--test", "tests/ember.test.js"]

@@ -146,7 +146,7 @@ def _observe_task_profiles(
     for mode, profile in profiles.items():
         with CodeMap(workspace, state_dir=state) as codemap:
             codemap.index.sync()
-            profile["packet"] = codemap.task_evidence(
+            profile["packet"] = codemap.tasks.evidence(
                 workflow["task"], result_mode=profile["result_mode"]
             )
             profile["revision_bound"] = _revision_bound(

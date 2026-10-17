@@ -5,14 +5,14 @@ from typing import TYPE_CHECKING, cast
 
 from hashmarks.paths import normalize_relative_path
 
-from .decision_session import ReadScopeOwner, diagnostic_producer
+from .decision_session import ReadScopeOwner
 from .repository_observation import packet_digest
 from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from .engine import CodeMap
+    from .evidence_verification import RepositoryVerification
 
 
 VERIFICATION_EXPLANATION_SCHEMA = "hashmarks.verification-selection-explanation.v1"
@@ -65,7 +65,7 @@ class VerificationExplanationMixin(ReadScopeOwner):
         requested_row: Mapping[str, object],
     ) -> str:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryVerification", self)
         selected_score = (
             self._verification_candidate_score(selected_row)
             if selected_row is not None
@@ -78,10 +78,10 @@ class VerificationExplanationMixin(ReadScopeOwner):
             else "canonical-selection-retained"
         )
 
-    @diagnostic_producer
-    def explain_verification_selection(
+    def explain_relevance(
         self,
         task: str,
+        relevance: Mapping[str, object],
         member_path: str | Path | None = None,
         *,
         limit: int = VERIFICATION_RELEVANCE_DEFAULTS.limit,
@@ -89,12 +89,7 @@ class VerificationExplanationMixin(ReadScopeOwner):
     ) -> dict[str, object]:
         """Explain selection/non-selection without adding execution semantics."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        relevance = self.verification_relevance(
-            task,
-            limit=limit,
-            candidate_limit=candidate_limit,
-        )
+            self = cast("RepositoryVerification", self)
         selected = relevance.get("selected")
         selected_row = selected if isinstance(selected, Mapping) else None
         selected_path = str(selected_row.get("path") or "") if selected_row else ""

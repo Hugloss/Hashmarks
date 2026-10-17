@@ -27,7 +27,7 @@ def _observe(root: Path, source: str) -> dict:
     _repository(root, source)
     with CodeMap(root) as codemap:
         codemap.index.sync()
-        return codemap.repository_findings(["cleanup.py"])
+        return codemap.ownership.findings(["cleanup.py"])
 
 
 def test_parent_binding_is_not_child_identity_and_guards_do_not_hide_evidence(
@@ -159,7 +159,13 @@ def test_bounded_discovery_retains_accounting_without_negative_evidence(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         bounds = replace(DEFAULT_BOUNDS, observations=0)
-        packet = FilesystemLifecycleAnalyzer(codemap, bounds).analyze(["cleanup.py"])
+        packet = FilesystemLifecycleAnalyzer(
+            codemap.structure.source,
+            codemap.structure.imports,
+            codemap.structure.relationships,
+            codemap.structure._resolve_call_target,
+            bounds,
+        ).analyze(["cleanup.py"])
     assert packet["observations"] == []
     assert packet["accounting"]["omitted"] == 1
     assert packet["coverage"]["truncated"] is True
@@ -170,9 +176,12 @@ def test_invalid_and_missing_sources_are_accounted_for(tmp_path: Path) -> None:
     _repository(tmp_path, "def invalid(:\n")
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = FilesystemLifecycleAnalyzer(codemap).analyze(
-            ["cleanup.py", "missing.py"]
-        )
+        packet = FilesystemLifecycleAnalyzer(
+            codemap.structure.source,
+            codemap.structure.imports,
+            codemap.structure.relationships,
+            codemap.structure._resolve_call_target,
+        ).analyze(["cleanup.py", "missing.py"])
     assert packet["coverage"]["completeness"] == "incomplete"
     assert packet["accounting"]["failed_paths"] == 2
     assert {row["path"] for row in packet["unresolved"]} == {"cleanup.py", "missing.py"}
@@ -205,18 +214,18 @@ def test_public_surfaces_preserve_lifecycle_and_freshness(tmp_path: Path) -> Non
     _repository(tmp_path, source)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        findings = codemap.repository_findings(["cleanup.py"])
-        locality = codemap.structural_locality("cleanup.py::cleanup")
-        task = codemap.task_evidence("inspect cleanup.py cleanup")
+        findings = codemap.ownership.findings(["cleanup.py"])
+        locality = codemap.structure.locality("cleanup.py::cleanup")
+        task = codemap.tasks.evidence("inspect cleanup.py cleanup")
         assert assert_object(locality["resource_lifecycle"])["observations"]
         assert assert_object(task["related"].get("resource_lifecycle"))["observations"]
         packet = assert_object(findings["resource_lifecycle"])
         assert (
-            codemap.repository_findings(["cleanup.py"])["resource_lifecycle"] == packet
+            codemap.ownership.findings(["cleanup.py"])["resource_lifecycle"] == packet
         )
         _repository(tmp_path, "def cleanup(name):\n return name\n")
         changed = assert_object(
-            codemap.repository_findings(["cleanup.py"])["resource_lifecycle"]
+            codemap.ownership.findings(["cleanup.py"])["resource_lifecycle"]
         )
         assert changed["observations"] == []
         assert changed["observation_identity"] != packet["observation_identity"]
@@ -232,14 +241,14 @@ def test_reopen_uses_current_source_not_prior_observations(tmp_path: Path) -> No
     state = tmp_path / ".state"
     with CodeMap(tmp_path, state_dir=state) as codemap:
         codemap.index.sync()
-        assert assert_object(codemap.repository_findings()["resource_lifecycle"])[
+        assert assert_object(codemap.ownership.findings()["resource_lifecycle"])[
             "observations"
         ]
     _repository(tmp_path, "def cleanup(name):\n return name\n")
     with CodeMap(tmp_path, state_dir=state) as codemap:
         codemap.index.sync()
         assert (
-            assert_object(codemap.repository_findings()["resource_lifecycle"])[
+            assert_object(codemap.ownership.findings()["resource_lifecycle"])[
                 "observations"
             ]
             == []
@@ -328,7 +337,11 @@ def test_bounds_cannot_be_relabelled_complete(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         packet = FilesystemLifecycleAnalyzer(
-            codemap, replace(DEFAULT_BOUNDS, observations=0)
+            codemap.structure.source,
+            codemap.structure.imports,
+            codemap.structure.relationships,
+            codemap.structure._resolve_call_target,
+            replace(DEFAULT_BOUNDS, observations=0),
         ).analyze(["cleanup.py"])
     packet["coverage"]["completeness"] = "complete-within-supported-scope"
     packet["observation_identity"] = lifecycle_identity(packet)
@@ -347,7 +360,11 @@ def test_call_budget_covers_repeated_helper_contexts(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         packet = FilesystemLifecycleAnalyzer(
-            codemap, replace(DEFAULT_BOUNDS, calls_per_symbol=2)
+            codemap.structure.source,
+            codemap.structure.imports,
+            codemap.structure.relationships,
+            codemap.structure._resolve_call_target,
+            replace(DEFAULT_BOUNDS, calls_per_symbol=2),
         ).analyze(["cleanup.py"])
     assert len(packet["observations"]) == 1
     assert (

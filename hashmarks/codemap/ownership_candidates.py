@@ -14,10 +14,10 @@ from hashmarks.ownership_decision import (
 )
 
 from .model import EvidenceVisibility, SearchHit
+from .ownership_candidate_evidence import OwnershipCandidateEvidenceMixin
+from .ownership_candidate_resolution import OwnershipCandidateResolutionMixin
 from .query_primitives import _TASK_STOPWORDS, _query_terms
 from .repository_domains import RepositoryDomain, classify_repository_path
-from .task_action_evidence import TaskActionEvidenceMixin
-from .task_action_projection import TaskActionProjectionMixin
 from .task_action_types import (
     _TaskActionAmbiguityPayloadState,
     _TaskActionDiscriminationState,
@@ -27,7 +27,7 @@ from .task_action_types import (
 from .task_evidence_contract import read_task_candidate
 
 if TYPE_CHECKING:
-    from .engine import CodeMap
+    from .ownership_graph import RepositoryOwnership
     from .ownership_relation_types import (
         StructuralOwnerCandidate,
         StructuralOwnerResolution,
@@ -45,7 +45,9 @@ _QUALIFIED_IDENTIFIER_RE = re.compile(
 _EXACT_IDENTIFIER_INDEX_LIMIT = 1024
 
 
-class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
+class OwnershipCandidatesMixin(
+    OwnershipCandidateResolutionMixin, OwnershipCandidateEvidenceMixin
+):
     def _task_action_discrimination_state(
         self, task: str, rows: Sequence[dict[str, object]]
     ) -> _TaskActionDiscriminationState:
@@ -64,7 +66,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
 
     def _task_action_discrimination_text(self, row: dict[str, object]) -> str:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         metadata = " ".join(
             str(row.get(key) or "").lower()
             for key in ("path", "name", "qualname", "signature")
@@ -181,9 +183,10 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         self, task: str, hits: Sequence[SearchHit], limit: int
     ) -> bool:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         island_paths = [
-            hit.path for hit in self._task_local_lexical_island_hits(task, limit=limit)
+            hit.path
+            for hit in self.search._task_local_lexical_island_hits(task, limit=limit)
         ]
         return bool(island_paths) and island_paths == [hit.path for hit in hits]
 
@@ -252,7 +255,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         limit: int,
     ) -> dict[str, object]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         existing = next(
             (row for row in rows if str(row.get("path")) == owner_path),
             None,
@@ -406,7 +409,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         limit: int,
     ) -> dict[str, object]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         existing = next(
             (row for row in rows if str(row.get("path") or "") == selected_path),
             None,
@@ -495,7 +498,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         implementation role.
         """
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         path = str(row.get("path") or "")
         domains = set(map(str, cast("Sequence[str]", row.get("domains") or ())))
         if (
@@ -527,7 +530,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         self, ref: Mapping[str, object], owner_path: str
     ) -> str | None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         if str(ref.get("kind") or "") != "import":
             return None
         source_path = str(ref.get("path") or "")
@@ -540,7 +543,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             or RepositoryDomain.SOURCE not in source_domains
         ):
             return None
-        owners, ambiguous = self._imports._resolve_import_owner_evidence(
+        owners, ambiguous = self.imports._resolve_import_owner_evidence(
             source_path, target
         )
         if not ambiguous and list(dict.fromkeys(owners)) == [owner_path]:
@@ -554,7 +557,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
     ) -> tuple[set[str], tuple[str, ...]]:
         """Return admitted exact terms without strengthening generic-name bounds."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         terms = set(self._task_action_exact_identifier_terms(task))
         explicit = bool(terms)
         masked = task
@@ -616,7 +619,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         projection_flag: str,
     ) -> dict[str, object] | None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         path = str(symbol.get("path") or "")
         if not path or path in failed:
             return None
@@ -655,7 +658,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         qualified_terms: Sequence[str],
     ) -> bool:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         identities = tuple(
             dict.fromkeys(
                 value.lower()
@@ -689,7 +692,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         names: Sequence[str],
     ) -> tuple[list[dict[str, object]], bool]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         if not names:
             return [], True
         probe = self.reads.exact_symbol_candidates(
@@ -774,7 +777,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
     ) -> tuple[dict[str, object] | None, bool]:
         """Follow one explicit module export through the bounded import owner."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         if direct:
             return None, True
         module, exported_name = term.rsplit(".", 1)
@@ -784,7 +787,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         if len(facades) != 1:
             return None, False
         facade = facades[0]
-        owners, unresolved = self._imports._resolve_import_owner_evidence(facade, term)
+        owners, unresolved = self.imports._resolve_import_owner_evidence(facade, term)
         if unresolved:
             return None, False
         leaves = [path for path in owners if path != facade]
@@ -977,7 +980,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         and merely substring-related evidence cannot become exact edit authority.
         """
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         terms, term_bound_reasons = self._task_action_exact_identifier_terms_evidence(
             task, failed
         )
@@ -1107,7 +1110,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         source path.
         """
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         selected_path = str(resolved.get("path") or "")
         source_path = str(resolved.get("source_path") or "")
         if not selected_path or not source_path:
@@ -1165,7 +1168,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         self, source_path: str, selected_path: str, symbol_names: set[str]
     ) -> bool:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         for edge in self.store.edges_from(source_path):
             if str(edge.get("kind") or "") != "import":
                 continue
@@ -1174,7 +1177,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             target = str(edge.get("target") or "")
             if not target:
                 continue
-            owners, ambiguous = self._imports._resolve_import_owner_evidence(
+            owners, ambiguous = self.imports._resolve_import_owner_evidence(
                 source_path, target
             )
             if not ambiguous and list(dict.fromkeys(owners)) == [selected_path]:
@@ -1499,7 +1502,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         )
         owner_eligible = explicit_target_basis != "explicit-test-edit"
         proof_scope, proof_scope_complete = (
-            TaskActionMixin._task_action_authority_proof_scope(
+            OwnershipCandidatesMixin._task_action_authority_proof_scope(
                 owner_basis, structural_owner
             )
         )

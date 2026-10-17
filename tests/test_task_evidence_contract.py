@@ -12,11 +12,11 @@ from types import MappingProxyType
 import pytest
 
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.ownership_candidates import OwnershipCandidatesMixin
 from hashmarks.codemap.ownership_relation_types import (
     OwnershipRelationGraph,
     StructuralOwnerCandidate,
 )
-from hashmarks.codemap.repository_task_action import TaskActionMixin
 from hashmarks.codemap.service import CodeMapServiceClient
 from hashmarks.codemap.task_evidence_contract import (
     read_initial_projection,
@@ -54,12 +54,12 @@ def samples(tmp_path_factory: pytest.TempPathFactory) -> _Samples:
     _repo(root)
     with _codemap(root) as codemap:
         codemap.index.sync()
-        packet = codemap.task_evidence(_TASK)
+        packet = codemap.tasks.evidence(_TASK)
         return _Samples(
-            graph=codemap.ownership_relation_graph(_TASK, "tests/test_owner.py"),
-            action=codemap.task_action_map(_TASK),
+            graph=codemap.ownership.relations(_TASK, "tests/test_owner.py"),
+            action=codemap.tasks.action_map(_TASK),
             packet=packet,
-            initial=codemap.task_evidence(_TASK, result_mode="initial"),
+            initial=codemap.tasks.evidence(_TASK, result_mode="initial"),
             delta=codemap.task_post_change_delta(
                 _TASK, ["owner.py"], previous_evidence=packet
             ),
@@ -297,7 +297,7 @@ def test_dictionary_input_contract_rejects_read_only_mapping_before_sync(
     _repo(tmp_path)
     with _codemap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_evidence(_TASK)
+        packet = codemap.tasks.evidence(_TASK)
         proxy = MappingProxyType(packet)
         (tmp_path / "owner.py").write_text("def widget(value): return value.lower()\n")
         generation = codemap.store.generation()
@@ -409,14 +409,14 @@ def test_polyglot_owner_proof_requires_the_exact_import_hop(
         "relation_graph_search_bound_reasons": [],
     }
     assert (
-        TaskActionMixin._task_action_polyglot_import_proves_owner(
+        OwnershipCandidatesMixin._task_action_polyglot_import_proves_owner(
             resolved, source, "owner.ts"
         )
         is expected
     )
     resolved["owner_path"] = []
     assert (
-        TaskActionMixin._task_action_polyglot_import_proves_owner(
+        OwnershipCandidatesMixin._task_action_polyglot_import_proves_owner(
             resolved, source, "owner.ts"
         )
         is False

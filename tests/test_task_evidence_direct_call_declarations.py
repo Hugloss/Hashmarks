@@ -44,8 +44,8 @@ def test_direct_source_call_keeps_exact_target_and_unknown_runtime_across_format
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         packets = [
-            codemap.task_evidence(_TASK),
-            codemap.task_evidence(_TASK, result_mode="initial"),
+            codemap.tasks.evidence(_TASK),
+            codemap.tasks.evidence(_TASK, result_mode="initial"),
         ]
     for packet, mode in zip(packets, ("default", "initial"), strict=True):
         context = _context(packet)
@@ -112,7 +112,7 @@ def test_shadowed_call_name_does_not_admit_same_named_declaration(
     _repository(tmp_path, shadow=True)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_evidence(_TASK)
+        packet = codemap.tasks.evidence(_TASK)
     rows = assert_records(assert_object(packet["retrieval"])["results"])
     assert not any("direct_call_declarations" in row for row in rows)
 
@@ -126,7 +126,7 @@ def test_direct_call_bound_accounts_for_unreturned_targets(tmp_path: Path) -> No
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_evidence(_TASK)
+        packet = codemap.tasks.evidence(_TASK)
     context = _context(packet)
     assert (
         context["observed"],
@@ -155,6 +155,6 @@ def test_direct_calls_cannot_reuse_stale_or_hidden_source(
             source.write_text("def replacement(): return None\n")
         elif invalidity == "deleted":
             source.unlink()
-        packet = codemap.task_evidence(_TASK)
+        packet = codemap.tasks.evidence(_TASK)
     rows = assert_records(assert_object(packet["retrieval"])["results"])
     assert not any("direct_call_declarations" in row for row in rows)

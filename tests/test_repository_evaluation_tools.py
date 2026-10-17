@@ -594,8 +594,10 @@ def test_profile_measures_nominated_public_operation_without_action_map_proxy(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     import hashlib
+    from collections.abc import Sequence
 
-    from hashmarks.codemap import CodeMap
+    from hashmarks.codemap.repository_source import RepositorySource
+    from hashmarks.codemap.repository_tasks import RepositoryTasks
     from scripts.repository_evaluation.profile_cases import profile_cases
 
     repo = tmp_path / "repo"
@@ -617,18 +619,31 @@ def test_profile_measures_nominated_public_operation_without_action_map_proxy(
         )
     )
     packets = []
-    original = CodeMap.source_observation
+    original = RepositorySource.observe
 
-    def observe(codemap: CodeMap, *args: object, **kwargs: object) -> dict:
-        packet = original(codemap, *args, **kwargs)
+    def observe(
+        source: RepositorySource,
+        relpath: str,
+        *,
+        context_lines: int,
+        lines: Sequence[int],
+        anchor_context_lines: int,
+    ) -> dict[str, object]:
+        packet = original(
+            source,
+            relpath,
+            context_lines=context_lines,
+            lines=lines,
+            anchor_context_lines=anchor_context_lines,
+        )
         packets.append(packet)
         return packet
 
     def disallow_proxy(*_args: object, **_kwargs: object) -> None:
         pytest.fail("public operation profiling must not substitute action-map timing")
 
-    monkeypatch.setattr(CodeMap, "source_observation", observe)
-    monkeypatch.setattr(CodeMap, "task_action_map", disallow_proxy)
+    monkeypatch.setattr(RepositorySource, "observe", observe)
+    monkeypatch.setattr(RepositoryTasks, "action_map", disallow_proxy)
     result = profile_cases(workspace=repo, cases_path=cases, warmups=1, samples=3)
     assert len(packets) == 4
     row = result["cases"][0]

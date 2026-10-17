@@ -11,6 +11,7 @@ from hashmarks.codemap.evidence_packet import (
     TASK_EVIDENCE_DEFAULT_OPTIONS,
     TaskEvidenceOptions,
 )
+from hashmarks.codemap.repository_tasks import RepositoryTasks
 from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
 from hashmarks.mcp_surface import HashmarksMcpSurface
 from hashmarks.operation_contract import operation_schema
@@ -25,7 +26,7 @@ def test_task_evidence_defaults_have_one_owner(
 ) -> None:
     defaults = TASK_EVIDENCE_DEFAULT_OPTIONS
     for owner in (
-        CodeMap.task_evidence,
+        RepositoryTasks.evidence,
         CodeMap.task_post_change_delta,
         CodeMapServiceClient.task_evidence,
         CodeMapServiceClient.task_post_change_delta,
@@ -71,8 +72,8 @@ def test_task_evidence_defaults_have_one_owner(
 
     captured: dict[str, object] = {}
 
-    class _Map:
-        def task_evidence(
+    class _TaskViews:
+        def evidence(
             self,
             task: str,
             *,
@@ -91,6 +92,10 @@ def test_task_evidence_defaults_have_one_owner(
                 ),
             )
             return {"schema": operation_schema("task_evidence")}
+
+    class _Map:
+        def __init__(self) -> None:
+            self.tasks = _TaskViews()
 
         def task_post_change_delta(
             self,

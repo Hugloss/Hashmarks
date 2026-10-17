@@ -39,7 +39,7 @@ def test_find_claim_admission_consumes_canonical_freshness(
             "freshness_state",
             lambda _stale: "stale",
         )
-        result = codemap.find_packet("src/missing.py")
+        result = codemap.search.packet("src/missing.py")
 
     assert result["freshness"] == "stale"
     assert result["negative_evidence"] == "not-admissible"

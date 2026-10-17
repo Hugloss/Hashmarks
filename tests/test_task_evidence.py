@@ -56,7 +56,7 @@ def test_task_evidence_supplies_exact_owner_source_and_verification(
     _semantic_repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        start = codemap.task_evidence(_task(), token_budget=512)
+        start = codemap.tasks.evidence(_task(), token_budget=512)
 
     ownership = _ownership(start)
     verification = _verification(start)
@@ -91,7 +91,7 @@ def test_task_evidence_never_emits_partial_source_when_exact_range_exceeds_budge
     _semantic_repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        start = codemap.task_evidence(_task(), token_budget=4)
+        start = codemap.tasks.evidence(_task(), token_budget=4)
 
     ownership = _ownership(start)
     assert ownership["status"] == "resolved"
@@ -112,7 +112,7 @@ def test_task_evidence_respects_outline_only_policy(tmp_path: Path) -> None:
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        start = codemap.task_evidence(_task(), token_budget=512)
+        start = codemap.tasks.evidence(_task(), token_budget=512)
 
     ownership = _ownership(start)
     assert ownership["source_evidence"]
@@ -134,7 +134,9 @@ def test_task_evidence_fails_closed_before_disclosing_evidence_without_edit_auth
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        start = codemap.task_evidence("Change the scarlet field behavior and verify it")
+        start = codemap.tasks.evidence(
+            "Change the scarlet field behavior and verify it"
+        )
 
     ownership = _ownership(start)
     assert ownership["status"] == "unresolved"
@@ -148,7 +150,7 @@ def test_task_evidence_computes_action_map_once(tmp_path: Path) -> None:
     _semantic_repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        original = codemap.task_action_map
+        original = codemap.tasks.action_map
         calls = 0
 
         def counted(*args, **kwargs) -> TaskActionMap:
@@ -156,8 +158,8 @@ def test_task_evidence_computes_action_map_once(tmp_path: Path) -> None:
             calls += 1
             return original(*args, **kwargs)
 
-        codemap.task_action_map = counted  # type: ignore[method-assign]
-        start = codemap.task_evidence(_task())
+        codemap.tasks.action_map = counted  # type: ignore[method-assign]
+        start = codemap.tasks.evidence(_task())
 
     assert _ownership(start)["status"] == "resolved"
     assert calls == 1
@@ -211,12 +213,12 @@ def test_task_evidence_and_owner_graph_never_cross_agent_deny_boundary(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        graph = codemap.ownership_relation_graph(
+        graph = codemap.ownership.relations(
             "Change cobalt route behavior and verify it",
             "tests/test_route.py",
             max_depth=3,
         )
-        start = codemap.task_evidence("Change cobalt route behavior and verify it")
+        start = codemap.tasks.evidence("Change cobalt route behavior and verify it")
 
     encoded = json.dumps({"graph": graph, "start": start}, sort_keys=True)
     assert "hidden/engine.py" not in encoded
@@ -268,7 +270,7 @@ def test_task_evidence_keeps_typescript_test_path_when_runner_is_project_scoped(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        start = codemap.task_evidence(
+        start = codemap.tasks.evidence(
             "For TSCOBALT41 change the accepted response from old to new and verify the route behavior",
             token_budget=512,
         )

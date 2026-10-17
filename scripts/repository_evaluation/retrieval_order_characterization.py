@@ -51,7 +51,7 @@ def _broad_rows(codemap: CodeMap, *, limit: int) -> list[tuple[str, str]]:
 def _find_rows(codemap: CodeMap, *, limit: int) -> list[tuple[str, str]]:
     return [
         (hit.path, str(hit.qualname or ""))
-        for hit in codemap.find("needle", limit=limit)
+        for hit in codemap.search.find("needle", limit=limit)
     ]
 
 

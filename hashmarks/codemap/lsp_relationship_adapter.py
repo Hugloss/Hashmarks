@@ -436,7 +436,7 @@ def _query_endpoint(
     resolver: RelationshipSourceResolver,
 ) -> dict[str, Any]:
     subject = f"{target['path']}::{target['qualname']}"
-    path, locator = lsp_query_locator(capture, resolver.codemap.workspace)
+    path, locator = lsp_query_locator(capture, resolver.source.workspace)
     if (
         path is None
         or path != subject.split("::", 1)[0]
@@ -470,7 +470,7 @@ def _result_endpoint(
     capture: Mapping[str, Any],
     resolver: RelationshipSourceResolver,
 ) -> dict[str, Any] | None:
-    path = uri_member(location["uri"], resolver.codemap.workspace)
+    path = uri_member(location["uri"], resolver.source.workspace)
     locator = {
         **location["range"],
         "position_encoding": location["position_encoding"],

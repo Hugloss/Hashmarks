@@ -56,7 +56,7 @@ def test_find_task_reuses_one_freshness_sample_for_nested_find(
     codemap = _map(tmp_path)
     calls = _count_observations(codemap, monkeypatch)
     try:
-        codemap.find_task("repository observation", limit=20)
+        codemap.search.find_task("repository observation", limit=20)
         assert len(calls) == 1
     finally:
         codemap.close()
@@ -68,7 +68,7 @@ def test_context_reuses_one_freshness_sample_for_nested_find(
     codemap = _map(tmp_path)
     calls = _count_observations(codemap, monkeypatch)
     try:
-        codemap.context("repository observation", token_budget=512, limit=20)
+        codemap.context.build("repository observation", token_budget=512, limit=20)
         assert len(calls) == 1
     finally:
         codemap.close()
@@ -80,7 +80,7 @@ def test_decision_packet_reuses_one_freshness_sample_for_nested_surfaces(
     codemap = _map(tmp_path)
     calls = _count_observations(codemap, monkeypatch)
     try:
-        codemap.task_decision_packet(
+        codemap.tasks.decision_packet(
             "repository observation", limit=20, token_budget=512
         )
         assert len(calls) == 1
@@ -108,7 +108,7 @@ def test_task_evidence_uses_selection_and_closing_freshness_samples(
     codemap = _map(tmp_path)
     calls = _count_observations(codemap, monkeypatch)
     try:
-        codemap.task_evidence("repository observation", limit=20, token_budget=512)
+        codemap.tasks.evidence("repository observation", limit=20, token_budget=512)
         assert len(calls) == 2
     finally:
         codemap.close()

@@ -29,7 +29,7 @@ def test_qualified_reference_beyond_global_short_name_prefix_remains_direct(
         codemap.index.sync()
         global_prefix = codemap.store.refs_many(["f"], limit_per_target=1024)["f"]
         assert not any(row["path"] == "tests/test_target.py" for row in global_prefix)
-        relevance = codemap.verification_relevance(
+        relevance = codemap.tasks.verification_relevance(
             "src/target.py", limit=20, candidate_limit=8
         )
 
@@ -72,7 +72,7 @@ def test_targeted_tail_uses_full_module_identity_when_leaf_names_collide(
             return original(short, suffix, limit=limit)
 
         monkeypatch.setattr(codemap.store, "refs_matching_target_suffix", recorded)
-        relevance = codemap.verification_relevance(
+        relevance = codemap.tasks.verification_relevance(
             "change pkg_b/target.py run behavior", limit=20, candidate_limit=8
         )
 
@@ -104,7 +104,7 @@ def test_literal_repository_path_is_not_replaced_by_structural_neighbor(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map("change pkg/target.py run behavior", limit=20)
+        action = codemap.tasks.action_map("change pkg/target.py run behavior", limit=20)
 
     assert action["edit"] is not None
     assert action["edit"]["path"] == "pkg/target.py"

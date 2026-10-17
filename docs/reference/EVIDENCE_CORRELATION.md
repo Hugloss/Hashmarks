@@ -51,7 +51,7 @@ Hashmarks does not ingest or retain the producing log stream. A parser, observab
 
 ## Public Python surface
 
-Use `CodeMap.correlate_evidence(...)`:
+Use `CodeMap.correlation.observe(...)`:
 
 ~~~python
 from hashmarks import CodeMap
@@ -75,7 +75,7 @@ bundles = [
 
 with CodeMap(".") as codemap:
     codemap.index.sync()
-    packet = codemap.correlate_evidence(
+    packet = codemap.correlation.observe(
         bundles,
         path_mappings=[{"external_prefix": "/app", "repository_prefix": ""}],
     )
@@ -178,7 +178,7 @@ External evidence is **request-scoped and not persisted** by the correlation con
 A consumer may supply a previous correlation packet:
 
 ~~~python
-after = codemap.correlate_evidence(
+after = codemap.correlation.observe(
     bundles,
     previous_correlation=before,
 )

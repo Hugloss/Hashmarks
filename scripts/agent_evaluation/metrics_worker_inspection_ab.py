@@ -65,11 +65,11 @@ def _entry_state(
     source: Path | CodeMap, query: str, *, limit: int
 ) -> dict[str, object]:
     if isinstance(source, CodeMap):
-        value = source.task_entry_points(query, limit=limit)
+        value = source.tasks.entry_points(query, limit=limit)
     else:
         with CodeMap(source) as codemap:
             codemap.index.sync()
-            value = codemap.task_entry_points(query, limit=limit)
+            value = codemap.tasks.entry_points(query, limit=limit)
     recommended = [row for row in value.get("recommended", []) if isinstance(row, dict)]
     ambiguity = value.get("ambiguity", {})
     if not isinstance(ambiguity, dict):

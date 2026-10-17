@@ -42,12 +42,12 @@ def test_structured_persisted_queries_share_freshness_authority(tmp_path: Path) 
         codemap.index.sync()
         values = [
             codemap.source.symbol("target"),
-            codemap.deps("caller"),
-            codemap.refs("target"),
-            codemap.affected("src/b.py"),
-            codemap.tests("src/b.py"),
-            codemap.projects(),
-            codemap.repository_instruction_scope("src/b.py"),
+            codemap.relationships.deps("caller"),
+            codemap.relationships.refs("target"),
+            codemap.relationships.affected("src/b.py"),
+            codemap.relationships.tests("src/b.py"),
+            codemap.relationships.projects(),
+            codemap.context.instruction_scope("src/b.py"),
             codemap.change_impact("src/b.py"),
         ]
     for value in values:

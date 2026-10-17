@@ -153,7 +153,7 @@ def test_overlay_rejects_base_generation_change_during_fused_read(
         base.index.sync()
         with WorktreeOverlay(base, worktree, worker_id="agent-a") as overlay:
             overlay.sync(["src/engine.py"])
-            original_find = overlay.overlay.find_task
+            original_find = overlay.overlay.search.find_task
 
             def advance_base_during_overlay_read(
                 task: str, *, limit: int = 20
@@ -164,7 +164,7 @@ def test_overlay_rejects_base_generation_change_during_fused_read(
                 return hits
 
             monkeypatch.setattr(
-                overlay.overlay,
+                overlay.overlay.search,
                 "find_task",
                 advance_base_during_overlay_read,
             )

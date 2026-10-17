@@ -121,7 +121,7 @@ def observe_structural(
 ) -> dict[str, object]:
     """Use existing public APIs and capture owners; execution stays external."""
     with CodeMap(workspace, state_dir=state) as codemap:
-        packet = codemap.structural_locality(_text(inputs["target"]))
+        packet = codemap.structure.locality(_text(inputs["target"]))
     write_json(output / "api.json", packet)
     paths = structural_source_paths(rule)
     api = grade_structural(workspace, packet, rule, paths)

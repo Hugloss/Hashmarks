@@ -50,7 +50,7 @@ def test_shadowed_export_never_becomes_an_exact_alias_call(
     )
     with CodeMap(root, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        packet: Any = codemap.structural_locality("service.py::handle")
+        packet: Any = codemap.structure.locality("service.py::handle")
     assert all(row["resolved_symbol_id"] is None for row in packet["edges"])
     assert {row["symbol_id"] for row in packet["nodes"]} == {"service.py::handle"}
 
@@ -76,7 +76,7 @@ def test_current_unconditional_declaration_retains_alias_evidence(
     )
     with CodeMap(root, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        packet: Any = codemap.structural_locality("service.py::handle")
+        packet: Any = codemap.structure.locality("service.py::handle")
     assert {row["resolved_symbol_id"] for row in packet["edges"]} == {
         "config.py::load_config"
     }
@@ -106,8 +106,8 @@ def test_reverse_aliases_and_relative_reexports_find_real_callers_and_tests(
     )
     with CodeMap(root, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        target: Any = codemap.structural_locality("pkg/impl.py::original")
-        outgoing: Any = codemap.structural_locality("consumer.py::use")
+        target: Any = codemap.structure.locality("pkg/impl.py::original")
+        outgoing: Any = codemap.structure.locality("consumer.py::use")
     node = next(
         row for row in target["nodes"] if row["symbol_id"] == "pkg/impl.py::original"
     )
@@ -133,10 +133,10 @@ def test_reverse_alias_budget_never_reports_complete_prefix(tmp_path: Path) -> N
         )
     with CodeMap(root, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        bounded: Any = codemap.structural_locality(
+        bounded: Any = codemap.structure.locality(
             "impl.py::original", ref_limit_per_symbol=2
         )
-        complete: Any = codemap.structural_locality(
+        complete: Any = codemap.structure.locality(
             "impl.py::original", ref_limit_per_symbol=64
         )
     assert bounded["nodes"][0]["caller_reference_bound_complete"] is False
@@ -153,7 +153,7 @@ def test_rebound_class_does_not_keep_exact_method_identity(tmp_path: Path) -> No
     )
     with CodeMap(root, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        packet: Any = codemap.structural_locality("service.py::use")
+        packet: Any = codemap.structure.locality("service.py::use")
     assert all(row["resolved_symbol_id"] is None for row in packet["edges"])
 
 
@@ -180,7 +180,7 @@ def test_reverse_aliases_preserve_hidden_and_ambiguous_callers_as_unproven(
     )
     with CodeMap(root, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        packet: Any = codemap.structural_locality("impl.py::original")
+        packet: Any = codemap.structure.locality("impl.py::original")
     assert packet["nodes"][0]["exact_callers"] == []
     assert packet["nodes"][0]["caller_reference_bound_complete"] is False
 
@@ -202,7 +202,7 @@ def test_reverse_reexport_hop_boundary_preserves_coverage(
     )
     with CodeMap(root, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        packet: Any = codemap.structural_locality("impl.py::original")
+        packet: Any = codemap.structure.locality("impl.py::original")
     node = packet["nodes"][0]
     if hops == 8:
         assert {row["path"] for row in node["exact_callers"]} == {"consumer.py"}

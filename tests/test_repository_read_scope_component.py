@@ -98,12 +98,12 @@ def test_final_task_reuse_is_scoped_by_its_domain(tmp_path: Path) -> None:
     ) as repository:
         repository.index.sync()
         with repository.reads.session() as first:
-            repository.task_action_map("inspect owner")
-            repository.task_action_map("inspect owner")
+            repository.tasks.action_map("inspect owner")
+            repository.tasks.action_map("inspect owner")
             assert repository.reads.stats()["task_action_hit"] == 1
         with repository.reads.session() as second:
             assert first.generation == second.generation
-            repository.task_action_map("inspect owner")
+            repository.tasks.action_map("inspect owner")
             assert repository.reads.stats()["task_action_hit"] == 0
             assert repository.reads.stats()["task_action_miss"] == 1
 

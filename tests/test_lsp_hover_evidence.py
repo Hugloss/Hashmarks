@@ -70,7 +70,7 @@ def _capture(repo: Path, result: object) -> dict:
 def _observed(repo: Path, capture: dict) -> dict:
     with CodeMap(repo) as cm:
         cm.index.sync()
-        return cm.structural_locality(
+        return cm.structure.locality(
             "source.py::target",
             result_mode="relationships",
             supplied_observations=[capture],
@@ -329,7 +329,7 @@ def test_rehashed_hover_claim_cannot_masquerade_as_relationship(
     with CodeMap(root) as cm:
         cm.index.sync()
         packets: list[Any] = [
-            cm.structural_locality(
+            cm.structure.locality(
                 "src/source.py::target",
                 result_mode="relationships",
                 supplied_observations=[lsp_capture(root, source, name)],

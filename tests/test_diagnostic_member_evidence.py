@@ -416,7 +416,7 @@ def _correlation(root: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, objec
         monkeypatch.setattr(
             cm.reads, "generation_status", lambda: (cm.store.generation(), None, False)
         )
-        return cm.correlate_evidence(
+        return cm.correlation.observe(
             [
                 {
                     "bundle_id": "post-edit-diagnostics",
@@ -485,7 +485,6 @@ def test_stale_or_foreign_relationship_evidence_never_hides_diagnostic_changes(
     if context == "freshness":
         # Regenerate canonical identities after changing the retained capability.
         repo["freshness"] = "unknown"
-        from hashmarks.codemap.evidence_verification import VerificationMixin
 
         native = correlation["repository_evidence"]
         native["bindings_identity"] = "sha256:" + packet_digest(

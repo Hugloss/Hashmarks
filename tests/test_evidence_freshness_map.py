@@ -222,7 +222,7 @@ def test_cross_repository_freshness_is_dependency_bound(tmp_path: Path) -> None:
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
+        codemap.native.enrich_projects(("npm-package-graph", "declared-project-links"))
         freshness = codemap.evidence_freshness_map(
             "backend value change", ["backend/value.ts"]
         )
@@ -311,7 +311,7 @@ def test_cross_repository_prior_invalidates_on_declared_dependency_change(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
+        codemap.native.enrich_projects(("npm-package-graph", "declared-project-links"))
         before = codemap.evidence_freshness_map(
             "backend value change", ["backend/value.ts"]
         )

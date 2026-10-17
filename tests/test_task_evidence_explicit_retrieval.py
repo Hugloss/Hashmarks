@@ -48,11 +48,11 @@ def test_requested_declaration_precedes_weaker_hits_without_changing_ownership(
     _repository(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(_TASK, limit=limit)
-        packet = codemap.task_evidence(_TASK, limit=limit)
+        action = codemap.tasks.action_map(_TASK, limit=limit)
+        packet = codemap.tasks.evidence(_TASK, limit=limit)
         initial = read_initial_projection(
             decode_initial_packet(
-                codemap.task_evidence(_TASK, limit=limit, result_mode="initial")
+                codemap.tasks.evidence(_TASK, limit=limit, result_mode="initial")
             )
         )
     for response in (packet, initial):
@@ -86,8 +86,8 @@ def test_literal_path_keeps_a_same_named_declaration_from_displacing_the_target(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(_TASK)
-        packet = codemap.task_evidence(_TASK)
+        action = codemap.tasks.action_map(_TASK)
+        packet = codemap.tasks.evidence(_TASK)
     first = packet["retrieval"]["results"][0]
     assert first["path"] == "transport.py"
     assert first.get("symbol") == "DeliveryStream.close"
@@ -105,8 +105,8 @@ def test_duplicate_qualified_targets_keep_both_locators_and_owner_ambiguity(
     task = "Inspect DeliveryStream.close declarations"
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(task)
-        packet = codemap.task_evidence(task)
+        action = codemap.tasks.action_map(task)
+        packet = codemap.tasks.evidence(task)
     rows = packet["retrieval"]["results"][:2]
     assert {row["path"] for row in rows} == {"transport.py", "alternative.py"}
     assert all(row.get("symbol") == "DeliveryStream.close" for row in rows)
@@ -121,7 +121,7 @@ def test_denied_requested_target_is_not_disclosed_by_ordering(tmp_path: Path) ->
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_evidence(_TASK)
+        packet = codemap.tasks.evidence(_TASK)
     assert all(row["path"] != "transport.py" for row in packet["retrieval"]["results"])
     assert packet["ownership"]["owner"] is None
 
@@ -151,8 +151,8 @@ def test_literal_path_precedes_same_named_methods_without_unique_ownership(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(task)
-        packet = codemap.task_evidence(task, result_mode=result_mode)
+        action = codemap.tasks.action_map(task)
+        packet = codemap.tasks.evidence(task, result_mode=result_mode)
     observed = (
         read_initial_projection(decode_initial_packet(packet))
         if result_mode == "initial"
@@ -182,7 +182,7 @@ def _check_initial_transport(root: Path, transport: str, ambiguous: bool) -> Non
         codemap.index.sync()
         expected = read_initial_projection(
             decode_initial_packet(
-                codemap.task_evidence(task, limit=3, result_mode="initial")
+                codemap.tasks.evidence(task, limit=3, result_mode="initial")
             )
         )
     capture = capture_cli if transport == "cli" else capture_mcp

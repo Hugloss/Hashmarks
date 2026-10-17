@@ -41,7 +41,7 @@ def observe(cm: CodeMap, root: Path, source: Path, name: str) -> dict[str, objec
     )
     try:
         return assert_object(
-            cm.structural_locality(
+            cm.structure.locality(
                 row["subject"],
                 result_mode="relationships",
                 supplied_observations=[lsp_capture(root, source, name)],
@@ -263,7 +263,7 @@ def test_native_hover_save_delta_and_codemap_reopen_do_not_replay(
         _assert_hover_formats(after, changed_capture)
     with CodeMap(root, state_dir=state) as cm:
         cm.index.sync()
-        current = cm.structural_locality(
+        current = cm.structure.locality(
             "src/source.py::target", result_mode="relationships"
         )
     assert all(
@@ -504,7 +504,7 @@ def test_native_lsp_disk_edit_rename_delete_and_reopen_do_not_replay(
                 )
                 == []
             )
-            without = cm.structural_locality(
+            without = cm.structure.locality(
                 "src/callee.py::target", result_mode="relationships"
             )
             assert assert_records(without["observations"]) == []
@@ -526,7 +526,7 @@ def test_native_only_typescript_method_accepts_genuine_lsp_without_lexical_promo
         import_native_scip(cm, native_scip_corpus / "typescript" / state)
         packet = observe(cm, root, source, "method-definition")
         with pytest.raises(KeyError):
-            cm.structural_locality("src/engine.ts::normalize")
+            cm.structure.locality("src/engine.ts::normalize")
     (claim,) = assert_records(lsp_row(packet)["claims"])
     assert assert_object(assert_object(claim["source"])["locator"])["start"] == {
         "line": line,
@@ -575,7 +575,7 @@ def test_genuine_scip_lsp_claims_preserve_unknown_encoding_and_independent_claim
         cm.index.sync()
         import_native_scip(cm, native_scip_corpus / "typescript" / "ambiguous")
         with pytest.raises(KeyError, match="ambiguous"):
-            cm.structural_locality(
+            cm.structure.locality(
                 "src/engine.ts::normalize", result_mode="relationships"
             )
         packet = observe(cm, root, source, "implementations")

@@ -56,7 +56,7 @@ def run_vectors(codemap: CodeMap, manifest: Mapping[str, Any]) -> list[dict[str,
     results = []
     for case in manifest["cases"]:
         try:
-            packet: Any = codemap.correlate_evidence(
+            packet: Any = codemap.correlation.observe(
                 claim_bundle(case["anchor"]), include_relationships=False
             )
         except ValueError as exc:
@@ -105,9 +105,7 @@ def binding_economics(codemap: CodeMap, iterations: int) -> dict[str, Any]:
         for _ in range(iterations):
             started = time.perf_counter_ns()
             packets.append(
-                codemap.repository_evidence_bindings(
-                    request, include_relationships=False
-                )
+                codemap.bindings.observe(request, include_relationships=False)
             )
             elapsed.append(time.perf_counter_ns() - started)
     facts = [row["evidence"] for row in packets[-1]["bindings"]]
@@ -126,9 +124,9 @@ def binding_economics(codemap: CodeMap, iterations: int) -> dict[str, Any]:
 def correspondence_quality(
     codemap: CodeMap, manifest: Mapping[str, Any]
 ) -> dict[str, Any]:
-    direct: Any = codemap.structural_locality(manifest["locality_target"])
-    indirect: Any = codemap.structural_locality(manifest["indirect_target"])
-    task: Any = codemap.task_evidence(manifest["task"])
+    direct: Any = codemap.structure.locality(manifest["locality_target"])
+    indirect: Any = codemap.structure.locality(manifest["indirect_target"])
+    task: Any = codemap.tasks.evidence(manifest["task"])
     owner = task["ownership"]["owner"]
     verifier = task["verification"]["selected"]
     return {

@@ -37,7 +37,7 @@ def emit(
         for task in public:
             events = []
             started = time.perf_counter_ns()
-            packet = codemap.task_decision_packet(task["query"])
+            packet = codemap.tasks.decision_packet(task["query"])
             after_packet = time.perf_counter_ns()
             events.append(
                 {

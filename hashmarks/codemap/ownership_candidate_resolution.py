@@ -18,7 +18,7 @@ from .task_action_types import (
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from .engine import CodeMap
+    from .ownership_graph import RepositoryOwnership
     from .ownership_relation_types import (
         StructuralOwnerCandidate,
         StructuralStartObservation,
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     )
 
 
-class TaskActionOwnerResolutionMixin:
+class OwnershipCandidateResolutionMixin:
     @staticmethod
     def _task_action_symbol_is_explicit_in_file_task(
         task: str, candidate: dict[str, object]
@@ -50,7 +50,7 @@ class TaskActionOwnerResolutionMixin:
         self, token: str
     ) -> tuple[str, dict[str, object] | None]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         path = normalize_relative_path(token, allow_root=False)
         row = self.reads.file_row(path)
         # Missing index rows do not prove absence. Only the canonical member
@@ -84,7 +84,7 @@ class TaskActionOwnerResolutionMixin:
     ) -> tuple[str, ...]:
         """Resolve explicitly named current repository paths without lexical retrieval."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         paths: list[str] = []
         for raw in task.split():
             token = raw.strip("`'\"()[]{}<>,:;").replace("\\", "/")
@@ -114,7 +114,7 @@ class TaskActionOwnerResolutionMixin:
     ) -> str:
         """Describe the strongest explicit repository identity behind one owner."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         qualified_terms = tuple(
             term
             for term in self._task_action_exact_identifier_terms(task)
@@ -137,7 +137,7 @@ class TaskActionOwnerResolutionMixin:
         edit: dict[str, object] | None,
     ) -> tuple[dict[str, object] | None, str]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         literal_task_paths = self._task_action_literal_task_paths(
             request.task, request.context.failed
         )
@@ -184,7 +184,7 @@ class TaskActionOwnerResolutionMixin:
         str | None,
     ]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         evidence = _TaskActionExactIdentifierEvidence([], None, ())
         owner_basis = "literal-path" if literal_task_path else None
         if not blocked:
@@ -248,7 +248,7 @@ class TaskActionOwnerResolutionMixin:
         task_terms: set[str],
     ) -> dict[str, object] | None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         best: tuple[int, dict[str, object]] | None = None
         path = str(row.get("path") or "")
         for symbol in self.reads.symbols_for_path(path):
@@ -290,7 +290,7 @@ class TaskActionOwnerResolutionMixin:
     ) -> dict[str, object] | None:
         """Promote one test-shaped source only with task-local production-use proof."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         task_terms = self._task_action_behavioral_terms(request.task)
         if not task_terms:
             return None
@@ -349,7 +349,7 @@ class TaskActionOwnerResolutionMixin:
         matched_rows: list[dict[str, object]],
     ) -> str | None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         test_candidate = self._task_action_specific_test_candidate(
             getattr(request.context, "canonical_rows", tuple(request.context.rows)),
             request.discrimination,
@@ -415,7 +415,7 @@ class TaskActionOwnerResolutionMixin:
         origin: str,
     ) -> tuple[StructuralStartObservation, StructuralOwnerCandidate | None]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         path = str(row.get("path") or "")
         entry: StructuralStartObservation = {
             "start_path": path,
@@ -432,7 +432,7 @@ class TaskActionOwnerResolutionMixin:
         if not self.index.is_current(path):
             entry["status"] = "stale"
             return entry, None
-        graph = self.ownership_relation_graph(request.task, path, max_depth=3)
+        graph = self.relations(request.task, path, max_depth=3)
         resolved = self._structural_owner_from_graph(graph, path)
         owner = str((resolved or {}).get("path") or "")
         current = bool(owner and self.index.is_current(owner))
@@ -470,7 +470,7 @@ class TaskActionOwnerResolutionMixin:
     ]:
         """Observe each nominated start once before selecting an owner candidate."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         canonical_rows = getattr(
             request.context, "canonical_rows", tuple(request.context.rows)
         )
@@ -557,7 +557,7 @@ class TaskActionOwnerResolutionMixin:
         candidate: _TaskActionOwnerCandidateState,
     ) -> _TaskActionOwnerResolutionState:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         owner_start, resolved_by_path, structural_starts = (
             self._task_action_observe_structural_starts(request, candidate)
         )
@@ -613,7 +613,7 @@ class TaskActionOwnerResolutionMixin:
     ) -> _TaskActionOwnerResolutionState:
         """Resolve ownership once, preferring stronger repository identity evidence."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         structural_owner = request.surface.literal_reference_owner
         owner_basis = (
             "literal-reference-owner" if structural_owner is not None else None

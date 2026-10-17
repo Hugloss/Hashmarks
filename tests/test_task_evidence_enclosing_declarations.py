@@ -19,9 +19,9 @@ def test_nested_helper_discloses_source_bound_enclosing_method_in_initial_and_fu
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         full = cast(
-            "dict[str, Any]", codemap.task_evidence("Inspect nested_cleanup_marker")
+            "dict[str, Any]", codemap.tasks.evidence("Inspect nested_cleanup_marker")
         )
-        wire = codemap.task_evidence(
+        wire = codemap.tasks.evidence(
             "Inspect nested_cleanup_marker", result_mode="initial"
         )
         initial = decode_initial_packet(wire)
@@ -64,7 +64,7 @@ def test_deep_nesting_is_bounded_and_does_not_establish_absence(tmp_path: Path) 
     (tmp_path / "backend.py").write_text("\n".join(lines) + "\n")
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = cast("dict[str, Any]", codemap.task_evidence("Inspect level_5"))
+        packet = cast("dict[str, Any]", codemap.tasks.evidence("Inspect level_5"))
     rows = [
         row["enclosing_declarations"]
         for row in packet["retrieval"]["results"]

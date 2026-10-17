@@ -9,8 +9,10 @@ if TYPE_CHECKING:
     from .decision_session import ReadScope
     from .model import SearchHit
     from .ownership_relation_types import StructuralOwnerResolution, StructuralStarts
+    from .query_router import NormalizedTaskQuery
     from .repository_domains import RepositoryDomain
     from .task_evidence_types import TaskActionMap, VerificationRelevance
+    from .task_retrieval import _TaskRetrievalResult
 
 
 @dataclass
@@ -21,6 +23,20 @@ class _TaskActionReuse:
     entries: dict[tuple[int, str, int, int], TaskActionMap] = field(
         default_factory=dict
     )
+
+
+@dataclass(frozen=True)
+class TaskObservation:
+    query: NormalizedTaskQuery
+    retrieval: _TaskRetrievalResult
+    scope: ReadScope
+
+
+@dataclass
+class _TaskObservationReuse:
+    scope: ReadScope | None = None
+    entries: dict[tuple[str, int], TaskObservation] = field(default_factory=dict)
+    queries: dict[str, NormalizedTaskQuery] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -46,7 +62,7 @@ class _TaskActionProjectionState:
     terms: list[str]
     document_frequency: dict[str, int]
     candidates: list[dict[str, object]]
-    file_rows: dict[str, object]
+    file_rows: dict[str, dict[str, object]]
     text_cache: dict[str, str | None]
     rows: list[dict[str, object]]
     limit: int
@@ -82,6 +98,7 @@ class _TaskActionConfigState:
 
 @dataclass
 class _TaskActionMapContext:
+    observation: TaskObservation
     hits: Sequence[SearchHit]
     rows: list[dict[str, object]]
     canonical_rows: tuple[dict[str, object], ...]
@@ -146,7 +163,7 @@ class _TaskActionOwnerCandidateState:
     literal_task_path: str
 
 
-@dataclass
+@dataclass(frozen=True)
 class _TaskActionSelectionState:
     edit: dict[str, object] | None
     verify: dict[str, object] | None
@@ -167,7 +184,7 @@ class _TaskActionSelectionState:
     related_rows: list[dict[str, object]]
 
 
-@dataclass
+@dataclass(frozen=True)
 class _TaskActionProjectionChoices:
     edit: dict[str, object] | None
     verify: dict[str, object] | None
@@ -175,7 +192,7 @@ class _TaskActionProjectionChoices:
     verification_relevance: VerificationRelevance
 
 
-@dataclass
+@dataclass(frozen=True)
 class _TaskActionFinalState:
     edit: dict[str, object] | None
     verify: dict[str, object] | None

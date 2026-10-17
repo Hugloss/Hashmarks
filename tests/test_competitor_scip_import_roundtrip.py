@@ -56,7 +56,7 @@ def _write_index(root: Path) -> Path:
 
 
 def _read_source_metadata(cm: CodeMap) -> dict:
-    packet = cm.structural_locality(
+    packet = cm.structure.locality(
         "code.py::Impl", result_mode="relationships", refresh=False
     )
     validate_relationship_observation(packet)
@@ -81,7 +81,7 @@ def test_metadata_survives_native_index_reopen_and_is_not_graph_authority(
     database = tmp_path / "native.sqlite3"
     with CodeMap(tmp_path, artifact_db=database) as cm:
         cm.index.sync()
-        cm.import_scip(path)
+        cm.native.import_scip(path)
         original = _read_source_metadata(cm)
     with CodeMap(tmp_path, artifact_db=database) as cm:
         cm.index.sync()

@@ -59,10 +59,10 @@ def test_same_name_context_preserves_source_and_unknown_runtime_in_every_format(
     source = _repository(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(_TASK)
+        action = codemap.tasks.action_map(_TASK)
         packets = [
-            codemap.task_evidence(_TASK),
-            codemap.task_evidence(_TASK, result_mode="initial"),
+            codemap.tasks.evidence(_TASK),
+            codemap.tasks.evidence(_TASK, result_mode="initial"),
         ]
     expected = [
         {
@@ -120,7 +120,7 @@ def test_same_name_context_accounts_for_bounded_alternatives(tmp_path: Path) -> 
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_evidence(_TASK)
+        packet = codemap.tasks.evidence(_TASK)
     context = _context(packet)
     assert (
         context["observed"],
@@ -144,12 +144,12 @@ def test_stale_or_denied_source_cannot_supply_same_name_declarations(
         )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        codemap.task_evidence(_TASK)
+        codemap.tasks.evidence(_TASK)
         if invalidity == "changed":
             source.write_text(
                 "class RecordCompiler:\n    def aggregate_records(self, records): return records\n"
             )
         elif invalidity == "deleted":
             source.unlink()
-        packet = codemap.task_evidence(_TASK)
+        packet = codemap.tasks.evidence(_TASK)
     assert not any("same_name_declarations" in row for row in _results(packet))

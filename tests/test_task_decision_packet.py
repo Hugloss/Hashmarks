@@ -21,7 +21,7 @@ def test_decision_packet_discriminates_unproven_ranked_candidate(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_decision_packet("Adapter implementation test", limit=20)
+        packet = codemap.tasks.decision_packet("Adapter implementation test", limit=20)
     assert assert_object(packet["edit"])["path"] == "src/adapter.py"
     assert assert_object(packet["verify"])["path"] == "tests/test_adapter.py"
     discrimination = assert_object(packet["discrimination"])
@@ -48,7 +48,7 @@ def test_decision_packet_requires_discrimination_when_no_supported_owner_exists(
     (tmp_path / "tests" / "test_only.py").write_text("def test_widget():\n    pass\n")
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_decision_packet("widget test verification", limit=20)
+        packet = codemap.tasks.decision_packet("widget test verification", limit=20)
     assert packet["edit"] is None
     discrimination = assert_object(packet["discrimination"])
     assert discrimination["needed"] is True
@@ -74,7 +74,7 @@ def test_structural_candidate_without_authority_requires_discrimination(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_decision_packet(
+        packet = codemap.tasks.decision_packet(
             "Fix widget accepted response to '-new'", limit=20
         )
     assert assert_object(packet["edit"])["path"] == "src/engine.py"
@@ -96,9 +96,9 @@ def test_decision_packet_build_guard_overrides_action_discrimination(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map("Adapter implementation test", limit=20)
+        action = codemap.tasks.action_map("Adapter implementation test", limit=20)
         assert action["action_discrimination"]["reason"] == "ownership-unresolved"
-        result = codemap._decision_packet_discrimination(
+        result = codemap.tasks._decision_packet_discrimination(
             action=action,
             verify=action["verify"],
             build={"complete": False},
@@ -119,7 +119,7 @@ def test_decision_packet_exposes_provenance_bound_verification_selection(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_decision_packet("Adapter implementation test", limit=20)
+        packet = codemap.tasks.decision_packet("Adapter implementation test", limit=20)
 
     membership = assert_object(packet["verification_membership"])
     envelope = assert_object(packet["verification_selection_envelope"])
@@ -163,11 +163,11 @@ def test_repeated_stable_query_reproduces_selection_identities(tmp_path: Path) -
 
     with CodeMap(tmp_path, state_dir=state, artifact_db=artifact_db) as codemap:
         codemap.index.sync()
-        first = codemap.task_decision_packet("Adapter implementation test", limit=20)
-        second = codemap.task_decision_packet("Adapter implementation test", limit=20)
+        first = codemap.tasks.decision_packet("Adapter implementation test", limit=20)
+        second = codemap.tasks.decision_packet("Adapter implementation test", limit=20)
 
     with CodeMap(tmp_path, state_dir=state, artifact_db=artifact_db) as codemap:
-        third = codemap.task_decision_packet("Adapter implementation test", limit=20)
+        third = codemap.tasks.decision_packet("Adapter implementation test", limit=20)
 
     for packet in (second, third):
         assert (
@@ -199,7 +199,7 @@ def test_decision_packet_is_observation_not_consumer_decision(tmp_path: Path) ->
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_decision_packet("Adapter implementation test", limit=20)
+        packet = codemap.tasks.decision_packet("Adapter implementation test", limit=20)
 
     assert packet["authority"] == "repository-observation-only"
     assert packet["consumer_action"] == "external"
@@ -231,7 +231,7 @@ def test_decision_packet_preserves_explicit_owner_with_named_dependency(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_decision_packet(task, limit=20, token_budget=256)
+        packet = codemap.tasks.decision_packet(task, limit=20, token_budget=256)
 
     assert assert_object(packet["edit"])["path"] == "src/publish.py"
     assert assert_object(packet["ambiguity"])["ambiguous"] is False
@@ -264,8 +264,8 @@ def test_leading_dependency_context_does_not_steal_explicit_edit_owner(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(task, limit=20, per_role=3)
-        packet = codemap.task_decision_packet(task, limit=20, token_budget=256)
+        action = codemap.tasks.action_map(task, limit=20, per_role=3)
+        packet = codemap.tasks.decision_packet(task, limit=20, token_budget=256)
 
     assert action["edit"] is not None
     assert action["edit"]["path"] == "src/publish.py"
@@ -292,7 +292,7 @@ def test_decision_packet_consumes_canonical_action_edit(tmp_path: Path) -> None:
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(task)
+        action = codemap.tasks.action_map(task)
         assert action["edit"] is not None
         assert action["edit"]["path"] == "src/engine.py"
         assert action["action_edit"] is not None
@@ -301,8 +301,8 @@ def test_decision_packet_consumes_canonical_action_edit(tmp_path: Path) -> None:
         assert action["admitted_edit"]["path"] == "src/engine.py"
 
         action["action_edit"] = None
-        codemap.task_action_map = lambda *args, **kwargs: action  # type: ignore[method-assign]
-        packet = codemap.task_decision_packet(task, token_budget=256)
+        codemap.tasks.action_map = lambda *args, **kwargs: action  # type: ignore[method-assign]
+        packet = codemap.tasks.decision_packet(task, token_budget=256)
 
     assert assert_object(packet["candidate"])["path"] == "src/engine.py"
     assert packet["edit"] is None

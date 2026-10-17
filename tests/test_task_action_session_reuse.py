@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 from hashmarks import CodeMap
-from hashmarks.codemap.model import SearchHit
+from hashmarks.codemap.task_action_types import _TaskActionSelectionState
+from hashmarks.codemap.task_retrieval import _TaskRetrievalResult
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -35,17 +35,17 @@ def test_identical_task_action_requests_reuse_one_session_composition(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         calls = 0
-        original = codemap.find_task
+        original = codemap.search.observe_task
 
-        def counted(*args, **kwargs) -> Sequence[SearchHit]:
+        def counted(*args, **kwargs) -> _TaskRetrievalResult:
             nonlocal calls
             calls += 1
             return original(*args, **kwargs)
 
-        monkeypatch.setattr(codemap, "find_task", counted)
+        monkeypatch.setattr(codemap.search, "observe_task", counted)
         with codemap.reads.session():
-            first = codemap.task_action_map(task, limit=20, per_role=3)
-            second = codemap.task_action_map(task, limit=20, per_role=3)
+            first = codemap.tasks.action_map(task, limit=20, per_role=3)
+            second = codemap.tasks.action_map(task, limit=20, per_role=3)
             stats = codemap.reads.stats()
 
         assert second == first
@@ -62,23 +62,33 @@ def test_task_action_reuse_key_includes_task_limit_and_per_role(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         calls = 0
-        original = codemap.find_task
+        original = codemap.search.observe_task
 
-        def counted(*args, **kwargs) -> Sequence[SearchHit]:
+        def counted(*args, **kwargs) -> _TaskRetrievalResult:
             nonlocal calls
             calls += 1
             return original(*args, **kwargs)
 
-        monkeypatch.setattr(codemap, "find_task", counted)
+        monkeypatch.setattr(codemap.search, "observe_task", counted)
+        compositions = 0
+        nominate = codemap.ownership.nominate
+
+        def counted_nomination(*args, **kwargs) -> _TaskActionSelectionState:
+            nonlocal compositions
+            compositions += 1
+            return nominate(*args, **kwargs)
+
+        monkeypatch.setattr(codemap.ownership, "nominate", counted_nomination)
         with codemap.reads.session():
-            codemap.task_action_map(task, limit=20, per_role=3)
-            codemap.task_action_map(task + " safely", limit=20, per_role=3)
-            codemap.task_action_map(task, limit=21, per_role=3)
-            codemap.task_action_map(task, limit=20, per_role=4)
-            codemap.task_action_map(task, limit=20, per_role=3)
+            codemap.tasks.action_map(task, limit=20, per_role=3)
+            codemap.tasks.action_map(task + " safely", limit=20, per_role=3)
+            codemap.tasks.action_map(task, limit=21, per_role=3)
+            codemap.tasks.action_map(task, limit=20, per_role=4)
+            codemap.tasks.action_map(task, limit=20, per_role=3)
             stats = codemap.reads.stats()
 
-        assert calls == 4
+        assert compositions == 4
+        assert calls == 3
         assert stats["task_action_miss"] == 4
         assert stats["task_action_hit"] == 1
 
@@ -88,11 +98,11 @@ def test_cached_task_action_isolated_from_caller_mutation(tmp_path: Path) -> Non
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         with codemap.reads.session():
-            first = codemap.task_action_map(task)
+            first = codemap.tasks.action_map(task)
             original_canonical = list(first["canonical"])
             first["canonical"].clear()
             first["bounds"]["limit"] = -1
-            second = codemap.task_action_map(task)
+            second = codemap.tasks.action_map(task)
 
         assert second["canonical"] == original_canonical
         assert second["bounds"]["limit"] == 20
@@ -106,18 +116,18 @@ def test_task_action_cache_is_not_reused_across_decision_sessions(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         calls = 0
-        original = codemap.find_task
+        original = codemap.search.observe_task
 
-        def counted(*args, **kwargs) -> Sequence[SearchHit]:
+        def counted(*args, **kwargs) -> _TaskRetrievalResult:
             nonlocal calls
             calls += 1
             return original(*args, **kwargs)
 
-        monkeypatch.setattr(codemap, "find_task", counted)
+        monkeypatch.setattr(codemap.search, "observe_task", counted)
         with codemap.reads.session():
-            codemap.task_action_map(task)
-            codemap.task_action_map(task)
+            codemap.tasks.action_map(task)
+            codemap.tasks.action_map(task)
         with codemap.reads.session():
-            codemap.task_action_map(task)
+            codemap.tasks.action_map(task)
 
         assert calls == 2

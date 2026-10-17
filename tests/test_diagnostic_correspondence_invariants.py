@@ -52,9 +52,7 @@ def test_distinct_consumer_bindings_share_one_snapshot_but_no_mutable_output(
         return original(path, max_attempts=max_attempts)
 
     monkeypatch.setattr(repository.file_store, "read_bytes_stable", observed)
-    first: Any = repository.repository_evidence_bindings(
-        _bindings(), include_relationships=False
-    )
+    first: Any = repository.bindings.observe(_bindings(), include_relationships=False)
     assert reads == 1
     assert len(first["bindings"]) == 16
     assert len({row["binding_id"] for row in first["bindings"]}) == 16
@@ -65,9 +63,7 @@ def test_distinct_consumer_bindings_share_one_snapshot_but_no_mutable_output(
     source = repository.workspace / "app/service.py"
     source.write_bytes(b"\n" + source.read_bytes())
     repository.index.sync()
-    after: Any = repository.repository_evidence_bindings(
-        _bindings(), include_relationships=False
-    )
+    after: Any = repository.bindings.observe(_bindings(), include_relationships=False)
     assert reads == 2
     assert after["bindings"][1]["evidence"] != first["bindings"][1]["evidence"]
 
@@ -87,9 +83,7 @@ def test_source_mutation_during_shared_snapshot_never_yields_a_clean_packet(
 
     monkeypatch.setattr(repository.file_store, "read_bytes_stable", edit_after_capture)
     with pytest.raises(UnstableFileError, match="binding source changed"):
-        repository.repository_evidence_bindings(
-            _bindings(), include_relationships=False
-        )
+        repository.bindings.observe(_bindings(), include_relationships=False)
 
 
 @pytest.mark.parametrize(
@@ -106,7 +100,7 @@ def test_alias_spelling_never_overrides_shadowing_ambiguity_or_missing_import(
 ) -> None:
     (repository.workspace / "app/service.py").write_text(source, encoding="utf-8")
     repository.index.sync()
-    packet: Any = repository.structural_locality("app/service.py::handle_request")
+    packet: Any = repository.structure.locality("app/service.py::handle_request")
     assert {row["symbol_id"] for row in packet["nodes"]} == {
         "app/service.py::handle_request"
     }
@@ -150,7 +144,7 @@ def test_reexport_walk_uses_final_declaration_identity(
         encoding="utf-8",
     )
     repository.index.sync()
-    packet: Any = repository.structural_locality("app/service.py::handle_request")
+    packet: Any = repository.structure.locality("app/service.py::handle_request")
     targets = {row["resolved_symbol_id"] for row in packet["edges"]}
     assert targets == {expected}
 
@@ -172,5 +166,5 @@ def test_hidden_intermediate_facade_cannot_prove_an_exact_call(tmp_path: Path) -
     )
     with CodeMap(root, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        packet: Any = codemap.structural_locality("app/service.py::handle_request")
+        packet: Any = codemap.structure.locality("app/service.py::handle_request")
     assert all(row["resolved_symbol_id"] is None for row in packet["edges"])

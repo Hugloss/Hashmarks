@@ -118,8 +118,8 @@ from hashmarks import CodeMap
 
 with CodeMap(Path(".")) as codemap:
     codemap.index.sync()
-    capsule = codemap.orient()
-    hits = codemap.find_task("where is cache invalidation owned?", limit=10)
+    capsule = codemap.context.orient()
+    hits = codemap.search.find_task("where is cache invalidation owned?", limit=10)
 
 print(capsule)
 for hit in hits:

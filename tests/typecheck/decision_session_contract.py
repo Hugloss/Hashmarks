@@ -26,6 +26,6 @@ def _incomplete(owner: CodeMap, path: str) -> int:
 def check_contract(owner: CodeMap) -> None:
     assert_type(_complete(owner, limit=3), str)
     assert_type(_incomplete(owner, "src/owner.py"), int)
-    assert_type(owner.task_action_map("inspect owner"), TaskActionMap)
+    assert_type(owner.tasks.action_map("inspect owner"), TaskActionMap)
     with owner.reads.session() as session:
         assert_type(session, ReadScope)

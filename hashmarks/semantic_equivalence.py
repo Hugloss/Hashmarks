@@ -65,11 +65,11 @@ def _canonical_json(value: object) -> str:
 
 def _run_query(codemap: Any, query: QueryKind, task: str, limit: int) -> object:
     if query == "find_task":
-        return codemap.find_task(task, limit=limit)
+        return codemap.search.find_task(task, limit=limit)
     if query == "task_action_map":
-        return codemap.task_action_map(task, limit=limit)
+        return codemap.tasks.action_map(task, limit=limit)
     if query == "task_decision_packet":
-        return codemap.task_decision_packet(task, limit=limit)
+        return codemap.tasks.decision_packet(task, limit=limit)
     raise ValueError(f"unsupported semantic-equivalence query: {query}")
 
 

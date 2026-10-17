@@ -28,7 +28,7 @@ def test_authority_graph_composes_loader_cache_and_reader(tmp_path: Path) -> Non
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        graph = codemap.repository_ownership_graph()
+        graph = codemap.ownership.repository_graph()
     assert graph["schema"] == "hashmarks.authority-ownership-graph.v3"
     relations = {e["relation"] for e in graph["edges"]}
     assert {"loads-module", "owns-cache", "references-cache-owner"} <= relations
@@ -59,7 +59,7 @@ def test_authority_graph_v2_composes_exact_imported_invalidator(tmp_path: Path) 
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        graph = codemap.repository_ownership_graph()
+        graph = codemap.ownership.repository_graph()
     assert graph["schema"] == "hashmarks.authority-ownership-graph.v3"
     edge = next(e for e in graph["edges"] if e["relation"] == "invalidates-cache")
     assert edge["source"] == "invalidator:maintenance.py:reset"
@@ -80,7 +80,7 @@ def test_authority_graph_v2_keeps_unqualified_same_name_invalidator_ambiguous(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        graph = codemap.repository_ownership_graph()
+        graph = codemap.ownership.repository_graph()
     assert not any(e["relation"] == "invalidates-cache" for e in graph["edges"])
     assert set(graph["ambiguities"]) == {"cache:a.py:CACHE", "cache:b.py:CACHE"}
     assert graph["summary"]["resolved_invalidation_owners"] == 0
@@ -96,7 +96,7 @@ def test_authority_graph_v3_composes_unguarded_concurrency_risk_as_nomination(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        graph = codemap.repository_ownership_graph(["store.py"])
+        graph = codemap.ownership.repository_graph(["store.py"])
     assert graph["schema"] == "hashmarks.authority-ownership-graph.v3"
     risk = next(n for n in graph["nodes"] if n["kind"] == "concurrency-risk")
     assert risk["path"] == "store.py" and risk["function"] == "bump"
@@ -121,7 +121,7 @@ def test_authority_graph_v3_keeps_visible_guard_as_non_runtime_proof(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        graph = codemap.repository_ownership_graph(["store.py"])
+        graph = codemap.ownership.repository_graph(["store.py"])
     risk = next(n for n in graph["nodes"] if n["kind"] == "concurrency-risk")
     assert risk["guarded"] is True
     assert risk["code"] == "python-read-modify-write-visible-guard"
@@ -144,7 +144,7 @@ def test_repository_ownership_graph_materializes_repository_rows_once(
             return original()
 
         monkeypatch.setattr(codemap.store, "all_file_rows", counted_all_file_rows)
-        graph = codemap.repository_ownership_graph()
+        graph = codemap.ownership.repository_graph()
 
     assert graph["schema"] == "hashmarks.authority-ownership-graph.v3"
     assert calls == 1
@@ -169,7 +169,7 @@ def test_scoped_repository_ownership_graph_reuses_rows_without_collapsing_eviden
             return original()
 
         monkeypatch.setattr(codemap.store, "all_file_rows", counted_all_file_rows)
-        graph = codemap.repository_ownership_graph(["maintenance.py"])
+        graph = codemap.ownership.repository_graph(["maintenance.py"])
 
     assert calls == 1
     assert not any(item["relation"] == "owns-cache" for item in graph["edges"])

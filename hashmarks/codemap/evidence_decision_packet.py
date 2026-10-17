@@ -8,11 +8,11 @@ from typing import TYPE_CHECKING, cast
 from hashmarks.operation_contract import operation_response, operation_schema
 
 from .decision_session import ReadScopeOwner, incomplete_decision_scoped
-from .evidence_verification import _VerificationSelectionState
 from .repository_observation import packet_digest
+from .verification_relevance_model import _VerificationSelectionState
 
 if TYPE_CHECKING:
-    from .engine import CodeMap
+    from .repository_tasks import RepositoryTasks
 
 
 @dataclass(frozen=True, slots=True)
@@ -170,7 +170,7 @@ class DecisionPacketMixin(ReadScopeOwner):
     ) -> tuple[dict[str, object], object, object, str]:
         """Bind packet evidence to repository, task, context and verification selection."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         generation, identity_generation, stale = self.reads.generation_status()
         task_identity = packet_digest("hashmarks.task.v1", {"task": task})
         context_digest = packet_digest("hashmarks.work-context.v1", work_context)
@@ -229,7 +229,7 @@ class DecisionPacketMixin(ReadScopeOwner):
         )
 
     @operation_response("task_decision_packet")
-    def task_decision_packet(
+    def decision_packet(
         self,
         task: str,
         *,
@@ -239,8 +239,8 @@ class DecisionPacketMixin(ReadScopeOwner):
     ) -> dict[str, object]:
         """Reconcile task evidence before its generation-bound observation."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        self._prepare_task_observation(task, limit)
+            self = cast("RepositoryTasks", self)
+        self.prepare(task, limit)
         return self._observe_task_decision_packet(
             task, limit=limit, per_role=per_role, token_budget=token_budget
         )
@@ -256,9 +256,9 @@ class DecisionPacketMixin(ReadScopeOwner):
     ) -> dict[str, object]:
         """Return bounded repository evidence for one task decision."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         timing = _DecisionPacketTiming()
-        action = self.task_action_map(
+        action = self.action_map(
             task,
             limit=limit,
             per_role=per_role,
@@ -277,7 +277,7 @@ class DecisionPacketMixin(ReadScopeOwner):
         )
 
         timing.begin_phase()
-        work_context = self.work_context(action, token_budget=token_budget)
+        work_context = self.context.work(action, token_budget=token_budget)
         timing.record("work_context")
         timing.begin_phase()
         verification = self._task_decision_verification_plan(verify)
@@ -305,7 +305,7 @@ class DecisionPacketMixin(ReadScopeOwner):
             "ownership_authority": action.get("ownership_authority"),
             "verify": verify,
             "verification_relevance": action.get("verification_relevance"),
-            "symbolic_nomination": self._symbolic_task_nomination(task),
+            "symbolic_nomination": self.search._symbolic_task_nomination(task),
             "verification_plan": verification,
             "verification_membership": verification_membership,
             "verification_selection_envelope": selection_envelope,

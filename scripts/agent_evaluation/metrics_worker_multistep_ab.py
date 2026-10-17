@@ -65,11 +65,11 @@ def _verification_state(
     source: Path | CodeMap, query: str, *, limit: int
 ) -> dict[str, object]:
     if isinstance(source, CodeMap):
-        hits = source.find_task(query + " test verification", limit=limit)
+        hits = source.search.find_task(query + " test verification", limit=limit)
     else:
         with CodeMap(source) as codemap:
             codemap.index.sync()
-            hits = codemap.find_task(query + " test verification", limit=limit)
+            hits = codemap.search.find_task(query + " test verification", limit=limit)
     candidates = [hit.path for hit in hits]
     target = next((path for path in candidates if _is_test_path(path)), None)
     examined = candidates.index(target) + 1 if target in candidates else len(candidates)

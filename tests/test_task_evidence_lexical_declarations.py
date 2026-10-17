@@ -32,10 +32,10 @@ def test_diagnostic_words_retrieve_their_enclosing_callable(tmp_path: Path) -> N
     task = "A reserved attribute causes a warning during instance construction."
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(task)
+        action = codemap.tasks.action_map(task)
         packets = [
-            codemap.task_evidence(task),
-            decode_initial_packet(codemap.task_evidence(task, result_mode="initial")),
+            codemap.tasks.evidence(task),
+            decode_initial_packet(codemap.tasks.evidence(task, result_mode="initial")),
         ]
     for packet in packets:
         rows = assert_records(assert_object(packet["retrieval"])["results"])
@@ -65,7 +65,7 @@ def test_lexical_disclosure_requires_current_source_visibility(
             source.write_text("def replacement(): return None\n")
         elif invalidity == "deleted":
             source.unlink()
-        packet = codemap.task_evidence(task)
+        packet = codemap.tasks.evidence(task)
     rows = assert_records(assert_object(packet["retrieval"])["results"])
     assert not any(
         row.get("path") == "builder.py"
@@ -124,7 +124,7 @@ def test_lexical_hint_keeps_literal_precedence_and_survives_every_format(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         for mode in ("default", "initial"):
-            packet = codemap.task_evidence(task, result_mode=mode)
+            packet = codemap.tasks.evidence(task, result_mode=mode)
             for format in FORMATS:
                 response = presentation_response(
                     "task_evidence", packet, format=format, result_mode=mode
@@ -133,7 +133,7 @@ def test_lexical_hint_keeps_literal_precedence_and_survives_every_format(
                     visible = json.dumps(response["presentation"])
                     assert "Builder._prepare" in visible
                     assert "bounded-lexical-source-position" in visible
-        explicit = codemap.task_evidence(
+        explicit = codemap.tasks.evidence(
             task + " Inspect events.py::reserved_attribute_events."
         )
     rows = assert_records(assert_object(explicit["retrieval"])["results"])

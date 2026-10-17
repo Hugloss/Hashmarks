@@ -39,10 +39,10 @@ def test_candidate_disclosure_preserves_ambiguity_and_verification_selection(
     task = "Inspect update_metadata behavior"
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(task)
-        packet = codemap.task_evidence(task)
+        action = codemap.tasks.action_map(task)
+        packet = codemap.tasks.evidence(task)
         initial = read_initial_projection(
-            decode_initial_packet(codemap.task_evidence(task, result_mode="initial"))
+            decode_initial_packet(codemap.tasks.evidence(task, result_mode="initial"))
         )
     assert packet["ownership"]["owner"] is None
     assert packet["ownership"]["ambiguity"]["ambiguous"] is True
@@ -91,9 +91,9 @@ def test_candidate_disclosure_never_promotes_stale_test_revision(
     path = tmp_path / "tests/test_original.py"
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        codemap.task_evidence("Inspect update_metadata behavior")
+        codemap.tasks.evidence("Inspect update_metadata behavior")
         path.write_text("def test_different_surface():\n    assert True\n")
-        packet = codemap.task_evidence("Inspect update_metadata behavior")
+        packet = codemap.tasks.evidence("Inspect update_metadata behavior")
     for row in packet["verification"]["relevance"]["candidates"]:
         if row["path"] == "tests/test_original.py" and "test_revision" in row:
             assert row.get("test_revision") == hash_file(path, domain=FILE_DOMAIN).hash
@@ -122,7 +122,7 @@ def test_source_identifier_scout_keeps_late_test_body_without_claiming_reference
         )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_evidence("Inspect metadata token behavior")
+        packet = codemap.tasks.evidence("Inspect metadata token behavior")
     assert packet["ownership"]["owner"] is None
     candidate = next(
         row

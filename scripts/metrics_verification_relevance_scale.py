@@ -70,7 +70,7 @@ def collect(*, sizes: tuple[int, ...] = (10, 50, 100, 500)) -> dict[str, object]
                 codemap.index.sync()
                 timings["sync_ms"] = (time.perf_counter() - started) * 1000.0
                 started = time.perf_counter()
-                action = codemap.task_action_map(task, limit=20)
+                action = codemap.tasks.action_map(task, limit=20)
                 timings["action_ms"] = (time.perf_counter() - started) * 1000.0
                 relevance = action["verification_relevance"]
                 selected = (
@@ -85,7 +85,7 @@ def collect(*, sizes: tuple[int, ...] = (10, 50, 100, 500)) -> dict[str, object]
                     else "",
                 }
                 plan = (
-                    codemap.verification_plan(
+                    codemap.verification.plan(
                         paths["selected"],
                         symbol=(str(selected.get("test_symbol") or "") or None)
                         if isinstance(selected, dict)

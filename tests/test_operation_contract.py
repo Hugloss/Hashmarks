@@ -186,8 +186,8 @@ def test_transports_do_not_own_semantic_find_or_dependency_schema() -> None:
     mcp_source = (ROOT / "hashmarks" / "mcp_surface.py").read_text(encoding="utf-8")
     cli_source = (ROOT / "hashmarks" / "repository_cli.py").read_text(encoding="utf-8")
 
-    assert "self._map.find_packet(" in mcp_source
-    assert "codemap.find_packet(" in cli_source
+    assert "self._map.search.packet(" in mcp_source
+    assert "codemap.search.packet(" in cli_source
     assert "hashmarks.mcp-find.v1" not in mcp_source
     assert "hashmarks.find.v1" not in cli_source
     assert "hashmarks.mcp-dependency-codemap.v1" not in mcp_source
@@ -380,77 +380,77 @@ def test_operation_modes_fail_closed() -> None:
 
 _FIXED_MODE_CORE_BOUNDARIES = {
     "repository_context": ("hashmarks/codemap/repository_context.py", "orient"),
-    "find": ("hashmarks/codemap/find_engine.py", "find_packet"),
+    "find": ("hashmarks/codemap/find_engine.py", "packet"),
     "change_impact": ("hashmarks/codemap/change_impact.py", "task_change_impact"),
     "correlate_evidence": (
         "hashmarks/codemap/evidence_correlation.py",
-        "correlate_evidence",
+        "observe",
     ),
     "post_change": ("hashmarks/codemap/post_change.py", "task_post_change_delta"),
-    "projects": ("hashmarks/codemap/query_surface.py", "projects"),
+    "projects": ("hashmarks/codemap/evidence_graph.py", "projects"),
     "outline": ("hashmarks/codemap/repository_source.py", "outline"),
     "grep": ("hashmarks/codemap/repository_source.py", "grep"),
-    "structural": ("hashmarks/codemap/query_surface.py", "structural"),
+    "structural": ("hashmarks/codemap/structural_locality.py", "search"),
     "symbol": ("hashmarks/codemap/repository_source.py", "symbol"),
     "source": ("hashmarks/codemap/repository_source.py", "read"),
-    "affected": ("hashmarks/codemap/query_surface.py", "affected"),
-    "tests": ("hashmarks/codemap/query_surface.py", "tests"),
+    "affected": ("hashmarks/codemap/evidence_graph.py", "affected"),
+    "tests": ("hashmarks/codemap/evidence_graph.py", "tests"),
     "context": ("hashmarks/codemap/model.py", "ContextPack.as_dict"),
     "repository_findings": (
         "hashmarks/codemap/ownership_analysis.py",
-        "repository_findings",
+        "findings",
     ),
     "import_ownership": (
         "hashmarks/codemap/ownership_analysis.py",
-        "import_ownership_findings",
+        "import_findings",
     ),
     "concurrency_risk": (
         "hashmarks/codemap/ownership_analysis.py",
-        "concurrency_risk_findings",
+        "concurrency_findings",
     ),
     "verification_ownership": (
         "hashmarks/codemap/verification_ownership.py",
-        "verification_ownership_graph",
+        "relationship_evidence",
     ),
     "repository_ownership": (
         "hashmarks/codemap/ownership_analysis.py",
-        "repository_ownership_graph",
+        "repository_graph",
     ),
     "cache_ownership": (
         "hashmarks/codemap/ownership_analysis.py",
-        "cache_ownership_findings",
+        "cache_findings",
     ),
     "cache_invalidation_ownership": (
         "hashmarks/codemap/ownership_analysis.py",
-        "cache_invalidation_ownership_graph",
+        "cache_invalidation_graph",
     ),
     "task_action_map": (
         "hashmarks/codemap/task_action_projection.py",
-        "task_action_map",
+        "action_map",
     ),
     "verification_relevance": (
         "hashmarks/codemap/evidence_verification.py",
-        "verification_relevance",
+        "for_owner",
     ),
     "ownership_relation_graph": (
         "hashmarks/codemap/ownership_graph.py",
-        "ownership_relation_graph",
+        "relations",
     ),
     "task_decision_packet": (
         "hashmarks/codemap/evidence_decision_packet.py",
-        "task_decision_packet",
+        "decision_packet",
     ),
     "task_decision_brief": (
         "hashmarks/codemap/evidence_packet.py",
-        "task_decision_brief",
+        "decision_brief",
     ),
     "task_action_brief": (
         "hashmarks/codemap/evidence_packet.py",
-        "task_action_brief",
+        "action_brief",
     ),
     "task_decision_brief_budget_sweep": (
         "hashmarks/codemap/evidence_packet.py",
-        "task_decision_brief_budget_sweep",
+        "decision_brief_budget_sweep",
     ),
     "repository_intelligence_query": (
         "hashmarks/codemap/repository_intelligence_query.py",
@@ -561,7 +561,7 @@ def test_core_repository_context_rejects_its_own_schema_drift(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         with pytest.raises(RuntimeError, match="operation response schema drift"):
-            codemap.orient()
+            codemap.context.orient()
 
 
 def test_core_find_rejects_its_own_schema_drift(
@@ -577,7 +577,7 @@ def test_core_find_rejects_its_own_schema_drift(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         with pytest.raises(RuntimeError, match="operation response schema drift"):
-            codemap.find_packet("widget")
+            codemap.search.packet("widget")
 
 
 def test_core_task_evidence_rejects_its_own_schema_drift(
@@ -593,7 +593,7 @@ def test_core_task_evidence_rejects_its_own_schema_drift(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         with pytest.raises(RuntimeError, match="operation response schema drift"):
-            codemap.task_evidence(task)
+            codemap.tasks.evidence(task)
 
 
 def test_core_change_impact_rejects_its_own_schema_drift(
@@ -643,7 +643,7 @@ def test_core_correlation_rejects_its_own_schema_drift(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         with pytest.raises(RuntimeError, match="operation response schema drift"):
-            codemap.correlate_evidence(
+            codemap.correlation.observe(
                 bundles,
                 path_mappings=[{"external_prefix": "/app", "repository_prefix": ""}],
             )
@@ -656,7 +656,7 @@ def test_core_post_change_rejects_its_own_schema_drift(
     source, task = _fixed_mode_repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        previous = codemap.task_evidence(task)
+        previous = codemap.tasks.evidence(task)
         source.write_text("def widget(): return 'new'\n", encoding="utf-8")
 
         def drifted_schema(operation: str, mode: str | None = None) -> str:

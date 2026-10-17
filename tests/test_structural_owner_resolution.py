@@ -34,7 +34,7 @@ def test_structural_owner_follows_active_test_route_engine_chain(
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(
+        action = codemap.tasks.action_map(
             "Fix ember accepted response behavior owner", limit=20
         )
     assert action["verify"] is not None
@@ -58,7 +58,7 @@ def test_structural_owner_does_not_choose_unreachable_duplicate_legacy_symbol(
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(
+        action = codemap.tasks.action_map(
             "Fix ember accepted response behavior owner", limit=20
         )
     assert action["edit"] is not None
@@ -73,7 +73,7 @@ def test_projected_file_owner_does_not_claim_an_unrelated_first_symbol(
     engine.write_text("def unrelated_helper():\n    return 0\n\n" + engine.read_text())
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(
+        action = codemap.tasks.action_map(
             "Fix ember accepted response behavior owner", limit=3
         )
     edit = assert_present(action["edit"])
@@ -107,7 +107,7 @@ def test_incomplete_structural_candidate_does_not_displace_named_source(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_evidence(
+        packet = codemap.tasks.evidence(
             "Fix Metadata.failed_update completing a request_update future through unsupported methods."
         )
     candidate = assert_present(packet["ownership"]["candidate"])
@@ -127,7 +127,7 @@ def test_explicit_policy_task_keeps_configuration_authority(tmp_path: Path) -> N
     (tmp_path / "src/case/policy.toml").write_text("mode='active'\nfeature='ember'\n")
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(
+        action = codemap.tasks.action_map(
             "Change ember policy config for accepted response", limit=20
         )
     assert action["ownership_resolution"] is None
@@ -146,7 +146,7 @@ def test_contract_named_verification_surface_never_overrides_structural_edit_own
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(
+        action = codemap.tasks.action_map(
             "Repair ember behavior and identify its contract verification outside default tests",
             limit=20,
         )
@@ -161,7 +161,7 @@ def test_ownership_relation_graph_exposes_typed_owner_path(tmp_path: Path) -> No
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        graph = codemap.ownership_relation_graph(
+        graph = codemap.ownership.relations(
             "Fix ember accepted response behavior owner",
             "tests/case/test_behavior.py",
             max_depth=2,
@@ -200,7 +200,7 @@ def test_ownership_relation_graph_is_cycle_safe(tmp_path: Path) -> None:
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        graph = codemap.ownership_relation_graph(
+        graph = codemap.ownership.relations(
             "Fix cycle behavior", "tests/test_cycle.py", max_depth=4
         )
     assert graph["cycle_count"] >= 1
@@ -216,7 +216,7 @@ def test_decision_brief_carries_compact_owner_path(tmp_path: Path) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        brief = codemap.task_decision_brief(
+        brief = codemap.tasks.decision_brief(
             "Fix ember accepted response behavior owner"
         )
     assert assert_object(brief["edit"])["path"] == "src/case/engine.py"
@@ -234,7 +234,7 @@ def test_import_alone_nominates_but_does_not_prove_owner(tmp_path: Path) -> None
     (tmp_path / "src/worker.py").write_text("def run():\n    return 1\n")
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        graph = codemap.ownership_relation_graph(
+        graph = codemap.ownership.relations(
             "Change unrelated behavior", "src/wrapper.py", max_depth=2
         )
     assert graph["candidates"]
@@ -267,14 +267,14 @@ def test_unique_third_hop_call_delegation_refines_owner(tmp_path: Path) -> None:
     codemap = CodeMap(tmp_path)
     codemap.index.sync()
     try:
-        brief = codemap.task_action_brief(
+        brief = codemap.tasks.action_brief(
             "Change the frosted meadow accepted response from old to new and verify it"
         )
         assert brief["edit"] == "src/case/engine.ts"
         assert "service.ts --imports--> src/case/engine.ts" in assert_text(
             brief["owner_path"]
         )
-        graph = codemap.ownership_relation_graph(
+        graph = codemap.ownership.relations(
             "frosted meadow accepted response", "tests/frosted.test.ts", max_depth=3
         )
         assert graph["selection_reason"] == "unique-task-local-delegation-continuation"
@@ -309,7 +309,7 @@ def test_third_hop_multiple_call_targets_do_not_guess_deeper_owner(
     codemap = CodeMap(tmp_path)
     codemap.index.sync()
     try:
-        graph = codemap.ownership_relation_graph(
+        graph = codemap.ownership.relations(
             "frosted meadow accepted response", "tests/frosted.test.ts", max_depth=3
         )
         assert graph["selected"] == "src/case/service.ts"

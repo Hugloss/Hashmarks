@@ -5,6 +5,7 @@ import pytest
 from contract_assertions import assert_array, assert_object, assert_records, assert_text
 
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.evidence_verification import RepositoryVerification
 from hashmarks.evidence_presentation import present_repository_evidence
 
 
@@ -14,7 +15,7 @@ def test_verification_ownership_keeps_unobserved_owner_scope_unknown(
     (tmp_path / "backend.py").write_text("def unrelated():\n    return 1\n")
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        graph = codemap.verification_ownership_graph(
+        graph = codemap.tasks.verification_ownership_graph(
             "Inspect an unknown qx_helix_root task"
         )
     summary = graph["summary"]
@@ -39,7 +40,6 @@ def test_verification_ownership_keeps_unobserved_owner_scope_unknown(
 )
 def test_verification_summary_preserves_scope_and_hidden_alternatives(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
     admissible: bool,
     count: int,
     returned: int,
@@ -63,12 +63,15 @@ def test_verification_summary_preserves_scope_and_hidden_alternatives(
     }
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        # Supply the existing semantic owner's observation to the public graph
-        # projection; this test does not nominate edit/verification authority.
-        monkeypatch.setattr(
-            codemap, "verification_relevance", lambda _task, **_bounds: relevance
-        )
-        graph = codemap.verification_ownership_graph("Change target42 in backend.py")
+        # Supply independently qualified observation values to their projection.
+        # Task orchestration and owner nomination have separate direct tests.
+        with codemap.reads.session():
+            graph = codemap.verification.relationship_evidence(
+                "Change target42 in backend.py",
+                {"edit": {"path": "backend.py"}},
+                relevance,
+                None,
+            )
 
     summary = graph["summary"]
     assert isinstance(summary, dict)
@@ -89,9 +92,9 @@ def test_task_test_match_bounds_do_not_establish_absence(tmp_path: Path) -> None
         )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map("Fix reset_token")
+        action = codemap.tasks.action_map("Fix reset_token")
         relevance_before = deepcopy(action["verification_relevance"])
-        packet = codemap.task_evidence("Fix reset_token")
+        packet = codemap.tasks.evidence("Fix reset_token")
         assert action["verification_relevance"] == relevance_before
     assert "task_matches" in packet["verification"]["relevance"]
     matches = packet["verification"]["relevance"]["task_matches"]
@@ -121,7 +124,7 @@ def test_task_test_matches_preserve_unresolved_ownership_and_selection(
         path.write_text(source)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_evidence("Fix reset_token")
+        packet = codemap.tasks.evidence("Fix reset_token")
     assert packet["ownership"]["owner"] is None
     relevance = packet["verification"]["relevance"]
     assert relevance["selection_changed"] is False
@@ -164,7 +167,7 @@ def test_lexical_verification_scouts_do_not_claim_references_or_replace_verifier
         path.write_text(source)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_evidence(
+        packet = codemap.tasks.evidence(
             "Change transform in src/internals/pipeline.py for redelivery ordering",
             limit=3,
             per_role=1,
@@ -217,7 +220,7 @@ def test_module_alias_verifier_preserves_export_owner_identity(
         path.write_text(source)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_evidence("Change handle in src/pkg/a.py")
+        packet = codemap.tasks.evidence("Change handle in src/pkg/a.py")
     relevance = packet["verification"]["relevance"]
     verifier = next(
         row for row in relevance["candidates"] if row["path"] == "tests/test_facade.py"
@@ -248,7 +251,7 @@ def test_indirect_verification_reference_requires_the_correct_import_owner(
         path.write_text(content)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_evidence("Change normalize_widget in src/owner.py")
+        packet = codemap.tasks.evidence("Change normalize_widget in src/owner.py")
     assert packet["ownership"]["owner"] is not None
     assert packet["ownership"]["owner"]["path"] == "src/owner.py"
     rows = {
@@ -280,7 +283,7 @@ def test_verification_ownership_is_evidence_only_and_bounded(tmp_path: Path) -> 
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        graph = codemap.verification_ownership_graph(
+        graph = codemap.tasks.verification_ownership_graph(
             "change calculate behavior", limit=10
         )
     assert graph["schema"] == "hashmarks.verification-ownership.v2"
@@ -316,7 +319,7 @@ def test_verification_ownership_v2_links_direct_verifier_to_edit_authority(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        graph = codemap.verification_ownership_graph(
+        graph = codemap.tasks.verification_ownership_graph(
             "change calculate behavior", limit=10
         )
     assert graph["schema"] == "hashmarks.verification-ownership.v2"
@@ -353,7 +356,7 @@ def test_verification_ownership_v2_does_not_link_wording_only_verifier(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        graph = codemap.verification_ownership_graph(
+        graph = codemap.tasks.verification_ownership_graph(
             "change calculate widget behavior", limit=10
         )
 
@@ -376,7 +379,7 @@ def test_dead_verifier_reference_cannot_claim_edit_coverage(tmp_path: Path) -> N
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        graph = codemap.verification_ownership_graph(
+        graph = codemap.tasks.verification_ownership_graph(
             "Fix ember_snow implementation and verify behavior"
         )
     verifier = next(
@@ -421,8 +424,8 @@ def test_symbol_scoped_edit_does_not_link_sibling_verifier(tmp_path: Path) -> No
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(task, limit=20)
-        graph = codemap.verification_ownership_graph(task, limit=20)
+        action = codemap.tasks.action_map(task, limit=20)
+        graph = codemap.tasks.verification_ownership_graph(task, limit=20)
 
     assert action["edit"] is not None
     assert action["edit"]["path"] == "src/launch.py"
@@ -482,7 +485,9 @@ def test_unique_direct_verifier_outranks_indirect_and_canonical_candidates(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        relevance = codemap.verification_relevance(task, limit=20, candidate_limit=16)
+        relevance = codemap.tasks.verification_relevance(
+            task, limit=20, candidate_limit=16
+        )
 
     selected = relevance["selected"]
     assert selected is not None
@@ -532,7 +537,7 @@ def test_module_alias_call_is_direct_verifier_for_exact_owner(tmp_path: Path) ->
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        relevance = codemap.verification_relevance(
+        relevance = codemap.tasks.verification_relevance(
             "Change policy.evaluate behavior", limit=20, candidate_limit=16
         )
 
@@ -573,7 +578,7 @@ def test_dead_module_alias_call_cannot_claim_direct_verification(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        relevance = codemap.verification_relevance(
+        relevance = codemap.tasks.verification_relevance(
             "Change policy.evaluate behavior", limit=20, candidate_limit=16
         )
 
@@ -606,7 +611,7 @@ def test_indirect_namespace_candidate_cannot_displace_reference_bound_canonical_
         "canonical_rank": None,
     }
 
-    selected, reason = CodeMap._verification_select_candidate(
+    selected, reason = RepositoryVerification._verification_select_candidate(
         [namespace_candidate, canonical],
         assert_text(canonical["path"]),
     )
@@ -634,7 +639,7 @@ def test_direct_or_unique_indirect_evidence_can_still_improve_weak_canonical_ver
         "task_anchor_count": 1,
         "canonical_rank": None,
     }
-    selected, reason = CodeMap._verification_select_candidate(
+    selected, reason = RepositoryVerification._verification_select_candidate(
         [direct, indirect_canonical],
         assert_text(indirect_canonical["path"]),
     )
@@ -654,7 +659,7 @@ def test_direct_or_unique_indirect_evidence_can_still_improve_weak_canonical_ver
         "task_anchor_count": 1,
         "canonical_rank": None,
     }
-    selected, reason = CodeMap._verification_select_candidate(
+    selected, reason = RepositoryVerification._verification_select_candidate(
         [indirect, unbound_canonical],
         assert_text(unbound_canonical["path"]),
     )
@@ -696,10 +701,10 @@ def test_module_alias_call_uses_the_existing_reexport_authority(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        relevance = codemap.verification_relevance(
+        relevance = codemap.tasks.verification_relevance(
             "Change owner.target behavior", limit=20, candidate_limit=16
         )
-        action = codemap.task_action_map("Change owner.target behavior", limit=20)
+        action = codemap.tasks.action_map("Change owner.target behavior", limit=20)
 
     selected = relevance["selected"]
     assert selected is not None
@@ -750,7 +755,7 @@ def test_module_alias_local_override_cannot_claim_reexported_owner(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        relevance = codemap.verification_relevance(
+        relevance = codemap.tasks.verification_relevance(
             "Change owner.target behavior", limit=20, candidate_limit=16
         )
 
@@ -787,7 +792,7 @@ def test_bounded_verification_candidates_always_retain_selected_verifier() -> No
     }
     candidates.append(selected)
 
-    bounded = CodeMap._verification_bounded_candidates(
+    bounded = RepositoryVerification._verification_bounded_candidates(
         candidates,
         selected,
         8,
@@ -799,7 +804,7 @@ def test_bounded_verification_candidates_always_retain_selected_verifier() -> No
     ]
     assert bounded[-1]["path"] == "scripts/tests/test_canonical.py"
 
-    single = CodeMap._verification_bounded_candidates(
+    single = RepositoryVerification._verification_bounded_candidates(
         candidates,
         {**selected, "selection_reason": "canonical-verification"},
         1,

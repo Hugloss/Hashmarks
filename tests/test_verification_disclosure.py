@@ -44,10 +44,10 @@ def test_task_candidate_survives_reference_fanout_without_reference_authority(
     task, expected = _repository(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(task)
-        packet = codemap.task_evidence(task)
+        action = codemap.tasks.action_map(task)
+        packet = codemap.tasks.evidence(task)
         initial = read_initial_projection(
-            decode_initial_packet(codemap.task_evidence(task, result_mode="initial"))
+            decode_initial_packet(codemap.tasks.evidence(task, result_mode="initial"))
         )
     assert packet["ownership"]["owner"] is not None
     assert packet["ownership"]["owner"]["path"] == "src/backend.py"
@@ -82,7 +82,7 @@ def test_disclosure_bounds_preserve_selected_verifier_and_candidate_population(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         projections = [
-            codemap.verification_relevance(task, candidate_limit=limit)
+            codemap.tasks.verification_relevance(task, candidate_limit=limit)
             for limit in (1, 3, 8)
         ]
     for limit, relevance in zip((1, 3, 8), projections, strict=True):
@@ -110,7 +110,7 @@ def test_short_identifier_components_remain_verification_task_evidence(
         )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_evidence("Inspect field db_type in src/backend.py")
+        packet = codemap.tasks.evidence("Inspect field db_type in src/backend.py")
     rows = {
         row["path"]: row for row in packet["verification"]["relevance"]["candidates"]
     }
@@ -139,7 +139,7 @@ def test_production_lexical_fanout_cannot_hide_the_test_observation_scope(
     (tmp_path / expected).write_text("def test_cancellation(client): client.close()\n")
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_evidence(
+        packet = codemap.tasks.evidence(
             "Inspect cancellation scope cleanup in src/engine.py"
         )
     relevance = packet["verification"]["relevance"]

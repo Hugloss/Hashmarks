@@ -37,6 +37,47 @@ owns qualified member/range reads and returns detached public outline symbols.
 Its instruction-scope primitive consumes explicit paths. Query-based instruction
 seed selection remains Context composition, above Source and retrieval.
 
+Native publication uses `CodeMap.native.import_scip()` and `.enrich_projects()`.
+`CodeMap.native.status()` reports native evidence qualification. Repository
+relationship queries use `CodeMap.relationships.projects()`, `.deps()`, `.refs()`,
+`.affected()` and `.tests()`. Both components can be constructed independently
+from their explicit lower repository inputs. Their retired root operations are
+removed; reverse-cache validity stays with Relationships and native publication
+uses the existing store transaction and generation.
+
+Structural operations use `CodeMap.structure.search()` and `.locality()`, with
+their existing evidence schemas and bounds. The old root methods are removed.
+`structural_locality_delta` remains exported from `hashmarks.codemap`; its direct
+defining import is now `hashmarks.codemap.structural_locality_delta`. Packet
+comparison does not import the live structural component.
+
+Retrieval uses `CodeMap.search.find()`, `.packet()`, `.find_task()`,
+`.task_query_views()`, `.formulate_task_query()` and `.query_route()`. Retrieval
+diagnostics use `.retrieval_stability()` and `.explain_retrieval()` on the same
+Search owner. Context uses `CodeMap.context.build()`, `.orient()`, `.task()`,
+`.task_plan()`, `.work()`, `.budget_sweep()` and `.instruction_scope()`. The old
+root methods and query/context cache fields are removed. Normalized find routes
+travel with their evidence; presentation does not classify the query again.
+
+Ownership uses `CodeMap.ownership.findings()`, `.repository_graph()`, `.relations()`,
+`.import_findings()`, `.cache_findings()`, `.cache_invalidation_graph()` and
+`.concurrency_findings()`. Task views use `CodeMap.tasks.action_map()`,
+`.entry_points()`, `.graph_adjacency()`, `.relationships()`,
+`.verification_relevance()`, `.verification_ownership_graph()` and
+`.explain_verification_selection()`. Their old flat root methods are removed.
+Direct verification uses `CodeMap.verification.for_owner(VerificationRequest)`
+inside the request's exact active read scope; `.plan()` describes a supplied test
+surface. Task convenience views share the normalized observation rather than
+calling back from Verification to Tasks. Candidate-local test observations retain
+their own source basis and cannot overwrite task-owner-bound reference facts.
+
+Task packets and briefs now use `CodeMap.tasks.evidence()`, `.action_brief()`,
+`.decision_packet()`, `.decision_brief()` and `.decision_brief_budget_sweep()`.
+The task component borrows Context and reuses its scoped task observation across
+all projections. Its Source comes from the supplied Search owner, rather than a
+second independently supplied source argument. Flat root packet methods and
+their inherited implementation paths are removed.
+
 The supported Python API is:
 
 1. names exported by `hashmarks.__all__`, including the lazily exposed `CodeMap`;
@@ -48,9 +89,9 @@ Consumer-facing producer binding is also part of the supported top-level Python 
 
 `validate_repository_intelligence_evidence()` is the supported consumer validator for current repository-intelligence evidence contracts used across decision, context, impact, verification, ownership, action-map, repository snapshot/delta, and external diagnostic/freshness surfaces. Hashmarks owns current schema recognition and producer-semantic validation. Obsolete development schema names are rejected rather than preserved as compatibility aliases. The returned `normalized` value is a compact, validated projection, not a lossless copy of its input. For diagnostic deltas it declares `projection_coverage: "projection-only"` and lists unprojected source pointers in `unprojected_sections`; consumers needing those facts must retain the original packet, whose identity is included in the normalized result. The projection may bind repository identity, generation, freshness, and the loaded producer implementation identity, but execution, result, retry, scheduling, and certification authority remain external.
 
-The documented `CodeMap.repository_evidence_bindings()`, `repository_evidence_binding_delta()`, and `repository_evidence_coverage()` methods are supported Python API through the exported `CodeMap` class. Their current schemas are `hashmarks.repository-evidence-bindings.v1`, `hashmarks.repository-evidence-binding-delta.v1`, and `hashmarks.repository-evidence-coverage.v1`; see [`REPOSITORY_EVIDENCE_BINDINGS.md`](REPOSITORY_EVIDENCE_BINDINGS.md).
+Bindings use `CodeMap.bindings.observe()`, `.delta()` and `.coverage()`. The independent `RepositoryBindings` component borrows Source and its read scope; it has no Tasks, packet or root dependency. Their current schemas are `hashmarks.repository-evidence-bindings.v1`, `hashmarks.repository-evidence-binding-delta.v1`, and `hashmarks.repository-evidence-coverage.v1`; see [`REPOSITORY_EVIDENCE_BINDINGS.md`](REPOSITORY_EVIDENCE_BINDINGS.md). Flat root binding operations are removed.
 
-The documented `CodeMap.correlate_evidence()` and `evidence_correlation_delta()` methods are also supported Python API. Their schemas are `hashmarks.evidence-correlation.v2` and `hashmarks.evidence-correlation-delta.v2`; see [`EVIDENCE_CORRELATION.md`](EVIDENCE_CORRELATION.md). Correlation remains a projection over existing repository evidence authorities and does not grant causal or action authority.
+Correlation uses `CodeMap.correlation.observe()` and `.delta()` on an independent `RepositoryCorrelation` component borrowing Source and Bindings. Their schemas are `hashmarks.evidence-correlation.v2` and `hashmarks.evidence-correlation-delta.v2`; see [`EVIDENCE_CORRELATION.md`](EVIDENCE_CORRELATION.md). Flat root correlation operations are removed. Correlation remains a projection over existing repository evidence authorities and does not grant causal or action authority. Pure retained-packet integrity checks do not construct live repository services.
 
 The documented dependency-resolution observation/query surface uses `hashmarks.dependency-resolution.v3` and `hashmarks.dependency-resolution-delta.v3`; derivation and explanation use `hashmarks.dependency-resolution-derivation.v1` and `hashmarks.dependency-resolution-explain.v1`, and dependency evidence correlation uses `hashmarks.dependency-evidence-correlation.v2`; see [`DEPENDENCY_EVIDENCE.md`](DEPENDENCY_EVIDENCE.md). V3 makes semantic evidence authority explicit, keeps producer/source-format `kind` opaque, and binds producer provenance to observation identity rather than semantic definition identity. Dependency endpoint delta compares caller-supplied qualified endpoints directly and reports repository identity, repository generation, semantic, adapter, producer, physical-evidence, coverage, and ownership change axes independently. Repository identity change is evidence reported by the comparison, not a reason to reconstruct or search repository history. Earlier development shapes are not compatibility aliases or accepted readers.
 
@@ -60,7 +101,7 @@ The local read-only MCP tools `dependency_codemap` and `repository_declarations`
 
 The documented `RepositoryDeclarationProvider`, `RepositoryDeclarationProviderContext`, `RepositoryDeclarationProviderResult`, `RepositoryDeclarationProviderError`, and `CodeMap.discover_repository_declarations()` surface is also supported Python API. The provider context exposes bounded admitted-path enumeration via `paths(prefix)`, plus revision-bound `exists`, `read_bytes`, and `read_text`; it intentionally does not expose a raw repository filesystem path. Discovery uses the `hashmarks.repository-declaration-discovery.v1` and `hashmarks.repository-declaration-discovery-delta.v1` wrapper schemas. Providers are explicitly supplied Python objects; ambient entry-point loading and arbitrary provider execution inside MCP are not part of the public contract.
 
-`CodeMap.task_evidence()` is the supported role-separated task-evidence API. Its default schema is `hashmarks.task-evidence.v5`: bounded retrieval, explicit-target evidence, ownership, verification, related evidence, freshness and provenance are distinct authority domains. Initial responses use `hashmarks.task-evidence-initial.v2` and retain the same facts through the initial packet codec; presentation bounds do not establish repository absence or ownership uniqueness.
+`CodeMap.tasks.evidence()` is the supported role-separated task-evidence API. Its default schema is `hashmarks.task-evidence.v5`: bounded retrieval, explicit-target evidence, ownership, verification, related evidence, freshness and provenance are distinct authority domains. Initial responses use `hashmarks.task-evidence-initial.v2` and retain the same facts through the initial packet codec; presentation bounds do not establish repository absence or ownership uniqueness.
 
 CodeMap service clients require canonical replies to be JSON objects with the
 expected operation schema. The existing service route definitions supply the
@@ -79,7 +120,7 @@ The semantic initial view has its own `InitialTaskEvidenceProjection` contract, 
 
 For natural-language tasks, `retrieval.results` may end with at most two `retrieval_supplement: "bounded-natural-language"` rows. These use the same search-hit fields as canonical rows, but their `score_basis` is `natural-identifier-phrase-relevance`; their scores are not comparable with canonical relevance scores. The requested result limit remains a hard cap. When supplements displace canonical rows, `retrieval.canonical_omitted_results` reports the exact number displaced and `retrieval.ordering` is `canonical-then-bounded-natural-language`. Supplements carry no ownership or verification authority.
 
-`CodeMap.verification_ownership_graph()` and `hashmarks map verification-ownership` expose existing edit-authority links and bounded verifier candidates through `hashmarks.verification-ownership.v2`. `verification_qualification` retains the underlying relevance observation's authority, completeness, truncation, candidate count and bounds when supplied. Summary `unowned` and `ambiguous` values may be `null` when their observation scope is unknown or incomplete. Empty returned candidates alone cannot establish absence; a hidden, observed second candidate cannot disappear from ambiguity merely because the displayed candidate limit is smaller. These summaries describe repository observations, not verification sufficiency or execution permission.
+`CodeMap.tasks.verification_ownership_graph()` and `hashmarks map verification-ownership` expose existing edit-authority links and bounded verifier candidates through `hashmarks.verification-ownership.v2`. `verification_qualification` retains the underlying relevance observation's authority, completeness, truncation, candidate count and bounds when supplied. Summary `unowned` and `ambiguous` values may be `null` when their observation scope is unknown or incomplete. Empty returned candidates alone cannot establish absence; a hidden, observed second candidate cannot disappear from ambiguity merely because the displayed candidate limit is smaller. These summaries describe repository observations, not verification sufficiency or execution permission.
 
 Verification relevance distinguishes aggregate reference uncertainty
 (`qualified_identity_ambiguous`) from unresolved identity in observed test

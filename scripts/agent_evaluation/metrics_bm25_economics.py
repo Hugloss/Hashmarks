@@ -41,7 +41,7 @@ def _task_report(
     limit: int,
 ) -> dict[str, object]:
     query = task["query"]
-    canonical = cm.task_entry_points(query, limit=limit)
+    canonical = cm.tasks.entry_points(query, limit=limit)
     recommended = [
         row for row in canonical.get("recommended", []) if isinstance(row, dict)
     ]

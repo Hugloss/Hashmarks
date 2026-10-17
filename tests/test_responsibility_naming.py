@@ -13,7 +13,7 @@ def test_repository_ownership_uses_single_current_name(tmp_path: Path) -> None:
     (tmp_path / "sample.py").write_text("VALUE = 1\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        value = codemap.repository_ownership_graph()
+        value = codemap.ownership.repository_graph()
         assert not hasattr(codemap, "authority_ownership_graph")
     assert value["schema"] == "hashmarks.authority-ownership-graph.v3"
 
@@ -23,7 +23,7 @@ def test_repository_instruction_scope_uses_single_current_name(tmp_path: Path) -
     (tmp_path / "sample.py").write_text("VALUE = 1\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        value = codemap.repository_instruction_scope("sample.py")
+        value = codemap.context.instruction_scope("sample.py")
         assert not hasattr(codemap, "scoped_authority")
     assert value["schema"] == "hashmarks.codemap-scoped-authority.v1"
 

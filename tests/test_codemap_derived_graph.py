@@ -189,9 +189,9 @@ def test_change_impact_is_bounded_and_does_not_change_task_retrieval(
         )
     with CodeMap(ws) as codemap:
         codemap.index.sync()
-        before = tuple(hit.path for hit in codemap.find_task("root", limit=10))
+        before = tuple(hit.path for hit in codemap.search.find_task("root", limit=10))
         impact = codemap.change_impact("a.py", limit_per_surface=2)
-        after = tuple(hit.path for hit in codemap.find_task("root", limit=10))
+        after = tuple(hit.path for hit in codemap.search.find_task("root", limit=10))
     assert len(impact["surfaces"]["implementation"]) <= 2
     assert before == after
 

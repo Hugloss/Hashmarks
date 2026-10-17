@@ -2,36 +2,50 @@ from __future__ import annotations
 
 import hashlib
 import json
-import time
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
+from hashmarks.operation_contract import operation_response, operation_schema
 from hashmarks.paths import normalize_relative_path
 
+from .decision_session import ReadScopeOwner, decision_scoped
 from .model import EvidenceVisibility
 from .repository_domains import is_test_path
-from .scip_adapter import load_scip_json
-from .scip_import import (
-    collect_scip_rows,
-    publish_scip_claim_metadata,
-    scip_reference_rows,
-)
-from .scip_relationship_adapter import scip_import_provenance
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable, Mapping, Sequence
-    from typing import Any
+    from collections.abc import Mapping, Sequence
 
-    from .engine import CodeMap
-    from .project_graph import ProjectEdge, ProjectNode
+    from .decision_session import DecisionScope
+    from .import_resolution import RepositoryImports
+    from .native_evidence import RepositoryNativeEvidence
+    from .repository_index_store import WorkspaceMapStore
+    from .repository_source import RepositorySource
 
 
-class EvidenceGraphMixin:
-    @staticmethod
-    def _is_test_path(path: str) -> bool:
-        # Cache ownership belongs to the lightweight pure repository-domain module,
-        # never to a CodeMap instance or dynamically reloaded heavy module.
-        return is_test_path(path)
+class RepositoryRelationships(ReadScopeOwner):
+    """Own repository-only relationship queries and their generation-bound reuse."""
+
+    def __init__(
+        self,
+        source: RepositorySource,
+        reads: DecisionScope,
+        store: WorkspaceMapStore,
+        imports: RepositoryImports,
+        native: RepositoryNativeEvidence,
+    ) -> None:
+        self.source = source
+        self._reads = reads
+        self.store = store
+        self.imports = imports
+        self.native = native
+        self.workspace = source.workspace
+        self._reverse_file_graph_cache: (
+            tuple[int, bytes, dict[str, set[str]]] | None
+        ) = None
+
+    @property
+    def reads(self) -> DecisionScope:
+        return self._reads
 
     @staticmethod
     def _python_file_graph_targets(
@@ -74,8 +88,6 @@ class EvidenceGraphMixin:
     def _file_graph(
         self, *, native_edges: Sequence[Mapping[str, object]]
     ) -> dict[str, set[str]]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         rows = [dict(row) for row in self.store.all_file_rows()]
         graph: dict[str, set[str]] = {str(row["path"]): set() for row in rows}
         language_by_path = {
@@ -108,20 +120,6 @@ class EvidenceGraphMixin:
                 graph[source].add(target)
         return graph
 
-    def _recent_changed_paths(self) -> set[str]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        raw = self.store.meta("recent_changed_paths", "[]") or "[]"
-        try:
-            value = json.loads(raw)
-        except json.JSONDecodeError:
-            return set()
-        return (
-            {str(item) for item in value if isinstance(item, str)}
-            if isinstance(value, list)
-            else set()
-        )
-
     @staticmethod
     def _longest_module_paths(target: str, resolved: dict[str, list[str]]) -> list[str]:
         parts = target.split(".")
@@ -134,8 +132,6 @@ class EvidenceGraphMixin:
     def _python_reverse_frontier(
         self, frontier: set[str], seen: set[str]
     ) -> set[str] | None:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         ordered_frontier = sorted(frontier)
         rows = [self.reads.file_row(path) for path in ordered_frontier]
         modules_by_path = {
@@ -176,8 +172,6 @@ class EvidenceGraphMixin:
         Returns ``None`` when the bounded fast path cannot prove semantic
         equivalence, causing callers to use the established full graph.
         """
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         root_rows = [self.reads.file_row(path) for path in sorted(roots)]
         if any(
             row is None
@@ -191,7 +185,7 @@ class EvidenceGraphMixin:
         # falling back whenever such evidence is currently authoritative.
         if any(
             row.get("kind") == "native-file" and row.get("fresh")
-            for row in self._native_evidence_status()
+            for row in self.native.status()
         ):
             return None
 
@@ -210,20 +204,12 @@ class EvidenceGraphMixin:
             frontier = nxt
         return levels
 
-    def _invalidate_file_graph_cache(self) -> None:
-        """Retire relationship reuse after repository or provider publication."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        self._reverse_file_graph_cache = None
-
     def _reverse_file_graph(self) -> dict[str, set[str]]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         generation = self.store.generation()
         # Source/manifest drift can disqualify native edges without publishing
         # another index generation. Qualify before a hit and build from that
         # same observed input, rather than letting indexing clear this cache.
-        native_edges = self._fresh_native_file_edges()
+        native_edges = self.native._fresh_native_file_edges()
         native_basis = hashlib.sha256(
             json.dumps(
                 native_edges,
@@ -243,8 +229,6 @@ class EvidenceGraphMixin:
         return reverse
 
     def _query_paths(self, query: str) -> set[str]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         try:
             rel = normalize_relative_path(query, allow_root=False)
         except ValueError:
@@ -258,335 +242,218 @@ class EvidenceGraphMixin:
             is not EvidenceVisibility.DENY
         }
 
-    def import_scip(
-        self, path: str | Path, *, provenance: Mapping[str, Any] | None = None
-    ) -> dict[str, object]:
-        """Import admitted native records and their direct producer claims atomically."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+    def _resolve_edge(self, edge: dict) -> dict:
+        value = dict(edge)
+        target = str(value.get("target", ""))
+        resolved_paths = (
+            self.imports._resolve_import_paths(str(value.get("path", "")), target)
+            if value.get("kind") == "import"
+            else []
+        )
+        short = target.rsplit(".", 1)[-1]
+        resolved_symbols = [
+            {
+                "path": row["path"],
+                "qualname": row["qualname"],
+                "signature": row["signature"],
+            }
+            for row in self.store.symbols_named(short, limit=8)
+            if EvidenceVisibility(str(row["evidence_visibility"]))
+            is not EvidenceVisibility.DENY
+        ]
+        value["resolved_paths"] = resolved_paths
+        value["resolved_symbols"] = resolved_symbols
+        return value
+
+    @decision_scoped
+    def deps(self, query: str) -> dict[str, object]:
         self.reads.ready()
-        raw_path = Path(path)
-        if not raw_path.is_absolute():
-            raw_path = self.workspace / raw_path
-        producer, occurrences, warnings = load_scip_json(
-            raw_path, workspace=self.workspace
-        )
-        qualified_provenance = scip_import_provenance(
-            provenance, sorted({row.path for row in occurrences})
-        )
-        rows = collect_scip_rows(self, producer, occurrences, qualified_provenance)
-        with self.store.publication_transaction():
-            previous_generation = self.store.generation()
-            generation = self.store.bump_generation()
-            self._carry_forward_evidence_generation(
-                previous_generation=previous_generation, generation=generation
+        matches = self.store.symbol(query)
+        if matches:
+            visible_matches = [
+                match
+                for match in matches
+                if EvidenceVisibility(str(match["evidence_visibility"]))
+                is not EvidenceVisibility.DENY
+            ]
+            edge_map = self.reads.edges_from_many(
+                [
+                    (str(match["path"]), str(match["qualname"]))
+                    for match in visible_matches
+                ],
+                limit_per_seed=100,
             )
-            self.store.replace_native_occurrences(
-                producer, rows.definitions, scip_reference_rows(rows.references)
-            )
-            self._record_evidence_snapshot(
-                "scip", producer, bind_generation=True, generation=generation
-            )
-            publish_scip_claim_metadata(self, producer, rows, qualified_provenance)
-            self.store.set_meta("scip_last_import_unix", str(time.time()))
-        return {
-            "schema": "hashmarks.scip-import.v1",
-            "producer": producer,
-            "definitions": len(rows.definitions),
-            "references": len(rows.references),
-            "skipped": rows.skipped,
-            "warnings": list(warnings),
-            "unlocated_relationship_claims": len(rows.unlocated),
-            "unlocated_relationship_omitted": rows.unlocated_omitted,
-        }
-
-    @staticmethod
-    def _project_node_value(node: object, name: str) -> object:
-        if isinstance(node, dict):
-            return node.get(name)
-        return getattr(node, name, None)
-
-    def _project_node_admitted(self, node: object) -> bool:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        manifest = str(self._project_node_value(node, "manifest") or "")
-        metadata_raw = self._project_node_value(node, "metadata")
-        metadata = metadata_raw if isinstance(metadata_raw, dict) else {}
-        freshness = metadata.get("freshness_manifests") or ()
-        manifests = (manifest, *(str(value) for value in freshness))
-        if any(self.files.visible_file(value) is None for value in manifests):
-            return False
-        root = str(self._project_node_value(node, "root") or "").strip("/")
-        if root in {"", "."}:
-            return True
-        return self.files.has_visible_file(root)
-
-    def _admitted_external_project_ids(self, producer: str) -> set[str]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        return {
-            str(row.get("project_id") or "")
-            for row in self._fresh_project_nodes()
-            if str(row.get("producer") or "") != producer
-            and self._project_node_admitted(row)
-        }
-
-    def _admit_project_graph(
-        self,
-        provider_name: str,
-        nodes: tuple[ProjectNode, ...],
-        edges: tuple[ProjectEdge, ...],
-    ) -> tuple[tuple[ProjectNode, ...], tuple[ProjectEdge, ...], int, int]:
-        admitted_nodes = tuple(
-            node for node in nodes if self._project_node_admitted(node)
-        )
-        admitted_ids = {
-            str(self._project_node_value(node, "project_id") or "")
-            for node in admitted_nodes
-        }
-        known_ids = admitted_ids | self._admitted_external_project_ids(provider_name)
-        admitted_edges = tuple(
-            edge
-            for edge in edges
-            if str(self._project_node_value(edge, "source") or "") in known_ids
-            and str(self._project_node_value(edge, "target") or "") in known_ids
-        )
-        return (
-            admitted_nodes,
-            admitted_edges,
-            len(nodes) - len(admitted_nodes),
-            len(edges) - len(admitted_edges),
-        )
-
-    def _enrich_project_graphs(
-        self,
-        selected: set[str] | None,
-        results: list[dict[str, object]],
-        warnings: list[str],
-        ensure_publication_generation: Callable[[], int],
-    ) -> None:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        for provider in self.project_graph_providers:
-            if selected is not None and provider.name not in selected:
-                continue
-            if not provider.detect(self.workspace):
-                continue
-            evidence = provider.collect(self.workspace)
-            nodes, edges, filtered_nodes, filtered_edges = self._admit_project_graph(
-                provider.name,
-                evidence.nodes,
-                evidence.edges,
-            )
-            if (
-                provider.topology_manifest is not None
-                and self.files.visible_file(provider.topology_manifest) is None
-            ):
-                nodes = ()
-                edges = ()
-                filtered_nodes = len(evidence.nodes)
-                filtered_edges = len(evidence.edges)
-            generation = ensure_publication_generation()
-            self.store.replace_project_graph(provider.name, nodes, edges)
-            project_manifests = [
-                manifest
-                for node in nodes
-                for manifest in (
-                    node.manifest,
-                    *(node.metadata.get("freshness_manifests") or ()),
+            rows = [
+                row
+                for match in visible_matches
+                for row in edge_map.get(
+                    (str(match["path"]), str(match["qualname"])), ()
                 )
             ]
-            # A provider topology manifest can own edge-only graph evidence even
-            # when the provider contributes no project nodes.
-            if provider.topology_manifest is not None:
-                project_manifests.insert(0, provider.topology_manifest)
-            self._record_evidence_snapshot(
-                "project",
-                provider.name,
-                bind_generation=provider.bind_generation,
-                manifests=project_manifests,
-                generation=generation,
-            )
-            results.append(
-                {
-                    "producer": evidence.producer,
-                    "projects": len(nodes),
-                    "edges": len(edges),
-                }
-            )
-            warnings.extend(evidence.warnings)
-            if filtered_nodes or filtered_edges:
-                warnings.append(
-                    f"{provider.name}: filtered project evidence outside repository admission "
-                    f"(projects={filtered_nodes}, edges={filtered_edges})"
+            native_rows = [
+                row
+                for match in visible_matches
+                for row in self.native._fresh_native_edges_from(
+                    str(match["path"]), str(match["qualname"])
                 )
-
-    def _enrich_typescript_graph(
-        self,
-        selected: set[str] | None,
-        results: list[dict[str, object]],
-        warnings: list[str],
-        ensure_publication_generation: Callable[[], int],
-    ) -> None:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        if selected is None or self.typescript_resolver.name in selected:
-            if self.typescript_resolver.detect(self.workspace):
-                ts = self.typescript_resolver.collect(self.workspace)
-                generation = ensure_publication_generation()
-                self.store.replace_native_file_edges(
-                    self.typescript_resolver.name, ts.edges
-                )
-                self._record_evidence_snapshot(
-                    "native-file",
-                    ts.producer,
-                    bind_generation=True,
-                    manifests=("tsconfig.json",),
-                    generation=generation,
-                )
-                results.append({"producer": ts.producer, "file_edges": len(ts.edges)})
-                warnings.extend(ts.warnings)
-
-    def _enrich_pyright_graph(
-        self,
-        selected: set[str] | None,
-        results: list[dict[str, object]],
-        warnings: list[str],
-        ensure_publication_generation: Callable[[], int],
-    ) -> None:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        if selected is None or self.pyright_type_server.name in selected:
-            if self.pyright_type_server.detect(self.workspace):
-                python_sources = [
-                    str(row["path"])
-                    for row in self.store.all_file_rows()
-                    if str(row.get("language") or "") == "python"
-                ]
-                pyright = self.pyright_type_server.collect(
-                    self.workspace, python_sources
-                )
-                generation = ensure_publication_generation()
-                self.store.replace_native_file_edges(
-                    self.pyright_type_server.name, pyright.edges
-                )
-                self._record_evidence_snapshot(
-                    "native-file",
-                    pyright.producer,
-                    bind_generation=True,
-                    manifests=("pyrightconfig.json", "pyproject.toml"),
-                    generation=generation,
-                )
-                results.append(
-                    {
-                        "producer": pyright.producer,
-                        "file_edges": len(pyright.edges),
-                        "protocol_version": pyright.protocol_version,
-                    }
-                )
-                warnings.extend(pyright.warnings)
-
-    def _enrich_vitest_graph(
-        self,
-        selected: set[str] | None,
-        results: list[dict[str, object]],
-        warnings: list[str],
-        ensure_publication_generation: Callable[[], int],
-    ) -> None:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        if selected is None or "vitest-vite" in selected:
-            # Preserve the historical monkeypatch seam on codemap.engine while
-            # implementation ownership lives in this mixin.
-            from . import engine as engine_module
-
-            if engine_module.local_vitest(self.workspace) is not None:
-                vite = engine_module.collect_vitest_vite_graph(self.workspace)
-                if vite.command or vite.edges:
-                    generation = ensure_publication_generation()
-                    self.store.replace_native_file_edges(vite.producer, vite.edges)
-                    self._record_evidence_snapshot(
-                        "native-file",
-                        vite.producer,
-                        bind_generation=True,
-                        manifests=(
-                            "package.json",
-                            "vitest.config.ts",
-                            "vitest.config.js",
-                            "vitest.config.mts",
-                            "vitest.config.mjs",
-                            "vite.config.ts",
-                            "vite.config.js",
-                            "vite.config.mts",
-                            "vite.config.mjs",
-                        ),
-                        generation=generation,
+            ]
+            return {
+                "schema": "hashmarks.deps.v1",
+                "query": query,
+                **self.reads.freshness_fields(),
+                "edges": [self._resolve_edge(row) for row in rows],
+                "native_edges": native_rows,
+                "native_file_edges": [
+                    row
+                    for match in matches
+                    for row in self.native._fresh_native_file_edges_from(
+                        str(match["path"])
                     )
-                    results.append(
-                        {"producer": vite.producer, "file_edges": len(vite.edges)}
-                    )
-                warnings.extend(vite.warnings)
-
-    def enrich_projects(
-        self,
-        providers: Iterable[str] | None = None,
-        *,
-        expected_generation: int | None = None,
-    ) -> dict[str, object]:
-        """Collect slower/native package graph evidence explicitly in the enrichment lane."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        selected = None if providers is None else {str(value) for value in providers}
-        results: list[dict[str, object]] = []
-        warnings: list[str] = []
-        publication_generation: int | None = None
-
-        def ensure_publication_generation() -> int:
-            nonlocal publication_generation
-            if publication_generation is None:
-                previous_generation = self.store.generation()
-                publication_generation = self.store.bump_generation()
-                self._carry_forward_evidence_generation(
-                    previous_generation=previous_generation,
-                    generation=publication_generation,
-                )
-            return publication_generation
-
-        with self.store.publication_transaction():
-            current_generation = self.store.generation()
-            if (
-                expected_generation is not None
-                and current_generation != expected_generation
-            ):
-                raise RuntimeError(
-                    "CodeMap generation changed before project enrichment "
-                    f"({expected_generation} -> {current_generation})"
-                )
-            self._enrich_project_graphs(
-                selected, results, warnings, ensure_publication_generation
-            )
-            self._enrich_typescript_graph(
-                selected, results, warnings, ensure_publication_generation
-            )
-            self._enrich_pyright_graph(
-                selected, results, warnings, ensure_publication_generation
-            )
-            self._enrich_vitest_graph(
-                selected, results, warnings, ensure_publication_generation
-            )
-            if publication_generation is not None:
-                self.store.set_meta("project_graph_last_sync_unix", str(time.time()))
-        self._invalidate_file_graph_cache()
+                ],
+            }
+        rel = normalize_relative_path(query, allow_root=False)
+        self.source.ensure_current(rel)
         return {
-            "schema": "hashmarks.codemap-project-enrichment.v1",
-            "generation": (
-                self.store.generation()
-                if publication_generation is None
-                else publication_generation
-            ),
-            "providers": results,
-            "projects": self._fresh_project_nodes(),
-            "edges": self._fresh_project_edges(),
-            "native_file_edges": self._fresh_native_file_edges(),
-            "warnings": list(dict.fromkeys(warnings)),
+            "schema": "hashmarks.deps.v1",
+            "query": query,
+            **self.reads.freshness_fields(),
+            "edges": [self._resolve_edge(row) for row in self.store.edges_from(rel)],
+            "native_edges": self.native._fresh_native_edges_from(rel),
+            "native_file_edges": self.native._fresh_native_file_edges_from(rel),
+        }
+
+    @decision_scoped
+    def refs(self, query: str) -> dict[str, object]:
+        self.reads.ready()
+        rows = [
+            row
+            for row in self.store.refs(query)
+            if EvidenceVisibility(str(row["evidence_visibility"]))
+            is not EvidenceVisibility.DENY
+        ]
+        native_rows = self.native._fresh_native_refs(query)
+        native_file_rows = self.reads.file_rows(str(row["path"]) for row in native_rows)
+        native = [
+            row
+            for row in native_rows
+            if (mapped := native_file_rows.get(str(row["path"]))) is not None
+            and EvidenceVisibility(str(mapped["evidence_visibility"]))
+            is not EvidenceVisibility.DENY
+        ]
+        return {
+            "schema": "hashmarks.refs.v1",
+            "query": query,
+            **self.reads.freshness_fields(),
+            "references": rows,
+            "native_references": native,
+        }
+
+    @operation_response("projects")
+    @decision_scoped
+    def projects(self) -> dict[str, object]:
+        self.reads.ready()
+        return {
+            "schema": operation_schema("projects"),
+            **self.reads.freshness_fields(),
+            "projects": self.native._fresh_project_nodes(),
+            "edges": self.native._fresh_project_edges(),
+            "native_file_edges": self.native._fresh_native_file_edges(),
+            "last_enriched_unix": None
+            if self.store.meta("project_graph_last_sync_unix") is None
+            else float(self.store.meta("project_graph_last_sync_unix") or 0),
+        }
+
+    def _affected_roots(self, query: str) -> set[str]:
+        roots = self._query_paths(query)
+        if roots:
+            return roots
+        try:
+            rel_query = normalize_relative_path(query, allow_root=False)
+        except ValueError:
+            rel_query = None
+        candidate = None if rel_query is None else self.workspace / rel_query
+        if (
+            rel_query is not None
+            and candidate is not None
+            and candidate.is_file()
+            and not candidate.is_symlink()
+        ):
+            return {rel_query}
+        raise KeyError(f"path or symbol not found: {query}")
+
+    def _affected_levels(
+        self,
+        roots: set[str],
+        *,
+        max_depth: int,
+    ) -> tuple[list[list[str]], set[str]]:
+        levels = self._python_reverse_levels(roots, max_depth=max_depth)
+        if levels is not None:
+            seen = set(roots)
+            for level in levels:
+                seen.update(level)
+            return levels, seen
+
+        reverse = self._reverse_file_graph()
+
+        seen = set(roots)
+        frontier = set(roots)
+        resolved: list[list[str]] = []
+        for _ in range(max_depth):
+            next_frontier: set[str] = set()
+            for path in frontier:
+                next_frontier.update(reverse.get(path, ()))
+            next_frontier -= seen
+            if not next_frontier:
+                break
+            resolved.append(sorted(next_frontier))
+            seen.update(next_frontier)
+            frontier = next_frontier
+        return resolved, seen
+
+    @operation_response("affected")
+    @decision_scoped
+    def affected(self, query: str, *, max_depth: int = 12) -> dict[str, object]:
+        self.reads.ready()
+        roots = self._affected_roots(query)
+        levels, seen = self._affected_levels(roots, max_depth=max_depth)
+        affected = sorted(seen - roots)
+        tests = [path for path in affected if is_test_path(path)]
+        root_projects = {
+            str(project["project_id"])
+            for path in roots
+            for project in self.native._fresh_projects_for_path(path)[:1]
+        }
+        impacted_projects = (
+            self.native._fresh_project_dependents(root_projects, max_depth=max_depth)
+            if root_projects
+            else set()
+        )
+        return {
+            "schema": operation_schema("affected"),
+            "query": query,
+            **self.reads.freshness_fields(),
+            "roots": sorted(roots),
+            "affected_files": affected,
+            "tests": tests,
+            "levels": levels,
+            "root_projects": sorted(root_projects),
+            "affected_projects": sorted(impacted_projects - root_projects),
+            "evidence": "static import graph plus retained native/manifest project graph when available; advisory and conservative",
+        }
+
+    @operation_response("tests")
+    @decision_scoped
+    def tests(self, query: str, *, max_depth: int = 12) -> dict[str, object]:
+        value = self.affected(query, max_depth=max_depth)
+        return {
+            "schema": operation_schema("tests"),
+            "query": query,
+            "generation": value["generation"],
+            "identity_generation": value["identity_generation"],
+            "stale": value["stale"],
+            "roots": value["roots"],
+            "tests": value["tests"],
+            "affected_files": value["affected_files"],
+            "evidence": value["evidence"],
         }

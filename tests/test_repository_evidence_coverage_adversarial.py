@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from hashmarks.client import RepositoryObservation
 from hashmarks.codemap.engine import CodeMap
+from hashmarks.codemap.repository_evidence_bindings import RepositoryBindings
 from hashmarks.observation import ObservationState
 
 
@@ -35,17 +36,17 @@ def _changed_shared_member(
     codemap: CodeMap,
     root: Path,
 ) -> tuple[dict[str, object], dict[str, object], dict[str, object]]:
-    before = codemap.repository_evidence_bindings(
+    before = codemap.bindings.observe(
         _bindings(),
         include_relationships=False,
     )
     (root / "shared.py").write_text("ONE\ntwo\n", encoding="utf-8")
     codemap.index.sync(["shared.py"])
-    after = codemap.repository_evidence_bindings(
+    after = codemap.bindings.observe(
         _bindings(),
         include_relationships=False,
     )
-    delta = codemap.repository_evidence_binding_delta(before, after)
+    delta = codemap.bindings.delta(before, after)
     return before, after, delta
 
 
@@ -93,7 +94,7 @@ def test_incomplete_change_set_keeps_exact_precision_binding_local(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         before, after, delta = _changed_shared_member(codemap, tmp_path)
-        coverage = codemap.repository_evidence_coverage(
+        coverage = codemap.bindings.coverage(
             after,
             changed_paths=["shared.py", "outside.py"],
             change_set_complete=False,
@@ -122,7 +123,7 @@ def test_incomplete_repository_observation_keeps_same_precision_split(
             paths_complete=False,
             dirty_path_count=2,
         )
-        coverage = codemap.repository_evidence_coverage(
+        coverage = codemap.bindings.coverage(
             after,
             repository_observation=observation,
             binding_delta=delta,
@@ -145,16 +146,20 @@ def test_coverage_prepares_each_binding_scope_once(tmp_path: Path) -> None:
     (tmp_path / "other.py").write_text("other\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        bindings = codemap.repository_evidence_bindings(
-            _bindings(), include_relationships=False
-        )
+        bindings = codemap.bindings.observe(_bindings(), include_relationships=False)
         with (
-            patch.object(CodeMap, "_binding_rows", wraps=CodeMap._binding_rows) as rows,
             patch.object(
-                CodeMap, "_binding_paths", wraps=CodeMap._binding_paths
+                RepositoryBindings,
+                "_binding_rows",
+                wraps=RepositoryBindings._binding_rows,
+            ) as rows,
+            patch.object(
+                RepositoryBindings,
+                "_binding_paths",
+                wraps=RepositoryBindings._binding_paths,
             ) as paths,
         ):
-            coverage = codemap.repository_evidence_coverage(
+            coverage = codemap.bindings.coverage(
                 bindings,
                 changed_paths=["shared.py", "outside.py"],
                 change_set_complete=False,

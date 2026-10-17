@@ -27,6 +27,7 @@ from hashmarks.codemap.decision_contract import (
 from hashmarks.codemap.engine import (
     CodeMap,
 )
+from hashmarks.codemap.indexing_lifecycle import RepositoryIndex
 
 logger = logging.getLogger(__name__)
 
@@ -262,7 +263,11 @@ def _surface_paths(db_path: Path, surfaces: set[str]) -> list[str]:
         ]
     finally:
         db.close()
-    return [path for path in paths if CodeMap._index_surface_for_path(path) in surfaces]
+    return [
+        path
+        for path in paths
+        if RepositoryIndex._index_surface_for_path(path) in surfaces
+    ]
 
 
 def apply_variant(
@@ -365,7 +370,7 @@ def _decision_phase_seconds(packet: dict[str, Any]) -> dict[str, Any]:
 
 def _evaluate_task(codemap: CodeMap, item: dict[str, Any]) -> _TaskEvaluation:
     started = time.perf_counter()
-    packet = codemap.task_decision_packet(str(item["task"]))
+    packet = codemap.tasks.decision_packet(str(item["task"]))
     contract = DecisionPacketContract.parse(packet)
     elapsed = time.perf_counter() - started
     edit, verify = contract.edit.path, contract.verify.path

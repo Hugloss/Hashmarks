@@ -145,7 +145,7 @@ def test_private_qualified_identifier_keeps_exact_scope_and_duplicate_ambiguity(
         task += ". Source: request.ts"
     with CodeMap(tmp_path, range_provider=native_ranges) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(task)
+        action = codemap.tasks.action_map(task)
         owner = action["admitted_edit"]
         assert owner is not None
         assert (owner["path"], owner.get("qualname")) == (
@@ -155,7 +155,7 @@ def test_private_qualified_identifier_keeps_exact_scope_and_duplicate_ambiguity(
     (tmp_path / "duplicate.ts").write_text(declaration)
     with CodeMap(tmp_path, range_provider=native_ranges) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(task)
+        action = codemap.tasks.action_map(task)
         if literal_path:
             owner = action["admitted_edit"]
             assert owner is not None
@@ -198,10 +198,10 @@ def test_matching_test_filename_is_a_bound_candidate_without_reference_authority
     task = "Inspect Options declarations for plain HTTP http2 false. Source: src/contracts.d.ts"
     with CodeMap(tmp_path, range_provider=native_ranges) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(task)
-        packet = codemap.task_evidence(task)
+        action = codemap.tasks.action_map(task)
+        packet = codemap.tasks.evidence(task)
         initial = read_initial_projection(
-            decode_initial_packet(codemap.task_evidence(task, result_mode="initial"))
+            decode_initial_packet(codemap.tasks.evidence(task, result_mode="initial"))
         )
     for observed in (packet, initial):
         relevance = observed["verification"]["relevance"]
@@ -248,7 +248,7 @@ def test_named_declaration_keeps_failure_context_as_evidence(
     )
     with CodeMap(tmp_path, range_provider=native_ranges) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(task)
+        action = codemap.tasks.action_map(task)
     owner = action["admitted_edit"]
     assert owner is not None
     assert (owner["path"], owner.get("qualname")) == (
@@ -311,8 +311,10 @@ def test_literal_file_discloses_common_and_private_names_without_owner_promotion
             ("Request.#cachedBody", "Request.#cachedBody", 3),
         ]:
             task = f"Inspect {requested} declarations. Source: handler.ts"
-            action = codemap.task_action_map(task, limit=limit)
-            response = codemap.task_evidence(task, limit=limit, result_mode=result_mode)
+            action = codemap.tasks.action_map(task, limit=limit)
+            response = codemap.tasks.evidence(
+                task, limit=limit, result_mode=result_mode
+            )
             packet = (
                 read_initial_projection(decode_initial_packet(response))
                 if result_mode == "initial"
@@ -349,8 +351,8 @@ def test_literal_file_disclosure_preserves_duplicate_scopes_and_denied_visibilit
     task = "Inspect Options declarations. Source: handler.ts"
     with CodeMap(tmp_path, range_provider=native_ranges) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(task)
-        packet = codemap.task_evidence(task)
+        action = codemap.tasks.action_map(task)
+        packet = codemap.tasks.evidence(task)
         assert {row.get("symbol") for row in packet["retrieval"]["results"][:2]} == {
             "left.Options",
             "right.Options",
@@ -362,7 +364,7 @@ def test_literal_file_disclosure_preserves_duplicate_scopes_and_denied_visibilit
     )
     with CodeMap(tmp_path, range_provider=native_ranges) as codemap:
         codemap.index.sync()
-        packet = codemap.task_evidence(task)
+        packet = codemap.tasks.evidence(task)
         assert all(
             row["path"] != "handler.ts" for row in packet["retrieval"]["results"]
         )

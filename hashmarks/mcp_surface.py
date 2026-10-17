@@ -314,7 +314,7 @@ class HashmarksMcpSurface:
 
     def repository_context(self, *, max_areas: int = 12) -> dict[str, object]:
         max_areas = _bounded_int(max_areas, name="max_areas", minimum=1, maximum=32)
-        return self._read(lambda: self._map.orient(max_areas=max_areas))
+        return self._read(lambda: self._map.context.orient(max_areas=max_areas))
 
     def find(
         self,
@@ -324,7 +324,7 @@ class HashmarksMcpSurface:
     ) -> dict[str, object]:
         query = _bounded_text(query, name="query", maximum=_MAX_QUERY_CHARS)
         limit = _bounded_int(limit, name="limit", minimum=1, maximum=_MAX_LIMIT)
-        return self._read(lambda: self._map.find_packet(query, limit=limit))
+        return self._read(lambda: self._map.search.packet(query, limit=limit))
 
     @overload
     def task_evidence(
@@ -383,7 +383,7 @@ class HashmarksMcpSurface:
             token_budget, name="token_budget", minimum=1, maximum=_MAX_TOKEN_BUDGET
         )
         return self._read(
-            lambda: self._map.task_evidence(
+            lambda: self._map.tasks.evidence(
                 task,
                 limit=limit,
                 per_role=per_role,
@@ -468,7 +468,7 @@ class HashmarksMcpSurface:
 
         def correlate() -> dict[str, object]:
             try:
-                return self._map.correlate_evidence(
+                return self._map.correlation.observe(
                     bundles,
                     path_mappings=mappings,
                     previous_correlation=previous,
@@ -716,7 +716,7 @@ class HashmarksMcpSurface:
         bindings = request.get("bindings")
         if not isinstance(bindings, list):
             raise ValueError("bindings must be a list")
-        return self._map.repository_evidence_bindings(
+        return self._map.bindings.observe(
             bindings,
             dependency_paths=request.get("dependency_paths"),
             include_relationships=request.get("include_relationships", True),
@@ -731,7 +731,7 @@ class HashmarksMcpSurface:
         packet = request.get("bindings_packet")
         if not isinstance(packet, dict):
             raise ValueError("bindings_packet must be an object")
-        return self._map.repository_evidence_coverage(
+        return self._map.bindings.coverage(
             packet,
             changed_paths=request.get("changed_paths"),
             change_set_complete=request.get("change_set_complete"),
@@ -767,7 +767,7 @@ class HashmarksMcpSurface:
 
         def project() -> dict[str, object]:
             self._map.index.sync()
-            return self._map.repository_findings(bounded)
+            return self._map.ownership.findings(bounded)
 
         return self._read(project)
 
@@ -781,7 +781,7 @@ class HashmarksMcpSurface:
         diagnostic_options: dict[str, Any],
     ) -> dict[str, object]:
         if result_mode == "structural":
-            from .codemap.structural_locality import structural_locality_delta
+            from .codemap.structural_locality_delta import structural_locality_delta
 
             return structural_locality_delta(before, after)
         if result_mode == "relationships":
@@ -790,7 +790,7 @@ class HashmarksMcpSurface:
             return semantic_relationship_delta(before, after)
         if result_mode == "bindings":
             self._map.index.sync()
-            return self._map.repository_evidence_binding_delta(before, after)
+            return self._map.bindings.delta(before, after)
         return self._map.diagnostic_observation_delta(
             before, after, changed_paths=changed_paths, **diagnostic_options
         )
@@ -884,7 +884,7 @@ class HashmarksMcpSurface:
 
         def project() -> dict[str, object]:
             try:
-                return self._map.structural_locality(
+                return self._map.structure.locality(
                     target,
                     max_depth=max_depth,
                     result_mode=result_mode,

@@ -169,7 +169,7 @@ hashmarks structural-locality-delta --result-mode relationships --before before.
 hashmarks structural-locality-delta --result-mode relationships --before before.json --after after.json --presentation text
 ```
 
-Python uses `CodeMap.structural_locality(target, result_mode="relationships",
+Python uses `CodeMap.structure.locality(target, result_mode="relationships",
 supplied_observations=[...])` and `semantic_relationship_delta(before, after)`.
 MCP uses the same structural mode and `evidence_comparison(...,
 result_mode="relationships")`. Existing structural and comparison tools own

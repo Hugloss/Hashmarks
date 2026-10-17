@@ -22,6 +22,7 @@ from .repository_declaration_contract import (
     normalize_request,
 )
 from .repository_declaration_delta import declaration_delta
+from .repository_evidence_binding_validation import validate_bindings_packet
 from .repository_observation import packet_digest
 
 if TYPE_CHECKING:
@@ -335,7 +336,7 @@ class RepositoryDeclarationsMixin:
         repository_evidence = packet.get("repository_evidence")
         if not isinstance(repository_evidence, Mapping):
             raise ValueError(f"{name} repository_evidence must be an object")
-        self._validate_binding_delta_input(
+        validate_bindings_packet(
             repository_evidence,
             name=f"{name} repository evidence",
         )
@@ -682,9 +683,7 @@ class RepositoryDeclarationsMixin:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         normalized_groups, bindings = normalize_request(groups)
-        evidence_packet = self.repository_evidence_bindings(
-            bindings, include_relationships=False
-        )
+        evidence_packet = self.bindings.observe(bindings, include_relationships=False)
         binding_rows = {
             str(row["binding_id"]): row
             for row in cast("list[dict[str, object]]", evidence_packet["bindings"])
@@ -740,7 +739,7 @@ class RepositoryDeclarationsMixin:
                 raise ValueError(
                     "previous_observation.repository_evidence must be an object"
                 )
-            repository_evidence_delta = self.repository_evidence_binding_delta(
+            repository_evidence_delta = self.bindings.delta(
                 previous_repository_evidence,
                 evidence_packet,
             )

@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.ownership_graph import (
-    OwnershipGraphMixin,
+    RepositoryOwnership,
     _OwnershipGraphState,
 )
 from hashmarks.codemap.ownership_relation_types import (
@@ -85,7 +85,7 @@ def test_edge_bound_cannot_become_structural_owner_absence(
             return {"src/start.py": probed_edges[:limit_per_path]}
 
         monkeypatch.setattr(codemap.reads, "edges_for_paths_many", edges_many)
-        graph = codemap.ownership_relation_graph(
+        graph = codemap.ownership.relations(
             "change target behavior",
             "src/start.py",
             max_depth=3,
@@ -132,7 +132,9 @@ def test_symbol_candidate_bound_is_observed_before_ownership_filtering(
             return symbols[:limit]
 
         monkeypatch.setattr(codemap.reads, "exact_symbol_candidates", exact_symbols)
-        symbol_map = codemap._ownership_symbol_map(state, expandable, edge_map)
+        symbol_map = codemap.ownership._ownership_symbol_map(
+            state, expandable, edge_map
+        )
 
     assert len(symbol_map["target"]) == 12
     assert state.search_bound_reasons == {"symbol-candidate-limit"}
@@ -143,7 +145,7 @@ def test_incomplete_ownership_graph_cannot_manufacture_unique_delegation() -> No
     state.edges.append(_delegation_edge())
     state.search_bound_reasons.add("edge-per-path-limit")
 
-    selected, reason = OwnershipGraphMixin._select_ownership_candidate(
+    selected, reason = RepositoryOwnership._select_ownership_candidate(
         state,
         _ranked_delegation(),
         3,
@@ -158,7 +160,7 @@ def test_complete_ownership_graph_can_still_select_unique_delegation() -> None:
     state = _state()
     state.edges.append(_delegation_edge())
 
-    selected, reason = OwnershipGraphMixin._select_ownership_candidate(
+    selected, reason = RepositoryOwnership._select_ownership_candidate(
         state,
         _ranked_delegation(),
         3,

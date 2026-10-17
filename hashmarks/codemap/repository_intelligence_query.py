@@ -10,7 +10,6 @@ from hashmarks.evidence_presentation import (
 from hashmarks.operation_contract import operation_response, operation_schema
 
 from .change_impact import ChangeImpactOptions
-from .evidence_verification import VerificationMixin
 from .freshness_map import FreshnessMapOptions
 from .repository_observation import packet_digest
 
@@ -80,7 +79,7 @@ class RepositoryIntelligenceQueryMixin:
             raise ValueError("task must not be empty")
 
         if surface == "verification-explanation":
-            result = self.explain_verification_selection(
+            result = self.tasks.explain_verification_selection(
                 task,
                 options.member_path,
                 limit=options.limit,

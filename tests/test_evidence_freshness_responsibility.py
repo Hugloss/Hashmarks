@@ -3,6 +3,8 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+from hashmarks.python_ast_cache import read_python_ast
+
 _FRESHNESS_METHODS = {
     "_evidence_key",
     "_manifest_digest",
@@ -22,12 +24,12 @@ _FRESHNESS_METHODS = {
     "_fresh_projects_for_path",
     "_fresh_project_dependents",
     "_fresh_project_dependents_with_provenance",
-    "_native_evidence_status",
+    "status",
 }
 
 
 def _class_methods(path: Path, class_name: str) -> set[str]:
-    tree = ast.parse(path.read_text(encoding="utf-8"))
+    tree = read_python_ast(path).tree
     owner = next(
         node
         for node in tree.body
@@ -42,7 +44,7 @@ def test_evidence_freshness_has_one_explicit_owner() -> None:
         root / "hashmarks/codemap/evidence_freshness.py", "EvidenceFreshnessMixin"
     )
     graph = _class_methods(
-        root / "hashmarks/codemap/evidence_graph.py", "EvidenceGraphMixin"
+        root / "hashmarks/codemap/evidence_graph.py", "RepositoryRelationships"
     )
 
     assert freshness >= _FRESHNESS_METHODS

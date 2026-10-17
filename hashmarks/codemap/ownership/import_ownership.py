@@ -9,13 +9,13 @@ from hashmarks.python_ast_cache import read_python_ast
 from .results import ImportOwnershipResult
 
 if TYPE_CHECKING:
-    from ..engine import CodeMap
+    from ..repository_source import RepositorySource
 
 
 class ImportOwnershipAnalyzer:
     def analyze(
         self,
-        codemap: CodeMap,
+        source: RepositorySource,
         paths: Sequence[str] | None,
         all_rows: Sequence[dict[str, object]],
     ) -> ImportOwnershipResult:
@@ -26,13 +26,13 @@ class ImportOwnershipAnalyzer:
         if paths is not None:
             candidates = []
             for rel in paths:
-                if rel in python_paths or (codemap.workspace / rel).suffix in {
+                if rel in python_paths or (source.workspace / rel).suffix in {
                     ".py",
                     ".pyi",
                 }:
                     candidates.append(rel)
         else:
-            rows = codemap.store.lexical_file_candidates(
+            rows = source.reads.lexical_file_candidates(
                 ["spec_from_file_location", "module_from_spec", "exec_module"],
                 limit=max(256, min(10_000, len(python_paths) or 256)),
             )
@@ -42,8 +42,8 @@ class ImportOwnershipAnalyzer:
 
         findings: list[dict[str, object]] = []
         for rel in sorted(set(candidates)):
-            codemap.source.ensure_current(rel)
-            source_path = codemap.workspace / rel
+            source.ensure_current(rel)
+            source_path = source.workspace / rel
             try:
                 snapshot = read_python_ast(source_path, errors="replace")
             except (OSError, UnicodeError, SyntaxError, ValueError):
@@ -61,7 +61,7 @@ class ImportOwnershipAnalyzer:
                 )
             )
 
-        generation, identity_generation, stale = codemap.reads.generation_status()
+        generation, identity_generation, stale = source.reads.generation_status()
         warnings = sum(1 for finding in findings if finding["severity"] == "warning")
         advisories = len(findings) - warnings
         return {

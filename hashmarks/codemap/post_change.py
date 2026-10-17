@@ -317,7 +317,7 @@ class PostChangeMixin(ChangeImpactMixin):
     ) -> tuple[TaskEvidencePacket, TaskEvidenceProvenance, str]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        current = self.task_evidence(
+        current = self.tasks.evidence(
             task,
             limit=limit,
             per_role=per_role,
@@ -510,7 +510,7 @@ class PostChangeMixin(ChangeImpactMixin):
         before = self.store.generation()
         sync_result = self.index.sync(normalized)
         with self.reads.session(expected_generation=sync_result.generation):
-            brief = self.task_decision_brief(
+            brief = self.tasks.decision_brief(
                 task,
                 limit=options.limit,
                 per_role=options.per_role,
@@ -583,7 +583,7 @@ class PostChangeMixin(ChangeImpactMixin):
         sync_result = self.index.sync(normalized)
         refresh_ms = (time.perf_counter() - started) * 1000.0
         with self.reads.session(expected_generation=sync_result.generation):
-            brief = self.task_decision_brief(
+            brief = self.tasks.decision_brief(
                 task,
                 limit=limit,
                 per_role=per_role,
@@ -632,7 +632,7 @@ class PostChangeMixin(ChangeImpactMixin):
         sync_result = self.index.sync(normalized)
         refresh_ms = (time.perf_counter() - started) * 1000.0
         with self.reads.session(expected_generation=sync_result.generation):
-            packet = self.task_decision_packet(
+            packet = self.tasks.decision_packet(
                 task,
                 limit=limit,
                 per_role=per_role,

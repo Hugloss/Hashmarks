@@ -17,10 +17,10 @@ from hashmarks.codemap.task_evidence_contract import (
     read_task_evidence,
 )
 from hashmarks.codemap.task_evidence_initial import decode_initial_packet
+from hashmarks.codemap.verification_relevance_model import VerificationRequest
 from hashmarks.mcp_surface import HashmarksMcpSurface
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
     from pathlib import Path
 
     from hashmarks.codemap.task_evidence_types import VerificationRelevance
@@ -63,9 +63,9 @@ def test_only_unresolved_verifiers_veto_an_independent_owner(
     _repository(tmp_path, unknown_verifier=unknown_verifier)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(_TASK)
-        packet = codemap.task_evidence(_TASK)
-        graph = codemap.verification_ownership_graph(_TASK)
+        action = codemap.tasks.action_map(_TASK)
+        packet = codemap.tasks.evidence(_TASK)
+        graph = codemap.tasks.verification_ownership_graph(_TASK)
 
     relevance = action["verification_relevance"]
     assert relevance.get("qualified_identity_ambiguous") is True
@@ -98,8 +98,8 @@ def test_identity_scope_is_qualified_before_path_and_candidate_projection(
     _repository(tmp_path, unknown_verifier=unknown_verifier)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        narrow = codemap.verification_relevance(_TASK, candidate_limit=1)
-        wide = codemap.verification_relevance(_TASK, candidate_limit=16)
+        narrow = codemap.tasks.verification_relevance(_TASK, candidate_limit=1)
+        wide = codemap.tasks.verification_relevance(_TASK, candidate_limit=16)
 
     for result in (narrow, wide):
         assert result.get("qualified_identity_ambiguous") is True
@@ -127,7 +127,7 @@ def test_unresolved_production_references_do_not_prove_verifier_absence(
     (tmp_path / "tests/test_catalog.py").unlink()
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_evidence(_TASK)
+        packet = codemap.tasks.evidence(_TASK)
     relevance = packet["verification"]["relevance"]
     assert relevance["selected"] is None
     assert relevance["candidates"] == []
@@ -144,24 +144,17 @@ def test_missing_scoped_qualification_keeps_the_aggregate_veto(
     _repository(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        original = codemap._verification_relevance
+        original = codemap.verification.for_owner
 
         def without_scope(
-            task: str,
-            *,
-            edit: Mapping[str, object] | None,
-            current_verify: Mapping[str, object] | None,
-            rows: Sequence[Mapping[str, object]],
-            limit: int,
+            request: VerificationRequest, *, limit: int
         ) -> VerificationRelevance:
-            result = original(
-                task, edit=edit, current_verify=current_verify, rows=rows, limit=limit
-            )
+            result = original(request, limit=limit)
             result.pop("verifier_identity_ambiguous")
             return result
 
-        monkeypatch.setattr(codemap, "_verification_relevance", without_scope)
-        action = codemap.task_action_map(_TASK)
+        monkeypatch.setattr(codemap.verification, "for_owner", without_scope)
+        action = codemap.tasks.action_map(_TASK)
     assert action["ambiguity"]["ambiguous"] is True
     assert action["ambiguity"]["reason"] == "unresolved-qualified-import-identity"
     assert read_task_action_map(json.loads(json.dumps(action))) == action
@@ -174,8 +167,8 @@ def test_identity_scope_survives_python_cli_mcp_and_initial_projection(
     state = tmp_path / ".hashmarks"
     with CodeMap(tmp_path, state_dir=state) as codemap:
         codemap.index.sync()
-        packet = codemap.task_evidence(_TASK)
-        initial = codemap.task_evidence(_TASK, result_mode="initial")
+        packet = codemap.tasks.evidence(_TASK)
+        initial = codemap.tasks.evidence(_TASK, result_mode="initial")
     surface = HashmarksMcpSurface(str(tmp_path), state_dir=str(state))
     try:
         mcp = surface.task_evidence(_TASK)
@@ -213,14 +206,14 @@ def test_unresolved_caller_cannot_clear_competing_owner_ambiguity(
     task = _competing_repository(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.task_action_map(task, limit=limit)
+        before = codemap.tasks.action_map(task, limit=limit)
         (tmp_path / "forward.py").write_text(
             "def forward(cache, value):\n    return cache.write_cache_block(value)\n",
             encoding="utf-8",
         )
         codemap.index.sync()
-        after = codemap.task_action_map(task, limit=limit)
-        packet = codemap.task_evidence(task, limit=limit)
+        after = codemap.tasks.action_map(task, limit=limit)
+        packet = codemap.tasks.evidence(task, limit=limit)
     for action in (before, after):
         assert action["ambiguity"]["ambiguous"] is True
         assert action["ambiguity"]["reason"] == "multiple-identifier-edit-owners"
@@ -242,8 +235,8 @@ def test_unproven_candidate_never_becomes_resolved_owner_source(
     task = _competing_repository(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(task, limit=limit)
-        packet = codemap.task_evidence(task, limit=limit)
+        action = codemap.tasks.action_map(task, limit=limit)
+        packet = codemap.tasks.evidence(task, limit=limit)
     authority = action["ownership_authority"]
     assert authority["owner_resolved"] is False
     assert authority["proof_complete"] is False
@@ -263,8 +256,8 @@ def test_unresolved_owner_survives_all_existing_packet_delivery_paths(
     state = tmp_path / ".hashmarks"
     with CodeMap(tmp_path, state_dir=state) as codemap:
         codemap.index.sync()
-        packet = codemap.task_evidence(task, limit=1)
-        initial = codemap.task_evidence(task, limit=1, result_mode="initial")
+        packet = codemap.tasks.evidence(task, limit=1)
+        initial = codemap.tasks.evidence(task, limit=1, result_mode="initial")
     surface = HashmarksMcpSurface(str(tmp_path), state_dir=str(state))
     try:
         mcp = surface.task_evidence(task, limit=1)

@@ -83,7 +83,7 @@ def _run_action(codemap: CodeMap, case: Mapping[str, object]) -> tuple[int, str]
     started = time.perf_counter_ns()
     with codemap.reads.session():
         if str(case.get("operation") or "task_action_map") == "task_action_map":
-            action = codemap.task_action_map(
+            action = codemap.tasks.action_map(
                 str(case.get("task") or ""),
                 limit=_profile_bound(case.get("limit"), 20),
                 per_role=_profile_bound(case.get("per_role"), 3),

@@ -106,7 +106,7 @@ def test_denied_nested_npm_manifest_is_not_parsed_or_projected(tmp_path: Path) -
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.index.sync()
-        enriched = codemap.enrich_projects(("npm-package-graph",))
+        enriched = codemap.native.enrich_projects(("npm-package-graph",))
 
     ids = {row["project_id"] for row in enriched["projects"]}
     assert ids == {"npm:root", "npm:@hm/public"}
@@ -128,10 +128,10 @@ def test_native_project_nodes_and_edges_are_filtered_by_repository_admission(
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.index.sync()
-        codemap.project_graph_providers = (
+        codemap.native.producers.projects = (
             _NativeProjectProvider(codemap.files.visible_manifests),
         )
-        enriched = codemap.enrich_projects(("fixture-native-projects",))
+        enriched = codemap.native.enrich_projects(("fixture-native-projects",))
         stored_ids = {
             str(row["project_id"])
             for row in codemap.store.project_nodes()
@@ -165,13 +165,13 @@ def test_denied_support_manifest_prevents_project_evidence_persistence(
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.index.sync()
-        codemap.project_graph_providers = (
+        codemap.native.producers.projects = (
             _NativeProjectProvider(
                 codemap.files.visible_manifests,
                 include_denied_freshness=True,
             ),
         )
-        enriched = codemap.enrich_projects(("fixture-native-projects",))
+        enriched = codemap.native.enrich_projects(("fixture-native-projects",))
         stored = [
             row
             for row in codemap.store.project_nodes()
@@ -208,7 +208,7 @@ def test_project_graph_allow_to_deny_converges_without_denied_residue(
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.index.sync()
-        before = codemap.enrich_projects(("npm-package-graph",))
+        before = codemap.native.enrich_projects(("npm-package-graph",))
         assert {row["project_id"] for row in before["projects"]} == {
             "npm:root",
             "npm:@hm/a",
@@ -222,9 +222,9 @@ def test_project_graph_allow_to_deny_converges_without_denied_residue(
 
         # Query-time policy reconciliation must stop exposing the old graph
         # before enrichment has a chance to rebuild the producer evidence.
-        assert codemap.projects()["projects"] == []
+        assert codemap.relationships.projects()["projects"] == []
 
-        after = codemap.enrich_projects(("npm-package-graph",))
+        after = codemap.native.enrich_projects(("npm-package-graph",))
 
     assert {row["project_id"] for row in after["projects"]} == {
         "npm:root",
@@ -250,7 +250,7 @@ def test_denied_declared_project_links_do_not_activate_or_parse(
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.index.sync()
-        enriched = codemap.enrich_projects(("declared-project-links",))
+        enriched = codemap.native.enrich_projects(("declared-project-links",))
 
     assert enriched["projects"] == []
     assert enriched["edges"] == []

@@ -10,24 +10,26 @@ from hashmarks.python_ast_cache import read_python_ast
 from .results import CacheInvalidationResult, CacheOwnershipResult, Finding
 
 if TYPE_CHECKING:
-    from ..engine import CodeMap
+    from ..import_resolution import RepositoryImports
+    from ..repository_source import RepositorySource
 
 
 class CacheInvalidationAnalyzer:
     def analyze(
         self,
-        codemap: CodeMap,
+        source: RepositorySource,
+        imports: RepositoryImports,
         paths: Sequence[str] | None,
         all_rows: Sequence[dict[str, object]],
         cache_result: CacheOwnershipResult,
     ) -> CacheInvalidationResult:
-        owners, owner_ids = self._cache_owner_modules(codemap, cache_result)
-        candidates = self._python_candidates(codemap, paths, all_rows)
-        findings = self._cache_invalidator_findings(codemap, candidates, owners)
+        owners, owner_ids = self._cache_owner_modules(imports, cache_result)
+        candidates = self._python_candidates(source, paths, all_rows)
+        findings = self._cache_invalidator_findings(source, imports, candidates, owners)
         nodes = self._cache_owner_nodes(owners, owner_ids)
         edges, invalidated = self._cache_invalidation_edges(findings, owner_ids, nodes)
         unresolved = sorted(cid for cid in owner_ids.values() if cid not in invalidated)
-        generation, identity_generation, stale = codemap.reads.generation_status()
+        generation, identity_generation, stale = source.reads.generation_status()
         return {
             "schema": operation_schema("cache_invalidation_ownership"),
             "generation": generation,
@@ -56,13 +58,13 @@ class CacheInvalidationAnalyzer:
         }
 
     def _cache_owner_modules(
-        self, codemap: CodeMap, cache_result: CacheOwnershipResult
+        self, imports: RepositoryImports, cache_result: CacheOwnershipResult
     ) -> tuple[list[Finding], dict[tuple[str, str], str]]:
         owners: list[Finding] = []
         owner_ids: dict[tuple[str, str], str] = {}
         for owner in cache_result["owners"]:
             path = str(owner["path"])
-            module = codemap._python_module_for_path(path)
+            module = imports.module_for_path(path)
             if not module:
                 continue
             enriched = dict(owner)
@@ -73,7 +75,7 @@ class CacheInvalidationAnalyzer:
 
     def _python_candidates(
         self,
-        codemap: CodeMap,
+        source: RepositorySource,
         paths: Sequence[str] | None,
         all_rows: Sequence[dict[str, object]],
     ) -> list[str]:
@@ -84,7 +86,7 @@ class CacheInvalidationAnalyzer:
             return sorted(python_paths)
         candidates: list[str] = []
         for rel in paths:
-            if rel in python_paths or (codemap.workspace / rel).suffix in {
+            if rel in python_paths or (source.workspace / rel).suffix in {
                 ".py",
                 ".pyi",
             }:
@@ -92,11 +94,15 @@ class CacheInvalidationAnalyzer:
         return sorted(set(candidates))
 
     def _cache_invalidator_findings(
-        self, codemap: CodeMap, candidates: list[str], owners: list[Finding]
+        self,
+        source: RepositorySource,
+        imports: RepositoryImports,
+        candidates: list[str],
+        owners: list[Finding],
     ) -> list[Finding]:
         findings: list[dict[str, object]] = []
         for rel in candidates:
-            module = codemap._python_module_for_path(rel)
+            module = imports.module_for_path(rel)
             if not module:
                 continue
             path_obj = PurePosixPath(rel)
@@ -106,7 +112,7 @@ class CacheInvalidationAnalyzer:
                 else (module.rsplit(".", 1)[0] if "." in module else None)
             )
             try:
-                snapshot = read_python_ast(codemap.workspace / rel, errors="replace")
+                snapshot = read_python_ast(source.workspace / rel, errors="replace")
             except (OSError, UnicodeError, SyntaxError, ValueError):
                 continue
             from ..cache_invalidation import analyze_python_cache_invalidators

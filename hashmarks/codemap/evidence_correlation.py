@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
@@ -11,20 +11,25 @@ from hashmarks.operation_contract import validate_operation_response
 from hashmarks.paths import normalize_relative_path
 
 from .decision_session import ReadScopeOwner, decision_scoped
+from .evidence_correlation_delta import EvidenceCorrelationDeltaMixin
 from .evidence_correlation_replay import (
     _CORRELATION_SCHEMA,
     _DEFINITION_DOMAIN,
-    _DELTA_SCHEMA,
     _MAX_TOTAL_ANCHORS,
     _SHA256,
     CORRELATION_PACKET_MAX_BYTES,
     CORRELATION_REQUEST_MAX_BYTES,
-    EvidenceCorrelationReplayMixin,
+    CorrelationPacketValidation,
+    _json_size,
+    validate_previous_correlation_size,
 )
+from .repository_evidence_binding_validation import validate_bindings_packet
 from .repository_observation import packet_digest
 
 if TYPE_CHECKING:
-    from .engine import CodeMap
+    from .decision_session import DecisionScope
+    from .repository_evidence_bindings import RepositoryBindings
+    from .repository_source import RepositorySource
 
 _MAX_BUNDLES = 64
 _MAX_ANCHORS_PER_BUNDLE = 256
@@ -102,19 +107,6 @@ class _BundleDeclaration:
     completeness: str
     scope: dict[str, object]
     truncation: str
-
-
-def _json_size(value: object, *, label: str) -> int:
-    try:
-        encoded = json.dumps(
-            value,
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=False,
-        ).encode("utf-8")
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{label} must contain JSON-compatible values") from exc
-    return len(encoded)
 
 
 def evidence_component_fits(value: object) -> bool:
@@ -365,7 +357,9 @@ def _binding_id(evidence: Sequence[Mapping[str, object]]) -> str:
     return "external-evidence:" + digest
 
 
-class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin, ReadScopeOwner):
+class RepositoryCorrelation(
+    EvidenceCorrelationDeltaMixin, CorrelationPacketValidation, ReadScopeOwner
+):
     """Correlate bounded external claims to canonical repository evidence.
 
     External claims remain claims. The implementation resolves them into the
@@ -373,6 +367,56 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin, ReadScopeOwner):
     correlation into causation, diagnosis, recommendation, workflow, or
     execution authority.
     """
+
+    def __init__(self, source: RepositorySource, bindings: RepositoryBindings) -> None:
+        self.source = source
+        self.bindings = bindings
+        self.store = source.store
+
+    @property
+    def reads(self) -> DecisionScope:
+        return self.source.reads
+
+    def _validate_correlation_packet(
+        self,
+        packet: Mapping[str, object],
+        *,
+        label: str,
+    ) -> None:
+        if packet.get("schema") != _CORRELATION_SCHEMA:
+            raise ValueError(f"{label} must be a {_CORRELATION_SCHEMA} packet")
+        repository_evidence = packet.get("repository_evidence")
+        if not isinstance(repository_evidence, Mapping):
+            raise ValueError("correlation packets must contain repository_evidence")
+        repository = repository_evidence.get("repository")
+        repository_identity = (
+            str(repository.get("repository_identity") or "")
+            if isinstance(repository, Mapping)
+            else ""
+        )
+        if repository_identity != self.reads.repository_identity():
+            raise ValueError(f"{label} correlation repository-mismatch")
+        validate_bindings_packet(repository_evidence, name=f"{label} repository")
+        supplied_identity = packet.get("correlation_identity")
+        if not isinstance(supplied_identity, str) or not _SHA256.fullmatch(
+            supplied_identity
+        ):
+            raise ValueError(
+                f"{label} correlation_identity must use sha256:<64 lowercase hex characters>"
+            )
+        identity_payload = dict(packet)
+        identity_payload.pop("correlation_identity", None)
+        identity_payload.pop("delta_from_previous", None)
+        expected_identity = "sha256:" + packet_digest(
+            _CORRELATION_SCHEMA,
+            identity_payload,
+        )
+        if supplied_identity != expected_identity:
+            raise ValueError(
+                f"{label} correlation_identity does not match packet content"
+            )
+
+        self._validate_correlation_projections(packet, label=label)
 
     @staticmethod
     def _correlation_path_mappings(
@@ -386,7 +430,7 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin, ReadScopeOwner):
             raise ValueError("path_mappings must be a sequence")
         if len(raw_mappings) > _MAX_PATH_MAPPINGS:
             raise ValueError(f"path_mappings exceeds {_MAX_PATH_MAPPINGS} entries")
-        mappings = EvidenceCorrelationMixin._validated_mappings(raw_mappings)
+        mappings = RepositoryCorrelation._validated_mappings(raw_mappings)
         mappings.sort(
             key=lambda row: (-len(row["external_prefix"]), row["external_prefix"])
         )
@@ -420,7 +464,7 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin, ReadScopeOwner):
                 "repository-relative",
             )
         for mapping in mappings:
-            mapped = EvidenceCorrelationMixin._apply_path_mapping(claimed_path, mapping)
+            mapped = RepositoryCorrelation._apply_path_mapping(claimed_path, mapping)
             if mapped is not None:
                 return mapped
         return None, "external-path-mapping-required"
@@ -491,8 +535,6 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin, ReadScopeOwner):
         *,
         mappings: Sequence[Mapping[str, str]],
     ) -> _Resolution:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         if claims.path is None:
             return self._resolve_pathless_anchor(claims)
         repository_path, path_origin = self._map_external_path(claims.path, mappings)
@@ -571,8 +613,6 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin, ReadScopeOwner):
         return module_resolution
 
     def _resolve_module_only(self, module: str) -> _Resolution:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         rows = self.store.visible_module_paths(module, limit=_MAX_MODULE_CANDIDATES + 1)
         raw_bound_exhausted = len(rows) > _MAX_MODULE_CANDIDATES
         admitted: list[str] = []
@@ -617,8 +657,6 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin, ReadScopeOwner):
         *,
         path_origin: str,
     ) -> _Resolution | None:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         row = self.reads.file_row(path)
         observed = "" if row is None else str(row.get("module_name") or "")
         if observed == module:
@@ -635,8 +673,6 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin, ReadScopeOwner):
         )
 
     def _resolve_symbol_only(self, symbol: str) -> _Resolution:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         rows = self.store.visible_symbol_candidates(
             symbol,
             limit=_MAX_SYMBOL_CANDIDATES + 1,
@@ -675,8 +711,6 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin, ReadScopeOwner):
         line: int | None,
         path_origin: str,
     ) -> _Resolution:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         rows = self.store.symbol_candidates_at_path(
             path,
             symbol,
@@ -772,8 +806,6 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin, ReadScopeOwner):
         *,
         path_origin: str,
     ) -> _Resolution:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         rows = self.store.symbols_containing_line(
             path,
             line,
@@ -846,16 +878,12 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin, ReadScopeOwner):
                 else {}
             ),
             **(
-                {
-                    "symbol": EvidenceCorrelationMixin._symbol_projection(
-                        resolution.symbol
-                    )
-                }
+                {"symbol": RepositoryCorrelation._symbol_projection(resolution.symbol)}
                 if resolution.symbol is not None
                 else {}
             ),
             "candidates": [
-                EvidenceCorrelationMixin._symbol_projection(row)
+                RepositoryCorrelation._symbol_projection(row)
                 for row in resolution.candidates
             ],
             "module_candidates": list(resolution.module_candidates),
@@ -879,10 +907,10 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin, ReadScopeOwner):
                 }
             ]
         if path is not None and resolution.symbol is not None:
-            return [EvidenceCorrelationMixin._symbol_reference(resolution.symbol)]
+            return [RepositoryCorrelation._symbol_reference(resolution.symbol)]
         if resolution.candidates:
             return [
-                EvidenceCorrelationMixin._symbol_reference(row)
+                RepositoryCorrelation._symbol_reference(row)
                 for row in resolution.candidates
             ]
         if resolution.module_candidates:
@@ -1140,70 +1168,11 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin, ReadScopeOwner):
             )
 
     @staticmethod
-    def _equivalence(
-        anchor: Mapping[str, object],
-        binding: Mapping[str, object],
-    ) -> dict[str, object]:
-        claims = anchor.get("claims")
-        evidence = binding.get("evidence")
-        if not isinstance(claims, Mapping):
-            return {"state": "unknown", "basis": []}
-        if not isinstance(evidence, Sequence) or isinstance(evidence, (str, bytes)):
-            return {"state": "unknown", "basis": []}
-        rows = [row for row in evidence if isinstance(row, Mapping)]
-        if len(rows) != 1:
-            return {"state": "unknown", "basis": []}
-        return EvidenceCorrelationMixin._equivalence_for_row(claims, rows[0])
-
-    @staticmethod
-    def _equivalence_for_row(
-        claims: Mapping[str, object],
-        observed: Mapping[str, object],
-    ) -> dict[str, object]:
-        basis: list[dict[str, object]] = []
-        unchecked = False
-        for claim_key, observed_key, kind in (
-            ("member_revision", "member_revision", "member-revision"),
-            ("span_identity", "span_identity", "span-identity"),
-        ):
-            if claims.get(claim_key) is None:
-                continue
-            if observed.get(observed_key) is None:
-                unchecked = True
-                continue
-            basis.append(
-                {
-                    "kind": kind,
-                    "matched": str(claims[claim_key]) == str(observed[observed_key]),
-                }
-            )
-        if any(not row["matched"] for row in basis):
-            state = "mismatch"
-        elif unchecked or not basis:
-            state = "unknown"
-        else:
-            state = "proven"
-        return {"state": state, "basis": basis}
-
-    @staticmethod
-    def _correlation_binding_rows(
-        repository_evidence: Mapping[str, object],
-    ) -> dict[str, Mapping[str, object]]:
-        rows = repository_evidence.get("bindings", [])
-        if not isinstance(rows, Sequence) or isinstance(rows, (str, bytes)):
-            return {}
-        return {
-            str(row["binding_id"]): row
-            for row in rows
-            if isinstance(row, Mapping) and row.get("binding_id") is not None
-        }
-
-    @staticmethod
     def _attach_repository_evidence(
         bundles: Sequence[dict[str, object]],
         repository_evidence: Mapping[str, object],
     ) -> None:
-        binding_rows = EvidenceCorrelationMixin._correlation_binding_rows(
+        binding_rows = RepositoryCorrelation._correlation_binding_rows(
             repository_evidence
         )
         for bundle in bundles:
@@ -1212,9 +1181,7 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin, ReadScopeOwner):
                 continue
             for anchor in anchors:
                 if isinstance(anchor, dict):
-                    EvidenceCorrelationMixin._attach_anchor_evidence(
-                        anchor, binding_rows
-                    )
+                    RepositoryCorrelation._attach_anchor_evidence(anchor, binding_rows)
 
     @staticmethod
     def _attach_anchor_evidence(
@@ -1225,7 +1192,7 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin, ReadScopeOwner):
         binding = binding_rows.get(binding_id)
         if binding is None:
             return
-        anchor["source_equivalence"] = EvidenceCorrelationMixin._equivalence(
+        anchor["source_equivalence"] = RepositoryCorrelation._equivalence(
             anchor, binding
         )
         anchor["repository_evidence"] = {
@@ -1234,153 +1201,8 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin, ReadScopeOwner):
             "binding_observation_identity": binding.get("binding_observation_identity"),
         }
 
-    @staticmethod
-    def _definition(
-        bundles: Sequence[Mapping[str, object]],
-        *,
-        mappings: Sequence[Mapping[str, str]],
-        include_relationships: bool,
-        relationship_limit_per_path: int,
-    ) -> dict[str, object]:
-        declarations = [
-            EvidenceCorrelationMixin._bundle_definition(bundle) for bundle in bundles
-        ]
-        declarations.sort(key=lambda row: str(row["bundle_id"]))
-        return {
-            "path_mappings": list(mappings),
-            "bundles": declarations,
-            "include_relationships": include_relationships,
-            "relationship_limit_per_path": (
-                relationship_limit_per_path if include_relationships else None
-            ),
-        }
-
-    @staticmethod
-    def _bundle_definition(
-        bundle: Mapping[str, object],
-    ) -> dict[str, object]:
-        anchors = cast(Iterable[object], bundle.get("anchors", []))
-        return {
-            "bundle_id": bundle.get("bundle_id"),
-            "producer": bundle.get("producer", {}),
-            "provenance": bundle.get("provenance", {}),
-            "completeness": bundle.get("completeness"),
-            "scope": bundle.get("scope", {}),
-            "truncation": bundle.get("truncation", "unknown"),
-            "anchors": [
-                {
-                    "anchor_id": anchor.get("anchor_id"),
-                    "claims": anchor.get("claims", {}),
-                }
-                for anchor in anchors
-                if isinstance(anchor, Mapping)
-            ],
-        }
-
-    @staticmethod
-    def _correspondence_target(
-        anchor: Mapping[str, object],
-    ) -> tuple[str, str, int, int] | None:
-        resolution = anchor.get("resolution")
-        if not isinstance(resolution, Mapping):
-            return None
-        if resolution.get("state") != "resolved-unique":
-            return None
-        path = resolution.get("repository_path")
-        if not isinstance(path, str):
-            return None
-        symbol = resolution.get("symbol")
-        if not isinstance(symbol, Mapping):
-            return path, "", 0, 0
-        return (
-            path,
-            str(symbol.get("name") or ""),
-            int(symbol.get("start_line") or 0),
-            int(symbol.get("end_line") or 0),
-        )
-
-    @staticmethod
-    def _cross_bundle_correspondence(
-        bundles: Sequence[Mapping[str, object]],
-    ) -> list[dict[str, object]]:
-        groups: dict[tuple[str, str, int, int], list[dict[str, str]]] = {}
-        for bundle in bundles:
-            bundle_id = str(bundle.get("bundle_id") or "")
-            anchors = bundle.get("anchors", [])
-            if not isinstance(anchors, Sequence) or isinstance(anchors, (str, bytes)):
-                continue
-            for anchor in anchors:
-                if not isinstance(anchor, Mapping):
-                    continue
-                key = EvidenceCorrelationMixin._correspondence_target(anchor)
-                if key is None:
-                    continue
-                groups.setdefault(key, []).append(
-                    {
-                        "bundle_id": bundle_id,
-                        "anchor_id": str(anchor.get("anchor_id") or ""),
-                    }
-                )
-        rows: list[dict[str, object]] = []
-        for (path, symbol, start_line, end_line), observations in sorted(
-            groups.items()
-        ):
-            bundle_ids = {row["bundle_id"] for row in observations}
-            if len(bundle_ids) < 2:
-                continue
-            rows.append(
-                {
-                    "state": "same-repository-target",
-                    "scope": "symbol" if symbol else "member",
-                    "repository_path": path,
-                    **(
-                        {
-                            "symbol": symbol,
-                            "start_line": start_line,
-                            "end_line": end_line,
-                        }
-                        if symbol
-                        else {}
-                    ),
-                    "observations": sorted(
-                        observations,
-                        key=lambda row: (row["bundle_id"], row["anchor_id"]),
-                    ),
-                    "causation": "not-inferred",
-                    "incident_identity": "not-inferred",
-                }
-            )
-        return rows
-
-    @staticmethod
-    def _overall_completeness(
-        bundles: Sequence[Mapping[str, object]],
-    ) -> dict[str, str]:
-        states = [str(bundle.get("completeness") or "unknown") for bundle in bundles]
-        truncations = [str(bundle.get("truncation") or "unknown") for bundle in bundles]
-        if "incomplete" in states or "truncated" in truncations:
-            state = "incomplete"
-        elif (
-            states
-            and all(item == "complete" for item in states)
-            and all(item == "complete" for item in truncations)
-        ):
-            state = "complete"
-        else:
-            state = "unknown"
-        return {
-            "state": state,
-            "scope": "caller-declared-external-observations",
-            "authority": "caller-claimed",
-            "negative_evidence": (
-                "admissible-within-declared-scopes"
-                if state == "complete"
-                else "not-admissible"
-            ),
-        }
-
     @decision_scoped
-    def correlate_evidence(
+    def observe(
         self,
         bundles: Sequence[Mapping[str, object]],
         *,
@@ -1390,8 +1212,6 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin, ReadScopeOwner):
         previous_correlation: Mapping[str, object] | None = None,
     ) -> dict[str, object]:
         """Correlate bounded evidence bundles with current repository truth."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         if type(include_relationships) is not bool:
             raise ValueError("include_relationships must be a boolean")
         if (
@@ -1401,11 +1221,11 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin, ReadScopeOwner):
             raise ValueError("relationship_limit_per_path must be between 1 and 1000")
         self._validate_request_size(bundles, path_mappings)
         if previous_correlation is not None:
-            self._validate_previous_correlation_size(previous_correlation)
+            validate_previous_correlation_size(previous_correlation)
         self._validate_bundles(bundles)
         mappings = self._correlation_path_mappings(path_mappings)
         prepared, bindings = self._prepare_bundles(bundles, mappings=mappings)
-        repository_evidence = self.repository_evidence_bindings(
+        repository_evidence = self.bindings.observe(
             bindings,
             relationship_limit_per_path=relationship_limit_per_path,
             include_relationships=include_relationships,
@@ -1433,9 +1253,7 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin, ReadScopeOwner):
             },
         )
         if previous_correlation is not None:
-            packet["delta_from_previous"] = self.evidence_correlation_delta(
-                previous_correlation, packet
-            )
+            packet["delta_from_previous"] = self.delta(previous_correlation, packet)
         self._validate_packet_size(packet)
         return validate_operation_response("correlate_evidence", packet)
 
@@ -1452,15 +1270,6 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin, ReadScopeOwner):
             raise ValueError(
                 "evidence correlation request exceeds "
                 f"{CORRELATION_REQUEST_MAX_BYTES} encoded bytes"
-            )
-
-    @staticmethod
-    def _validate_previous_correlation_size(packet: Mapping[str, object]) -> None:
-        size = _json_size(packet, label="previous correlation")
-        if size > CORRELATION_PACKET_MAX_BYTES:
-            raise ValueError(
-                "previous correlation exceeds "
-                f"{CORRELATION_PACKET_MAX_BYTES} encoded bytes"
             )
 
     @staticmethod
@@ -1494,8 +1303,6 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin, ReadScopeOwner):
         *,
         mappings: Sequence[Mapping[str, str]],
     ) -> dict[str, object]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         packet: dict[str, object] = {
             "schema": _CORRELATION_SCHEMA,
             "evidence_definition_identity": "sha256:"
@@ -1530,62 +1337,3 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin, ReadScopeOwner):
             packet,
         )
         return packet
-
-    def evidence_correlation_delta(
-        self,
-        before: Mapping[str, object],
-        after: Mapping[str, object],
-    ) -> dict[str, object]:
-        """Compare correlation packets without inferring causal meaning."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        self._validate_correlation_packet(before, label="before")
-        self._validate_correlation_packet(after, label="after")
-        before_repository = before["repository_evidence"]
-        after_repository = after["repository_evidence"]
-        assert isinstance(before_repository, Mapping)
-        assert isinstance(after_repository, Mapping)
-        repository_delta = self.repository_evidence_binding_delta(
-            before_repository,
-            after_repository,
-        )
-        payload = self._correlation_delta_packet(
-            before,
-            after,
-            repository_delta,
-        )
-        payload["delta_identity"] = "sha256:" + packet_digest(
-            _DELTA_SCHEMA,
-            payload,
-        )
-        return payload
-
-    @staticmethod
-    def _correlation_delta_packet(
-        before: Mapping[str, object],
-        after: Mapping[str, object],
-        repository_delta: dict[str, object],
-    ) -> dict[str, object]:
-        definition_state = (
-            "preserved"
-            if before.get("evidence_definition_identity")
-            == after.get("evidence_definition_identity")
-            else "changed"
-        )
-        comparable = definition_state == "preserved"
-        return {
-            "schema": _DELTA_SCHEMA,
-            "comparability": "comparable" if comparable else "not-comparable",
-            "definition": {
-                "state": definition_state,
-                "before": before.get("evidence_definition_identity"),
-                "after": after.get("evidence_definition_identity"),
-            },
-            "repository_evidence_delta": repository_delta if comparable else None,
-            "before_correlation_identity": before.get("correlation_identity"),
-            "after_correlation_identity": after.get("correlation_identity"),
-            "authority": "repository-intelligence-only",
-            "interpretation_authority": "consumer-owned",
-            "causation": "not-inferred",
-            "execution_effect": "none",
-        }

@@ -63,3 +63,31 @@ def packet_digest(domain: str, payload: object) -> str:
         allow_nan=False,
     ).encode("utf-8")
     return hashlib.sha256(domain.encode("utf-8") + b"\0" + encoded).hexdigest()
+
+
+def _observer_descriptor() -> dict[str, object]:
+    """Describe the observer capability separately from repository identity."""
+    return {
+        "producer": "hashmarks",
+        "surface": "repository-intelligence",
+        "schema": "hashmarks.repository-observer.v1",
+        "capabilities": [
+            "affected",
+            "dependencies",
+            "evidence-bindings",
+            "freshness",
+            "ownership",
+            "symbols",
+            "verification",
+        ],
+    }
+
+
+def repository_observer_packet() -> dict[str, object]:
+    """Return the canonical observer capability descriptor with stable identity."""
+    observer = _observer_descriptor()
+    return {
+        **observer,
+        "identity": "sha256:"
+        + packet_digest("hashmarks.repository-observer.v1", observer),
+    }

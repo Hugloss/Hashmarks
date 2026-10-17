@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import unquote, urlsplit
 
@@ -13,10 +14,12 @@ from hashmarks.paths import normalize_relative_path
 from .semantic_relationship_model import CANDIDATE_LIMIT, content_identity
 
 if TYPE_CHECKING:
-    from .engine import CodeMap
+    from .decision_session import DecisionScope
+    from .repository_index_store import WorkspaceMapStore
+    from .repository_source import RepositorySource
 
 
-def uri_member(uri: object, workspace: object) -> str | None:
+def uri_member(uri: object, workspace: Path) -> str | None:
     if not isinstance(uri, str):
         raise ValueError("LSP location URI must be a string")
     value = urlsplit(uri)
@@ -24,8 +27,6 @@ def uri_member(uri: object, workspace: object) -> str | None:
         return None
     if value.query or value.fragment or "\x00" in unquote(value.path):
         raise ValueError("LSP file URI is malformed")
-    from pathlib import Path
-
     try:
         relative = Path(unquote(value.path)).relative_to(workspace)
     except ValueError:
@@ -68,22 +69,26 @@ def character_offset(text: str, units: int, encoding: str) -> int | None:
 class RelationshipSourceResolver:
     """Reuse one canonical stable member read for each admitted path."""
 
-    def __init__(self, codemap: CodeMap) -> None:
-        self.codemap = codemap
+    def __init__(
+        self, source: RepositorySource, reads: DecisionScope, store: WorkspaceMapStore
+    ) -> None:
+        self.source = source
+        self.reads = reads
+        self.store = store
         self.members: dict[str, tuple[dict[str, Any], bytes | None]] = {}
 
     def admitted(self, path: str) -> bool:
-        row = self.codemap.reads.file_row(path)
+        row = self.reads.file_row(path)
         return (
             row is not None
             and row.get("evidence_visibility") != "deny"
-            and self.codemap.files.is_admitted(path)
-            and self.codemap.files.decide(path).evidence_visibility.value != "deny"
+            and self.source.files.is_admitted(path)
+            and self.source.files.decide(path).evidence_visibility.value != "deny"
         )
 
     def member(self, path: str) -> tuple[dict[str, Any], bytes | None]:
         if path not in self.members:
-            self.members[path] = self.codemap.source._bounded_source_observation(
+            self.members[path] = self.source._bounded_source_observation(
                 path, 1_048_576
             )
         return self.members[path]
@@ -115,7 +120,7 @@ class RelationshipSourceResolver:
             "provenance": snapshot.get("provenance"),
             "observed_at_import": snapshot.get("observed_at_import"),
             "source_observation_identity": content_identity(
-                {"member": member, "generation": self.codemap.store.generation()}
+                {"member": member, "generation": self.store.generation()}
             ),
             "member_state": member.get("state"),
             "reason": member.get("reason"),
@@ -173,9 +178,7 @@ class RelationshipSourceResolver:
         position = locator["start"]
         rows = [
             row
-            for row in cast(
-                "list[dict[str, Any]]", self.codemap.reads.symbols_for_path(path)
-            )
+            for row in cast("list[dict[str, Any]]", self.reads.symbols_for_path(path))
             if int(row["start_line"]) == position["line"] + 1
             and (name is None or row["name"] == name)
             and row.get("evidence_visibility") != "deny"

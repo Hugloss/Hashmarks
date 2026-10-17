@@ -97,7 +97,7 @@ def collect_suite(
         )
     protocol = {
         "schema": PROTOCOL_SCHEMA,
-        "retrieval": "CodeMap.find_task + CodeMap.context",
+        "retrieval": "CodeMap.search.find_task + CodeMap.context.build",
         "budget": int(budget),
         "limit": int(limit),
         "repositories": protocol_repositories,

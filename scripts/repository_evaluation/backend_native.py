@@ -373,7 +373,7 @@ def _stale_native_observation(
     try:
         packet = cast(
             "dict[str, Any]",
-            codemap.structural_locality(target, result_mode="relationships"),
+            codemap.structure.locality(target, result_mode="relationships"),
         )
     except (KeyError, PermissionError) as error:
         # The after specimen may deliberately replace an entire source file.
@@ -406,7 +406,7 @@ def _transition_observation(
     )
     try:
         if unchanged:
-            packet = codemap.structural_locality(
+            packet = codemap.structure.locality(
                 prior["path"] + "::" + prior["symbol"], result_mode="relationships"
             )
             valid = _matching_binding(packet, prior, previous_revision)
@@ -501,7 +501,7 @@ def _observe_native_targets(
     with CodeMap(workspace, state_dir=state) as codemap:
         for ordinal, label in enumerate(labels):
             destination = output if ordinal == 0 else output / "targets" / str(ordinal)
-            packet = codemap.structural_locality(
+            packet = codemap.structure.locality(
                 label["path"] + "::" + label["symbol"], result_mode="relationships"
             )
             definition = _native_definition(capture, label)
@@ -577,7 +577,7 @@ def qualify_native_workflow(
                 codemap.index.sync()
                 write_json(
                     output / stage / "import.json",
-                    codemap.import_scip(
+                    codemap.native.import_scip(
                         captures[stage] / "index.json", provenance=provenance[stage]
                     ),
                 )

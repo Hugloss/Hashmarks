@@ -51,7 +51,7 @@ def test_explicit_config_task_uses_verification_backed_active_locality(
     task = "Change the quartz_config accepted-response policy; behavior is configuration-controlled"
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(task)
+        action = codemap.tasks.action_map(task)
 
     assert action["edit"]["path"] == "src/widget/policy.toml"
 
@@ -78,7 +78,7 @@ def test_checks_spec_can_be_selected_as_verification(tmp_path: Path) -> None:
     task = "Repair quartz_checks behavior and locate its verification outside the default tests tree"
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(task)
+        action = codemap.tasks.action_map(task)
 
     assert action["edit"]["path"] == "src/widget/engine.py"
     assert action["verify"]["path"] == "checks/widget/contract_spec.py"

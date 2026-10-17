@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import json
-import math
-import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal, cast, overload
 
 from hashmarks.digest import hash_file
 from hashmarks.evidence_context import evidence_context_identity
+from hashmarks.freshness import freshness_state
 from hashmarks.operation_contract import (
     operation_response,
     operation_schema,
@@ -22,8 +21,7 @@ from .evidence_decision_packet import (
     TASK_DECISION_DEFAULT_OPTIONS,
     DecisionPacketMixin,
 )
-from .evidence_freshness import freshness_state
-from .model import EvidenceVisibility, SearchHit
+from .model import EvidenceVisibility
 from .python_ast import estimate_tokens
 from .repository_observation import packet_digest
 from .task_action_projection import TASK_ACTION_DEFAULT_OPTIONS
@@ -36,7 +34,7 @@ from .task_evidence_scoped_method import TaskEvidenceScopedMethodMixin
 from .task_evidence_types import SourceReadPending
 
 if TYPE_CHECKING:
-    from .engine import CodeMap
+    from .repository_tasks import RepositoryTasks
     from .task_evidence_types import (
         DiscriminationRead,
         ExplicitTaskTarget,
@@ -123,7 +121,7 @@ class TaskEvidencePacketMixin(
         return row
 
     @operation_response("task_decision_brief")
-    def task_decision_brief(
+    def decision_brief(
         self,
         task: str,
         *,
@@ -133,8 +131,8 @@ class TaskEvidencePacketMixin(
     ) -> dict[str, object]:
         """Reconcile task evidence before its generation-bound observation."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        self._prepare_task_observation(task, limit)
+            self = cast("RepositoryTasks", self)
+        self.prepare(task, limit)
         return self._observe_task_decision_brief(
             task, limit=limit, per_role=per_role, token_budget=token_budget
         )
@@ -154,7 +152,7 @@ class TaskEvidencePacketMixin(
         intentionally carries only the action anchors needed to inspect, edit, and
         verify plus safety/freshness signals.
         """
-        packet = self.task_decision_packet(
+        packet = self.decision_packet(
             task,
             limit=limit,
             per_role=per_role,
@@ -226,7 +224,7 @@ class TaskEvidencePacketMixin(
         exhaustive budget sweeps remain a QA/diagnostic surface.
         """
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         used = 0
         seen: set[str] = set()
         for role in ("edit", "verify", "contract"):
@@ -238,7 +236,12 @@ class TaskEvidencePacketMixin(
                 continue
             seen.add(path)
             used += int(
-                cast(int, self._work_context_anchor(row, role=role)["estimated_tokens"])
+                cast(
+                    int,
+                    self.context._work_context_anchor(row, role=role)[
+                        "estimated_tokens"
+                    ],
+                )
             )
         return used
 
@@ -279,7 +282,7 @@ class TaskEvidencePacketMixin(
     ) -> TaskVerificationPlan:
         """Project the selected verification evidence into its existing plan contract."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         if verify is None or not verify.get("path"):
             return {
                 "schema": "hashmarks.verification-plan.v1",
@@ -293,7 +296,7 @@ class TaskEvidencePacketMixin(
             if verify.get("name") is not None
             else None
         )
-        return self.verification_plan(
+        return self.verification.plan(
             str(verify["path"]),
             symbol=symbol,
             qualname=str(verify.get("qualname"))
@@ -331,9 +334,9 @@ class TaskEvidencePacketMixin(
         retrieval merely to strip authority/debug metadata from the model view.
         """
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         del limit
-        context = self.work_context(action, token_budget=token_budget)
+        context = self.context.work(action, token_budget=token_budget)
         edit, verify, contract = self._task_action_selected_rows(action)
         verification = self._task_action_verification_plan(verify)
         evidence_receipt = self._decision_evidence_receipt(task, action, verification)
@@ -407,7 +410,7 @@ class TaskEvidencePacketMixin(
     ) -> Mapping[str, object] | None:
         """Rebind a selected evidence row to its unique current indexed symbol."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         current = self.store.symbol_at(path, qualname) if qualname else None
         if current is not None or not name:
             return current
@@ -430,7 +433,7 @@ class TaskEvidencePacketMixin(
     ) -> tuple[TaskSourceEvidence | None, SourceReadPending | None]:
         """Return the smallest policy-safe structural fallback for selected evidence."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         content = signature
         representation = "signature"
         if not content:
@@ -458,7 +461,7 @@ class TaskEvidencePacketMixin(
     def _task_evidence_visibility(self, path: str) -> EvidenceVisibility | None:
         """Return current source-disclosure policy for one already-selected path."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         file_row = self.reads.file_row(path)
         if file_row is None:
             return None
@@ -504,7 +507,7 @@ class TaskEvidencePacketMixin(
         token_budget: int,
     ) -> tuple[TaskSourceEvidence | None, SourceReadPendingDraft]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         assert evidence.start is not None and evidence.end is not None
         try:
             body = self.source.slice(
@@ -591,7 +594,7 @@ class TaskEvidencePacketMixin(
         source body when the exact symbol range does not fit.
         """
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         if token_budget < 0:
             raise ValueError("token_budget must be >= 0")
         path = str(row.get("path") or "")
@@ -728,7 +731,7 @@ class TaskEvidencePacketMixin(
     ) -> TaskProvenanceDraft:
         """Return compact source-revision and freshness evidence for a start packet."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         edit = action.get("edit")
         edit = edit if isinstance(edit, dict) else None
         generation, identity_generation, stale = self.reads.generation_status()
@@ -948,7 +951,7 @@ class TaskEvidencePacketMixin(
         target from being emitted as safe-fresh after selection.
         """
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         verify = action.get("verify")
         if not isinstance(verify, Mapping) or not verify.get("path"):
             return False
@@ -1080,7 +1083,7 @@ class TaskEvidencePacketMixin(
         self, result: TaskEvidenceDraft, task: str
     ) -> None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         verification = result["verification"]
         assert isinstance(verification, dict)
         relevance = verification.get("relevance")
@@ -1089,8 +1092,10 @@ class TaskEvidencePacketMixin(
             # with a no-owner result. Term matches have no such authority.
             verification["relevance"] = {
                 **relevance,
-                "task_matches": self._verification_task_matches(
-                    self._verification_state(task, "", "", ())
+                "task_matches": self.verification._verification_task_matches(
+                    self.verification._verification_state(
+                        self._task_query(task), "", "", ()
+                    )
                 ),
             }
 
@@ -1099,7 +1104,7 @@ class TaskEvidencePacketMixin(
     ) -> TaskEvidencePacket:
         """Close the required response shape after bounds and provenance are attached."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         assert "provenance" in draft and "freshness" in draft
         bounds = draft["retrieval"]["bounds"]
         assert "canonical_completeness" in bounds
@@ -1139,7 +1144,7 @@ class TaskEvidencePacketMixin(
         return envelope
 
     @overload
-    def task_evidence(
+    def evidence(
         self,
         task: str,
         *,
@@ -1151,7 +1156,7 @@ class TaskEvidencePacketMixin(
     ) -> TaskEvidencePacket: ...
 
     @overload
-    def task_evidence(
+    def evidence(
         self,
         task: str,
         *,
@@ -1163,7 +1168,7 @@ class TaskEvidencePacketMixin(
     ) -> InitialTaskEvidenceEnvelope: ...
 
     @overload
-    def task_evidence(
+    def evidence(
         self,
         task: str,
         *,
@@ -1174,7 +1179,7 @@ class TaskEvidencePacketMixin(
         result_mode: str,
     ) -> TaskEvidencePacket | InitialTaskEvidenceEnvelope: ...
 
-    def task_evidence(
+    def evidence(
         self,
         task: str,
         *,
@@ -1186,16 +1191,16 @@ class TaskEvidencePacketMixin(
     ) -> TaskEvidencePacket | InitialTaskEvidenceEnvelope:
         """Return role-separated repository evidence for an external consumer."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         from .lsp_relationship_adapter import normalize_lsp_captures
 
         require_operation_mode("task_evidence", result_mode)
         captures = normalize_lsp_captures(supplied_observations)
         if token_budget < 1:
             raise ValueError("token_budget must be >= 1")
-        reconciled_task_paths = set(self._reconcile_cached_task_paths(task, limit))
+        reconciled_task_paths = set(self.prepare(task, limit, probe_on_miss=False))
         with self.reads.session():
-            action = self.task_action_map(
+            action = self.action_map(
                 task,
                 limit=limit,
                 per_role=per_role,
@@ -1212,7 +1217,7 @@ class TaskEvidencePacketMixin(
                 verification_plan,
             )
             self._task_evidence_attach_test_matches(result, task)
-            canonical = self._find_task_evidence_impl(task, limit=limit)
+            canonical = self._task_observation(task, limit).retrieval
             retrieval = result["retrieval"]
             assert isinstance(retrieval, dict)
             bounds = retrieval["bounds"]
@@ -1269,7 +1274,7 @@ class TaskEvidencePacketMixin(
         self, result: TaskEvidenceDraft, action: TaskActionMap
     ) -> None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         from .ownership.filesystem_lifecycle import FilesystemLifecycleAnalyzer
 
         if result["ownership"].get("status") != "resolved":
@@ -1279,12 +1284,17 @@ class TaskEvidencePacketMixin(
             return
         path = str(owner["path"])
         if path.endswith(".py"):
-            packet = FilesystemLifecycleAnalyzer(self).analyze([path])
+            packet = FilesystemLifecycleAnalyzer(
+                self.structure.source,
+                self.structure.imports,
+                self.structure.relationships,
+                self.structure._resolve_call_target,
+            ).analyze([path])
             result["related"]["resource_lifecycle"] = packet
 
     @operation_response("task_action_brief")
     @decision_scoped
-    def task_action_brief(
+    def action_brief(
         self,
         task: str,
         *,
@@ -1304,8 +1314,8 @@ class TaskEvidencePacketMixin(
         archaeology simply to discard that metadata again.
         """
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        action = self.task_action_map(
+            self = cast("RepositoryTasks", self)
+        action = self.action_map(
             task,
             limit=limit,
             per_role=per_role,
@@ -1328,7 +1338,7 @@ class TaskEvidencePacketMixin(
         )
 
     @operation_response("task_decision_brief_budget_sweep")
-    def task_decision_brief_budget_sweep(
+    def decision_brief_budget_sweep(
         self,
         task: str,
         *,
@@ -1349,7 +1359,7 @@ class TaskEvidencePacketMixin(
             raise ValueError("budgets must contain positive integers")
         rows: list[dict[str, object]] = []
         for budget in normalized:
-            brief = self.task_decision_brief(
+            brief = self.decision_brief(
                 task,
                 limit=limit,
                 per_role=per_role,

@@ -306,15 +306,15 @@ workspace = Path(".").resolve()
 with CodeMap(workspace) as codemap:
     codemap.index.sync()
 
-    print(codemap.orient())
+    print(codemap.context.orient())
 
-    for hit in codemap.find_task(
+    for hit in codemap.search.find_task(
         "where is repository freshness decided?",
         limit=5,
     ):
         print(hit.path, hit.score)
 
-    print(codemap.affected("hashmarks/codemap/engine.py"))
+    print(codemap.relationships.affected("hashmarks/codemap/engine.py"))
 ```
 
 ### Repository evidence bindings
@@ -324,7 +324,7 @@ from hashmarks import CodeMap
 
 with CodeMap(".") as codemap:
     codemap.index.sync()
-    before = codemap.repository_evidence_bindings(
+    before = codemap.bindings.observe(
         [
             {
                 "binding_id": "consumer:contract-a",

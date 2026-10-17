@@ -296,7 +296,7 @@ def test_mcp_find_qualifies_absence_and_uniqueness_against_freshness(
             generation = surface._map.store.generation()
             return generation, generation, False
 
-        monkeypatch.setattr(surface._map, "_generation_status", current_generation)
+        monkeypatch.setattr(surface._map.reads, "generation_status", current_generation)
 
         missing = surface.find("definitely_missing_symbol", limit=10)
         assert missing["query_intent"] == "identifier"
@@ -867,7 +867,7 @@ def test_mcp_task_evidence_preserves_canonical_authority_proof_identity(
     try:
         task = "change flare041 behavior"
         direct = surface._read(
-            lambda: surface._map.task_action_map(task, limit=20, per_role=3)
+            lambda: surface._map.tasks.action_map(task, limit=20, per_role=3)
         )
         evidence = surface.task_evidence(task, token_budget=256)
     finally:
@@ -1287,7 +1287,7 @@ def test_mcp_correlation_preserves_core_authority_and_completeness(
     ]
     with CodeMap(repo) as codemap:
         codemap.index.sync()
-        core = codemap.correlate_evidence(bundles, include_relationships=False)
+        core = codemap.correlation.observe(bundles, include_relationships=False)
     surface = HashmarksMcpSurface(str(repo), state_dir=str(tmp_path / "mcp-state"))
     try:
         projected = surface.correlate_evidence(bundles, include_relationships=False)

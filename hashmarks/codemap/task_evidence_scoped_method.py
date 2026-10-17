@@ -12,8 +12,8 @@ from .model import EvidenceVisibility
 from .task_evidence_contract import read_task_candidate
 
 if TYPE_CHECKING:
-    from .engine import CodeMap
     from .evidence_verification import _VerificationRelevanceState
+    from .repository_tasks import RepositoryTasks
     from .task_evidence_types import RetrievalLocator, TaskEvidenceDraft
 
 
@@ -22,7 +22,7 @@ class TaskEvidenceScopedMethodMixin:
         self, path: str, locator: Mapping[str, object]
     ) -> dict[str, object] | None:
         """Project qualified direct calls using the structural-locality resolver."""
-        codemap = cast("CodeMap", self)
+        codemap = cast("RepositoryTasks", self)
         symbol = str(locator.get("symbol") or "")
         selected = codemap.store.symbol_at(path, symbol)
         if selected is None or (
@@ -38,7 +38,7 @@ class TaskEvidenceScopedMethodMixin:
         targets: dict[str, dict[str, object]] = {}
         resolved_calls = 0
         for edge in calls[:64]:
-            target, _, _, complete = codemap._resolve_call_target(edge)
+            target, _, _, complete = codemap.structure._resolve_call_target(edge)
             if not complete or target is None or target.get("path") != path:
                 continue
             if target.get("kind") not in {"function", "method"}:
@@ -81,7 +81,7 @@ class TaskEvidenceScopedMethodMixin:
     def _task_evidence_attach_direct_call_declarations(
         self, packet: TaskEvidenceDraft
     ) -> None:
-        codemap = cast("CodeMap", self)
+        codemap = cast("RepositoryTasks", self)
         for row in packet["retrieval"]["results"][:3]:
             path = row["path"]
             if (
@@ -125,7 +125,7 @@ class TaskEvidenceScopedMethodMixin:
     ) -> dict[str, object] | None:
         """Observe indexed lexical containers without assigning behavior ownership."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         indexed: dict[str, list[dict]] = {}
         for row in self.reads.symbols_for_path(path):
             indexed.setdefault(str(row.get("qualname") or ""), []).append(row)
@@ -176,7 +176,7 @@ class TaskEvidenceScopedMethodMixin:
 
     def _task_evidence_declaration_visible(self, path: str) -> bool:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         return (
             self._task_evidence_visibility(path)
             in {EvidenceVisibility.SOURCE, EvidenceVisibility.OUTLINE}
@@ -188,7 +188,7 @@ class TaskEvidenceScopedMethodMixin:
         self, packet: TaskEvidenceDraft
     ) -> None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         retrieval = packet.get("retrieval")
         if not isinstance(retrieval, dict):
             return
@@ -211,7 +211,7 @@ class TaskEvidenceScopedMethodMixin:
     ) -> dict[str, object]:
         """Disclose indexed lexical members; inherited/runtime members are unknown."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         qualname = str(parent["qualname"])
         members = sorted(
             (
@@ -270,7 +270,7 @@ class TaskEvidenceScopedMethodMixin:
     ) -> Mapping[str, object] | None:
         """Resolve one indexed lexical class or direct method container."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         symbols = self.reads.symbols_for_path(path)
         selected = [
             symbol for symbol in symbols if symbol.get("qualname") == row.get("symbol")
@@ -312,7 +312,7 @@ class TaskEvidenceScopedMethodMixin:
         self, path: str, locator: Mapping[str, object]
     ) -> dict[str, object] | None:
         """Expose lexical name alternatives, without dispatch/inheritance claims."""
-        codemap = cast("CodeMap", self)
+        codemap = cast("RepositoryTasks", self)
         symbols = codemap.reads.symbols_for_path(path)
         selected = [
             row
@@ -365,7 +365,7 @@ class TaskEvidenceScopedMethodMixin:
     def _task_evidence_attach_same_named_declarations(
         self, path: str, row: RetrievalLocator
     ) -> None:
-        codemap = cast("CodeMap", self)
+        codemap = cast("RepositoryTasks", self)
         alternatives = codemap._task_evidence_same_named_declarations(path, row)
         if alternatives is not None and codemap.index.is_current(path):
             row["same_name_declarations"] = alternatives
@@ -374,7 +374,7 @@ class TaskEvidenceScopedMethodMixin:
         self, packet: TaskEvidenceDraft
     ) -> None:
         """Disclose bounded class scopes for the first three source locators."""
-        codemap = cast("CodeMap", self)
+        codemap = cast("RepositoryTasks", self)
         retrieval = packet.get("retrieval")
         if not isinstance(retrieval, dict):
             return
@@ -401,7 +401,7 @@ class TaskEvidenceScopedMethodMixin:
     def _task_evidence_verification_subject(
         self, row: Mapping[str, object]
     ) -> Mapping[str, object] | None:
-        codemap = cast("CodeMap", self)
+        codemap = cast("RepositoryTasks", self)
         path = str(row.get("path") or "")
         if not path or not codemap.index.is_current(path):
             return None
@@ -427,7 +427,7 @@ class TaskEvidenceScopedMethodMixin:
         from .repository_domains import RepositoryDomain, classify_repository_path
         from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 
-        codemap = cast("CodeMap", self)
+        codemap = cast("RepositoryTasks", self)
         path = str(row.get("path") or "")
         if RepositoryDomain.TEST in classify_repository_path(path):
             return []
@@ -435,7 +435,9 @@ class TaskEvidenceScopedMethodMixin:
         member = codemap.reads.file_row(path)
         if subject is None or member is None:
             return []
-        state = codemap._verification_state(task, path, "", ())
+        state = codemap.verification._verification_state(
+            codemap._task_query(task), path, "", ()
+        )
         subject_terms = sorted(
             state.task_terms.intersection(
                 _query_terms(
@@ -453,7 +455,7 @@ class TaskEvidenceScopedMethodMixin:
         term_counts = {
             str(match["path"]): cast("int", match["matches"])
             for match in lexical[:64]
-            if codemap._verification_ref_visible(match)
+            if codemap.verification._verification_ref_visible(match)
             and RepositoryDomain.TEST in classify_repository_path(str(match["path"]))
         }
         state.candidate_paths.update(term_counts)
@@ -461,14 +463,14 @@ class TaskEvidenceScopedMethodMixin:
             state, subject_terms
         )
         state.candidate_paths.update(filename_candidates)
-        codemap._verification_collect_direct_references(
+        codemap.verification._verification_collect_direct_references(
             state, [str(subject["qualname"])]
         )
         test_modules = codemap._task_evidence_test_module_references(state)
         state.source_ref_paths.update(test_modules)
-        codemap._verification_collect_indirect_references(state)
-        candidates = codemap._verification_candidates(state)
-        candidates.extend(codemap._verification_lexical_candidates(state))
+        codemap.verification._verification_collect_indirect_references(state)
+        candidates = codemap.verification._verification_candidates(state)
+        candidates.extend(codemap.verification._verification_lexical_candidates(state))
         for candidate in candidates:
             candidate["subject_term_matches"] = term_counts.get(
                 str(candidate["path"]), 0
@@ -515,6 +517,8 @@ class TaskEvidenceScopedMethodMixin:
                             **basis,
                             **filename_candidates.get(str(candidate["path"]), {}),
                             "reference_strength": candidate.get("reference_strength"),
+                            "direct_reference": candidate.get("direct_reference"),
+                            "indirect_reference": candidate.get("indirect_reference"),
                             "reference_symbols": candidate.get("reference_symbols", []),
                             "indirect_reference_symbols": candidate.get(
                                 "indirect_reference_symbols", []
@@ -548,7 +552,7 @@ class TaskEvidenceScopedMethodMixin:
         """Bound test-owned source observations for candidate disclosure only."""
         from .repository_domains import RepositoryDomain, classify_repository_path
 
-        codemap = cast("CodeMap", self)
+        codemap = cast("RepositoryTasks", self)
         paths = sorted(
             path
             for path in state.refs_by_path
@@ -575,8 +579,8 @@ class TaskEvidenceScopedMethodMixin:
         """Projection ordering only; lexical locality never grants selection proof."""
         from .query_primitives import _query_terms
 
-        codemap = cast("CodeMap", self)
-        score = codemap._verification_candidate_score(row)
+        codemap = cast("RepositoryTasks", self)
+        score = codemap.verification._verification_candidate_score(row)
         declaration_matches = self._task_evidence_test_declaration_matches(
             row, fallback=score[2]
         )
@@ -640,7 +644,7 @@ class TaskEvidenceScopedMethodMixin:
         """Rank a coherent declaration match without changing module-wide facts."""
         from .query_primitives import _query_terms
 
-        codemap = cast("CodeMap", self)
+        codemap = cast("RepositoryTasks", self)
         anchors = row.get("task_anchor_terms")
         if not isinstance(anchors, list):
             return fallback
@@ -680,7 +684,7 @@ class TaskEvidenceScopedMethodMixin:
         subject_terms: Sequence[str],
     ) -> dict[str, dict[str, object]]:
         """Observe indexed test filename similarity without import/use authority."""
-        codemap = cast("CodeMap", self)
+        codemap = cast("RepositoryTasks", self)
         if not subject_terms:
             return {}
         prefix = (
@@ -688,7 +692,7 @@ class TaskEvidenceScopedMethodMixin:
         )
         paths = [
             path
-            for path in codemap._verification_test_paths(state)
+            for path in codemap.verification._verification_test_paths(state)
             if Path(path).name.split(".", 1)[0].removeprefix("test_").casefold()
             == prefix
         ]
@@ -719,7 +723,7 @@ class TaskEvidenceScopedMethodMixin:
         from .repository_domains import RepositoryDomain, classify_repository_path
         from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 
-        codemap = cast("CodeMap", self)
+        codemap = cast("RepositoryTasks", self)
         retrieval = packet["retrieval"]
         verification = packet["verification"]
         if not isinstance(retrieval, dict) or not isinstance(verification, dict):
@@ -757,12 +761,10 @@ class TaskEvidenceScopedMethodMixin:
                 merged_bases = previous_bases + [
                     basis for basis in new_bases if basis not in previous_bases
                 ]
-                if (
-                    "test_revision" not in previous
-                    or codemap._task_evidence_candidate_verifier_score(candidate)
-                    > codemap._task_evidence_candidate_verifier_score(previous)
-                ):
-                    by_path[path] = candidate
+                # The existing row is qualified against the task's selected
+                # owner. Candidate-local references describe their own source
+                # basis and cannot replace that relationship or its rank.
+                by_path[path] = {**candidate, **previous}
                 by_path[path]["source_candidate_basis"] = merged_bases
         # Each namespace/reference score is relative to its observed source.
         # Preserve those source-local orders instead of comparing their scores
@@ -777,7 +779,7 @@ class TaskEvidenceScopedMethodMixin:
             (path, row) for path, row in by_path.items() if path not in ordered_by_path
         )
         ordered = list(ordered_by_path.values())
-        ordered = codemap._verification_disclosure_order(
+        ordered = codemap.verification._verification_disclosure_order(
             ordered,
             task_candidates=[
                 by_path[str(row["path"])] for row in relevance.get("candidates", [])
@@ -786,7 +788,7 @@ class TaskEvidenceScopedMethodMixin:
         limit = VERIFICATION_RELEVANCE_DEFAULTS.candidate_limit
         relevance["candidates"] = [
             read_task_candidate(row)
-            for row in codemap._verification_bounded_candidates(
+            for row in codemap.verification._verification_bounded_candidates(
                 ordered, relevance.get("selected"), limit
             )
         ]
@@ -806,8 +808,8 @@ class TaskEvidenceScopedMethodMixin:
     ) -> tuple[str, str, EvidenceVisibility] | None:
         """Bind one explicitly named class to current visible repository symbols."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        terms = self._task_action_exact_identifier_terms(task)
+            self = cast("RepositoryTasks", self)
+        terms = self.ownership._task_action_exact_identifier_terms(task)
         if re.search(r"\bmethod\b", task, flags=re.IGNORECASE) is None or not terms:
             return None
         indexed = self.reads.exact_symbol_candidates(terms, limit=65)
@@ -846,7 +848,7 @@ class TaskEvidenceScopedMethodMixin:
     ) -> dict[str, object] | None:
         """Expose a lexical member of one named class without owner authority."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         scope = self._task_evidence_named_class_scope(task)
         if scope is None:
             return None
@@ -904,7 +906,7 @@ class TaskEvidenceScopedMethodMixin:
     ) -> tuple[Mapping[str, object] | None, str]:
         """Rebind the admitted locator to an exact, visible current symbol."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         path = str(owner.get("path") or "")
         qualname = str(owner.get("qualname") or "")
         scope = "owner" if qualname else "owned-file-query"
@@ -932,11 +934,11 @@ class TaskEvidenceScopedMethodMixin:
         self, path: str, captures: Sequence[Mapping[str, object]]
     ) -> Mapping[str, object] | None:
         """Bind one explicit producer query; never infer a symbol owner from a file."""
-        self = cast("CodeMap", self)
+        self = cast("RepositoryTasks", self)
         from .lsp_relationship_adapter import lsp_query_locator
         from .semantic_relationship_source import RelationshipSourceResolver
 
-        resolver = RelationshipSourceResolver(self)
+        resolver = RelationshipSourceResolver(self.source, self.reads, self.store)
         subjects: set[str] = set()
         for capture in captures:
             query_path, locator = lsp_query_locator(capture, self.workspace)
@@ -963,7 +965,7 @@ class TaskEvidenceScopedMethodMixin:
     ) -> None:
         """Expose retained SCIP observations without changing task ownership."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         if supplied_observations:
             packet["supplied_observation_accounting"] = {
                 "received": len(supplied_observations),
@@ -990,10 +992,10 @@ class TaskEvidenceScopedMethodMixin:
             if current is None:
                 return
             observation = semantic_relationship_observation(
-                self, current, supplied_observations
+                self.structure, current, supplied_observations
             )
             compact = compact_relationships(observation)
-            discovery = self._scip_compact_discovery(current)
+            discovery = self.structure._scip_compact_discovery(current)
         if supplied_observations:
             retained = sum(
                 "method" in row["scope"] for row in observation["observations"]

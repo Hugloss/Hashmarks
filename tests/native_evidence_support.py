@@ -6,7 +6,7 @@ import json
 import shutil
 from collections import Counter
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from hashmarks.adapters import (
     maven_dependency_observation,
@@ -15,6 +15,9 @@ from hashmarks.adapters import (
 from hashmarks.digest import FILE_DOMAIN, hash_bytes
 from hashmarks.evidence_presentation import FORMATS, presentation_response
 from hashmarks.evidence_presentation_conformance import validate_evidence_presentation
+
+if TYPE_CHECKING:
+    from hashmarks.codemap import CodeMap
 
 CORPUS = Path(__file__).parent / "fixtures" / "dependency_dogfood"
 SCIP_CORPUS = Path(__file__).parent / "fixtures" / "native_scip"
@@ -169,8 +172,8 @@ def assert_lsp_transcript(source: Path, metadata: dict, captures: list[dict]) ->
     assert requests == responses == set(expected)
 
 
-def import_native_scip(cm: object, source: Path) -> None:
-    cm.import_scip(
+def import_native_scip(cm: CodeMap, source: Path) -> None:
+    cm.native.import_scip(
         source / "index.json",
         provenance=json.loads((source / "provenance.json").read_text()),
     )

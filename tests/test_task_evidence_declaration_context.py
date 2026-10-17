@@ -33,10 +33,10 @@ def test_class_and_parameter_words_disclose_an_opaque_method(tmp_path: Path) -> 
     _repository(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(_TASK)
+        action = codemap.tasks.action_map(_TASK)
         packets = [
-            codemap.task_evidence(_TASK),
-            decode_initial_packet(codemap.task_evidence(_TASK, result_mode="initial")),
+            codemap.tasks.evidence(_TASK),
+            decode_initial_packet(codemap.tasks.evidence(_TASK, result_mode="initial")),
         ]
     for packet in packets:
         retrieval = assert_object(packet["retrieval"])
@@ -93,7 +93,7 @@ def test_context_disclosure_cannot_promote_hidden_or_invalidated_declarations(
             source.write_text("def replacement(): return None\n")
         elif invalidity == "deleted":
             source.unlink()
-        packet = codemap.task_evidence(_TASK)
+        packet = codemap.tasks.evidence(_TASK)
     rows = assert_records(assert_object(packet["retrieval"])["results"])
     assert not any(
         row.get("path") == "z_backend.py"
@@ -112,8 +112,8 @@ def test_context_hints_keep_explicit_targets_and_outline_visibility(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         packets = [
-            codemap.task_evidence(_TASK),
-            codemap.task_evidence(
+            codemap.tasks.evidence(_TASK),
+            codemap.tasks.evidence(
                 _TASK + " Inspect a_noise_00.py::serialization_criteria."
             ),
         ]
@@ -137,7 +137,7 @@ def test_sql_prefix_prefilter_cannot_manufacture_identifier_matches(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_evidence("Transcribing adapter settings fails.")
+        packet = codemap.tasks.evidence("Transcribing adapter settings fails.")
     rows = assert_records(assert_object(packet["retrieval"])["results"])
     assert not any(
         row.get("supplement") == "bounded-declaration-context" for row in rows
@@ -160,7 +160,7 @@ def test_hidden_contexts_cannot_exhaust_the_lookup_bound(tmp_path: Path) -> None
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_evidence(_TASK)
+        packet = codemap.tasks.evidence(_TASK)
     rows = assert_records(assert_object(packet["retrieval"])["results"])
     assert any(
         row.get("path") == "z_visible.py"
@@ -174,7 +174,7 @@ def test_repeated_task_words_do_not_expand_the_bounded_query(tmp_path: Path) -> 
     _repository(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_evidence(_TASK + " Deferred query." * 40)
+        packet = codemap.tasks.evidence(_TASK + " Deferred query." * 40)
     rows = assert_records(assert_object(packet["retrieval"])["results"])
     assert any(row.get("symbol") == "DeferredLoader.process" for row in rows[:3])
 
@@ -187,8 +187,8 @@ def test_explicit_method_and_context_hint_share_one_retrieval_slot(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         packets = [
-            codemap.task_evidence(task),
-            decode_initial_packet(codemap.task_evidence(task, result_mode="initial")),
+            codemap.tasks.evidence(task),
+            decode_initial_packet(codemap.tasks.evidence(task, result_mode="initial")),
         ]
     for packet in packets:
         rows = assert_records(assert_object(packet["retrieval"])["results"])

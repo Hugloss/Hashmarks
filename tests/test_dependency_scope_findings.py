@@ -48,11 +48,11 @@ def test_explicit_findings_do_not_read_pruned_dependency_implementation(
             "hashmarks.codemap.ownership_analysis.read_python_ast",
             side_effect=AssertionError("pruned dependency source must not be read"),
         ):
-            direct = codemap.import_ownership_findings([rel])
+            direct = codemap.ownership.import_findings([rel])
         assert direct["summary"]["files_considered"] == 0
         assert direct["findings"] == []
 
-        projected = codemap.repository_findings([rel])
+        projected = codemap.ownership.findings([rel])
         assert projected["summary"]["findings"] == 0
         assert projected["findings"] == []
 
@@ -72,7 +72,7 @@ def test_explicit_findings_respect_context_policy_index_denial(tmp_path: Path) -
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.index.sync()
         assert rel not in codemap.store.paths()
-        result = codemap.import_ownership_findings([rel])
+        result = codemap.ownership.import_findings([rel])
         assert result["summary"]["files_considered"] == 0
         assert result["findings"] == []
 
@@ -86,7 +86,7 @@ def test_findings_scope_pruning_is_segment_aware(tmp_path: Path) -> None:
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.index.sync()
         assert rel in codemap.store.paths()
-        result = codemap.repository_findings([rel])
+        result = codemap.ownership.findings([rel])
         assert result["summary"]["findings"] == 1
         assert result["findings"][0]["path"] == rel
         assert result["findings"][0]["code"] == "python-dynamic-module-identity-bypass"

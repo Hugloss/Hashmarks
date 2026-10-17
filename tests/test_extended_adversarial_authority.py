@@ -50,7 +50,7 @@ def test_cross_task_previous_evidence_never_launders_authority(tmp_path: Path) -
     repo, tasks = _hard_repo(tmp_path)
     with CodeMap(repo) as codemap:
         codemap.index.sync()
-        starts = [codemap.task_evidence(row["query"]) for row in tasks]
+        starts = [codemap.tasks.evidence(row["query"]) for row in tasks]
         assert all(_candidate_path(start) for start in starts)
         for index, row in enumerate(tasks):
             foreign = starts[(index + 1) % len(starts)]
@@ -66,7 +66,7 @@ def test_context_identity_mutation_matrix_fails_closed(tmp_path: Path) -> None:
     with CodeMap(repo) as codemap:
         codemap.index.sync()
         for row in tasks:
-            start = codemap.task_evidence(row["query"])
+            start = codemap.tasks.evidence(row["query"])
             tampered = copy.deepcopy(start)
             tampered["provenance"]["context_identity"] = "sha256:" + "0" * 64
             with pytest.raises(ValueError, match="context-identity-mismatch"):
@@ -82,13 +82,13 @@ def test_selected_verification_mutation_is_never_safe_fresh_across_hard_corpus(
     with CodeMap(repo) as codemap:
         codemap.index.sync()
         for row in tasks:
-            start = codemap.task_evidence(row["query"])
+            start = codemap.tasks.evidence(row["query"])
             verify_path = repo / _verification_path(start)
             original = verify_path.read_text(encoding="utf-8")
             verify_path.write_text(
                 original + "\n# adversarial verification mutation\n", encoding="utf-8"
             )
-            stale = codemap.task_evidence(row["query"])
+            stale = codemap.tasks.evidence(row["query"])
             assert _freshness_state(stale) == "stale"
             assert stale["provenance"]["freshness"] == "stale"
             assert "freshness_reason" in stale["provenance"]

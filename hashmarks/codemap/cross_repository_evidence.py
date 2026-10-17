@@ -161,7 +161,7 @@ class CrossRepositoryEvidenceMixin(ReadScopeOwner):
         verify = action.get("verify")
         verify_row = verify if isinstance(verify, Mapping) else {}
         member = str(verify_row.get("path") or "")
-        explanation = self.explain_verification_selection(
+        explanation = self.tasks.explain_verification_selection(
             task, member or None, limit=limit, candidate_limit=16
         )
         return {
@@ -214,7 +214,7 @@ class CrossRepositoryEvidenceMixin(ReadScopeOwner):
         )
         action = cast(
             Mapping[str, object],
-            self.task_action_map(task, limit=limit, per_role=per_role),
+            self.tasks.action_map(task, limit=limit, per_role=per_role),
         )
         freshness = cast(
             Mapping[str, object],

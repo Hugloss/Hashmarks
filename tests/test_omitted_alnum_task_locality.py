@@ -61,8 +61,8 @@ def test_omitted_lowercase_alnum_identifier_recovers_task_local_action(
     query = _configuration_query(target["token"])
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        views = codemap.task_query_views(query)
-        action = codemap.task_action_map(query, limit=20, per_role=3)
+        views = codemap.search.task_query_views(query)
+        action = codemap.tasks.action_map(query, limit=20, per_role=3)
 
     assert all(
         target["token"] not in views[key].split()
@@ -81,7 +81,7 @@ def test_omitted_identifier_probe_survives_leading_version_protocol_tokens(
     query = _configuration_query(target["token"], prefix=distractors)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(query, limit=20, per_role=3)
+        action = codemap.tasks.action_map(query, limit=20, per_role=3)
 
     assert action["edit"]["path"] == target["edit"]
     assert action["verify"]["path"] == target["verify"]
@@ -116,8 +116,8 @@ def test_omitted_identifiers_preserve_existing_multi_owner_ambiguity(
     task = "Fix behavior for flare001 and flare002 across all active product paths and verify each contract."
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(task, limit=20, per_role=3)
-        packet = codemap.task_decision_packet(task)
+        action = codemap.tasks.action_map(task, limit=20, per_role=3)
+        packet = codemap.tasks.decision_packet(task)
 
     assert action["ambiguity"]["ambiguous"] is True
     assert action["ambiguity"]["reason"] == "multiple-task-local-structural-owners"

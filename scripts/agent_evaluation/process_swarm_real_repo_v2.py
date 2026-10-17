@@ -134,7 +134,7 @@ def _codemap_candidates(
 ) -> tuple[list[str], str | None, bool, list[dict[str, Any]], dict[str, Any]]:
     started = time.perf_counter()
     if strategy == "find-task":
-        hits = codemap.find_task(query, limit=limit)
+        hits = codemap.search.find_task(query, limit=limit)
         candidates = [hit.path for hit in hits]
         return (
             candidates,
@@ -147,7 +147,7 @@ def _codemap_candidates(
                 "candidates": candidates[:10],
             },
         )
-    entry_points = codemap.task_entry_points(query, limit=limit)
+    entry_points = codemap.tasks.entry_points(query, limit=limit)
     recommended = [
         row for row in entry_points.get("recommended", []) if isinstance(row, dict)
     ]
@@ -193,7 +193,9 @@ def _codemap_observation(
             if resolution.get("resolved"):
                 first = str(resolution.get("target") or first)
         started = time.perf_counter()
-        verification_hits = codemap.find_task(query + " test verification", limit=limit)
+        verification_hits = codemap.search.find_task(
+            query + " test verification", limit=limit
+        )
         verification_ms = (time.perf_counter() - started) * 1000
     observation = WorkerObservation(
         candidates=candidates,

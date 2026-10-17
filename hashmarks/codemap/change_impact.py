@@ -270,7 +270,7 @@ class ChangeImpactMixin(ReadScopeOwner):
         provider = next(
             (
                 candidate
-                for candidate in self.project_graph_providers
+                for candidate in self.native.producers.projects
                 if candidate.supports_shared_input_freshness_rebind
                 and candidate.topology_manifest is not None
             ),
@@ -280,23 +280,23 @@ class ChangeImpactMixin(ReadScopeOwner):
             return None, None
         producer = provider.name
         declared_file = provider.topology_manifest
-        fresh, freshness_reason = self._evidence_fresh("project", producer)
+        fresh, freshness_reason = self.native._evidence_fresh("project", producer)
         if (
             fresh
             or not freshness_reason
             or not freshness_reason.startswith("manifest changed: ")
         ):
             return None, None
-        changed_manifests = self._evidence_manifest_changes("project", producer)
+        changed_manifests = self.native._evidence_manifest_changes("project", producer)
         reported = set(normalized)
         shared_only = bool(changed_manifests) and all(
             rel != declared_file
             and rel in reported
-            and self._project_shared_input(rel, producer)
+            and self.native._project_shared_input(rel, producer)
             for rel in changed_manifests
         )
         rebind_generation = (
-            self._rebind_project_freshness(
+            self.native._rebind_project_freshness(
                 producer, expected_generation=expected_generation
             )
             if shared_only
@@ -317,7 +317,7 @@ class ChangeImpactMixin(ReadScopeOwner):
         if declared_file not in changed_manifests or declared_file not in reported:
             return None, None
         if provider.detect(self.workspace):
-            refreshed = self.enrich_projects(
+            refreshed = self.native.enrich_projects(
                 (producer,), expected_generation=expected_generation
             )
             return (
@@ -349,11 +349,11 @@ class ChangeImpactMixin(ReadScopeOwner):
         for changed in normalized:
             root_projects = {
                 str(row.get("project_id") or "")
-                for row in self._fresh_projects_for_path(changed)[:1]
+                for row in self.native._fresh_projects_for_path(changed)[:1]
                 if str(row.get("project_id") or "")
             }
             if root_projects:
-                fragment = self._fresh_project_dependents_with_provenance(
+                fragment = self.native._fresh_project_dependents_with_provenance(
                     root_projects,
                     max_depth=max_depth,
                     limit=effective_project_impact_limit,
@@ -427,7 +427,7 @@ class ChangeImpactMixin(ReadScopeOwner):
                 starts.insert(0, same_package)
         for start in starts:
             try:
-                reconstructed = self.ownership_relation_graph(task, start, max_depth=3)
+                reconstructed = self.ownership.relations(task, start, max_depth=3)
             except (KeyError, PermissionError, ValueError):
                 continue
             candidate_edges = reconstructed.get("owner_path")
@@ -535,7 +535,7 @@ class ChangeImpactMixin(ReadScopeOwner):
         )
         if not changed_hits_task or verify is None:
             return
-        plan = self.verification_plan(
+        plan = self.verification.plan(
             verify_path,
             symbol=str(verify.get("verification_test_symbol") or "")
             or str(verify.get("name") or "")
@@ -688,7 +688,7 @@ class ChangeImpactMixin(ReadScopeOwner):
         )
 
         with self.reads.session(expected_generation=decision_generation):
-            action = self.task_action_map(task, limit=limit, per_role=per_role)
+            action = self.tasks.action_map(task, limit=limit, per_role=per_role)
             state = self._change_impact_surface_state(
                 normalized,
                 max_depth=options.max_depth,

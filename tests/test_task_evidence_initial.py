@@ -308,10 +308,10 @@ def test_initial_profile_preserves_authority_and_source_identity(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        native = cast("dict[str, Any]", codemap.task_evidence("Fix widget"))
+        native = cast("dict[str, Any]", codemap.tasks.evidence("Fix widget"))
         before = deepcopy(native)
         initial = initial_task_evidence(native)
-        api = codemap.task_evidence("Fix widget", result_mode="initial")
+        api = codemap.tasks.evidence("Fix widget", result_mode="initial")
     assert native == before
     assert api["schema"] == "hashmarks.task-evidence-initial.v2"
     assert initial["source_evidence_identity"] == native["evidence_packet_identity"]
@@ -371,7 +371,7 @@ def _assert_mcp_initial_authority(
 
 def test_initial_mode_rejects_unknown_mode_before_observation(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap, pytest.raises(ValueError, match="result_mode"):
-        codemap.task_evidence("Fix widget", result_mode="invented")
+        codemap.tasks.evidence("Fix widget", result_mode="invented")
     surface = HashmarksMcpSurface(str(tmp_path))
     try:
         with pytest.raises(McpSurfaceError, match="result_mode") as caught:
@@ -389,7 +389,9 @@ def test_initial_class_table_keeps_future_fields_and_preserves_source_packet(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = cast("dict[str, Any]", codemap.task_evidence("Inspect ChannelBackend"))
+        packet = cast(
+            "dict[str, Any]", codemap.tasks.evidence("Inspect ChannelBackend")
+        )
     context = next(
         row["class_declarations"]
         for row in packet["retrieval"]["results"]
@@ -423,7 +425,7 @@ def test_initial_disclosure_keeps_admitted_owner_and_verification_alternatives(
         )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = cast("dict[str, Any]", codemap.task_evidence("Inspect owner.py."))
+        packet = cast("dict[str, Any]", codemap.tasks.evidence("Inspect owner.py."))
     assert packet["ownership"]["owner"]["path"] == "owner.py"
     rows = packet["retrieval"]["results"]
     owner_row = next(row for row in rows if row["path"] == "owner.py")

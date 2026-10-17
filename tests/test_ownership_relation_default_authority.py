@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hashmarks.codemap import CodeMap
+from hashmarks.codemap.ownership_graph import RepositoryOwnership
 from hashmarks.codemap.ownership_relation_defaults import (
     OWNERSHIP_RELATION_DEFAULT_OPTIONS,
     OwnershipRelationOptions,
@@ -21,8 +21,8 @@ def test_ownership_relation_defaults_have_one_owner(
 ) -> None:
     defaults = OWNERSHIP_RELATION_DEFAULT_OPTIONS
     for owner in (
-        CodeMap.ownership_relation_graph,
-        CodeMap._structural_owner_candidate,
+        RepositoryOwnership.relations,
+        RepositoryOwnership._structural_owner_candidate,
         CodeMapServiceClient.ownership_relation_graph,
     ):
         parameters = inspect.signature(owner).parameters
@@ -30,8 +30,8 @@ def test_ownership_relation_defaults_have_one_owner(
 
     captured: list[OwnershipRelationOptions] = []
 
-    class _Map:
-        def ownership_relation_graph(
+    class _Ownership:
+        def relations(
             self,
             task: str,
             start_path: str,
@@ -41,6 +41,10 @@ def test_ownership_relation_defaults_have_one_owner(
             del task, start_path
             captured.append(OwnershipRelationOptions(max_depth=max_depth))
             return {"schema": "hashmarks.ownership-relation-graph.v1"}
+
+    class _Map:
+        def __init__(self) -> None:
+            self.ownership = _Ownership()
 
     service = CodeMapService(tmp_path, socket_path=tmp_path / "service.sock")
     monkeypatch.setattr(service, "_map", lambda: _Map())

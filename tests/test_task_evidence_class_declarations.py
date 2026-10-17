@@ -42,8 +42,8 @@ def test_retrieved_class_exposes_exact_direct_members_in_every_format(
     )
     with CodeMap(tmp_path) as cm:
         cm.index.sync()
-        packet = cm.task_evidence("Inspect ChannelBackend subscription behavior")
-        initial = cm.task_evidence(
+        packet = cm.tasks.evidence("Inspect ChannelBackend subscription behavior")
+        initial = cm.tasks.evidence(
             "Inspect ChannelBackend subscription behavior", result_mode="initial"
         )
     context = _context(packet)
@@ -92,7 +92,7 @@ def test_lexical_member_bound_accounts_for_omissions_without_runtime_absence(
     )
     with CodeMap(tmp_path) as cm:
         cm.index.sync()
-        packet = cm.task_evidence("Inspect ChannelBackend")
+        packet = cm.tasks.evidence("Inspect ChannelBackend")
     context = _context(packet)
     assert (context["observed"], context["returned"], context["omitted"]) == (
         30,
@@ -111,10 +111,10 @@ def test_reopened_stale_class_cannot_disclose_old_members_as_current(
     state = tmp_path / "state"
     with CodeMap(tmp_path, state_dir=state) as cm:
         cm.index.sync()
-        cm.task_evidence("Inspect ChannelBackend")
+        cm.tasks.evidence("Inspect ChannelBackend")
     path.write_text("class ChannelBackend:\n    def current_member(self): pass\n")
     with CodeMap(tmp_path, state_dir=state) as cm:
-        packet = cast("dict", cm.task_evidence("Inspect ChannelBackend"))
+        packet = cast("dict", cm.tasks.evidence("Inspect ChannelBackend"))
     for row in packet["retrieval"]["results"]:
         if "class_declarations" in row:
             context = row["class_declarations"]
@@ -139,7 +139,7 @@ def test_class_disclosure_respects_source_visibility(
     )
     with CodeMap(tmp_path) as cm:
         cm.index.sync()
-        packet = cm.task_evidence("Inspect ChannelBackend")
+        packet = cm.tasks.evidence("Inspect ChannelBackend")
     assert "private_body_literal" not in json.dumps(packet)
     if visibility == "deny":
         assert "class_declarations" not in json.dumps(packet)
@@ -164,11 +164,11 @@ def test_retrieved_method_discloses_qualified_direct_class_scope(
     with CodeMap(tmp_path) as cm:
         cm.index.sync()
         full = cast(
-            "dict", cm.task_evidence("Inspect Worker.metadata_update in backend.py")
+            "dict", cm.tasks.evidence("Inspect Worker.metadata_update in backend.py")
         )
         initial = cast(
             "dict",
-            cm.task_evidence(
+            cm.tasks.evidence(
                 "Inspect Worker.metadata_update in backend.py", result_mode="initial"
             ),
         )

@@ -5,15 +5,15 @@ import json
 import time
 from typing import TYPE_CHECKING, Any, cast
 
-from hashmarks.freshness import FRESHNESS_STATES, freshness_state
 from hashmarks.paths import normalize_relative_path
 
 from .scip_relationship_adapter import qualify_scip_reference_rows
+from .semantic_relationship_source import RelationshipSourceResolver
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from .engine import CodeMap
+    from .native_evidence import RepositoryNativeEvidence
 
 
 def _inadmissible_manifest_count(value: dict[str, object]) -> int | None:
@@ -35,7 +35,7 @@ class EvidenceFreshnessMixin:
 
     def _manifest_admitted(self, relpath: str) -> bool:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryNativeEvidence", self)
         path = self.workspace / relpath
         decision = self.files.decide(relpath)
         return (
@@ -46,7 +46,7 @@ class EvidenceFreshnessMixin:
 
     def _manifest_digest(self, relpath: str) -> str | None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryNativeEvidence", self)
         try:
             rel = normalize_relative_path(relpath, allow_root=False)
         except ValueError:
@@ -70,7 +70,7 @@ class EvidenceFreshnessMixin:
         generation: int | None = None,
     ) -> None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryNativeEvidence", self)
         manifest_rows: dict[str, str | None] = {}
         inadmissible_manifest_count = 0
         for raw in manifests:
@@ -109,7 +109,7 @@ class EvidenceFreshnessMixin:
         their own manifest checks say otherwise.
         """
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryNativeEvidence", self)
         if generation != previous_generation + 1:
             raise RuntimeError("enrichment generation must advance exactly once")
         prefix = "native_evidence:"
@@ -135,7 +135,7 @@ class EvidenceFreshnessMixin:
 
     def _evidence_snapshot(self, kind: str, producer: str) -> dict[str, object] | None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryNativeEvidence", self)
         raw = self.store.meta(self._evidence_key(kind, producer))
         if not raw:
             return None
@@ -161,7 +161,7 @@ class EvidenceFreshnessMixin:
 
     def _project_shared_input(self, relpath: str, producer: str) -> bool:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryNativeEvidence", self)
         for row in self.store.project_nodes():
             if str(row.get("producer") or "") != producer:
                 continue
@@ -177,7 +177,7 @@ class EvidenceFreshnessMixin:
         self, producer: str, *, expected_generation: int | None = None
     ) -> int | None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryNativeEvidence", self)
         value = self._evidence_snapshot("project", producer)
         if value is None or bool(value.get("bind_generation", False)):
             return None
@@ -218,7 +218,7 @@ class EvidenceFreshnessMixin:
         self, value: dict[str, object]
     ) -> tuple[bool, str | None]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryNativeEvidence", self)
         try:
             recorded_generation = int(cast(int, value.get("generation")))
         except (TypeError, ValueError):
@@ -259,7 +259,7 @@ class EvidenceFreshnessMixin:
 
     def _evidence_fresh(self, kind: str, producer: str) -> tuple[bool, str | None]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryNativeEvidence", self)
         value = self._evidence_snapshot(kind, producer)
         if value is None:
             return False, "no freshness snapshot"
@@ -274,7 +274,7 @@ class EvidenceFreshnessMixin:
 
     def _fresh_native_file_edges(self) -> list[dict]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryNativeEvidence", self)
         cache: dict[str, bool] = {}
         out: list[dict] = []
         for row in self.store.native_file_edges():
@@ -287,7 +287,7 @@ class EvidenceFreshnessMixin:
 
     def _fresh_native_file_edges_from(self, path: str) -> list[dict]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryNativeEvidence", self)
         return [
             row
             for row in self.store.native_file_edges_from(path)
@@ -296,7 +296,7 @@ class EvidenceFreshnessMixin:
 
     def _fresh_native_definitions(self, query: str, *, limit: int = 100) -> list[dict]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryNativeEvidence", self)
         return [
             row
             for row in self.store.native_definitions(query, limit=limit)
@@ -307,7 +307,7 @@ class EvidenceFreshnessMixin:
         self, path: str, *, name: str, line: int, limit: int = 129
     ) -> tuple[list[dict], bool]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryNativeEvidence", self)
         # Test source bounds before filtering freshness; stale producers must
         # not silently conceal truncation of fresh producer records.
         rows = self.store.native_definitions_for_path(
@@ -324,12 +324,12 @@ class EvidenceFreshnessMixin:
 
     def _fresh_native_refs(self, query: str, *, limit: int = 200) -> list[dict]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryNativeEvidence", self)
         rows = self.store.native_refs(query, limit=limit)
         for path in sorted({str(row["path"]) for row in rows}):
             self.source.ensure_current(path)
         return qualify_scip_reference_rows(
-            self,
+            RelationshipSourceResolver(self.source, self.reads, self.store),
             [
                 row
                 for row in rows
@@ -341,10 +341,10 @@ class EvidenceFreshnessMixin:
         self, path: str, source: str | None = None, *, limit: int = 200
     ) -> list[dict]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryNativeEvidence", self)
         self.source.ensure_current(path)
         return qualify_scip_reference_rows(
-            self,
+            RelationshipSourceResolver(self.source, self.reads, self.store),
             [
                 row
                 for row in self.store.native_edges_from(path, source, limit=limit)
@@ -354,7 +354,7 @@ class EvidenceFreshnessMixin:
 
     def _fresh_project_nodes(self) -> list[dict]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryNativeEvidence", self)
         cache: dict[str, bool] = {}
         out: list[dict] = []
         for row in self.store.project_nodes():
@@ -367,7 +367,7 @@ class EvidenceFreshnessMixin:
 
     def _fresh_project_edges(self) -> list[dict]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryNativeEvidence", self)
         cache: dict[str, bool] = {}
         out: list[dict] = []
         for row in self.store.project_edges():
@@ -486,9 +486,9 @@ class EvidenceFreshnessMixin:
             edge_keys.add(key)
             edges.append(compact)
 
-    def _native_evidence_status(self) -> list[dict[str, object]]:
+    def status(self) -> list[dict[str, object]]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryNativeEvidence", self)
         prefix = "native_evidence:"
         rows: list[dict[str, object]] = []
         for key, _raw in self.store.meta_items(prefix=prefix):

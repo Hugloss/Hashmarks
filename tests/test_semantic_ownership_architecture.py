@@ -35,9 +35,7 @@ def test_relationship_cache_writes_stay_with_its_owner() -> None:
     violations = []
     for path in sorted(CODEMAP.glob("*.py")):
         for cls, method, line in _relationship_cache_writers(_tree(path)):
-            if path.name == "evidence_graph.py" and cls == "EvidenceGraphMixin":
-                continue
-            if (path.name, cls, method) == ("engine.py", "CodeMap", "__init__"):
+            if path.name == "evidence_graph.py" and cls == "RepositoryRelationships":
                 continue
             violations.append(f"{path.name}:{method}:{line}")
     assert violations == [], violations
@@ -186,15 +184,20 @@ def test_evidence_binding_projection_does_not_read_repository_bytes_directly() -
 
 def test_canonical_freshness_vocabulary_is_owned_once() -> None:
     owner = (ROOT / "hashmarks" / "freshness.py").read_text(encoding="utf-8")
-    codemap_freshness = (CODEMAP / "evidence_freshness.py").read_text(encoding="utf-8")
     state_doc = (
         ROOT / "docs" / "reference" / "STATE_AND_SEMANTIC_OWNERS.md"
     ).read_text(encoding="utf-8")
     assert 'FRESHNESS_STATES = frozenset({"current", "stale", "unknown"})' in owner
     assert "def freshness_state(" in owner
-    assert "from hashmarks.freshness import FRESHNESS_STATES, freshness_state" in (
-        codemap_freshness
-    )
+    for name in (
+        "repository_evidence_bindings.py",
+        "freshness_map.py",
+        "evidence_packet.py",
+        "change_intelligence.py",
+    ):
+        consumer = (CODEMAP / name).read_text(encoding="utf-8")
+        assert "from hashmarks.freshness import freshness_state" in consumer
+        assert "from .evidence_freshness import freshness_state" not in consumer
     assert "current" in state_doc and "stale" in state_doc and "unknown" in state_doc
 
     freshness_map = (CODEMAP / "freshness_map.py").read_text(encoding="utf-8")
@@ -246,8 +249,8 @@ def test_declarations_reuse_repository_evidence_authorities() -> None:
             violations.append(f"{path.name}:{node.lineno}:{node.func.attr}")
 
     assert violations == []
-    assert "self.repository_evidence_bindings(" in source
-    assert "self.repository_evidence_binding_delta(" in source
+    assert "self.bindings.observe(" in source
+    assert "self.bindings.delta(" in source
 
 
 def test_declaration_provider_context_has_no_raw_workspace_authority() -> None:
@@ -307,20 +310,16 @@ def test_repository_file_discovery_has_one_semantic_owner() -> None:
 
 def test_repository_derived_file_evidence_uses_canonical_admission_owner() -> None:
     indexing = (CODEMAP / "indexing_lifecycle.py").read_text(encoding="utf-8")
-    engine = (CODEMAP / "engine.py").read_text(encoding="utf-8")
+    native = (CODEMAP / "native_evidence.py").read_text(encoding="utf-8")
     freshness = (CODEMAP / "evidence_freshness.py").read_text(encoding="utf-8")
-    graph = (CODEMAP / "evidence_graph.py").read_text(encoding="utf-8")
 
     assert '.rglob("pyproject.toml")' not in indexing
     assert 'self.files.visible_manifests("pyproject.toml")' in indexing
-    assert (
-        "default_project_graph_providers(\n            self.files.visible_manifests"
-        in engine
-    )
+    assert "default_project_graph_providers(files.visible_manifests)" in native
     assert "def _manifest_admitted(" in freshness
     assert "self.files.is_admitted(relpath)" in freshness
     assert "self.files.decide(relpath)" in freshness
-    assert "self._admit_project_graph(" in graph
-    assert graph.index("self._admit_project_graph(") < graph.index(
+    assert "self._admit_project_graph(" in native
+    assert native.index("self._admit_project_graph(") < native.index(
         "self.store.replace_project_graph("
     )

@@ -362,7 +362,7 @@ and unrecognized bits. They do not create new reference/implementation graph
 edges or prove reference-set completeness. Both fields stay inside the existing
 native producer observation and source-equivalence/freshness authority.
 
-Reference reads (`CodeMap.refs`, `CodeMap.deps`, and the corresponding CLI
+Reference reads (`CodeMap.relationships.refs`, `CodeMap.relationships.deps`, and the corresponding CLI
 commands) expose additive `occurrence_metadata` on existing native rows.
 Different ranges or masks on the same symbol/line remain separate occurrences;
 they are not combined into one mask or extra graph edges. Each row retains a

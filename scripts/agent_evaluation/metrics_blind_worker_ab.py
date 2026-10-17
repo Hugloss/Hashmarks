@@ -105,14 +105,14 @@ def _hashmarks_worker(
             "name": hit.name,
             "qualname": hit.qualname,
         }
-        for hit in codemap.find_task(query, limit=limit)
+        for hit in codemap.search.find_task(query, limit=limit)
     ]
 
 
 def _entry_points_worker(
     codemap: CodeMap, query: str, *, limit: int
 ) -> list[dict[str, object]]:
-    value = codemap.task_entry_points(query, limit=limit)
+    value = codemap.tasks.entry_points(query, limit=limit)
     ambiguity = value.get("ambiguity", {})
     ambiguous = (
         bool(ambiguity.get("ambiguous")) if isinstance(ambiguity, dict) else False
@@ -171,7 +171,7 @@ def _ambiguity_reviewer(
     codemap: CodeMap, query: str, *, limit: int
 ) -> dict[str, object]:
     """Independent reviewer: inspect task/repository evidence, never worker-A output or hidden answers."""
-    value = codemap.task_entry_points(query, limit=limit)
+    value = codemap.tasks.entry_points(query, limit=limit)
     ambiguity = value.get("ambiguity", {})
     if not isinstance(ambiguity, dict):
         ambiguity = {}

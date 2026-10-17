@@ -49,10 +49,10 @@ def test_source_candidate_follows_fixture_module_to_the_importing_test(
     _repository(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(_TASK)
-        packet = codemap.task_evidence(_TASK)
+        action = codemap.tasks.action_map(_TASK)
+        packet = codemap.tasks.evidence(_TASK)
         initial = read_initial_projection(
-            decode_initial_packet(codemap.task_evidence(_TASK, result_mode="initial"))
+            decode_initial_packet(codemap.tasks.evidence(_TASK, result_mode="initial"))
         )
     revision = hash_file(tmp_path / "tests/models.py", domain=FILE_DOMAIN).hash
     for observed in (packet, initial):
@@ -103,10 +103,10 @@ def test_fixture_module_cannot_supply_an_unqualified_reference(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         if invalidity == "stale":
-            codemap.task_evidence(_TASK)
+            codemap.tasks.evidence(_TASK)
             helper.write_text("def persist_request(repository): return None\n")
-        action = codemap.task_action_map(_TASK)
-        packet = codemap.task_evidence(_TASK)
+        action = codemap.tasks.action_map(_TASK)
+        packet = codemap.tasks.evidence(_TASK)
     for candidate in packet["verification"]["relevance"]["candidates"]:
         for basis in assert_records(candidate.get("source_candidate_basis", [])):
             if basis["path"] == "service.py":
@@ -128,8 +128,8 @@ def test_established_edit_owner_keeps_reference_backed_test_candidates(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(_TASK)
-        packet = codemap.task_evidence(_TASK)
+        action = codemap.tasks.action_map(_TASK)
+        packet = codemap.tasks.evidence(_TASK)
     assert action["admitted_edit"] is not None
     assert packet["ownership"]["owner"] == action["admitted_edit"]
     assert packet["verification"]["selected"] == action["verify"]
@@ -168,8 +168,8 @@ def test_source_reference_fanout_preserves_the_observed_behavior_test(
     task = "Inspect the message source for a batch nack seek in Stream.nack. Source: service.py"
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(task)
-        packet = codemap.task_evidence(task)
+        action = codemap.tasks.action_map(task)
+        packet = codemap.tasks.evidence(task)
     assert any(
         row["path"] == expected
         for row in action["verification_relevance"]["candidates"]

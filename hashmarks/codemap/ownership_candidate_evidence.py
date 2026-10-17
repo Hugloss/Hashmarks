@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import posixpath
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -19,13 +19,34 @@ from .task_action_types import (
 )
 
 if TYPE_CHECKING:
-    from .engine import CodeMap
+    from .ownership_graph import RepositoryOwnership
     from .ownership_relation_types import StructuralOwnerResolution
 
 _WORD_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
 
-class TaskActionEvidenceMixin:
+def _task_row_domains(row: Mapping[str, object]) -> Iterable[object]:
+    value = row["domains"]
+    if not isinstance(value, Iterable):
+        raise TypeError("task row domains must be iterable")
+    return value
+
+
+def _task_row_rank(row: Mapping[str, object]) -> int:
+    value = row.get("canonical_rank") or 10_000
+    if not isinstance(value, (int, str, float, bytes, bytearray)):
+        raise TypeError("task row canonical rank must be numeric")
+    return int(value)
+
+
+def _task_row_score(row: Mapping[str, object]) -> float:
+    value = row.get("canonical_score") or 0.0
+    if not isinstance(value, (int, str, float, bytes, bytearray)):
+        raise TypeError("task row canonical score must be numeric")
+    return float(value)
+
+
+class OwnershipCandidateEvidenceMixin:
     @staticmethod
     def _validate_task_action_limits(limit: int, per_role: int) -> None:
         if limit < 1:
@@ -156,14 +177,14 @@ class TaskActionEvidenceMixin:
     ) -> list[str]:
         roles = ["disproven"] if disproven else []
         roles.extend(
-            TaskActionEvidenceMixin._task_action_test_roles(
+            OwnershipCandidateEvidenceMixin._task_action_test_roles(
                 surface, disproven=disproven, explicit_test_edit=cues.explicit_test_edit
             )
         )
         if surface.is_contract and not surface.is_test:
             roles.append("contract")
         roles.extend(
-            TaskActionEvidenceMixin._task_action_content_roles(
+            OwnershipCandidateEvidenceMixin._task_action_content_roles(
                 surface,
                 disproven=disproven,
                 config_requested=bool(cues.words.intersection(strong_config_cues)),
@@ -187,8 +208,8 @@ class TaskActionEvidenceMixin:
         cues: _TaskActionCues,
         strong_config_cues: set[str],
     ) -> dict[str, object]:
-        surface = TaskActionEvidenceMixin._task_action_surface(hit.path)
-        roles = TaskActionEvidenceMixin._task_action_roles(
+        surface = OwnershipCandidateEvidenceMixin._task_action_surface(hit.path)
+        roles = OwnershipCandidateEvidenceMixin._task_action_roles(
             surface,
             disproven=hit.path in failed,
             cues=cues,
@@ -212,7 +233,7 @@ class TaskActionEvidenceMixin:
         self, task: str, rows: list[dict[str, object]], limit: int
     ) -> _TaskActionProjectionState:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         terms = [
             value.lower()
             for value in _WORD_RE.findall(task)
@@ -259,7 +280,7 @@ class TaskActionEvidenceMixin:
         self, path: str, state: _TaskActionProjectionState
     ) -> str | None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         if path not in state.text_cache:
             try:
                 state.text_cache[path] = (
@@ -330,7 +351,7 @@ class TaskActionEvidenceMixin:
         scored: tuple[float, int, dict[str, object]],
     ) -> dict[str, object]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         best_score, best_matches, best = scored
         path = str(best["path"])
         existing = next(
@@ -401,7 +422,7 @@ class TaskActionEvidenceMixin:
         self, rows: Sequence[dict[str, object]], tokens: Sequence[str]
     ) -> dict[str, object] | None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
 
         def match(row: dict[str, object]) -> tuple[int, int]:
             text = (
@@ -422,11 +443,15 @@ class TaskActionEvidenceMixin:
             )
             return (
                 self._identifier_anchor_count(text, tokens),
-                -int(row.get("canonical_rank") or 10_000),
+                -_task_row_rank(row),
             )
 
         local_verify = max(
-            (row for row in rows if RepositoryDomain.TEST.value in row["domains"]),
+            (
+                row
+                for row in rows
+                if RepositoryDomain.TEST.value in _task_row_domains(row)
+            ),
             key=match,
             default=None,
         )
@@ -451,7 +476,7 @@ class TaskActionEvidenceMixin:
 
     def _literal_sql_references(self, verify_path: str) -> list[str]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         try:
             verify_source = (self.workspace / verify_path).read_text(
                 encoding="utf-8", errors="replace"
@@ -477,7 +502,7 @@ class TaskActionEvidenceMixin:
         self, verify: dict[str, object], rows: list[dict[str, object]], limit: int
     ) -> tuple[dict[str, object] | None, StructuralOwnerResolution | None]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         verify_path = str(verify["path"])
         referenced_sql = self._literal_sql_references(verify_path)
         if len(referenced_sql) != 1:
@@ -536,7 +561,7 @@ class TaskActionEvidenceMixin:
         self, task: str, verify: dict[str, object] | None
     ) -> tuple[str, int] | None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         verify_path = str(verify.get("path") or "") if isinstance(verify, dict) else ""
         if not verify_path:
             return None
@@ -551,7 +576,7 @@ class TaskActionEvidenceMixin:
         self, active_path: str, depth: int, rows: list[dict[str, object]], limit: int
     ) -> dict[str, object]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         existing = next(
             (row for row in rows if str(row.get("path") or "") == active_path), None
         )
@@ -602,7 +627,7 @@ class TaskActionEvidenceMixin:
         self, local_path: str, limit: int
     ) -> dict[str, object] | None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         file_row = self.reads.file_row(local_path)
         if (
             file_row is None
@@ -645,7 +670,7 @@ class TaskActionEvidenceMixin:
         limit: int,
     ) -> None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         source_parent = Path(str(source_anchor["path"])).parent.as_posix()
         existing_paths = {str(row.get("path") or "") for row in config_candidates}
         for local_path in sorted(self.store.paths_under(source_parent)):
@@ -675,8 +700,8 @@ class TaskActionEvidenceMixin:
         }
         return (
             len(anchor_parts & row_parts),
-            float(row.get("canonical_score") or 0.0),
-            -int(row.get("canonical_rank") or 10_000),
+            _task_row_score(row),
+            -_task_row_rank(row),
         )
 
     @staticmethod
@@ -691,7 +716,7 @@ class TaskActionEvidenceMixin:
         return [
             row
             for row in local_candidates
-            if concrete_domains.intersection(row["domains"])
+            if concrete_domains.intersection(_task_row_domains(row))
         ]
 
     @classmethod
@@ -742,7 +767,7 @@ class TaskActionEvidenceMixin:
         self, task: str, rows: Sequence[dict[str, object]]
     ) -> _TaskActionConfigState:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         task_terms = [
             value.lower()
             for value in _WORD_RE.findall(task)
@@ -782,16 +807,17 @@ class TaskActionEvidenceMixin:
         candidates = [
             row
             for row in rows
-            if not excluded.intersection(row["domains"])
+            if not excluded.intersection(_task_row_domains(row))
             and cls._task_action_config_specificity(row, state) > 0.0
         ]
+        if not candidates:
+            return None
         return max(
             candidates,
             key=lambda row: (
                 cls._task_action_config_specificity(row, state),
-                -int(row.get("canonical_rank") or 10_000),
+                -_task_row_rank(row),
             ),
-            default=None,
         )
 
     @staticmethod
@@ -807,8 +833,8 @@ class TaskActionEvidenceMixin:
         return [
             row
             for row in rows
-            if RepositoryDomain.TEST.value not in row["domains"]
-            and domains.intersection(row["domains"])
+            if RepositoryDomain.TEST.value not in _task_row_domains(row)
+            and domains.intersection(_task_row_domains(row))
             and str(row.get("path") or "") not in failed
         ]
 
@@ -820,15 +846,16 @@ class TaskActionEvidenceMixin:
         candidates = [
             row
             for row in rows
-            if RepositoryDomain.TEST.value not in row["domains"]
-            and source_domains.intersection(row["domains"])
+            if RepositoryDomain.TEST.value not in _task_row_domains(row)
+            and source_domains.intersection(_task_row_domains(row))
             and cls._task_action_config_specificity(row, state) > 0.0
         ]
+        if not candidates:
+            return None
         return max(
             candidates,
             key=lambda row: (
                 cls._task_action_config_specificity(row, state),
-                -int(row.get("canonical_rank") or 10_000),
+                -_task_row_rank(row),
             ),
-            default=None,
         )

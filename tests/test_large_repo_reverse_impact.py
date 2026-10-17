@@ -23,8 +23,8 @@ def test_python_reverse_fast_path_preserves_longest_module_resolution(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        package = codemap.affected("src/pkg/__init__.py", max_depth=2)
-        module = codemap.affected("src/pkg/sub.py", max_depth=2)
+        package = codemap.relationships.affected("src/pkg/__init__.py", max_depth=2)
+        module = codemap.relationships.affected("src/pkg/sub.py", max_depth=2)
     assert "src/consumer.py" not in package["affected_files"]
     assert "src/consumer.py" in module["affected_files"]
 
@@ -72,8 +72,8 @@ def test_python_reverse_fast_path_matches_full_graph_on_chain(tmp_path: Path) ->
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         roots = {"src/m7.py"}
-        fast = codemap._python_reverse_levels(roots, max_depth=8)
-        reverse = codemap._reverse_file_graph()
+        fast = codemap.relationships._python_reverse_levels(roots, max_depth=8)
+        reverse = codemap.relationships._reverse_file_graph()
         seen = set(roots)
         frontier = set(roots)
         expected = []

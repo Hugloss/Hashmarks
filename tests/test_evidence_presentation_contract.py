@@ -25,7 +25,7 @@ from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
 from hashmarks.codemap.static_python_backend_declarations import (
     StaticPythonBackendDeclarations,
 )
-from hashmarks.codemap.structural_locality import structural_locality_delta
+from hashmarks.codemap.structural_locality_delta import structural_locality_delta
 from hashmarks.evidence_presentation import (
     FORMATS,
     present_repository_evidence,
@@ -179,8 +179,8 @@ def native_packets(
     with CodeMap(root, state_dir=root / "state") as codemap:
         codemap.index.sync()
         snapshot = codemap.repository_intelligence_snapshot(task, paths)
-        previous = codemap.task_evidence(task)
-        binding = codemap.repository_evidence_bindings(
+        previous = codemap.tasks.evidence(task)
+        binding = codemap.bindings.observe(
             [
                 {
                     "binding_id": "one",
@@ -190,18 +190,18 @@ def native_packets(
         )
         observation = codemap.dependency_resolution_evidence(dependency)
         declarations = codemap.repository_declarations([group])
-        locality = codemap.structural_locality("src/owner.py::widget")
+        locality = codemap.structure.locality("src/owner.py::widget")
         packets: list[tuple[str, str, Mapping[str, object]]] = [
-            ("repository_context", "default", codemap.orient()),
-            ("find", "default", codemap.find_packet("widget")),
+            ("repository_context", "default", codemap.context.orient()),
+            ("find", "default", codemap.search.packet("widget")),
             ("task_evidence", "default", previous),
             (
                 "task_evidence",
                 "initial",
-                codemap.task_evidence(task, result_mode="initial"),
+                codemap.tasks.evidence(task, result_mode="initial"),
             ),
             ("change_impact", "default", codemap.task_change_impact(task, paths)),
-            ("correlate_evidence", "default", codemap.correlate_evidence([bundle])),
+            ("correlate_evidence", "default", codemap.correlation.observe([bundle])),
             (
                 "dependency_codemap",
                 "observation",
@@ -251,11 +251,11 @@ def native_packets(
             (
                 "repository_evidence",
                 "coverage",
-                codemap.repository_evidence_coverage(
+                codemap.bindings.coverage(
                     binding, changed_paths=paths, change_set_complete=False
                 ),
             ),
-            ("repository_findings", "default", codemap.repository_findings()),
+            ("repository_findings", "default", codemap.ownership.findings()),
             (
                 "structural_locality",
                 "default",
@@ -269,7 +269,7 @@ def native_packets(
             (
                 "evidence_comparison",
                 "bindings",
-                codemap.repository_evidence_binding_delta(binding, binding),
+                codemap.bindings.delta(binding, binding),
             ),
             (
                 "evidence_comparison",
@@ -281,7 +281,7 @@ def native_packets(
             (
                 "structural_locality",
                 "relationships",
-                codemap.structural_locality(
+                codemap.structure.locality(
                     "src/owner.py::widget", result_mode="relationships"
                 ),
             )
@@ -306,7 +306,7 @@ def native_packets(
                 "evidence_comparison",
                 "structural",
                 structural_locality_delta(
-                    locality, codemap.structural_locality("src/owner.py::widget")
+                    locality, codemap.structure.locality("src/owner.py::widget")
                 ),
             )
         )

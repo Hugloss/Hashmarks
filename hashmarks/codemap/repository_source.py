@@ -1105,6 +1105,35 @@ class RepositorySource(ScopedSourceLiteralsMixin, ReadScopeOwner):
                 raise DecisionRefreshRequired(rel)
             self.index.reconcile_path(rel)
 
+    def reconcile_contributors(self, paths: Sequence[str]) -> None:
+        """Reconcile caller-observed drift before opening another read scope."""
+        if not paths:
+            return
+        normalized = tuple(
+            normalize_relative_path(path, allow_root=False) for path in paths
+        )
+        if self.reads.depth > 0:
+            for path in normalized:
+                self.ensure_current(path)
+            return
+        if any(not (self.workspace / path).exists() for path in normalized):
+            self.index.sync()
+        else:
+            self.index.sync(normalized)
+
+    def restored_contributors(self, paths: Sequence[str]) -> tuple[str, ...]:
+        """Observe admitted regular files that have returned under a stale binding."""
+        return tuple(
+            sorted(
+                path
+                for path in paths
+                if self.files.is_admitted(path)
+                and (self.workspace / path).is_file()
+                and not (self.workspace / path).is_symlink()
+                and not self.index.is_current(path)
+            )
+        )
+
     @operation_response("outline")
     @decision_scoped
     def outline(self, relpath: str) -> dict[str, object]:

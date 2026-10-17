@@ -28,7 +28,7 @@ def _claims(packet: object) -> list[object]:
 
 
 def _observe(cm: CodeMap, target: str = "src/engine.ts::Engine") -> object:
-    return cm.structural_locality(target, result_mode="relationships")
+    return cm.structure.locality(target, result_mode="relationships")
 
 
 def test_native_scip_capture_bytes_and_input_revisions_are_revalidated(
@@ -99,7 +99,7 @@ def test_native_typescript_method_reference_flag_is_not_a_call_or_inverse(
         import_native_scip(cm, source)
         method = _observe(cm, "src/engine.ts::normalize")
         with pytest.raises(KeyError, match="symbol not found"):
-            cm.structural_locality("src/engine.ts::normalize")
+            cm.structure.locality("src/engine.ts::normalize")
     claims = _claims(method)
     assert {claim["kind"] for claim in claims} == {"reference", "implementation"}
     assert len(claims) == 2
@@ -175,7 +175,7 @@ def test_native_python_empty_claims_become_unavailable_before_reindex_and_reopen
     with CodeMap(root, state_dir=state) as cm:
         cm.index.sync()
         import_native_scip(cm, source)
-        previous: object = cm.task_evidence(TASK)
+        previous: object = cm.tasks.evidence(TASK)
         assert previous["semantic_relationships"]["observed_relationship_count"] == 0
         assert (
             previous["semantic_relationships"]["negative_evidence_admissible"] is False
@@ -189,16 +189,16 @@ def test_native_python_empty_claims_become_unavailable_before_reindex_and_reopen
         assert (
             delta["semantic_relationships"]["claim_set_comparison"] == "not-performed"
         )
-        assert "semantic_relationships" not in cm.task_evidence(TASK)
+        assert "semantic_relationships" not in cm.tasks.evidence(TASK)
         assert_projection(delta, "post_change")
         import_native_scip(cm, source)
-        current: object = cm.task_evidence(TASK)
+        current: object = cm.tasks.evidence(TASK)
     with CodeMap(root, state_dir=state) as reopened:
-        restored: object = reopened.task_evidence(TASK)
+        restored: object = reopened.tasks.evidence(TASK)
     with CodeMap(root, state_dir=tmp_path / "fresh") as fresh:
         fresh.index.sync()
         import_native_scip(fresh, source)
-        rebuilt: object = fresh.task_evidence(TASK)
+        rebuilt: object = fresh.tasks.evidence(TASK)
     for packet in (current, restored, rebuilt):
         assert packet["semantic_relationships"]["observed_relationship_count"] == 0
         assert packet["semantic_relationships"]["evidence"]["claims"] == []
@@ -230,12 +230,12 @@ def test_native_typescript_stale_index_is_not_current_or_replayed_after_deletion
         assert_projection(comparison, "evidence_comparison", "relationships")
         (root / "src" / "engine.ts").unlink()
         cm.index.sync(["src/engine.ts"])
-        current: object = cm.task_evidence(
+        current: object = cm.tasks.evidence(
             "Change Engine in src/engine.ts to document its behavior."
         )
         assert "semantic_relationships" not in current
     with CodeMap(root, state_dir=state) as reopened:
-        packet: object = reopened.task_evidence(
+        packet: object = reopened.tasks.evidence(
             "Change Engine in src/engine.ts to document its behavior."
         )
     assert "semantic_relationships" not in packet

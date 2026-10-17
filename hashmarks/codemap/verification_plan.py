@@ -9,7 +9,7 @@ from hashmarks.paths import normalize_relative_path
 from .repository_domains import RepositoryDomain, classify_repository_path
 
 if TYPE_CHECKING:
-    from .engine import CodeMap
+    from .evidence_verification import RepositoryVerification
     from .task_evidence_types import TaskVerificationPlan
 
 
@@ -18,7 +18,7 @@ class VerificationPlanMixin:
 
     def _pytest_declared(self) -> bool:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryVerification", self)
         pyproject = self.workspace / "pyproject.toml"
         if not pyproject.is_file():
             return False
@@ -71,7 +71,7 @@ class VerificationPlanMixin:
         self, rel: str, target: Path
     ) -> TaskVerificationPlan | None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryVerification", self)
         if (
             not target.name.endswith("_test.go")
             or not (self.workspace / "go.mod").is_file()
@@ -104,7 +104,7 @@ class VerificationPlanMixin:
         self, rel: str, target: Path
     ) -> TaskVerificationPlan | None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryVerification", self)
         runner = self._vitest_runner(self.workspace)
         if runner is not None:
             return {
@@ -144,7 +144,7 @@ class VerificationPlanMixin:
         self, rel: str, target: Path
     ) -> TaskVerificationPlan | None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryVerification", self)
         if target.suffix.lower() not in {".ts", ".tsx", ".mts", ".cts"}:
             return None
         if not (self.workspace / "tsconfig.json").is_file():
@@ -182,12 +182,12 @@ class VerificationPlanMixin:
             "reason": "unsupported-test-runner",
         }
 
-    def verification_plan(
+    def plan(
         self, path: str, *, symbol: str | None = None, qualname: str | None = None
     ) -> TaskVerificationPlan:
         """Derive a bounded argv for a known verification surface."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryVerification", self)
         rel = normalize_relative_path(path, allow_root=False)
         if not self.files.is_admitted(rel):
             return {

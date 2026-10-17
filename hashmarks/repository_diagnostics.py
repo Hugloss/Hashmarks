@@ -102,11 +102,11 @@ def shared_python_ast_propagation_audit(
 
 def _run_query(codemap: Any, query: str, task: str, limit: int) -> object:
     if query == "find_task":
-        return codemap.find_task(task, limit=limit)
+        return codemap.search.find_task(task, limit=limit)
     if query == "task_action_map":
-        return codemap.task_action_map(task, limit=limit)
+        return codemap.tasks.action_map(task, limit=limit)
     if query == "task_decision_packet":
-        return codemap.task_decision_packet(task, limit=limit)
+        return codemap.tasks.decision_packet(task, limit=limit)
     raise ValueError(f"unsupported repository-intelligence query: {query}")
 
 
@@ -243,11 +243,11 @@ def _related_query_session(
 ) -> tuple[object, dict[str, object], dict[str, object], dict[str, dict[str, int]]]:
     with codemap.reads.session():
         start = codemap.reads.stats()
-        found = codemap.find_task(task, limit=limit)
+        found = codemap.search.find_task(task, limit=limit)
         after_find = codemap.reads.stats()
-        action = codemap.task_action_map(task, limit=limit)
+        action = codemap.tasks.action_map(task, limit=limit)
         after_action = codemap.reads.stats()
-        packet = codemap.task_decision_packet(task, limit=limit)
+        packet = codemap.tasks.decision_packet(task, limit=limit)
         after_packet = codemap.reads.stats()
     deltas = {
         "find_task": _delta_stats(start, after_find),
@@ -363,7 +363,7 @@ def _profile_limit(
     limit: int,
 ) -> dict[str, object]:
     started_ns = time.perf_counter_ns()
-    rows = codemap.find_task(task, limit=limit)
+    rows = codemap.search.find_task(task, limit=limit)
     elapsed_ns = time.perf_counter_ns() - started_ns
     paths = [row.path for row in rows]
     return {
@@ -457,7 +457,7 @@ def ownership_graph_economics_receipt(
         ) as codemap:
             codemap.index.sync()
             started_ns = time.perf_counter_ns()
-            graph = codemap.ownership_relation_graph(
+            graph = codemap.ownership.relations(
                 task,
                 start_path,
                 max_depth=max_depth,

@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.model import SearchHit
+from hashmarks.codemap.task_retrieval import _TaskRetrievalResult
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -62,9 +63,16 @@ def _install_bounded_exact_index(
 
     monkeypatch.setattr(codemap.reads, "exact_symbol_candidates", exact_symbols)
     monkeypatch.setattr(
-        codemap,
+        codemap.search,
         "find_task",
         lambda _task, *, limit=20: (_canonical_test_hit(),)[:limit],
+    )
+    monkeypatch.setattr(
+        codemap.search,
+        "observe_task",
+        lambda task, *, limit=20: _TaskRetrievalResult(
+            codemap.search.find_task(task, limit=limit), ()
+        ),
     )
 
 
@@ -78,11 +86,14 @@ def test_exact_symbol_bound_cannot_manufacture_unique_owner(
         codemap.index.sync()
         _install_bounded_exact_index(codemap, monkeypatch, visible=True)
         task = "Refactor collision_owner without changing behavior"
-        context = codemap._task_action_map_context(task, 1)
-        evidence = codemap._task_action_exact_identifier_edit_candidates(
-            task, context.rows, context.failed
-        )
-        action = codemap.task_action_map(task, limit=1, per_role=1)
+        with codemap.reads.session() as _task_read_scope:
+            context = codemap.ownership.observe_candidates(
+                codemap.tasks._task_observation(task, 1), 1
+            )
+            evidence = codemap.ownership._task_action_exact_identifier_edit_candidates(
+                task, context.rows, context.failed
+            )
+            action = codemap.tasks.action_map(task, limit=1, per_role=1)
 
     assert [row["path"] for row in evidence.candidates] == ["src/a.py"]
     assert evidence.search_complete is False
@@ -117,11 +128,14 @@ def test_exact_symbol_bound_cannot_become_no_exact_owner_then_structural_fallbac
         codemap.index.sync()
         _install_bounded_exact_index(codemap, monkeypatch, visible=False)
         task = "Refactor collision_owner without changing behavior"
-        context = codemap._task_action_map_context(task, 1)
-        evidence = codemap._task_action_exact_identifier_edit_candidates(
-            task, context.rows, context.failed
-        )
-        action = codemap.task_action_map(task, limit=1, per_role=1)
+        with codemap.reads.session() as _task_read_scope:
+            context = codemap.ownership.observe_candidates(
+                codemap.tasks._task_observation(task, 1), 1
+            )
+            evidence = codemap.ownership._task_action_exact_identifier_edit_candidates(
+                task, context.rows, context.failed
+            )
+            action = codemap.tasks.action_map(task, limit=1, per_role=1)
 
     assert evidence.candidates == []
     assert evidence.search_complete is False
@@ -150,7 +164,7 @@ def test_complete_exact_symbol_search_can_still_resolve_unique_owner(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(
+        action = codemap.tasks.action_map(
             "Refactor collision_owner without changing behavior",
             limit=1,
             per_role=1,
@@ -179,7 +193,7 @@ def test_literal_path_remains_independent_authority_when_symbol_index_is_bounded
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         _install_bounded_exact_index(codemap, monkeypatch, visible=True)
-        action = codemap.task_action_map(
+        action = codemap.tasks.action_map(
             "Change src/a.py collision_owner behavior",
             limit=1,
             per_role=1,
@@ -209,16 +223,16 @@ def test_skipped_exact_identifier_search_cannot_claim_negative_or_unique_evidenc
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         calls = []
-        original = codemap._task_action_exact_identifier_edit_candidates
+        original = codemap.ownership._task_action_exact_identifier_edit_candidates
 
         def tracked(*_args: object, **_kwargs: object) -> object:
             calls.append(True)
             return original(*_args, **_kwargs)
 
         monkeypatch.setattr(
-            codemap, "_task_action_exact_identifier_edit_candidates", tracked
+            codemap.ownership, "_task_action_exact_identifier_edit_candidates", tracked
         )
-        action = codemap.task_action_map("Change configuration for alpha_owner")
+        action = codemap.tasks.action_map("Change configuration for alpha_owner")
 
     assert not calls
     assert action["exact_identifier_search"] == {

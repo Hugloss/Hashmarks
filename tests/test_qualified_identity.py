@@ -92,7 +92,7 @@ def test_cross_repository_shared_input_identity_binds_projects_and_content(
     _shared_repo(tmp_path)
     with _map(tmp_path) as codemap:
         codemap.index.sync()
-        codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
+        codemap.native.enrich_projects(("npm-package-graph", "declared-project-links"))
         first = qualified_shared_input_identity(codemap, relpath="contract.json")
         second = qualified_shared_input_identity(codemap, relpath="contract.json")
     assert first == second
@@ -110,7 +110,7 @@ def test_shared_input_change_is_stale_until_authoritative_refresh_then_rebinds(
     _shared_repo(tmp_path)
     with _map(tmp_path) as codemap:
         codemap.index.sync()
-        codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
+        codemap.native.enrich_projects(("npm-package-graph", "declared-project-links"))
         before = qualified_shared_input_identity(codemap, relpath="contract.json")
         _write(tmp_path, "contract.json", '{"v":2}\n')
         stale = qualified_shared_input_identity(codemap, relpath="contract.json")
@@ -130,9 +130,9 @@ def test_shared_input_change_during_identity_read_fails_closed(
     _shared_repo(tmp_path)
     with _map(tmp_path) as codemap:
         codemap.index.sync()
-        codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
+        codemap.native.enrich_projects(("npm-package-graph", "declared-project-links"))
         before = qualified_shared_input_identity(codemap, relpath="contract.json")
-        original_digest = codemap._manifest_digest
+        original_digest = codemap.native._manifest_digest
         changed = False
 
         def change_after_digest(relpath: str) -> str | None:
@@ -143,7 +143,7 @@ def test_shared_input_change_during_identity_read_fails_closed(
                 _write(tmp_path, "contract.json", '{"v":2}\n')
             return digest
 
-        monkeypatch.setattr(codemap, "_manifest_digest", change_after_digest)
+        monkeypatch.setattr(codemap.native, "_manifest_digest", change_after_digest)
         during = qualified_shared_input_identity(codemap, relpath="contract.json")
 
     assert changed

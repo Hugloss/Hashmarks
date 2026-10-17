@@ -81,7 +81,7 @@ def _freeze_scenario(
         for task in tasks:
             query = str(task["query"])
             start_started = time.perf_counter()
-            start = codemap.task_evidence(query)
+            start = codemap.tasks.evidence(query)
             start_ms = (time.perf_counter() - start_started) * 1000.0
             edit_path = _task_candidate_path(start)
             if edit_path:

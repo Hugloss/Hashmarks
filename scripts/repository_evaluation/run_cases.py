@@ -49,8 +49,8 @@ def _case_result(codemap: CodeMap, case: Mapping[str, object]) -> dict[str, Any]
     limit = int(case.get("limit") or 20)
     started = time.perf_counter_ns()
     with codemap.reads.session(diagnostics=True):
-        hits = codemap.find_task(task, limit=limit)
-        action = codemap.task_action_map(
+        hits = codemap.search.find_task(task, limit=limit)
+        action = codemap.tasks.action_map(
             task,
             limit=limit,
             per_role=int(case.get("per_role") or 3),

@@ -1033,7 +1033,7 @@ def correlate(
         raise ValueError("dogfood report has no bundle")
     with CodeMap(workspace) as codemap:
         sync = codemap.index.sync()
-        packet = codemap.correlate_evidence(
+        packet = codemap.correlation.observe(
             [bundle],
             path_mappings=path_mappings,
             include_relationships=False,

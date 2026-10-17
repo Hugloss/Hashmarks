@@ -14,7 +14,7 @@ def test_action_ambiguity_explains_plausibility_and_discriminator_without_secret
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map("widget implementation test", limit=20)
+        action = codemap.tasks.action_map("widget implementation test", limit=20)
     ambiguity = action["ambiguity"]
     assert ambiguity["schema"] == "hashmarks.action-ambiguity.v2"
     assert ambiguity["secret_knowledge_used"] is False
@@ -37,7 +37,7 @@ def test_decision_packet_carries_ambiguity_only_when_scout_needs_it(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_decision_packet("widget implementation test", limit=20)
+        packet = codemap.tasks.decision_packet("widget implementation test", limit=20)
     if (
         packet["discrimination"]["needed"]
         and packet["discrimination"]["reason"] == "competing-action-roles"

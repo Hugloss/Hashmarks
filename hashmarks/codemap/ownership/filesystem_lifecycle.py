@@ -1,10 +1,10 @@
-"""Revision-qualified composition of filesystem facts with canonical CodeMap."""
+"""Revision-qualified composition of filesystem facts with the structural observer."""
 
 from __future__ import annotations
 
 import ast
 import json
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
@@ -25,7 +25,11 @@ from ..filesystem_lifecycle_contract import (
 )
 
 if TYPE_CHECKING:
-    from ..engine import CodeMap
+    from ..evidence_graph import RepositoryRelationships
+    from ..import_resolution import RepositoryImports
+    from ..repository_source import RepositorySource
+    from ..structural_locality import RepositoryStructure
+    from ..structural_locality_model import CallTargetResolver
 
 
 @dataclass
@@ -68,9 +72,17 @@ def _unique(rows: list[dict[str, object]]) -> list[dict[str, object]]:
 
 class FilesystemLifecycleAnalyzer:
     def __init__(
-        self, codemap: CodeMap, bounds: LifecycleBounds = DEFAULT_BOUNDS
+        self,
+        source: RepositorySource,
+        imports: RepositoryImports,
+        relationships: RepositoryRelationships,
+        resolve_call_target: CallTargetResolver,
+        bounds: LifecycleBounds = DEFAULT_BOUNDS,
     ) -> None:
-        self.codemap = codemap
+        self.source = source
+        self.imports = imports
+        self.relationships = relationships
+        self.resolve_call_target = resolve_call_target
         self.bounds = bounds
         self.modules: dict[str, _Module | None] = {}
         self.failures: list[dict[str, object]] = []
@@ -88,12 +100,12 @@ class FilesystemLifecycleAnalyzer:
         if path in self.modules:
             return self.modules[path]
         self.modules[path] = None
-        member, raw = self.codemap.source.member(path, include_bytes=True)
+        member, raw = self.source.member(path, include_bytes=True)
         if member["state"] != "known-present" or raw is None:
             self._failure(path, str(member.get("reason") or member["state"]))
             return None
         try:
-            snapshot = read_python_ast(self.codemap.workspace / path)
+            snapshot = read_python_ast(self.source.workspace / path)
             source = raw.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
         except (OSError, UnicodeError, SyntaxError, ValueError) as exc:
             self._failure(path, f"source-unavailable:{type(exc).__name__}")
@@ -143,9 +155,9 @@ class FilesystemLifecycleAnalyzer:
         root = target.split(".")[0]
         if root not in {"os", "pathlib"}:
             return None
-        if self.codemap._imports._resolve_import_paths(
+        if self.imports._resolve_import_paths(
             path, root
-        ) or self.codemap._imports._python_import_identity_ambiguous(path, root):
+        ) or self.imports._python_import_identity_ambiguous(path, root):
             return None
         return target
 
@@ -164,7 +176,7 @@ class FilesystemLifecycleAnalyzer:
         mutated = self._mutated_api(module.snapshot.tree, root)
         if mutated:
             self._failure(path, "source-visible-api-rebinding")
-        kind, targets = self.codemap._imports._python_export_binding(path, root)
+        kind, targets = self.imports._python_export_binding(path, root)
         if kind not in {"module", "reexport"}:
             return None
         if len(targets) != 1 or mutated:
@@ -193,22 +205,20 @@ class FilesystemLifecycleAnalyzer:
     def _reexport_api(
         self, path: str, target: str, seen: set[tuple[str, str]]
     ) -> str | None:
-        owners = self.codemap._imports._resolve_import_paths(path, target)
+        owners = self.imports._resolve_import_paths(path, target)
         if (
-            self.codemap._imports._python_import_identity_ambiguous(path, target)
+            self.imports._python_import_identity_ambiguous(path, target)
             or len(owners) != 1
         ):
             return None
         owner = owners[0]
-        if self.codemap.files.decide(owner).evidence_visibility.value != "source":
+        if self.source.files.decide(owner).evidence_visibility.value != "source":
             return None
-        row = self.codemap.reads.file_row(owner)
+        row = self.source.reads.file_row(owner)
         module_name = str(row.get("module_name") or "") if row else ""
         absolute = target
         if target.startswith("."):
-            absolute = self.codemap._imports._python_relative_module_candidate(
-                path, target
-            )
+            absolute = self.imports._python_relative_module_candidate(path, target)
         suffix = absolute.removeprefix(module_name + ".")
         if suffix == absolute:
             return None
@@ -225,7 +235,7 @@ class FilesystemLifecycleAnalyzer:
         if key not in self.edges:
             self.edges[key] = [
                 dict(row)
-                for row in self.codemap.store.edges_from(*key)
+                for row in self.source.store.edges_from(*key)
                 if row["kind"] == "call"
             ]
         matching = [
@@ -235,12 +245,12 @@ class FilesystemLifecycleAnalyzer:
         ]
         if len(matching) != 1:
             return None
-        resolved, _, _, complete = self.codemap._resolve_call_target(matching[0])
+        resolved, _, _, complete = self.resolve_call_target(matching[0])
         if resolved is None or not complete:
             return None
         target_key = (str(resolved["path"]), str(resolved["qualname"]))
         if (
-            self.codemap.files.decide(target_key[0]).evidence_visibility.value
+            self.source.files.decide(target_key[0]).evidence_visibility.value
             != "source"
         ):
             return None
@@ -254,10 +264,10 @@ class FilesystemLifecycleAnalyzer:
     def _current(self, path: str, module: _Module) -> bool:
         # Metadata only detects drift of the already content-bound snapshot;
         # it never supplies source identity or freshness authority itself.
-        if isinstance(self.codemap.source._repository_member_source(path), dict):
+        if isinstance(self.source._repository_member_source(path), dict):
             return False
         try:
-            info = (self.codemap.workspace / path).stat()
+            info = (self.source.workspace / path).stat()
         except OSError:
             return False
         identity = (
@@ -278,11 +288,9 @@ class FilesystemLifecycleAnalyzer:
         if paths is None:
             paths = [
                 str(row["path"])
-                for row in self.codemap.store.all_file_rows()
+                for row in self.source.store.all_file_rows()
                 if row["language"] == "python"
-                and self.codemap.files.decide(
-                    str(row["path"])
-                ).evidence_visibility.value
+                and self.source.files.decide(str(row["path"])).evidence_visibility.value
                 != "deny"
             ]
         scope = sorted(
@@ -326,7 +334,7 @@ class FilesystemLifecycleAnalyzer:
         ]
         for path in drifted:
             self._failure(path, "source-changed-during-observation")
-        generation, _, stale = self.codemap.reads.generation_status()
+        generation, _, stale = self.source.reads.generation_status()
         unresolved = _unique([*analyzer.unresolved, *self.failures])
         truncated = len(candidates) < len(scope) or len(retained) < len(observations)
         truncated = truncated or any(
@@ -375,7 +383,9 @@ class FilesystemLifecycleAnalyzer:
             assert isinstance(use, dict)
             path = str(use["path"])
             if path not in verifiers:
-                verifiers[path] = self.codemap.tests(path, max_depth=3).get("tests", [])
+                verifiers[path] = self.relationships.tests(path, max_depth=3).get(
+                    "tests", []
+                )
             observation["verification"] = {
                 "paths": verifiers[path],
                 "authority": "structural-relevance-only",
@@ -396,7 +406,7 @@ class FilesystemLifecycleAnalyzer:
         return {
             "schema": SCHEMA,
             "repository_identity": "sha256:"
-            + self.codemap.index._workspace_fingerprint_from_store(),
+            + self.source.index._workspace_fingerprint_from_store(),
             "generation": generation,
             "stale": stale,
             "producer": {
@@ -423,8 +433,8 @@ class FilesystemLifecycleAnalyzer:
 
 
 def locality_lifecycle(
-    codemap: CodeMap,
-    nodes: list[dict[str, object]],
+    structure: RepositoryStructure,
+    nodes: Sequence[Mapping[str, object]],
     max_depth: int,
     call_limit: int,
     reference_limit: int,
@@ -437,9 +447,13 @@ def locality_lifecycle(
         calls_per_symbol=call_limit,
         references_per_symbol=reference_limit,
     )
-    return FilesystemLifecycleAnalyzer(codemap, bounds).analyze(
-        sorted({path for path, _ in symbols}), symbols
-    )
+    return FilesystemLifecycleAnalyzer(
+        structure.source,
+        structure.imports,
+        structure.relationships,
+        structure._resolve_call_target,
+        bounds,
+    ).analyze(sorted({path for path, _ in symbols}), symbols)
 
 
 def lifecycle_findings(packet: LifecyclePacket) -> list[dict[str, object]]:

@@ -8,8 +8,11 @@ from typing import TYPE_CHECKING, cast
 from hashmarks.operation_contract import operation_response, operation_schema
 from hashmarks.paths import normalize_relative_path
 
-from .decision_session import ReadScopeOwner, decision_scoped
+from .decision_session import ReadScopeOwner
 from .model import EvidenceVisibility, SearchHit
+from .ownership_analysis import OwnershipAnalysisMixin
+from .ownership_candidates import OwnershipCandidatesMixin
+from .ownership_nomination import OwnershipNominationMixin
 from .ownership_relation_defaults import OWNERSHIP_RELATION_DEFAULT_OPTIONS
 from .ownership_relation_types import (
     OwnershipCandidate,
@@ -19,14 +22,17 @@ from .ownership_relation_types import (
     OwnershipRelationGraph,
     StructuralOwnerCandidate,
 )
-from .python_ast import estimate_tokens
 from .query_primitives import _WORD_RE, _query_terms
-from .query_router import QueryRoute, route_query
+from .query_router import QueryRoute
 from .repository_domains import RepositoryDomain, classify_repository_path
 
 if TYPE_CHECKING:
-    from .decision_session import ReadScope
-    from .engine import CodeMap
+    from .decision_session import DecisionScope, ReadScope
+    from .find_engine import RepositorySearch
+    from .import_resolution import RepositoryImports
+    from .repository_source import RepositorySource
+    from .structural_locality import RepositoryStructure
+    from .task_action_types import TaskObservation
 
 
 @dataclass
@@ -57,7 +63,35 @@ class _OwnershipExpansion:
     frontier: list[tuple[str, int, tuple[str, ...]]]
 
 
-class OwnershipGraphMixin(ReadScopeOwner):
+class RepositoryOwnership(
+    OwnershipAnalysisMixin,
+    OwnershipCandidatesMixin,
+    OwnershipNominationMixin,
+    ReadScopeOwner,
+):
+    """Own repository ownership observations, import reuse and candidate proof facts."""
+
+    def __init__(
+        self,
+        source: RepositorySource,
+        imports: RepositoryImports,
+        structure: RepositoryStructure,
+        search: RepositorySearch,
+    ) -> None:
+        self.search = search
+        self.source = source
+        self.imports = imports
+        self.structure = structure
+        self.files = source.files
+        self.store = source.store
+        self.index = source.index
+        self.workspace = source.workspace
+        self._ownership_import_reuse = _OwnershipImportReuse()
+
+    @property
+    def reads(self) -> DecisionScope:
+        return self.source.reads
+
     @staticmethod
     def _entry_role_domains() -> dict[str, tuple[RepositoryDomain, ...]]:
         return {
@@ -76,8 +110,6 @@ class OwnershipGraphMixin(ReadScopeOwner):
     def _entry_role_symbol_specificity(
         self, role: str, path: str, task_terms: set[str]
     ) -> int:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         if role != "implementation" or not task_terms:
             return 0
         evidence_terms: set[str] = set()
@@ -393,8 +425,6 @@ class OwnershipGraphMixin(ReadScopeOwner):
         ]
 
     def _entry_row_text(self, row: dict[str, object]) -> tuple[str, str]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         path = str(row.get("path") or "")
         symbol_text = " ".join(
             " ".join(
@@ -485,8 +515,6 @@ class OwnershipGraphMixin(ReadScopeOwner):
         distinctive = self._entry_distinctive_tokens(task)
         if not distinctive:
             return None, {}
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         self.reads.preload_symbols(
             [str(row["path"]) for role in explicit_roles for row in role_rows[role]]
         )
@@ -569,24 +597,27 @@ class OwnershipGraphMixin(ReadScopeOwner):
             "secret_knowledge_used": False,
         }
 
-    @decision_scoped
-    def task_entry_points(
-        self, task: str, *, limit: int = 20, per_role: int = 2
+    def entry_points_for_candidates(
+        self,
+        observation: TaskObservation,
+        *,
+        limit: int = 20,
+        per_role: int = 2,
     ) -> dict[str, object]:
         """Project canonical task hits into bounded worker-facing roles."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         if limit < 1:
             raise ValueError("limit must be >= 1")
         if per_role < 1:
             raise ValueError("per_role must be >= 1")
         if per_role > 8:
             raise ValueError("per_role must be <= 8")
-        retrieval = self._find_task_evidence_impl(task, limit=limit)
+        if self.reads.scope is not observation.scope:
+            raise RuntimeError("entry candidates belong to a different read scope")
+        query, retrieval = observation.query, observation.retrieval
+        task, route = query.text, query.route
         hits = retrieval.hits
         retrieval_completeness = "complete" if retrieval.complete else "incomplete"
-        route = route_query(task)
-        task_terms = set(_query_terms(task))
+        task_terms = set(query.terms)
         role_domains = self._entry_role_domains()
         all_role_rows = self._entry_role_rows(hits, role_domains, task_terms)
         role_rows = {role: rows[:per_role] for role, rows in all_role_rows.items()}
@@ -620,8 +651,6 @@ class OwnershipGraphMixin(ReadScopeOwner):
         }
 
     def _ownership_evidence_visible(self, path: str) -> bool:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         file_row = self.reads.file_row(path)
         if file_row is None:
             return False
@@ -634,8 +663,6 @@ class OwnershipGraphMixin(ReadScopeOwner):
             return False
 
     def _ownership_node(self, state: _OwnershipGraphState, path: str) -> OwnershipNode:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         current = state.nodes.get(path)
         if current is not None:
             return current
@@ -680,17 +707,13 @@ class OwnershipGraphMixin(ReadScopeOwner):
     def _visible_resolved_import_paths(
         self, source_path: str, target: str
     ) -> list[str]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         return [
             candidate
-            for candidate in self._imports._resolve_import_paths(source_path, target)
+            for candidate in self.imports._resolve_import_paths(source_path, target)
             if self._ownership_evidence_visible(candidate)
         ]
 
     def _exact_ownership_import_paths(self, source_path: str, target: str) -> list[str]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         if not target:
             return []
         cache_key: tuple[int, str, str] | None = None
@@ -712,13 +735,11 @@ class OwnershipGraphMixin(ReadScopeOwner):
     def _uncached_exact_ownership_import_paths(
         self, source_path: str, target: str
     ) -> list[str]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         source_row = self.reads.file_row(source_path)
         language = None if source_row is None else str(source_row["language"] or "")
         if language != "python":
             return self._visible_resolved_import_paths(source_path, target)
-        candidates = self._imports._python_import_module_candidates(source_path, target)
+        candidates = self.imports._python_import_module_candidates(source_path, target)
         if candidates:
             direct = self.reads.module_paths(candidates[0])
             if direct:
@@ -727,7 +748,7 @@ class OwnershipGraphMixin(ReadScopeOwner):
                     if len(direct) == 1
                     else []
                 )
-        resolved, unresolved = self._imports._resolve_import_owner_evidence(
+        resolved, unresolved = self.imports._resolve_import_owner_evidence(
             source_path, target
         )
         return (
@@ -777,8 +798,6 @@ class OwnershipGraphMixin(ReadScopeOwner):
         expandable: Sequence[tuple[str, int, tuple[str, ...]]],
         edge_map: Mapping[str, Sequence[dict[str, object]]],
     ) -> dict[str, list[dict]]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         call_shorts = self._ownership_call_shorts(expandable, edge_map)
         if not call_shorts:
             return {}
@@ -969,17 +988,13 @@ class OwnershipGraphMixin(ReadScopeOwner):
         edge_map: Mapping[str, Sequence[dict[str, object]]],
     ) -> None:
         """Preload only the exact module probe each ownership import will ask first."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         modules: set[str] = set()
         for path, _, _ in expandable:
             source_row = self.reads.file_row(path)
             if source_row is None or str(source_row.get("language") or "") != "python":
                 continue
             for target in self._ownership_import_targets(edge_map.get(path, ())):
-                candidates = self._imports._python_import_module_candidates(
-                    path, target
-                )
+                candidates = self.imports._python_import_module_candidates(path, target)
                 if candidates:
                     modules.add(candidates[0])
         if len(modules) >= 2:
@@ -991,8 +1006,6 @@ class OwnershipGraphMixin(ReadScopeOwner):
         current_frontier: list[tuple[str, int, tuple[str, ...]]],
         max_depth: int,
     ) -> list[tuple[str, int, tuple[str, ...]]]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         expandable = [item for item in current_frontier if item[1] < max_depth]
         if not expandable:
             return []
@@ -1180,7 +1193,7 @@ class OwnershipGraphMixin(ReadScopeOwner):
         return None if selected is None else str(selected["path"])
 
     @operation_response("ownership_relation_graph")
-    def ownership_relation_graph(
+    def relations(
         self,
         task: str,
         start_path: str,
@@ -1188,8 +1201,6 @@ class OwnershipGraphMixin(ReadScopeOwner):
         max_depth: int = OWNERSHIP_RELATION_DEFAULT_OPTIONS.max_depth,
     ) -> OwnershipRelationGraph:
         """Project a bounded, cycle-safe ownership relation graph."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         start = normalize_relative_path(start_path, allow_root=False)
         max_depth = max(1, min(int(max_depth), 4))
         start_row = self.reads.file_row(start)
@@ -1279,7 +1290,7 @@ class OwnershipGraphMixin(ReadScopeOwner):
         task: str = "",
     ) -> StructuralOwnerCandidate | None:
         """Project the selected typed ownership relation into the action anchor shape."""
-        graph = self.ownership_relation_graph(task, start_path, max_depth=max_depth)
+        graph = self.relations(task, start_path, max_depth=max_depth)
         return self._structural_owner_from_graph(graph, start_path)
 
     def _structural_owner_from_graph(
@@ -1311,27 +1322,4 @@ class OwnershipGraphMixin(ReadScopeOwner):
             "relation_graph_completeness": graph["completeness"],
             "relation_graph_truncation": graph["truncation"],
             "relation_graph_search_bound_reasons": list(graph["search_bound_reasons"]),
-        }
-
-    @staticmethod
-    def _work_context_anchor(row: dict[str, object], *, role: str) -> dict[str, object]:
-        path = str(row.get("path") or "")
-        symbol = str(row.get("qualname") or row.get("name") or "")
-        signature = str(row.get("signature") or "").strip()
-        content_parts = [f"path: {path}", f"role: {role}"]
-        if symbol:
-            content_parts.append(f"symbol: {symbol}")
-        if signature:
-            content_parts.append(f"signature: {signature}")
-        content = "\n".join(content_parts)
-        return {
-            "path": path,
-            "role": role,
-            "symbol": symbol or None,
-            "representation": "action-anchor",
-            "content": content,
-            "estimated_tokens": estimate_tokens(content),
-            "canonical_rank": int(cast("int", row.get("canonical_rank") or 0)),
-            "reason": f"{role}-anchor",
-            "mandatory": role in {"edit", "verify", "contract"},
         }

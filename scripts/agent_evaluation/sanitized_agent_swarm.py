@@ -61,7 +61,7 @@ def _trace_task(
     codemap: CodeMap, task: dict[str, str], trace_dir: Path
 ) -> dict[str, Any]:
     started = time.perf_counter()
-    action = codemap.task_action_map(task["query"], limit=20)
+    action = codemap.tasks.action_map(task["query"], limit=20)
     row = {
         "schema": "hashmarks.sanitized-agent-trace.v1",
         "task": task,

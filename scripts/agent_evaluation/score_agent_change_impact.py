@@ -99,7 +99,7 @@ def _freeze_public_evidence(
         for task in tasks:
             task_id = str(task["id"])
             query = str(task["query"])
-            start = codemap.task_evidence(query)
+            start = codemap.tasks.evidence(query)
             edit_path = _task_candidate_path(start)
             if not edit_path:
                 raise ValueError(f"PUBLIC task {task_id} has no repository candidate")

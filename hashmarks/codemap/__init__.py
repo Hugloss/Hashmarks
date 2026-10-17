@@ -46,7 +46,7 @@ if TYPE_CHECKING:
     from .service import CodeMapService as CodeMapService
     from .service import CodeMapServiceClient as CodeMapServiceClient
     from .service import default_codemap_socket as default_codemap_socket
-    from .structural_locality import (
+    from .structural_locality_delta import (
         structural_locality_delta as structural_locality_delta,
     )
     from .worktree_overlay import WorktreeOverlay as WorktreeOverlay
@@ -77,7 +77,7 @@ _EXPORTS: dict[str, str] = {
     "SyncResult": "model",
     "WorktreeOverlay": "worktree_overlay",
     "WorktreeOverlayBaseChangedError": "worktree_overlay",
-    "structural_locality_delta": "structural_locality",
+    "structural_locality_delta": "structural_locality_delta",
     "semantic_relationship_delta": "semantic_relationship_delta",
     "COMPACT_PROJECT_IMPACT_SCHEMA": "project_impact_codec",
     "compact_project_impact": "project_impact_codec",

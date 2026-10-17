@@ -17,7 +17,7 @@ def test_post_change_refresh_is_changed_path_scoped_and_regenerates_packet(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.task_decision_packet(
+        before = codemap.tasks.decision_packet(
             "target implementation test", token_budget=256
         )
         source.write_text("def target(value: int) -> int:\n    return value + 1\n")

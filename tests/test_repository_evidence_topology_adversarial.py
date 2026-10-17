@@ -32,7 +32,7 @@ def test_identical_span_bytes_keep_distinct_repository_path_authority(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.repository_evidence_bindings(
+        packet = codemap.bindings.observe(
             bindings,
             include_relationships=False,
         )
@@ -62,7 +62,7 @@ def test_same_content_path_relocation_is_definition_change_not_content_change(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.repository_evidence_bindings(
+        before = codemap.bindings.observe(
             _binding("moved", "a.py"),
             include_relationships=False,
         )
@@ -70,12 +70,12 @@ def test_same_content_path_relocation_is_definition_change_not_content_change(
         moved = tmp_path / "b.py"
         source.replace(moved)
         codemap.index.sync(["a.py", "b.py"])
-        after = codemap.repository_evidence_bindings(
+        after = codemap.bindings.observe(
             _binding("moved", "b.py"),
             include_relationships=False,
         )
-        delta = codemap.repository_evidence_binding_delta(before, after)
-        coverage = codemap.repository_evidence_coverage(
+        delta = codemap.bindings.delta(before, after)
+        coverage = codemap.bindings.coverage(
             after,
             changed_paths=["a.py", "b.py"],
             change_set_complete=True,

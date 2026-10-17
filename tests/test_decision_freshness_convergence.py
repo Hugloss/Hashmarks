@@ -37,9 +37,9 @@ def test_unknown_freshness_converges_across_decision_surfaces(
 
         monkeypatch.setattr(codemap.reads, "generation_status", unknown_status)
 
-        packet = codemap.task_decision_packet(task, token_budget=256)
-        decision = codemap.task_decision_brief(task, token_budget=256)
-        action = codemap.task_action_brief(task, token_budget=256)
+        packet = codemap.tasks.decision_packet(task, token_budget=256)
+        decision = codemap.tasks.decision_brief(task, token_budget=256)
+        action = codemap.tasks.action_brief(task, token_budget=256)
 
     assert packet["identity"]["stale"] is True
     assert packet["identity"]["codemap_complete"] is True
@@ -73,7 +73,7 @@ def test_codemap_completeness_does_not_redefine_freshness(
             lambda: {"state": "BUILDING", "complete": False},
         )
 
-        packet = codemap.task_decision_packet(task, token_budget=256)
+        packet = codemap.tasks.decision_packet(task, token_budget=256)
 
     assert packet["identity"]["stale"] is False
     assert packet["identity"]["codemap_complete"] is False
@@ -89,7 +89,7 @@ def test_action_brief_status_consumes_receipt_freshness_once(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         generation = codemap.store.generation()
-        action = codemap.task_action_map(task)
+        action = codemap.tasks.action_map(task)
         reads = 0
 
         def one_freshness_read(observation: object = None) -> tuple[int, int, bool]:
@@ -103,7 +103,7 @@ def test_action_brief_status_consumes_receipt_freshness_once(
             return generation, generation, False
 
         monkeypatch.setattr(codemap.reads, "generation_status", one_freshness_read)
-        brief = codemap._task_action_brief_from_action(
+        brief = codemap.tasks._task_action_brief_from_action(
             action,
             task=task,
             token_budget=256,

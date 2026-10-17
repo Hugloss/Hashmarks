@@ -5,7 +5,10 @@ from typing import TYPE_CHECKING
 from contract_assertions import assert_text
 
 from hashmarks import CodeMap
-from hashmarks.codemap.evidence_verification import _VerificationRelevanceState
+from hashmarks.codemap.evidence_verification import (
+    RepositoryVerification,
+    _VerificationRelevanceState,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -20,10 +23,12 @@ def test_verification_reference_strength_preserves_syntactic_fallback(
         "from pkg import target\ndef broken(:\n", encoding="utf-8"
     )
     with CodeMap(tmp_path) as codemap:
-        assert codemap._verification_reference_strength(
+        assert codemap.verification._verification_reference_strength(
             "tests/test_bad.py", ["target"]
         ) == {"syntactic_reference": True, "reference_strength": "syntactic"}
-        assert codemap._verification_reference_strength("tests/test_bad.py", []) == {
+        assert codemap.verification._verification_reference_strength(
+            "tests/test_bad.py", []
+        ) == {
             "syntactic_reference": False,
             "reference_strength": "none",
         }
@@ -55,7 +60,7 @@ def test_exact_verification_import_requires_resolved_owner_path(tmp_path: Path) 
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        paths, available = codemap._verification_exact_import_paths(
+        paths, available = codemap.verification._verification_exact_import_paths(
             state,
             [
                 {
@@ -96,7 +101,7 @@ def test_verification_locality_replaces_unrelated_canonical_without_reference_pr
         "runner_available": True,
     }
 
-    chosen, reason = CodeMap._verification_select_candidate(
+    chosen, reason = RepositoryVerification._verification_select_candidate(
         [local, selected], assert_text(selected["path"])
     )
 
@@ -124,7 +129,7 @@ def test_verification_locality_never_overrides_reference_evidence() -> None:
         "runner_available": True,
     }
 
-    chosen, reason = CodeMap._verification_select_candidate(
+    chosen, reason = RepositoryVerification._verification_select_candidate(
         [local, selected], assert_text(selected["path"])
     )
 

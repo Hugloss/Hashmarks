@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hashmarks.cli import _add_common_arguments
-from hashmarks.codemap import CodeMap
+from hashmarks.codemap.evidence_verification import RepositoryVerification
+from hashmarks.codemap.repository_tasks import RepositoryTasks
 from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
 from hashmarks.codemap.verification_defaults import (
     VERIFICATION_RELEVANCE_DEFAULTS,
@@ -24,8 +25,8 @@ def test_verification_defaults_have_one_core_owner(
 ) -> None:
     defaults = VERIFICATION_RELEVANCE_DEFAULTS
     for owner in (
-        CodeMap.verification_relevance,
-        CodeMap.verification_ownership_graph,
+        RepositoryTasks.verification_relevance,
+        RepositoryTasks.verification_ownership_graph,
         CodeMapServiceClient.verification_relevance,
         CodeMapServiceClient.verification_ownership_graph,
     ):
@@ -33,16 +34,18 @@ def test_verification_defaults_have_one_core_owner(
         assert parameters["limit"].default == defaults.limit
         assert parameters["candidate_limit"].default == defaults.candidate_limit
 
-    private_parameters = inspect.signature(CodeMap._verification_relevance).parameters
+    private_parameters = inspect.signature(RepositoryVerification.for_owner).parameters
     assert private_parameters["limit"].default == defaults.candidate_limit
 
-    explanation = inspect.signature(CodeMap.explain_verification_selection).parameters
+    explanation = inspect.signature(
+        RepositoryTasks.explain_verification_selection
+    ).parameters
     assert explanation["limit"].default == defaults.limit
     assert explanation["candidate_limit"].default == 16
 
     captured: list[VerificationRelevanceOptions] = []
 
-    class _Map:
+    class _TaskViews:
         def verification_relevance(
             self,
             task: str,
@@ -74,6 +77,10 @@ def test_verification_defaults_have_one_core_owner(
                 )
             )
             return {"schema": "hashmarks.verification-ownership.v2"}
+
+    class _Map:
+        def __init__(self) -> None:
+            self.tasks = _TaskViews()
 
     service = CodeMapService(tmp_path, socket_path=tmp_path / "service.sock")
     monkeypatch.setattr(service, "_map", lambda: _Map())

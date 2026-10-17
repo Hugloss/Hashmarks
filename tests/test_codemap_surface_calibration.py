@@ -183,8 +183,8 @@ def test_decision_session_reuses_evidence_primitives_without_caching_final_packe
     ) as codemap:
         codemap.index.sync()
         with codemap.reads.session():
-            first = codemap.task_decision_packet("Change LeaseOwner issue behavior.")
-            second = codemap.task_decision_packet(
+            first = codemap.tasks.decision_packet("Change LeaseOwner issue behavior.")
+            second = codemap.tasks.decision_packet(
                 "Add regression coverage for LeaseOwner issue behavior."
             )
             stats = codemap.reads.stats()
@@ -316,10 +316,10 @@ def test_weak_generic_contract_anchor_fails_closed_but_identifier_anchor_resolve
         artifact_db=tmp_path / "artifacts-weak-anchor.sqlite3",
     ) as codemap:
         codemap.index.sync()
-        generic = codemap.task_action_map(
+        generic = codemap.tasks.action_map(
             "Change the observer behavior while preserving its existing public contract."
         )
-        anchored = codemap.task_action_map(
+        anchored = codemap.tasks.action_map(
             "Change the project_observability_receipt behavior while preserving its existing public contract."
         )
     assert generic["ambiguity"]["ambiguous"] is True

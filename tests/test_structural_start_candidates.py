@@ -99,17 +99,17 @@ def test_ninth_source_start_changes_observed_structural_ambiguity(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         monkeypatch.setattr(
-            codemap, "find_task", lambda _task, *, limit=20: hits[:limit]
+            codemap.search, "find_task", lambda _task, *, limit=20: hits[:limit]
         )
         monkeypatch.setattr(
-            codemap,
-            "ownership_relation_graph",
+            codemap.ownership,
+            "relations",
             _graph,
         )
-        first_eight = codemap.task_action_map(task, limit=8, per_role=1)
-        all_nine = codemap.task_action_map(task, limit=9, per_role=1)
-        wider_display = codemap.task_action_map(task, limit=9, per_role=4)
-        packet = codemap.task_decision_packet(task, limit=9, per_role=1)
+        first_eight = codemap.tasks.action_map(task, limit=8, per_role=1)
+        all_nine = codemap.tasks.action_map(task, limit=9, per_role=1)
+        wider_display = codemap.tasks.action_map(task, limit=9, per_role=4)
+        packet = codemap.tasks.decision_packet(task, limit=9, per_role=1)
 
     assert first_eight["structural_starts"]["observed_owners"] == ["src/owner_a.py"]
     assert first_eight["structural_starts"]["limit_reached"] is True
@@ -133,16 +133,16 @@ def test_unselected_graph_bound_and_stale_competitor_remain_visible(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         monkeypatch.setattr(
-            codemap, "find_task", lambda _task, *, limit=20: hits[:limit]
+            codemap.search, "find_task", lambda _task, *, limit=20: hits[:limit]
         )
         monkeypatch.setattr(
-            codemap,
-            "ownership_relation_graph",
+            codemap.ownership,
+            "relations",
             lambda task, start_path, *, max_depth=2: _graph(
                 task, start_path, max_depth=max_depth, incomplete=True
             ),
         )
-        bounded = codemap.task_action_map(task, limit=9)
+        bounded = codemap.tasks.action_map(task, limit=9)
         last = bounded["structural_starts"]["candidates"][-1]
         assert last["status"] == "graph-incomplete"
         assert last["graph_bound_reasons"] == ["edge-per-path-limit"]
@@ -151,19 +151,19 @@ def test_unselected_graph_bound_and_stale_competitor_remain_visible(
         )
 
         monkeypatch.setattr(
-            codemap,
-            "ownership_relation_graph",
+            codemap.ownership,
+            "relations",
             _graph,
         )
         codemap.index.sync(["src/route_09.py"])
-        before = codemap.task_action_map(task, limit=9)
+        before = codemap.tasks.action_map(task, limit=9)
         assert before["structural_starts"]["observed_owners"] == [
             "src/owner_a.py",
             "src/owner_b.py",
         ]
         generation = codemap.store.generation()
         (tmp_path / "src/owner_b.py").unlink()
-        after = codemap.task_action_map(task, limit=9)
+        after = codemap.tasks.action_map(task, limit=9)
         after_generation = codemap.store.generation()
 
     assert after_generation > generation

@@ -45,7 +45,7 @@ def test_repository_findings_projects_existing_analyzers_without_low_signal_cach
     _write_repository(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        result = codemap.repository_findings()
+        result = codemap.ownership.findings()
 
     assert result["schema"] == "hashmarks.repository-findings.v1"
     assert result["summary"] == {
@@ -79,7 +79,7 @@ def test_repository_findings_path_scope_preserves_repository_import_risk_linkage
     _write_repository(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        result = codemap.repository_findings(["pkg/state.py"])
+        result = codemap.ownership.findings(["pkg/state.py"])
 
     assert {finding["path"] for finding in result["findings"]} == {"pkg/state.py"}
     assert {finding["code"] for finding in result["findings"]} == {
@@ -135,7 +135,7 @@ def test_repository_findings_retain_observation_and_expose_adjudication(
     _write_repository(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        result = codemap.repository_findings()
+        result = codemap.ownership.findings()
 
     assert result["findings"]
     for finding in result["findings"]:

@@ -27,8 +27,8 @@ def test_task_action_brief_is_smaller_than_authority_brief_and_action_complete(
     _repo(tmp_path)
     with CodeMap(tmp_path) as c:
         c.index.sync()
-        full = c.task_decision_brief("widget implementation test", token_budget=64)
-        agent = c.task_action_brief("widget implementation test", token_budget=64)
+        full = c.tasks.decision_brief("widget implementation test", token_budget=64)
+        agent = c.tasks.action_brief("widget implementation test", token_budget=64)
     assert agent["schema"] == "hashmarks.task-action-brief.v1"
     assert agent["status"] == "safe-unknown"
     assert agent["edit"] == "src/engine.py"
@@ -47,7 +47,7 @@ def test_task_action_brief_fails_closed_without_hiding_missing_roles(
     _repo(tmp_path)
     with CodeMap(tmp_path) as c:
         c.index.sync()
-        agent = c.task_action_brief("widget implementation test", token_budget=1)
+        agent = c.tasks.action_brief("widget implementation test", token_budget=1)
     assert agent["status"] == "unsafe"
     assert agent["missing"]
 
@@ -58,8 +58,8 @@ def test_task_action_brief_auto_budget_qualifies_instead_of_assuming_fixed_minim
     _repo(tmp_path)
     with CodeMap(tmp_path) as c:
         c.index.sync()
-        auto = c.task_action_brief("widget implementation test")
-        forced_tiny = c.task_action_brief("widget implementation test", token_budget=1)
+        auto = c.tasks.action_brief("widget implementation test")
+        forced_tiny = c.tasks.action_brief("widget implementation test", token_budget=1)
     assert auto["status"] == "safe-unknown"
     assert forced_tiny["status"] == "unsafe"
 
@@ -68,15 +68,15 @@ def test_task_action_brief_fast_budget_matches_diagnostic_sweep(tmp_path: Path) 
     _repo(tmp_path)
     with CodeMap(tmp_path) as c:
         c.index.sync()
-        sweep = c.task_decision_brief_budget_sweep(
+        sweep = c.tasks.decision_brief_budget_sweep(
             "widget implementation test", budgets=[1, 32, 64, 96, 128]
         )
-        auto = c.task_action_brief(
+        auto = c.tasks.action_brief(
             "widget implementation test", candidate_budgets=[1, 32, 64, 96, 128]
         )
         budget = sweep["smallest_safe_budget"]
         assert isinstance(budget, int)
-        expected = c.task_action_brief(
+        expected = c.tasks.action_brief(
             "widget implementation test", token_budget=budget
         )
     assert sweep["smallest_safe_budget"] is not None
@@ -96,8 +96,8 @@ def test_task_action_brief_auto_budget_does_not_call_diagnostic_sweep(
                 "diagnostic sweep must not run on production brief path"
             )
 
-        monkeypatch.setattr(c, "task_decision_brief_budget_sweep", forbidden)
-        brief = c.task_action_brief("widget implementation test")
+        monkeypatch.setattr(c.tasks, "decision_brief_budget_sweep", forbidden)
+        brief = c.tasks.action_brief("widget implementation test")
 
     assert brief["status"] == "safe-unknown"
 
@@ -108,7 +108,7 @@ def test_task_action_brief_computes_canonical_action_map_once(
     _repo(tmp_path)
     with CodeMap(tmp_path) as c:
         c.index.sync()
-        original = c.task_action_map
+        original = c.tasks.action_map
         calls = 0
 
         def counted(task: str, *, limit: int = 20, per_role: int = 3) -> TaskActionMap:
@@ -116,9 +116,9 @@ def test_task_action_brief_computes_canonical_action_map_once(
             calls += 1
             return original(task, limit=limit, per_role=per_role)
 
-        monkeypatch.setattr(c, "task_action_map", counted)
+        monkeypatch.setattr(c.tasks, "action_map", counted)
 
-        brief = c.task_action_brief("widget implementation test")
+        brief = c.tasks.action_brief("widget implementation test")
     assert brief["status"] == "safe-unknown"
     assert calls == 1
 
@@ -148,16 +148,16 @@ def test_rare_ticket_action_brief_uses_exact_index_anchor_without_general_find(
     )
     with CodeMap(tmp_path) as c:
         c.index.sync()
-        original_find = c.find
+        original_find = c.search.find
         queries: list[str] = []
 
         def counted(query: str, *, limit: int = 20) -> tuple[SearchHit, ...]:
             queries.append(query)
             return original_find(query, limit=limit)
 
-        monkeypatch.setattr(c, "find", counted)
+        monkeypatch.setattr(c.search, "find", counted)
 
-        brief = c.task_action_brief("For ABC123 change the accepted response")
+        brief = c.tasks.action_brief("For ABC123 change the accepted response")
     assert brief["status"] == "safe-unknown"
     assert brief["edit"] == "src/abc123/engine_b.py"
     assert brief["verify"] == [
@@ -191,7 +191,7 @@ def test_rare_ticket_fast_path_is_not_used_for_configuration_authority(
                 "configuration authority must use the normal evidence path"
             )
 
-        brief = c.task_action_brief("For ABC123 change the configuration policy")
+        brief = c.tasks.action_brief("For ABC123 change the configuration policy")
     assert brief["status"] in {"safe-unknown", "unsafe"}
 
 
@@ -217,7 +217,7 @@ def test_multi_term_task_local_island_beats_large_generic_vocabulary(
     codemap = CodeMap(tmp_path)
     codemap.index.sync()
     try:
-        brief = codemap.task_action_brief(
+        brief = codemap.tasks.action_brief(
             "Change the cobalt grove accepted response from old to new. Update the implementation that drives the request and verify the behavior."
         )
         assert brief["status"] == "safe-unknown"
@@ -245,7 +245,7 @@ def test_multi_term_island_does_not_activate_when_multiple_tests_share_terms(
     codemap = CodeMap(tmp_path)
     codemap.index.sync()
     try:
-        hits = codemap._task_local_lexical_island_hits(
+        hits = codemap.search._task_local_lexical_island_hits(
             "cobalt grove behavior", limit=20
         )
         assert hits == ()
@@ -263,7 +263,7 @@ def test_task_action_brief_never_claims_safe_without_edit_target(
     codemap = CodeMap(tmp_path)
     codemap.index.sync()
     try:
-        brief = codemap.task_action_brief(
+        brief = codemap.tasks.action_brief(
             "Change the scarlet field behavior and verify it"
         )
         assert brief["status"] == "unsafe"
@@ -285,7 +285,7 @@ def test_multi_term_lexical_island_does_not_intercept_plain_compound_symbol_look
     codemap = CodeMap(tmp_path)
     codemap.index.sync()
     try:
-        assert codemap.find_task("NxImpactAdapter")[0].path == "src/adapter.py"
+        assert codemap.search.find_task("NxImpactAdapter")[0].path == "src/adapter.py"
     finally:
         codemap.close()
 
@@ -312,7 +312,7 @@ def test_task_action_brief_does_not_launder_named_dependency_into_owner(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        brief = codemap.task_action_brief(
+        brief = codemap.tasks.action_brief(
             "Fix publish_result so it uses AuthorityReceipt.canonical_identity"
         )
 
@@ -335,8 +335,8 @@ def test_non_ambiguous_action_edit_remains_separate_from_repository_owner_proof(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(task, limit=20)
-        packet = codemap.task_decision_packet(task, limit=20, token_budget=256)
+        action = codemap.tasks.action_map(task, limit=20)
+        packet = codemap.tasks.decision_packet(task, limit=20, token_budget=256)
 
     assert action["edit"] is not None
     assert action["edit"]["path"] == "src/adapter.py"
@@ -365,8 +365,8 @@ def test_task_action_brief_keeps_ambiguous_candidate_out_of_edit_authority(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map("Fix publish_result")
-        brief = codemap.task_action_brief("Fix publish_result", token_budget=256)
+        action = codemap.tasks.action_map("Fix publish_result")
+        brief = codemap.tasks.action_brief("Fix publish_result", token_budget=256)
 
     assert action["edit"] is not None
     assert action["edit"]["path"] in {"src/a.py", "src/b.py"}
@@ -386,7 +386,7 @@ def test_task_action_brief_consumes_canonical_action_edit(
     task = "widget implementation test"
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(task)
+        action = codemap.tasks.action_map(task)
         assert action["ambiguity"]["ambiguous"] is False
         assert action["edit"] is not None
         assert action["edit"]["path"] == "src/engine.py"
@@ -394,8 +394,8 @@ def test_task_action_brief_consumes_canonical_action_edit(
         assert action["action_edit"]["path"] == "src/engine.py"
 
         action["action_edit"] = None
-        monkeypatch.setattr(codemap, "task_action_map", lambda *args, **kwargs: action)
-        brief = codemap.task_action_brief(task, token_budget=256)
+        monkeypatch.setattr(codemap.tasks, "action_map", lambda *args, **kwargs: action)
+        brief = codemap.tasks.action_brief(task, token_budget=256)
 
     assert brief["status"] == "unsafe"
     assert "edit" not in brief
@@ -410,7 +410,7 @@ def test_action_surfaces_consume_canonical_action_discrimination(
     task = "widget implementation test"
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(task)
+        action = codemap.tasks.action_map(task)
         assert action["action_discrimination"] == {
             "needed": True,
             "reason": "ownership-unresolved",
@@ -422,9 +422,9 @@ def test_action_surfaces_consume_canonical_action_discrimination(
             "needed": True,
             "reason": "missing-verification-evidence",
         }
-        monkeypatch.setattr(codemap, "task_action_map", lambda *args, **kwargs: action)
-        brief = codemap.task_action_brief(task, token_budget=256)
-        packet = codemap.task_decision_packet(task, token_budget=256)
+        monkeypatch.setattr(codemap.tasks, "action_map", lambda *args, **kwargs: action)
+        brief = codemap.tasks.action_brief(task, token_budget=256)
+        packet = codemap.tasks.decision_packet(task, token_budget=256)
 
     assert brief["discrimination"] == "missing-verification-evidence"
     assert assert_object(packet["discrimination"])["needed"] is True
@@ -440,14 +440,16 @@ def test_task_action_brief_receipt_is_assembled_inside_decision_session(
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        original = codemap._decision_evidence_receipt
+        original = codemap.tasks._decision_evidence_receipt
 
         def observed(*args, **kwargs) -> object:
             assert codemap.reads.depth > 0
             return original(*args, **kwargs)
 
-        monkeypatch.setattr(codemap, "_decision_evidence_receipt", observed)
-        brief = codemap.task_action_brief("widget implementation test", token_budget=64)
+        monkeypatch.setattr(codemap.tasks, "_decision_evidence_receipt", observed)
+        brief = codemap.tasks.action_brief(
+            "widget implementation test", token_budget=64
+        )
 
     assert brief["status"] == "safe-unknown"
 
@@ -467,7 +469,7 @@ def test_ambiguity_is_sticky_across_retrieval_presentation_bounds(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(
+        action = codemap.tasks.action_map(
             "Fix duplicate_owner", limit=limit, per_role=per_role
         )
 
@@ -487,9 +489,9 @@ def test_task_action_brief_preserves_authority_proof_identity_across_budgets(
     task = "Refactor engine.widget without changing behavior"
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(task, limit=20, per_role=3)
+        action = codemap.tasks.action_map(task, limit=20, per_role=3)
         briefs = [
-            codemap.task_action_brief(task, limit=20, per_role=3, token_budget=budget)
+            codemap.tasks.action_brief(task, limit=20, per_role=3, token_budget=budget)
             for budget in (32, 64, 256)
         ]
 

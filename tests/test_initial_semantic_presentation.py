@@ -45,7 +45,7 @@ def test_initial_relationship_view_preserves_all_values_and_future_types(
         codemap.index.sync()
         wire = cast(
             "dict[str, Any]",
-            codemap.task_evidence("Inspect owner.py", result_mode="initial"),
+            codemap.tasks.evidence("Inspect owner.py", result_mode="initial"),
         )
     logical = decode_initial_packet(wire)
     binding: dict[str, Any] = {

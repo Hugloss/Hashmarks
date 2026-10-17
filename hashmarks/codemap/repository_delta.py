@@ -23,7 +23,11 @@ from .diagnostic_source_revision import (
     diagnostic_source_revision_evidence,
 )
 from .freshness_map import FreshnessMapOptions
-from .repository_observation import evidence_identity, packet_digest
+from .repository_observation import (
+    evidence_identity,
+    packet_digest,
+    repository_observer_packet,
+)
 
 REPOSITORY_DELTA_DEFAULT_OPTIONS = ChangeImpactOptions(
     impact_limit_per_surface=4,
@@ -47,24 +51,6 @@ class _SnapshotReuse:
     ] = field(default_factory=dict)
 
 
-def _observer_descriptor() -> dict[str, object]:
-    """Describe the observer capability separately from repository identity."""
-    return {
-        "producer": "hashmarks",
-        "surface": "repository-intelligence",
-        "schema": "hashmarks.repository-observer.v1",
-        "capabilities": [
-            "affected",
-            "dependencies",
-            "evidence-bindings",
-            "freshness",
-            "ownership",
-            "symbols",
-            "verification",
-        ],
-    }
-
-
 REPOSITORY_SNAPSHOT_SCHEMA = "hashmarks.repository-intelligence-snapshot.v1"
 REPOSITORY_DELTA_SCHEMA = "hashmarks.repository-intelligence-delta.v1"
 
@@ -77,17 +63,6 @@ class RepositoryDeltaMixin(ReadScopeOwner):
     freshness authority yields changed facts and compact summaries without
     a historical repository store.
     """
-
-    def _repository_observer_packet(self) -> dict[str, object]:
-        """Return the canonical observer capability descriptor with stable identity."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        observer = _observer_descriptor()
-        return {
-            **observer,
-            "identity": "sha256:"
-            + packet_digest("hashmarks.repository-observer.v1", observer),
-        }
 
     @staticmethod
     def _delta_mapping(value: object, *, field: str) -> Mapping[str, object]:
@@ -388,7 +363,7 @@ class RepositoryDeltaMixin(ReadScopeOwner):
         )
         payload: dict[str, object] = {
             "schema": REPOSITORY_SNAPSHOT_SCHEMA,
-            "observer": self._repository_observer_packet(),
+            "observer": repository_observer_packet(),
             "repository": deepcopy(brief["repository"]),
             "task_identity": brief["task_identity"],
             "paths": self._snapshot_paths(changed_paths),

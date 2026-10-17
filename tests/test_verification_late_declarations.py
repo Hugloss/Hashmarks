@@ -20,7 +20,7 @@ def test_late_relevant_test_declaration_is_not_hidden_by_module_prefix(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        relevance = codemap.verification_relevance(
+        relevance = codemap.tasks.verification_relevance(
             "Fix backend.py execute reserved attribute warning"
         )
     rows = assert_records(relevance["candidates"])
@@ -45,7 +45,7 @@ def test_late_equal_match_preserves_unknown_test_symbol(tmp_path: Path) -> None:
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        relevance = codemap.verification_relevance(
+        relevance = codemap.tasks.verification_relevance(
             "Fix backend.py execute reserved attribute warning"
         )
     rows = assert_records(relevance["candidates"])

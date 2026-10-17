@@ -50,10 +50,10 @@ def test_problem_named_test_is_not_buried_by_generic_protocol_helpers(
     task = "Inspect cancellation when Boundary.__aexit__ receives exit. Source: app/protocols/scope.py"
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(task)
+        action = codemap.tasks.action_map(task)
         packets = [
-            codemap.task_evidence(task),
-            decode_initial_packet(codemap.task_evidence(task, result_mode="initial")),
+            codemap.tasks.evidence(task),
+            decode_initial_packet(codemap.tasks.evidence(task, result_mode="initial")),
         ]
     for packet in packets:
         verification = assert_object(packet["verification"])
@@ -98,10 +98,10 @@ def test_broad_candidate_pool_cannot_erase_other_observed_source_namespaces(
     task = "Inspect Alpha.process, Beta.process and Zulu.process for record processing."
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(task)
+        action = codemap.tasks.action_map(task)
         packets = [
-            codemap.task_evidence(task),
-            decode_initial_packet(codemap.task_evidence(task, result_mode="initial")),
+            codemap.tasks.evidence(task),
+            decode_initial_packet(codemap.tasks.evidence(task, result_mode="initial")),
         ]
     for packet in packets:
         relevance = assert_object(assert_object(packet["verification"])["relevance"])
@@ -146,7 +146,7 @@ def test_task_directory_words_cannot_displace_source_namespace_locality(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         with codemap.reads.session():
-            rows = codemap._task_evidence_candidate_verifiers(
+            rows = codemap.tasks._task_evidence_candidate_verifiers(
                 "A reserved attribute warning breaks SQL queries.",
                 {
                     "path": "app/processing/backend.py",
@@ -182,10 +182,10 @@ def test_source_declaration_words_retain_tests_when_task_uses_other_word_forms(
     task = "Assembly of a bundle fails with TypeError."
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(task)
+        action = codemap.tasks.action_map(task)
         packets = [
-            codemap.task_evidence(task),
-            decode_initial_packet(codemap.task_evidence(task, result_mode="initial")),
+            codemap.tasks.evidence(task),
+            decode_initial_packet(codemap.tasks.evidence(task, result_mode="initial")),
         ]
     for packet in packets:
         verification = assert_object(packet["verification"])
@@ -231,10 +231,10 @@ def test_directory_task_words_keep_a_specific_test_in_bounded_disclosure(
     task = "A reserved attribute warning appears while processing records."
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map(task)
+        action = codemap.tasks.action_map(task)
         packets = [
-            codemap.task_evidence(task),
-            decode_initial_packet(codemap.task_evidence(task, result_mode="initial")),
+            codemap.tasks.evidence(task),
+            decode_initial_packet(codemap.tasks.evidence(task, result_mode="initial")),
         ]
     for packet in packets:
         verification = assert_object(packet["verification"])
@@ -294,7 +294,7 @@ def test_module_wide_keyword_union_cannot_hide_a_specific_test_declaration(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         with codemap.reads.session():
-            rows = codemap._task_evidence_candidate_verifiers(
+            rows = codemap.tasks._task_evidence_candidate_verifiers(
                 "A reserved attribute warning breaks record placement and produces handler failures.",
                 {
                     "path": "app/engine/adapter.py",

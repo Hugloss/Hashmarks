@@ -65,7 +65,7 @@ def _verification_target(
     workspace: Path, query: str, *, limit: int, codemap: CodeMap | None = None
 ) -> tuple[str | None, int]:
     if codemap is not None:
-        hits = codemap.find_task(query + " test verification", limit=limit)
+        hits = codemap.search.find_task(query + " test verification", limit=limit)
         paths = [h.path for h in hits]
     else:
         paths = [
@@ -134,7 +134,7 @@ def _hashmarks_worker(
         for task in tasks:
             q = task["query"]
             t1 = time.perf_counter()
-            entry = cm.task_entry_points(q, limit=limit)
+            entry = cm.tasks.entry_points(q, limit=limit)
             query_ms = (time.perf_counter() - t1) * 1000
             rec = [r for r in entry.get("recommended", []) if isinstance(r, dict)]
             first = str(rec[0].get("path") or "") if rec else None

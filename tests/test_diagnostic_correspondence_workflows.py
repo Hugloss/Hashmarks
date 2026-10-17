@@ -141,7 +141,7 @@ def test_old_locations_do_not_become_exact_current_source_after_changes(
     else:
         path.write_text("def replacement():\n    return 42\n", encoding="utf-8")
     repository.index.sync()
-    packet: Any = repository.correlate_evidence(
+    packet: Any = repository.correlation.observe(
         claim_bundle(
             {
                 "anchor_id": "prior",
@@ -184,19 +184,19 @@ def test_line_endings_and_encoding_remain_exact_member_evidence(
 def test_alias_reexport_call_chain_and_verifier_correspondence(
     repository: CodeMap,
 ) -> None:
-    locality: Any = repository.structural_locality("app/service.py::handle_request")
+    locality: Any = repository.structure.locality("app/service.py::handle_request")
     assert {row["symbol_id"] for row in locality["nodes"]} == {
         "app/service.py::handle_request",
         "app/config.py::load_config",
     }
     assert "tests/test_service.py" in locality["verification_paths"]
-    evidence: Any = repository.task_evidence(
+    evidence: Any = repository.tasks.evidence(
         "Change app/service.py handle_request and verify its test"
     )
     assert evidence["ownership"]["owner"]["path"] == "app/service.py"
     assert evidence["verification"]["selected"]["path"] == "tests/test_service.py"
     assert locality["claims"]["execution_authority"] is False
-    indirect: Any = repository.structural_locality("app/api.py::dispatch")
+    indirect: Any = repository.structure.locality("app/api.py::dispatch")
     assert {row["symbol_id"] for row in indirect["nodes"]} == {
         "app/api.py::dispatch",
         "app/service.py::handle_request",
@@ -310,19 +310,19 @@ def test_replay_rejects_substitution_and_does_not_persist_claims(
     repository: CodeMap,
 ) -> None:
     bundle = claim_bundle({"anchor_id": "current", "path": "app/service.py"})
-    before: Any = repository.correlate_evidence(bundle, include_relationships=False)
-    assert repository.correlate_evidence(bundle, include_relationships=False) == before
+    before: Any = repository.correlation.observe(bundle, include_relationships=False)
+    assert repository.correlation.observe(bundle, include_relationships=False) == before
     tampered = deepcopy(before)
     tampered["bundles"][0]["anchors"][0]["claims"]["path"] = "app/unrelated.py"
     with pytest.raises(ValueError, match="identity"):
-        repository.correlate_evidence(
+        repository.correlation.observe(
             bundle, previous_correlation=tampered, include_relationships=False
         )
-    repository.correlate_evidence(
+    repository.correlation.observe(
         bundle, previous_correlation=before, include_relationships=False
     )
     assert (
-        repository.correlate_evidence([], include_relationships=False)["bundles"] == []
+        repository.correlation.observe([], include_relationships=False)["bundles"] == []
     )
     projected = present_repository_evidence(before, format="compact")
     assert projected["source_evidence_identity"] == before["correlation_identity"]
@@ -460,7 +460,7 @@ def test_changed_test_source_replaces_exact_caller_correspondence(
     repository: CodeMap,
 ) -> None:
     target = "app/service.py::handle_request"
-    before: Any = repository.structural_locality(target)
+    before: Any = repository.structure.locality(target)
     assert "tests/test_service.py" in {
         row["path"] for row in before["nodes"][0]["exact_callers"]
     }
@@ -475,7 +475,7 @@ def test_changed_test_source_replaces_exact_caller_correspondence(
         encoding="utf-8",
     )
     repository.index.sync()
-    after: Any = repository.structural_locality(target)
+    after: Any = repository.structure.locality(target)
     owner = next(row for row in after["nodes"] if row["symbol_id"] == target)
     callers = {row["path"] for row in owner["exact_callers"]}
     assert "tests/test_replacement.py" in callers
@@ -523,7 +523,7 @@ def test_existing_delivery_routes_preserve_complete_local_packets(
         },
     }[operation]
     if operation == "repository_evidence":
-        expected = repository.repository_evidence_bindings(bindings)
+        expected = repository.bindings.observe(bindings)
     else:
         expected = getattr(repository, operation)(**inputs)
     surface = HashmarksMcpSurface(

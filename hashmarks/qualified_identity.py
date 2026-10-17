@@ -120,7 +120,7 @@ def _shared_input_payload(
         "repository_identity": _codemap_repository_identity(codemap),
         "producer_implementation_identity": native_producer_implementation_identity(),
         "path": rel,
-        "content_sha256": codemap._manifest_digest(rel),
+        "content_sha256": codemap.native._manifest_digest(rel),
         "projects": projects,
     }
 
@@ -143,7 +143,9 @@ def qualified_shared_input_identity(
     )
     projects = _shared_input_projects(codemap, synthetic) if node is not None else []
     payload = _shared_input_payload(codemap, rel, projects)
-    fresh, stale_reason = codemap._evidence_fresh("project", "declared-project-links")
+    fresh, stale_reason = codemap.native._evidence_fresh(
+        "project", "declared-project-links"
+    )
     status = _shared_input_status(node, fresh)
     identity_available = (
         status == "resolved"

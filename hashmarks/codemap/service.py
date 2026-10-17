@@ -395,15 +395,13 @@ class CodeMapService:
     def _repository_findings_response(self, request: dict[str, Any]) -> dict[str, Any]:
         return {
             "ok": True,
-            "repository_findings": self._map().repository_findings(
-                self._paths(request)
-            ),
+            "repository_findings": self._map().ownership.findings(self._paths(request)),
         }
 
     def _import_ownership_response(self, request: dict[str, Any]) -> dict[str, Any]:
         return {
             "ok": True,
-            "import_ownership": self._map().import_ownership_findings(
+            "import_ownership": self._map().ownership.import_findings(
                 self._paths(request)
             ),
         }
@@ -411,7 +409,7 @@ class CodeMapService:
     def _cache_ownership_response(self, request: dict[str, Any]) -> dict[str, Any]:
         return {
             "ok": True,
-            "cache_ownership": self._map().cache_ownership_findings(
+            "cache_ownership": self._map().ownership.cache_findings(
                 self._paths(request)
             ),
         }
@@ -419,7 +417,7 @@ class CodeMapService:
     def _cache_invalidation_response(self, request: dict[str, Any]) -> dict[str, Any]:
         return {
             "ok": True,
-            "cache_invalidation_ownership": self._map().cache_invalidation_ownership_graph(
+            "cache_invalidation_ownership": self._map().ownership.cache_invalidation_graph(
                 self._paths(request)
             ),
         }
@@ -427,7 +425,7 @@ class CodeMapService:
     def _authority_ownership_response(self, request: dict[str, Any]) -> dict[str, Any]:
         return {
             "ok": True,
-            "authority_ownership": self._map().repository_ownership_graph(
+            "authority_ownership": self._map().ownership.repository_graph(
                 self._paths(request)
             ),
         }
@@ -435,7 +433,7 @@ class CodeMapService:
     def _concurrency_risk_response(self, request: dict[str, Any]) -> dict[str, Any]:
         return {
             "ok": True,
-            "concurrency_risk": self._map().concurrency_risk_findings(
+            "concurrency_risk": self._map().ownership.concurrency_findings(
                 self._paths(request)
             ),
         }
@@ -449,7 +447,7 @@ class CodeMapService:
         candidate_limit = self._bounded_int(
             request, "candidate_limit", defaults.candidate_limit, 1, 16
         )
-        graph = self._map().verification_ownership_graph(
+        graph = self._map().tasks.verification_ownership_graph(
             task, limit=limit, candidate_limit=candidate_limit
         )
         return {"ok": True, "verification_ownership": graph}
@@ -459,7 +457,9 @@ class CodeMapService:
         limit = self._bounded_int(request, "limit", 20, 1, 100)
         return {
             "ok": True,
-            "hits": [hit.as_dict() for hit in self._map().find_task(task, limit=limit)],
+            "hits": [
+                hit.as_dict() for hit in self._map().search.find_task(task, limit=limit)
+            ],
         }
 
     def _task_context(self, request: dict[str, Any]) -> tuple[str, int, int]:
@@ -479,7 +479,7 @@ class CodeMapService:
 
     def _task_action_map_response(self, request: dict[str, Any]) -> dict[str, Any]:
         task, limit, per_role = self._task_action_context(request)
-        result = self._map().task_action_map(task, limit=limit, per_role=per_role)
+        result = self._map().tasks.action_map(task, limit=limit, per_role=per_role)
         return {"ok": True, "action_map": result}
 
     def _verification_relevance_response(
@@ -491,7 +491,7 @@ class CodeMapService:
         candidate_limit = self._bounded_int(
             request, "candidate_limit", defaults.candidate_limit, 1, 16
         )
-        result = self._map().verification_relevance(
+        result = self._map().tasks.verification_relevance(
             task, limit=limit, candidate_limit=candidate_limit
         )
         return {"ok": True, "verification_relevance": result}
@@ -504,9 +504,7 @@ class CodeMapService:
         max_depth = int(
             request.get("max_depth", OWNERSHIP_RELATION_DEFAULT_OPTIONS.max_depth)
         )
-        result = self._map().ownership_relation_graph(
-            task, start_path, max_depth=max_depth
-        )
+        result = self._map().ownership.relations(task, start_path, max_depth=max_depth)
         return {"ok": True, "ownership_relation_graph": result}
 
     def _task_evidence_response(self, request: dict[str, Any]) -> dict[str, Any]:
@@ -517,7 +515,7 @@ class CodeMapService:
         token_budget = self._bounded_int(
             request, "token_budget", defaults.token_budget, 1, 100_000
         )
-        result = self._map().task_evidence(
+        result = self._map().tasks.evidence(
             task,
             limit=limit,
             per_role=per_role,
@@ -722,7 +720,7 @@ class CodeMapService:
         budget = self._bounded_int(
             request, "token_budget", defaults.token_budget, 1, 100_000
         )
-        result = self._map().task_decision_brief(
+        result = self._map().tasks.decision_brief(
             task, limit=limit, per_role=per_role, token_budget=budget
         )
         return {"ok": True, "decision_brief": result}
@@ -735,7 +733,7 @@ class CodeMapService:
         budget = None if raw_budget is None else int(raw_budget)
         if budget is not None and not 1 <= budget <= 100_000:
             raise ValueError("token_budget must be between 1 and 100000")
-        result = self._map().task_action_brief(
+        result = self._map().tasks.action_brief(
             task, limit=limit, per_role=per_role, token_budget=budget
         )
         return {"ok": True, "task_action_brief": result}
@@ -754,7 +752,7 @@ class CodeMapService:
             or not all(isinstance(value, int) for value in budgets)
         ):
             raise ValueError("budgets must be a non-empty list of integers")
-        result = self._map().task_decision_brief_budget_sweep(
+        result = self._map().tasks.decision_brief_budget_sweep(
             task, budgets=budgets, limit=limit, per_role=per_role
         )
         return {"ok": True, "budget_sweep": result}
@@ -767,7 +765,7 @@ class CodeMapService:
         budget = self._bounded_int(
             request, "token_budget", defaults.token_budget, 1, 100_000
         )
-        result = self._map().task_decision_packet(
+        result = self._map().tasks.decision_packet(
             task, limit=limit, per_role=per_role, token_budget=budget
         )
         return {"ok": True, "decision_packet": result}

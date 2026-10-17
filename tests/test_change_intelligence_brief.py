@@ -43,7 +43,7 @@ def test_change_intelligence_brief_is_compact_identity_bound_repository_truth(
     task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_decision_packet(task)
+        packet = codemap.tasks.decision_packet(task)
         brief = codemap.change_intelligence_brief(task, ["src/case/engine.py"])
 
     assert brief["schema"] == "hashmarks.change-intelligence-brief.v1"
@@ -97,10 +97,14 @@ def test_verification_explanation_selected_and_why_not_are_deterministic(
     (tmp_path / "tests" / "test_other.py").write_text("def test_other(): assert True\n")
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        first = codemap.explain_verification_selection(task)
-        second = codemap.explain_verification_selection(task)
-        why_not = codemap.explain_verification_selection(task, "tests/test_other.py")
-        absent = codemap.explain_verification_selection(task, "tests/not_present.py")
+        first = codemap.tasks.explain_verification_selection(task)
+        second = codemap.tasks.explain_verification_selection(task)
+        why_not = codemap.tasks.explain_verification_selection(
+            task, "tests/test_other.py"
+        )
+        absent = codemap.tasks.explain_verification_selection(
+            task, "tests/not_present.py"
+        )
 
     assert first == second
     assert first["status"] == "selected"
@@ -147,7 +151,7 @@ def test_verification_explanation_preserves_bounded_candidate_reason(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         monkeypatch.setattr(
-            codemap,
+            codemap.tasks,
             "verification_relevance",
             lambda *args, **kwargs: {
                 "selected": selected,
@@ -155,7 +159,7 @@ def test_verification_explanation_preserves_bounded_candidate_reason(
                 "selection_reason": "qualified-reference",
             },
         )
-        explanation = codemap.explain_verification_selection(
+        explanation = codemap.tasks.explain_verification_selection(
             task, "tests/test_other.py"
         )
     assert explanation["status"] == "not-selected"

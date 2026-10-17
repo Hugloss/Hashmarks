@@ -3,9 +3,10 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.freshness import freshness_state
+
 from .change_impact import ChangeImpactOptions
 from .decision_session import ReadScopeOwner, diagnostic_producer
-from .evidence_freshness import freshness_state
 from .repository_observation import packet_digest
 
 if TYPE_CHECKING:
@@ -80,12 +81,12 @@ class ChangeIntelligenceMixin(ReadScopeOwner):
                 project_impact_encoding="compact",
             ),
         )
-        action = self.task_action_map(task, limit=limit, per_role=per_role)
+        action = self.tasks.action_map(task, limit=limit, per_role=per_role)
         verify = (
             action.get("verify") if isinstance(action.get("verify"), dict) else None
         )
         verification_path = str(verify.get("path") or "") if verify else ""
-        explanation = self.explain_verification_selection(
+        explanation = self.tasks.explain_verification_selection(
             task,
             verification_path or None,
             limit=limit,

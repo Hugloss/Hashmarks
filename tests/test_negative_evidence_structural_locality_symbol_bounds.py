@@ -75,12 +75,12 @@ def authority(value):
     with _codemap(tmp_path) as codemap:
         codemap.index.sync()
         _install_hidden_same_name_candidate(codemap, monkeypatch)
-        packet = codemap.structural_locality(
+        packet = codemap.structure.locality(
             "pkg/core.py::authority",
             max_depth=2,
             refresh=False,
         )
-        helper = codemap.structural_locality(
+        helper = codemap.structure.locality(
             "pkg/core.py::helper",
             max_depth=0,
             refresh=False,
@@ -125,7 +125,7 @@ def authority(value):
     )
 
     with _codemap(tmp_path) as codemap:
-        packet = codemap.structural_locality(
+        packet = codemap.structure.locality(
             "pkg/core.py::authority",
             max_depth=2,
         )
@@ -194,7 +194,7 @@ def authority(value):
             return original(name, limit=limit)
 
         monkeypatch.setattr(codemap.store, "visible_symbol_candidates", symbols_named)
-        packet = codemap.structural_locality(
+        packet = codemap.structure.locality(
             "pkg/core.py::authority",
             max_depth=2,
             refresh=False,

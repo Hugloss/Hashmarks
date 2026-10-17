@@ -46,8 +46,8 @@ def test_interrupted_generation_never_publishes_partial_rows_and_recovers(
     with CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as reopened:
         assert reopened.status()["build"]["state"] == "NEVER_SYNCED"
         assert reopened.store.paths() == set()
-        assert reopened.find("symbol_00")[0].path == "src/m00.py"
+        assert reopened.search.find("symbol_00")[0].path == "src/m00.py"
         assert reopened.status()["build"]["complete"] is True
         assert len(reopened.store.paths()) == 40
-        assert reopened.find("symbol_39")[0].path == "src/m39.py"
+        assert reopened.search.find("symbol_39")[0].path == "src/m39.py"
         assert reopened.source.outline("src/m39.py")["path"] == "src/m39.py"

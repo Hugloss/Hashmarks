@@ -36,7 +36,7 @@ def test_external_state_dir_is_bound_to_exactly_one_workspace(tmp_path: Path) ->
         repo_a, state_dir=state, artifact_db=tmp_path / "a-artifacts.sqlite3"
     ) as codemap:
         codemap.index.sync()
-        assert codemap.find("alpha_only")
+        assert codemap.search.find("alpha_only")
 
     with pytest.raises(
         WorkspaceStateMismatchError, match="already bound to a different workspace"
@@ -46,8 +46,10 @@ def test_external_state_dir_is_bound_to_exactly_one_workspace(tmp_path: Path) ->
     with CodeMap(
         repo_a, state_dir=state, artifact_db=tmp_path / "a-artifacts.sqlite3"
     ) as codemap:
-        assert codemap.find("alpha_only")
-        assert not any(hit.name == "beta_only" for hit in codemap.find("beta_only"))
+        assert codemap.search.find("alpha_only")
+        assert not any(
+            hit.name == "beta_only" for hit in codemap.search.find("beta_only")
+        )
 
 
 def test_concurrent_external_state_first_claim_has_one_workspace_owner(
@@ -145,7 +147,7 @@ def test_clean_preserves_external_workspace_binding(tmp_path: Path) -> None:
         repo_a, state_dir=state, artifact_db=tmp_path / "a-artifacts.sqlite3"
     ) as codemap:
         codemap.index.sync()
-        assert codemap.find("alpha_only")
+        assert codemap.search.find("alpha_only")
 
     with pytest.raises(
         WorkspaceStateMismatchError, match="already bound to a different workspace"

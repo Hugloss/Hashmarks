@@ -94,7 +94,7 @@ def qualify_call_site_source(
         if capture["request"]["method"] == "callHierarchy/incomingCalls"
         else capture["request"]["params"]["item"]
     )
-    path = uri_member(caller["uri"], resolver.codemap.workspace)
+    path = uri_member(caller["uri"], resolver.source.workspace)
     basis: dict[str, Any] = {
         "path": path,
         "ranges": row["fromRanges"],

@@ -48,13 +48,13 @@ def test_relationship_fact_change_is_path_shared_but_range_impact_stays_local(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.repository_evidence_bindings(_bindings())
+        before = codemap.bindings.observe(_bindings())
 
         source.write_text("from beta import VALUE\nKEEP = 1\n", encoding="utf-8")
         codemap.index.sync(["source.py"])
-        after = codemap.repository_evidence_bindings(_bindings())
-        delta = codemap.repository_evidence_binding_delta(before, after)
-        coverage = codemap.repository_evidence_coverage(
+        after = codemap.bindings.observe(_bindings())
+        delta = codemap.bindings.delta(before, after)
+        coverage = codemap.bindings.coverage(
             after,
             changed_paths=["source.py"],
             change_set_complete=True,
@@ -124,16 +124,16 @@ def test_relationship_locator_move_stays_separate_and_does_not_leak_bindings(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.repository_evidence_bindings(bindings)
+        before = codemap.bindings.observe(bindings)
 
         source.write_text(
             "PAD = 0\nfrom dependency import VALUE\nKEEP = 1\n",
             encoding="utf-8",
         )
         codemap.index.sync(["source.py"])
-        after = codemap.repository_evidence_bindings(bindings)
-        delta = codemap.repository_evidence_binding_delta(before, after)
-        coverage = codemap.repository_evidence_coverage(
+        after = codemap.bindings.observe(bindings)
+        delta = codemap.bindings.delta(before, after)
+        coverage = codemap.bindings.coverage(
             after,
             changed_paths=["source.py"],
             change_set_complete=True,

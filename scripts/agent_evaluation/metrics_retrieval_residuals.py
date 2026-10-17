@@ -26,10 +26,10 @@ FAMILY = "hashmarks-residual-classification-a"
 def _task_report(
     cm: object, task: dict[str, object], secret: dict[str, object], *, limit: int
 ) -> dict[str, object]:
-    hits = cm.find_task(task["query"], limit=limit)
+    hits = cm.search.find_task(task["query"], limit=limit)
     paths = [hit.path for hit in hits]
     expected = set(secret.get("expected_files") or ())
-    entry = cm.task_entry_points(task["query"], limit=limit)
+    entry = cm.tasks.entry_points(task["query"], limit=limit)
     recommended = [row for row in entry.get("recommended", []) if isinstance(row, dict)]
     first = str(recommended[0].get("path") or "") if recommended else None
     top1 = first in expected

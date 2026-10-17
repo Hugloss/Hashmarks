@@ -55,7 +55,7 @@ def test_exact_owner_is_invariant_to_retrieval_saturation(tmp_path: Path) -> Non
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         packets = [
-            codemap.task_evidence(task, limit=limit, per_role=1, token_budget=256)
+            codemap.tasks.evidence(task, limit=limit, per_role=1, token_budget=256)
             for limit in (1, 2, 5, 20)
         ]
 
@@ -91,7 +91,7 @@ def test_weaker_docs_comments_and_tests_cannot_displace_exact_owner(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_evidence(
+        packet = codemap.tasks.evidence(
             "change PublicationAuthority contract",
             limit=3,
             per_role=1,
@@ -109,12 +109,12 @@ def test_second_exact_owner_weakens_unique_ownership_to_ambiguous(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.task_evidence("change target_impl", limit=1)
+        before = codemap.tasks.evidence("change target_impl", limit=1)
         assert _owner_path(before) == "src/a.py"
 
         _write(tmp_path, "src/b.py", "def target_impl():\n    return 2\n")
         codemap.index.sync(["src/b.py"])
-        after = codemap.task_evidence("change target_impl", limit=1)
+        after = codemap.tasks.evidence("change target_impl", limit=1)
 
     assert _ownership(after)["status"] == "ambiguous"
     assert _ownership(after)["owner"] is None
@@ -129,12 +129,12 @@ def test_removed_exact_owner_cannot_survive_as_current_authority(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.task_evidence("change target_impl")
+        before = codemap.tasks.evidence("change target_impl")
         assert _owner_path(before) == "src/owner.py"
 
         owner.unlink()
         codemap.index.sync(["src/owner.py"])
-        after = codemap.task_evidence("change target_impl")
+        after = codemap.tasks.evidence("change target_impl")
 
     assert _ownership(after)["status"] != "resolved"
     assert _ownership(after)["owner"] is None
@@ -162,7 +162,7 @@ def test_denied_exact_symbol_cannot_participate_in_target_or_ownership(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_evidence("change denied_target")
+        packet = codemap.tasks.evidence("change denied_target")
 
     assert "hidden/owner.py" not in str(packet)
     assert _owner_path(packet) != "hidden/owner.py"
@@ -180,7 +180,7 @@ def test_test_only_exact_symbol_is_not_silently_promoted_to_implementation_owner
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_evidence("diagnose test_target_impl behavior")
+        packet = codemap.tasks.evidence("diagnose test_target_impl behavior")
 
     assert _ownership(packet)["owner"] is None
     assert _ownership(packet)["status"] != "resolved"
@@ -204,7 +204,7 @@ def test_explicit_test_edit_is_target_evidence_not_implementation_ownership(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_evidence(
+        packet = codemap.tasks.evidence(
             "strengthen regression test test_run_task_contract"
         )
 
@@ -228,7 +228,7 @@ def test_freshness_state_does_not_upgrade_or_downgrade_owner_identity(
         monkeypatch.setattr(
             codemap.reads, "generation_status", lambda: (generation, 41, True)
         )
-        packet = codemap.task_evidence("change target_impl")
+        packet = codemap.tasks.evidence("change target_impl")
 
     assert _owner_path(packet) == "src/owner.py"
     assert _ownership(packet)["status"] == "resolved"
@@ -260,13 +260,13 @@ def test_external_correlation_cannot_change_task_ownership_authority(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.task_evidence("change duplicate_owner")
-        correlation = codemap.correlate_evidence(
+        before = codemap.tasks.evidence("change duplicate_owner")
+        correlation = codemap.correlation.observe(
             bundle,
             path_mappings=[{"external_prefix": "/app", "repository_prefix": ""}],
             include_relationships=False,
         )
-        after = codemap.task_evidence("change duplicate_owner")
+        after = codemap.tasks.evidence("change duplicate_owner")
 
     assert correlation["authority"] == "repository-intelligence-only"
     assert correlation["interpretation_authority"] == "consumer-owned"
@@ -285,11 +285,11 @@ def test_candidate_never_becomes_admitted_owner_across_action_projections(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map("fix duplicate_owner")
-        evidence = codemap.task_evidence("fix duplicate_owner")
-        packet = codemap.task_decision_packet("fix duplicate_owner")
-        decision_brief = codemap.task_decision_brief("fix duplicate_owner")
-        action_brief = codemap.task_action_brief(
+        action = codemap.tasks.action_map("fix duplicate_owner")
+        evidence = codemap.tasks.evidence("fix duplicate_owner")
+        packet = codemap.tasks.decision_packet("fix duplicate_owner")
+        decision_brief = codemap.tasks.decision_brief("fix duplicate_owner")
+        action_brief = codemap.tasks.action_brief(
             "fix duplicate_owner", token_budget=256
         )
 
@@ -325,11 +325,11 @@ def test_resolved_owner_survives_all_action_projections(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        action = codemap.task_action_map("fix exact_owner")
-        evidence = codemap.task_evidence("fix exact_owner")
-        packet = codemap.task_decision_packet("fix exact_owner")
-        decision_brief = codemap.task_decision_brief("fix exact_owner")
-        action_brief = codemap.task_action_brief("fix exact_owner", token_budget=256)
+        action = codemap.tasks.action_map("fix exact_owner")
+        evidence = codemap.tasks.evidence("fix exact_owner")
+        packet = codemap.tasks.decision_packet("fix exact_owner")
+        decision_brief = codemap.tasks.decision_brief("fix exact_owner")
+        action_brief = codemap.tasks.action_brief("fix exact_owner", token_budget=256)
 
     assert assert_object(action["edit"])["path"] == "src/owner.py"
     assert assert_object(action["admitted_edit"])["path"] == "src/owner.py"

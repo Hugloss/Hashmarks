@@ -119,7 +119,7 @@ def test_lsp_direct_claims_are_request_local(
 ) -> None:
     with CodeMap(repo) as cm:
         cm.index.sync()
-        result = cm.structural_locality(
+        result = cm.structure.locality(
             f"source.py::{subject}",
             result_mode="relationships",
             supplied_observations=[_capture(repo, method)],
@@ -145,7 +145,7 @@ def test_lsp_direct_claims_are_request_local(
 def test_prepare_call_hierarchy_exposes_no_invented_edges(repo: Path) -> None:
     with CodeMap(repo) as cm:
         cm.index.sync()
-        result = cm.structural_locality(
+        result = cm.structure.locality(
             "source.py::target",
             result_mode="relationships",
             supplied_observations=[_capture(repo, "textDocument/prepareCallHierarchy")],
@@ -221,7 +221,7 @@ def test_projection_rejects_claim_upgrade_and_omitted_context() -> None:
 def test_reacquisition_reference_is_scope_only_not_current_proof(repo: Path) -> None:
     with CodeMap(repo) as cm:
         cm.index.sync()
-        packet = cm.repository_evidence_bindings(
+        packet = cm.bindings.observe(
             [
                 {
                     "binding_id": "consumer:source",
@@ -359,9 +359,7 @@ def test_legacy_relationship_packet_without_correspondence_still_validates(
 ) -> None:
     with CodeMap(repo) as cm:
         cm.index.sync()
-        packet = cm.structural_locality(
-            "source.py::target", result_mode="relationships"
-        )
+        packet = cm.structure.locality("source.py::target", result_mode="relationships")
     legacy = deepcopy(packet)
     legacy.pop("producer_correspondence")
     legacy.pop("evidence_identity")
@@ -375,9 +373,7 @@ def test_legacy_relationship_packet_without_correspondence_still_validates(
 def test_forged_cross_producer_correspondence_is_rejected(repo: Path) -> None:
     with CodeMap(repo) as cm:
         cm.index.sync()
-        packet = cm.structural_locality(
-            "source.py::target", result_mode="relationships"
-        )
+        packet = cm.structure.locality("source.py::target", result_mode="relationships")
     tampered = deepcopy(packet)
     tampered["producer_correspondence"]["negative_evidence_admissible"] = True
     tampered.pop("evidence_identity")

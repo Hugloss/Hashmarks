@@ -33,8 +33,10 @@ def test_task_entry_point_ambiguity_does_not_turn_truncation_into_unambiguous(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        narrow = codemap.task_entry_points("source tests alpha", limit=1, per_role=1)
-        complete = codemap.task_entry_points("source tests alpha", limit=20, per_role=1)
+        narrow = codemap.tasks.entry_points("source tests alpha", limit=1, per_role=1)
+        complete = codemap.tasks.entry_points(
+            "source tests alpha", limit=20, per_role=1
+        )
 
     assert len(assert_array(narrow["canonical"])) == 1
     assert narrow["schema"] == "hashmarks.task-entry-points.v4"
@@ -89,7 +91,7 @@ def test_task_entry_point_unambiguous_requires_exhausted_canonical_retrieval(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_entry_points("source tests alpha", limit=20, per_role=1)
+        packet = codemap.tasks.entry_points("source tests alpha", limit=20, per_role=1)
 
     assert assert_object(packet["bounds"])["canonical_completeness"] == "complete"
     assert assert_object(packet["ambiguity"])["completeness"] == "complete"
@@ -115,7 +117,7 @@ def test_internal_task_retrieval_cap_cannot_prove_entry_point_absence(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_entry_points("alpha implementation", limit=200)
+        packet = codemap.tasks.entry_points("alpha implementation", limit=200)
 
     assert len(assert_array(packet["canonical"])) < 120
     assert assert_object(packet["bounds"])["canonical_completeness"] != "complete"
@@ -130,7 +132,7 @@ def test_task_entry_points_reuses_one_retrieval_composition(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         calls = []
-        original = codemap._task_find_sequences
+        original = codemap.search._task_find_sequences
 
         def tracked(
             task: str, limit: int
@@ -142,10 +144,10 @@ def test_task_entry_points_reuses_one_retrieval_composition(
             calls.append((task, limit, codemap.store.generation()))
             return original(task, limit)
 
-        monkeypatch.setattr(codemap, "_task_find_sequences", tracked)
-        packet = codemap.task_entry_points("source tests alpha", limit=10)
+        monkeypatch.setattr(codemap.search, "_task_find_sequences", tracked)
+        packet = codemap.tasks.entry_points("source tests alpha", limit=10)
         cache_keys = [
-            key for key in codemap._task_result_cache if key[1] == packet["task"]
+            key for key in codemap.search._task_result_cache if key[1] == packet["task"]
         ]
 
     assert len(calls) == 1
@@ -160,14 +162,14 @@ def test_stale_cached_task_hit_invalidates_retrieval_completeness(
     _write_source_and_test(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        first = codemap.task_entry_points("source tests alpha", limit=20)
+        first = codemap.tasks.entry_points("source tests alpha", limit=20)
         assert assert_object(first["bounds"])["canonical_completeness"] == "complete"
         monkeypatch.setattr(
             codemap.index,
             "is_current",
             lambda path: path != "tests/test_alpha.py",
         )
-        second = codemap.task_entry_points("source tests alpha", limit=20)
+        second = codemap.tasks.entry_points("source tests alpha", limit=20)
 
     assert assert_object(second["bounds"])["canonical_completeness"] == "incomplete"
     assert assert_object(second["bounds"])["canonical_truncation"] == "unknown"
@@ -187,8 +189,8 @@ def test_query_base_term_limit_invalidates_task_entry_absence(tmp_path: Path) ->
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         task = f"source tests {terms}"
-        packet = codemap.task_entry_points(task, limit=20)
-        canonical = [hit.as_dict() for hit in codemap.find_task(task, limit=20)]
+        packet = codemap.tasks.entry_points(task, limit=20)
+        canonical = [hit.as_dict() for hit in codemap.search.find_task(task, limit=20)]
 
     assert packet["canonical"] == canonical
     assert "task-query-base-term-limit" in assert_array(
@@ -210,7 +212,7 @@ def test_query_view_term_limits_invalidate_task_entry_absence(tmp_path: Path) ->
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_entry_points(task, limit=20)
+        packet = codemap.tasks.entry_points(task, limit=20)
 
     reasons = assert_array(assert_object(packet["bounds"])["bound_reasons"])
     assert "task-query-governance-term-limit" in reasons
@@ -226,7 +228,7 @@ def test_omitted_identifier_input_limit_invalidates_task_entry_absence(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.task_entry_points(task, limit=20)
+        packet = codemap.tasks.entry_points(task, limit=20)
 
     assert "task-omitted-component-input-limit" in assert_array(
         assert_object(packet["bounds"])["bound_reasons"]
@@ -262,13 +264,13 @@ def test_role_presentation_limit_cannot_hide_competing_anchor(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         monkeypatch.setattr(
-            codemap,
+            codemap.search,
             "_find_task_evidence_impl",
             lambda task, *, limit=20: _TaskRetrievalResult(hits[:limit], ()),
         )
         task = "change source tests AnchorOwner test_AnchorOwner"
-        narrow = codemap.task_entry_points(task, per_role=1)
-        wide = codemap.task_entry_points(task, per_role=2)
+        narrow = codemap.tasks.entry_points(task, per_role=1)
+        wide = codemap.tasks.entry_points(task, per_role=2)
 
     assert len(assert_array(assert_object(narrow["roles"])["verification"])) == 1
     assert len(assert_array(assert_object(wide["roles"])["verification"])) == 2

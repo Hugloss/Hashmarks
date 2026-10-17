@@ -256,7 +256,7 @@ def observe_runtime(
         destination = output / "runtime" / variant
         write_json(destination / "request.json", request)
         with CodeMap(workspace, state_dir=state) as codemap:
-            packet = codemap.correlate_evidence(**request)
+            packet = codemap.correlation.observe(**request)
         write_json(destination / "api.json", packet)
         case: dict[str, object] = {"operation": "correlate_evidence", "inputs": request}
         for surface, observe in (("cli", capture_cli), ("mcp", capture_mcp)):

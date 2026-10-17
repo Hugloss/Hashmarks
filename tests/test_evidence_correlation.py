@@ -144,10 +144,8 @@ def test_evidence_correlation_extension_preserves_repository_coverage_owner(
     ]
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.repository_evidence_bindings(
-            binding, include_relationships=False
-        )
-        coverage = codemap.repository_evidence_coverage(
+        packet = codemap.bindings.observe(binding, include_relationships=False)
+        coverage = codemap.bindings.coverage(
             packet,
             changed_paths=[],
             change_set_complete=True,
@@ -168,7 +166,7 @@ def test_external_runtime_path_maps_to_repository_symbol_without_gaining_authori
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.correlate_evidence(
+        packet = codemap.correlation.observe(
             _bundle(
                 {
                     "anchor_id": "frame:0",
@@ -204,7 +202,7 @@ def test_opaque_commit_like_metadata_never_proves_repository_source_identity(
     (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.correlate_evidence(
+        packet = codemap.correlation.observe(
             _bundle(
                 {
                     "anchor_id": "runtime",
@@ -238,14 +236,14 @@ def test_qualified_member_revision_proves_or_rejects_source_equivalence(
     base = _bundle({"anchor_id": "member", "path": "owner.py"})
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        observed = codemap.correlate_evidence(base, include_relationships=False)
+        observed = codemap.correlation.observe(base, include_relationships=False)
         observed_anchor = assert_array(
             assert_object(assert_array(observed["bundles"])[0])["anchors"]
         )[0]
         revision = assert_object(
             assert_array(_binding(observed, observed_anchor)["evidence"])[0]
         )["member_revision"]
-        proven = codemap.correlate_evidence(
+        proven = codemap.correlation.observe(
             _bundle(
                 {
                     "anchor_id": "member",
@@ -255,7 +253,7 @@ def test_qualified_member_revision_proves_or_rejects_source_equivalence(
             ),
             include_relationships=False,
         )
-        mismatch = codemap.correlate_evidence(
+        mismatch = codemap.correlation.observe(
             _bundle(
                 {
                     "anchor_id": "member",
@@ -299,7 +297,7 @@ def test_symbol_only_evidence_preserves_repository_ambiguity(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.correlate_evidence(
+        packet = codemap.correlation.observe(
             _bundle({"anchor_id": "symbol", "symbol": "duplicate"}),
             include_relationships=False,
         )
@@ -329,7 +327,7 @@ def test_conflicting_symbol_and_line_stays_a_claim_conflict(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.correlate_evidence(
+        packet = codemap.correlation.observe(
             _bundle(
                 {
                     "anchor_id": "conflict",
@@ -357,7 +355,7 @@ def test_missing_repository_member_does_not_become_resolved_by_mapping(
 ) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.correlate_evidence(
+        packet = codemap.correlation.observe(
             _bundle(
                 {
                     "anchor_id": "missing",
@@ -405,8 +403,8 @@ def test_bundle_reordering_does_not_change_correlation_identity(
     ]
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        first = codemap.correlate_evidence(left, include_relationships=False)
-        second = codemap.correlate_evidence(
+        first = codemap.correlation.observe(left, include_relationships=False)
+        second = codemap.correlation.observe(
             list(reversed(left)), include_relationships=False
         )
 
@@ -427,10 +425,10 @@ def test_anchor_reordering_within_bundle_does_not_change_correlation_identity(
     ]
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        first = codemap.correlate_evidence(
+        first = codemap.correlation.observe(
             _bundle(*anchors), include_relationships=False
         )
-        second = codemap.correlate_evidence(
+        second = codemap.correlation.observe(
             _bundle(*reversed(anchors)), include_relationships=False
         )
 
@@ -466,7 +464,7 @@ def test_symbol_candidate_bound_preserves_ambiguity(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.correlate_evidence(
+        packet = codemap.correlation.observe(
             _bundle(
                 {
                     "anchor_id": "dense",
@@ -496,7 +494,7 @@ def test_absolute_external_path_requires_explicit_mapping(
     (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.correlate_evidence(
+        packet = codemap.correlation.observe(
             _bundle(
                 {
                     "anchor_id": "unmapped",
@@ -525,7 +523,7 @@ def test_external_paths_and_mapping_prefixes_fail_closed_on_escape(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         with pytest.raises(ValueError, match="must not contain '..'"):
-            codemap.correlate_evidence(
+            codemap.correlation.observe(
                 _bundle(
                     {
                         "anchor_id": "escape",
@@ -540,7 +538,7 @@ def test_external_paths_and_mapping_prefixes_fail_closed_on_escape(
                 ],
             )
         with pytest.raises(ValueError, match="must not contain '..'"):
-            codemap.correlate_evidence(
+            codemap.correlation.observe(
                 _bundle(
                     {
                         "anchor_id": "safe",
@@ -562,7 +560,7 @@ def test_bundle_completeness_is_preserved_not_inferred(
     (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.correlate_evidence(
+        packet = codemap.correlation.observe(
             _bundle(
                 {"anchor_id": "partial", "path": "owner.py"},
                 completeness="incomplete",
@@ -594,7 +592,7 @@ def test_complete_external_bundle_requires_explicit_non_truncation(
             ValueError,
             match="completeness=complete requires truncation=complete",
         ):
-            codemap.correlate_evidence([bundle], include_relationships=False)
+            codemap.correlation.observe([bundle], include_relationships=False)
 
 
 def test_truncated_external_bundle_cannot_authorize_negative_evidence(
@@ -609,7 +607,7 @@ def test_truncated_external_bundle_cannot_authorize_negative_evidence(
     bundle["truncation"] = "truncated"
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.correlate_evidence([bundle], include_relationships=False)
+        packet = codemap.correlation.observe([bundle], include_relationships=False)
 
     assert assert_object(assert_array(packet["bundles"])[0])["scope"] == bundle["scope"]
     assert (
@@ -638,7 +636,7 @@ def test_complete_scoped_external_bundle_marks_negative_evidence_scope_only(
     }
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.correlate_evidence([bundle], include_relationships=False)
+        packet = codemap.correlation.observe([bundle], include_relationships=False)
 
     assert packet["completeness"] == {
         "state": "complete",
@@ -663,11 +661,11 @@ def test_scope_and_truncation_change_definition_identity(
     second_bundle["scope"] = {"window": "second"}
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        first = codemap.correlate_evidence([first_bundle], include_relationships=False)
-        second = codemap.correlate_evidence(
+        first = codemap.correlation.observe([first_bundle], include_relationships=False)
+        second = codemap.correlation.observe(
             [second_bundle], include_relationships=False
         )
-        delta = codemap.evidence_correlation_delta(first, second)
+        delta = codemap.correlation.delta(first, second)
 
     assert (
         first["evidence_definition_identity"] != second["evidence_definition_identity"]
@@ -687,11 +685,11 @@ def test_bundle_scope_is_bounded_and_json_compatible(tmp_path: Path) -> None:
             ValueError,
             match="evidence correlation request must contain JSON-compatible values",
         ):
-            codemap.correlate_evidence([bundle], include_relationships=False)
+            codemap.correlation.observe([bundle], include_relationships=False)
 
         bundle["scope"] = {"value": "x" * 9000}
         with pytest.raises(ValueError, match="bundle scope exceeds 8192 encoded bytes"):
-            codemap.correlate_evidence([bundle], include_relationships=False)
+            codemap.correlation.observe([bundle], include_relationships=False)
 
 
 def test_uv_lock_upgrade_delta_reuses_repository_binding_authority(
@@ -715,13 +713,13 @@ def test_uv_lock_upgrade_delta_reuses_repository_binding_authority(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.correlate_evidence(evidence, include_relationships=False)
+        before = codemap.correlation.observe(evidence, include_relationships=False)
         lock.write_text(
             'version = 1\npackage = "cryptography==47.0.0"\n',
             encoding="utf-8",
         )
         codemap.index.sync(["uv.lock"])
-        after = codemap.correlate_evidence(
+        after = codemap.correlation.observe(
             evidence,
             include_relationships=False,
             previous_correlation=before,
@@ -754,7 +752,7 @@ def test_previous_correlation_rejects_tampered_top_level_packet(
     (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.correlate_evidence(
+        before = codemap.correlation.observe(
             _bundle({"anchor_id": "owner", "path": "owner.py"}),
             include_relationships=False,
         )
@@ -764,7 +762,7 @@ def test_previous_correlation_rejects_tampered_top_level_packet(
             ValueError,
             match="correlation_identity does not match packet content",
         ):
-            codemap.correlate_evidence(
+            codemap.correlation.observe(
                 _bundle({"anchor_id": "owner", "path": "owner.py"}),
                 include_relationships=False,
                 previous_correlation=tampered,
@@ -777,7 +775,7 @@ def test_previous_correlation_rejects_tampered_nested_repository_evidence(
     (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.correlate_evidence(
+        before = codemap.correlation.observe(
             _bundle({"anchor_id": "owner", "path": "owner.py"}),
             include_relationships=False,
         )
@@ -788,7 +786,7 @@ def test_previous_correlation_rejects_tampered_nested_repository_evidence(
             ValueError,
             match="bindings identity mismatch",
         ):
-            codemap.correlate_evidence(
+            codemap.correlation.observe(
                 _bundle({"anchor_id": "owner", "path": "owner.py"}),
                 include_relationships=False,
                 previous_correlation=tampered,
@@ -801,19 +799,19 @@ def test_previous_correlation_rejects_missing_or_malformed_identity(
     (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.correlate_evidence(
+        before = codemap.correlation.observe(
             _bundle({"anchor_id": "owner", "path": "owner.py"}),
             include_relationships=False,
         )
         missing = dict(before)
         missing.pop("correlation_identity")
         with pytest.raises(ValueError, match="correlation_identity must use sha256"):
-            codemap.evidence_correlation_delta(missing, before)
+            codemap.correlation.delta(missing, before)
 
         malformed = dict(before)
         malformed["correlation_identity"] = "opaque"
         with pytest.raises(ValueError, match="correlation_identity must use sha256"):
-            codemap.evidence_correlation_delta(before, malformed)
+            codemap.correlation.delta(before, malformed)
 
 
 def test_duplicate_bundle_ids_fail_closed_before_correlation(
@@ -831,7 +829,7 @@ def test_duplicate_bundle_ids_fail_closed_before_correlation(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         with pytest.raises(ValueError, match="duplicate bundle_id: duplicate"):
-            codemap.correlate_evidence(
+            codemap.correlation.observe(
                 [bundle, dict(bundle)],
                 include_relationships=False,
             )
@@ -847,7 +845,7 @@ def test_duplicate_anchor_ids_fail_closed_within_bundle(
             ValueError,
             match="duplicate anchor_id in bundle observation:1: owner",
         ):
-            codemap.correlate_evidence(
+            codemap.correlation.observe(
                 _bundle(
                     {"anchor_id": "owner", "path": "owner.py"},
                     {"anchor_id": "owner", "path": "owner.py"},
@@ -862,7 +860,7 @@ def test_previous_correlation_rejects_tampered_authority_definition_and_bounds(
     (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.correlate_evidence(
+        before = codemap.correlation.observe(
             _bundle({"anchor_id": "owner", "path": "owner.py"}),
             include_relationships=False,
         )
@@ -885,7 +883,7 @@ def test_previous_correlation_rejects_tampered_authority_definition_and_bounds(
                 ValueError,
                 match="correlation_identity does not match packet content",
             ):
-                codemap.evidence_correlation_delta(tampered, before)
+                codemap.correlation.delta(tampered, before)
 
 
 def test_correlation_replay_reproves_definition_even_after_outer_resign(
@@ -894,14 +892,14 @@ def test_correlation_replay_reproves_definition_even_after_outer_resign(
     (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.correlate_evidence(
+        before = codemap.correlation.observe(
             _bundle({"anchor_id": "owner", "path": "owner.py"}),
             include_relationships=False,
         )
         changed = _bundle({"anchor_id": "owner", "path": "owner.py"})
         changed[0]["provenance"] = {"producer_revision": "different"}
-        after = codemap.correlate_evidence(changed, include_relationships=False)
-        assert codemap.evidence_correlation_delta(before, after)["comparability"] == (
+        after = codemap.correlation.observe(changed, include_relationships=False)
+        assert codemap.correlation.delta(before, after)["comparability"] == (
             "not-comparable"
         )
 
@@ -909,7 +907,7 @@ def test_correlation_replay_reproves_definition_even_after_outer_resign(
         forged["evidence_definition_identity"] = before["evidence_definition_identity"]
         _resign_correlation(codemap, forged)
         with pytest.raises(ValueError, match="evidence_definition_identity mismatch"):
-            codemap.evidence_correlation_delta(before, forged)
+            codemap.correlation.delta(before, forged)
 
 
 def test_correlation_replay_reproves_packet_local_projections(
@@ -918,7 +916,7 @@ def test_correlation_replay_reproves_packet_local_projections(
     (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        observed = codemap.correlate_evidence(
+        observed = codemap.correlation.observe(
             _bundle({"anchor_id": "owner", "path": "owner.py"}),
             include_relationships=False,
         )
@@ -932,7 +930,7 @@ def test_correlation_replay_reproves_packet_local_projections(
                 )["evidence"]
             )[0]
         )["member_revision"]
-        packet = codemap.correlate_evidence(
+        packet = codemap.correlation.observe(
             _bundle(
                 {"anchor_id": "owner", "path": "owner.py", "member_revision": revision}
             ),
@@ -950,19 +948,19 @@ def test_correlation_replay_reproves_packet_local_projections(
             forged["bundles"][0]["anchors"][0][field] = value
             _resign_correlation(codemap, forged)
             with pytest.raises(ValueError, match=message):
-                codemap.evidence_correlation_delta(forged, packet)
+                codemap.correlation.delta(forged, packet)
 
         forged = json.loads(json.dumps(packet))
         forged["completeness"]["state"] = "unknown"
         _resign_correlation(codemap, forged)
         with pytest.raises(ValueError, match="completeness mismatch"):
-            codemap.evidence_correlation_delta(forged, packet)
+            codemap.correlation.delta(forged, packet)
 
         forged = json.loads(json.dumps(packet))
         forged["authority"] = "consumer-owned"
         _resign_correlation(codemap, forged)
         with pytest.raises(ValueError, match="authority or bounds mismatch"):
-            codemap.evidence_correlation_delta(forged, packet)
+            codemap.correlation.delta(forged, packet)
 
 
 def test_empty_correlation_retains_definition_options_and_rejects_v1(
@@ -970,8 +968,8 @@ def test_empty_correlation_retains_definition_options_and_rejects_v1(
 ) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.correlate_evidence([], include_relationships=False)
-        after = codemap.correlate_evidence(
+        before = codemap.correlation.observe([], include_relationships=False)
+        after = codemap.correlation.observe(
             [], include_relationships=True, relationship_limit_per_path=7
         )
         assert before["definition_options"] == {
@@ -982,7 +980,7 @@ def test_empty_correlation_retains_definition_options_and_rejects_v1(
             "include_relationships": True,
             "relationship_limit_per_path": 7,
         }
-        assert codemap.evidence_correlation_delta(before, after)["comparability"] == (
+        assert codemap.correlation.delta(before, after)["comparability"] == (
             "not-comparable"
         )
 
@@ -990,23 +988,23 @@ def test_empty_correlation_retains_definition_options_and_rejects_v1(
         forged["definition_options"] = before["definition_options"]
         _resign_correlation(codemap, forged)
         with pytest.raises(ValueError, match="evidence_definition_identity mismatch"):
-            codemap.evidence_correlation_delta(forged, after)
+            codemap.correlation.delta(forged, after)
 
         legacy = json.loads(json.dumps(before))
         legacy["schema"] = "hashmarks.evidence-correlation.v1"
         with pytest.raises(
             ValueError, match="must be a hashmarks.evidence-correlation.v2"
         ):
-            codemap.evidence_correlation_delta(legacy, before)
+            codemap.correlation.delta(legacy, before)
 
 
 def test_correlation_requires_exact_relationship_option_types(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         with pytest.raises(ValueError, match="include_relationships must be a boolean"):
-            codemap.correlate_evidence([], include_relationships=cast("bool", 1))
+            codemap.correlation.observe([], include_relationships=cast("bool", 1))
         with pytest.raises(ValueError, match="relationship_limit_per_path must be"):
-            codemap.correlate_evidence(
+            codemap.correlation.observe(
                 [], relationship_limit_per_path=cast("int", True)
             )
 
@@ -1018,7 +1016,7 @@ def test_correlation_replay_rejects_swapped_anchor_bindings_and_correspondence(
     (tmp_path / "b.py").write_text("B = 1\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.correlate_evidence(
+        packet = codemap.correlation.observe(
             _bundle(
                 {"anchor_id": "a", "path": "a.py"},
                 {"anchor_id": "b", "path": "b.py"},
@@ -1031,11 +1029,11 @@ def test_correlation_replay_rejects_swapped_anchor_bindings_and_correspondence(
             anchors[0][field], anchors[1][field] = anchors[1][field], anchors[0][field]
         _resign_correlation(codemap, forged)
         with pytest.raises(ValueError, match="anchor binding references mismatch"):
-            codemap.evidence_correlation_delta(forged, packet)
+            codemap.correlation.delta(forged, packet)
 
         second = _bundle({"anchor_id": "second", "path": "a.py"})[0]
         second["bundle_id"] = "observation:2"
-        corresponded = codemap.correlate_evidence(
+        corresponded = codemap.correlation.observe(
             [_bundle({"anchor_id": "first", "path": "a.py"})[0], second],
             include_relationships=False,
         )
@@ -1044,7 +1042,7 @@ def test_correlation_replay_rejects_swapped_anchor_bindings_and_correspondence(
         forged["correspondence"] = []
         _resign_correlation(codemap, forged)
         with pytest.raises(ValueError, match="correspondence mismatch"):
-            codemap.evidence_correlation_delta(forged, corresponded)
+            codemap.correlation.delta(forged, corresponded)
 
 
 def test_correlation_request_reuses_binding_total_bound(
@@ -1073,7 +1071,7 @@ def test_correlation_request_reuses_binding_total_bound(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         with pytest.raises(ValueError, match="256 total anchors"):
-            codemap.correlate_evidence(bundles, include_relationships=False)
+            codemap.correlation.observe(bundles, include_relationships=False)
 
 
 def test_module_lookup_bound_cannot_authorize_absence_after_filtering(
@@ -1104,8 +1102,8 @@ def test_module_lookup_bound_cannot_authorize_absence_after_filtering(
             member_observation,
         )
 
-        resolution = codemap._resolve_module_only("pkg.target")
-        projected = codemap._resolution_packet(resolution)
+        resolution = codemap.correlation._resolve_module_only("pkg.target")
+        projected = codemap.correlation._resolution_packet(resolution)
 
     assert resolution.state == "unresolved"
     assert resolution.reason == "module-match-bound-exhausted"
@@ -1143,8 +1141,8 @@ def test_module_lookup_bound_cannot_authorize_uniqueness_after_filtering(
             member_observation,
         )
 
-        resolution = codemap._resolve_module_only("pkg.target")
-        projected = codemap._resolution_packet(resolution)
+        resolution = codemap.correlation._resolve_module_only("pkg.target")
+        projected = codemap.correlation._resolution_packet(resolution)
 
     assert resolution.state == "resolved-ambiguous"
     assert resolution.reason == "module-match-bound-exhausted"
@@ -1181,8 +1179,8 @@ def test_exhausted_module_lookup_can_still_authorize_absence(
             member_observation,
         )
 
-        resolution = codemap._resolve_module_only("pkg.target")
-        projected = codemap._resolution_packet(resolution)
+        resolution = codemap.correlation._resolve_module_only("pkg.target")
+        projected = codemap.correlation._resolution_packet(resolution)
 
     assert resolution.state == "unresolved"
     assert resolution.reason == "module-not-found"
@@ -1205,7 +1203,7 @@ def test_exact_module_locator_reuses_repository_module_identity(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.correlate_evidence(
+        packet = codemap.correlation.observe(
             _bundle(
                 {"anchor_id": "owned", "module": "utils.kafka"},
                 {"anchor_id": "external", "module": "httpx"},
@@ -1241,7 +1239,7 @@ def test_module_claim_conflicting_with_exact_path_stays_conflict(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.correlate_evidence(
+        packet = codemap.correlation.observe(
             _bundle(
                 {
                     "anchor_id": "conflict",
@@ -1284,7 +1282,7 @@ def test_repeated_observations_share_one_repository_binding(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         with codemap.reads.session(diagnostics=True):
-            packet = codemap.correlate_evidence(
+            packet = codemap.correlation.observe(
                 _bundle(*anchors),
                 include_relationships=True,
             )
@@ -1348,7 +1346,7 @@ def test_core_packet_budget_fails_closed_for_dense_relationship_evidence(
             ValueError,
             match="packet exceeds 1048576 encoded bytes",
         ):
-            codemap.correlate_evidence(
+            codemap.correlation.observe(
                 _bundle(*anchors),
                 include_relationships=True,
                 relationship_limit_per_path=100,
@@ -1368,7 +1366,7 @@ def test_external_temporal_provenance_is_preserved_but_not_repository_freshness(
     }
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.correlate_evidence([bundle], include_relationships=False)
+        packet = codemap.correlation.observe([bundle], include_relationships=False)
 
     emitted = assert_object(assert_array(packet["bundles"])[0])
     assert emitted["provenance"] == bundle["provenance"]
@@ -1386,11 +1384,11 @@ def test_temporal_provenance_changes_definition_not_repository_delta(
     second_bundle["provenance"] = {"observed_time": "2026-09-21T09:00:00Z"}
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        first = codemap.correlate_evidence([first_bundle], include_relationships=False)
-        second = codemap.correlate_evidence(
+        first = codemap.correlation.observe([first_bundle], include_relationships=False)
+        second = codemap.correlation.observe(
             [second_bundle], include_relationships=False
         )
-        delta = codemap.evidence_correlation_delta(first, second)
+        delta = codemap.correlation.delta(first, second)
 
     assert delta["comparability"] == "not-comparable"
     assert assert_object(delta["definition"])["state"] == "changed"
@@ -1403,11 +1401,11 @@ def test_same_definition_keeps_correlation_delta_comparable(tmp_path: Path) -> N
     bundle = _bundle({"anchor_id": "owner", "path": "owner.py"})
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.correlate_evidence(bundle, include_relationships=False)
+        before = codemap.correlation.observe(bundle, include_relationships=False)
         path.write_text("VALUE = 2\n", encoding="utf-8")
         codemap.index.sync(["owner.py"])
-        after = codemap.correlate_evidence(bundle, include_relationships=False)
-        delta = codemap.evidence_correlation_delta(before, after)
+        after = codemap.correlation.observe(bundle, include_relationships=False)
+        delta = codemap.correlation.delta(before, after)
 
     assert delta["comparability"] == "comparable"
     assert assert_object(delta["definition"])["state"] == "preserved"
@@ -1426,14 +1424,14 @@ def test_bundle_provenance_is_bounded_and_json_compatible(tmp_path: Path) -> Non
             ValueError,
             match="evidence correlation request must contain JSON-compatible values",
         ):
-            codemap.correlate_evidence([bundle], include_relationships=False)
+            codemap.correlation.observe([bundle], include_relationships=False)
 
         bundle["provenance"] = {"value": "x" * 9000}
         with pytest.raises(
             ValueError,
             match="bundle provenance exceeds 8192 encoded bytes",
         ):
-            codemap.correlate_evidence([bundle], include_relationships=False)
+            codemap.correlation.observe([bundle], include_relationships=False)
 
 
 @pytest.mark.parametrize(
@@ -1454,7 +1452,7 @@ def test_path_mapping_portability_preserves_repository_identity(
     (tmp_path / "src" / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.correlate_evidence(
+        packet = codemap.correlation.observe(
             _bundle({"anchor_id": "portable", "path": external_path}),
             path_mappings=[
                 {"external_prefix": external_prefix, "repository_prefix": "src"}
@@ -1483,7 +1481,7 @@ def test_longest_path_mapping_prefix_wins_deterministically(tmp_path: Path) -> N
     ]
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.correlate_evidence(
+        packet = codemap.correlation.observe(
             _bundle({"anchor_id": "owner", "path": "/app/pkg/owner.py"}),
             path_mappings=list(reversed(mappings)),
             include_relationships=False,
@@ -1508,7 +1506,7 @@ def test_source_equivalence_requires_independent_repository_identity(
         codemap.index.sync()
         observed, _raw = codemap.source.member("owner.py")
         revision = observed["member_revision"]
-        proven = codemap.correlate_evidence(
+        proven = codemap.correlation.observe(
             _bundle(
                 {
                     "anchor_id": "proven",
@@ -1522,7 +1520,7 @@ def test_source_equivalence_requires_independent_repository_identity(
             ),
             include_relationships=False,
         )
-        mismatch = codemap.correlate_evidence(
+        mismatch = codemap.correlation.observe(
             _bundle(
                 {
                     "anchor_id": "mismatch",
@@ -1532,7 +1530,7 @@ def test_source_equivalence_requires_independent_repository_identity(
             ),
             include_relationships=False,
         )
-        unknown = codemap.correlate_evidence(
+        unknown = codemap.correlation.observe(
             _bundle(
                 {
                     "anchor_id": "unknown",
@@ -1578,7 +1576,7 @@ def test_member_revision_and_span_identity_disagreement_is_mismatch(
     source.write_text("VALUE = 1\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        baseline = codemap.correlate_evidence(
+        baseline = codemap.correlation.observe(
             _bundle({"anchor_id": "baseline", "path": "owner.py", "line": 1}),
             include_relationships=False,
         )
@@ -1598,7 +1596,7 @@ def test_member_revision_and_span_identity_disagreement_is_mismatch(
             )
         )
         evidence = assert_object(assert_array(binding["evidence"])[0])
-        packet = codemap.correlate_evidence(
+        packet = codemap.correlation.observe(
             _bundle(
                 {
                     "anchor_id": "conflict",
@@ -1635,7 +1633,7 @@ def test_source_equivalence_requires_every_supplied_identity_to_be_checked(
         codemap.index.sync()
         member, _raw = codemap.source.member("owner.py")
         revision = member["member_revision"]
-        observed_span = codemap.correlate_evidence(
+        observed_span = codemap.correlation.observe(
             _bundle({"anchor_id": "line", "path": "owner.py", "line": 1}),
             include_relationships=False,
         )
@@ -1671,7 +1669,7 @@ def test_source_equivalence_requires_every_supplied_identity_to_be_checked(
                 "span_identity": span_identity,
             },
         )
-        packet = codemap.correlate_evidence(
+        packet = codemap.correlation.observe(
             _bundle(*claims), include_relationships=False
         )
 
@@ -1732,7 +1730,7 @@ def test_producer_neutral_evidence_uses_same_repository_correlation_owner(
     bundle["producer"] = {"kind": producer_kind}
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.correlate_evidence([bundle], include_relationships=False)
+        packet = codemap.correlation.observe([bundle], include_relationships=False)
 
     emitted = assert_object(assert_array(packet["bundles"])[0])
     anchor = assert_object(assert_array(emitted["anchors"])[0])
@@ -1749,7 +1747,7 @@ def test_evidence_payload_is_not_operational_telemetry(tmp_path: Path) -> None:
     secret_marker = "evidence-payload-must-not-be-telemetry"
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.correlate_evidence(
+        packet = codemap.correlation.observe(
             _bundle(
                 {
                     "anchor_id": "otel",
@@ -1800,7 +1798,7 @@ def test_cross_bundle_correspondence_reports_same_target_without_incident_or_cau
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.correlate_evidence(bundles, include_relationships=False)
+        packet = codemap.correlation.observe(bundles, include_relationships=False)
 
     assert packet["correspondence"] == [
         {
@@ -1835,7 +1833,7 @@ def test_cross_bundle_correspondence_excludes_ambiguous_and_unresolved(
     second["bundle_id"] = "second"
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.correlate_evidence(
+        packet = codemap.correlation.observe(
             [first, second], include_relationships=False
         )
 
@@ -1860,8 +1858,8 @@ def test_final_correlation_scale_matrix_is_bounded_and_deterministic(
     bundles = _bundle(*anchors)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        first = codemap.correlate_evidence(bundles, include_relationships=False)
-        replay = codemap.correlate_evidence(
+        first = codemap.correlation.observe(bundles, include_relationships=False)
+        replay = codemap.correlation.observe(
             list(reversed(bundles)),
             include_relationships=False,
         )
@@ -1888,14 +1886,14 @@ def test_cross_bundle_correspondence_is_identity_bound_and_tamper_detected(
         bundles.append(bundle)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.correlate_evidence(bundles, include_relationships=False)
+        packet = codemap.correlation.observe(bundles, include_relationships=False)
         tampered = json.loads(json.dumps(packet))
         tampered["correspondence"][0]["causation"] = "same-cause"
         with pytest.raises(
             ValueError,
             match="correlation_identity does not match packet content",
         ):
-            codemap.evidence_correlation_delta(packet, tampered)
+            codemap.correlation.delta(packet, tampered)
 
 
 def test_external_evidence_correlation_cannot_create_edit_ownership(
@@ -1913,8 +1911,8 @@ def test_external_evidence_correlation_cannot_create_edit_ownership(
     task = "Fix publish_result behavior"
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.task_action_map(task)
-        correlated = codemap.correlate_evidence(
+        before = codemap.tasks.action_map(task)
+        correlated = codemap.correlation.observe(
             _bundle(
                 {
                     "anchor_id": "runtime-frame",
@@ -1925,7 +1923,7 @@ def test_external_evidence_correlation_cannot_create_edit_ownership(
             ),
             include_relationships=False,
         )
-        after = codemap.task_action_map(task)
+        after = codemap.tasks.action_map(task)
 
     assert correlated["authority"] == "repository-intelligence-only"
     assert correlated["interpretation_authority"] == "consumer-owned"
@@ -1946,8 +1944,8 @@ def test_external_evidence_conflict_is_retained_without_mutating_owner(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.task_action_map("Fix first")
-        correlated = codemap.correlate_evidence(
+        before = codemap.tasks.action_map("Fix first")
+        correlated = codemap.correlation.observe(
             _bundle(
                 {
                     "anchor_id": "conflict",
@@ -1958,7 +1956,7 @@ def test_external_evidence_conflict_is_retained_without_mutating_owner(
             ),
             include_relationships=False,
         )
-        after = codemap.task_action_map("Fix first")
+        after = codemap.tasks.action_map("Fix first")
 
     anchor = assert_object(
         assert_array(assert_object(assert_array(correlated["bundles"])[0])["anchors"])[
@@ -1979,18 +1977,18 @@ def test_correlation_delta_rejects_foreign_repository_packet(tmp_path: Path) -> 
 
     with CodeMap(left) as codemap:
         codemap.index.sync()
-        before = codemap.correlate_evidence(
+        before = codemap.correlation.observe(
             _bundle({"anchor_id": "member", "path": "owner.py"}),
             include_relationships=False,
         )
     with CodeMap(right) as codemap:
         codemap.index.sync()
-        after = codemap.correlate_evidence(
+        after = codemap.correlation.observe(
             _bundle({"anchor_id": "member", "path": "owner.py"}),
             include_relationships=False,
         )
         with pytest.raises(ValueError, match="before correlation repository-mismatch"):
-            codemap.evidence_correlation_delta(before, after)
+            codemap.correlation.delta(before, after)
 
 
 def test_previous_correlation_from_foreign_repository_fails_closed(
@@ -2005,14 +2003,14 @@ def test_previous_correlation_from_foreign_repository_fails_closed(
 
     with CodeMap(left) as codemap:
         codemap.index.sync()
-        previous = codemap.correlate_evidence(
+        previous = codemap.correlation.observe(
             _bundle({"anchor_id": "member", "path": "owner.py"}),
             include_relationships=False,
         )
     with CodeMap(right) as codemap:
         codemap.index.sync()
         with pytest.raises(ValueError, match="before correlation repository-mismatch"):
-            codemap.correlate_evidence(
+            codemap.correlation.observe(
                 _bundle({"anchor_id": "member", "path": "owner.py"}),
                 include_relationships=False,
                 previous_correlation=previous,
@@ -2025,7 +2023,7 @@ def test_correlation_delta_rejects_nested_repository_evidence_tampering(
     (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.correlate_evidence(
+        packet = codemap.correlation.observe(
             _bundle({"anchor_id": "member", "path": "owner.py"}),
             include_relationships=False,
         )
@@ -2043,7 +2041,7 @@ def test_correlation_delta_rejects_nested_repository_evidence_tampering(
         )
 
         with pytest.raises(ValueError, match="bindings identity mismatch"):
-            codemap.evidence_correlation_delta(tampered, packet)
+            codemap.correlation.delta(tampered, packet)
 
 
 def test_correlation_definition_identity_is_bundle_order_invariant(
@@ -2057,10 +2055,10 @@ def test_correlation_definition_identity_is_bundle_order_invariant(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        forward = codemap.correlate_evidence(
+        forward = codemap.correlation.observe(
             [first, second], include_relationships=False
         )
-        reverse = codemap.correlate_evidence(
+        reverse = codemap.correlation.observe(
             [second, first], include_relationships=False
         )
 
@@ -2073,7 +2071,7 @@ def test_correlation_definition_identity_is_bundle_order_invariant(
 def test_incomplete_correlation_never_admits_negative_evidence(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.correlate_evidence(
+        packet = codemap.correlation.observe(
             _bundle(
                 {"anchor_id": "missing", "path": "missing.py"},
                 completeness="incomplete",

@@ -42,7 +42,7 @@ def test_import_ownership_reports_repository_owned_dynamic_module_bypass(
     _write_package(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        result = codemap.import_ownership_findings()
+        result = codemap.ownership.import_findings()
 
     assert result["schema"] == "hashmarks.import-ownership.v2"
     assert result["summary"]["warnings"] == 1
@@ -68,7 +68,7 @@ def test_import_ownership_does_not_flag_normal_package_import(tmp_path: Path) ->
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        result = codemap.import_ownership_findings()
+        result = codemap.ownership.import_findings()
     assert result["findings"] == []
 
 
@@ -76,7 +76,7 @@ def test_import_ownership_downgrades_test_loader_to_advisory(tmp_path: Path) -> 
     _write_package(tmp_path, loader_path="tests/test_loader.py")
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        result = codemap.import_ownership_findings()
+        result = codemap.ownership.import_findings()
     assert len(result["findings"]) == 1
     finding = result["findings"][0]
     assert finding["domain"] == "test"
@@ -88,7 +88,7 @@ def test_import_ownership_recognizes_explicit_sys_modules_owner(tmp_path: Path) 
     _write_package(tmp_path, register=True)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        result = codemap.import_ownership_findings()
+        result = codemap.ownership.import_findings()
     assert len(result["findings"]) == 1
     finding = result["findings"][0]
     assert finding["code"] == "python-custom-module-loader"
@@ -101,7 +101,7 @@ def test_import_ownership_can_inspect_explicit_path(tmp_path: Path) -> None:
     (tmp_path / "other.py").write_text("value = 1\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        result = codemap.import_ownership_findings(["scripts/research.py"])
+        result = codemap.ownership.import_findings(["scripts/research.py"])
     assert result["summary"]["files_considered"] == 1
     assert result["findings"][0]["path"] == "scripts/research.py"
 
@@ -136,7 +136,7 @@ def test_import_ownership_resolves_bound_and_wrapped_target_path(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        result = codemap.import_ownership_findings()
+        result = codemap.ownership.import_findings()
     assert result["findings"][0]["target_path"] == "pkg/helper.py"
     assert result["findings"][0]["target_module"] == "pkg.helper"
 
@@ -157,7 +157,7 @@ def test_import_ownership_reports_duplicate_module_identity(tmp_path: Path) -> N
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        finding = codemap.import_ownership_findings()["findings"][0]
+        finding = codemap.ownership.import_findings()["findings"][0]
     assert finding["code"] == "python-duplicate-module-identity"
     assert finding["target_module"] == "pkg.helper"
     assert finding["requested_module"] == "private_helper_copy"

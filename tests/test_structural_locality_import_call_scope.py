@@ -41,7 +41,7 @@ def test_unrelated_local_binding_cannot_hide_a_qualified_import_call(
         )
     (tmp_path / "consumer.py").write_text(source)
     with CodeMap(tmp_path) as codemap:
-        packet = codemap.structural_locality("consumer.py::Publisher.publish")
+        packet = codemap.structure.locality("consumer.py::Publisher.publish")
     calls = [
         row
         for row in assert_records(packet["edges"])
@@ -83,7 +83,7 @@ def test_actual_lexical_shadowing_cannot_gain_import_authority(
         target = "consumer.py::publish"
     (tmp_path / "consumer.py").write_text(text)
     with CodeMap(tmp_path) as codemap:
-        packet = codemap.structural_locality(target)
+        packet = codemap.structure.locality(target)
     calls = [
         row
         for row in assert_records(packet["edges"])
@@ -104,7 +104,7 @@ def test_duplicate_declarations_in_the_same_scope_stay_unresolved(
         "def publish(Envelope):\n    return Envelope.from_cmd()\n"
     )
     with CodeMap(tmp_path) as codemap:
-        packet = codemap.structural_locality("consumer.py::publish")
+        packet = codemap.structure.locality("consumer.py::publish")
     assert all(
         row["resolved_symbol_id"] is None for row in assert_records(packet["edges"])
     )

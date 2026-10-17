@@ -22,8 +22,8 @@ def test_brief_preserves_action_and_verification_without_verbose_candidates(
     )
     with CodeMap(tmp_path) as c:
         c.index.sync()
-        full = c.task_decision_packet("widget implementation test")
-        brief = c.task_decision_brief("widget implementation test")
+        full = c.tasks.decision_packet("widget implementation test")
+        brief = c.tasks.decision_brief("widget implementation test")
     assert assert_object(brief["edit"])["path"] == assert_object(full["edit"])["path"]
     assert (
         assert_object(brief["verify"])["path"] == assert_object(full["verify"])["path"]
@@ -48,7 +48,7 @@ def test_brief_deduplicates_contract_when_edit_is_contract(tmp_path: Path) -> No
     )
     with CodeMap(tmp_path) as c:
         c.index.sync()
-        brief = c.task_decision_brief("change policy config test")
+        brief = c.tasks.decision_brief("change policy config test")
     if brief["edit"] and brief.get("contract"):
         assert (
             assert_object(brief["edit"])["path"]
@@ -70,8 +70,8 @@ def test_decision_brief_keeps_ambiguous_candidate_out_of_edit_authority(
     )
     with CodeMap(tmp_path) as c:
         c.index.sync()
-        packet = c.task_decision_packet("Fix publish_result")
-        brief = c.task_decision_brief("Fix publish_result")
+        packet = c.tasks.decision_packet("Fix publish_result")
+        brief = c.tasks.decision_brief("Fix publish_result")
 
     assert packet["edit"] is None
     assert assert_object(packet["candidate"])["path"] in {"src/a.py", "src/b.py"}

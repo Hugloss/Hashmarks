@@ -21,7 +21,7 @@ def packet(
 ) -> dict[str, object]:
     with CodeMap(workspace) as cm:
         cm.index.sync()
-        entry = cm.task_entry_points(query, limit=limit)
+        entry = cm.tasks.entry_points(query, limit=limit)
         rec = [r for r in entry.get("recommended", []) if isinstance(r, dict)]
         ambiguity = (
             entry.get("ambiguity", {})
@@ -40,7 +40,7 @@ def packet(
             if resolved.get("resolved") and resolved.get("target"):
                 chosen = str(resolved["target"])
                 resolution = "selective-scout-" + str(resolved.get("reason"))
-        verify_hits = cm.find_task(query + " test verification", limit=limit)
+        verify_hits = cm.search.find_task(query + " test verification", limit=limit)
         verify = next(
             (
                 h.path

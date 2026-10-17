@@ -74,7 +74,7 @@ def _base_rows(workspace: Path, public: list[dict], limit: int) -> list[dict]:
     with CodeMap(workspace) as codemap:
         codemap.index.sync()
         for task in public:
-            entry = codemap.task_entry_points(task["query"], limit=limit)
+            entry = codemap.tasks.entry_points(task["query"], limit=limit)
             recommended = [
                 row for row in entry.get("recommended", []) if isinstance(row, dict)
             ]

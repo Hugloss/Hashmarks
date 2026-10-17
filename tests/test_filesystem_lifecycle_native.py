@@ -63,7 +63,7 @@ def test_native_child_replacement_is_separate_from_source_evidence(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        evidence = codemap.repository_findings(["cleanup.py"])["resource_lifecycle"]
+        evidence = codemap.ownership.findings(["cleanup.py"])["resource_lifecycle"]
         assert isinstance(evidence, dict)
         observations = assert_records(evidence["observations"])
         assert observations
@@ -71,7 +71,7 @@ def test_native_child_replacement_is_separate_from_source_evidence(
         assert observation["runtime_identity"] == "unverified"
         anchor = assert_object(observation["use"])
         assert anchor["guards"]
-        correlated = codemap.correlate_evidence(
+        correlated = codemap.correlation.observe(
             [
                 {
                     "bundle_id": "native-child-replacement",

@@ -13,10 +13,9 @@ from .query_primitives import _TASK_STOPWORDS, _WORD_RE
 if TYPE_CHECKING:
     from collections.abc import Sequence, Set
 
-    from .engine import CodeMap
+    from .repository_tasks import RepositoryTasks
     from .task_evidence_types import (
         SourceReadPending,
-        TaskSourceConfig,
         TaskSourceEvidence,
     )
 
@@ -391,7 +390,7 @@ class ConfigurationEvidenceMixin:
         be unique.  Unsupported/ambiguous syntax remains an explicit next-read.
         """
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         suffix = Path(path).suffix.lower()
         if suffix not in {".toml", ".json", ".yaml", ".yml"} or not task.strip():
             return None, None

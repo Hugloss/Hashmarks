@@ -193,7 +193,7 @@ def _correlate_evidence_code(args: Namespace) -> int:
     bundles = _request_mappings(request.get("bundles"), "bundles")
     options = _correlation_options(request)
     value = _call_codemap(
-        args, lambda codemap: codemap.correlate_evidence(bundles, **options)
+        args, lambda codemap: codemap.correlation.observe(bundles, **options)
     )
     _print_operation("correlate_evidence", value, presentation=args.presentation)
     return 0
@@ -312,7 +312,7 @@ def _map_sync(args: Namespace) -> int:
 
 def _map_findings(args: Namespace) -> int:
     value = _call_codemap(
-        args, lambda codemap: codemap.repository_findings(args.path or None)
+        args, lambda codemap: codemap.ownership.findings(args.path or None)
     )
     _print_operation("repository_findings", value)
     return 0
@@ -320,7 +320,7 @@ def _map_findings(args: Namespace) -> int:
 
 def _map_import_ownership(args: Namespace) -> int:
     value = _call_codemap(
-        args, lambda codemap: codemap.import_ownership_findings(args.path or None)
+        args, lambda codemap: codemap.ownership.import_findings(args.path or None)
     )
     _print_operation("import_ownership", value)
     return 0
@@ -328,7 +328,7 @@ def _map_import_ownership(args: Namespace) -> int:
 
 def _map_concurrency_risk(args: Namespace) -> int:
     value = _call_codemap(
-        args, lambda codemap: codemap.concurrency_risk_findings(args.path or None)
+        args, lambda codemap: codemap.ownership.concurrency_findings(args.path or None)
     )
     _print_operation("concurrency_risk", value)
     return 0
@@ -337,7 +337,7 @@ def _map_concurrency_risk(args: Namespace) -> int:
 def _map_verification_ownership(args: Namespace) -> int:
     value = _call_codemap(
         args,
-        lambda codemap: codemap.verification_ownership_graph(
+        lambda codemap: codemap.tasks.verification_ownership_graph(
             args.task, limit=args.limit, candidate_limit=args.candidate_limit
         ),
     )
@@ -347,7 +347,7 @@ def _map_verification_ownership(args: Namespace) -> int:
 
 def _map_repository_ownership(args: Namespace) -> int:
     value = _call_codemap(
-        args, lambda codemap: codemap.repository_ownership_graph(args.path or None)
+        args, lambda codemap: codemap.ownership.repository_graph(args.path or None)
     )
     _print_operation("repository_ownership", value)
     return 0
@@ -355,7 +355,7 @@ def _map_repository_ownership(args: Namespace) -> int:
 
 def _map_cache_ownership(args: Namespace) -> int:
     value = _call_codemap(
-        args, lambda codemap: codemap.cache_ownership_findings(args.path or None)
+        args, lambda codemap: codemap.ownership.cache_findings(args.path or None)
     )
     _print_operation("cache_ownership", value)
     return 0
@@ -364,7 +364,7 @@ def _map_cache_ownership(args: Namespace) -> int:
 def _map_cache_invalidation_ownership(args: Namespace) -> int:
     value = _call_codemap(
         args,
-        lambda codemap: codemap.cache_invalidation_ownership_graph(args.path or None),
+        lambda codemap: codemap.ownership.cache_invalidation_graph(args.path or None),
     )
     _print_operation("cache_invalidation_ownership", value)
     return 0
@@ -403,14 +403,14 @@ def _map_status(args: Namespace) -> int:
 
 def _map_enrich(args: Namespace) -> int:
     value = _call_codemap(
-        args, lambda codemap: codemap.enrich_projects(args.provider or None)
+        args, lambda codemap: codemap.native.enrich_projects(args.provider or None)
     )
     _print(value)
     return 0
 
 
 def _map_projects(args: Namespace) -> int:
-    value = _call_codemap(args, lambda codemap: codemap.projects())
+    value = _call_codemap(args, lambda codemap: codemap.relationships.projects())
     _print_operation("projects", value)
     return 0
 
@@ -423,7 +423,7 @@ def _map_import_scip(args: Namespace) -> int:
     )
     value = _call_codemap(
         args,
-        lambda codemap: codemap.import_scip(args.path, provenance=provenance),
+        lambda codemap: codemap.native.import_scip(args.path, provenance=provenance),
         extra_errors=(RuntimeError,),
     )
     _print(value)
@@ -431,7 +431,7 @@ def _map_import_scip(args: Namespace) -> int:
 
 
 def _map_orient(args: Namespace) -> int:
-    value = _call_codemap(args, lambda codemap: codemap.orient())
+    value = _call_codemap(args, lambda codemap: codemap.context.orient())
     _print_operation("repository_context", value)
     return 0
 
@@ -445,7 +445,7 @@ def _outline(args: Namespace) -> int:
 def _find_code(args: Namespace) -> int:
     value = _call_codemap(
         args,
-        lambda codemap: codemap.find_packet(args.query, limit=args.limit),
+        lambda codemap: codemap.search.packet(args.query, limit=args.limit),
     )
     _print_operation("find", value)
     return 0
@@ -465,7 +465,7 @@ def _grep_code(args: Namespace) -> int:
 def _structural_code(args: Namespace) -> int:
     value = _call_codemap(
         args,
-        lambda codemap: codemap.structural(
+        lambda codemap: codemap.structure.search(
             args.pattern, language=args.lang, limit=args.limit
         ),
     )
@@ -488,20 +488,23 @@ def _source_code(args: Namespace) -> int:
 
 
 def _deps_code(args: Namespace) -> int:
-    value = _call_codemap(args, lambda codemap: codemap.deps(args.query))
+    value = _call_codemap(args, lambda codemap: codemap.relationships.deps(args.query))
     _print(value)
     return 0
 
 
 def _refs_code(args: Namespace) -> int:
-    value = _call_codemap(args, lambda codemap: codemap.refs(args.query))
+    value = _call_codemap(args, lambda codemap: codemap.relationships.refs(args.query))
     _print(value)
     return 0
 
 
 def _affected_code(args: Namespace) -> int:
     value = _call_codemap(
-        args, lambda codemap: codemap.affected(args.query, max_depth=args.max_depth)
+        args,
+        lambda codemap: codemap.relationships.affected(
+            args.query, max_depth=args.max_depth
+        ),
     )
     _print_operation("affected", value)
     return 0
@@ -509,7 +512,10 @@ def _affected_code(args: Namespace) -> int:
 
 def _tests_code(args: Namespace) -> int:
     value = _call_codemap(
-        args, lambda codemap: codemap.tests(args.query, max_depth=args.max_depth)
+        args,
+        lambda codemap: codemap.relationships.tests(
+            args.query, max_depth=args.max_depth
+        ),
     )
     _print_operation("tests", value)
     return 0
@@ -519,7 +525,7 @@ def _structural_locality_code(args: Namespace) -> int:
     supplied = _supplied_relationship_observations(args)
     value = _call_codemap(
         args,
-        lambda codemap: codemap.structural_locality(
+        lambda codemap: codemap.structure.locality(
             args.target,
             max_depth=args.max_depth,
             call_limit_per_symbol=args.call_limit,
@@ -560,7 +566,7 @@ def _structural_locality_delta_code(args: Namespace) -> int:
 def _context_code(args: Namespace) -> int:
     value = _call_codemap(
         args,
-        lambda codemap: codemap.context(
+        lambda codemap: codemap.context.build(
             args.query,
             token_budget=args.budget,
             limit=args.limit,
@@ -575,7 +581,7 @@ def _task_evidence_code(args: Namespace) -> int:
     supplied = _supplied_relationship_observations(args)
     value = _call_codemap(
         args,
-        lambda codemap: codemap.task_evidence(
+        lambda codemap: codemap.tasks.evidence(
             args.task,
             token_budget=args.budget,
             limit=args.limit,
@@ -608,7 +614,7 @@ def _supplied_relationship_observations(
 def _verification_relevance_code(args: Namespace) -> int:
     value = _call_codemap(
         args,
-        lambda codemap: codemap.verification_relevance(
+        lambda codemap: codemap.tasks.verification_relevance(
             args.task, limit=args.limit, candidate_limit=args.candidate_limit
         ),
     )

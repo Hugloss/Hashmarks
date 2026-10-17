@@ -83,7 +83,7 @@ def test_post_change_delta_rejects_competing_generation_after_sync(
         CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as writer,
     ):
         reader.index.sync()
-        previous = reader.task_evidence(task)
+        previous = reader.tasks.evidence(task)
         source.write_text("def widget(): return 'new'\n", encoding="utf-8")
         _install_competing_writer(reader, writer, other, monkeypatch)
 
@@ -132,7 +132,7 @@ def test_declared_freshness_rebind_rejects_competing_generation(
         CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as writer,
     ):
         reader.index.sync()
-        reader.enrich_projects(("npm-package-graph", "declared-project-links"))
+        reader.native.enrich_projects(("npm-package-graph", "declared-project-links"))
         original_sync = reader.index.sync
 
         def racing_sync(paths: list[str] | None = None) -> None:
@@ -174,7 +174,7 @@ def test_project_enrichment_rejects_stale_expected_generation(tmp_path: Path) ->
             RuntimeError,
             match="CodeMap generation changed before project enrichment",
         ):
-            reader.enrich_projects(
+            reader.native.enrich_projects(
                 ("npm-package-graph",),
                 expected_generation=expected_generation,
             )

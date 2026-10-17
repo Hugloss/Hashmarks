@@ -53,9 +53,9 @@ def _task_metrics(
         "files": {str(value) for value in task.get("expected_files") or ()},
         "symbols": {str(value) for value in task.get("expected_symbols") or ()},
     }
-    hits, find_seconds = _timed(lambda: codemap.find(query, limit=limit))
+    hits, find_seconds = _timed(lambda: codemap.search.find(query, limit=limit))
     pack, context_seconds = _timed(
-        lambda: codemap.context(query, token_budget=budget, limit=limit)
+        lambda: codemap.context.build(query, token_budget=budget, limit=limit)
     )
     observed_files = {
         "hits": {hit.path for hit in hits},

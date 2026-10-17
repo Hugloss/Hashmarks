@@ -10,25 +10,25 @@ from ..repository_domains import RepositoryDomain, classify_repository_path
 from .results import ConcurrencyRiskResult
 
 if TYPE_CHECKING:
-    from ..engine import CodeMap
+    from ..repository_source import RepositorySource
 
 
 class ConcurrencyRiskAnalyzer:
     def analyze(
         self,
-        codemap: CodeMap,
+        source: RepositorySource,
         paths: Sequence[str] | None,
         all_rows: Sequence[dict[str, object]],
     ) -> ConcurrencyRiskResult:
         python_paths = {
             str(row["path"]) for row in all_rows if row["language"] == "python"
         }
-        candidates = self._candidates(codemap, paths, python_paths)
+        candidates = self._candidates(source, paths, python_paths)
 
         findings = []
         for rel in candidates:
             try:
-                snapshot = read_python_ast(codemap.workspace / rel, errors="replace")
+                snapshot = read_python_ast(source.workspace / rel, errors="replace")
             except (OSError, UnicodeError, SyntaxError, ValueError):
                 continue
 
@@ -41,7 +41,7 @@ class ConcurrencyRiskAnalyzer:
                 )
             )
 
-        generation, identity_generation, stale = codemap.reads.generation_status()
+        generation, identity_generation, stale = source.reads.generation_status()
         return {
             "schema": operation_schema("concurrency_risk"),
             "generation": generation,
@@ -58,12 +58,12 @@ class ConcurrencyRiskAnalyzer:
 
     @staticmethod
     def _candidates(
-        codemap: CodeMap,
+        source: RepositorySource,
         paths: Sequence[str] | None,
         python_paths: set[str],
     ) -> list[str]:
         if paths is None:
-            rows = codemap.store.lexical_file_candidates(
+            rows = source.reads.lexical_file_candidates(
                 [
                     "read",
                     "get",

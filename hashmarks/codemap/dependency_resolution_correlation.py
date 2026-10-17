@@ -157,7 +157,7 @@ class DependencyResolutionCorrelationMixin:
         )
         normalized_anchors: list[dict[str, object]] = []
         for anchor in anchors:
-            claims = self._anchor_claims(anchor)
+            claims = self.correlation._anchor_claims(anchor)
             normalized_anchors.append(
                 {"anchor_id": claims.anchor_id, "claims": claims.as_dict()}
             )
@@ -271,7 +271,7 @@ class DependencyResolutionCorrelationMixin:
             used_sources.update(source_ids)
             dependency_links.append(link)
             bundles.append(bundle)
-        packet = self.correlate_evidence(
+        packet = self.correlation.observe(
             bundles,
             path_mappings=cast(
                 "Sequence[Mapping[str, object]] | None",

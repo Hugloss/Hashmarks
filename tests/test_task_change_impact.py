@@ -63,7 +63,7 @@ def test_task_change_impact_composes_owner_path_and_verification(
     task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        start = codemap.task_evidence(task)
+        start = codemap.tasks.evidence(task)
         assert _task_candidate_path(start) == "src/case/engine.py"
         (tmp_path / "src/case/engine.py").write_text(
             "def apply_ember(value: str) -> str:\n    return 'new' if value == 'accepted' else value\n",
@@ -101,7 +101,7 @@ def test_task_change_impact_config_root_is_typed_and_gets_verification(
     config_task = next(row for row in tasks if row["id"] == "hard-004")
     with CodeMap(repo) as codemap:
         codemap.index.sync()
-        start = codemap.task_evidence(config_task["query"])
+        start = codemap.tasks.evidence(config_task["query"])
         candidate_path = _task_candidate_path(start)
         assert candidate_path.endswith("policy.toml")
         impact = codemap.task_change_impact(config_task["query"], [candidate_path])
@@ -329,7 +329,7 @@ def test_task_change_impact_reconstructs_same_package_go_owner_chain(
     task = "Change CobaltRidgeAlpha accepted response from old to new"
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        start = codemap.task_evidence(task)
+        start = codemap.tasks.evidence(task)
         assert _task_candidate_path(start) == "engine/engine.go"
         assert _task_verification_path(start) == "route/cobaltridgealpha_test.go"
         impact = codemap.task_change_impact(task, ["engine/engine.go"])
@@ -455,7 +455,7 @@ def test_task_change_impact_declared_project_provenance_and_shared_input_refresh
     fake_maven_wrapper(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        codemap.enrich_projects(
+        codemap.native.enrich_projects(
             ("npm-package-graph", "maven-pom-graph", "declared-project-links")
         )
         source_impact = codemap.task_change_impact(
@@ -528,7 +528,7 @@ def test_task_change_impact_project_provenance_is_bounded(tmp_path: Path) -> Non
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
+        codemap.native.enrich_projects(("npm-package-graph", "declared-project-links"))
         impact = codemap.task_change_impact(
             "root value change",
             ["root/value.ts"],
@@ -580,7 +580,7 @@ def test_project_impact_limit_is_independent_and_reports_truncation(
     )
     with CodeMap(root, artifact_db=root / "artifacts.sqlite3") as codemap:
         codemap.index.sync()
-        codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
+        codemap.native.enrich_projects(("npm-package-graph", "declared-project-links"))
         (root / "p0/src/index.ts").write_text(
             "export const value = 99;\n", encoding="utf-8"
         )
@@ -629,10 +629,10 @@ def test_declared_shared_input_refresh_rebinds_freshness_without_recollecting_to
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
+        codemap.native.enrich_projects(("npm-package-graph", "declared-project-links"))
         provider = next(
             p
-            for p in codemap.project_graph_providers
+            for p in codemap.native.producers.projects
             if p.name == "declared-project-links"
         )
         original_collect = provider.collect
@@ -677,10 +677,10 @@ def test_declared_topology_change_recollects_provider(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
+        codemap.native.enrich_projects(("npm-package-graph", "declared-project-links"))
         provider = next(
             p
-            for p in codemap.project_graph_providers
+            for p in codemap.native.producers.projects
             if p.name == "declared-project-links"
         )
         original_collect = provider.collect
@@ -736,10 +736,12 @@ def test_unreported_shared_input_change_does_not_rebind_stale_project_evidence(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
+        codemap.native.enrich_projects(("npm-package-graph", "declared-project-links"))
         (tmp_path / "contract.json").write_text('{"v":2}\n', encoding="utf-8")
         impact = codemap.task_change_impact("backend changed", ["backend/value.ts"])
-        fresh, reason = codemap._evidence_fresh("project", "declared-project-links")
+        fresh, reason = codemap.native._evidence_fresh(
+            "project", "declared-project-links"
+        )
 
     assert impact.get("project_refresh") is None
     assert fresh is False
@@ -771,7 +773,7 @@ def test_task_change_impact_compact_project_provenance_round_trips(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
+        codemap.native.enrich_projects(("npm-package-graph", "declared-project-links"))
         verbose = codemap.task_change_impact(
             "root value change",
             ["root/value.ts"],
@@ -821,7 +823,7 @@ def test_task_change_impact_compact_preserves_multiple_edges_from_one_project(
     changed = ["root-a/value.ts", "root-b/value.ts"]
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
+        codemap.native.enrich_projects(("npm-package-graph", "declared-project-links"))
         verbose = codemap.task_change_impact(
             "both roots changed",
             changed,

@@ -17,12 +17,12 @@ from .query_primitives import (
     _query_terms,
 )
 from .query_router import QueryRoute, route_query
-from .repository_domains import RepositoryDomain, classify_repository_path
+from .repository_domains import RepositoryDomain, classify_repository_path, is_test_path
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
-    from .engine import CodeMap
+    from .find_engine import RepositorySearch
 
 
 @dataclass
@@ -126,7 +126,7 @@ _TASK_SCOPE_EXPANSIONS: tuple[tuple[frozenset[str], tuple[str, ...]], ...] = (
 
 
 class TaskRetrievalMixin(ReadScopeOwner):
-    def _prepare_task_observation(self, task: str, limit: int) -> None:
+    def prepare_task(self, task: str, limit: int) -> None:
         """Task-owned freshness preparation, before a read scope is sampled."""
         if not isinstance(task, str) or type(limit) is not int or limit < 1:
             return
@@ -139,53 +139,24 @@ class TaskRetrievalMixin(ReadScopeOwner):
         stale_paths: tuple[str, ...],
     ) -> tuple[str, ...]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositorySearch", self)
         if not stale_paths:
             return recent_paths
         remembered = tuple(sorted({*recent_paths, *stale_paths}))
-        self._task_recent_authority_paths[recent_key] = remembered
-        if len(self._task_recent_authority_paths) > 256:
+        self._task_recent_retrieval_paths[recent_key] = remembered
+        if len(self._task_recent_retrieval_paths) > 256:
             # Preserve only the task proving stale authority so the pressure
             # event cannot erase the resurrection fence it just established.
-            self._task_recent_authority_paths.clear()
-            self._task_recent_authority_paths[recent_key] = remembered
+            self._task_recent_retrieval_paths.clear()
+            self._task_recent_retrieval_paths[recent_key] = remembered
         return remembered
 
-    def _reconcile_active_task_stale_paths(self, stale_paths: tuple[str, ...]) -> None:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        if not stale_paths:
-            return
-        # Missing authority may have moved to an unknown path, which requires
-        # repository discovery. Byte changes and file->symlink transitions are
-        # exact-path changes and stay path-scoped.
-        if any(not (self.workspace / path).exists() for path in stale_paths):
-            self.index.sync()
-        else:
-            self.index.sync(stale_paths)
-
-    def _task_resurrection_paths(
-        self, recent_paths: tuple[str, ...]
+    def _reconcile_retrieval_restoration(
+        self, recent: tuple[str, ...]
     ) -> tuple[str, ...]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        return tuple(
-            sorted(
-                path
-                for path in recent_paths
-                if self.files.is_admitted(path)
-                and (self.workspace / path).is_file()
-                and not (self.workspace / path).is_symlink()
-                and not self.index.is_current(path)
-            )
-        )
-
-    def _reconcile_task_resurrection_paths(
-        self, recent_paths: tuple[str, ...]
-    ) -> tuple[str, ...]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        restored = self._task_resurrection_paths(recent_paths)
+            self = cast("RepositorySearch", self)
+        restored = self.source.restored_contributors(recent)
         if restored:
             self.index.sync(restored)
         return restored
@@ -194,16 +165,15 @@ class TaskRetrievalMixin(ReadScopeOwner):
         self, task: str, limit: int, *, probe_on_miss: bool = False
     ) -> tuple[str, ...]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositorySearch", self)
         if self.reads.depth > 0 or self.store.meta("sync.build_state") == "BUILDING":
             return ()
         generation = self.store.generation()
         key = (generation, task, int(limit))
         cached = self._task_result_cache.get(key)
-        authority_paths = self._task_authority_paths_cache.get(key, ())
         recent_key = (task, int(limit))
-        recent_authority_paths = self._task_recent_authority_paths.get(recent_key, ())
-        if cached is None and not authority_paths and not recent_authority_paths:
+        recent_authority_paths = self._task_recent_retrieval_paths.get(recent_key, ())
+        if cached is None and not recent_authority_paths:
             if not probe_on_miss:
                 return ()
             # Cache/history pressure must not make an old task permanently weaker
@@ -218,7 +188,6 @@ class TaskRetrievalMixin(ReadScopeOwner):
 
         active_paths = {
             *(hit.path for hit in (cached.hits if cached else ())),
-            *authority_paths,
         }
         active_stale = tuple(
             sorted(path for path in active_paths if not self.index.is_current(path))
@@ -229,12 +198,12 @@ class TaskRetrievalMixin(ReadScopeOwner):
         recent_authority_paths = self._remember_task_resurrection_paths(
             recent_key, recent_authority_paths, active_stale
         )
-        self._reconcile_active_task_stale_paths(active_stale)
+        self.source.reconcile_contributors(active_stale)
 
         # Missing/symlink tombstones do no work. Exact regular-file return pays
         # one admitted path-scoped sync, closing delete/recreate and symlink ABA
         # without a watcher or repository-wide polling.
-        restored = self._reconcile_task_resurrection_paths(recent_authority_paths)
+        restored = self._reconcile_retrieval_restoration(recent_authority_paths)
         return tuple(sorted({*active_stale, *restored}))
 
     @staticmethod
@@ -363,7 +332,7 @@ class TaskRetrievalMixin(ReadScopeOwner):
         raw_query: str | None = None,
     ) -> float:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositorySearch", self)
         raw = query.strip().lower() if raw_query is None else raw_query
         tokens = _query_terms(query) if tokens is None else tokens
         surface = self._score_surface(row)
@@ -373,7 +342,7 @@ class TaskRetrievalMixin(ReadScopeOwner):
             score += 18.0 * float(ranks.get(str(row.get("path", "")), 0.0))
         if recent and str(row.get("path", "")) in recent:
             score += 24.0
-        if self._is_test_path(str(row.get("path", ""))):
+        if is_test_path(str(row.get("path", ""))):
             score += (
                 12.0
                 if any(token in {"test", "tests", "spec"} for token in tokens)
@@ -501,7 +470,7 @@ class TaskRetrievalMixin(ReadScopeOwner):
         bound_reasons: set[str] | None = None,
     ) -> str:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositorySearch", self)
         raw_tokens = _WORD_RE.findall(task)
         words: list[str] = []
         original: dict[str, str] = {}
@@ -654,7 +623,7 @@ class TaskRetrievalMixin(ReadScopeOwner):
         contents are scanned and no alternate ranking authority is introduced.
         """
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositorySearch", self)
         normalized = token.lower()
         row_limit = max(8, min(32, limit * 2))
         file_rows = self.reads.lexical_file_candidates([normalized], limit=row_limit)
@@ -702,7 +671,7 @@ class TaskRetrievalMixin(ReadScopeOwner):
     ) -> tuple[str, ...]:
         """Return bounded rare lexical terms eligible for locality evidence."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositorySearch", self)
         if len(_WORD_RE.findall(task)) < 2:
             return ()
         locality_generic = {
@@ -752,7 +721,7 @@ class TaskRetrievalMixin(ReadScopeOwner):
     ) -> tuple[list[dict[str, object]], dict[str, set[RepositoryDomain]]] | None:
         """Validate one bounded lexical island and retain its path domains."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositorySearch", self)
         if len(selected_terms) < 2:
             return None
         row_limit = max(32, min(96, limit * 4))
@@ -800,7 +769,7 @@ class TaskRetrievalMixin(ReadScopeOwner):
     ) -> dict[str, dict[str, object]]:
         """Bind task-local island paths to already-indexed matching symbols."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositorySearch", self)
         paths = [str(row.get("path") or "") for row in island if row.get("path")]
         symbol_limit = max(64, min(512, len(paths) * 16))
         symbols = self.store.symbols_for_paths(paths, limit=symbol_limit)
@@ -896,7 +865,7 @@ class TaskRetrievalMixin(ReadScopeOwner):
         self, task: str, limit: int, *, ensure_ready: bool = True
     ) -> tuple[tuple[int, str, int], _TaskRetrievalResult | None]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositorySearch", self)
         if ensure_ready:
             self.reads.ready()
         generation = self.store.generation()
@@ -908,25 +877,15 @@ class TaskRetrievalMixin(ReadScopeOwner):
         return key, cached
 
     def _task_find_trim_cache(self, generation: int) -> None:
-        if (
-            len(self._task_result_cache) < 256
-            and len(self._task_authority_paths_cache) < 256
-        ):
+        if len(self._task_result_cache) < 256:
             return
         self._task_result_cache = {
             key: value
             for key, value in self._task_result_cache.items()
             if key[0] == generation
         }
-        self._task_authority_paths_cache = {
-            key: value
-            for key, value in self._task_authority_paths_cache.items()
-            if key[0] == generation
-        }
         if len(self._task_result_cache) >= 256:
             self._task_result_cache.clear()
-        if len(self._task_authority_paths_cache) >= 256:
-            self._task_authority_paths_cache.clear()
 
     @staticmethod
     def _task_is_identifier_token(token: str) -> bool:
@@ -979,7 +938,7 @@ class TaskRetrievalMixin(ReadScopeOwner):
         self, raw_tokens: Sequence[str], cue_words: set[str]
     ) -> str | None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositorySearch", self)
         fast_tokens = self._task_fast_identifier_tokens(raw_tokens)
         if not fast_tokens:
             return None
@@ -1058,7 +1017,7 @@ class TaskRetrievalMixin(ReadScopeOwner):
         tuple[str, ...],
     ]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositorySearch", self)
         bound_reasons: set[str] = set()
         views = self._task_query_views_evidence(task, bound_reasons)
         specs = self._task_sequence_specs(views, limit)
@@ -1122,7 +1081,7 @@ class TaskRetrievalMixin(ReadScopeOwner):
         bound_reasons: set[str],
     ) -> None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositorySearch", self)
         rows = self.reads.exact_symbol_candidates(raw_tokens, limit=64)
         if len(rows) >= 64:
             bound_reasons.add("task-exact-anchor-limit")
@@ -1156,7 +1115,7 @@ class TaskRetrievalMixin(ReadScopeOwner):
         include_signature: bool = False,
     ) -> list[SearchHit]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositorySearch", self)
         token_lower = token.lower()
         hits: list[SearchHit] = []
         evidence = self._find_evidence(token, limit=10)
@@ -1251,7 +1210,7 @@ class TaskRetrievalMixin(ReadScopeOwner):
         bound_reasons: set[str] | None = None,
     ) -> tuple[str, ...]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositorySearch", self)
         candidates, truncated = self._task_natural_term_candidates(task)
         if truncated and bound_reasons is not None:
             bound_reasons.add("task-natural-term-input-limit")
@@ -1329,7 +1288,7 @@ class TaskRetrievalMixin(ReadScopeOwner):
         bound_reasons: set[str],
     ) -> None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositorySearch", self)
         tokens = self._task_omitted_alnum_tokens(task, views, bound_reasons)
         if not tokens:
             return
@@ -1487,7 +1446,7 @@ class TaskRetrievalMixin(ReadScopeOwner):
     def _task_current_hits(self, hits: tuple[SearchHit, ...]) -> tuple[SearchHit, ...]:
         """Fail closed when retrieval evidence no longer matches workspace bytes."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositorySearch", self)
         return tuple(hit for hit in hits if self.index.is_current(hit.path))
 
     def _find_task_evidence_impl(  # noqa: C901, PLR0912, PLR0914, PLR0915
@@ -1568,3 +1527,8 @@ class TaskRetrievalMixin(ReadScopeOwner):
     def find_task(self, task: str, *, limit: int = 20) -> tuple[SearchHit, ...]:
         """Retrieve a full task description through bounded path-level RRF."""
         return self._find_task_impl(task, limit=limit)
+
+    @decision_scoped
+    def observe_task(self, task: str, *, limit: int = 20) -> _TaskRetrievalResult:
+        """Return the same candidate retrieval together with its explicit bounds."""
+        return self._find_task_evidence_impl(task, limit=limit)

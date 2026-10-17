@@ -63,7 +63,7 @@ def test_scip_rows_and_freshness_snapshot_roll_back_together(
 
     with CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as codemap:
         codemap.index.sync()
-        codemap.import_scip(scip)
+        codemap.native.import_scip(scip)
         before_generation = codemap.store.generation()
         before_snapshot = _scip_snapshot(codemap)
         assert codemap.store.native_definitions("BeforeOwner")
@@ -73,9 +73,9 @@ def test_scip_rows_and_freshness_snapshot_roll_back_together(
         def fail_snapshot(*args, **kwargs) -> None:
             raise RuntimeError("injected snapshot publication failure")
 
-        monkeypatch.setattr(codemap, "_record_evidence_snapshot", fail_snapshot)
+        monkeypatch.setattr(codemap.native, "_record_evidence_snapshot", fail_snapshot)
         with pytest.raises(RuntimeError, match="injected snapshot publication failure"):
-            codemap.import_scip(scip)
+            codemap.native.import_scip(scip)
 
         assert codemap.store.generation() == before_generation
         assert _scip_snapshot(codemap) == before_snapshot
@@ -92,7 +92,7 @@ def test_project_rows_and_freshness_snapshot_roll_back_together(
 
     with CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as codemap:
         codemap.index.sync()
-        codemap.enrich_projects(("npm-package-graph",))
+        codemap.native.enrich_projects(("npm-package-graph",))
         before_generation = codemap.store.generation()
         before_nodes = codemap.store.project_nodes()
         before_snapshot = codemap.store.meta(
@@ -107,11 +107,11 @@ def test_project_rows_and_freshness_snapshot_roll_back_together(
         def fail_snapshot(*args, **kwargs) -> None:
             raise RuntimeError("injected project snapshot publication failure")
 
-        monkeypatch.setattr(codemap, "_record_evidence_snapshot", fail_snapshot)
+        monkeypatch.setattr(codemap.native, "_record_evidence_snapshot", fail_snapshot)
         with pytest.raises(
             RuntimeError, match="injected project snapshot publication failure"
         ):
-            codemap.enrich_projects(("npm-package-graph",))
+            codemap.native.enrich_projects(("npm-package-graph",))
 
         assert codemap.store.generation() == before_generation
         assert codemap.store.project_nodes() == before_nodes
@@ -132,7 +132,7 @@ def test_enrichment_commit_invalidates_inflight_generation_session(
 
     with CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as seed:
         seed.index.sync()
-        seed.import_scip(scip)
+        seed.native.import_scip(scip)
 
     _write_scip(scip, symbol="AfterOwner")
     with (
@@ -144,10 +144,10 @@ def test_enrichment_commit_invalidates_inflight_generation_session(
             RuntimeError, match="generation changed during decision session"
         ):
             with reader.reads.session():
-                assert reader._fresh_native_definitions("BeforeOwner")
-                writer.import_scip(scip)
+                assert reader.native._fresh_native_definitions("BeforeOwner")
+                writer.native.import_scip(scip)
                 assert writer.store.generation() == before_generation + 1
-                assert reader._fresh_native_definitions("AfterOwner")
+                assert reader.native._fresh_native_definitions("AfterOwner")
 
 
 def test_enrichment_only_generation_carries_unrelated_scip_binding(
@@ -161,20 +161,24 @@ def test_enrichment_only_generation_carries_unrelated_scip_binding(
 
     with CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as codemap:
         codemap.index.sync()
-        codemap.import_scip(scip)
+        codemap.native.import_scip(scip)
         before_generation = codemap.store.generation()
-        assert codemap._evidence_fresh("scip", "scip-python:publication-test") == (
+        assert codemap.native._evidence_fresh(
+            "scip", "scip-python:publication-test"
+        ) == (
             True,
             None,
         )
 
-        result = codemap.enrich_projects(("npm-package-graph",))
+        result = codemap.native.enrich_projects(("npm-package-graph",))
 
         assert result["providers"]
         assert codemap.store.generation() == before_generation + 1
         snapshot = json.loads(_scip_snapshot(codemap) or "{}")
         assert snapshot["generation"] == codemap.store.generation()
-        assert codemap._evidence_fresh("scip", "scip-python:publication-test") == (
+        assert codemap.native._evidence_fresh(
+            "scip", "scip-python:publication-test"
+        ) == (
             True,
             None,
         )

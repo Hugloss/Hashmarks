@@ -47,12 +47,12 @@ def test_global_queries_retire_historical_pruned_rows_before_returning_evidence(
         _simulate_historical_dependency_row(codemap, rel, monkeypatch)
         assert rel in codemap.store.paths()
 
-        assert codemap.find("dependency_impl") == ()
+        assert codemap.search.find("dependency_impl") == ()
         assert rel not in codemap.store.paths()
         with pytest.raises(KeyError, match="symbol not found"):
             codemap.source.symbol("dependency_impl")
         assert codemap.derived_graph(rel)["nodes"] == []
-        assert {hit.path for hit in codemap.find("owned")} == {"src/app.py"}
+        assert {hit.path for hit in codemap.search.find("owned")} == {"src/app.py"}
 
 
 def test_stable_scope_identity_avoids_repeated_repository_map_scan(
@@ -68,7 +68,7 @@ def test_stable_scope_identity_avoids_repeated_repository_map_scan(
             "paths",
             side_effect=AssertionError("stable scope must not rescan persisted paths"),
         ):
-            assert {hit.path for hit in codemap.find("owned")} == {"src/app.py"}
+            assert {hit.path for hit in codemap.search.find("owned")} == {"src/app.py"}
             assert codemap.source.symbol("owned")["matches"][0]["path"] == "src/app.py"
 
 
@@ -119,9 +119,9 @@ def test_context_policy_change_retires_historical_rows_on_reopen(
     )
 
     with CodeMap(tmp_path, state_dir=state_dir, artifact_db=artifact_db) as codemap:
-        assert codemap.find("hidden") == ()
+        assert codemap.search.find("hidden") == ()
         assert "private/hidden.py" not in codemap.store.paths()
-        assert {hit.path for hit in codemap.find("adapter")} == {
+        assert {hit.path for hit in codemap.search.find("adapter")} == {
             "src/node_modules_adapter.py"
         }
 

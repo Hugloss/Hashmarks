@@ -5,18 +5,25 @@ from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from hashmarks.file_store import UnstableFileError
+from hashmarks.freshness import freshness_state
 from hashmarks.operation_contract import operation_schema
 from hashmarks.paths import normalize_relative_path
 
 from .decision_session import ReadScopeOwner, decision_scoped
-from .evidence_freshness import freshness_state
-from .repository_observation import evidence_identity, packet_digest
+from .repository_evidence_binding_delta import RepositoryEvidenceBindingDeltaMixin
+from .repository_evidence_coverage import RepositoryEvidenceCoverageMixin
+from .repository_observation import (
+    evidence_identity,
+    packet_digest,
+    repository_observer_packet,
+)
 
 if TYPE_CHECKING:
-    from .engine import CodeMap
+    from .decision_session import DecisionScope
+    from .repository_source import RepositorySource
 
 
 _MAX_BINDINGS = 256
@@ -24,6 +31,12 @@ _MAX_EVIDENCE_PER_BINDING = 256
 _MAX_DEPENDENCIES_PER_BINDING = 512
 _MAX_UNIQUE_PATHS = 2048
 _MAX_RELATIONSHIPS_PER_PATH = 1000
+
+
+def _binding_coordinate(value: object) -> int:
+    if not isinstance(value, (int, str, float, bytes, bytearray)):
+        raise TypeError("repository evidence coordinates must be numeric")
+    return int(value)
 
 
 def _binding_member_stamp(path: Path) -> tuple[int, ...] | None:
@@ -65,7 +78,9 @@ class _BindingObservationRequest:
     stamps: dict[str, tuple[int, ...]] = field(default_factory=dict)
 
 
-class RepositoryEvidenceBindingsMixin(ReadScopeOwner):
+class RepositoryBindings(
+    RepositoryEvidenceBindingDeltaMixin, RepositoryEvidenceCoverageMixin, ReadScopeOwner
+):
     """Observe opaque consumer bindings to exact repository evidence.
 
     This surface owns repository facts only. Binding identifiers are opaque;
@@ -73,12 +88,20 @@ class RepositoryEvidenceBindingsMixin(ReadScopeOwner):
     authority.
     """
 
+    def __init__(self, source: RepositorySource) -> None:
+        self.source = source
+        self.workspace = source.workspace
+
+    @property
+    def reads(self) -> DecisionScope:
+        return self.source.reads
+
     @staticmethod
     def _binding_span(raw: Mapping[str, object]) -> EvidenceSpan:
         path = normalize_relative_path(str(raw.get("path") or ""), allow_root=False)
         try:
-            start = int(raw["start_line"])
-            end = int(raw["end_line"])
+            start = _binding_coordinate(raw["start_line"])
+            end = _binding_coordinate(raw["end_line"])
         except (KeyError, TypeError, ValueError) as exc:
             raise ValueError(
                 "evidence span requires integer start_line/end_line"
@@ -118,8 +141,6 @@ class RepositoryEvidenceBindingsMixin(ReadScopeOwner):
         return lines
 
     def _observe_span(self, span: EvidenceSpan) -> dict[str, object]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         member, raw = self.source.member(span.path, include_bytes=True)
         base: dict[str, object] = {
             "scope": "lines",
@@ -189,7 +210,6 @@ class RepositoryEvidenceBindingsMixin(ReadScopeOwner):
     def _observe_reference_once(
         self, ref: EvidenceReference, request: _BindingObservationRequest
     ) -> dict[str, object]:
-        self = cast("CodeMap", self)
         if not isinstance(ref, EvidenceSpan):
             return self._observe_reference(ref)
         source = self.source._repository_member_source(ref.path)
@@ -213,7 +233,6 @@ class RepositoryEvidenceBindingsMixin(ReadScopeOwner):
         return observed
 
     def _validate_binding_snapshot(self, request: _BindingObservationRequest) -> None:
-        self = cast("CodeMap", self)
         for path, stamp in request.stamps.items():
             if _binding_member_stamp(self.workspace / path) != stamp:
                 raise UnstableFileError(
@@ -235,8 +254,6 @@ class RepositoryEvidenceBindingsMixin(ReadScopeOwner):
         self, evidence: Sequence[Mapping[str, object]], *, limit_per_path: int
     ) -> dict[str, object]:
         """Project bounded indexed relationships without inventing dependency authority."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         paths = sorted(
             {
                 str(row.get("path") or "")
@@ -276,7 +293,7 @@ class RepositoryEvidenceBindingsMixin(ReadScopeOwner):
         relationships.sort(
             key=lambda row: (
                 str(row.get("path") or ""),
-                int(row.get("line") or 0),
+                _binding_coordinate(row.get("line") or 0),
                 str(row.get("kind") or ""),
                 str(row.get("target") or ""),
             )
@@ -386,7 +403,7 @@ class RepositoryEvidenceBindingsMixin(ReadScopeOwner):
         }
 
     @decision_scoped
-    def repository_evidence_bindings(
+    def observe(
         self,
         bindings: Sequence[Mapping[str, object]],
         *,
@@ -395,8 +412,6 @@ class RepositoryEvidenceBindingsMixin(ReadScopeOwner):
         include_relationships: bool = True,
     ) -> dict[str, object]:
         """Return deterministic exact-span evidence for opaque consumer bindings."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         if not isinstance(bindings, Sequence) or isinstance(bindings, (str, bytes)):
             raise ValueError("bindings must be a sequence")
         if len(bindings) > _MAX_BINDINGS:
@@ -435,7 +450,7 @@ class RepositoryEvidenceBindingsMixin(ReadScopeOwner):
         rows.sort(key=lambda row: str(row["binding_id"]))
         payload: dict[str, object] = {
             "schema": operation_schema("repository_evidence", "observation"),
-            "observer": self._repository_observer_packet(),
+            "observer": repository_observer_packet(),
             "repository": {
                 "repository_identity": self.reads.repository_identity(),
                 "source_identity": self.source.packet_identity(

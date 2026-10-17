@@ -155,10 +155,10 @@ class WorktreeOverlay:
         stats = self._require_bound_base()
         changed = set(self._changed)
         with self.base.reads.session(expected_generation=stats.base_generation):
-            overlay_hits = list(self.overlay.find_task(task, limit=limit))
+            overlay_hits = list(self.overlay.search.find_task(task, limit=limit))
             base_hits = [
                 hit
-                for hit in self.base.find_task(task, limit=limit)
+                for hit in self.base.search.find_task(task, limit=limit)
                 if hit.path not in changed
             ]
             result: list[SearchHit] = []

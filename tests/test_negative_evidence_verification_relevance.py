@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.query_router import normalize_task_query
+from hashmarks.codemap.verification_relevance_model import VerificationRequest
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -53,8 +55,8 @@ def test_real_indexed_reference_window_qualifies_completeness_before_projection(
         assert len(prefix["target"]) == 1024
         assert len(lookahead["target"]) == min(reference_count + 1, 1025)
         assert prefix["target"] == lookahead["target"][:1024]
-        packet = codemap.verification_relevance(task)
-        graph = codemap.verification_ownership_graph(task)
+        packet = codemap.tasks.verification_relevance(task)
+        graph = codemap.tasks.verification_ownership_graph(task)
     truncated = reference_count + 1 > 1024
     assert "search_bound_reasons" in packet
     reasons = packet["search_bound_reasons"]
@@ -100,12 +102,17 @@ def test_bounded_reference_search_cannot_report_no_verification_candidate(
             lambda _paths, *, limit_per_path: {},
         )
 
-        packet = codemap._verification_relevance(
-            "target",
-            edit={"path": "src/owner.py", "name": "target"},
-            current_verify=None,
-            rows=[],
-        )
+        with codemap.reads.session() as _task_read_scope:
+            packet = codemap.verification.for_owner(
+                VerificationRequest(
+                    _task_read_scope,
+                    normalize_task_query("target"),
+                    "nominated",
+                    {"path": "src/owner.py", "name": "target"},
+                    None,
+                    tuple([]),
+                )
+            )
 
     assert packet["selected"] is None
     assert packet["selection_reason"] == "verification-candidate-search-bounded"
@@ -152,12 +159,17 @@ def test_bounded_reference_search_cannot_manufacture_unique_verifier(
             lambda _short, _suffix, *, limit: [],
         )
 
-        packet = codemap._verification_relevance(
-            "target",
-            edit={"path": "src/owner.py", "name": "target"},
-            current_verify=None,
-            rows=[],
-        )
+        with codemap.reads.session() as _task_read_scope:
+            packet = codemap.verification.for_owner(
+                VerificationRequest(
+                    _task_read_scope,
+                    normalize_task_query("target"),
+                    "nominated",
+                    {"path": "src/owner.py", "name": "target"},
+                    None,
+                    tuple([]),
+                )
+            )
 
     assert packet["selected"] is not None
     assert packet["selected"]["path"] == "tests/test_owner.py"
@@ -193,12 +205,17 @@ def test_exhausted_verification_search_can_still_authorize_absence(
             lambda _short, _suffix, *, limit: [],
         )
 
-        packet = codemap._verification_relevance(
-            "target",
-            edit={"path": "src/owner.py", "name": "target"},
-            current_verify=None,
-            rows=[],
-        )
+        with codemap.reads.session() as _task_read_scope:
+            packet = codemap.verification.for_owner(
+                VerificationRequest(
+                    _task_read_scope,
+                    normalize_task_query("target"),
+                    "nominated",
+                    {"path": "src/owner.py", "name": "target"},
+                    None,
+                    tuple([]),
+                )
+            )
 
     assert packet["selected"] is None
     assert packet["selection_reason"] == "no-verification-candidate"

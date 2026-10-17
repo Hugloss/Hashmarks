@@ -12,7 +12,7 @@ def test_cache_ownership_maps_module_cache_and_unproven_invalidation(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        result = codemap.cache_ownership_findings()
+        result = codemap.ownership.cache_findings()
     assert result["schema"] == "hashmarks.cache-ownership.v1"
     owner = next(x for x in result["owners"] if x["owner"] == "CACHE")
     assert owner["scope"] == "module"
@@ -27,7 +27,7 @@ def test_cache_ownership_maps_lru_cache_as_decorator_managed(tmp_path: Path) -> 
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        result = codemap.cache_ownership_findings()
+        result = codemap.ownership.cache_findings()
     owner = next(x for x in result["owners"] if x["owner"] == "value")
     assert owner["kind"] == "decorator:lru_cache"
     assert owner["invalidation"] == "decorator-managed"
@@ -48,7 +48,7 @@ def test_cache_ownership_composes_with_import_identity_risk(tmp_path: Path) -> N
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        result = codemap.cache_ownership_findings()
+        result = codemap.ownership.cache_findings()
     owner = next(
         x
         for x in result["owners"]
@@ -62,7 +62,7 @@ def test_cache_ownership_does_not_invent_ordinary_module_state(tmp_path: Path) -
     (tmp_path / "plain.py").write_text("VALUES = {}\nCOUNT = 0\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        result = codemap.cache_ownership_findings()
+        result = codemap.ownership.cache_findings()
     assert result["owners"] == []
 
 

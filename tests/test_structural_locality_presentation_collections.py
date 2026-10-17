@@ -38,7 +38,7 @@ def test_locality_display_conserves_complete_bounded_collections(
         + "\n    return receiver.deliver()\n"
     )
     with CodeMap(tmp_path) as codemap:
-        packet = codemap.structural_locality("worker.py::owner")
+        packet = codemap.structure.locality("worker.py::owner")
     # The pure projection also conserves future producer-owned qualifiers.
     assert_records(packet["edges"])[-1]["future_qualification"] = {
         "unknown": None,
@@ -72,7 +72,7 @@ def test_locality_display_conserves_complete_bounded_collections(
 def test_locality_collection_counts_describe_native_members(tmp_path: Path) -> None:
     (tmp_path / "worker.py").write_text("def owner():\n    return 1\n")
     with CodeMap(tmp_path) as codemap:
-        packet = codemap.structural_locality("worker.py::owner")
+        packet = codemap.structure.locality("worker.py::owner")
     projection = present_repository_evidence(packet, format="compact")
     findings = [
         row
