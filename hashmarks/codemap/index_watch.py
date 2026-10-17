@@ -18,6 +18,7 @@ from .watch_continuity import (
 
 if TYPE_CHECKING:
     from .engine import CodeMap
+    from .model import SyncResult
 
 
 class WatchLeaseHeldError(RuntimeError):
@@ -33,7 +34,7 @@ class _IndexWatchSession:
     """Mutable reconciliation state shared by watcher callbacks and the loop."""
 
     codemap: CodeMap
-    on_update: Callable[[object, list[str]], None] | None
+    on_update: Callable[[SyncResult, list[str]], None] | None
     tracker: ChangeTracker = field(default_factory=ChangeTracker)
     update_lock: threading.RLock = field(default_factory=threading.RLock)
     owner: str = field(default_factory=lambda: uuid.uuid4().hex)
@@ -133,7 +134,7 @@ class IndexWatchMixin:
         self,
         *,
         debounce_seconds: float = 0.05,
-        on_update: Callable[[object, list[str]], None] | None = None,
+        on_update: Callable[[SyncResult, list[str]], None] | None = None,
     ) -> None:
         """Maintain CodeMap incrementally in a separate foreground process.
 

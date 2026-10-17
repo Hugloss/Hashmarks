@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import pytest
+from contract_assertions import assert_object, assert_records
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.parsers import parse_source
@@ -11,7 +12,10 @@ from hashmarks.codemap.task_evidence_contract import (
     read_initial_projection,
     read_task_evidence,
 )
-from hashmarks.codemap.task_evidence_initial import decode_initial_packet
+from hashmarks.codemap.task_evidence_initial import (
+    decode_initial_collection,
+    decode_initial_packet,
+)
 
 
 @pytest.fixture
@@ -125,6 +129,136 @@ def test_unavailable_native_ranges_keep_the_advisory_capability_explicit() -> No
         ("Callback", 1, 1),
     ]
     assert "tree-sitter" not in artifact.parser
+
+
+@pytest.mark.parametrize("literal_path", [False, True])
+def test_private_qualified_identifier_keeps_exact_scope_and_duplicate_ambiguity(
+    tmp_path: Path,
+    native_ranges: TreeSitterRangeProvider,
+    literal_path: bool,
+) -> None:
+    declaration = "class Request { #cachedBody = () => 'body'; }\n"
+    (tmp_path / "request.ts").write_text(declaration)
+    (tmp_path / "foreign.ts").write_text("namespace other { " + declaration + "}\n")
+    task = "Inspect Request.#cachedBody declarations"
+    if literal_path:
+        task += ". Source: request.ts"
+    with CodeMap(tmp_path) as codemap:
+        codemap.range_provider = native_ranges
+        codemap.sync()
+        action = codemap.task_action_map(task)
+        owner = action["admitted_edit"]
+        assert owner is not None
+        assert (owner["path"], owner.get("qualname")) == (
+            "request.ts",
+            "Request.#cachedBody",
+        )
+    (tmp_path / "duplicate.ts").write_text(declaration)
+    with CodeMap(tmp_path) as codemap:
+        codemap.range_provider = native_ranges
+        codemap.sync()
+        action = codemap.task_action_map(task)
+        if literal_path:
+            owner = action["admitted_edit"]
+            assert owner is not None
+            assert (owner["path"], owner.get("qualname")) == (
+                "request.ts",
+                "Request.#cachedBody",
+            )
+        else:
+            assert action["admitted_edit"] is None
+            assert action["ambiguity"]["ambiguous"] is True
+
+
+@pytest.mark.parametrize("hidden", [False, True])
+@pytest.mark.parametrize("subject_text", [False, True])
+def test_matching_test_filename_is_a_bound_candidate_without_reference_authority(
+    tmp_path: Path,
+    native_ranges: TreeSitterRangeProvider,
+    hidden: bool,
+    subject_text: bool,
+) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "src/contracts.d.ts").write_text(
+        "export interface Options { http2?: false }\n"
+    )
+    expected = "tests/contracts.tst.ts"
+    (tmp_path / expected).write_text(
+        ("// Options declaration input\n" if subject_text else "")
+        + "export const unrelated = 1;\n"
+    )
+    for index in range(12):
+        (tmp_path / f"tests/test_noise_{index:02}.py").write_text(
+            "# Inspect Options declarations plain HTTP http2 false contracts\n"
+            "def test_options(): assert True\n"
+        )
+    if hidden:
+        (tmp_path / ".hashmarks-context.toml").write_text(
+            f'[[rule]]\npattern = "{expected}"\nvisibility = "deny"\n'
+        )
+    task = "Inspect Options declarations for plain HTTP http2 false. Source: src/contracts.d.ts"
+    with CodeMap(tmp_path) as codemap:
+        codemap.range_provider = native_ranges
+        codemap.sync()
+        action = codemap.task_action_map(task)
+        packet = codemap.task_evidence(task)
+        initial = read_initial_projection(
+            decode_initial_packet(codemap.task_evidence(task, result_mode="initial"))
+        )
+    for observed in (packet, initial):
+        relevance = observed["verification"]["relevance"]
+        rows: object = relevance["candidates"]
+        if "candidates_encoding" in relevance:
+            rows = decode_initial_collection(
+                rows, assert_object(relevance["candidates_encoding"])
+            )
+        matches = [row for row in assert_records(rows) if row["path"] == expected]
+        if hidden:
+            assert not matches
+        elif subject_text:
+            assert matches
+            row = matches[0]
+            assert row.get("source_filename_prefix_match") is True
+            assert row.get("direct_reference") is False
+            assert row.get("indirect_reference") is False
+            assert row.get("verification_selection_authority") is False
+            assert row.get("edit_relationship") == "unestablished"
+        else:
+            assert all(
+                row.get("source_filename_prefix_match") is not True for row in matches
+            )
+        assert observed["verification"]["selected"] is not None
+        assert action["verify"] is not None
+        assert observed["verification"]["selected"]["path"] == action["verify"]["path"]
+
+
+@pytest.mark.parametrize("context", ["using", "when"])
+def test_named_declaration_keeps_failure_context_as_evidence(
+    tmp_path: Path,
+    native_ranges: TreeSitterRangeProvider,
+    context: str,
+) -> None:
+    (tmp_path / "request.ts").write_text(
+        "class Request {\n"
+        "  #cachedBody = () => 'body';\n"
+        "  formData() { return this.#cachedBody(); }\n"
+        "}\n"
+    )
+    task = (
+        f"Inspect Request.#cachedBody declarations {context} Request.formData "
+        "reads the cached input. Source: request.ts"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.range_provider = native_ranges
+        codemap.sync()
+        action = codemap.task_action_map(task)
+    owner = action["admitted_edit"]
+    assert owner is not None
+    assert (owner["path"], owner.get("qualname")) == (
+        "request.ts",
+        "Request.#cachedBody",
+    )
 
 
 def test_namespace_member_survives_reopen_and_revision_change(

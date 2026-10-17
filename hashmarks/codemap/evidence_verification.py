@@ -864,7 +864,12 @@ class VerificationMixin(VerificationOwnershipMixin):
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         paths = sorted(state.candidate_paths)
-        candidate_symbols = self.store.symbols_for_paths_many(paths, limit_per_path=64)
+        # Observe each selected module before bounding the reply. A source-order
+        # prefix can hide the relevant test or manufacture a unique best symbol.
+        self._session_preload_symbols(paths)
+        candidate_symbols = {
+            path: self._session_symbols_for_path(path) for path in paths
+        }
         result: list[dict[str, object]] = []
         pytest_declared = (
             self._pytest_declared()
@@ -943,9 +948,9 @@ class VerificationMixin(VerificationOwnershipMixin):
             "negative_evidence_admissible": False,
         }
 
-    def _verification_test_lexical_rows(
+    def _verification_test_paths(
         self, state: _VerificationRelevanceState
-    ) -> list[dict[str, object]]:
+    ) -> tuple[str, ...]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         if state.lexical_test_paths is None:
@@ -956,8 +961,17 @@ class VerificationMixin(VerificationOwnershipMixin):
                     if RepositoryDomain.TEST in classify_repository_path(path)
                 )
             )
+        return state.lexical_test_paths
+
+    def _verification_test_lexical_rows(
+        self, state: _VerificationRelevanceState
+    ) -> list[dict[str, object]]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         return self._session_lexical_file_candidates(
-            sorted(state.task_terms), limit=65, paths=state.lexical_test_paths
+            sorted(state.task_terms),
+            limit=65,
+            paths=self._verification_test_paths(state),
         )
 
     @staticmethod

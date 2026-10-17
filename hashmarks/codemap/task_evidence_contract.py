@@ -411,7 +411,12 @@ def _retrieval_locator(value: object, path: str) -> None:
     _fields(row, path, int, (), ("rank", "start_line", "end_line"))
     if "roles" in row:
         _strings(row["roles"], f"{path}.roles")
-    for key in ("enclosing_declarations", "class_declarations"):
+    for key in (
+        "enclosing_declarations",
+        "class_declarations",
+        "same_name_declarations",
+        "direct_call_declarations",
+    ):
         if key in row:
             _record(row[key], f"{path}.{key}")
 

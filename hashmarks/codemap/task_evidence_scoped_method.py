@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping, Sequence
+from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from .model import EvidenceVisibility
@@ -12,10 +13,89 @@ from .task_evidence_contract import read_task_candidate
 if TYPE_CHECKING:
     from .engine import CodeMap
     from .evidence_verification import _VerificationRelevanceState
-    from .task_evidence_types import TaskEvidenceDraft
+    from .task_evidence_types import RetrievalLocator, TaskEvidenceDraft
 
 
 class TaskEvidenceScopedMethodMixin:
+    def _task_evidence_direct_call_declarations(
+        self, path: str, locator: Mapping[str, object]
+    ) -> dict[str, object] | None:
+        """Project qualified direct calls using the structural-locality resolver."""
+        codemap = cast("CodeMap", self)
+        symbol = str(locator.get("symbol") or "")
+        selected = codemap.store.symbol_at(path, symbol)
+        if selected is None or (
+            selected.get("start_line"),
+            selected.get("end_line"),
+        ) != (locator.get("start_line"), locator.get("end_line")):
+            return None
+        calls = [
+            edge
+            for edge in codemap.store.edges_from(path, symbol)
+            if edge.get("kind") == "call" and edge.get("source") == symbol
+        ]
+        targets: dict[str, dict[str, object]] = {}
+        resolved_calls = 0
+        for edge in calls[:64]:
+            target, _, _, complete = codemap._resolve_call_target(edge)
+            if not complete or target is None or target.get("path") != path:
+                continue
+            if target.get("kind") not in {"function", "method"}:
+                continue
+            resolved_calls += 1
+            name = str(target["qualname"])
+            targets.setdefault(
+                name,
+                {
+                    "path": path,
+                    "symbol": name,
+                    "start_line": target["start_line"],
+                    "end_line": target["end_line"],
+                    "call_line": edge["line"],
+                },
+            )
+        member = codemap._session_file_row(path)
+        if not targets or member is None or not codemap._indexed_path_current(path):
+            return None
+        declarations = list(targets.values())
+        return {
+            "authority": "indexed-qualified-local-call-declarations-only",
+            "scope": "same-file-direct-call-target-declarations",
+            "ownership_authority": False,
+            "runtime_members": "not-established",
+            "negative_evidence_admissible": False,
+            "source_revision": member["file_digest"],
+            "index_generation": codemap.store.generation(),
+            "observed_calls": len(calls),
+            "examined_calls": min(len(calls), 64),
+            "unexamined_calls": max(0, len(calls) - 64),
+            "unresolved_or_other_scope_calls": min(len(calls), 64) - resolved_calls,
+            "observed": len(declarations),
+            "returned": min(len(declarations), 4),
+            "omitted": max(0, len(declarations) - 4),
+            "bound": 4,
+            "declarations": declarations[:4],
+        }
+
+    def _task_evidence_attach_direct_call_declarations(
+        self, packet: TaskEvidenceDraft
+    ) -> None:
+        codemap = cast("CodeMap", self)
+        for row in packet["retrieval"]["results"][:3]:
+            path = row["path"]
+            if (
+                row.get("supplement") != "bounded-lexical-source-position"
+                or not codemap._indexed_path_current(path)
+                or codemap._task_evidence_visibility(path)
+                is not EvidenceVisibility.SOURCE
+                or codemap.policy.decide(path).evidence_visibility
+                is not EvidenceVisibility.SOURCE
+            ):
+                continue
+            context = codemap._task_evidence_direct_call_declarations(path, row)
+            if context is not None and codemap._indexed_path_current(path):
+                row["direct_call_declarations"] = context
+
     @staticmethod
     def _enclosing_span_stop(
         parent: Mapping[str, object], child: Mapping[str, object]
@@ -227,6 +307,68 @@ class TaskEvidenceScopedMethodMixin:
             return None
         return parent
 
+    def _task_evidence_same_named_declarations(
+        self, path: str, locator: Mapping[str, object]
+    ) -> dict[str, object] | None:
+        """Expose lexical name alternatives, without dispatch/inheritance claims."""
+        codemap = cast("CodeMap", self)
+        symbols = codemap._session_symbols_for_path(path)
+        selected = [
+            row
+            for row in symbols
+            if (row.get("qualname"), row.get("start_line"), row.get("end_line"))
+            == (
+                locator.get("symbol"),
+                locator.get("start_line"),
+                locator.get("end_line"),
+            )
+        ]
+        if len(selected) != 1 or selected[0].get("kind") not in {"method", "function"}:
+            return None
+        alternatives = sorted(
+            (
+                row
+                for row in symbols
+                if row is not selected[0]
+                and row.get("name") == selected[0].get("name")
+                and row.get("kind") in {"method", "function"}
+            ),
+            key=lambda row: str(row.get("qualname") or ""),
+        )
+        member = codemap._session_file_row(path)
+        if not alternatives or member is None:
+            return None
+        return {
+            "authority": "indexed-lexical-declarations-only",
+            "scope": "same-file-same-name-declarations",
+            "ownership_authority": False,
+            "runtime_members": "not-established",
+            "negative_evidence_admissible": False,
+            "source_revision": member["file_digest"],
+            "index_generation": codemap.store.generation(),
+            "observed": len(alternatives),
+            "returned": min(len(alternatives), 4),
+            "omitted": max(0, len(alternatives) - 4),
+            "bound": 4,
+            "declarations": [
+                {
+                    "path": path,
+                    "symbol": row["qualname"],
+                    "start_line": row["start_line"],
+                    "end_line": row["end_line"],
+                }
+                for row in alternatives[:4]
+            ],
+        }
+
+    def _task_evidence_attach_same_named_declarations(
+        self, path: str, row: RetrievalLocator
+    ) -> None:
+        codemap = cast("CodeMap", self)
+        alternatives = codemap._task_evidence_same_named_declarations(path, row)
+        if alternatives is not None and codemap._indexed_path_current(path):
+            row["same_name_declarations"] = alternatives
+
     def _task_evidence_attach_class_declarations(
         self, packet: TaskEvidenceDraft
     ) -> None:
@@ -244,6 +386,7 @@ class TaskEvidenceScopedMethodMixin:
                 continue
             if not codemap._task_evidence_declaration_visible(path):
                 continue
+            codemap._task_evidence_attach_same_named_declarations(path, row)
             declaration = codemap._task_evidence_retrieved_class_scope(path, row)
             if declaration is None or (path, declaration["qualname"]) in observed:
                 continue
@@ -313,9 +456,13 @@ class TaskEvidenceScopedMethodMixin:
             and RepositoryDomain.TEST in classify_repository_path(str(match["path"]))
         }
         state.candidate_paths.update(term_counts)
-        names: list[str] = []
-        codemap._append_verification_symbol_names(names, subject)
-        codemap._verification_collect_direct_references(state, names)
+        filename_candidates = codemap._task_evidence_filename_test_candidates(
+            state, subject_terms
+        )
+        state.candidate_paths.update(filename_candidates)
+        codemap._verification_collect_direct_references(
+            state, [str(subject["qualname"])]
+        )
         test_modules = codemap._task_evidence_test_module_references(state)
         state.source_ref_paths.update(test_modules)
         codemap._verification_collect_indirect_references(state)
@@ -325,6 +472,7 @@ class TaskEvidenceScopedMethodMixin:
             candidate["subject_term_matches"] = term_counts.get(
                 str(candidate["path"]), 0
             )
+            candidate.update(filename_candidates.get(str(candidate["path"]), {}))
         candidates.sort(
             key=codemap._task_evidence_candidate_verifier_score, reverse=True
         )
@@ -361,6 +509,7 @@ class TaskEvidenceScopedMethodMixin:
                     "source_candidate_basis": [
                         {
                             **basis,
+                            **filename_candidates.get(str(candidate["path"]), {}),
                             "reference_strength": candidate.get("reference_strength"),
                             "reference_symbols": candidate.get("reference_symbols", []),
                             "indirect_reference_symbols": candidate.get(
@@ -420,10 +569,62 @@ class TaskEvidenceScopedMethodMixin:
         score = codemap._verification_candidate_score(row)
         return (
             score[0],
+            int(row.get("source_filename_prefix_match") is True),
+            self._task_evidence_test_directory_matches(row),
             score[1],
             cast("int", row.get("subject_term_matches", 0)),
             *score[2:],
         )
+
+    @staticmethod
+    def _task_evidence_test_directory_matches(row: Mapping[str, object]) -> int:
+        """Use existing task/path facts for disclosure, never test selection."""
+        from .query_primitives import _query_terms
+
+        anchors = row.get("task_anchor_terms")
+        if not isinstance(anchors, list):
+            return 0
+        directory = str(Path(str(row.get("path") or "")).parent).replace("/", " ")
+        terms = set(_query_terms(directory))
+        return sum(isinstance(term, str) and term in terms for term in anchors)
+
+    def _task_evidence_filename_test_candidates(
+        self,
+        state: _VerificationRelevanceState,
+        subject_terms: Sequence[str],
+    ) -> dict[str, dict[str, object]]:
+        """Observe indexed test filename similarity without import/use authority."""
+        codemap = cast("CodeMap", self)
+        if not subject_terms:
+            return {}
+        prefix = (
+            Path(state.edit_path).name.split(".", 1)[0].removeprefix("test_").casefold()
+        )
+        paths = [
+            path
+            for path in codemap._verification_test_paths(state)
+            if Path(path).name.split(".", 1)[0].removeprefix("test_").casefold()
+            == prefix
+        ]
+        codemap._session_file_rows(paths)
+        paths = [
+            path for path in paths if codemap._task_evidence_declaration_visible(path)
+        ]
+        if len(paths) > 64:
+            state.search_bound_reasons.add("source-filename-test-candidate-limit")
+        if not paths:
+            return {}
+        matches = codemap._session_lexical_file_candidates(
+            subject_terms, limit=65, paths=paths[:64]
+        )
+        return {
+            str(row["path"]): {
+                "source_filename_prefix_match": True,
+                "subject_term_matches": row["matches"],
+            }
+            for row in matches
+            if codemap._indexed_path_current(str(row["path"]))
+        }
 
     def _task_evidence_attach_candidate_verifiers(
         self, packet: TaskEvidenceDraft, task: str

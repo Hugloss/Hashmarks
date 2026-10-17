@@ -364,13 +364,15 @@ def _owner_authority_safe(packet: dict[str, Any], rule: dict[str, Any]) -> bool 
         if oracle["scope"] == "file"
         else ("path", "qualname", "start_line", "end_line")
     )
-    # A coarse file locator does not assert the finer symbol facts. Missing
-    # precision remains incomplete; any contradictory fact still fails.
+    # Validate the facts actually asserted. A unique symbol oracle also supports
+    # its containing file; a file-only owner makes no finer claim. Declaration
+    # sufficiency and recall are measured independently, with unchanged oracles.
     return combine_required(
         [
             None
-            if owner.get(key) is None
-            else owner[key] == oracle["candidates"][0][key]
+            if key == "path" and owner.get(key) is None
+            else owner.get(key) is None
+            or _json_equal(owner[key], oracle["candidates"][0][key])
             for key in fields
         ]
     )
@@ -380,7 +382,11 @@ def _declaration_locators(row: Mapping[str, Any]) -> list[dict[str, Any]]:
     from hashmarks.codemap.task_evidence_initial import decode_initial_collection
 
     candidates = []
-    for family in ("class_declarations", "enclosing_declarations"):
+    for family in (
+        "class_declarations",
+        "enclosing_declarations",
+        "same_name_declarations",
+    ):
         context = row.get(family)
         if not isinstance(context, dict):
             continue

@@ -19,6 +19,7 @@ from hashmarks.mcp_launch import installed_mcp_command
 from .common import canonical_sha256
 
 _JSON_CLI_OPERATIONS = {
+    "correlate_evidence": "correlate-evidence",
     "dependency_codemap": "dependency-codemap",
     "repository_intelligence_query": "repository-intelligence-query",
 }

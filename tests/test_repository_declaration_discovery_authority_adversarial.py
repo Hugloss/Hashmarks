@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from contract_assertions import assert_array, assert_object, assert_records, assert_text
+
 from hashmarks.codemap import (
     RepositoryDeclarationProviderContext,
     RepositoryDeclarationProviderResult,
@@ -481,15 +483,15 @@ class _NamespacedOwnershipProvider:
 
 
 def _provider(packet: dict[str, object]) -> dict[str, object]:
-    return packet["providers"][0]
+    return assert_records(packet["providers"])[0]
 
 
 def _nested_group(packet: dict[str, object]) -> dict[str, object]:
-    return packet["declarations"]["groups"][0]
+    return assert_records(assert_object(packet["declarations"])["groups"])[0]
 
 
 def _nested_delta(packet: dict[str, object]) -> dict[str, object]:
-    return packet["delta_from_previous"]["declarations"]
+    return assert_object(assert_object(packet["delta_from_previous"])["declarations"])
 
 
 def test_detection_lifecycle_adds_and_removes_claims_without_inventing_absence(
@@ -520,26 +522,34 @@ def test_detection_lifecycle_adds_and_removes_claims_without_inventing_absence(
         )
 
     assert _provider(not_detected)["state"] == "not-detected"
-    assert _provider(not_detected)["inputs"][0]["state"] == "known-absent"
-    assert not_detected["declarations"]["groups"] == []
+    assert (
+        assert_object(assert_records(_provider(not_detected)["inputs"])[0])["state"]
+        == "known-absent"
+    )
+    assert assert_object(not_detected["declarations"])["groups"] == []
 
     assert _provider(collected)["state"] == "collected"
-    assert {row["path"] for row in _provider(collected)["inputs"]} == {
+    assert {row["path"] for row in assert_records(_provider(collected)["inputs"])} == {
         "provider.marker",
         "value.meta",
     }
-    assert collected["delta_from_previous"]["providers"] == {
+    assert assert_object(collected["delta_from_previous"])["providers"] == {
         "added": [],
         "removed": [],
         "changed": ["marker-provider"],
     }
     assert _nested_delta(collected)["added_group_ids"] == ["marker-provider"]
-    assert _nested_group(collected)["absence"]["state"] == "known-present"
+    assert (
+        assert_object(_nested_group(collected)["absence"])["state"] == "known-present"
+    )
 
     assert _provider(removed)["state"] == "not-detected"
-    assert _provider(removed)["inputs"][0]["state"] == "known-absent"
-    assert removed["declarations"]["groups"] == []
-    assert removed["delta_from_previous"]["providers"] == {
+    assert (
+        assert_object(assert_records(_provider(removed)["inputs"])[0])["state"]
+        == "known-absent"
+    )
+    assert assert_object(removed["declarations"])["groups"] == []
+    assert assert_object(removed["delta_from_previous"])["providers"] == {
         "added": [],
         "removed": [],
         "changed": ["marker-provider"],
@@ -576,29 +586,29 @@ def test_warning_text_is_wrapper_provenance_until_coverage_explicitly_downgrades
 
     assert _provider(base)["warnings"] == []
     assert _provider(warned)["warnings"] == ["enumeration may be partial"]
-    assert warned["delta_from_previous"]["providers"] == {
+    assert assert_object(warned["delta_from_previous"])["providers"] == {
         "added": [],
         "removed": [],
         "changed": ["warning-provider"],
     }
     assert _nested_delta(warned)["changed_groups"] == []
     assert (
-        base["declarations"]["observation_identity"]
-        == warned["declarations"]["observation_identity"]
+        assert_object(base["declarations"])["observation_identity"]
+        == assert_object(warned["declarations"])["observation_identity"]
     )
 
-    assert incomplete["delta_from_previous"]["providers"] == {
+    assert assert_object(incomplete["delta_from_previous"])["providers"] == {
         "added": [],
         "removed": [],
         "changed": [],
     }
-    changed = _nested_delta(incomplete)["changed_groups"][0]
+    changed = assert_records(_nested_delta(incomplete)["changed_groups"])[0]
     assert changed["definition_changed"] is False
     assert changed["value_changed_declaration_ids"] == []
     assert changed["observation_changed_declaration_ids"] == []
     assert changed["coverage_changed"] is True
     assert changed["absence_changed"] is True
-    assert _nested_group(warned)["absence"]["state"] == "known-absent"
+    assert assert_object(_nested_group(warned)["absence"])["state"] == "known-absent"
     assert _nested_group(incomplete)["absence"] == {
         "state": "unknown",
         "missing_declaration_ids": [],
@@ -635,33 +645,35 @@ def test_enumerated_source_move_changes_definition_without_value_churn(
     assert _provider(after)["enumerations"] == [
         {"prefix": "owners", "paths": ["owners/b.meta"]}
     ]
-    assert after["delta_from_previous"]["providers"] == {
+    assert assert_object(after["delta_from_previous"])["providers"] == {
         "added": [],
         "removed": [],
         "changed": ["enumerating-owner-provider"],
     }
 
-    changed = _nested_delta(after)["changed_groups"][0]
+    changed = assert_records(_nested_delta(after)["changed_groups"])[0]
     assert changed["definition_changed"] is True
     assert changed["definition_changed_declaration_ids"] == ["value"]
     assert changed["value_changed_declaration_ids"] == []
     assert changed["comparison_changed"] is False
     assert changed["absence_changed"] is False
 
-    nested_binding_changes = _nested_delta(after)["repository_evidence"]["bindings"][
-        "changed"
-    ]
+    nested_binding_changes = assert_records(
+        assert_object(
+            assert_object(_nested_delta(after)["repository_evidence"])["bindings"]
+        )["changed"]
+    )
     assert len(nested_binding_changes) == 1
     binding = nested_binding_changes[0]
-    assert binding["definition"]["state"] == "changed"
-    assert binding["direct_evidence"]["state"] == "preserved"
-    assert binding["member_evidence"]["state"] == "preserved"
+    assert assert_object(binding["definition"])["state"] == "changed"
+    assert assert_object(binding["direct_evidence"])["state"] == "preserved"
+    assert assert_object(binding["member_evidence"])["state"] == "preserved"
 
 
 def _role_rows(packet: dict[str, object]) -> dict[str, dict[str, object]]:
     return {
-        row["semantic_role"]["kind"]: row
-        for row in _nested_group(packet)["declarations"]
+        assert_text(assert_object(row["semantic_role"])["kind"]): row
+        for row in assert_records(_nested_group(packet)["declarations"])
     }
 
 
@@ -703,13 +715,15 @@ def _assert_generated_role_absence(
 ) -> str:
     present_group = _nested_group(present)
     absent_group = _nested_group(absent)
-    generated_identity = _role_rows(present)["generated-copy"][
-        "semantic_declaration_identity"
-    ]
+    generated_identity = assert_text(
+        assert_object(_role_rows(present)["generated-copy"])[
+            "semantic_declaration_identity"
+        ]
+    )
 
-    assert present_group["comparison"]["state"] == "equivalent"
-    assert present_group["absence"]["state"] == "known-present"
-    assert absent_group["comparison"]["state"] == "insufficient"
+    assert assert_object(present_group["comparison"])["state"] == "equivalent"
+    assert assert_object(present_group["absence"])["state"] == "known-present"
+    assert assert_object(absent_group["comparison"])["state"] == "insufficient"
     assert absent_group["absence"] == {
         "state": "known-absent",
         "missing_declaration_ids": ["generated-owner"],
@@ -717,31 +731,35 @@ def _assert_generated_role_absence(
         "unexpected_declaration_ids": [],
     }
     assert _provider(absent)["state"] == "collected"
-    assert absent["delta_from_previous"]["providers"] == {
+    assert assert_object(absent["delta_from_previous"])["providers"] == {
         "added": [],
         "removed": [],
         "changed": ["generated-owner-provider"],
     }
 
     delta = _nested_delta(absent)
-    changed = delta["changed_groups"][0]
+    changed = assert_records(delta["changed_groups"])[0]
     assert changed["removed_declaration_ids"] == ["generated-owner"]
     assert changed["added_declaration_ids"] == []
     assert changed["comparison_changed"] is True
     assert changed["absence_changed"] is True
     assert changed["coverage_changed"] is False
 
-    subject = delta["semantic_subjects"]["changed"][0]
+    subject = assert_records(assert_object(delta["semantic_subjects"])["changed"])[0]
     assert subject["semantic_declarations"] == {
         "added": [],
         "removed": [generated_identity],
         "ambiguous": [],
         "changed": [],
     }
-    bindings = delta["repository_evidence"]["bindings"]
+    bindings = assert_object(assert_object(delta["repository_evidence"])["bindings"])
     assert bindings["changed"] == []
-    assert bindings["removed"] == [_role_rows(present)["generated-copy"]["binding_id"]]
-    assert bindings["preserved"] == [_role_rows(present)["source"]["binding_id"]]
+    assert bindings["removed"] == [
+        assert_object(_role_rows(present)["generated-copy"])["binding_id"]
+    ]
+    assert bindings["preserved"] == [
+        assert_object(_role_rows(present)["source"])["binding_id"]
+    ]
     return generated_identity
 
 
@@ -757,9 +775,9 @@ def _assert_generated_role_reappearance(
         "state": "differing",
         "distinct_values": ["team-a", "team-b"],
     }
-    assert restored_group["absence"]["state"] == "known-present"
+    assert assert_object(restored_group["absence"])["state"] == "known-present"
     assert (
-        restored_roles["generated-copy"]["semantic_declaration_identity"]
+        assert_object(restored_roles["generated-copy"])["semantic_declaration_identity"]
         == generated_identity
     )
     assert (
@@ -769,22 +787,40 @@ def _assert_generated_role_reappearance(
     )
 
     delta = _nested_delta(restored)
-    subject = delta["semantic_subjects"]["changed"][0]
+    subject = assert_records(assert_object(delta["semantic_subjects"])["changed"])[0]
     assert subject["semantic_declarations"] == {
         "added": [generated_identity],
         "removed": [],
         "ambiguous": [],
         "changed": [],
     }
-    assert subject["comparison_transition"]["before"]["state"] == "insufficient"
-    assert subject["comparison_transition"]["after"]["state"] == "differing"
-    assert subject["absence_transition"]["before"]["state"] == "known-absent"
-    assert subject["absence_transition"]["after"]["state"] == "known-present"
+    assert (
+        assert_object(assert_object(subject["comparison_transition"])["before"])[
+            "state"
+        ]
+        == "insufficient"
+    )
+    assert (
+        assert_object(assert_object(subject["comparison_transition"])["after"])["state"]
+        == "differing"
+    )
+    assert (
+        assert_object(assert_object(subject["absence_transition"])["before"])["state"]
+        == "known-absent"
+    )
+    assert (
+        assert_object(assert_object(subject["absence_transition"])["after"])["state"]
+        == "known-present"
+    )
 
-    bindings = delta["repository_evidence"]["bindings"]
-    assert bindings["added"] == [restored_roles["generated-copy"]["binding_id"]]
+    bindings = assert_object(assert_object(delta["repository_evidence"])["bindings"])
+    assert bindings["added"] == [
+        assert_object(restored_roles["generated-copy"])["binding_id"]
+    ]
     assert bindings["changed"] == []
-    assert bindings["preserved"] == [restored_roles["source"]["binding_id"]]
+    assert bindings["preserved"] == [
+        assert_object(restored_roles["source"])["binding_id"]
+    ]
 
     original_generated = _role_rows(present)["generated-copy"]
     restored_generated = restored_roles["generated-copy"]
@@ -855,7 +891,7 @@ def _assert_ownership_uncertainty_current_state(
         "state": "equivalent",
         "distinct_values": ["team-a"],
     }
-    assert baseline_group["absence"]["state"] == "known-present"
+    assert assert_object(baseline_group["absence"])["state"] == "known-present"
     assert stressed_group["comparison"] == {
         "state": "ambiguous",
         "reason": "one-or-more-values-not-resolved",
@@ -869,16 +905,16 @@ def _assert_ownership_uncertainty_current_state(
         "unexpected_declaration_ids": [],
         "reason": "coverage-does-not-authorize-negative-evidence",
     }
-    assert stressed["declarations"]["winner"] == "not-selected"
-    assert "preferred" not in stressed_group["comparison"]
-    assert "authoritative_value" not in stressed_group["comparison"]
+    assert assert_object(stressed["declarations"])["winner"] == "not-selected"
+    assert "preferred" not in assert_object(stressed_group["comparison"])
+    assert "authoritative_value" not in assert_object(stressed_group["comparison"])
 
     baseline_roles = _role_rows(baseline)
     stressed_roles = _role_rows(stressed)
     for role in ("source-metadata", "generated-catalog"):
         assert (
-            baseline_roles[role]["semantic_declaration_identity"]
-            == stressed_roles[role]["semantic_declaration_identity"]
+            assert_object(baseline_roles[role])["semantic_declaration_identity"]
+            == assert_object(stressed_roles[role])["semantic_declaration_identity"]
         )
 
 
@@ -888,7 +924,7 @@ def _assert_ownership_uncertainty_semantic_delta(
 ) -> None:
     baseline_roles = _role_rows(baseline)
     delta = _nested_delta(stressed)
-    changed = delta["changed_groups"][0]
+    changed = assert_records(delta["changed_groups"])[0]
     assert changed["definition_changed"] is True
     assert changed["removed_declaration_ids"] == ["policy-owner"]
     assert changed["added_declaration_ids"] == []
@@ -897,18 +933,20 @@ def _assert_ownership_uncertainty_semantic_delta(
     assert changed["absence_changed"] is True
     assert changed["coverage_changed"] is True
 
-    subject = delta["semantic_subjects"]["changed"][0]
-    semantic = subject["semantic_declarations"]
+    subject = assert_records(assert_object(delta["semantic_subjects"])["changed"])[0]
+    semantic = assert_object(subject["semantic_declarations"])
     assert semantic["added"] == []
     assert semantic["ambiguous"] == []
     assert semantic["removed"] == [
-        baseline_roles["repository-policy"]["semantic_declaration_identity"]
+        assert_object(baseline_roles["repository-policy"])[
+            "semantic_declaration_identity"
+        ]
     ]
     assert semantic["changed"] == [
         {
-            "semantic_declaration_identity": baseline_roles["generated-catalog"][
-                "semantic_declaration_identity"
-            ],
+            "semantic_declaration_identity": assert_object(
+                baseline_roles["generated-catalog"]
+            )["semantic_declaration_identity"],
             "semantic_role": {"kind": "generated-catalog"},
             "previous_declaration_id": "generated-owner",
             "current_declaration_id": "generated-owner",
@@ -922,12 +960,32 @@ def _assert_ownership_uncertainty_semantic_delta(
             },
         }
     ]
-    assert subject["comparison_transition"]["before"]["state"] == "equivalent"
-    assert subject["comparison_transition"]["after"]["state"] == "ambiguous"
-    assert subject["absence_transition"]["before"]["state"] == "known-present"
-    assert subject["absence_transition"]["after"]["state"] == "unknown"
-    assert subject["coverage_transition"]["before"]["state"] == "complete"
-    assert subject["coverage_transition"]["after"]["state"] == "incomplete"
+    assert (
+        assert_object(assert_object(subject["comparison_transition"])["before"])[
+            "state"
+        ]
+        == "equivalent"
+    )
+    assert (
+        assert_object(assert_object(subject["comparison_transition"])["after"])["state"]
+        == "ambiguous"
+    )
+    assert (
+        assert_object(assert_object(subject["absence_transition"])["before"])["state"]
+        == "known-present"
+    )
+    assert (
+        assert_object(assert_object(subject["absence_transition"])["after"])["state"]
+        == "unknown"
+    )
+    assert (
+        assert_object(assert_object(subject["coverage_transition"])["before"])["state"]
+        == "complete"
+    )
+    assert (
+        assert_object(assert_object(subject["coverage_transition"])["after"])["state"]
+        == "incomplete"
+    )
 
 
 def _assert_ownership_uncertainty_binding_separation(
@@ -936,13 +994,19 @@ def _assert_ownership_uncertainty_binding_separation(
 ) -> None:
     baseline_roles = _role_rows(baseline)
     stressed_roles = _role_rows(stressed)
-    bindings = _nested_delta(stressed)["repository_evidence"]["bindings"]
-    assert bindings["removed"] == [baseline_roles["repository-policy"]["binding_id"]]
+    bindings = assert_object(
+        assert_object(_nested_delta(stressed)["repository_evidence"])["bindings"]
+    )
+    assert bindings["removed"] == [
+        assert_object(baseline_roles["repository-policy"])["binding_id"]
+    ]
     assert bindings["added"] == []
-    assert stressed_roles["source-metadata"]["binding_id"] in bindings["preserved"]
+    assert assert_object(stressed_roles["source-metadata"])[
+        "binding_id"
+    ] in assert_array(bindings["preserved"])
     assert (
-        stressed_roles["generated-catalog"]["binding_id"]
-        == baseline_roles["generated-catalog"]["binding_id"]
+        assert_object(stressed_roles["generated-catalog"])["binding_id"]
+        == assert_object(baseline_roles["generated-catalog"])["binding_id"]
     )
 
 
@@ -958,7 +1022,7 @@ def test_ownership_value_ambiguity_and_incomplete_coverage_remain_orthogonal(
 def _policy_role_rows(packet: dict[str, object]) -> list[dict[str, object]]:
     return [
         row
-        for row in _nested_group(packet)["declarations"]
+        for row in assert_records(_nested_group(packet)["declarations"])
         if row.get("semantic_role") == {"kind": "repository-policy"}
     ]
 
@@ -1005,22 +1069,30 @@ def _assert_policy_multiplicity_current_state(
         "state": "differing",
         "distinct_values": ["team-a", "team-b"],
     }
-    assert baseline_group["absence"]["state"] == "known-present"
-    assert stressed_group["absence"]["state"] == "known-present"
-    assert stressed["declarations"]["winner"] == "not-selected"
-    assert "preferred" not in stressed_group["comparison"]
-    assert "authoritative_value" not in stressed_group["comparison"]
+    assert assert_object(baseline_group["absence"])["state"] == "known-present"
+    assert assert_object(stressed_group["absence"])["state"] == "known-present"
+    assert assert_object(stressed["declarations"])["winner"] == "not-selected"
+    assert "preferred" not in assert_object(stressed_group["comparison"])
+    assert "authoritative_value" not in assert_object(stressed_group["comparison"])
 
     baseline_policy = _policy_role_rows(baseline)
     stressed_policy = _policy_role_rows(stressed)
     assert len(baseline_policy) == 1
     assert len(stressed_policy) == 3
-    policy_identity = baseline_policy[0]["semantic_declaration_identity"]
+    policy_identity = assert_text(
+        assert_object(baseline_policy[0])["semantic_declaration_identity"]
+    )
     assert {row["semantic_declaration_identity"] for row in stressed_policy} == {
         policy_identity
     }
-    assert [row["producer"]["ordinal"] for row in stressed_policy] == [1, 2, 3]
-    assert [row["producer"]["specificity"] for row in stressed_policy] == [
+    assert [assert_object(row["producer"])["ordinal"] for row in stressed_policy] == [
+        1,
+        2,
+        3,
+    ]
+    assert [
+        assert_object(row["producer"])["specificity"] for row in stressed_policy
+    ] == [
         1,
         13,
         20,
@@ -1037,9 +1109,13 @@ def _assert_policy_multiplicity_semantic_delta(
     stressed: dict[str, object],
     policy_identity: str,
 ) -> None:
-    semantic = _nested_delta(stressed)["semantic_subjects"]["changed"][0][
-        "semantic_declarations"
-    ]
+    semantic = assert_object(
+        assert_object(
+            assert_records(
+                assert_object(_nested_delta(stressed)["semantic_subjects"])["changed"]
+            )[0]
+        )["semantic_declarations"]
+    )
     assert semantic["added"] == []
     assert semantic["removed"] == []
     assert semantic["changed"] == []
@@ -1065,22 +1141,24 @@ def _assert_policy_multiplicity_binding_separation(
     baseline_policy = _policy_role_rows(baseline)
     source = next(
         row
-        for row in baseline_group["declarations"]
+        for row in assert_records(baseline_group["declarations"])
         if row.get("semantic_role") == {"kind": "source-metadata"}
     )
-    bindings = _nested_delta(stressed)["repository_evidence"]["bindings"]
+    bindings = assert_object(
+        assert_object(_nested_delta(stressed)["repository_evidence"])["bindings"]
+    )
     assert bindings["preserved"] == [source["binding_id"]]
-    assert len(bindings["added"]) == 2
+    assert len(assert_array(bindings["added"])) == 2
     assert bindings["removed"] == []
 
     policy_binding = next(
         row
-        for row in bindings["changed"]
-        if row["binding_id"] == baseline_policy[0]["binding_id"]
+        for row in assert_records(bindings["changed"])
+        if row["binding_id"] == assert_object(baseline_policy[0])["binding_id"]
     )
-    assert policy_binding["definition"]["state"] == "preserved"
-    assert policy_binding["direct_evidence"]["state"] == "preserved"
-    assert policy_binding["locator_evidence"]["state"] == "preserved"
+    assert assert_object(policy_binding["definition"])["state"] == "preserved"
+    assert assert_object(policy_binding["direct_evidence"])["state"] == "preserved"
+    assert assert_object(policy_binding["locator_evidence"])["state"] == "preserved"
     assert policy_binding["member_evidence"] == {
         "state": "changed",
         "changes": [
@@ -1154,7 +1232,7 @@ def _namespace_isolation_packets(
 
 
 def _single_role_declaration(packet: dict[str, object]) -> dict[str, object]:
-    return _nested_group(packet)["declarations"][0]
+    return assert_records(_nested_group(packet)["declarations"])[0]
 
 
 def _assert_cross_provider_namespace_isolation(
@@ -1179,25 +1257,27 @@ def _assert_cross_provider_namespace_isolation(
         != declaration_b["semantic_declaration_identity"]
     )
 
-    delta = provider_b["delta_from_previous"]
+    delta = assert_object(provider_b["delta_from_previous"])
     assert delta["providers"] == {
         "added": ["provider-b"],
         "removed": ["provider-a"],
         "changed": [],
     }
-    subjects = _nested_delta(provider_b)["semantic_subjects"]
+    subjects = assert_object(_nested_delta(provider_b)["semantic_subjects"])
     assert subjects["added"] == [group_b["semantic_subject_identity"]]
     assert subjects["removed"] == [group_a["semantic_subject_identity"]]
     assert subjects["ambiguous"] == []
     assert subjects["changed"] == []
 
-    changed_group = _nested_delta(provider_b)["changed_groups"][0]
+    changed_group = assert_records(_nested_delta(provider_b)["changed_groups"])[0]
     assert changed_group["group_id"] == "ownership-request"
     assert changed_group["semantic_subject_changed"] is True
     assert changed_group["value_changed_declaration_ids"] == []
     assert changed_group["definition_changed_declaration_ids"] == ["owner"]
 
-    bindings = _nested_delta(provider_b)["repository_evidence"]["bindings"]
+    bindings = assert_object(
+        assert_object(_nested_delta(provider_b)["repository_evidence"])["bindings"]
+    )
     assert bindings["changed"] == []
     assert bindings["added"] == []
     assert bindings["removed"] == []
@@ -1213,9 +1293,19 @@ def _assert_provider_version_is_not_semantic_identity(
     before_declaration = _single_role_declaration(before)
     after_declaration = _single_role_declaration(after)
 
-    assert before["providers"][0]["provenance"]["version"] == "1"
-    assert after["providers"][0]["provenance"]["version"] == "2"
-    assert after["delta_from_previous"]["providers"] == {
+    assert (
+        assert_object(
+            assert_object(assert_records(before["providers"])[0])["provenance"]
+        )["version"]
+        == "1"
+    )
+    assert (
+        assert_object(
+            assert_object(assert_records(after["providers"])[0])["provenance"]
+        )["version"]
+        == "2"
+    )
+    assert assert_object(after["delta_from_previous"])["providers"] == {
         "added": [],
         "removed": [],
         "changed": ["provider-b"],
@@ -1229,8 +1319,8 @@ def _assert_provider_version_is_not_semantic_identity(
         == after_declaration["semantic_declaration_identity"]
     )
     assert (
-        before["declarations"]["observation_identity"]
-        == after["declarations"]["observation_identity"]
+        assert_object(before["declarations"])["observation_identity"]
+        == assert_object(after["declarations"])["observation_identity"]
     )
     assert _nested_delta(after)["changed_groups"] == []
     assert _nested_delta(after)["semantic_subjects"] == {
@@ -1263,24 +1353,26 @@ def _assert_scope_change_is_semantic_remove_add(
         != after_declaration["semantic_declaration_identity"]
     )
 
-    delta = after["delta_from_previous"]
+    delta = assert_object(after["delta_from_previous"])
     assert delta["providers"] == {
         "added": [],
         "removed": [],
         "changed": [],
     }
-    subjects = _nested_delta(after)["semantic_subjects"]
+    subjects = assert_object(_nested_delta(after)["semantic_subjects"])
     assert subjects["added"] == [after_group["semantic_subject_identity"]]
     assert subjects["removed"] == [before_group["semantic_subject_identity"]]
     assert subjects["ambiguous"] == []
     assert subjects["changed"] == []
 
-    changed_group = _nested_delta(after)["changed_groups"][0]
+    changed_group = assert_records(_nested_delta(after)["changed_groups"])[0]
     assert changed_group["semantic_subject_changed"] is True
     assert changed_group["value_changed_declaration_ids"] == []
     assert changed_group["definition_changed_declaration_ids"] == ["owner"]
 
-    bindings = _nested_delta(after)["repository_evidence"]["bindings"]
+    bindings = assert_object(
+        assert_object(_nested_delta(after)["repository_evidence"])["bindings"]
+    )
     assert bindings["changed"] == []
     assert bindings["added"] == []
     assert bindings["removed"] == []

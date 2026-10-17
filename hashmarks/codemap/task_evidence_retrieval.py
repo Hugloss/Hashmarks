@@ -8,10 +8,12 @@ from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, cast
 
 from .model import EvidenceVisibility, SearchHit
+from .repository_domains import RepositoryDomain, classify_repository_path
+from .task_retrieval import TaskRetrievalMixin
 
 if TYPE_CHECKING:
     from .engine import CodeMap
-    from .task_evidence_types import TaskEvidenceDraft
+    from .task_evidence_types import TaskEvidenceDraft, TaskRetrievalDraft
 
 
 class TaskEvidenceRetrievalMixin:
@@ -99,13 +101,38 @@ class TaskEvidenceRetrievalMixin:
             )
         return tuple(parts)
 
-    @staticmethod
-    def _task_evidence_phrase_relevance(
-        parts: Sequence[str], query_tokens: Sequence[tuple[str, ...]]
-    ) -> float:
-        def matches(part: str, variant: str) -> bool:
-            return variant == part or (len(part) >= 5 and variant.startswith(part))
+    @classmethod
+    def _task_evidence_natural_part_matches(
+        cls, part: str, variants: Sequence[str]
+    ) -> bool:
+        normalized = TaskRetrievalMixin._task_natural_term_variants(
+            part, include_derivations=True
+        )
+        return any(
+            variant == form
+            or (len(form) >= 5 and variant.startswith(form))
+            or (len(variant) >= 5 and form.startswith(variant))
+            for form in normalized
+            for variant in variants
+        )
 
+    @classmethod
+    def _task_evidence_natural_match_count(
+        cls, name: str, query_tokens: Sequence[tuple[str, ...]]
+    ) -> int:
+        parts = cls._task_evidence_identifier_parts(name)
+        return sum(
+            any(
+                cls._task_evidence_natural_part_matches(part, variants)
+                for part in parts
+            )
+            for variants in query_tokens
+        )
+
+    @classmethod
+    def _task_evidence_phrase_relevance(
+        cls, parts: Sequence[str], query_tokens: Sequence[tuple[str, ...]]
+    ) -> float:
         phrase_length = 0
         phrase_position = 0
         for start in range(len(parts)):
@@ -114,9 +141,8 @@ class TaskEvidenceRetrievalMixin:
                 while (
                     start + length < len(parts)
                     and position + length < len(query_tokens)
-                    and any(
-                        matches(parts[start + length], variant)
-                        for variant in query_tokens[position + length]
+                    and cls._task_evidence_natural_part_matches(
+                        parts[start + length], query_tokens[position + length]
                     )
                 ):
                     length += 1
@@ -140,9 +166,6 @@ class TaskEvidenceRetrievalMixin:
         if not parts:
             return 0.0
 
-        def matches(part: str, variant: str) -> bool:
-            return variant == part or (len(part) >= 5 and variant.startswith(part))
-
         weighted = 0.0
         matched_parts = 0
         for part in parts:
@@ -150,7 +173,7 @@ class TaskEvidenceRetrievalMixin:
                 (variant, position)
                 for position, variants in enumerate(query_tokens)
                 for variant in variants
-                if matches(part, variant)
+                if cls._task_evidence_natural_part_matches(part, (variant,))
             ]
             if not options:
                 continue
@@ -173,24 +196,43 @@ class TaskEvidenceRetrievalMixin:
         query_tokens: Sequence[tuple[str, ...]],
         frequencies: Mapping[str, int],
         total: int,
-    ) -> list[tuple[float, Mapping[str, object]]]:
+    ) -> list[tuple[int, int, float, Mapping[str, object]]]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        scored: list[tuple[float, str, Mapping[str, object]]] = []
+        scored: list[tuple[int, int, float, str, Mapping[str, object]]] = []
         for symbol in self._session_symbols_for_path(path):
+            name = str(symbol.get("name") or "")
             score = self._task_evidence_symbol_relevance(
-                str(symbol.get("name") or ""), query_tokens, frequencies, total
+                name, query_tokens, frequencies, total
             )
             if score > 0:
+                qualname = str(symbol.get("qualname") or name)
                 scored.append(
                     (
+                        self._task_evidence_natural_match_count(name, query_tokens),
+                        self._task_evidence_natural_match_count(
+                            qualname + " " + str(symbol.get("signature") or ""),
+                            query_tokens,
+                        ),
                         score,
-                        str(symbol.get("qualname") or symbol.get("name") or ""),
+                        qualname,
                         symbol,
                     )
                 )
-        scored.sort(key=lambda row: (-row[0], row[1]))
-        return [(row[0], row[2]) for row in scored[:8]]
+        scored.sort(
+            key=lambda row: (
+                *self._task_evidence_natural_declaration_order(*row[:3]),
+                row[3],
+            )
+        )
+        return [(row[0], row[1], row[2], row[4]) for row in scored[:8]]
+
+    @staticmethod
+    def _task_evidence_natural_declaration_order(
+        matches: int, context_matches: int, score: float
+    ) -> tuple[bool, float]:
+        """Use declared context to order multiword lookup hints, never authority."""
+        return matches < 2, -(score + 2 * max(0, context_matches - matches))
 
     @staticmethod
     def _task_evidence_supplement_row(
@@ -199,6 +241,7 @@ class TaskEvidenceRetrievalMixin:
         *,
         score: float,
         visibility: EvidenceVisibility,
+        matched_task_terms: int = 0,
     ) -> dict[str, object]:
         def optional_text(key: str) -> str | None:
             value = symbol.get(key)
@@ -225,6 +268,7 @@ class TaskEvidenceRetrievalMixin:
         row["end_line"] = optional_line("end_line")
         row["retrieval_supplement"] = "bounded-natural-language"
         row["score_basis"] = "natural-identifier-phrase-relevance"
+        row["natural_identifier_term_matches"] = matched_task_terms
         return row
 
     def _task_evidence_natural_retrieval_supplements(
@@ -246,15 +290,18 @@ class TaskEvidenceRetrievalMixin:
             for row in existing
         }
         query = self._task_evidence_retrieval_query(task)
-        terms, _truncated = self._task_natural_term_candidates(query)
+        terms, _truncated = self._task_natural_term_candidates(
+            query, include_derivations=True
+        )
         if not terms:
             return []
-        term_set = set(terms)
         query_tokens = tuple(
             tuple(
                 variant
-                for variant in self._task_natural_term_variants(word)
-                if variant in term_set
+                for variant in self._task_natural_term_variants(
+                    word, include_derivations=True
+                )
+                if variant in terms
             )
             for word in re.findall(r"[A-Za-z]+", query.lower())
         )
@@ -279,9 +326,17 @@ class TaskEvidenceRetrievalMixin:
                 continue
             eligible.append((path, visibility))
         self._session_preload_symbols([path for path, _ in eligible])
-        scored_rows: list[tuple[float, int, str, dict[str, object]]] = []
+        test_edit = self._task_action_cues(task).explicit_test_edit
+        scored_rows: list[
+            tuple[bool, int, int, float, int, str, dict[str, object]]
+        ] = []
         for path_rank, (path, visibility) in enumerate(eligible):
-            for score, symbol in self._task_evidence_scored_symbols(
+            for (
+                matches,
+                context_matches,
+                score,
+                symbol,
+            ) in self._task_evidence_scored_symbols(
                 path, query_tokens, frequencies, total
             ):
                 key = (
@@ -293,18 +348,204 @@ class TaskEvidenceRetrievalMixin:
                 existing_keys.add(key)
                 scored_rows.append(
                     (
+                        not test_edit
+                        and RepositoryDomain.TEST in classify_repository_path(path),
+                        matches,
+                        context_matches,
                         score,
                         path_rank,
                         str(symbol.get("qualname") or symbol.get("name") or ""),
                         self._task_evidence_supplement_row(
-                            path, symbol, score=score, visibility=visibility
+                            path,
+                            symbol,
+                            score=score,
+                            visibility=visibility,
+                            matched_task_terms=matches,
                         ),
                     )
                 )
-        scored_rows.sort(key=lambda row: (-row[0], row[1], row[2]))
-        return ([scoped] if scoped is not None else []) + [
-            row[3] for row in scored_rows[: 2 - int(scoped is not None)]
+        scored_rows.sort(
+            key=lambda row: (
+                row[0],
+                *self._task_evidence_natural_declaration_order(*row[1:4]),
+                row[4],
+                row[5],
+            )
+        )
+        return self._task_evidence_combine_natural_supplements(
+            ([scoped] if scoped is not None else [])
+            + [row[6] for row in scored_rows[: 2 - int(scoped is not None)]],
+            self._task_evidence_lexical_supplement(
+                task, query_tokens, frequencies, total, test_edit=test_edit
+            ),
+        )
+
+    @classmethod
+    def _task_evidence_combine_natural_supplements(
+        cls,
+        natural: list[dict[str, object]],
+        lexical: dict[str, object] | None,
+    ) -> list[dict[str, object]]:
+        if lexical is None:
+            return natural
+        lexical_key = cls._task_evidence_requested_locator_key(lexical)
+        # A callable name is a stronger declaration hint than a class name.
+        # Preserve the best existing callable and disclose one source position.
+        named = next(
+            (
+                row
+                for row in natural
+                if row.get("kind") in {"function", "method"}
+                and cls._task_evidence_requested_locator_key(row) != lexical_key
+            ),
+            None,
+        )
+        return ([named] if named is not None else []) + [lexical]
+
+    @staticmethod
+    def _task_evidence_lexical_pairs(
+        query_tokens: Sequence[tuple[str, ...]], frequencies: Mapping[str, int]
+    ) -> list[tuple[str, str]]:
+        groups = [
+            tuple(term for term in variants if frequencies.get(term, 0) > 0)[:2]
+            for variants in query_tokens
+            if variants
         ]
+        ranked: list[tuple[int, int, list[tuple[str, str]]]] = []
+        for position, (left, right) in enumerate(zip(groups, groups[1:], strict=False)):
+            pairs = sorted(
+                {(a, b) for a in left for b in right if a != b},
+                key=lambda pair: (frequencies[pair[0]] * frequencies[pair[1]], pair),
+            )
+            if pairs:
+                ranked.append(
+                    (
+                        frequencies[pairs[0][0]] * frequencies[pairs[0][1]],
+                        position,
+                        pairs,
+                    )
+                )
+        return list(
+            dict.fromkeys(pair for _, _, pairs in sorted(ranked)[:8] for pair in pairs)
+        )
+
+    def _task_evidence_lexical_supplement(
+        self,
+        task: str,
+        query_tokens: Sequence[tuple[str, ...]],
+        frequencies: Mapping[str, int],
+        total: int,
+        *,
+        test_edit: bool,
+    ) -> dict[str, object] | None:
+        """Retrieve an indexed diagnostic/source position, never a failure owner."""
+        codemap = cast("CodeMap", self)
+        if not {
+            "error",
+            "exception",
+            "warning",
+            "traceback",
+            "diagnostic",
+        }.intersection(self._task_evidence_identifier_parts(task)):
+            return None
+        pairs = self._task_evidence_lexical_pairs(query_tokens, frequencies)
+        terms = tuple(dict.fromkeys(term for group in query_tokens for term in group))
+        rows = codemap.store.lexical_declaration_candidates(pairs, terms)
+        eligible: list[tuple[bool, float, str, str, dict[str, object]]] = []
+        for symbol in rows:
+            path = str(symbol["path"])
+            if (
+                codemap._task_evidence_visibility(path) is not EvidenceVisibility.SOURCE
+                or codemap.policy.decide(path).evidence_visibility
+                is not EvidenceVisibility.SOURCE
+                or not codemap._indexed_path_current(path)
+            ):
+                continue
+            raw_matched = symbol["matched_terms"]
+            assert isinstance(raw_matched, list)
+            matched = [term for term in raw_matched if isinstance(term, str)]
+            count = sum(
+                any(term in matched for term in group) for group in query_tokens
+            )
+            score = sum(
+                max(
+                    (
+                        math.log((total + 1) / (frequencies[term] + 1))
+                        for term in group
+                        if term in matched
+                    ),
+                    default=0.0,
+                )
+                for group in query_tokens
+            )
+            row = self._task_evidence_supplement_row(
+                path, symbol, score=score, visibility=EvidenceVisibility.SOURCE
+            )
+            row["retrieval_supplement"] = "bounded-lexical-source-position"
+            row["score_basis"] = "lexical-source-term-relevance"
+            row["lexical_query_term_matches"] = count
+            eligible.append(
+                (
+                    not test_edit
+                    and RepositoryDomain.TEST in classify_repository_path(path),
+                    -score,
+                    path,
+                    str(symbol["qualname"]),
+                    row,
+                )
+            )
+        eligible.sort(key=lambda row: row[:4])
+        for _, _, path, _, row in eligible:
+            if codemap._indexed_path_current(path):
+                return row
+        return None
+
+    def _task_evidence_order_supplements(
+        self,
+        retrieval: TaskRetrievalDraft,
+        requested_keys: set[tuple[str, str]],
+        natural: Sequence[Mapping[str, object]],
+    ) -> None:
+        """Order disclosure hints independently from edit/verification authority."""
+        natural_names = {
+            (key[0], key[1].rsplit(".", 1)[-1])
+            for row in natural
+            if isinstance(matches := row.get("natural_identifier_term_matches"), int)
+            and matches >= 2
+            if (key := self._task_evidence_requested_locator_key(row))
+        }
+        natural_keys = {
+            key
+            for row in [*retrieval["results"], *natural]
+            if (key := self._task_evidence_requested_locator_key(row))
+            and (key[0], key[1].rsplit(".", 1)[-1]) in natural_names
+        }
+        lexical_keys = {
+            self._task_evidence_requested_locator_key(row)
+            for row in natural
+            if row.get("retrieval_supplement") == "bounded-lexical-source-position"
+        }
+        if requested_keys:
+            keys, ordering = (
+                requested_keys,
+                "requested-identifiers-then-retrieval-relevance",
+            )
+        elif natural_keys or lexical_keys:
+            keys, ordering = (
+                natural_keys | lexical_keys,
+                (
+                    "natural-source-matches-then-canonical-retrieval"
+                    if lexical_keys
+                    else "natural-identifier-matches-then-canonical-retrieval"
+                ),
+            )
+        else:
+            return
+        retrieval["results"] = sorted(
+            retrieval["results"],
+            key=lambda row: self._task_evidence_requested_locator_key(row) not in keys,
+        )
+        retrieval["ordering"] = ordering
 
     def _task_evidence_attach_retrieval_supplements(
         self,
@@ -375,7 +616,16 @@ class TaskEvidenceRetrievalMixin:
             [*current, *supplements],
             limit=limit,
         )
-        supplements.extend(natural[: 2 - len(supplements)])
+        supplements.extend(
+            [
+                row
+                for row in natural
+                if self._task_evidence_requested_locator_key(row) not in existing_keys
+            ][: 2 - len(supplements)]
+        )
+        retrieval["results"] = current
+        self._task_evidence_order_supplements(retrieval, requested_keys, natural)
+        current = retrieval["results"]
         if exact_terms or literal_path:
             retrieval["exact_identifier_supplements"] = {
                 "observed": len(exact),
@@ -401,16 +651,10 @@ class TaskEvidenceRetrievalMixin:
                 )
                 else "canonical-then-bounded-natural-language"
             )
-        if requested_keys:
-            retrieval["results"] = sorted(
-                retrieval["results"],
-                key=lambda row: (
-                    self._task_evidence_requested_locator_key(row) not in requested_keys
-                ),
-            )
-            retrieval["ordering"] = "requested-identifiers-then-retrieval-relevance"
+        self._task_evidence_order_supplements(retrieval, requested_keys, natural)
         self._task_evidence_attach_class_declarations(result)
         self._task_evidence_attach_enclosing_functions(result)
+        self._task_evidence_attach_direct_call_declarations(result)
         self._task_evidence_attach_candidate_verifiers(result, task)
 
     def _task_evidence_requested_identifiers(

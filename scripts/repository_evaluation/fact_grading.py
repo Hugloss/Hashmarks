@@ -128,6 +128,10 @@ def _check(packet: object, rule: Mapping[str, Any]) -> dict[str, object]:
     pointer, predicate = str(rule["pointer"]), str(rule["predicate"])
     values = pointer_values(packet, pointer)
     expected = rule["value"]
+    if predicate == "ordered_values_equal" and (
+        not isinstance(expected, list) or not expected
+    ):
+        raise ValueError("ordered fact values require a nonempty expected array")
     alternatives = rule.get("alternative_records", [])
     if alternatives and (predicate != "includes_record" or rule.get("authority_check")):
         raise ValueError("alternative records are only positive source-fact checks")
@@ -143,6 +147,7 @@ def _check(packet: object, rule: Mapping[str, Any]) -> dict[str, object]:
         )
     predicates = {
         "equals": lambda: len(values) == 1 and _json_equal(values[0], expected),
+        "ordered_values_equal": lambda: _json_equal(values, expected),
         "includes": lambda: any(_json_equal(value, expected) for value in values),
         "includes_record": lambda: any(
             any(_matches_record(value, record_expected) for value in record_values)

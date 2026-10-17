@@ -277,29 +277,39 @@ def compact_initial_declarations(groups: list[dict[str, Any]]) -> None:
             details[family]
             for finding in group["findings"]
             if isinstance(details := finding.get("details"), dict)
-            for family in ("class_declarations", "enclosing_declarations")
+            for family in (
+                "class_declarations",
+                "enclosing_declarations",
+                "same_name_declarations",
+                "direct_call_declarations",
+            )
             if isinstance(details.get(family), dict)
         ]
         shared = declaration_common_qualifiers(contexts)
         if contexts:
             group["declaration_qualifiers"] = shared
             group["declaration_table"] = (
-                "Native row order; <scope>/declarations/<row>; symbol prefix; extras retain absence."
+                "Scope = finding source_ref + /family; rows = scope/declarations/i; symbol prefix; extras retain absence."
             )
         for finding in group["findings"]:
             details = finding.get("details")
             if not isinstance(details, dict):
                 continue
-            for family in ("class_declarations", "enclosing_declarations"):
+            for family in (
+                "class_declarations",
+                "enclosing_declarations",
+                "same_name_declarations",
+                "direct_call_declarations",
+            ):
                 context = details.get(family)
                 if isinstance(context, dict):
-                    ref = finding["source_refs"][0] + "/" + family
-                    details[family] = {
-                        "source_ref": ref,
-                        "text": "\n".join(
-                            declaration_scope_text(context, "", shared=shared)
-                        ),
-                    }
+                    # The finding's exact source_ref and this family key bind
+                    # the table; repeating the full pointer adds no source fact.
+                    details[family] = "\n".join(
+                        declaration_scope_text(
+                            context, "", shared=shared, label="Scope"
+                        )
+                    )
 
 
 def compact_initial_verification_qualifiers(groups: list[dict[str, Any]]) -> None:
@@ -396,6 +406,9 @@ def project_initial_task(
                 "end_line",
                 "class_declarations",
                 "enclosing_declarations",
+                "same_name_declarations",
+                "direct_call_declarations",
+                "supplement",
             )
             if key in row
         }
@@ -468,7 +481,7 @@ def initial_evidence_text(packet: Mapping[str, object]) -> str:
         lines.append("Owner unresolved (@ /ownership/owner).")
     for index, row in enumerate(retrieval.get("results", [])):
         lines.append(
-            f"Source candidate: {row['path']}::{row.get('symbol', row.get('qualname', ''))} ({row.get('start_line', 'unknown')}:{row.get('end_line', 'unknown')}; @ /retrieval/results/{index})."
+            f"Source candidate: {row['path']}::{row.get('symbol', row.get('qualname', ''))} ({row.get('start_line', 'unknown')}:{row.get('end_line', 'unknown')}; basis: {row.get('supplement', 'canonical-retrieval')}; @ /retrieval/results/{index})."
         )
     lines.extend(declaration_scopes_text(retrieval.get("results", [])))
     lines.extend(initial_semantic_relationship_text(packet))

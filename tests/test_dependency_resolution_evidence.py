@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 import pytest
+from contract_assertions import assert_array, assert_number, assert_object, assert_text
 
 from hashmarks.codemap.engine import CodeMap
 
@@ -197,7 +198,7 @@ def test_v3_refuses_obsolete_v2_schema(tmp_path: Path) -> None:
 @pytest.mark.parametrize("kind", ["depends-on", "conflicts-with"])
 def test_v3_rejects_non_dependency_relationship_kind(tmp_path: Path, kind: str) -> None:
     snapshot = _snapshot_v3()
-    snapshot["relationships"][0]["kind"] = kind
+    assert_object(assert_array(snapshot["relationships"])[0])["kind"] = kind
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -212,7 +213,9 @@ def test_v3_replay_rejects_non_dependency_relationship_kind(tmp_path: Path) -> N
         codemap.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         tampered = copy.deepcopy(observation)
-        tampered["relationships"][0]["kind"] = "conflicts-with"
+        assert_object(assert_array(tampered["relationships"])[0])["kind"] = (
+            "conflicts-with"
+        )
 
         with pytest.raises(
             ValueError, match="unsupported dependency relationship kind"
@@ -233,11 +236,13 @@ def test_v3_distinguishes_inventory_membership_from_graph_reachability(
         codemap.sync()
         packet = codemap.dependency_resolution_evidence(_snapshot_v3())
 
-    inventory_nodes = {row["node_id"] for row in packet["inventory"]}
+    inventory_nodes = {
+        assert_object(row)["node_id"] for row in assert_array(packet["inventory"])
+    }
     graph_nodes = {
         endpoint
-        for row in packet["relationships"]
-        for endpoint in (row["source"], row["target"])
+        for row in assert_array(packet["relationships"])
+        for endpoint in (assert_object(row)["source"], assert_object(row)["target"])
     }
     assert "inventory-only@1" in inventory_nodes
     assert "inventory-only@1" not in graph_nodes
@@ -280,7 +285,7 @@ def test_v3_public_consumers_revalidate_qualified_observation(
             == observation["observation_identity"]
         )
         tampered = copy.deepcopy(observation)
-        tampered["producer"]["kind"] = "changed-after-qualification"
+        assert_object(tampered["producer"])["kind"] = "changed-after-qualification"
 
         consumers = (
             lambda: codemap.dependency_resolution_queries(
@@ -335,7 +340,7 @@ def test_v3_revalidation_rejects_unqualified_coverage_claim(
         codemap.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         tampered = copy.deepcopy(observation)
-        tampered["coverage"].append(
+        assert_array(tampered["coverage"]).append(
             {
                 "context": "runtime",
                 "kind": "resolved-inventory",
@@ -355,7 +360,9 @@ def test_v3_revalidation_binds_root_evidence_sources(tmp_path: Path) -> None:
         codemap.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         tampered = copy.deepcopy(observation)
-        tampered["root_evidence"][0]["evidence_sources"] = ["list:compile"]
+        assert_object(assert_array(tampered["root_evidence"])[0])[
+            "evidence_sources"
+        ] = ["list:compile"]
         with pytest.raises(ValueError, match="root requires resolution-graph"):
             codemap.dependency_resolution_queries(
                 tampered, [{"operation": "inventory", "node_id": "missing"}]
@@ -368,15 +375,17 @@ def test_v3_identity_separates_semantics_from_producer_provenance(
     base = _snapshot_v3()
     provenance = copy.deepcopy(base)
     provenance["producer"] = {"kind": "other-resolver", "schema_version": "9"}
-    for source in provenance["evidence_sources"]:
-        source["kind"] = "other-source-format"
-        source["producer_digest"] = "sha256:other"
+    for source in assert_array(provenance["evidence_sources"]):
+        assert_object(source)["kind"] = "other-source-format"
+        assert_object(source)["producer_digest"] = "sha256:other"
     semantic_scope = copy.deepcopy(base)
     semantic_scope["scope"] = {"environment": "production"}
     changed_resolution = copy.deepcopy(base)
-    changed_resolution["selections"][1]["version"] = "2"
+    assert_object(assert_array(changed_resolution["selections"])[1])["version"] = "2"
     changed_coverage = copy.deepcopy(base)
-    changed_coverage["coverage"][0]["completeness"] = "incomplete"
+    assert_object(assert_array(changed_coverage["coverage"])[0])["completeness"] = (
+        "incomplete"
+    )
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -407,8 +416,8 @@ def test_v3_derivation_authority_is_traceable_without_history_store(
     tmp_path: Path,
 ) -> None:
     snapshot = _snapshot_v3()
-    for source in snapshot["evidence_sources"]:
-        source["producer_digest"] = "sha256:" + "a" * 64
+    for source in assert_array(snapshot["evidence_sources"]):
+        assert_object(source)["producer_digest"] = "sha256:" + "a" * 64
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -431,12 +440,23 @@ def test_v3_derivation_authority_is_traceable_without_history_store(
         "tree:compile",
         "tree:runtime",
     ]
-    assert {row["source_id"] for row in derivation["evidence_sources"]} == {
+    assert {
+        assert_object(row)["source_id"]
+        for row in assert_array(derivation["evidence_sources"])
+    } == {
         "list:compile",
         "tree:compile",
         "tree:runtime",
     }
-    assert len({row["producer_digest"] for row in derivation["evidence_sources"]}) == 1
+    assert (
+        len(
+            {
+                assert_object(row)["producer_digest"]
+                for row in assert_array(derivation["evidence_sources"])
+            }
+        )
+        == 1
+    )
     assert derivation["semantic_authorities"] == [
         "module-ownership",
         "resolution-graph",
@@ -467,7 +487,9 @@ def test_v3_derivation_identity_changes_with_adapter_semantics_only(
 ) -> None:
     before_raw = _snapshot_v3()
     after_raw = copy.deepcopy(before_raw)
-    after_raw["producer"]["adapter_semantics"] = "test.neutral-dependency-adapter.v2"
+    assert_object(after_raw["producer"])["adapter_semantics"] = (
+        "test.neutral-dependency-adapter.v2"
+    )
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -489,7 +511,7 @@ def test_v3_derivation_authority_requires_explicit_adapter_semantics(
     tmp_path: Path,
 ) -> None:
     snapshot = _snapshot_v3()
-    snapshot["producer"].pop("adapter_semantics")
+    assert_object(snapshot["producer"]).pop("adapter_semantics")
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -505,7 +527,9 @@ def test_v3_derivation_authority_revalidates_observation_before_projection(
         codemap.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         tampered = copy.deepcopy(observation)
-        tampered["evidence_sources"][0]["source_id"] = "forged-source"
+        assert_object(assert_array(tampered["evidence_sources"])[0])["source_id"] = (
+            "forged-source"
+        )
 
         with pytest.raises(ValueError):
             codemap.dependency_resolution_derivation_authority(tampered)
@@ -569,9 +593,13 @@ def test_v3_each_coverage_domain_is_independent_of_source_completeness(
         with pytest.raises(ValueError, match="coverage exceeds evidence source"):
             codemap.dependency_resolution_evidence(snapshot)
 
-    assert partial["negative_evidence"][0]["state"] == "not-admissible"
     assert (
-        complete["negative_evidence"][0]["state"] == "admissible-within-declared-scope"
+        assert_object(assert_array(partial["negative_evidence"])[0])["state"]
+        == "not-admissible"
+    )
+    assert (
+        assert_object(assert_array(complete["negative_evidence"])[0])["state"]
+        == "admissible-within-declared-scope"
     )
 
 
@@ -579,15 +607,17 @@ def test_v3_negative_evidence_is_scoped_by_context_and_coverage_kind(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v3()
-    changed["coverage"][1]["completeness"] = "incomplete"
-    changed["coverage"][1]["truncation"] = "truncated"
+    assert_object(assert_array(changed["coverage"])[1])["completeness"] = "incomplete"
+    assert_object(assert_array(changed["coverage"])[1])["truncation"] = "truncated"
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         packet = codemap.dependency_resolution_evidence(changed)
 
     states = {
-        (row["context"], row["kind"]): row["state"]
-        for row in packet["negative_evidence"]
+        (assert_object(row)["context"], assert_object(row)["kind"]): assert_object(row)[
+            "state"
+        ]
+        for row in assert_array(packet["negative_evidence"])
     }
     assert states[("compile", "resolution-graph")] == "admissible-within-declared-scope"
     assert states[("runtime", "resolution-graph")] == "not-admissible"
@@ -611,11 +641,13 @@ def test_v3_refuses_unknown_authority_contract_fields(
     if target == "snapshot":
         changed[field] = "unexpected"
     elif target == "source":
-        changed["evidence_sources"][0][field] = "unexpected"
+        assert_object(assert_array(changed["evidence_sources"])[0])[field] = (
+            "unexpected"
+        )
     elif target == "selection":
-        changed["selections"][0][field] = "unexpected"
+        assert_object(assert_array(changed["selections"])[0])[field] = "unexpected"
     else:
-        changed["coverage"][0][field] = "unexpected"
+        assert_object(assert_array(changed["coverage"])[0])[field] = "unexpected"
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -643,13 +675,13 @@ def test_v3_refuses_non_string_typed_fields(
 ) -> None:
     changed = _snapshot_v3()
     if target == "producer":
-        changed["producer"][field] = value
+        assert_object(changed["producer"])[field] = value
     elif target == "component":
-        changed["components"][0][field] = value
+        assert_object(assert_array(changed["components"])[0])[field] = value
     elif target == "selection":
-        changed["selections"][0][field] = value
+        assert_object(assert_array(changed["selections"])[0])[field] = value
     else:
-        changed["relationships"][0][field] = value
+        assert_object(assert_array(changed["relationships"])[0])[field] = value
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -659,7 +691,9 @@ def test_v3_refuses_non_string_typed_fields(
 
 def test_v3_rejects_dangling_evidence_source_reference(tmp_path: Path) -> None:
     changed = _snapshot_v3()
-    changed["relationships"][0]["evidence_sources"] = ["missing"]
+    assert_object(assert_array(changed["relationships"])[0])["evidence_sources"] = [
+        "missing"
+    ]
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         with pytest.raises(ValueError, match="dangling relationship evidence source"):
@@ -673,11 +707,15 @@ def test_v3_delta_reports_selection_inventory_and_relationship_change(
         codemap.sync()
         before = codemap.dependency_resolution_evidence(_snapshot_v3())
         changed = _snapshot_v3()
-        changed["selections"][1]["version"] = "2"
+        assert_object(assert_array(changed["selections"])[1])["version"] = "2"
         changed["inventory"] = [
-            row for row in changed["inventory"] if row["node_id"] != "inventory-only@1"
+            row
+            for row in assert_array(changed["inventory"])
+            if assert_object(row)["node_id"] != "inventory-only@1"
         ]
-        changed["relationships"][0]["effective_scope"] = "runtime"
+        assert_object(assert_array(changed["relationships"])[0])["effective_scope"] = (
+            "runtime"
+        )
         after = codemap.dependency_resolution_evidence(changed)
         delta = codemap.dependency_resolution_delta(before, after)
 
@@ -697,7 +735,9 @@ def test_v3_relationship_parent_change_is_not_selection_change(
 ) -> None:
     before_snapshot = _snapshot_v3()
     after_snapshot = _snapshot_v3()
-    after_snapshot["relationships"][0]["source"] = "inventory-only@1"
+    assert_object(assert_array(after_snapshot["relationships"])[0])["source"] = (
+        "inventory-only@1"
+    )
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -718,15 +758,20 @@ def test_v3_relationship_parent_change_is_not_selection_change(
 
 def test_v3_rejects_module_owner_outside_observed_context(tmp_path: Path) -> None:
     changed = _snapshot_v3()
-    changed["selections"][1]["contexts"] = ["runtime"]
-    changed["selections"][1]["evidence_sources"] = ["tree:runtime"]
+    assert_object(assert_array(changed["selections"])[1])["contexts"] = ["runtime"]
+    assert_object(assert_array(changed["selections"])[1])["evidence_sources"] = [
+        "tree:runtime"
+    ]
     changed["inventory"] = [
-        row for row in changed["inventory"] if row["node_id"] != "library@1"
+        row
+        for row in assert_array(changed["inventory"])
+        if assert_object(row)["node_id"] != "library@1"
     ]
     changed["relationships"] = [
         row
-        for row in changed["relationships"]
-        if row["target"] != "library@1" or row["context"] != "compile"
+        for row in assert_array(changed["relationships"])
+        if assert_object(row)["target"] != "library@1"
+        or assert_object(row)["context"] != "compile"
     ]
     changed["module_ownership"] = [
         {
@@ -762,9 +807,9 @@ def test_v3_module_ownership_preserves_ambiguous_maven_module(
         codemap.sync()
         observation = codemap.dependency_resolution_evidence(snapshot)
 
-    ownership = observation["module_ownership"][0]
-    assert ownership["state"] == "resolved-ambiguous"
-    assert ownership["owners"] == ["inventory-only@1", "library@1"]
+    ownership = assert_array(observation["module_ownership"])[0]
+    assert assert_object(ownership)["state"] == "resolved-ambiguous"
+    assert assert_object(ownership)["owners"] == ["inventory-only@1", "library@1"]
 
 
 def test_v3_repository_correspondence_refuses_foreign_repository_binding(
@@ -844,10 +889,12 @@ def test_v3_dependency_correlation_preserves_contextual_ownership(
     snapshot = _snapshot_v3()
     runtime_source = next(
         row
-        for row in snapshot["evidence_sources"]
-        if row["source_id"] == "tree:runtime"
+        for row in assert_array(snapshot["evidence_sources"])
+        if assert_object(row)["source_id"] == "tree:runtime"
     )
-    runtime_source["authorities"].append("module-ownership")
+    assert_array(assert_object(runtime_source)["authorities"]).append(
+        "module-ownership"
+    )
     snapshot["module_ownership"] = [
         {
             "module": "library",
@@ -891,7 +938,9 @@ def test_v3_dependency_correlation_preserves_contextual_ownership(
     assert packet["schema"] == "hashmarks.dependency-evidence-correlation.v2"
     assert packet["dependency_links"] == [
         {
-            "bundle_id": packet["correlation"]["bundles"][0]["bundle_id"],
+            "bundle_id": assert_object(
+                assert_array(assert_object(packet["correlation"])["bundles"])[0]
+            )["bundle_id"],
             "module": "library",
             "context": "compile",
             "distribution_state": "resolved-unique",
@@ -905,24 +954,44 @@ def test_v3_dependency_correlation_preserves_contextual_ownership(
             "causation": "not-inferred",
         }
     ]
-    assert packet["dependency_provenance"]["producer"] == observation["producer"]
     assert (
-        packet["dependency_provenance"]["repository_binding"]
+        assert_object(packet["dependency_provenance"])["producer"]
+        == observation["producer"]
+    )
+    assert (
+        assert_object(packet["dependency_provenance"])["repository_binding"]
         == observation["repository_binding"]
     )
     assert [
-        row["source_id"] for row in packet["dependency_provenance"]["evidence_sources"]
+        assert_object(row)["source_id"]
+        for row in assert_array(
+            assert_object(packet["dependency_provenance"])["evidence_sources"]
+        )
     ] == ["list:compile"]
-    packet["dependency_provenance"]["producer"]["kind"] = "changed-by-consumer"
-    packet["dependency_provenance"]["evidence_sources"][0]["kind"] = (
-        "changed-by-consumer"
+    assert_object(assert_object(packet["dependency_provenance"])["producer"])[
+        "kind"
+    ] = "changed-by-consumer"
+    assert_object(
+        assert_array(
+            assert_object(packet["dependency_provenance"])["evidence_sources"]
+        )[0]
+    )["kind"] = "changed-by-consumer"
+    assert assert_object(observation["producer"])["kind"] == "neutral-resolver"
+    assert (
+        assert_object(assert_array(observation["evidence_sources"])[0])["kind"]
+        == "test-inventory-source"
     )
-    assert observation["producer"]["kind"] == "neutral-resolver"
-    assert observation["evidence_sources"][0]["kind"] == "test-inventory-source"
     assert packet["producer_authority"] == "caller-claimed"
     assert packet["observation_identity"] == observation["observation_identity"]
-    assert packet["correlation"]["bundles"][0]["producer_authority"] == "caller-claimed"
-    assert packet["correlation"]["bundles"][0]["scope"] == {
+    assert (
+        assert_object(assert_array(assert_object(packet["correlation"])["bundles"])[0])[
+            "producer_authority"
+        ]
+        == "caller-claimed"
+    )
+    assert assert_object(
+        assert_array(assert_object(packet["correlation"])["bundles"])[0]
+    )["scope"] == {
         "kind": "dependency-module-correlation",
         "module": "library",
         "context": "compile",
@@ -935,10 +1004,12 @@ def test_v3_dependency_correlation_without_context_preserves_cross_context_ambig
     snapshot = _snapshot_v3()
     runtime_source = next(
         row
-        for row in snapshot["evidence_sources"]
-        if row["source_id"] == "tree:runtime"
+        for row in assert_array(snapshot["evidence_sources"])
+        if assert_object(row)["source_id"] == "tree:runtime"
     )
-    runtime_source["authorities"].append("module-ownership")
+    assert_array(assert_object(runtime_source)["authorities"]).append(
+        "module-ownership"
+    )
     snapshot["module_ownership"] = [
         {
             "module": "library",
@@ -972,10 +1043,10 @@ def test_v3_dependency_correlation_without_context_preserves_cross_context_ambig
             },
         )
 
-    link = packet["dependency_links"][0]
-    assert link["distribution_state"] == "resolved-ambiguous"
-    assert link["distribution_nodes"] == ["app@1", "library@1"]
-    assert link["observed_contexts"] == ["compile", "runtime"]
+    link = assert_array(packet["dependency_links"])[0]
+    assert assert_object(link)["distribution_state"] == "resolved-ambiguous"
+    assert assert_object(link)["distribution_nodes"] == ["app@1", "library@1"]
+    assert assert_object(link)["observed_contexts"] == ["compile", "runtime"]
 
 
 def test_import_correspondence_selects_most_specific_owner_per_context(
@@ -985,10 +1056,12 @@ def test_import_correspondence_selects_most_specific_owner_per_context(
     snapshot = _snapshot_v3()
     runtime_source = next(
         row
-        for row in snapshot["evidence_sources"]
-        if row["source_id"] == "tree:runtime"
+        for row in assert_array(snapshot["evidence_sources"])
+        if assert_object(row)["source_id"] == "tree:runtime"
     )
-    runtime_source["authorities"].append("module-ownership")
+    assert_array(assert_object(runtime_source)["authorities"]).append(
+        "module-ownership"
+    )
     snapshot["module_ownership"] = [
         {
             "module": "library.sub",
@@ -1038,7 +1111,7 @@ def test_import_correspondence_selects_most_specific_owner_per_context(
     ]
     assert compile_result["import_claim_authority"] == "caller-claimed"
     assert (
-        compile_result["dependency_provenance"]["observation_identity"]
+        assert_object(compile_result["dependency_provenance"])["observation_identity"]
         == (observation["observation_identity"])
     )
     assert aggregate["distribution_state"] == "resolved-ambiguous"
@@ -1056,8 +1129,10 @@ def test_import_correspondence_selects_most_specific_owner_per_context(
         },
     ]
     assert [
-        row["source_id"]
-        for row in aggregate["dependency_provenance"]["evidence_sources"]
+        assert_object(row)["source_id"]
+        for row in assert_array(
+            assert_object(aggregate["dependency_provenance"])["evidence_sources"]
+        )
     ] == ["list:compile", "tree:runtime"]
 
 
@@ -1107,14 +1182,22 @@ def test_import_correspondence_does_not_fall_back_from_observed_empty_exact_row(
         )
 
     assert fallback_result["distribution_nodes"] == ["library@1"]
-    assert fallback_result["matched_modules"][0]["module"] == "library"
+    assert (
+        assert_object(assert_array(fallback_result["matched_modules"])[0])["module"]
+        == "library"
+    )
     assert exact_result["distribution_state"] == "unresolved"
     assert exact_result["distribution_nodes"] == []
     assert exact_result["ownership_completeness"] == "incomplete"
-    assert exact_result["matched_modules"][0]["module"] == "library.sub"
+    assert (
+        assert_object(assert_array(exact_result["matched_modules"])[0])["module"]
+        == "library.sub"
+    )
     assert missing_result["distribution_state"] == "unknown"
     assert missing_result["matched_modules"] == []
-    assert missing_result["dependency_provenance"]["evidence_sources"] == []
+    assert (
+        assert_object(missing_result["dependency_provenance"])["evidence_sources"] == []
+    )
 
 
 def test_dependency_correlation_identity_ignores_request_and_anchor_order(
@@ -1175,25 +1258,37 @@ def test_dependency_correlation_identity_ignores_request_and_anchor_order(
 
     assert forward["schema"] == "hashmarks.dependency-evidence-correlation.v2"
     assert (
-        forward["correlation"]["evidence_definition_identity"]
-        == (reverse["correlation"]["evidence_definition_identity"])
+        assert_object(forward["correlation"])["evidence_definition_identity"]
+        == (assert_object(reverse["correlation"])["evidence_definition_identity"])
     )
     assert (
-        forward["correlation"]["correlation_identity"]
-        == (reverse["correlation"]["correlation_identity"])
+        assert_object(forward["correlation"])["correlation_identity"]
+        == (assert_object(reverse["correlation"])["correlation_identity"])
     )
     assert forward["dependency_links"] == reverse["dependency_links"]
     assert (
-        forward["correlation"]["evidence_definition_identity"]
-        != (changed["correlation"]["evidence_definition_identity"])
+        assert_object(forward["correlation"])["evidence_definition_identity"]
+        != (assert_object(changed["correlation"])["evidence_definition_identity"])
     )
-    assert len({row["bundle_id"] for row in duplicates["dependency_links"]}) == 3
     assert (
-        duplicates["correlation"]["correlation_identity"]
-        == (reordered_duplicates["correlation"]["correlation_identity"])
+        len(
+            {
+                assert_object(row)["bundle_id"]
+                for row in assert_array(duplicates["dependency_links"])
+            }
+        )
+        == 3
     )
-    assert {row["bundle_id"] for row in forward["dependency_links"]} == {
-        row["bundle_id"] for row in forward["correlation"]["bundles"]
+    assert (
+        assert_object(duplicates["correlation"])["correlation_identity"]
+        == (assert_object(reordered_duplicates["correlation"])["correlation_identity"])
+    )
+    assert {
+        assert_object(row)["bundle_id"]
+        for row in assert_array(forward["dependency_links"])
+    } == {
+        assert_object(row)["bundle_id"]
+        for row in assert_array(assert_object(forward["correlation"])["bundles"])
     }
 
 
@@ -1207,9 +1302,11 @@ def test_v3_repository_binding_tracks_current_codemap_generation(
         expected_generation = codemap.store.generation()
 
     binding = packet["repository_binding"]
-    assert binding["repository_identity"] == expected_identity
-    assert binding["repository_identity"].startswith(("git-tree:", "workspace:"))
-    assert binding["codemap_generation"] == expected_generation
+    assert assert_object(binding)["repository_identity"] == expected_identity
+    assert assert_text(assert_object(binding)["repository_identity"]).startswith(
+        ("git-tree:", "workspace:")
+    )
+    assert assert_object(binding)["codemap_generation"] == expected_generation
 
 
 def test_v3_graph_query_refuses_node_outside_requested_context(
@@ -1417,13 +1514,19 @@ def test_v3_multicontext_graph_query_requires_explicit_context(
 ) -> None:
     changed = _snapshot_v3()
     changed["relationships"] = [
-        row for row in changed["relationships"] if row["context"] == "compile"
+        row
+        for row in assert_array(changed["relationships"])
+        if assert_object(row)["context"] == "compile"
     ]
     inventory_only = next(
-        row for row in changed["selections"] if row["node_id"] == "inventory-only@1"
+        row
+        for row in assert_array(changed["selections"])
+        if assert_object(row)["node_id"] == "inventory-only@1"
     )
-    inventory_only["contexts"].append("runtime")
-    inventory_only["evidence_sources"].append("tree:runtime")
+    assert_array(assert_object(inventory_only)["contexts"]).append("runtime")
+    assert_array(assert_object(inventory_only)["evidence_sources"]).append(
+        "tree:runtime"
+    )
     changed["relationships"].append(
         {
             "source": "library@1",
@@ -1463,7 +1566,9 @@ def test_v3_graph_query_reports_conditional_relationship_omission(
     operation: str,
 ) -> None:
     changed = _snapshot_v3()
-    changed["relationships"][0]["marker"] = "sys_platform == 'linux'"
+    assert_object(assert_array(changed["relationships"])[0])["marker"] = (
+        "sys_platform == 'linux'"
+    )
     request = {
         "operation": operation,
         "node_id": "app@1" if operation != "dependents" else "library@1",
@@ -1475,23 +1580,26 @@ def test_v3_graph_query_reports_conditional_relationship_omission(
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         observation = codemap.dependency_resolution_evidence(changed)
-        result = codemap.dependency_resolution_queries(observation, [request])[
-            "results"
-        ][0]
+        result = assert_array(
+            codemap.dependency_resolution_queries(observation, [request])["results"]
+        )[0]
 
-    assert result["completeness"] == "incomplete"
-    assert result["omissions"] == [
+    assert assert_object(result)["completeness"] == "incomplete"
+    assert assert_object(result)["omissions"] == [
         {"reason": "conditional-edge", "node_id": request["node_id"]}
     ]
     if operation == "reachability":
-        assert result["result"]["reachable"] is False
-        assert result["result"]["negative_evidence"] == "not-admissible"
+        assert assert_object(assert_object(result)["result"])["reachable"] is False
+        assert (
+            assert_object(assert_object(result)["result"])["negative_evidence"]
+            == "not-admissible"
+        )
     elif operation == "paths":
-        assert result["result"] == []
-        assert result["negative_evidence"] == "not-admissible"
+        assert assert_object(result)["result"] == []
+        assert assert_object(result)["negative_evidence"] == "not-admissible"
     else:
-        assert result["result"] == []
-        assert result["negative_evidence"] == "not-admissible"
+        assert assert_object(result)["result"] == []
+        assert assert_object(result)["negative_evidence"] == "not-admissible"
 
 
 @pytest.mark.parametrize("marked_node", ["app@1", "library@1"])
@@ -1503,9 +1611,11 @@ def test_v3_graph_query_does_not_traverse_marker_qualified_selection(
 ) -> None:
     changed = _snapshot_v3()
     selection = next(
-        row for row in changed["selections"] if row["node_id"] == marked_node
+        row
+        for row in assert_array(changed["selections"])
+        if assert_object(row)["node_id"] == marked_node
     )
-    selection["marker"] = "sys_platform == 'linux'"
+    assert_object(selection)["marker"] = "sys_platform == 'linux'"
     start = "library@1" if operation == "dependents" else "app@1"
     request = {"operation": operation, "node_id": start, "context": "compile"}
     if operation in {"reachability", "paths"}:
@@ -1514,28 +1624,30 @@ def test_v3_graph_query_does_not_traverse_marker_qualified_selection(
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         observation = codemap.dependency_resolution_evidence(changed)
-        result = codemap.dependency_resolution_queries(observation, [request])[
-            "results"
-        ][0]
+        result = assert_array(
+            codemap.dependency_resolution_queries(observation, [request])["results"]
+        )[0]
 
     reason = "conditional-selection" if start == marked_node else "conditional-edge"
-    assert result["omissions"] == [{"reason": reason, "node_id": start}]
-    assert result["completeness"] == "incomplete"
+    assert assert_object(result)["omissions"] == [{"reason": reason, "node_id": start}]
+    assert assert_object(result)["completeness"] == "incomplete"
     if operation == "reachability":
-        assert result["result"] == {
+        assert assert_object(result)["result"] == {
             "reachable": False,
             "negative_evidence": "not-admissible",
         }
     else:
-        assert result["result"] == []
-        assert result["negative_evidence"] == "not-admissible"
+        assert assert_object(result)["result"] == []
+        assert assert_object(result)["negative_evidence"] == "not-admissible"
 
 
 def test_v3_isolated_conditional_selection_cannot_prove_graph_absence(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v3()
-    changed["selections"][2]["marker"] = "sys_platform == 'linux'"
+    assert_object(assert_array(changed["selections"])[2])["marker"] = (
+        "sys_platform == 'linux'"
+    )
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -1556,20 +1668,25 @@ def test_v3_isolated_conditional_selection_cannot_prove_graph_absence(
             ],
         )["results"]
 
-    assert results[0]["result"] == []
-    assert results[0]["negative_evidence"] == "not-admissible"
-    assert results[0]["omissions"] == [
+    assert assert_object(assert_array(results)[0])["result"] == []
+    assert (
+        assert_object(assert_array(results)[0])["negative_evidence"] == "not-admissible"
+    )
+    assert assert_object(assert_array(results)[0])["omissions"] == [
         {"reason": "conditional-selection", "node_id": "inventory-only@1"}
     ]
-    assert [row["node_id"] for row in results[1]["result"]] == ["library@1"]
-    assert results[1]["completeness"] == "complete"
+    assert [
+        assert_object(row)["node_id"]
+        for row in assert_array(assert_object(assert_array(results)[1])["result"])
+    ] == ["library@1"]
+    assert assert_object(assert_array(results)[1])["completeness"] == "complete"
 
 
 def test_v3_depth_bound_precedes_conditional_edge_omission(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v3()
-    changed["relationships"].append(
+    assert_array(changed["relationships"]).append(
         {
             "source": "library@1",
             "target": "inventory-only@1",
@@ -1583,47 +1700,58 @@ def test_v3_depth_bound_precedes_conditional_edge_omission(
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         observation = codemap.dependency_resolution_evidence(changed)
-        result = codemap.dependency_resolution_queries(
-            observation,
-            [
-                {
-                    "operation": "dependencies",
-                    "node_id": "app@1",
-                    "context": "compile",
-                    "max_depth": 1,
-                }
-            ],
-        )["results"][0]
+        result = assert_array(
+            codemap.dependency_resolution_queries(
+                observation,
+                [
+                    {
+                        "operation": "dependencies",
+                        "node_id": "app@1",
+                        "context": "compile",
+                        "max_depth": 1,
+                    }
+                ],
+            )["results"]
+        )[0]
 
-    assert [row["node_id"] for row in result["result"]] == ["library@1"]
-    assert result["omissions"] == [{"reason": "depth-limit", "node_id": "library@1"}]
-    assert result["completeness"] == "incomplete"
+    assert [
+        assert_object(row)["node_id"]
+        for row in assert_array(assert_object(result)["result"])
+    ] == ["library@1"]
+    assert assert_object(result)["omissions"] == [
+        {"reason": "depth-limit", "node_id": "library@1"}
+    ]
+    assert assert_object(result)["completeness"] == "incomplete"
 
 
 def test_v3_zero_length_path_does_not_consume_conditional_edges(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v3()
-    changed["relationships"][0]["marker"] = "sys_platform == 'linux'"
+    assert_object(assert_array(changed["relationships"])[0])["marker"] = (
+        "sys_platform == 'linux'"
+    )
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         observation = codemap.dependency_resolution_evidence(changed)
-        result = codemap.dependency_resolution_queries(
-            observation,
-            [
-                {
-                    "operation": "paths",
-                    "node_id": "app@1",
-                    "target_id": "app@1",
-                    "context": "compile",
-                }
-            ],
-        )["results"][0]
+        result = assert_array(
+            codemap.dependency_resolution_queries(
+                observation,
+                [
+                    {
+                        "operation": "paths",
+                        "node_id": "app@1",
+                        "target_id": "app@1",
+                        "context": "compile",
+                    }
+                ],
+            )["results"]
+        )[0]
 
-    assert result["result"] == [["app@1"]]
-    assert result["completeness"] == "complete"
-    assert result["omissions"] == []
+    assert assert_object(result)["result"] == [["app@1"]]
+    assert assert_object(result)["completeness"] == "complete"
+    assert assert_object(result)["omissions"] == []
 
 
 @pytest.mark.parametrize("operation", ["paths", "reachability"])
@@ -1631,37 +1759,41 @@ def test_v3_zero_length_identity_query_preserves_conditional_selection(
     tmp_path: Path, operation: str
 ) -> None:
     changed = _snapshot_v3()
-    changed["selections"][0]["marker"] = "sys_platform == 'linux'"
+    assert_object(assert_array(changed["selections"])[0])["marker"] = (
+        "sys_platform == 'linux'"
+    )
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         observation = codemap.dependency_resolution_evidence(changed)
-        result = codemap.dependency_resolution_queries(
-            observation,
-            [
-                {
-                    "operation": operation,
-                    "node_id": "app@1",
-                    "target_id": "app@1",
-                    "context": "compile",
-                }
-            ],
-        )["results"][0]
+        result = assert_array(
+            codemap.dependency_resolution_queries(
+                observation,
+                [
+                    {
+                        "operation": operation,
+                        "node_id": "app@1",
+                        "target_id": "app@1",
+                        "context": "compile",
+                    }
+                ],
+            )["results"]
+        )[0]
 
-    assert result["result"] == (
+    assert assert_object(result)["result"] == (
         [["app@1"]]
         if operation == "paths"
         else {"reachable": True, "negative_evidence": "not-applicable"}
     )
-    assert result["completeness"] == "complete"
-    assert result["omissions"] == []
+    assert assert_object(result)["completeness"] == "complete"
+    assert assert_object(result)["omissions"] == []
 
 
 def test_v3_conditional_duplicate_does_not_weaken_unconditional_topology(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v3()
-    changed["relationships"].append(
+    assert_array(changed["relationships"]).append(
         {
             "source": "app@1",
             "target": "library@1",
@@ -1675,27 +1807,32 @@ def test_v3_conditional_duplicate_does_not_weaken_unconditional_topology(
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         observation = codemap.dependency_resolution_evidence(changed)
-        result = codemap.dependency_resolution_queries(
-            observation,
-            [
-                {
-                    "operation": "dependencies",
-                    "node_id": "app@1",
-                    "context": "compile",
-                }
-            ],
-        )["results"][0]
+        result = assert_array(
+            codemap.dependency_resolution_queries(
+                observation,
+                [
+                    {
+                        "operation": "dependencies",
+                        "node_id": "app@1",
+                        "context": "compile",
+                    }
+                ],
+            )["results"]
+        )[0]
 
-    assert [row["node_id"] for row in result["result"]] == ["library@1"]
-    assert result["completeness"] == "complete"
-    assert result["omissions"] == []
+    assert [
+        assert_object(row)["node_id"]
+        for row in assert_array(assert_object(result)["result"])
+    ] == ["library@1"]
+    assert assert_object(result)["completeness"] == "complete"
+    assert assert_object(result)["omissions"] == []
 
 
 def test_v3_duplicate_unconditional_edges_do_not_duplicate_node_paths(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v3()
-    changed["relationships"].append(
+    assert_array(changed["relationships"]).append(
         {
             "source": "app@1",
             "target": "library@1",
@@ -1709,22 +1846,24 @@ def test_v3_duplicate_unconditional_edges_do_not_duplicate_node_paths(
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         observation = codemap.dependency_resolution_evidence(changed)
-        result = codemap.dependency_resolution_queries(
-            observation,
-            [
-                {
-                    "operation": "paths",
-                    "node_id": "app@1",
-                    "target_id": "library@1",
-                    "context": "compile",
-                    "max_results": 1,
-                }
-            ],
-        )["results"][0]
+        result = assert_array(
+            codemap.dependency_resolution_queries(
+                observation,
+                [
+                    {
+                        "operation": "paths",
+                        "node_id": "app@1",
+                        "target_id": "library@1",
+                        "context": "compile",
+                        "max_results": 1,
+                    }
+                ],
+            )["results"]
+        )[0]
 
-    assert result["result"] == [["app@1", "library@1"]]
-    assert result["completeness"] == "complete"
-    assert result["omissions"] == []
+    assert assert_object(result)["result"] == [["app@1", "library@1"]]
+    assert assert_object(result)["completeness"] == "complete"
+    assert assert_object(result)["omissions"] == []
 
 
 def test_v3_bounded_queries_report_dependencies_paths_and_contexts(
@@ -1751,11 +1890,17 @@ def test_v3_bounded_queries_report_dependencies_paths_and_contexts(
             ],
         )
 
-    dependencies, paths, contexts = packet["results"]
-    assert dependencies["result"][0]["node_id"] == "library@1"
-    assert paths["result"] == [["app@1", "library@1"]]
-    assert contexts["result"] == ["compile", "runtime"]
-    assert all(row["completeness"] == "complete" for row in packet["results"])
+    dependencies, paths, contexts = assert_array(packet["results"])
+    assert (
+        assert_object(assert_array(assert_object(dependencies)["result"])[0])["node_id"]
+        == "library@1"
+    )
+    assert assert_object(paths)["result"] == [["app@1", "library@1"]]
+    assert assert_object(contexts)["result"] == ["compile", "runtime"]
+    assert all(
+        assert_object(row)["completeness"] == "complete"
+        for row in assert_array(packet["results"])
+    )
 
 
 def test_v3_contexts_query_exposes_incomplete_context_evidence(
@@ -1764,11 +1909,12 @@ def test_v3_contexts_query_exposes_incomplete_context_evidence(
     changed = _snapshot_v3()
     selection_runtime = next(
         row
-        for row in changed["coverage"]
-        if row["kind"] == "selection" and row["context"] == "runtime"
+        for row in assert_array(changed["coverage"])
+        if assert_object(row)["kind"] == "selection"
+        and assert_object(row)["context"] == "runtime"
     )
-    selection_runtime["completeness"] = "incomplete"
-    selection_runtime["truncation"] = "truncated"
+    assert_object(selection_runtime)["completeness"] = "incomplete"
+    assert_object(selection_runtime)["truncation"] = "truncated"
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -1778,17 +1924,17 @@ def test_v3_contexts_query_exposes_incomplete_context_evidence(
             [{"operation": "contexts", "node_id": "library@1"}],
         )
 
-    result = packet["results"][0]
-    assert result["result"] == ["compile", "runtime"]
-    assert result["completeness"] == "incomplete"
+    result = assert_array(packet["results"])[0]
+    assert assert_object(result)["result"] == ["compile", "runtime"]
+    assert assert_object(result)["completeness"] == "incomplete"
 
 
 def test_v3_reachability_absence_requires_complete_context_coverage(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v3()
-    changed["coverage"][1]["completeness"] = "incomplete"
-    changed["coverage"][1]["truncation"] = "truncated"
+    assert_object(assert_array(changed["coverage"])[1])["completeness"] = "incomplete"
+    assert_object(assert_array(changed["coverage"])[1])["truncation"] = "truncated"
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         observation = codemap.dependency_resolution_evidence(changed)
@@ -1811,20 +1957,27 @@ def test_v3_reachability_absence_requires_complete_context_coverage(
         )
 
     assert (
-        packet["results"][0]["result"]["negative_evidence"]
+        assert_object(assert_object(assert_array(packet["results"])[0])["result"])[
+            "negative_evidence"
+        ]
         == "admissible-within-declared-scope"
     )
-    assert packet["results"][1]["result"]["negative_evidence"] == "not-admissible"
+    assert (
+        assert_object(assert_object(assert_array(packet["results"])[1])["result"])[
+            "negative_evidence"
+        ]
+        == "not-admissible"
+    )
 
 
 def test_v3_query_exposes_depth_omission_instead_of_silent_partial_result(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v3()
-    changed["components"].append(
+    assert_array(changed["components"]).append(
         {"component_id": "leaf", "name": "leaf", "ecosystem": "test"}
     )
-    changed["selections"].append(
+    assert_array(changed["selections"]).append(
         {
             "node_id": "leaf@1",
             "component_id": "leaf",
@@ -1834,7 +1987,7 @@ def test_v3_query_exposes_depth_omission_instead_of_silent_partial_result(
             "evidence_sources": ["tree:compile"],
         }
     )
-    changed["relationships"].append(
+    assert_array(changed["relationships"]).append(
         {
             "source": "library@1",
             "target": "leaf@1",
@@ -1859,10 +2012,15 @@ def test_v3_query_exposes_depth_omission_instead_of_silent_partial_result(
             ],
         )
 
-    result = packet["results"][0]
-    assert [row["node_id"] for row in result["result"]] == ["library@1"]
-    assert result["completeness"] == "incomplete"
-    assert result["omissions"] == [{"reason": "depth-limit", "node_id": "library@1"}]
+    result = assert_array(packet["results"])[0]
+    assert [
+        assert_object(row)["node_id"]
+        for row in assert_array(assert_object(result)["result"])
+    ] == ["library@1"]
+    assert assert_object(result)["completeness"] == "incomplete"
+    assert assert_object(result)["omissions"] == [
+        {"reason": "depth-limit", "node_id": "library@1"}
+    ]
 
 
 def test_v3_repository_input_revision_requires_string_sha256(
@@ -1949,7 +2107,9 @@ def test_v3_provenance_change_does_not_masquerade_as_resolution_change(
         codemap.sync()
         before = codemap.dependency_resolution_evidence(_snapshot_v3())
         changed = _snapshot_v3()
-        changed["evidence_sources"][0]["producer_digest"] = "sha256:producer-a"
+        assert_object(assert_array(changed["evidence_sources"])[0])[
+            "producer_digest"
+        ] = "sha256:producer-a"
         after = codemap.dependency_resolution_evidence(changed)
         delta = codemap.dependency_resolution_delta(before, after)
 
@@ -1965,9 +2125,13 @@ def test_v3_contextual_module_ownership_preserves_independent_observations(
 ) -> None:
     changed = _snapshot_v3()
     runtime_source = next(
-        row for row in changed["evidence_sources"] if row["source_id"] == "tree:runtime"
+        row
+        for row in assert_array(changed["evidence_sources"])
+        if assert_object(row)["source_id"] == "tree:runtime"
     )
-    runtime_source["authorities"].append("module-ownership")
+    assert_array(assert_object(runtime_source)["authorities"]).append(
+        "module-ownership"
+    )
     changed["module_ownership"] = [
         {
             "module": "library.module",
@@ -1988,7 +2152,10 @@ def test_v3_contextual_module_ownership_preserves_independent_observations(
         codemap.sync()
         packet = codemap.dependency_resolution_evidence(changed)
 
-    assert [(row["module"], row["context"]) for row in packet["module_ownership"]] == [
+    assert [
+        (assert_object(row)["module"], assert_object(row)["context"])
+        for row in assert_array(packet["module_ownership"])
+    ] == [
         ("library.module", "compile"),
         ("library.module", "runtime"),
     ]
@@ -1998,7 +2165,7 @@ def test_v3_explicit_empty_complete_module_ownership_is_negative_evidence(
     tmp_path: Path,
 ) -> None:
     snapshot = _snapshot_v3()
-    snapshot["coverage"].append(
+    assert_array(snapshot["coverage"]).append(
         {
             "context": "compile",
             "kind": "module-ownership",
@@ -2019,27 +2186,36 @@ def test_v3_explicit_empty_complete_module_ownership_is_negative_evidence(
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         observation = codemap.dependency_resolution_evidence(snapshot)
-        result = codemap.dependency_resolution_queries(
-            observation,
-            [
-                {
-                    "operation": "module-owners",
-                    "module": "missing.module",
-                    "context": "compile",
-                }
-            ],
-        )["results"][0]
+        result = assert_array(
+            codemap.dependency_resolution_queries(
+                observation,
+                [
+                    {
+                        "operation": "module-owners",
+                        "module": "missing.module",
+                        "context": "compile",
+                    }
+                ],
+            )["results"]
+        )[0]
 
-    assert result["result"][0]["state"] == "unresolved"
-    assert result["result"][0]["owners"] == []
-    assert result["negative_evidence"] == "admissible-within-declared-scope"
+    assert (
+        assert_object(assert_array(assert_object(result)["result"])[0])["state"]
+        == "unresolved"
+    )
+    assert (
+        assert_object(assert_array(assert_object(result)["result"])[0])["owners"] == []
+    )
+    assert (
+        assert_object(result)["negative_evidence"] == "admissible-within-declared-scope"
+    )
 
 
 def test_v3_explicit_empty_unknown_module_ownership_is_not_negative_evidence(
     tmp_path: Path,
 ) -> None:
     snapshot = _snapshot_v3()
-    snapshot["coverage"].append(
+    assert_array(snapshot["coverage"]).append(
         {
             "context": "compile",
             "kind": "module-ownership",
@@ -2060,19 +2236,23 @@ def test_v3_explicit_empty_unknown_module_ownership_is_not_negative_evidence(
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         observation = codemap.dependency_resolution_evidence(snapshot)
-        result = codemap.dependency_resolution_queries(
-            observation,
-            [
-                {
-                    "operation": "module-owners",
-                    "module": "missing.module",
-                    "context": "compile",
-                }
-            ],
-        )["results"][0]
+        result = assert_array(
+            codemap.dependency_resolution_queries(
+                observation,
+                [
+                    {
+                        "operation": "module-owners",
+                        "module": "missing.module",
+                        "context": "compile",
+                    }
+                ],
+            )["results"]
+        )[0]
 
-    assert result["result"][0]["owners"] == []
-    assert result["negative_evidence"] == "not-admissible"
+    assert (
+        assert_object(assert_array(assert_object(result)["result"])[0])["owners"] == []
+    )
+    assert assert_object(result)["negative_evidence"] == "not-admissible"
 
 
 def test_v3_source_kind_is_opaque_when_semantic_authorities_are_explicit(
@@ -2175,9 +2355,9 @@ def test_v3_source_kind_is_opaque_when_semantic_authorities_are_explicit(
         codemap.sync()
         packet = codemap.dependency_resolution_evidence(snapshot)
 
-    assert packet["producer"]["kind"] == "fixture-resolver"
+    assert assert_object(packet["producer"])["kind"] == "fixture-resolver"
     assert packet["contexts"] == ["default", "dev"]
-    assert packet["relationships"][0]["context"] == "dev"
+    assert assert_object(assert_array(packet["relationships"])[0])["context"] == "dev"
     assert "groupId" not in repr(packet)
     assert "artifactId" not in repr(packet)
 
@@ -2191,12 +2371,14 @@ def test_v3_equivalent_producer_packets_have_query_and_delta_parity(
     translated = copy.deepcopy(original)
     translated["producer"] = {"kind": producer_kind, "schema_version": "42"}
     source_ids = {
-        source["source_id"]: f"other:{index}"
-        for index, source in enumerate(translated["evidence_sources"])
+        assert_object(source)["source_id"]: f"other:{index}"
+        for index, source in enumerate(assert_array(translated["evidence_sources"]))
     }
-    for source in translated["evidence_sources"]:
-        source["source_id"] = source_ids[source["source_id"]]
-        source["kind"] = f"{producer_kind}-physical-format"
+    for source in assert_array(translated["evidence_sources"]):
+        assert_object(source)["source_id"] = source_ids[
+            assert_object(source)["source_id"]
+        ]
+        assert_object(source)["kind"] = f"{producer_kind}-physical-format"
     for family in (
         "roots",
         "selections",
@@ -2205,9 +2387,10 @@ def test_v3_equivalent_producer_packets_have_query_and_delta_parity(
         "coverage",
         "module_ownership",
     ):
-        for row in translated[family]:
-            row["evidence_sources"] = [
-                source_ids[ref] for ref in row["evidence_sources"]
+        for row in assert_array(translated[family]):
+            assert_object(row)["evidence_sources"] = [
+                source_ids[ref]
+                for ref in assert_array(assert_object(row)["evidence_sources"])
             ]
 
     requests = [
@@ -2228,16 +2411,23 @@ def test_v3_equivalent_producer_packets_have_query_and_delta_parity(
     assert before["resolution_identity"] == after["resolution_identity"]
     assert before["observation_identity"] != after["observation_identity"]
     for left, right in zip(
-        before_queries["results"], after_queries["results"], strict=True
+        assert_array(before_queries["results"]),
+        assert_array(after_queries["results"]),
+        strict=True,
     ):
-        assert _without_source_refs(left["result"]) == _without_source_refs(
-            right["result"]
-        )
-        assert left["completeness"] == right["completeness"]
-        assert left["negative_evidence"] == right["negative_evidence"]
+        assert _without_source_refs(
+            assert_object(left)["result"]
+        ) == _without_source_refs(assert_object(right)["result"])
         assert (
-            left["producer_authority"]
-            == right["producer_authority"]
+            assert_object(left)["completeness"] == assert_object(right)["completeness"]
+        )
+        assert (
+            assert_object(left)["negative_evidence"]
+            == assert_object(right)["negative_evidence"]
+        )
+        assert (
+            assert_object(left)["producer_authority"]
+            == assert_object(right)["producer_authority"]
             == "caller-claimed"
         )
     assert delta["comparability"] == "comparable"
@@ -2264,7 +2454,7 @@ def test_v3_module_owner_absence_requires_complete_ownership_coverage(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v3()
-    changed["coverage"].append(
+    assert_array(changed["coverage"]).append(
         {
             "context": "compile",
             "kind": "module-ownership",
@@ -2273,7 +2463,7 @@ def test_v3_module_owner_absence_requires_complete_ownership_coverage(
             "evidence_sources": ["list:compile"],
         }
     )
-    changed["evidence_sources"].append(
+    assert_array(changed["evidence_sources"]).append(
         {
             "source_id": "modules:runtime",
             "kind": "test-module-source",
@@ -2283,7 +2473,7 @@ def test_v3_module_owner_absence_requires_complete_ownership_coverage(
             "truncation": "complete",
         }
     )
-    changed["coverage"].append(
+    assert_array(changed["coverage"]).append(
         {
             "context": "runtime",
             "kind": "module-ownership",
@@ -2311,13 +2501,16 @@ def test_v3_module_owner_absence_requires_complete_ownership_coverage(
             ],
         )
 
-    compile_result, runtime_result = packet["results"]
-    assert compile_result["result"] == []
-    assert compile_result["negative_evidence"] == "admissible-within-declared-scope"
-    assert compile_result["completeness"] == "complete"
-    assert runtime_result["result"] == []
-    assert runtime_result["completeness"] == "incomplete"
-    assert runtime_result["negative_evidence"] == "not-admissible"
+    compile_result, runtime_result = assert_array(packet["results"])
+    assert assert_object(compile_result)["result"] == []
+    assert (
+        assert_object(compile_result)["negative_evidence"]
+        == "admissible-within-declared-scope"
+    )
+    assert assert_object(compile_result)["completeness"] == "complete"
+    assert assert_object(runtime_result)["result"] == []
+    assert assert_object(runtime_result)["completeness"] == "incomplete"
+    assert assert_object(runtime_result)["negative_evidence"] == "not-admissible"
 
 
 def test_v3_dependency_query_exact_result_bound_is_complete(tmp_path: Path) -> None:
@@ -2336,20 +2529,23 @@ def test_v3_dependency_query_exact_result_bound_is_complete(tmp_path: Path) -> N
             ],
         )
 
-    result = packet["results"][0]
-    assert [row["node_id"] for row in result["result"]] == ["library@1"]
-    assert result["completeness"] == "complete"
-    assert result["omissions"] == []
+    result = assert_array(packet["results"])[0]
+    assert [
+        assert_object(row)["node_id"]
+        for row in assert_array(assert_object(result)["result"])
+    ] == ["library@1"]
+    assert assert_object(result)["completeness"] == "complete"
+    assert assert_object(result)["omissions"] == []
 
 
 def test_v3_dependency_query_reports_result_bound_when_result_is_omitted(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v3()
-    changed["components"].append(
+    assert_array(changed["components"]).append(
         {"component_id": "second", "name": "second", "ecosystem": "test"}
     )
-    changed["selections"].append(
+    assert_array(changed["selections"]).append(
         {
             "node_id": "second@1",
             "component_id": "second",
@@ -2359,7 +2555,7 @@ def test_v3_dependency_query_reports_result_bound_when_result_is_omitted(
             "evidence_sources": ["tree:compile"],
         }
     )
-    changed["relationships"].append(
+    assert_array(changed["relationships"]).append(
         {
             "source": "app@1",
             "target": "second@1",
@@ -2384,10 +2580,10 @@ def test_v3_dependency_query_reports_result_bound_when_result_is_omitted(
             ],
         )
 
-    result = packet["results"][0]
-    assert len(result["result"]) == 1
-    assert result["completeness"] == "incomplete"
-    assert result["omissions"] == [{"reason": "result-limit"}]
+    result = assert_array(packet["results"])[0]
+    assert len(assert_array(assert_object(result)["result"])) == 1
+    assert assert_object(result)["completeness"] == "incomplete"
+    assert assert_object(result)["omissions"] == [{"reason": "result-limit"}]
 
 
 def test_v3_context_query_rejects_context_argument_instead_of_ignoring_it(
@@ -2416,8 +2612,8 @@ def test_v3_context_query_includes_selection_context_without_inventory_or_edge(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v3()
-    changed["contexts"].append("optional")
-    changed["evidence_sources"].append(
+    assert_array(changed["contexts"]).append("optional")
+    assert_array(changed["evidence_sources"]).append(
         {
             "source_id": "tree:optional",
             "kind": "test-resolution-source",
@@ -2427,8 +2623,12 @@ def test_v3_context_query_includes_selection_context_without_inventory_or_edge(
             "truncation": "complete",
         }
     )
-    changed["selections"][1]["contexts"].append("optional")
-    changed["selections"][1]["evidence_sources"].append("tree:optional")
+    assert_array(
+        assert_object(assert_array(changed["selections"])[1])["contexts"]
+    ).append("optional")
+    assert_array(
+        assert_object(assert_array(changed["selections"])[1])["evidence_sources"]
+    ).append("tree:optional")
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         observation = codemap.dependency_resolution_evidence(changed)
@@ -2437,14 +2637,18 @@ def test_v3_context_query_includes_selection_context_without_inventory_or_edge(
             [{"operation": "contexts", "node_id": "library@1"}],
         )
 
-    assert packet["results"][0]["result"] == ["compile", "optional", "runtime"]
+    assert assert_object(assert_array(packet["results"])[0])["result"] == [
+        "compile",
+        "optional",
+        "runtime",
+    ]
 
 
 def test_v3_inventory_absence_requires_complete_inventory_coverage(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v3()
-    changed["evidence_sources"].append(
+    assert_array(changed["evidence_sources"]).append(
         {
             "source_id": "list:runtime",
             "kind": "test-inventory-source",
@@ -2454,7 +2658,7 @@ def test_v3_inventory_absence_requires_complete_inventory_coverage(
             "truncation": "complete",
         }
     )
-    changed["coverage"].append(
+    assert_array(changed["coverage"]).append(
         {
             "context": "runtime",
             "kind": "resolved-inventory",
@@ -2482,20 +2686,23 @@ def test_v3_inventory_absence_requires_complete_inventory_coverage(
             ],
         )
 
-    compile_result, runtime_result = packet["results"]
-    assert compile_result["result"] == []
-    assert compile_result["completeness"] == "complete"
-    assert compile_result["negative_evidence"] == "admissible-within-declared-scope"
-    assert runtime_result["result"] == []
-    assert runtime_result["completeness"] == "incomplete"
-    assert runtime_result["negative_evidence"] == "not-admissible"
+    compile_result, runtime_result = assert_array(packet["results"])
+    assert assert_object(compile_result)["result"] == []
+    assert assert_object(compile_result)["completeness"] == "complete"
+    assert (
+        assert_object(compile_result)["negative_evidence"]
+        == "admissible-within-declared-scope"
+    )
+    assert assert_object(runtime_result)["result"] == []
+    assert assert_object(runtime_result)["completeness"] == "incomplete"
+    assert assert_object(runtime_result)["negative_evidence"] == "not-admissible"
 
 
 def test_v3_unscoped_module_absence_requires_coverage_for_every_context(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v3()
-    changed["evidence_sources"].append(
+    assert_array(changed["evidence_sources"]).append(
         {
             "source_id": "modules:compile",
             "kind": "test-module-source",
@@ -2505,7 +2712,7 @@ def test_v3_unscoped_module_absence_requires_coverage_for_every_context(
             "truncation": "complete",
         }
     )
-    changed["coverage"].append(
+    assert_array(changed["coverage"]).append(
         {
             "context": "compile",
             "kind": "module-ownership",
@@ -2522,10 +2729,10 @@ def test_v3_unscoped_module_absence_requires_coverage_for_every_context(
             [{"operation": "module-owners", "module": "missing.module"}],
         )
 
-    result = packet["results"][0]
-    assert result["result"] == []
-    assert result["completeness"] == "incomplete"
-    assert result["negative_evidence"] == "not-admissible"
+    result = assert_array(packet["results"])[0]
+    assert assert_object(result)["result"] == []
+    assert assert_object(result)["completeness"] == "incomplete"
+    assert assert_object(result)["negative_evidence"] == "not-admissible"
 
 
 def test_v3_unscoped_module_absence_is_admissible_when_all_contexts_complete(
@@ -2534,7 +2741,7 @@ def test_v3_unscoped_module_absence_is_admissible_when_all_contexts_complete(
     changed = _snapshot_v3()
     for context in ("compile", "runtime"):
         source_id = f"modules:{context}"
-        changed["evidence_sources"].append(
+        assert_array(changed["evidence_sources"]).append(
             {
                 "source_id": source_id,
                 "kind": "test-module-source",
@@ -2544,7 +2751,7 @@ def test_v3_unscoped_module_absence_is_admissible_when_all_contexts_complete(
                 "truncation": "complete",
             }
         )
-        changed["coverage"].append(
+        assert_array(changed["coverage"]).append(
             {
                 "context": context,
                 "kind": "module-ownership",
@@ -2561,10 +2768,12 @@ def test_v3_unscoped_module_absence_is_admissible_when_all_contexts_complete(
             [{"operation": "module-owners", "module": "missing.module"}],
         )
 
-    result = packet["results"][0]
-    assert result["result"] == []
-    assert result["completeness"] == "complete"
-    assert result["negative_evidence"] == "admissible-within-declared-scope"
+    result = assert_array(packet["results"])[0]
+    assert assert_object(result)["result"] == []
+    assert assert_object(result)["completeness"] == "complete"
+    assert (
+        assert_object(result)["negative_evidence"] == "admissible-within-declared-scope"
+    )
 
 
 def test_v3_graph_query_completeness_requires_complete_resolution_coverage(
@@ -2573,10 +2782,11 @@ def test_v3_graph_query_completeness_requires_complete_resolution_coverage(
     changed = _snapshot_v3()
     runtime_coverage = next(
         row
-        for row in changed["coverage"]
-        if row["context"] == "runtime" and row["kind"] == "resolution-graph"
+        for row in assert_array(changed["coverage"])
+        if assert_object(row)["context"] == "runtime"
+        and assert_object(row)["kind"] == "resolution-graph"
     )
-    runtime_coverage["completeness"] = "incomplete"
+    assert_object(runtime_coverage)["completeness"] = "incomplete"
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         observation = codemap.dependency_resolution_evidence(changed)
@@ -2597,13 +2807,16 @@ def test_v3_graph_query_completeness_requires_complete_resolution_coverage(
             ],
         )
 
-    dependencies, paths = packet["results"]
-    assert [row["node_id"] for row in dependencies["result"]] == ["library@1"]
-    assert dependencies["omissions"] == []
-    assert dependencies["completeness"] == "incomplete"
-    assert paths["result"] == [["app@1", "library@1"]]
-    assert paths["omissions"] == []
-    assert paths["completeness"] == "incomplete"
+    dependencies, paths = assert_array(packet["results"])
+    assert [
+        assert_object(row)["node_id"]
+        for row in assert_array(assert_object(dependencies)["result"])
+    ] == ["library@1"]
+    assert assert_object(dependencies)["omissions"] == []
+    assert assert_object(dependencies)["completeness"] == "incomplete"
+    assert assert_object(paths)["result"] == [["app@1", "library@1"]]
+    assert assert_object(paths)["omissions"] == []
+    assert assert_object(paths)["completeness"] == "incomplete"
 
 
 def test_v3_empty_graph_queries_expose_negative_evidence_authority(
@@ -2612,10 +2825,11 @@ def test_v3_empty_graph_queries_expose_negative_evidence_authority(
     changed = _snapshot_v3()
     runtime_coverage = next(
         row
-        for row in changed["coverage"]
-        if row["context"] == "runtime" and row["kind"] == "resolution-graph"
+        for row in assert_array(changed["coverage"])
+        if assert_object(row)["context"] == "runtime"
+        and assert_object(row)["kind"] == "resolution-graph"
     )
-    runtime_coverage["completeness"] = "incomplete"
+    assert_object(runtime_coverage)["completeness"] = "incomplete"
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         observation = codemap.dependency_resolution_evidence(changed)
@@ -2647,26 +2861,30 @@ def test_v3_empty_graph_queries_expose_negative_evidence_authority(
             ],
         )
 
-    compile_dependencies, runtime_dependencies, compile_paths, runtime_paths = packet[
-        "results"
-    ]
-    assert compile_dependencies["result"] == []
-    assert (
-        compile_dependencies["negative_evidence"] == "admissible-within-declared-scope"
+    compile_dependencies, runtime_dependencies, compile_paths, runtime_paths = (
+        assert_array(packet["results"])
     )
-    assert runtime_dependencies["result"] == []
-    assert runtime_dependencies["negative_evidence"] == "not-admissible"
-    assert compile_paths["result"] == []
-    assert compile_paths["negative_evidence"] == "admissible-within-declared-scope"
-    assert runtime_paths["result"] == []
-    assert runtime_paths["negative_evidence"] == "not-admissible"
+    assert assert_object(compile_dependencies)["result"] == []
+    assert (
+        assert_object(compile_dependencies)["negative_evidence"]
+        == "admissible-within-declared-scope"
+    )
+    assert assert_object(runtime_dependencies)["result"] == []
+    assert assert_object(runtime_dependencies)["negative_evidence"] == "not-admissible"
+    assert assert_object(compile_paths)["result"] == []
+    assert (
+        assert_object(compile_paths)["negative_evidence"]
+        == "admissible-within-declared-scope"
+    )
+    assert assert_object(runtime_paths)["result"] == []
+    assert assert_object(runtime_paths)["negative_evidence"] == "not-admissible"
 
 
 def test_v3_path_query_exact_result_bound_does_not_claim_omission(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v3()
-    changed["components"].extend(
+    assert_array(changed["components"]).extend(
         [
             {"component_id": "dead", "ecosystem": "generic", "name": "dead"},
             {
@@ -2676,7 +2894,7 @@ def test_v3_path_query_exact_result_bound_does_not_claim_omission(
             },
         ]
     )
-    changed["selections"].extend(
+    assert_array(changed["selections"]).extend(
         [
             {
                 "node_id": "dead@1",
@@ -2694,7 +2912,7 @@ def test_v3_path_query_exact_result_bound_does_not_claim_omission(
             },
         ]
     )
-    changed["relationships"].extend(
+    assert_array(changed["relationships"]).extend(
         [
             {
                 "source": "app@1",
@@ -2715,29 +2933,31 @@ def test_v3_path_query_exact_result_bound_does_not_claim_omission(
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         observation = codemap.dependency_resolution_evidence(changed)
-        result = codemap.dependency_resolution_queries(
-            observation,
-            [
-                {
-                    "operation": "paths",
-                    "node_id": "app@1",
-                    "target_id": "target@1",
-                    "context": "compile",
-                    "max_results": 1,
-                }
-            ],
-        )["results"][0]
+        result = assert_array(
+            codemap.dependency_resolution_queries(
+                observation,
+                [
+                    {
+                        "operation": "paths",
+                        "node_id": "app@1",
+                        "target_id": "target@1",
+                        "context": "compile",
+                        "max_results": 1,
+                    }
+                ],
+            )["results"]
+        )[0]
 
-    assert result["result"] == [["app@1", "library@1", "target@1"]]
-    assert result["omissions"] == []
-    assert result["completeness"] == "complete"
+    assert assert_object(result)["result"] == [["app@1", "library@1", "target@1"]]
+    assert assert_object(result)["omissions"] == []
+    assert assert_object(result)["completeness"] == "complete"
 
 
 def test_v3_path_query_reports_result_bound_only_when_a_path_is_omitted(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v3()
-    changed["relationships"].extend(
+    assert_array(changed["relationships"]).extend(
         [
             {
                 "source": "app@1",
@@ -2758,33 +2978,35 @@ def test_v3_path_query_reports_result_bound_only_when_a_path_is_omitted(
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         observation = codemap.dependency_resolution_evidence(changed)
-        result = codemap.dependency_resolution_queries(
-            observation,
-            [
-                {
-                    "operation": "paths",
-                    "node_id": "app@1",
-                    "target_id": "library@1",
-                    "context": "compile",
-                    "max_results": 1,
-                }
-            ],
-        )["results"][0]
+        result = assert_array(
+            codemap.dependency_resolution_queries(
+                observation,
+                [
+                    {
+                        "operation": "paths",
+                        "node_id": "app@1",
+                        "target_id": "library@1",
+                        "context": "compile",
+                        "max_results": 1,
+                    }
+                ],
+            )["results"]
+        )[0]
 
-    assert len(result["result"]) == 1
-    assert result["omissions"] == [{"reason": "result-limit"}]
-    assert result["completeness"] == "incomplete"
+    assert len(assert_array(assert_object(result)["result"])) == 1
+    assert assert_object(result)["omissions"] == [{"reason": "result-limit"}]
+    assert assert_object(result)["completeness"] == "incomplete"
 
 
 def _visit_limit_snapshot() -> dict[str, object]:
     snapshot = _snapshot_v3()
-    snapshot["components"].extend(
+    assert_array(snapshot["components"]).extend(
         [
             {"component_id": "left", "name": "left", "ecosystem": "test"},
             {"component_id": "right", "name": "right", "ecosystem": "test"},
         ]
     )
-    snapshot["selections"].extend(
+    assert_array(snapshot["selections"]).extend(
         [
             {
                 "node_id": "left@1",
@@ -2842,20 +3064,21 @@ def test_v3_query_visit_accounting_never_exceeds_declared_bound(
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         observation = codemap.dependency_resolution_evidence(_visit_limit_snapshot())
-        result = codemap.dependency_resolution_queries(observation, [request])[
-            "results"
-        ][0]
+        result = assert_array(
+            codemap.dependency_resolution_queries(observation, [request])["results"]
+        )[0]
 
-    assert result["bounds"]["visited"] <= result["bounds"]["max_visits"]
-    assert result["completeness"] == "incomplete"
-    assert result["omissions"] == [{"reason": "visit-limit"}]
+    bounds = assert_object(assert_object(result)["bounds"])
+    assert assert_number(bounds["visited"]) <= assert_number(bounds["max_visits"])
+    assert assert_object(result)["completeness"] == "incomplete"
+    assert assert_object(result)["omissions"] == [{"reason": "visit-limit"}]
 
 
 def test_v3_complete_module_ownership_cannot_exceed_incomplete_source(
     tmp_path: Path,
 ) -> None:
     snapshot = _snapshot_v3()
-    snapshot["evidence_sources"].append(
+    assert_array(snapshot["evidence_sources"]).append(
         {
             "source_id": "ownership:compile",
             "kind": "test-module-source",
@@ -2886,7 +3109,7 @@ def test_v3_complete_module_ownership_cannot_be_backed_only_by_unknown_source(
     tmp_path: Path,
 ) -> None:
     snapshot = _snapshot_v3()
-    snapshot["evidence_sources"].append(
+    assert_array(snapshot["evidence_sources"]).append(
         {
             "source_id": "ownership:compile",
             "kind": "test-module-source",
@@ -2915,7 +3138,7 @@ def test_v3_complete_module_ownership_cannot_be_backed_only_by_unknown_source(
 
 def test_v3_complete_coverage_can_combine_complete_sources(tmp_path: Path) -> None:
     snapshot = _snapshot_v3()
-    snapshot["evidence_sources"].append(
+    assert_array(snapshot["evidence_sources"]).append(
         {
             "source_id": "tree:compile:second",
             "kind": "test-resolution-source",
@@ -2925,37 +3148,41 @@ def test_v3_complete_coverage_can_combine_complete_sources(tmp_path: Path) -> No
             "truncation": "complete",
         }
     )
-    snapshot["coverage"][0]["evidence_sources"].append("tree:compile:second")
+    assert_array(
+        assert_object(assert_array(snapshot["coverage"])[0])["evidence_sources"]
+    ).append("tree:compile:second")
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         packet = codemap.dependency_resolution_evidence(snapshot)
 
     coverage = next(
         row
-        for row in packet["coverage"]
-        if row["context"] == "compile" and row["kind"] == "resolution-graph"
+        for row in assert_array(packet["coverage"])
+        if assert_object(row)["context"] == "compile"
+        and assert_object(row)["kind"] == "resolution-graph"
     )
-    assert coverage["completeness"] == "complete"
-    assert coverage["truncation"] == "complete"
+    assert assert_object(coverage)["completeness"] == "complete"
+    assert assert_object(coverage)["truncation"] == "complete"
 
 
 def test_v3_unknown_coverage_can_reference_complete_source_without_strengthening(
     tmp_path: Path,
 ) -> None:
     snapshot = _snapshot_v3()
-    snapshot["coverage"][0]["completeness"] = "unknown"
-    snapshot["coverage"][0]["truncation"] = "unknown"
+    assert_object(assert_array(snapshot["coverage"])[0])["completeness"] = "unknown"
+    assert_object(assert_array(snapshot["coverage"])[0])["truncation"] = "unknown"
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         packet = codemap.dependency_resolution_evidence(snapshot)
 
     coverage = next(
         row
-        for row in packet["coverage"]
-        if row["context"] == "compile" and row["kind"] == "resolution-graph"
+        for row in assert_array(packet["coverage"])
+        if assert_object(row)["context"] == "compile"
+        and assert_object(row)["kind"] == "resolution-graph"
     )
-    assert coverage["completeness"] == "unknown"
-    assert coverage["truncation"] == "unknown"
+    assert assert_object(coverage)["completeness"] == "unknown"
+    assert assert_object(coverage)["truncation"] == "unknown"
 
 
 def test_v3_reachability_rejects_unknown_target_node(tmp_path: Path) -> None:
@@ -3029,9 +3256,11 @@ def test_v3_component_unknown_identity_is_authoritative_absence(tmp_path: Path) 
             [{"operation": "component", "component_id": "missing"}],
         )
 
-    result = packet["results"][0]
-    assert result["result"] == []
-    assert result["negative_evidence"] == "admissible-within-declared-scope"
+    result = assert_array(packet["results"])[0]
+    assert assert_object(result)["result"] == []
+    assert (
+        assert_object(result)["negative_evidence"] == "admissible-within-declared-scope"
+    )
 
 
 def test_v3_component_absence_requires_complete_selection_coverage(
@@ -3039,18 +3268,22 @@ def test_v3_component_absence_requires_complete_selection_coverage(
 ) -> None:
     snapshot = _snapshot_v3()
     snapshot["coverage"] = [
-        row for row in snapshot["coverage"] if row["kind"] != "selection"
+        row
+        for row in assert_array(snapshot["coverage"])
+        if assert_object(row)["kind"] != "selection"
     ]
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         observation = codemap.dependency_resolution_evidence(snapshot)
-        result = codemap.dependency_resolution_queries(
-            observation, [{"operation": "component", "component_id": "missing"}]
-        )["results"][0]
+        result = assert_array(
+            codemap.dependency_resolution_queries(
+                observation, [{"operation": "component", "component_id": "missing"}]
+            )["results"]
+        )[0]
 
-    assert result["result"] == []
-    assert result["completeness"] == "incomplete"
-    assert result["negative_evidence"] == "not-admissible"
+    assert assert_object(result)["result"] == []
+    assert assert_object(result)["completeness"] == "incomplete"
+    assert assert_object(result)["negative_evidence"] == "not-admissible"
 
 
 def test_v3_component_present_identity_does_not_claim_negative_evidence(
@@ -3064,17 +3297,17 @@ def test_v3_component_present_identity_does_not_claim_negative_evidence(
             [{"operation": "component", "component_id": "library"}],
         )
 
-    result = packet["results"][0]
-    assert result["result"]
-    assert result["negative_evidence"] == "not-applicable"
+    result = assert_array(packet["results"])[0]
+    assert assert_object(result)["result"]
+    assert assert_object(result)["negative_evidence"] == "not-applicable"
 
 
 def test_v3_component_absence_remains_authoritative_with_incomplete_resolution_coverage(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v3()
-    changed["coverage"][1]["completeness"] = "incomplete"
-    changed["coverage"][1]["truncation"] = "truncated"
+    assert_object(assert_array(changed["coverage"])[1])["completeness"] = "incomplete"
+    assert_object(assert_array(changed["coverage"])[1])["truncation"] = "truncated"
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         observation = codemap.dependency_resolution_evidence(changed)
@@ -3083,10 +3316,12 @@ def test_v3_component_absence_remains_authoritative_with_incomplete_resolution_c
             [{"operation": "component", "component_id": "missing"}],
         )
 
-    result = packet["results"][0]
-    assert result["result"] == []
-    assert result["completeness"] == "complete"
-    assert result["negative_evidence"] == "admissible-within-declared-scope"
+    result = assert_array(packet["results"])[0]
+    assert assert_object(result)["result"] == []
+    assert assert_object(result)["completeness"] == "complete"
+    assert (
+        assert_object(result)["negative_evidence"] == "admissible-within-declared-scope"
+    )
 
 
 def test_v3_component_result_limit_does_not_weaken_exact_identity_lookup(
@@ -3106,15 +3341,15 @@ def test_v3_component_result_limit_does_not_weaken_exact_identity_lookup(
             ],
         )
 
-    result = packet["results"][0]
-    assert len(result["result"]) == 1
-    assert result["completeness"] == "complete"
-    assert result["omissions"] == []
+    result = assert_array(packet["results"])[0]
+    assert len(assert_array(assert_object(result)["result"])) == 1
+    assert assert_object(result)["completeness"] == "complete"
+    assert assert_object(result)["omissions"] == []
 
 
 def test_v3_component_without_selection_is_rejected(tmp_path: Path) -> None:
     snapshot = _snapshot_v3()
-    snapshot["components"].append(
+    assert_array(snapshot["components"]).append(
         {"component_id": "orphan", "name": "orphan", "ecosystem": "test"}
     )
     with CodeMap(tmp_path) as codemap:
@@ -3125,7 +3360,7 @@ def test_v3_component_without_selection_is_rejected(tmp_path: Path) -> None:
 
 def test_v3_multiple_selections_for_one_component_remain_valid(tmp_path: Path) -> None:
     snapshot = _snapshot_v3()
-    snapshot["selections"].append(
+    assert_array(snapshot["selections"]).append(
         {
             "node_id": "library@2",
             "component_id": "library",
@@ -3140,9 +3375,9 @@ def test_v3_multiple_selections_for_one_component_remain_valid(tmp_path: Path) -
         packet = codemap.dependency_resolution_evidence(snapshot)
 
     library_nodes = {
-        row["node_id"]
-        for row in packet["selections"]
-        if row["component_id"] == "library"
+        assert_object(row)["node_id"]
+        for row in assert_array(packet["selections"])
+        if assert_object(row)["component_id"] == "library"
     }
     assert library_nodes == {"library@1", "library@2"}
 
@@ -3150,16 +3385,21 @@ def test_v3_multiple_selections_for_one_component_remain_valid(tmp_path: Path) -
 def test_v3_selection_without_any_context_is_rejected(tmp_path: Path) -> None:
     snapshot = _snapshot_v3()
     selection = next(
-        row for row in snapshot["selections"] if row["node_id"] == "library@1"
+        row
+        for row in assert_array(snapshot["selections"])
+        if assert_object(row)["node_id"] == "library@1"
     )
-    selection["contexts"] = []
+    assert_object(selection)["contexts"] = []
     snapshot["inventory"] = [
-        row for row in snapshot["inventory"] if row["node_id"] != "library@1"
+        row
+        for row in assert_array(snapshot["inventory"])
+        if assert_object(row)["node_id"] != "library@1"
     ]
     snapshot["relationships"] = [
         row
-        for row in snapshot["relationships"]
-        if row["source"] != "library@1" and row["target"] != "library@1"
+        for row in assert_array(snapshot["relationships"])
+        if assert_object(row)["source"] != "library@1"
+        and assert_object(row)["target"] != "library@1"
     ]
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -3169,7 +3409,7 @@ def test_v3_selection_without_any_context_is_rejected(tmp_path: Path) -> None:
 
 def test_v3_root_requires_evidence_source_provenance(tmp_path: Path) -> None:
     snapshot = _snapshot_v3()
-    snapshot["roots"][0]["evidence_sources"] = []
+    assert_object(assert_array(snapshot["roots"])[0])["evidence_sources"] = []
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         with pytest.raises(ValueError, match="root must reference evidence source"):
@@ -3178,7 +3418,9 @@ def test_v3_root_requires_evidence_source_provenance(tmp_path: Path) -> None:
 
 def test_v3_root_rejects_incompatible_evidence_source_context(tmp_path: Path) -> None:
     snapshot = _snapshot_v3()
-    snapshot["roots"][0]["evidence_sources"] = ["tree:runtime"]
+    assert_object(assert_array(snapshot["roots"])[0])["evidence_sources"] = [
+        "tree:runtime"
+    ]
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         with pytest.raises(
@@ -3192,7 +3434,7 @@ def test_v3_root_provenance_changes_observation_not_resolution_identity(
 ) -> None:
     baseline = _snapshot_v3()
     changed = _snapshot_v3()
-    changed["evidence_sources"].append(
+    assert_array(changed["evidence_sources"]).append(
         {
             "source_id": "tree:compile:copy",
             "kind": "test-resolution-source",
@@ -3202,7 +3444,9 @@ def test_v3_root_provenance_changes_observation_not_resolution_identity(
             "truncation": "complete",
         }
     )
-    changed["roots"][0]["evidence_sources"] = ["tree:compile:copy"]
+    assert_object(assert_array(changed["roots"])[0])["evidence_sources"] = [
+        "tree:compile:copy"
+    ]
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -3219,10 +3463,12 @@ def test_v3_selection_requires_provenance_for_each_observed_context(
 ) -> None:
     snapshot = _snapshot_v3()
     library = next(
-        row for row in snapshot["selections"] if row["node_id"] == "library@1"
+        row
+        for row in assert_array(snapshot["selections"])
+        if assert_object(row)["node_id"] == "library@1"
     )
-    library["contexts"] = ["compile", "runtime"]
-    library["evidence_sources"] = ["tree:compile"]
+    assert_object(library)["contexts"] = ["compile", "runtime"]
+    assert_object(library)["evidence_sources"] = ["tree:compile"]
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -3237,24 +3483,32 @@ def test_v3_complete_resolution_graph_can_have_selected_nodes_without_root(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v3()
-    changed["roots"] = [row for row in changed["roots"] if row["context"] != "runtime"]
+    changed["roots"] = [
+        row
+        for row in assert_array(changed["roots"])
+        if assert_object(row)["context"] != "runtime"
+    ]
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         observation = codemap.dependency_resolution_evidence(changed)
-        result = codemap.dependency_resolution_queries(
-            observation,
-            [
-                {
-                    "operation": "dependencies",
-                    "node_id": "library@1",
-                    "context": "runtime",
-                }
-            ],
-        )["results"][0]
+        result = assert_array(
+            codemap.dependency_resolution_queries(
+                observation,
+                [
+                    {
+                        "operation": "dependencies",
+                        "node_id": "library@1",
+                        "context": "runtime",
+                    }
+                ],
+            )["results"]
+        )[0]
 
-    assert result["result"] == []
-    assert result["negative_evidence"] == "admissible-within-declared-scope"
+    assert assert_object(result)["result"] == []
+    assert (
+        assert_object(result)["negative_evidence"] == "admissible-within-declared-scope"
+    )
 
 
 def test_v3_unscoped_inventory_absence_requires_coverage_for_every_context(
@@ -3268,10 +3522,10 @@ def test_v3_unscoped_inventory_absence_requires_coverage_for_every_context(
             [{"operation": "inventory", "node_id": "missing@1"}],
         )
 
-    result = packet["results"][0]
-    assert result["result"] == []
-    assert result["completeness"] == "incomplete"
-    assert result["negative_evidence"] == "not-admissible"
+    result = assert_array(packet["results"])[0]
+    assert assert_object(result)["result"] == []
+    assert assert_object(result)["completeness"] == "incomplete"
+    assert assert_object(result)["negative_evidence"] == "not-admissible"
 
 
 def test_v3_empty_complete_graph_and_inventory_preserve_negative_evidence(
@@ -3284,7 +3538,7 @@ def test_v3_empty_complete_graph_and_inventory_preserve_negative_evidence(
     changed["inventory"] = []
     changed["relationships"] = []
     changed["module_ownership"] = []
-    changed["coverage"].append(
+    assert_array(changed["coverage"]).append(
         {
             "context": "compile",
             "kind": "module-ownership",
@@ -3310,10 +3564,15 @@ def test_v3_empty_complete_graph_and_inventory_preserve_negative_evidence(
         )["results"]
 
     assert observation["roots"] == []
-    assert observation["negative_evidence"][0]["producer_authority"] == "caller-claimed"
+    assert (
+        assert_object(assert_array(observation["negative_evidence"])[0])[
+            "producer_authority"
+        ]
+        == "caller-claimed"
+    )
     assert all(
-        row["negative_evidence"] == "admissible-within-declared-scope"
-        for row in results
+        assert_object(row)["negative_evidence"] == "admissible-within-declared-scope"
+        for row in assert_array(results)
     )
 
 
@@ -3321,7 +3580,7 @@ def test_v3_inventory_requires_resolved_inventory_evidence_authority(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v3()
-    changed["evidence_sources"].append(
+    assert_array(changed["evidence_sources"]).append(
         {
             "source_id": "fact:inventory:compile",
             "kind": "opaque-fact-source",
@@ -3331,7 +3590,9 @@ def test_v3_inventory_requires_resolved_inventory_evidence_authority(
             "truncation": "complete",
         }
     )
-    changed["inventory"][0]["evidence_sources"] = ["fact:inventory:compile"]
+    assert_object(assert_array(changed["inventory"])[0])["evidence_sources"] = [
+        "fact:inventory:compile"
+    ]
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -3346,7 +3607,7 @@ def test_v3_module_ownership_requires_module_ownership_evidence_authority(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v3()
-    changed["evidence_sources"][2]["authorities"] = [
+    assert_object(assert_array(changed["evidence_sources"])[2])["authorities"] = [
         "resolved-inventory",
         "selection",
     ]
@@ -3373,16 +3634,17 @@ def test_v3_selection_requires_selection_evidence_authority(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v3()
-    changed["evidence_sources"][2]["authorities"] = [
+    assert_object(assert_array(changed["evidence_sources"])[2])["authorities"] = [
         "module-ownership",
         "resolved-inventory",
     ]
     selection_coverage = next(
         row
-        for row in changed["coverage"]
-        if row["context"] == "compile" and row["kind"] == "selection"
+        for row in assert_array(changed["coverage"])
+        if assert_object(row)["context"] == "compile"
+        and assert_object(row)["kind"] == "selection"
     )
-    selection_coverage["evidence_sources"] = ["tree:compile"]
+    assert_object(selection_coverage)["evidence_sources"] = ["tree:compile"]
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -3395,7 +3657,9 @@ def test_v3_selection_requires_selection_evidence_authority(
 
 def test_v3_rejects_producer_specific_coverage_kind(tmp_path: Path) -> None:
     changed = _snapshot_v3()
-    changed["coverage"][0]["kind"] = "maven-dependency-tree"
+    assert_object(assert_array(changed["coverage"])[0])["kind"] = (
+        "maven-dependency-tree"
+    )
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -3410,8 +3674,12 @@ def test_v3_complete_graph_coverage_refuses_inventory_only_source_authority(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v3()
-    changed["evidence_sources"][0]["authorities"] = ["selection"]
-    changed["coverage"][0]["evidence_sources"] = ["tree:compile"]
+    assert_object(assert_array(changed["evidence_sources"])[0])["authorities"] = [
+        "selection"
+    ]
+    assert_object(assert_array(changed["coverage"])[0])["evidence_sources"] = [
+        "tree:compile"
+    ]
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -3426,7 +3694,7 @@ def test_v3_relationship_refuses_inventory_only_source_authority(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v3()
-    changed["evidence_sources"].append(
+    assert_array(changed["evidence_sources"]).append(
         {
             "source_id": "fact:relationship:compile",
             "kind": "opaque-fact-source",
@@ -3436,7 +3704,9 @@ def test_v3_relationship_refuses_inventory_only_source_authority(
             "truncation": "complete",
         }
     )
-    changed["relationships"][0]["evidence_sources"] = ["fact:relationship:compile"]
+    assert_object(assert_array(changed["relationships"])[0])["evidence_sources"] = [
+        "fact:relationship:compile"
+    ]
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -3449,7 +3719,7 @@ def test_v3_relationship_refuses_inventory_only_source_authority(
 
 def test_v3_root_refuses_inventory_only_source_authority(tmp_path: Path) -> None:
     changed = _snapshot_v3()
-    changed["evidence_sources"].append(
+    assert_array(changed["evidence_sources"]).append(
         {
             "source_id": "fact:root:compile",
             "kind": "opaque-fact-source",
@@ -3459,7 +3729,9 @@ def test_v3_root_refuses_inventory_only_source_authority(tmp_path: Path) -> None
             "truncation": "complete",
         }
     )
-    changed["roots"][0]["evidence_sources"] = ["fact:root:compile"]
+    assert_object(assert_array(changed["roots"])[0])["evidence_sources"] = [
+        "fact:root:compile"
+    ]
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -3474,8 +3746,12 @@ def test_v3_complete_inventory_coverage_refuses_graph_only_source_authority(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v3()
-    changed["evidence_sources"][2]["authorities"] = ["selection"]
-    changed["coverage"][2]["evidence_sources"] = ["list:compile"]
+    assert_object(assert_array(changed["evidence_sources"])[2])["authorities"] = [
+        "selection"
+    ]
+    assert_object(assert_array(changed["coverage"])[2])["evidence_sources"] = [
+        "list:compile"
+    ]
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -3515,7 +3791,9 @@ def test_v3_every_cited_source_must_support_its_fact_or_coverage(
     message: str,
 ) -> None:
     snapshot = _snapshot_v3()
-    snapshot[family][index]["evidence_sources"].append(unsupported)
+    assert_array(
+        assert_object(assert_array(snapshot[family])[index])["evidence_sources"]
+    ).append(unsupported)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         with pytest.raises(ValueError, match=message):
@@ -3545,7 +3823,7 @@ def test_v3_mixed_module_ownership_sources_do_not_borrow_authority(
 
 def test_v3_mixed_selection_sources_do_not_borrow_authority(tmp_path: Path) -> None:
     snapshot = _snapshot_v3()
-    snapshot["evidence_sources"].append(
+    assert_array(snapshot["evidence_sources"]).append(
         {
             "source_id": "ownership-only:compile",
             "kind": "opaque",
@@ -3555,7 +3833,9 @@ def test_v3_mixed_selection_sources_do_not_borrow_authority(tmp_path: Path) -> N
             "truncation": "complete",
         }
     )
-    snapshot["selections"][0]["evidence_sources"].append("ownership-only:compile")
+    assert_array(
+        assert_object(assert_array(snapshot["selections"])[0])["evidence_sources"]
+    ).append("ownership-only:compile")
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         with pytest.raises(
@@ -3580,5 +3860,5 @@ def test_v3_delta_reports_cross_repository_identity_change(tmp_path: Path) -> No
     delta = CodeMap.dependency_resolution_delta(before, after)
 
     assert delta["comparability"] == "comparable"
-    assert delta["change_axes"]["repository_identity"] == "changed"
-    assert delta["change_axes"]["semantic_resolution"] == "unchanged"
+    assert assert_object(delta["change_axes"])["repository_identity"] == "changed"
+    assert assert_object(delta["change_axes"])["semantic_resolution"] == "unchanged"

@@ -98,3 +98,47 @@ Compatibility must never weaken Hashmarks' authority model. In particular:
 - fail-closed freshness and provenance rules take precedence over preserving an obsolete convenience API.
 
 See [`PRODUCT_BOUNDARY.md`](PRODUCT_BOUNDARY.md) and [`INVARIANTS.md`](INVARIANTS.md).
+
+Task retrieval may include `same_name_declarations`: up to four other indexed
+callable declarations with the same spelling in the retrieved callable's file.
+The context retains exact source spans, member revision, index generation and
+observed/returned/omitted counts. Initial and presented responses preserve these
+facts. Same spelling establishes neither runtime identity nor inheritance,
+dispatch, ownership or verification selection; no global name graph is created.
+
+Diagnostic queries may also disclose one `bounded-lexical-source-position`
+supplement: a current source-visible callable containing query-token conjunctions
+after its declaration line. Lookup examines at most eight adjacent query-term
+groups (two observed spelling variants per term), thirty-two indexed declarations
+and one returned source-position hint. These are disclosure bounds, not semantic
+completeness or failure-owner proof. Explicit locators retain precedence and
+edit/verification selection remains independently owned.
+
+Such a locator may carry `direct_call_declarations`, containing up to four
+same-file callable targets from at most sixty-four direct indexed calls. The
+existing structural-locality resolver must qualify each target; nested callable
+calls, shadowed names and transitive targets are excluded. Exact target spans,
+call positions, source revision, generation, omissions and unqualified-call counts
+remain visible in every format. Runtime invocation remains unestablished and no
+negative-evidence authority is granted.
+
+Source-candidate test disclosure also retains task words in a candidate's directory
+before considering the union of declared names throughout its module. It derives
+that ordering from existing path and task-anchor facts. Qualified reference and
+filename evidence retain their ordering, and the selected verifier and edit owner
+are unchanged. A directory match establishes no test relationship or sufficiency.
+
+Initial compact declaration tables bind their scope through the finding's exact
+`source_refs[0]` plus the declaration-family key. Table row references append
+`/declarations/<i>` in native order. This avoids repeating that pointer inside
+each table; the complete native context, qualifiers and row values are retained.
+
+Observed repository fact/evidence: distinct same-named callable declarations in
+one selected repository file.
+Authority source: existing source-derived CodeMap symbol index and member binding.
+Completeness/freshness behavior: current visible source only, bounded disclosure
+with explicit omissions, no negative-evidence authority.
+Existing Hashmarks owner extended: task evidence lexical declaration disclosure.
+Consumer/execution responsibility explicitly not acquired: runtime dispatch,
+solution selection, execution and certification.
+Decision: OBSERVER.

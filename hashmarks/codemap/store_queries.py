@@ -4,7 +4,7 @@ import json
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Sequence
 
     from .repository_index_store import WorkspaceMapStore
 
@@ -635,6 +635,84 @@ class WorkspaceMapQueryMixin:
                 (limit,),
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def lexical_declaration_candidates(
+        self,
+        pairs: Sequence[tuple[str, str]],
+        terms: Sequence[str],
+        *,
+        limit: int = 32,
+    ) -> list[dict[str, object]]:
+        """Observe query-token conjunctions inside source-visible callable spans.
+
+        The closest indexed callable contains the matched line. This is lexical
+        containment, not runtime ownership, invocation, or repository absence.
+        """
+        if TYPE_CHECKING:
+            self = cast("WorkspaceMapStore", self)
+        if type(limit) is not int or not 1 <= limit <= 32:
+            raise ValueError("lexical declaration limit must be between 1 and 32")
+        if len(pairs) > 32 or len(terms) > 32 or any(a == b for a, b in pairs):
+            raise ValueError("lexical lookup requires bounded distinct token pairs")
+        if not pairs or not terms:
+            return []
+        self._count_read("lexical_declaration_candidates")
+        with self._lock:
+            rows = self._db.execute(
+                """WITH pair_tokens AS (
+                    SELECT p.key pair_index,t.value token
+                    FROM json_each(?) p,json_each(p.value) t
+                ), matches AS (
+                    SELECT p.pair_index,l.path,l.line
+                    FROM pair_tokens p JOIN lexical l ON l.token=p.token
+                    JOIN file_map f ON f.path=l.path
+                    WHERE f.evidence_visibility='source'
+                    GROUP BY p.pair_index,l.path,l.line
+                    HAVING COUNT(DISTINCT l.token)=2
+                ), enclosing AS (
+                    SELECT m.*,s.qualname,s.start_line,s.end_line,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY m.pair_index,m.path,m.line
+                            ORDER BY s.end_line-s.start_line,s.qualname
+                        ) closest
+                    FROM matches m JOIN symbol s ON s.path=m.path
+                    AND m.line BETWEEN s.start_line AND s.end_line
+                    WHERE s.kind IN ('function','method')
+                ), alternatives AS (
+                    SELECT *,ROW_NUMBER() OVER (
+                        PARTITION BY path,qualname,start_line,end_line
+                        ORDER BY pair_index,line
+                    ) first_site
+                    FROM enclosing WHERE closest=1 AND line>start_line
+                ), selected AS (
+                    SELECT * FROM alternatives WHERE first_site=1
+                    ORDER BY pair_index,path,line LIMIT ?
+                )
+                SELECT s.*,f.file_digest,f.evidence_visibility,
+                    a.line match_line,a.pair_index,
+                    json_group_array(DISTINCT l.token) matched_terms
+                FROM selected a JOIN symbol s ON s.path=a.path
+                    AND s.qualname=a.qualname AND s.start_line=a.start_line
+                    AND s.end_line=a.end_line
+                JOIN file_map f ON f.path=s.path
+                JOIN lexical l ON l.path=s.path
+                    AND l.line BETWEEN s.start_line AND s.end_line
+                WHERE l.token IN (SELECT value FROM json_each(?))
+                GROUP BY s.path,s.qualname,s.start_line,s.end_line
+                ORDER BY a.pair_index,s.path,a.line""",
+                (json.dumps(pairs), limit, json.dumps(tuple(terms))),
+            ).fetchall()
+        result: list[dict[str, object]] = []
+        for row in rows:
+            value = dict(row)
+            matched: object = json.loads(value["matched_terms"])
+            if not isinstance(matched, list) or not all(
+                isinstance(term, str) for term in matched
+            ):
+                raise ValueError("indexed lexical terms must be strings")
+            value["matched_terms"] = matched
+            result.append(value)
+        return result
 
     def lexical_candidates(self, tokens: list[str], limit: int = 500) -> list[dict]:
         if TYPE_CHECKING:

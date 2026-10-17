@@ -1,4 +1,4 @@
-"""JSON CLI adapters preserve canonical dependency and query evidence."""
+"""JSON CLI adapters preserve canonical repository observations."""
 
 from __future__ import annotations
 
@@ -9,10 +9,11 @@ import sys
 from pathlib import Path
 
 import pytest
-from contract_assertions import assert_object, assert_text
+from contract_assertions import assert_array, assert_object, assert_records, assert_text
 
 from hashmarks.adapters import uv_lock_dependency_observation
 from hashmarks.codemap import CodeMap
+from hashmarks.digest import FILE_DOMAIN, hash_file
 from hashmarks.evidence_presentation_conformance import validate_evidence_presentation
 from hashmarks.operation_contract import operation_schema
 from scripts.repository_evaluation.backend_grading import validate_transport_capture
@@ -27,6 +28,7 @@ def observation_inputs(
     root, state = tmp_path / "repo", tmp_path / "state"
     root.mkdir()
     (root / "backend.py").write_text("def handler():\n    return 1\n")
+    (root / "alternative.py").write_text("def handler():\n    return 2\n")
     fixture = Path(__file__).parent / "fixtures/dependency_dogfood/uv/v1/uv.lock"
     cases: list[dict[str, object]] = [
         {
@@ -43,10 +45,84 @@ def observation_inputs(
                 "changed_paths": ["backend.py"],
             },
         },
+        {
+            "operation": "correlate_evidence",
+            "inputs": {
+                "path_mappings": [{"external_prefix": "/app", "repository_prefix": ""}],
+                "bundles": [
+                    {
+                        "bundle_id": "runtime:1",
+                        "producer": {"kind": "external-runtime-producer-claim"},
+                        "scope": {"kind": "repository-frames"},
+                        "completeness": "complete",
+                        "truncation": "complete",
+                        "anchors": [
+                            {
+                                "anchor_id": "qualified",
+                                "path": "/app/backend.py",
+                                "line": 2,
+                                "symbol": "handler",
+                                "member_revision": hash_file(
+                                    root / "backend.py", domain=FILE_DOMAIN
+                                ).hash,
+                            },
+                            {
+                                "anchor_id": "stale",
+                                "path": "/app/backend.py",
+                                "line": 2,
+                                "symbol": "handler",
+                                "member_revision": "0" * 64,
+                            },
+                            {"anchor_id": "ambiguous", "symbol": "handler"},
+                            {
+                                "anchor_id": "conflicting",
+                                "path": "/app/backend.py",
+                                "line": 2,
+                                "symbol": "missing",
+                            },
+                        ],
+                    }
+                ],
+            },
+        },
     ]
     with CodeMap(root, state_dir=state) as codemap:
         codemap.sync()
         packets = [observe_case(codemap, case) for case in cases]
+        correlation = packets[-1]
+        assert correlation["causation"] == "not-inferred"
+        assert correlation["storage"] == "request-scoped-not-persisted"
+        bundle = assert_object(assert_array(correlation["bundles"])[0])
+        anchors = {row["anchor_id"]: row for row in assert_records(bundle["anchors"])}
+        assert {
+            key: assert_object(row["resolution"])["state"]
+            for key, row in anchors.items()
+        } == {
+            "qualified": "resolved-unique",
+            "stale": "resolved-unique",
+            "ambiguous": "resolved-ambiguous",
+            "conflicting": "claim-conflict",
+        }
+        assert {
+            key: assert_object(row["source_equivalence"])["state"]
+            for key, row in anchors.items()
+        } == {
+            "qualified": "proven",
+            "stale": "mismatch",
+            "ambiguous": "unknown",
+            "conflicting": "unknown",
+        }
+        bounded: dict[str, object] = {
+            "operation": "correlate_evidence",
+            "inputs": {
+                **assert_object(cases[-1]["inputs"]),
+                "include_relationships": False,
+                "relationship_limit_per_path": 1,
+                "previous_correlation": correlation,
+            },
+        }
+        cases.append(bounded)
+        packets.append(observe_case(codemap, bounded))
     return root, state, cases, packets
 
 
@@ -131,6 +207,53 @@ def test_official_mcp_matches_json_cli_observation_contract(
                 "changed_paths": [1],
             },
             "changed_paths member must be a string",
+        ),
+        ("correlate-evidence", {}, "bundles must be a JSON array"),
+        ("correlate-evidence", {"bundles": {}}, "bundles must be a JSON array"),
+        (
+            "correlate-evidence",
+            {"bundles": [1]},
+            "bundles member must be a JSON object",
+        ),
+        (
+            "correlate-evidence",
+            {"bundles": [], "argv": ["echo"]},
+            "unknown observation input",
+        ),
+        (
+            "correlate-evidence",
+            {"bundles": [], "path_mappings": {}},
+            "path_mappings must be a JSON array",
+        ),
+        (
+            "correlate-evidence",
+            {"bundles": [], "path_mappings": [1]},
+            "path_mappings member must be a JSON object",
+        ),
+        (
+            "correlate-evidence",
+            {"bundles": [], "include_relationships": 1},
+            "include_relationships must be a boolean",
+        ),
+        (
+            "correlate-evidence",
+            {"bundles": [], "relationship_limit_per_path": True},
+            "relationship_limit_per_path must be an integer",
+        ),
+        (
+            "correlate-evidence",
+            {"bundles": [], "relationship_limit_per_path": 1.0},
+            "relationship_limit_per_path must be an integer",
+        ),
+        (
+            "correlate-evidence",
+            {"bundles": [], "relationship_limit_per_path": 0},
+            "relationship_limit_per_path must be between 1 and 1000",
+        ),
+        (
+            "correlate-evidence",
+            {"bundles": [], "previous_correlation": []},
+            "previous_correlation must be a JSON object",
         ),
     ],
 )

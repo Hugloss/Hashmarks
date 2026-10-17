@@ -4,7 +4,7 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, TypedDict, TypeVar
 
 from hashmarks._command_output import log_command_output
 
@@ -28,12 +28,14 @@ from .repository_retry import (
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
+    from argparse import ArgumentParser, Namespace, _SubParsersAction
     from collections.abc import Callable
 
     from .codemap import CodeMap
+    from .codemap.model import SyncResult
 
 
-def _print(value: Any, *, compact: bool = False) -> None:
+def _print(value: object, *, compact: bool = False) -> None:
     log_command_output(
         logger,
         json.dumps(
@@ -64,7 +66,7 @@ _REPOSITORY_USER_ERRORS = (KeyError, PermissionError, ValueError, FileNotFoundEr
 
 
 def _call_codemap(
-    args: Any,
+    args: Namespace,
     operation: Callable[[CodeMap], _T],
     *,
     extra_errors: tuple[type[BaseException], ...] = (),
@@ -92,7 +94,7 @@ def _read_json_object(path: str | Path, *, option: str) -> dict[str, object]:
     return value
 
 
-def _codemap(args: object) -> None:
+def _codemap(args: Namespace) -> CodeMap:
     # Lazy import is a performance firewall: identity/daemon commands do not
     # import parsing or agent-context code.
     from .codemap import CodeMap
@@ -100,7 +102,9 @@ def _codemap(args: object) -> None:
     return CodeMap(args.workspace, state_dir=args.state_dir)
 
 
-def _read_observation_request(args: Any, fields: frozenset[str]) -> dict[str, object]:
+def _read_observation_request(
+    args: Namespace, fields: frozenset[str]
+) -> dict[str, object]:
     request = _read_json_object(args.input_json, option="--input-json")
     unexpected = sorted(set(request) - fields)
     if unexpected:
@@ -144,7 +148,58 @@ def _request_queries(value: object) -> list[dict[str, object]]:
     return [_request_mapping(row, "query") for row in value]
 
 
-def _dependency_codemap_code(args: Any) -> int:
+def _request_mappings(value: object, name: str) -> list[dict[str, object]]:
+    if not isinstance(value, list):
+        raise RepositoryCliError(f"{name} must be a JSON array")
+    return [_request_mapping(row, f"{name} member") for row in value]
+
+
+class _CorrelationOptions(TypedDict, total=False):
+    path_mappings: list[dict[str, object]] | None
+    relationship_limit_per_path: int
+    include_relationships: bool
+    previous_correlation: dict[str, object] | None
+
+
+def _correlation_options(request: dict[str, object]) -> _CorrelationOptions:
+    options: _CorrelationOptions = {}
+    if "path_mappings" in request:
+        value = request["path_mappings"]
+        options["path_mappings"] = (
+            None if value is None else _request_mappings(value, "path_mappings")
+        )
+    if "relationship_limit_per_path" in request:
+        limit = request["relationship_limit_per_path"]
+        if type(limit) is not int:
+            raise RepositoryCliError("relationship_limit_per_path must be an integer")
+        options["relationship_limit_per_path"] = limit
+    if "include_relationships" in request:
+        include = request["include_relationships"]
+        if not isinstance(include, bool):
+            raise RepositoryCliError("include_relationships must be a boolean")
+        options["include_relationships"] = include
+    if "previous_correlation" in request:
+        options["previous_correlation"] = _request_previous(
+            request["previous_correlation"], "previous_correlation"
+        )
+    return options
+
+
+def _correlate_evidence_code(args: Namespace) -> int:
+    request = _read_observation_request(
+        args,
+        frozenset({"bundles", *_CorrelationOptions.__annotations__}),
+    )
+    bundles = _request_mappings(request.get("bundles"), "bundles")
+    options = _correlation_options(request)
+    value = _call_codemap(
+        args, lambda codemap: codemap.correlate_evidence(bundles, **options)
+    )
+    _print_operation("correlate_evidence", value, presentation=args.presentation)
+    return 0
+
+
+def _dependency_codemap_code(args: Namespace) -> int:
     request = _read_observation_request(
         args, frozenset({"snapshot", "queries", "previous_observation", "result_mode"})
     )
@@ -169,7 +224,7 @@ def _dependency_codemap_code(args: Any) -> int:
     return 0
 
 
-def _repository_intelligence_query_code(args: Any) -> int:
+def _repository_intelligence_query_code(args: Namespace) -> int:
     from .codemap.repository_intelligence_query import (
         REPOSITORY_INTELLIGENCE_QUERY_DEFAULT_OPTIONS,
         RepositoryIntelligenceQueryOptions,
@@ -216,7 +271,7 @@ def _repository_intelligence_query_code(args: Any) -> int:
     return 0
 
 
-def _repository_declarations_code(args: Any) -> int:
+def _repository_declarations_code(args: Namespace) -> int:
     from .codemap.static_python_backend_declarations import (
         StaticPythonBackendDeclarations,
     )
@@ -249,13 +304,13 @@ def _repository_declarations_code(args: Any) -> int:
     return 0
 
 
-def _map_sync(args: Any) -> int:
+def _map_sync(args: Namespace) -> int:
     result = _call_codemap(args, lambda codemap: codemap.sync(args.path or None))
     _print(result.as_dict())
     return 0
 
 
-def _map_findings(args: Any) -> int:
+def _map_findings(args: Namespace) -> int:
     value = _call_codemap(
         args, lambda codemap: codemap.repository_findings(args.path or None)
     )
@@ -263,7 +318,7 @@ def _map_findings(args: Any) -> int:
     return 0
 
 
-def _map_import_ownership(args: Any) -> int:
+def _map_import_ownership(args: Namespace) -> int:
     value = _call_codemap(
         args, lambda codemap: codemap.import_ownership_findings(args.path or None)
     )
@@ -271,7 +326,7 @@ def _map_import_ownership(args: Any) -> int:
     return 0
 
 
-def _map_concurrency_risk(args: Any) -> int:
+def _map_concurrency_risk(args: Namespace) -> int:
     value = _call_codemap(
         args, lambda codemap: codemap.concurrency_risk_findings(args.path or None)
     )
@@ -279,7 +334,7 @@ def _map_concurrency_risk(args: Any) -> int:
     return 0
 
 
-def _map_verification_ownership(args: Any) -> int:
+def _map_verification_ownership(args: Namespace) -> int:
     value = _call_codemap(
         args,
         lambda codemap: codemap.verification_ownership_graph(
@@ -290,7 +345,7 @@ def _map_verification_ownership(args: Any) -> int:
     return 0
 
 
-def _map_repository_ownership(args: Any) -> int:
+def _map_repository_ownership(args: Namespace) -> int:
     value = _call_codemap(
         args, lambda codemap: codemap.repository_ownership_graph(args.path or None)
     )
@@ -298,7 +353,7 @@ def _map_repository_ownership(args: Any) -> int:
     return 0
 
 
-def _map_cache_ownership(args: Any) -> int:
+def _map_cache_ownership(args: Namespace) -> int:
     value = _call_codemap(
         args, lambda codemap: codemap.cache_ownership_findings(args.path or None)
     )
@@ -306,7 +361,7 @@ def _map_cache_ownership(args: Any) -> int:
     return 0
 
 
-def _map_cache_invalidation_ownership(args: Any) -> int:
+def _map_cache_invalidation_ownership(args: Namespace) -> int:
     value = _call_codemap(
         args,
         lambda codemap: codemap.cache_invalidation_ownership_graph(args.path or None),
@@ -315,7 +370,7 @@ def _map_cache_invalidation_ownership(args: Any) -> int:
     return 0
 
 
-def _map_clean(args: Any) -> int:
+def _map_clean(args: Namespace) -> int:
     value = _call_codemap(
         args, lambda codemap: codemap.clean(shared_artifacts=args.shared_artifacts)
     )
@@ -323,8 +378,8 @@ def _map_clean(args: Any) -> int:
     return 0
 
 
-def _map_watch(args: Any) -> int:
-    def on_update(result: object, paths: list[str]) -> None:
+def _map_watch(args: Namespace) -> int:
+    def on_update(result: SyncResult, paths: list[str]) -> None:
         _print(
             {
                 "event": "codemap_update",
@@ -339,13 +394,13 @@ def _map_watch(args: Any) -> int:
     return 0
 
 
-def _map_status(args: Any) -> int:
+def _map_status(args: Namespace) -> int:
     value = _call_codemap(args, lambda codemap: codemap.status())
     _print(value)
     return 0
 
 
-def _map_enrich(args: Any) -> int:
+def _map_enrich(args: Namespace) -> int:
     value = _call_codemap(
         args, lambda codemap: codemap.enrich_projects(args.provider or None)
     )
@@ -353,13 +408,13 @@ def _map_enrich(args: Any) -> int:
     return 0
 
 
-def _map_projects(args: Any) -> int:
+def _map_projects(args: Namespace) -> int:
     value = _call_codemap(args, lambda codemap: codemap.projects())
     _print_operation("projects", value)
     return 0
 
 
-def _map_import_scip(args: Any) -> int:
+def _map_import_scip(args: Namespace) -> int:
     provenance = (
         _read_json_object(args.provenance, option="--provenance")
         if args.provenance
@@ -374,19 +429,19 @@ def _map_import_scip(args: Any) -> int:
     return 0
 
 
-def _map_orient(args: Any) -> int:
+def _map_orient(args: Namespace) -> int:
     value = _call_codemap(args, lambda codemap: codemap.orient())
     _print_operation("repository_context", value)
     return 0
 
 
-def _outline(args: Any) -> int:
+def _outline(args: Namespace) -> int:
     value = _call_codemap(args, lambda codemap: codemap.outline(args.path))
     _print_operation("outline", value)
     return 0
 
 
-def _find_code(args: Any) -> int:
+def _find_code(args: Namespace) -> int:
     value = _call_codemap(
         args,
         lambda codemap: codemap.find_packet(args.query, limit=args.limit),
@@ -395,7 +450,7 @@ def _find_code(args: Any) -> int:
     return 0
 
 
-def _grep_code(args: Any) -> int:
+def _grep_code(args: Namespace) -> int:
     value = _call_codemap(
         args,
         lambda codemap: codemap.grep(
@@ -406,7 +461,7 @@ def _grep_code(args: Any) -> int:
     return 0
 
 
-def _structural_code(args: Any) -> int:
+def _structural_code(args: Namespace) -> int:
     value = _call_codemap(
         args,
         lambda codemap: codemap.structural(
@@ -417,13 +472,13 @@ def _structural_code(args: Any) -> int:
     return 0
 
 
-def _symbol_code(args: Any) -> int:
+def _symbol_code(args: Namespace) -> int:
     value = _call_codemap(args, lambda codemap: codemap.symbol(args.query))
     _print_operation("symbol", value)
     return 0
 
 
-def _source_code(args: Any) -> int:
+def _source_code(args: Namespace) -> int:
     value = _call_codemap(
         args, lambda codemap: codemap.source(args.query, token_budget=args.budget)
     )
@@ -431,19 +486,19 @@ def _source_code(args: Any) -> int:
     return 0
 
 
-def _deps_code(args: Any) -> int:
+def _deps_code(args: Namespace) -> int:
     value = _call_codemap(args, lambda codemap: codemap.deps(args.query))
     _print(value)
     return 0
 
 
-def _refs_code(args: Any) -> int:
+def _refs_code(args: Namespace) -> int:
     value = _call_codemap(args, lambda codemap: codemap.refs(args.query))
     _print(value)
     return 0
 
 
-def _affected_code(args: Any) -> int:
+def _affected_code(args: Namespace) -> int:
     value = _call_codemap(
         args, lambda codemap: codemap.affected(args.query, max_depth=args.max_depth)
     )
@@ -451,7 +506,7 @@ def _affected_code(args: Any) -> int:
     return 0
 
 
-def _tests_code(args: Any) -> int:
+def _tests_code(args: Namespace) -> int:
     value = _call_codemap(
         args, lambda codemap: codemap.tests(args.query, max_depth=args.max_depth)
     )
@@ -459,7 +514,7 @@ def _tests_code(args: Any) -> int:
     return 0
 
 
-def _structural_locality_code(args: Any) -> int:
+def _structural_locality_code(args: Namespace) -> int:
     supplied = _supplied_relationship_observations(args)
     value = _call_codemap(
         args,
@@ -481,7 +536,7 @@ def _structural_locality_code(args: Any) -> int:
     return 0
 
 
-def _structural_locality_delta_code(args: Any) -> int:
+def _structural_locality_delta_code(args: Namespace) -> int:
     from .codemap import structural_locality_delta
 
     before = _read_json_object(args.before, option="--before")
@@ -501,7 +556,7 @@ def _structural_locality_delta_code(args: Any) -> int:
     return 0
 
 
-def _context_code(args: Any) -> int:
+def _context_code(args: Namespace) -> int:
     value = _call_codemap(
         args,
         lambda codemap: codemap.context(
@@ -515,7 +570,7 @@ def _context_code(args: Any) -> int:
     return 0
 
 
-def _task_evidence_code(args: Any) -> int:
+def _task_evidence_code(args: Namespace) -> int:
     supplied = _supplied_relationship_observations(args)
     value = _call_codemap(
         args,
@@ -534,7 +589,9 @@ def _task_evidence_code(args: Any) -> int:
     return 0
 
 
-def _supplied_relationship_observations(args: object) -> list[dict[str, object]] | None:
+def _supplied_relationship_observations(
+    args: Namespace,
+) -> list[dict[str, object]] | None:
     if not args.supplied_observations:
         return None
     value = _read_json_object(
@@ -547,7 +604,7 @@ def _supplied_relationship_observations(args: object) -> list[dict[str, object]]
     return value["observations"]
 
 
-def _verification_relevance_code(args: Any) -> int:
+def _verification_relevance_code(args: Namespace) -> int:
     value = _call_codemap(
         args,
         lambda codemap: codemap.verification_relevance(
@@ -573,7 +630,7 @@ def _changed_line_span_args(values: list[str] | None) -> list[dict[str, object]]
     return rows
 
 
-def _change_impact_code(args: Any) -> int:
+def _change_impact_code(args: Namespace) -> int:
     value = _call_codemap(
         args,
         lambda codemap: codemap.task_change_impact(
@@ -594,7 +651,7 @@ def _change_impact_code(args: Any) -> int:
     return 0
 
 
-def _post_change_code(args: Any) -> int:
+def _post_change_code(args: Namespace) -> int:
     previous = _read_json_object(args.previous_evidence, option="--previous-evidence")
     value = _call_codemap(
         args,
@@ -611,10 +668,10 @@ def _post_change_code(args: Any) -> int:
     return 0
 
 
-def _source_observation_code(args: Any) -> int:
+def _source_observation_code(args: Namespace) -> int:
     requested = validated_source_lines(args.line or ())
 
-    def observe(codemap: object) -> object:
+    def observe(codemap: CodeMap) -> object:
         codemap.sync([args.path])
         return codemap.source_observation(
             args.path,
@@ -629,7 +686,7 @@ def _source_observation_code(args: Any) -> int:
     return 0
 
 
-def _add_evidence_presentation_cli(parser: argparse.ArgumentParser) -> None:
+def _add_evidence_presentation_cli(parser: ArgumentParser) -> None:
     parser.add_argument(
         "--presentation",
         choices=FORMATS,
@@ -639,7 +696,7 @@ def _add_evidence_presentation_cli(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_source_observation_cli(
-    sub: Any, *, add_common_arguments: Callable[..., None]
+    sub: _SubParsersAction[ArgumentParser], *, add_common_arguments: Callable[..., None]
 ) -> None:
     source = sub.add_parser(
         "source-observation",
@@ -654,7 +711,9 @@ def _add_source_observation_cli(
     source.set_defaults(func=_source_observation_code, automatic_update_check=True)
 
 
-def _add_map_cli(sub: Any, *, add_common_arguments: Callable[..., None]) -> None:
+def _add_map_cli(
+    sub: _SubParsersAction[ArgumentParser], *, add_common_arguments: Callable[..., None]
+) -> None:
     map_cmd = sub.add_parser("map", help="derived repository CodeMap")
     add_common_arguments(map_cmd, inherited=True)
     map_sub = map_cmd.add_subparsers(dest="map_command", required=True)
@@ -674,7 +733,9 @@ def _add_map_cli(sub: Any, *, add_common_arguments: Callable[..., None]) -> None
 
 
 def _add_map_ownership_cli(
-    map_sub: Any, *, add_common_arguments: Callable[..., None]
+    map_sub: _SubParsersAction[ArgumentParser],
+    *,
+    add_common_arguments: Callable[..., None],
 ) -> None:
     map_findings = map_sub.add_parser(
         "findings",
@@ -766,7 +827,9 @@ def _add_map_ownership_cli(
 
 
 def _add_map_enrichment_cli(
-    map_sub: Any, *, add_common_arguments: Callable[..., None]
+    map_sub: _SubParsersAction[ArgumentParser],
+    *,
+    add_common_arguments: Callable[..., None],
 ) -> None:
     map_enrich = map_sub.add_parser(
         "enrich", help="collect slower/native package graph evidence explicitly"
@@ -823,7 +886,9 @@ def _add_map_enrichment_cli(
     map_watch.set_defaults(func=_map_watch, automatic_update_check=True)
 
 
-def _add_navigation_cli(sub: Any, *, add_common_arguments: Callable[..., None]) -> None:
+def _add_navigation_cli(
+    sub: _SubParsersAction[ArgumentParser], *, add_common_arguments: Callable[..., None]
+) -> None:
     orient = sub.add_parser("orient", help="compact repository capsule")
     add_common_arguments(orient, inherited=True)
     orient.set_defaults(func=_map_orient, automatic_update_check=True)
@@ -853,7 +918,9 @@ def _add_navigation_cli(sub: Any, *, add_common_arguments: Callable[..., None]) 
     grep_code.set_defaults(func=_grep_code, automatic_update_check=True)
 
 
-def _add_graph_cli(sub: Any, *, add_common_arguments: Callable[..., None]) -> None:
+def _add_graph_cli(
+    sub: _SubParsersAction[ArgumentParser], *, add_common_arguments: Callable[..., None]
+) -> None:
     structural_code = sub.add_parser(
         "structural", help="optional syntax-aware search via local ast-grep"
     )
@@ -901,7 +968,7 @@ def _add_graph_cli(sub: Any, *, add_common_arguments: Callable[..., None]) -> No
 
 
 def _add_structural_locality_cli(
-    sub: Any, *, add_common_arguments: Callable[..., None]
+    sub: _SubParsersAction[ArgumentParser], *, add_common_arguments: Callable[..., None]
 ) -> None:
     locality = sub.add_parser(
         "structural-locality",
@@ -937,7 +1004,9 @@ def _add_structural_locality_cli(
     )
 
 
-def _add_context_cli(sub: Any, *, add_common_arguments: Callable[..., None]) -> None:
+def _add_context_cli(
+    sub: _SubParsersAction[ArgumentParser], *, add_common_arguments: Callable[..., None]
+) -> None:
     context_code = sub.add_parser(
         "context", help="build a token-budgeted repository context pack"
     )
@@ -963,7 +1032,7 @@ def _add_context_cli(sub: Any, *, add_common_arguments: Callable[..., None]) -> 
 
 
 def _add_task_evidence_cli(
-    sub: Any, *, add_common_arguments: Callable[..., None]
+    sub: _SubParsersAction[ArgumentParser], *, add_common_arguments: Callable[..., None]
 ) -> None:
     task_evidence = sub.add_parser(
         "task-evidence",
@@ -1011,7 +1080,9 @@ def _add_task_evidence_cli(
     )
 
 
-def _add_change_cli(sub: Any, *, add_common_arguments: Callable[..., None]) -> None:
+def _add_change_cli(
+    sub: _SubParsersAction[ArgumentParser], *, add_common_arguments: Callable[..., None]
+) -> None:
     change_impact = sub.add_parser(
         "change-impact",
         help="expose bounded changed-code impact and verification relevance",
@@ -1091,7 +1162,9 @@ def _add_change_cli(sub: Any, *, add_common_arguments: Callable[..., None]) -> N
     post_change.set_defaults(func=_post_change_code, automatic_update_check=True)
 
 
-def add_repository_cli(sub: Any, *, add_common_arguments: Callable[..., None]) -> None:
+def add_repository_cli(
+    sub: _SubParsersAction[ArgumentParser], *, add_common_arguments: Callable[..., None]
+) -> None:
     """Register repository-intelligence CLI families without owning top-level CLI policy."""
     _add_map_cli(sub, add_common_arguments=add_common_arguments)
     _add_navigation_cli(sub, add_common_arguments=add_common_arguments)
@@ -1120,9 +1193,14 @@ def add_repository_cli(sub: Any, *, add_common_arguments: Callable[..., None]) -
 
 
 def _add_json_observation_cli(
-    sub: Any, *, add_common_arguments: Callable[..., None]
+    sub: _SubParsersAction[ArgumentParser], *, add_common_arguments: Callable[..., None]
 ) -> None:
     for name, handler, description in (
+        (
+            "correlate-evidence",
+            _correlate_evidence_code,
+            "correlate caller-supplied evidence with repository sources",
+        ),
         (
             "dependency-codemap",
             _dependency_codemap_code,

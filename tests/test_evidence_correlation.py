@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, cast
 
 import pytest
+from contract_assertions import assert_array, assert_object, assert_records
 
 from hashmarks import CodeMap
 from hashmarks.codemap import (
@@ -18,7 +20,7 @@ if TYPE_CHECKING:
 
 
 def _bundle(
-    *anchors: dict[str, object], completeness: str = "complete"
+    *anchors: Mapping[str, object], completeness: str = "complete"
 ) -> list[dict[str, object]]:
     return [
         {
@@ -34,10 +36,10 @@ def _bundle(
 
 def _binding(
     packet: dict[str, object],
-    anchor: dict[str, object],
+    anchor: object,
 ) -> dict[str, object]:
-    binding_id = anchor["repository_evidence_binding_id"]
-    rows = packet["repository_evidence"]["bindings"]
+    binding_id = assert_object(anchor)["repository_evidence_binding_id"]
+    rows = assert_records(assert_object(packet["repository_evidence"])["bindings"])
     return next(row for row in rows if row["binding_id"] == binding_id)
 
 
@@ -53,7 +55,7 @@ def _resign_correlation(codemap: CodeMap, packet: dict[str, object]) -> None:
 
 
 def test_evidence_request_budget_owner_matches_total_limits() -> None:
-    small_bundle = {
+    small_bundle: dict[str, object] = {
         "bundle_id": "small",
         "producer": {"kind": "test"},
         "provenance": {},
@@ -79,7 +81,7 @@ def test_evidence_request_budget_owner_matches_total_limits() -> None:
     ]
     assert not evidence_request_budget_fits([metadata_heavy])
 
-    request_heavy = dict(small_bundle)
+    request_heavy = assert_object(dict(small_bundle))
     request_heavy["anchors"] = [
         {
             "anchor_id": f"a-{index}",
@@ -177,16 +179,21 @@ def test_external_runtime_path_maps_to_repository_symbol_without_gaining_authori
             path_mappings=[{"external_prefix": "/app", "repository_prefix": ""}],
         )
 
-    anchor = packet["bundles"][0]["anchors"][0]
+    anchor = assert_object(
+        assert_array(assert_object(assert_array(packet["bundles"])[0])["anchors"])[0]
+    )
     assert packet["schema"] == "hashmarks.evidence-correlation.v2"
     assert packet["authority"] == "repository-intelligence-only"
     assert packet["interpretation_authority"] == "consumer-owned"
     assert packet["causation"] == "not-inferred"
     assert packet["storage"] == "request-scoped-not-persisted"
-    assert anchor["resolution"]["state"] == "resolved-unique"
-    assert anchor["resolution"]["repository_path"] == "src/worker.py"
-    assert anchor["resolution"]["symbol"]["qualname"] == "process_output_data"
-    assert anchor["source_equivalence"]["state"] == "unknown"
+    assert assert_object(anchor["resolution"])["state"] == "resolved-unique"
+    assert assert_object(anchor["resolution"])["repository_path"] == "src/worker.py"
+    assert (
+        assert_object(assert_object(anchor["resolution"])["symbol"])["qualname"]
+        == "process_output_data"
+    )
+    assert assert_object(anchor["source_equivalence"])["state"] == "unknown"
 
 
 def test_opaque_commit_like_metadata_never_proves_repository_source_identity(
@@ -209,8 +216,13 @@ def test_opaque_commit_like_metadata_never_proves_repository_source_identity(
             )
         )
 
-    anchor = packet["bundles"][0]["anchors"][0]
-    assert anchor["claims"]["metadata"]["commit"] == "3916110"
+    anchor = assert_object(
+        assert_array(assert_object(assert_array(packet["bundles"])[0])["anchors"])[0]
+    )
+    assert (
+        assert_object(assert_object(anchor["claims"])["metadata"])["commit"]
+        == "3916110"
+    )
     assert anchor["source_equivalence"] == {
         "state": "unknown",
         "basis": [],
@@ -225,8 +237,12 @@ def test_qualified_member_revision_proves_or_rejects_source_equivalence(
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         observed = codemap.correlate_evidence(base, include_relationships=False)
-        observed_anchor = observed["bundles"][0]["anchors"][0]
-        revision = _binding(observed, observed_anchor)["evidence"][0]["member_revision"]
+        observed_anchor = assert_array(
+            assert_object(assert_array(observed["bundles"])[0])["anchors"]
+        )[0]
+        revision = assert_object(
+            assert_array(_binding(observed, observed_anchor)["evidence"])[0]
+        )["member_revision"]
         proven = codemap.correlate_evidence(
             _bundle(
                 {
@@ -248,9 +264,24 @@ def test_qualified_member_revision_proves_or_rejects_source_equivalence(
             include_relationships=False,
         )
 
-    assert proven["bundles"][0]["anchors"][0]["source_equivalence"]["state"] == "proven"
     assert (
-        mismatch["bundles"][0]["anchors"][0]["source_equivalence"]["state"]
+        assert_object(
+            assert_object(
+                assert_array(
+                    assert_object(assert_array(proven["bundles"])[0])["anchors"]
+                )[0]
+            )["source_equivalence"]
+        )["state"]
+        == "proven"
+    )
+    assert (
+        assert_object(
+            assert_object(
+                assert_array(
+                    assert_object(assert_array(mismatch["bundles"])[0])["anchors"]
+                )[0]
+            )["source_equivalence"]
+        )["state"]
         == "mismatch"
     )
 
@@ -271,9 +302,17 @@ def test_symbol_only_evidence_preserves_repository_ambiguity(
             include_relationships=False,
         )
 
-    resolution = packet["bundles"][0]["anchors"][0]["resolution"]
+    resolution = assert_object(
+        assert_object(
+            assert_array(assert_object(assert_array(packet["bundles"])[0])["anchors"])[
+                0
+            ]
+        )["resolution"]
+    )
     assert resolution["state"] == "resolved-ambiguous"
-    assert [row["path"] for row in resolution["candidates"]] == [
+    assert [
+        assert_object(row)["path"] for row in assert_array(resolution["candidates"])
+    ] == [
         "left.py",
         "right.py",
     ]
@@ -300,7 +339,13 @@ def test_conflicting_symbol_and_line_stays_a_claim_conflict(
             include_relationships=False,
         )
 
-    resolution = packet["bundles"][0]["anchors"][0]["resolution"]
+    resolution = assert_object(
+        assert_object(
+            assert_array(assert_object(assert_array(packet["bundles"])[0])["anchors"])[
+                0
+            ]
+        )["resolution"]
+    )
     assert resolution["state"] == "claim-conflict"
     assert resolution["reason"] == "symbol-does-not-contain-claimed-line"
 
@@ -322,10 +367,15 @@ def test_missing_repository_member_does_not_become_resolved_by_mapping(
             include_relationships=False,
         )
 
-    anchor = packet["bundles"][0]["anchors"][0]
-    assert anchor["resolution"]["state"] == "unresolved"
-    assert anchor["resolution"]["repository_path"] == "src/missing.py"
-    assert _binding(packet, anchor)["evidence"][0]["state"] == "known-absent"
+    anchor = assert_object(
+        assert_array(assert_object(assert_array(packet["bundles"])[0])["anchors"])[0]
+    )
+    assert assert_object(anchor["resolution"])["state"] == "unresolved"
+    assert assert_object(anchor["resolution"])["repository_path"] == "src/missing.py"
+    assert (
+        assert_object(assert_array(_binding(packet, anchor)["evidence"])[0])["state"]
+        == "known-absent"
+    )
 
 
 def test_bundle_reordering_does_not_change_correlation_identity(
@@ -359,7 +409,9 @@ def test_bundle_reordering_does_not_change_correlation_identity(
         )
 
     assert first == second
-    assert [row["bundle_id"] for row in first["bundles"]] == ["a", "b"]
+    assert [
+        assert_object(row)["bundle_id"] for row in assert_array(first["bundles"])
+    ] == ["a", "b"]
 
 
 def test_anchor_reordering_within_bundle_does_not_change_correlation_identity(
@@ -382,11 +434,20 @@ def test_anchor_reordering_within_bundle_does_not_change_correlation_identity(
 
     assert first == second
     assert first["correlation_identity"] == second["correlation_identity"]
-    assert [anchor["anchor_id"] for anchor in first["bundles"][0]["anchors"]] == [
+    assert [
+        assert_object(anchor)["anchor_id"]
+        for anchor in assert_array(
+            assert_object(assert_array(first["bundles"])[0])["anchors"]
+        )
+    ] == [
         "a:0",
         "b:0",
     ]
-    assert first["bundles"][0]["anchors"][0]["claims"]["metadata"] == {"ordinal": 1}
+    assert assert_object(
+        assert_object(
+            assert_array(assert_object(assert_array(first["bundles"])[0])["anchors"])[0]
+        )["claims"]
+    )["metadata"] == {"ordinal": 1}
 
 
 def test_symbol_candidate_bound_preserves_ambiguity(
@@ -414,11 +475,17 @@ def test_symbol_candidate_bound_preserves_ambiguity(
             include_relationships=False,
         )
 
-    resolution = packet["bundles"][0]["anchors"][0]["resolution"]
+    resolution = assert_object(
+        assert_object(
+            assert_array(assert_object(assert_array(packet["bundles"])[0])["anchors"])[
+                0
+            ]
+        )["resolution"]
+    )
     assert resolution["state"] == "resolved-ambiguous"
     assert resolution["reason"] == "symbol-match-bound-exhausted"
     assert resolution["candidate_completeness"] == "bounded"
-    assert len(resolution["candidates"]) == 32
+    assert len(assert_array(resolution["candidates"])) == 32
 
 
 def test_absolute_external_path_requires_explicit_mapping(
@@ -438,9 +505,14 @@ def test_absolute_external_path_requires_explicit_mapping(
             include_relationships=False,
         )
 
-    anchor = packet["bundles"][0]["anchors"][0]
-    assert anchor["resolution"]["state"] == "unresolved"
-    assert anchor["resolution"]["reason"] == "external-path-mapping-required"
+    anchor = assert_object(
+        assert_array(assert_object(assert_array(packet["bundles"])[0])["anchors"])[0]
+    )
+    assert assert_object(anchor["resolution"])["state"] == "unresolved"
+    assert (
+        assert_object(anchor["resolution"])["reason"]
+        == "external-path-mapping-required"
+    )
     assert _binding(packet, anchor)["evidence"] == []
 
 
@@ -496,7 +568,10 @@ def test_bundle_completeness_is_preserved_not_inferred(
             include_relationships=False,
         )
 
-    assert packet["bundles"][0]["completeness"] == "incomplete"
+    assert (
+        assert_object(assert_array(packet["bundles"])[0])["completeness"]
+        == "incomplete"
+    )
     assert packet["completeness"] == {
         "state": "incomplete",
         "scope": "caller-declared-external-observations",
@@ -534,9 +609,14 @@ def test_truncated_external_bundle_cannot_authorize_negative_evidence(
         codemap.sync()
         packet = codemap.correlate_evidence([bundle], include_relationships=False)
 
-    assert packet["bundles"][0]["scope"] == bundle["scope"]
-    assert packet["bundles"][0]["truncation"] == "truncated"
-    assert packet["bundles"][0]["producer_authority"] == "caller-claimed"
+    assert assert_object(assert_array(packet["bundles"])[0])["scope"] == bundle["scope"]
+    assert (
+        assert_object(assert_array(packet["bundles"])[0])["truncation"] == "truncated"
+    )
+    assert (
+        assert_object(assert_array(packet["bundles"])[0])["producer_authority"]
+        == "caller-claimed"
+    )
     assert packet["completeness"] == {
         "state": "incomplete",
         "scope": "caller-declared-external-observations",
@@ -564,7 +644,7 @@ def test_complete_scoped_external_bundle_marks_negative_evidence_scope_only(
         "authority": "caller-claimed",
         "negative_evidence": "admissible-within-declared-scopes",
     }
-    assert packet["bundles"][0]["scope"] == bundle["scope"]
+    assert assert_object(assert_array(packet["bundles"])[0])["scope"] == bundle["scope"]
 
 
 def test_scope_and_truncation_change_definition_identity(
@@ -590,7 +670,7 @@ def test_scope_and_truncation_change_definition_identity(
     assert (
         first["evidence_definition_identity"] != second["evidence_definition_identity"]
     )
-    assert delta["definition"]["state"] == "changed"
+    assert assert_object(delta["definition"])["state"] == "changed"
 
 
 def test_bundle_scope_is_bounded_and_json_compatible(tmp_path: Path) -> None:
@@ -645,12 +725,23 @@ def test_uv_lock_upgrade_delta_reuses_repository_binding_authority(
             previous_correlation=before,
         )
 
-    delta = after["delta_from_previous"]
+    delta = assert_object(after["delta_from_previous"])
     assert delta["schema"] == "hashmarks.evidence-correlation-delta.v2"
-    assert delta["definition"]["state"] == "preserved"
-    changed = delta["repository_evidence_delta"]["bindings"]["changed"][0]
-    assert changed["direct_evidence"]["state"] == "changed"
-    assert changed["direct_evidence"]["changes"][0]["scope"] == "member"
+    assert assert_object(delta["definition"])["state"] == "preserved"
+    changed = assert_object(
+        assert_array(
+            assert_object(
+                assert_object(delta["repository_evidence_delta"])["bindings"]
+            )["changed"]
+        )[0]
+    )
+    assert assert_object(changed["direct_evidence"])["state"] == "changed"
+    assert (
+        assert_object(
+            assert_array(assert_object(changed["direct_evidence"])["changes"])[0]
+        )["scope"]
+        == "member"
+    )
     assert delta["causation"] == "not-inferred"
     assert delta["interpretation_authority"] == "consumer-owned"
 
@@ -829,9 +920,16 @@ def test_correlation_replay_reproves_packet_local_projections(
             _bundle({"anchor_id": "owner", "path": "owner.py"}),
             include_relationships=False,
         )
-        revision = _binding(observed, observed["bundles"][0]["anchors"][0])["evidence"][
-            0
-        ]["member_revision"]
+        revision = assert_object(
+            assert_array(
+                _binding(
+                    observed,
+                    assert_array(
+                        assert_object(assert_array(observed["bundles"])[0])["anchors"]
+                    )[0],
+                )["evidence"]
+            )[0]
+        )["member_revision"]
         packet = codemap.correlate_evidence(
             _bundle(
                 {"anchor_id": "owner", "path": "owner.py", "member_revision": revision}
@@ -1114,15 +1212,18 @@ def test_exact_module_locator_reuses_repository_module_identity(
         )
 
     anchors = {
-        anchor["anchor_id"]: anchor for anchor in packet["bundles"][0]["anchors"]
+        assert_object(anchor)["anchor_id"]: anchor
+        for anchor in assert_array(
+            assert_object(assert_array(packet["bundles"])[0])["anchors"]
+        )
     }
-    owned = anchors["owned"]
-    external = anchors["external"]
-    assert owned["resolution"]["state"] == "resolved-unique"
-    assert owned["resolution"]["repository_path"] == "src/utils/kafka.py"
-    assert owned["resolution"]["reason"] == "module-only"
-    assert external["resolution"]["state"] == "unresolved"
-    assert external["resolution"]["reason"] == "module-not-found"
+    owned = assert_object(anchors["owned"])
+    external = assert_object(anchors["external"])
+    assert assert_object(owned["resolution"])["state"] == "resolved-unique"
+    assert assert_object(owned["resolution"])["repository_path"] == "src/utils/kafka.py"
+    assert assert_object(owned["resolution"])["reason"] == "module-only"
+    assert assert_object(external["resolution"])["state"] == "unresolved"
+    assert assert_object(external["resolution"])["reason"] == "module-not-found"
 
 
 def test_module_claim_conflicting_with_exact_path_stays_conflict(
@@ -1149,7 +1250,13 @@ def test_module_claim_conflicting_with_exact_path_stays_conflict(
             include_relationships=False,
         )
 
-    resolution = packet["bundles"][0]["anchors"][0]["resolution"]
+    resolution = assert_object(
+        assert_object(
+            assert_array(assert_object(assert_array(packet["bundles"])[0])["anchors"])[
+                0
+            ]
+        )["resolution"]
+    )
     assert resolution["state"] == "claim-conflict"
     assert resolution["reason"] == "module-does-not-match-resolved-path"
 
@@ -1179,13 +1286,18 @@ def test_repeated_observations_share_one_repository_binding(
                 _bundle(*anchors),
                 include_relationships=True,
             )
-        diagnostics = codemap.decision_session_diagnostics()
+        diagnostics = assert_object(codemap.decision_session_diagnostics())
 
-    emitted = packet["bundles"][0]["anchors"]
-    assert len(packet["repository_evidence"]["bindings"]) == 1
-    assert len({row["repository_evidence_binding_id"] for row in emitted}) == 1
+    emitted = assert_array(assert_object(assert_array(packet["bundles"])[0])["anchors"])
+    assert (
+        len(assert_array(assert_object(packet["repository_evidence"])["bindings"])) == 1
+    )
+    assert (
+        len({assert_object(row)["repository_evidence_binding_id"] for row in emitted})
+        == 1
+    )
     assert all(
-        set(row["repository_evidence"])
+        set(assert_object(assert_object(row)["repository_evidence"]))
         == {
             "binding_id",
             "binding_definition_identity",
@@ -1195,7 +1307,10 @@ def test_repeated_observations_share_one_repository_binding(
     )
     encoded = json.dumps(packet, separators=(",", ":")).encode("utf-8")
     assert len(encoded) <= CORRELATION_PACKET_MAX_BYTES
-    assert diagnostics["store_reads"]["store_symbol_candidates_at_path"] == 1
+    assert (
+        assert_object(diagnostics["store_reads"])["store_symbol_candidates_at_path"]
+        == 1
+    )
 
 
 def test_core_packet_budget_fails_closed_for_dense_relationship_evidence(
@@ -1253,7 +1368,7 @@ def test_external_temporal_provenance_is_preserved_but_not_repository_freshness(
         codemap.sync()
         packet = codemap.correlate_evidence([bundle], include_relationships=False)
 
-    emitted = packet["bundles"][0]
+    emitted = assert_object(assert_array(packet["bundles"])[0])
     assert emitted["provenance"] == bundle["provenance"]
     assert emitted["provenance_authority"] == "caller-claimed"
     assert emitted["repository_freshness_authority"] == "independent"
@@ -1276,7 +1391,7 @@ def test_temporal_provenance_changes_definition_not_repository_delta(
         delta = codemap.evidence_correlation_delta(first, second)
 
     assert delta["comparability"] == "not-comparable"
-    assert delta["definition"]["state"] == "changed"
+    assert assert_object(delta["definition"])["state"] == "changed"
     assert delta["repository_evidence_delta"] is None
 
 
@@ -1293,7 +1408,7 @@ def test_same_definition_keeps_correlation_delta_comparable(tmp_path: Path) -> N
         delta = codemap.evidence_correlation_delta(before, after)
 
     assert delta["comparability"] == "comparable"
-    assert delta["definition"]["state"] == "preserved"
+    assert assert_object(delta["definition"])["state"] == "preserved"
     assert delta["repository_evidence_delta"] is not None
 
 
@@ -1345,7 +1460,13 @@ def test_path_mapping_portability_preserves_repository_identity(
             include_relationships=False,
         )
 
-    resolution = packet["bundles"][0]["anchors"][0]["resolution"]
+    resolution = assert_object(
+        assert_object(
+            assert_array(assert_object(assert_array(packet["bundles"])[0])["anchors"])[
+                0
+            ]
+        )["resolution"]
+    )
     assert resolution["state"] == "resolved-unique"
     assert resolution["repository_path"] == "src/owner.py"
     assert resolution["path_origin"] == "explicit-path-mapping"
@@ -1366,7 +1487,13 @@ def test_longest_path_mapping_prefix_wins_deterministically(tmp_path: Path) -> N
             include_relationships=False,
         )
 
-    resolution = packet["bundles"][0]["anchors"][0]["resolution"]
+    resolution = assert_object(
+        assert_object(
+            assert_array(assert_object(assert_array(packet["bundles"])[0])["anchors"])[
+                0
+            ]
+        )["resolution"]
+    )
     assert resolution["repository_path"] == "src/owner.py"
 
 
@@ -1414,12 +1541,29 @@ def test_source_equivalence_requires_independent_repository_identity(
             include_relationships=False,
         )
 
-    assert proven["bundles"][0]["anchors"][0]["source_equivalence"]["state"] == "proven"
     assert (
-        mismatch["bundles"][0]["anchors"][0]["source_equivalence"]["state"]
+        assert_object(
+            assert_object(
+                assert_array(
+                    assert_object(assert_array(proven["bundles"])[0])["anchors"]
+                )[0]
+            )["source_equivalence"]
+        )["state"]
+        == "proven"
+    )
+    assert (
+        assert_object(
+            assert_object(
+                assert_array(
+                    assert_object(assert_array(mismatch["bundles"])[0])["anchors"]
+                )[0]
+            )["source_equivalence"]
+        )["state"]
         == "mismatch"
     )
-    assert unknown["bundles"][0]["anchors"][0]["source_equivalence"] == {
+    assert assert_object(
+        assert_array(assert_object(assert_array(unknown["bundles"])[0])["anchors"])[0]
+    )["source_equivalence"] == {
         "state": "unknown",
         "basis": [],
     }
@@ -1436,14 +1580,22 @@ def test_member_revision_and_span_identity_disagreement_is_mismatch(
             _bundle({"anchor_id": "baseline", "path": "owner.py", "line": 1}),
             include_relationships=False,
         )
-        anchor = baseline["bundles"][0]["anchors"][0]
-        binding_id = anchor["repository_evidence_binding_id"]
-        binding = next(
-            row
-            for row in baseline["repository_evidence"]["bindings"]
-            if row["binding_id"] == binding_id
+        anchor = assert_object(
+            assert_array(
+                assert_object(assert_array(baseline["bundles"])[0])["anchors"]
+            )[0]
         )
-        evidence = binding["evidence"][0]
+        binding_id = anchor["repository_evidence_binding_id"]
+        binding = assert_object(
+            next(
+                row
+                for row in assert_array(
+                    assert_object(baseline["repository_evidence"])["bindings"]
+                )
+                if assert_object(row)["binding_id"] == binding_id
+            )
+        )
+        evidence = assert_object(assert_array(binding["evidence"])[0])
         packet = codemap.correlate_evidence(
             _bundle(
                 {
@@ -1457,9 +1609,17 @@ def test_member_revision_and_span_identity_disagreement_is_mismatch(
             include_relationships=False,
         )
 
-    equivalence = packet["bundles"][0]["anchors"][0]["source_equivalence"]
+    equivalence = assert_object(
+        assert_object(
+            assert_array(assert_object(assert_array(packet["bundles"])[0])["anchors"])[
+                0
+            ]
+        )["source_equivalence"]
+    )
     assert equivalence["state"] == "mismatch"
-    assert {row["kind"] for row in equivalence["basis"]} == {
+    assert {
+        assert_object(row)["kind"] for row in assert_array(equivalence["basis"])
+    } == {
         "member-revision",
         "span-identity",
     }
@@ -1477,10 +1637,12 @@ def test_source_equivalence_requires_every_supplied_identity_to_be_checked(
             _bundle({"anchor_id": "line", "path": "owner.py", "line": 1}),
             include_relationships=False,
         )
-        span_anchor = observed_span["bundles"][0]["anchors"][0]
-        span_identity = _binding(observed_span, span_anchor)["evidence"][0][
-            "span_identity"
-        ]
+        span_anchor = assert_array(
+            assert_object(assert_array(observed_span["bundles"])[0])["anchors"]
+        )[0]
+        span_identity = assert_object(
+            assert_array(_binding(observed_span, span_anchor)["evidence"])[0]
+        )["span_identity"]
         claims = (
             {
                 "anchor_id": "partial",
@@ -1512,8 +1674,10 @@ def test_source_equivalence_requires_every_supplied_identity_to_be_checked(
         )
 
     equivalences = {
-        row["anchor_id"]: row["source_equivalence"]
-        for row in packet["bundles"][0]["anchors"]
+        assert_object(row)["anchor_id"]: assert_object(row)["source_equivalence"]
+        for row in assert_array(
+            assert_object(assert_array(packet["bundles"])[0])["anchors"]
+        )
     }
     assert equivalences["partial"] == {
         "state": "unknown",
@@ -1568,12 +1732,12 @@ def test_producer_neutral_evidence_uses_same_repository_correlation_owner(
         codemap.sync()
         packet = codemap.correlate_evidence([bundle], include_relationships=False)
 
-    emitted = packet["bundles"][0]
-    anchor = emitted["anchors"][0]
+    emitted = assert_object(assert_array(packet["bundles"])[0])
+    anchor = assert_object(assert_array(emitted["anchors"])[0])
     assert emitted["producer"] == {"kind": producer_kind}
     assert emitted["producer_authority"] == "caller-claimed"
-    assert anchor["resolution"]["state"] == "resolved-unique"
-    assert anchor["resolution"]["repository_path"] == "owner.py"
+    assert assert_object(anchor["resolution"])["state"] == "resolved-unique"
+    assert assert_object(anchor["resolution"])["repository_path"] == "owner.py"
     assert packet["causation"] == "not-inferred"
     assert packet["interpretation_authority"] == "consumer-owned"
 
@@ -1595,7 +1759,15 @@ def test_evidence_payload_is_not_operational_telemetry(tmp_path: Path) -> None:
         )
 
     assert (
-        packet["bundles"][0]["anchors"][0]["claims"]["metadata"]["message"]
+        assert_object(
+            assert_object(
+                assert_object(
+                    assert_array(
+                        assert_object(assert_array(packet["bundles"])[0])["anchors"]
+                    )[0]
+                )["claims"]
+            )["metadata"]
+        )["message"]
         == secret_marker
     )
     assert packet["storage"] == "request-scoped-not-persisted"
@@ -1692,8 +1864,13 @@ def test_final_correlation_scale_matrix_is_bounded_and_deterministic(
             include_relationships=False,
         )
 
-    assert len(first["bundles"][0]["anchors"]) == anchor_count
-    assert len(first["repository_evidence"]["bindings"]) == 1
+    assert (
+        len(assert_array(assert_object(assert_array(first["bundles"])[0])["anchors"]))
+        == anchor_count
+    )
+    assert (
+        len(assert_array(assert_object(first["repository_evidence"])["bindings"])) == 1
+    )
     assert first["correlation_identity"] == replay["correlation_identity"]
     assert len(json.dumps(first, separators=(",", ":")).encode("utf-8")) <= 1_048_576
 
@@ -1781,8 +1958,12 @@ def test_external_evidence_conflict_is_retained_without_mutating_owner(
         )
         after = codemap.task_action_map("Fix first")
 
-    anchor = correlated["bundles"][0]["anchors"][0]
-    assert anchor["resolution"]["state"] == "claim-conflict"
+    anchor = assert_object(
+        assert_array(assert_object(assert_array(correlated["bundles"])[0])["anchors"])[
+            0
+        ]
+    )
+    assert assert_object(anchor["resolution"])["state"] == "claim-conflict"
     assert before["ownership_authority"] == after["ownership_authority"]
 
 
@@ -1898,5 +2079,7 @@ def test_incomplete_correlation_never_admits_negative_evidence(tmp_path: Path) -
             include_relationships=False,
         )
 
-    assert packet["completeness"]["state"] == "incomplete"
-    assert packet["completeness"]["negative_evidence"] == "not-admissible"
+    assert assert_object(packet["completeness"])["state"] == "incomplete"
+    assert (
+        assert_object(packet["completeness"])["negative_evidence"] == "not-admissible"
+    )

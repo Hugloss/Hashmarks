@@ -378,13 +378,19 @@ def decode_initial_collection(
 
 def _encode_class_declarations(rows: list[dict[str, Any]]) -> None:
     for row in rows:
-        declarations = row.get("class_declarations")
-        if isinstance(declarations, dict):
-            _encode_rows(
-                declarations,
-                "declarations",
-                ["path", "symbol", "start_line", "end_line"],
-            )
+        for family in (
+            "class_declarations",
+            "same_name_declarations",
+            "direct_call_declarations",
+        ):
+            declarations = row.get(family)
+            if isinstance(declarations, dict):
+                _encode_rows(
+                    declarations,
+                    "declarations",
+                    ["path", "symbol", "start_line", "end_line"]
+                    + (["call_line"] if family == "direct_call_declarations" else []),
+                )
 
 
 def _project_verification(
@@ -441,7 +447,7 @@ def initial_task_evidence(packet: Mapping[str, Any]) -> InitialTaskEvidenceProje
         omissions["sections"].append("/ownership/source_evidence/content")
     retrieval = result["retrieval"]
     rows = retrieval["results"]
-    # Preserve the canonical first three and already admitted declaration
+    # Preserve the first three retrieval rows and already admitted declaration
     # supplements. No authority or retrieval decision is made by this profile.
     retained = rows[:3] + [row for row in rows[3:] if row.get("supplement")][:2]
     owner = ownership.get("owner")

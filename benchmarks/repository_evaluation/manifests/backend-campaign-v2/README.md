@@ -22,8 +22,13 @@ problems across Fastify, Hono and NestJS. See
 [the language source review](suites/language/README.md). Declaration-only
 TypeScript contracts are distinguished from runtime implementations.
 
-The campaign declares 73 entries representing 57 distinct upstream problems
-across six suites. Reuse adds no distinct problem. Semantic review, executable
+`backend-debug-v2` adds four runtime failure/diagnostic workflows in SQLAlchemy,
+including two problems already in the core suite. See
+[the debugging source review](suites/debug/README.md). Its partial population
+does not satisfy capability-4 breadth.
+
+The campaign declares 77 entries representing 59 distinct upstream problems
+across seven suites. Reuse adds no distinct problem. Semantic review, executable
 witness membership and observed results still govern qualification.
 
 The model grader now separates `task_source_labels` from native `source_labels`.

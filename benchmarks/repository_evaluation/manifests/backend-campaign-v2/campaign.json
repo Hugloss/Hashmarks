@@ -144,6 +144,18 @@
         "nest-param-promise",
         "nest-redirect-result"
       ]
+    },
+    {
+      "grader_sha256": "99bc23fd8fb9cb6bc651771387395fe580b55faa379f7475d2936ce012a25cf5",
+      "id": "backend-debug-v2",
+      "suite_file": "suites/debug/suite.json",
+      "suite_sha256": "20514dee46005e0cb3ca64862f01ae528bab6263a80f815ca954fd86a1c5bb31",
+      "workflow_ids": [
+        "sqlalchemy-logging-token-reset",
+        "sqlalchemy-aggregate-strings",
+        "sqlalchemy-custom-metadata-warning",
+        "sqlalchemy-forwardref-diagnostic"
+      ]
     }
   ]
 }

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import json
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from hashmarks.digest import FILE_DOMAIN, hash_file
 
@@ -20,6 +20,65 @@ from .backend_grading import (
     grade_fact_observation,
     validate_transport_capture,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+
+@dataclass(frozen=True)
+class CapturedFactObservation:
+    context: FactObservation
+    response: dict[str, object]
+    packet: dict[str, object]
+
+
+def _capture_object(value: object) -> dict[str, object]:
+    if not isinstance(value, dict):
+        raise ValueError("backend captured observation must be a JSON object")
+    return value
+
+
+def _capture_rows(value: object, surface: str) -> list[tuple[str, dict[str, object]]]:
+    if surface == "api":
+        return [("none", _capture_object(value))]
+    if not isinstance(value, list):
+        raise ValueError("backend transport artifact must contain a capture array")
+    rows = []
+    for raw in value:
+        capture = _capture_object(raw)
+        validate_transport_capture(capture)
+        if capture["transport"] != surface:
+            raise ValueError("backend capture transport differs from artifact surface")
+        format = capture.get("format")
+        if not isinstance(format, str):
+            raise ValueError("backend capture requires an explicit presentation format")
+        rows.append((format, _capture_object(capture.get("response"))))
+    return rows
+
+
+def captured_fact_observations(
+    output: Path, family: str, context: FactObservation
+) -> Iterator[CapturedFactObservation]:
+    """Decode one retained byte snapshot per surface, keeping its exact context."""
+    for surface in ("api", "cli", "mcp"):
+        relative = (family + "/" if family else "") + surface + ".json"
+        contents = confined_file(output, relative).read_bytes()
+        formats = set()
+        for format, response in _capture_rows(json.loads(contents), surface):
+            if format in formats:
+                raise ValueError("backend transport contains duplicate formats")
+            formats.add(format)
+            captured_context = replace(
+                context,
+                surface=surface,
+                format=format,
+                artifact=(context.stage + "/" + relative, contents),
+            )
+            yield CapturedFactObservation(
+                captured_context,
+                response,
+                _capture_object(response.get("result", response)),
+            )
 
 
 def api_fact_witnesses(
@@ -220,44 +279,33 @@ def captured_fact_witnesses(
     context: FactObservation,
 ) -> list[dict[str, Any]]:
     witnesses = []
-    for surface in ("api", "cli", "mcp"):
-        relative = (family + "/" if family else "") + surface + ".json"
-        contents = confined_file(output, relative).read_bytes()
-        decoded = json.loads(contents)
-        captures = (
-            [("none", decoded)]
-            if surface == "api"
-            else [(row["format"], row) for row in decoded]
+    for observation in captured_fact_observations(output, family, context):
+        captured_context = observation.context
+        witnesses.extend(
+            grade_fact_observation(observation.packet, rule, captured_context)[
+                "witnesses"
+            ]
         )
-        for format, captured in captures:
-            response = captured
-            if surface != "api":
-                validate_transport_capture(captured)
-                response = captured["response"]
-            packet = response.get("result", response)
-            captured_context = replace(
-                context,
-                surface=surface,
-                format=format,
-                artifact=(context.stage + "/" + relative, contents),
+        display = rule.get("display_checks", {}).get(captured_context.format)
+        if (
+            captured_context.surface != "api"
+            and captured_context.format != "none"
+            and display
+        ):
+            display_context = replace(
+                captured_context,
+                gate=context.gate.removesuffix("_facts") + "_presentation",
+                oracle_pointer=context.oracle_pointer.removesuffix("/checks")
+                + "/display_checks/"
+                + captured_context.format,
             )
             witnesses.extend(
-                grade_fact_observation(packet, rule, captured_context)["witnesses"]
+                grade_fact_observation(
+                    _capture_object(observation.response["presentation"]),
+                    {"checks": display},
+                    display_context,
+                )["witnesses"]
             )
-            display = rule.get("display_checks", {}).get(format)
-            if surface != "api" and format != "none" and display:
-                display_context = replace(
-                    captured_context,
-                    gate=context.gate.removesuffix("_facts") + "_presentation",
-                    oracle_pointer=context.oracle_pointer.removesuffix("/checks")
-                    + "/display_checks/"
-                    + format,
-                )
-                witnesses.extend(
-                    grade_fact_observation(
-                        response["presentation"], {"checks": display}, display_context
-                    )["witnesses"]
-                )
     return witnesses
 
 

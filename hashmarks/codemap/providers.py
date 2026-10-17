@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, replace
 from importlib import metadata
 from typing import TYPE_CHECKING, Literal, Protocol
@@ -147,10 +148,12 @@ class TreeSitterRangeProvider:
         *,
         version: str | None = None,
         detail: str | None = None,
+        binding_version: str | None = None,
     ) -> None:
         self._parser_factory = parser_factory
         self.version = version
         self.detail = detail
+        self._binding_version = binding_version
         self._parsers: dict[str, StructuralParser] = {}
 
     @classmethod
@@ -164,9 +167,15 @@ class TreeSitterRangeProvider:
             )
         try:
             version = metadata.version("tree-sitter-language-pack")
+            binding_version = metadata.version("tree-sitter")
         except metadata.PackageNotFoundError:
-            version = "unknown"
-        return cls(get_parser, version=version)
+            return cls(None, detail="native parser version metadata unavailable")
+        return cls(
+            get_parser,
+            version=version,
+            binding_version=binding_version,
+            detail=f"tree-sitter binding {binding_version}",
+        )
 
     @property
     def available(self) -> bool:
@@ -186,7 +195,12 @@ class TreeSitterRangeProvider:
     def signature(self, language: str) -> str | None:
         if not self.supports(language):
             return None
-        return f"{TREE_SITTER_RANGE_SCHEMA}:{self.version or 'unknown'}:{self._LANGUAGE_NAMES[language]}"
+        version = self.version or "unknown"
+        if self._binding_version is not None:
+            version = json.dumps(
+                [version, self._binding_version], separators=(",", ":")
+            )
+        return f"{TREE_SITTER_RANGE_SCHEMA}:{version}:{self._LANGUAGE_NAMES[language]}"
 
     def _parser(self, language: str) -> StructuralParser:
         name = self._LANGUAGE_NAMES[language]

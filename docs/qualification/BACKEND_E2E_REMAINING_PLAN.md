@@ -11,7 +11,9 @@ capability tags from the original campaign. The messaging intake extends this
 to 49 entries and 40 distinct upstream problems. Transaction/persistence intake
 extends it to 61 entries and 51 distinct problems across five suites. Language
 intake adds twelve entries, six new upstream problems and three new repositories:
-the current campaign has 73 entries and 57 distinct problems across six suites.
+the language checkpoint had 73 entries and 57 distinct problems across six suites.
+Debugging intake adds four entries, including two new upstream problems. The
+current campaign has 77 entries and 59 distinct problems across seven suites.
 Its language catalog has six Python and six TypeScript cases over twenty-four
 source trees. Copying a suite or reusing a problem adds no distinct evidence.
 The original campaign remains historical. The active schemas remain workflow
@@ -19,6 +21,271 @@ v2, campaign v4 and matrix v5. Additional capability membership is admitted only
 after source review and executable witness proof.
 
 ## Completion contract
+
+### Latest implementation checkpoint: 2026-10-17, base `1280456`
+
+No capability is complete at 5/5. Corpus breadth is still 77 entries / 59 distinct
+problems / seven suites. Eight entire catalogs remain missing: 2, 8, 9, 11, 15,
+16, 18 and 20. Debugging still has only four problems in one repository. Every
+review flag remains false; no population or oracle was relaxed.
+
+The current repair batch closes three reproduced generic gaps:
+
+1. Diagnostic words were indexed but their containing callable was missed when
+   its declaration name did not match the task. `store_queries.py` now joins
+   bounded adjacent query-token conjunctions to the closest indexed callable
+   after its declaration line. `task_evidence_retrieval.py` admits at most one
+   such source-position hint within the existing two-supplement budget. Explicit
+   locators, visibility, freshness, ownership and verifier selection are preserved.
+   The dense natural-language localization regressions remain unchanged.
+2. Verification examined only the first 64 declarations in a candidate test file.
+   `evidence_verification.py` now reuses the existing complete per-file session
+   symbol reader for the selected path set before bounding the reply. A relevant
+   late test is found; an equally matching late declaration preserves ambiguity.
+3. The annotation method's new helper was hidden after retrieving the method.
+   `direct_call_declarations` reuses the structural-locality resolver for up to
+   four qualified same-file targets from 64 direct calls. Nested callable calls,
+   shadowed names and transitive targets are excluded. Spans, call positions,
+   revisions, generations and omitted/unqualified counts remain visible. Runtime
+   invocation, unique ownership and repository-negative evidence remain unknown.
+
+Two subsequent repairs are also implemented:
+
+- Compact declaration tables derive their source scope from the finding's exact
+  pointer plus the family key. `compact-scope-preservation-01.json` reconstructs
+  the entire former response from the new response and confirms native-packet
+  equality, unchanged noncompact formats, and exact source-scope preservation.
+  On the same retained metadata API packet, compact size falls from 4,062 to
+  3,995 estimated tokens. This is a same-packet measurement, not transport proof.
+  No alternate opaque encoding or token-budget increase was introduced.
+- Source-candidate verifier disclosure considers existing task words in the test
+  directory before whole-module declaration-name overlap. It changes disclosure
+  only. A neutral reproduction with twelve broad competing test files now keeps
+  the specific test visible. Ambiguous owners stay unresolved; an unrelated
+  directory match gains no direct or indirect relationship. The unchanged
+  selected verifier and owner are checked in both result profiles.
+  `test-directory-regression-03.log`: 29 tests pass. `test-directory-probe-01`
+  admits all three metadata source/test facts in default and initial API output;
+  initial compact/text estimates are 3,995 / 3,793. Genuine current transport
+  qualification is still required before closing this repair.
+
+Frozen artifacts and completed proof, under
+`.hashmarks/backend-e2e/explicit-retrieval-20261016/`:
+
+| Evidence | Exact scope and result |
+| --- | --- |
+| `source-lexical-01/source.zip` | 1,125 members, SHA-256 `9bc671f4022ed8a2a8c75eac51420fa6977616fb86e9b0478ddbaa270f2e36d1`; observer `sha256:b32c447b628e040b51d5e80acfd70b1b2de81b3d5c432d95c87196e42f660587`; independent import-origin proof and 305 affected tests PASS |
+| `source-lexical-02/source.zip` | 1,125 members, SHA-256 `24ea3580838918a1e5583bacec674c4abf1c2bb59e55e4b80655d53c2d9cc814`; observer `sha256:70d500b73ad005ba9dcd9907d087b607caf792f15eb618c1d1665ef8e4752284`; independent import-origin proof and 58 affected format/source tests PASS |
+| Both artifacts | Evaluator `sha256:3c36b8cddc21d4b764b2a9d2cc0f9f53b6112348f362abb9c0a41cb693ed3ab2`; both precede the latest directory-disclosure repair and adversarial-test typing cleanup |
+| `debug-lexical-native-02` / `-03` | Fresh captures and CLI/MCP qualification: four workflows PASS, 120 + 120 + 120 + 150 = 510 witnesses for each exact artifact; not current-observer qualification after the latest repair |
+| `debug-lexical-native-01.log` | Prerequisite failure before capture: `scip` and `scip-python` missing from PATH; not a test or evidence PASS. Existing installed qualification tools were added for the later successful runs |
+| `debug-lexical-public-01` | On artifact 01, annotation passes all ten workflow gates but overall INCOMPLETE. Metadata remains FAIL for missing verification disclosure and compact size. Authority, revision and freshness remain PASS |
+| `debug-lexical-public-02/{contracts,regressions}` | Artifact 02 public qualification; inspect terminal summaries before using. Partial acquisition is never a passing batch |
+| `direct-call-oracle-projection-admission-01.json` | Exact helper identity unchanged; additional positive context location only. Both former API profiles still FAIL and ten wrong-identity controls remain FAIL. Debug grader SHA-256 is `99bc23fd8fb9cb6bc651771387395fe580b55faa379f7475d2936ce012a25cf5` |
+| `preflight-lexical-03.log` | Formatting, full Ruff, hygiene, zero complexity and production size debt PASS; source compilation also passed before artifact 02 |
+
+Typing work is separate from behavioral qualification. The repository-evidence
+binding tests now pass all 70 tests and scoped Ty/Pyright, with all 63 original
+test bodies preserved after checked-access expansion. Declaration-discovery
+authority adversarial tests now pass seven tests and scoped Ty/Pyright; their
+71 Ty diagnostics are removed. `declaration-adversarial-typing-preservation-01.json`
+proves the complete original module AST, including 46 functions, all provider
+fixtures, inputs and assertions, is identical after erasing checked narrowing.
+No `Any`, casts, ignores, exclusions or assertion/input removals were introduced.
+The newest complete Ty inventory is `full-ty-after-declaration-adversarial-01.log`:
+**2,685 diagnostics remain**. The complete Pyright counterpart reports **2,697
+errors**. Both commands remain red. Scoped checks do not close T09.
+
+Next executable batch:
+
+1. Run `make agent-preflight`, scoped Ty/Pyright and the affected source/format
+   ring. Freeze the current observer including directory disclosure, compile
+   source once, produce one deterministic source ZIP, assert independent import
+   origin, and run focused tests from that extraction. Keep earlier artifacts and
+   reports historical. Do not acquire evidence from files being edited.
+2. Using that extraction, run all four debugging workflows at both revisions
+   through API, CLI and official MCP, every required variant/format and stale
+   control. Preserve current grader, source identities, tasks, review flags and
+   the 4,000-token limit. Record exact failed witnesses; API estimates alone do
+   not close size, display or transport gates.
+3. Regenerate all four native workflows for the exact observer. Prepend the
+   existing `.hashmarks/qualification-tools/bin`,
+   `.hashmarks/qualification-tools/node_modules/.bin` and project `.venv/bin`
+   to PATH; no tool-version policy or package-specific product rule is needed.
+   Expect all 510 actual witnesses, not merely four capture-binding statuses.
+4. Aggregate only compatible current reports with the complete campaign source
+   map. Expect INCOMPLETE until independent reviews, exact witness membership and
+   corpus floors close; preserve FAIL if any hard gate or required fact fails.
+5. Admit eight further genuine debugging problems across two additional target
+   repositories, using the existing source-first intake and finite runtime QA
+   producer. Then finish the eight missing capability catalogs, independent
+   positive/adversarial/display oracles and witness families described in T07.
+6. Continue T09 typing cleanup using checked narrowing and preservation proof,
+   then T10 deterministic full-test membership, unseen heldouts, economics with
+   noise controls and final exact-artifact qualification. No 5/5 or clean-pass
+   claim is valid before all of those complete.
+
+### Historical same-name checkpoint: 2026-10-16
+
+That repair adds bounded `same_name_declarations` to a retrieved callable:
+other same-named callable declarations in that exact file, with source spans,
+revision, generation and omission accounting. It establishes no runtime identity,
+inheritance, dispatch or owner. The initial codec, contract reader and all
+presentations retain it. The first format ring caught and repaired a text omission;
+`same-name-declarations-ring-03.log` passes 54 tests. Modified owners pass scoped
+Ty/Pyright. This newer repair makes earlier observer qualification historical.
+Fresh public/native acquisition and a new artifact are required.
+
+`natural-probe-04` is an API-only after-source probe. All four frozen task facts
+now pass in default and initial profiles. The override fact is exposed in the
+new declaration context. The original exact path/symbol/span expectation and
+direct-locator check are retained, with a second positive source-fact location.
+`same-name-oracle-projection-admission-01.json` proves both old API profiles still
+FAIL under the extended oracle, and wrong symbol/path/span probes remain FAIL.
+An API projection estimate is 3,680 tokens for initial compact and 3,289 for text;
+complete real CLI/MCP responses still need qualification.
+
+The following retains the earlier checkpoint; later narrative sections retain earlier
+measurements under their original identities. No capability is claimed at 5/5.
+Eight entire catalogs remain missing: 2, 8, 9, 11, 15, 16, 18 and 20. The partial
+debug catalog has four of twelve required problems and one of three repositories.
+
+Completed observer and QA work:
+
+- Correlation has its JSON CLI surface, owned by repository CLI and delegated to
+  `CodeMap.correlate_evidence`. Real API/CLI/official MCP tests cover four formats,
+  current and deliberately invalidated revisions, ambiguity and prior packets.
+- Runtime observations are integrated into existing corpus admission, workflow
+  acquisition, artifact-bound witnesses, pure regrading and frame metrics.
+  Runtime capture execution stays in development QA. Empty successful controls
+  add no frame or negative-evidence proof. Missing transports yield incomplete
+  measurements; contradictions dominate missing information.
+- Retained capture grading now rejects a CLI response filed as MCP, duplicate
+  formats and context mismatches. Packet and projection grading share one exact
+  byte snapshot. The previous implementation could emit a passing MCP witness
+  from CLI bytes; the regression now exercises that real authority defect.
+- The debug suite has four pinned SQLAlchemy problems and eight source trees:
+  logging-token reset, aggregate strings, custom metadata warning and Python
+  3.14 forward-reference diagnostics. All forty frame units remain accounted for;
+  thirty-nine have independent exact source declarations and the comprehension
+  remains unsupported. This source admission is not measured correspondence.
+- All four problems now have fresh captures from the checked-in finite producer,
+  including Python executable, producer, observer and evaluator identities. The
+  producer retains the complete displayed ordinary cause/context chain and
+  restores its temporary module registration on success and failure. The Python
+  3.14 sample is compiled without inherited future-annotation flags. After the
+  forward-reference fix, MappedAnnotationError is intentional; that invocation
+  still raises. The former one-off captures remain historical.
+- Source-only aggregate-strings review added the new StrSQLCompiler override and
+  the actual string-rendering regression to executable task oracles. The base
+  signature change, DefaultDialect guard and actual innermost failure frame
+  remain separate facts. Native nominations were not silently expanded.
+- Natural-language retrieval now admits bounded derived-word lookup alternatives
+  and declared scope/signature context. Multiword disclosure hints can appear
+  early, while explicit locators retain precedence. Canonical omission counts,
+  ambiguity, selected edit and selected verifier authority remain independent.
+  No framework names or oracle hints participate in retrieval.
+
+Measured evidence under
+`.hashmarks/backend-e2e/explicit-retrieval-20261016/`:
+
+- `runtime-natural-regression-01.log`: 197 passing tests cover the current
+  retrieval/action/freshness and runtime/CLI/MCP integration. The earlier
+  `runtime-integrated-regression-02.log` records 199 passing tests for runtime workflow,
+  source/adversarial admission, byte integrity, pure regrading and existing
+  backend/native qualification. A previous run retained an implementation-drift
+  failure after a QA edit during acquisition; the stable rerun passed.
+- `debug-public-01`: the earlier two-case public run is FAIL. Logging-token reset
+  passes its recorded gates; aggregate strings misses essential task source and
+  owner evidence. Runtime correlation itself passes across API/CLI/MCP, including
+  all deliberately invalidated bindings. Seventeen of eighteen frames have exact
+  callable correspondence; the comprehension remains a miss.
+- `debug-native-01`: fresh native captures pass the two original cases. This
+  proves nominated producer/source/transport binding, not task sufficiency. Both
+  two-case reports have older suite/grader identities and are not current
+  four-case evidence.
+- `debug-native-02` completed four cases, but the two new cases had no frozen
+  native fact oracles and emitted zero fact witnesses. Its binding/transport
+  PASS is not fact qualification. Nine exact native target oracles were then
+  frozen from existing source labels and member bytes, without reading native
+  response facts. `debug-native-03` freshly reacquired all four cases and passes
+  510 artifact-bound source/definition/stale/CLI/MCP witnesses. Review remains
+  pending, and its observer predates the same-name disclosure repair.
+- `debug-natural-public-02` is a complete genuine before/after run of aggregate
+  strings. Authority, freshness, revision, initial size and owner top-three gates
+  pass. One frozen fact fails in both profiles and every surface: the new
+  override. Eighteen failing witnesses preserve that omission. Initial
+  compact/text responses peak at 3,620 tokens across both transports/revisions.
+  Runtime correlation passes; thirteen of fourteen frames have exact callable
+  correspondence, and the comprehension remains unsupported. The report is
+  historical after the same-name disclosure repair.
+- `natural-declaration-ring-07.log`: 33 passing retrieval/verification tests.
+  `natural-probe-03`: an API-only genuine after-source probe places the base
+  compiler method in the first three findings. Its initial API envelope is 6,813
+  bytes (about 1,704 estimated tokens). The new override is still missing. This
+  is neither full public transport proof nor a passing workflow; preserve the
+  stronger frozen oracle and repair the remaining omission.
+- `runtime-chain-ring-02.log`: 23 passing tests for actual cause/context,
+  suppressed causes, cycle accounting, source frame identity, native annotation
+  semantics, module lifetime and existing runtime witnesses.
+- `runtime-captures-02/admission.json`: four problems, eight source trees and
+  forty frame units admitted; all prior source declaration identities retained.
+  Capability/display/adversarial review flags remain false.
+- `full-ty-after-natural-01.log` and its Pyright counterpart: 2,840 Ty diagnostics
+  and 2,851 Pyright errors. Modified retrieval, runtime producer and witness
+  owners pass scoped checks. Full configured typing remains red; T09 is open.
+- `full-ty-after-chain-01.log` and its Pyright counterpart remeasure the
+  producer/chain changes: the same 2,840 Ty diagnostics and 2,851 Pyright errors.
+- `source-runtime-natural-01/source.zip` has 1,121 members and SHA-256
+  `ea68900512eca464f6c6660f662658f90b76f08a571a884b6e9dc1d804f27ee5`.
+  An independent extraction verifies import origin and both implementation
+  identities, then passes 124 selected tests. It predates the new native target
+  oracles and same-name disclosure. Its observer is
+  `sha256:12f373399c492162f1c6cdd8d18077d26fb5bc201024966137d74aba33169ddd`;
+  evaluator is `sha256:9337980982f182f448098bc8defc4b4d63887b6ca33933c6710c81b33d1471ad`.
+- `native-lsp-regression-01.log`: all 33 native LSP change regressions pass.
+- `preflight-runtime-natural-02.log` and `compile-runtime-natural-01.log`: Ruff,
+  formatting, portable hygiene, zero complexity/file-size debt and source
+  compilation pass. These do not substitute for behavioral qualification.
+
+The next debugging work is concrete:
+
+1. Qualify the same-name disclosure against the unchanged source facts and all
+   four genuine workflows. Keep the pre-repair public failure and the six
+   wrong-identity oracle controls. Reproduce a defect before making another
+   observer change; do not add repository-specific retrieval rules.
+2. Freeze source, then acquire both revisions through API/CLI/official MCP for
+   all four cases and required variants/formats. Measure complete visible initial
+   compact/text responses against 4,000 estimated tokens. API estimates and
+   historical reports do not satisfy this step.
+3. Reacquire fresh native evidence for the current observer and current four-case
+   suite. Keep nominated native source scope separate from task-fact scope. Bind
+   reports to current suite, grader, observer, evaluator, captures and source.
+4. Admit four genuine debugging problems each in databases and Litestar. Freeze
+   all source/frame oracles before observing Hashmarks. If a pool is unsupported,
+   record the shortage and explicitly admit another repository instead.
+5. Complete independent semantic/display/adversarial review and exact required
+   witness membership. Count stage-qualified frames once. Transport copies,
+   successful controls and repeated runs add no corpus breadth.
+6. Continue T03–T10. Complete the eight missing catalogs, witness families, full
+   typing, deterministic regression membership, heldouts, economics and artifact
+   qualification before any final clean or 5/5 claim.
+
+Preserve these intake distinctions:
+
+- Natural lookup spends two supplement slots on StrCompileDialect and the base
+  compiler method. Same-name disclosure now carries the other exact declaration
+  as bounded source context. That source observation does not prove dispatch or
+  inheritance. Do not convert lexical alternatives into unique edit authority.
+- A proposed databases deferred-constraint commit failure was rejected before
+  execution: its transaction reset occurs after successful commit/connection
+  exit, so a failing commit never reaches the fix in either revision. See
+  `runtime-intake/debug-intake-rejected-leads-01.json`. Existing transaction syntax
+  evidence remains valid; it does not prove a debugging failure.
+- Cancellation specimens need an explicitly supported capture contract.
+  `asyncio.CancelledError` is outside `Exception`; an uncaptured cancellation must
+  never become a successful empty control. Add a finite QA specimen and a
+  decisive producer test before admitting it.
 
 Every one of the twenty rows needs at least twelve distinct genuine problems
 across three repositories, independently reviewed positive/adversarial checks,
@@ -703,6 +970,82 @@ Independent oracles, missing witness families, current complete populations,
 full typing, deterministic regressions, unseen holdouts and final artifact
 qualification remain required. No capability is claimed at 5/5.
 
+### Native declaration and projection checkpoint: 2026-10-16
+
+The optimized `567428497…` observer completed all thirteen messaging and twelve
+transaction public workflows in `ast-index-*-public-01`. Every recorded workflow
+gate passes; no workflow outcome is missing. Maximum complete initial compact/text
+responses are 3,454 and 3,825 estimated tokens respectively. Both suite summaries
+remain INCOMPLETE because capability review and required witness closure remain
+open. These are workflow passes, not twenty-capability qualification.
+
+`source-ast-index-01/source.zip` freezes those source bytes: SHA-256
+`7a8e98aec5230ee886db7e3d9e8aadd151bf0cfaebc1ebb543fc309adfc06379`,
+1,110 members, with per-member hashes/modes and observer/evaluator identities.
+Source compilation passes. Its independent extraction passes 29 focused tests,
+including actual CLI/MCP, with explicit extraction `PYTHONPATH` and verified
+import origin. The first sandboxed smoke was interrupted during transport access;
+it is incomplete. `extracted-smoke-02.log` is the completed run. This artifact
+predates the native TypeScript changes below.
+
+The first genuine TypeScript run retained four failing public workflows and one
+completed native specimen before qualified namespace lookup aborted acquisition.
+No missing native outcomes were counted as passed. Independent TypeScript-parser
+oracles exposed header-only ranges, flattened namespaces, missing private callable
+fields and missing arrow-function bindings in the advisory outline.
+
+The existing optional Tree-sitter adapter now supplies lexical namespaces,
+callable bindings/fields, nested function scope and complete declaration ranges.
+Native JavaScript/TypeScript names replace flat advisory names after successful
+parsing. Python and other existing range owners retain their existing merge.
+The adapter contract uses checked structural types rather than Any; its cache
+signature advances to v2. This is KEEP COHESIVE: grammar translation and range
+enrichment stay in their existing owner, with no new graph or authority registry.
+`pyproject.toml` declares the optional bundled syntax extra and the test requirement;
+`uv.lock` records resolution. Normal frozen setup consumes that lock. Missing
+native support still exposes the advisory capability explicitly.
+
+The isolated candidate's fresh acquisition passes all six TypeScript native
+specimens in `typescript-native-ranges-native-01`; its observer is `9d9bd305…`
+and evaluator `b964b29e…`. That narrower source/transport evidence is historical
+after later projection fixes and does not qualify the complete language suite.
+
+Literal name matches inside a caller-nominated file now supplement retrieval
+without changing edit or verification selection. Common names and private-member
+syntax remain source observations; duplicate scopes stay visible. Genuine reruns
+also exposed a generic projection defect: SearchHit wire records used `lines`
+while retrieval locators consumed `start_line`/`end_line`. The supplement adapter
+now retains both forms. Tests require exact endpoints in default and initial
+responses, rather than checking names alone. Qualified task identifiers also
+recognize JavaScript `$` and private `#` members; duplicate declarations still
+prevent unique ownership.
+
+`typescript-retained-ranges-public-01` completes all six cases against observer
+`58d3d0a7…`. Three pass every gate. The Hono cases expose their required source
+and test facts but retain incomplete symbol-owner authority; the observed file
+owner claims no exact symbol. The grader distinguishes missing precision from a
+contradictory assertion, retaining failure for wrong paths, names or spans. The
+unchanged independent declaration/recall checks still require exact ranges.
+Fastify HTTP options retains a missing relevant-test failure. Do not waive these
+states or weaken the frozen oracles to obtain a passing summary.
+
+The next verification repair observes matching indexed test filename prefixes as
+weak candidates. It binds current source/test revisions, filters visibility before
+the bound, and retains the filename fact in the source-specific basis. It asserts
+no import, call, runtime compatibility or test sufficiency; selected verification
+and edit ownership are unchanged. The 58-test disclosure/identity ring and
+166-test adjacent task-evidence ring pass. Fresh public/native qualification must
+bind the final integrated candidate after this repair.
+
+The latest full configured measurement, before the final fake-parser narrowing,
+reports 3,314 Ty diagnostics and 3,322 Pyright errors. Most remaining diagnostics
+are tests (2,501 Ty), with 459 in scripts and 348 in production. The native parser
+owner and projection repairs pass scoped checks; that does not close full typing.
+The former SimpleNamespace parser fixtures are replaced by explicit protocol
+fixtures, preserving their semantic assertions. Refresh full measurements before
+claiming a new total. Final deterministic regression membership, all missing
+catalogs/oracles/witness families, unseen holdouts and artifact proof remain open.
+
 ### T00: baseline and prerequisites
 
 Record HEAD/worktree state, observer/evaluator identities, lock/configuration
@@ -777,8 +1120,10 @@ member. Unsupported/ambiguous producer output remains unresolved.
 The messaging source catalog has thirteen problems across three repositories;
 the transaction/persistence catalog has twelve across three. The language
 catalog has twelve across six, balanced between Python and TypeScript.
-Their incomplete qualification is detailed above. The other nine catalogs
-still require genuine source intake.
+Their incomplete qualification is detailed above. Debugging now has four
+SQLAlchemy problems and still needs eight problems across two repositories.
+Eight other catalogs still require genuine source intake: 2, 8, 9, 11, 15, 16,
+18 and 20.
 
 Each catalog targets four genuine problems per repository in the initial pool.
 Inspect source history from recorded revisions; pin exact before/after archives;

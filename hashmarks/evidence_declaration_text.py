@@ -71,7 +71,11 @@ def _table_rows(
 
 
 def declaration_scope_text(
-    context: Mapping[str, Any], ref: str, *, shared: Mapping[str, Any] | None = None
+    context: Mapping[str, Any],
+    ref: str,
+    *,
+    shared: Mapping[str, Any] | None = None,
+    label: str = "Declarations",
 ) -> list[str]:
     """Rows follow native order; a scope pointer plus row index locates each fact."""
     rows = context.get("declarations", [])
@@ -90,7 +94,7 @@ def declaration_scope_text(
         if key not in (shared or {})
     }
     return [
-        f"{'Declarations @ ' + ref if ref else 'Declarations'}: {_dump(metadata)}",
+        f"{label + ' @ ' + ref if ref else label}: {_dump(metadata)}",
         f"Common={_dump(common)}; prefix={_dump(prefix)}; columns={_dump(columns)}; extras={_dump(extras)}",
         *(_dump(row) for row in table),
     ]
@@ -102,7 +106,12 @@ def declaration_contexts(
     return [
         (f"/retrieval/results/{index}/{family}", row[family])
         for index, row in enumerate(rows)
-        for family in ("class_declarations", "enclosing_declarations")
+        for family in (
+            "class_declarations",
+            "enclosing_declarations",
+            "same_name_declarations",
+            "direct_call_declarations",
+        )
         if isinstance(row.get(family), dict)
     ]
 

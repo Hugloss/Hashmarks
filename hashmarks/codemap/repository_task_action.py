@@ -40,7 +40,7 @@ if TYPE_CHECKING:
 
 _WORD_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 _QUALIFIED_IDENTIFIER_RE = re.compile(
-    r"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+"
+    r"[A-Za-z_$][A-Za-z0-9_$]*(?:\.#?[A-Za-z_$][A-Za-z0-9_$]*)+"
 )
 _EXACT_IDENTIFIER_INDEX_LIMIT = 1024
 
@@ -928,7 +928,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             flags=re.IGNORECASE,
         )
         dependency_tail = re.search(
-            r"\s(?:so|using|with|by|via|through|to use|to call)\s",
+            r"\s(?:so|when|using|with|by|via|through|to use|to call)\s",
             task,
             flags=re.IGNORECASE,
         )

@@ -19,6 +19,7 @@ from .backend_declarations import observe_declarations
 from .backend_gates import combine_required, fact_state, presentation_conformance
 from .backend_grading import _authority_safe, _gates, _packet, display_fact_gate
 from .backend_matrix import INITIAL_TOKEN_CEILING
+from .backend_runtime import observe_runtime
 from .backend_transport import capture_cli, capture_mcp
 from .backend_witnesses import (
     delta_fact_witnesses,
@@ -222,17 +223,30 @@ def _observe_stage(
         if declaration_inputs is not None and declaration_rule is not None
         else None
     )
+    runtime_inputs = workflow.get("runtime_observations", {}).get(rule["_stage"])
+    runtime_oracles = rule.get("runtime_oracles", {}).get(rule["_stage"])
+    runtime = (
+        observe_runtime(
+            workspace, state, runtime_inputs, runtime_oracles, output, transports
+        )
+        if runtime_inputs is not None and runtime_oracles is not None
+        else None
+    )
     # A sequence of public observations must belong to one stable repository
     # snapshot, including producer and transport reads after the writer closes.
     _check_snapshot(workspace, snapshot)
     return {
         **profiles["full"],
-        "fact_witnesses": stage_fact_witnesses(workspace, output, workflow, rule),
+        "fact_witnesses": [
+            *stage_fact_witnesses(workspace, output, workflow, rule),
+            *(runtime["gate_witnesses"] if runtime is not None else []),
+        ],
         "grade": grade_facts(workflow["id"], {"packet": packet}, rule),
         "revision_bound": _revision_bound(workspace, packet),
         "initial": profiles["initial"],
         "boundary": boundary,
         "declarations": declarations,
+        "runtime": runtime,
     }
 
 
@@ -354,7 +368,7 @@ def execute_workflow(
         )
     gates = _gates(before, after, stale, rule, delta_grade)
     for stage in (before, after):
-        for component in (stage["boundary"], stage["declarations"]):
+        for component in (stage["boundary"], stage["declarations"], stage["runtime"]):
             if component is None:
                 continue
             for key, value in component["gates"].items():
@@ -380,6 +394,21 @@ def execute_workflow(
             "before": before["declarations"],
             "after": after["declarations"],
         },
+        **(
+            {
+                "runtime_observations": {
+                    "before": before["runtime"],
+                    "after": after["runtime"],
+                },
+                "debug_frame_observations": [
+                    row
+                    for observed in (before, after)
+                    for row in observed["runtime"]["debug_frame_observations"]
+                ],
+            }
+            if "runtime_observations" in workflow
+            else {}
+        ),
         "transport_grades": {
             "before": {key: before[key] for key in ("cli", "mcp")},
             "after": {key: after[key] for key in ("cli", "mcp")},
@@ -398,6 +427,11 @@ def execute_workflow(
                 "delta": delta,
                 "boundary": [before["boundary"], after["boundary"]],
                 "declarations": [before["declarations"], after["declarations"]],
+                **(
+                    {"runtime": [before["runtime"], after["runtime"]]}
+                    if "runtime_observations" in workflow
+                    else {}
+                ),
             }
         ),
     }

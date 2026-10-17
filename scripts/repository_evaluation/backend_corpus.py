@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -188,7 +189,54 @@ def _check_workflow(
         )
     _check_boundary_inputs(workflow, rule, sources)
     _check_declaration_inputs(workflow, rule, sources)
+    _check_runtime_inputs(workflow, rule, sources)
     _check_native_oracles(rule)
+
+
+def _check_runtime_inputs(
+    workflow: Mapping[str, object],
+    rule: Mapping[str, object],
+    sources: Mapping[str, Path],
+) -> None:
+    # Local import keeps source admission and the runtime oracle reader acyclic.
+    from .backend_runtime_witnesses import (
+        _object,
+        _oracle_frames,
+        _text,
+        validate_runtime_stage,
+    )
+
+    inputs, oracles = workflow.get("runtime_observations"), rule.get("runtime_oracles")
+    if inputs is None and oracles is None:
+        return
+    requests, expected = _object(inputs), _object(oracles)
+    if set(requests) != {"before", "after"} or set(expected) != set(requests):
+        raise ValueError("backend runtime observations require both source stages")
+    units = set()
+    for stage in ("before", "after"):
+        validate_runtime_stage(
+            sources[_text(workflow[stage])],
+            requests[stage],
+            expected[stage],
+            repository=_text(workflow["repository"]),
+            workflow=_text(workflow["id"]),
+            stage=stage,
+        )
+        units.update(
+            stage + ":" + _text(frame["anchor_id"])
+            for frame in _oracle_frames(_object(expected[stage]))
+        )
+    declared = workflow.get("debug_frame_units")
+    if (
+        not isinstance(declared, list)
+        or not units
+        or len(declared) != len(units)
+        or not all(isinstance(unit, str) and unit in units for unit in declared)
+        or len(set(declared)) != len(units)
+    ):
+        raise ValueError(
+            "backend debug frame units differ from complete captured membership"
+        )
 
 
 def _check_native_oracles(rule: dict[str, Any]) -> None:

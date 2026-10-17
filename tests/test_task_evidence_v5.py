@@ -839,7 +839,7 @@ def test_task_evidence_supplements_account_for_displaced_canonical_hits(
     assert retrieval["presentation"] == "compact-locators-v1"
     assert 1 <= len(supplements) <= 2
     assert len(results) <= 20
-    canonical_prefix = results[: -len(supplements)]
+    canonical_prefix = [row for row in results if not row.get("supplement")]
     for rank, (projected, internal) in enumerate(
         zip(
             canonical_prefix,
@@ -869,7 +869,9 @@ def test_task_evidence_supplements_account_for_displaced_canonical_hits(
     )
     assert retrieval.get("supplemental_results") == len(supplements)
     assert retrieval.get("supplemental_authority") is False
-    assert retrieval["ordering"] == "canonical-then-bounded-natural-language"
+    assert retrieval["ordering"] == (
+        "natural-identifier-matches-then-canonical-retrieval"
+    )
     assert retrieval["bounds"]["canonical_completeness"] == "incomplete"
     assert retrieval["bounds"]["canonical_truncation"] == "truncated"
     assert "task-result-limit" in retrieval["bounds"]["bound_reasons"]

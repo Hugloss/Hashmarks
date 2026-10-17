@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
+from contract_assertions import assert_array, assert_object, assert_records, assert_text
 
 from hashmarks import CodeMap
 from hashmarks.codemap import (
@@ -352,7 +353,7 @@ def test_discovery_is_format_and_domain_neutral(
         "provider_contract": "read-only",
         "provider_sandboxed": False,
     }
-    provider_row = packet["providers"][0]
+    provider_row = assert_records(packet["providers"])[0]
     assert provider_row["name"] == "fixture-provider"
     assert provider_row["state"] == "collected"
     assert provider_row["provenance"] == {
@@ -361,27 +362,36 @@ def test_discovery_is_format_and_domain_neutral(
     }
     assert provider_row["warnings"] == []
     assert provider_row["group_ids"] == ["fixture-group"]
-    assert [row["path"] for row in provider_row["inputs"]] == sorted(paths)
+    assert [row["path"] for row in assert_records(provider_row["inputs"])] == sorted(
+        paths
+    )
     assert all(
         row["state"] == "known-present" and row.get("member_revision")
-        for row in provider_row["inputs"]
+        for row in assert_records(provider_row["inputs"])
     )
-    group = packet["declarations"]["groups"][0]
+    group = assert_records(assert_object(packet["declarations"])["groups"])[0]
     assert group["semantic_namespace"] == "fixture-provider"
     assert group["concept"] == concept
-    assert group["comparison"]["state"] == "equivalent"
-    assert packet["observation_identity"].startswith("sha256:")
+    assert assert_object(group["comparison"])["state"] == "equivalent"
+    assert assert_text(packet["observation_identity"]).startswith("sha256:")
 
 
 def _semantic_role_rows(packet: dict[str, object]) -> dict[str, dict[str, object]]:
-    group = packet["declarations"]["groups"][0]
-    return {row["semantic_role"]["kind"]: row for row in group["declarations"]}
+    group = assert_records(assert_object(packet["declarations"])["groups"])[0]
+    return {
+        assert_text(assert_object(row["semantic_role"])["kind"]): row
+        for row in assert_records(group["declarations"])
+    }
 
 
 def _binding_rows(packet: dict[str, object]) -> dict[str, dict[str, object]]:
     return {
-        row["binding_id"]: row
-        for row in packet["declarations"]["repository_evidence"]["bindings"]
+        assert_text(row["binding_id"]): row
+        for row in assert_records(
+            assert_object(assert_object(packet["declarations"])["repository_evidence"])[
+                "bindings"
+            ]
+        )
     }
 
 
@@ -428,16 +438,26 @@ def _assert_provider_role_semantics(
     before: dict[str, object],
     after: dict[str, object],
 ) -> None:
-    assert before["providers"][0]["provenance"]["version"] == "1"
-    assert after["providers"][0]["provenance"]["version"] == "2"
-    assert after["delta_from_previous"]["providers"] == {
+    assert (
+        assert_object(
+            assert_object(assert_records(before["providers"])[0])["provenance"]
+        )["version"]
+        == "1"
+    )
+    assert (
+        assert_object(
+            assert_object(assert_records(after["providers"])[0])["provenance"]
+        )["version"]
+        == "2"
+    )
+    assert assert_object(after["delta_from_previous"])["providers"] == {
         "added": [],
         "removed": [],
         "changed": ["runtime-provider"],
     }
 
-    before_group = before["declarations"]["groups"][0]
-    after_group = after["declarations"]["groups"][0]
+    before_group = assert_records(assert_object(before["declarations"])["groups"])[0]
+    after_group = assert_records(assert_object(after["declarations"])["groups"])[0]
     assert (
         before_group["semantic_subject_identity"]
         == after_group["semantic_subject_identity"]
@@ -446,46 +466,66 @@ def _assert_provider_role_semantics(
     before_by_role = _semantic_role_rows(before)
     after_by_role = _semantic_role_rows(after)
     for role in ("project-intent", "container-runtime"):
-        assert (
-            before_by_role[role]["semantic_declaration_identity"]
-            == after_by_role[role]["semantic_declaration_identity"]
+        assert assert_text(
+            assert_object(before_by_role[role])["semantic_declaration_identity"]
+        ) == assert_text(
+            assert_object(after_by_role[role])["semantic_declaration_identity"]
         )
 
-    subject = after["delta_from_previous"]["declarations"]["semantic_subjects"][
-        "changed"
-    ][0]
+    subject = assert_records(
+        assert_object(
+            assert_object(assert_object(after["delta_from_previous"])["declarations"])[
+                "semantic_subjects"
+            ]
+        )["changed"]
+    )[0]
     assert subject["previous_group_id"] == "runtime-request-v1"
     assert subject["current_group_id"] == "runtime-request-v2"
     assert subject["group_id_changed"] is True
 
-    semantic = subject["semantic_declarations"]
+    semantic = assert_object(subject["semantic_declarations"])
     assert semantic["added"] == []
     assert semantic["removed"] == []
     assert semantic["ambiguous"] == []
-    changes = {row["semantic_role"]["kind"]: row for row in semantic["changed"]}
+    changes = {
+        assert_text(assert_object(row["semantic_role"])["kind"]): row
+        for row in assert_records(semantic["changed"])
+    }
     assert changes["project-intent"] == {
-        "semantic_declaration_identity": before_by_role["project-intent"][
-            "semantic_declaration_identity"
-        ],
+        "semantic_declaration_identity": assert_text(
+            assert_object(before_by_role["project-intent"])[
+                "semantic_declaration_identity"
+            ]
+        ),
         "semantic_role": {"kind": "project-intent"},
         "previous_declaration_id": "intent-v1",
         "current_declaration_id": "intent-v2",
         "declaration_id_changed": True,
     }
-    assert changes["container-runtime"]["value_transition"] == {
+    assert assert_object(changes["container-runtime"])["value_transition"] == {
         "before": {"value_state": "resolved", "value": "3.12"},
         "after": {"value_state": "resolved", "value": "3.13"},
     }
-    assert changes["container-runtime"]["previous_declaration_id"] == "container-v1"
-    assert changes["container-runtime"]["current_declaration_id"] == "container-v2"
-    assert changes["container-runtime"]["declaration_id_changed"] is True
+    assert (
+        assert_object(changes["container-runtime"])["previous_declaration_id"]
+        == "container-v1"
+    )
+    assert (
+        assert_object(changes["container-runtime"])["current_declaration_id"]
+        == "container-v2"
+    )
+    assert assert_object(changes["container-runtime"])["declaration_id_changed"] is True
     assert "producer_transition" not in changes["container-runtime"]
 
-    assert subject["coverage_transition"]["before"]["expected_declaration_ids"] == [
+    assert assert_object(assert_object(subject["coverage_transition"])["before"])[
+        "expected_declaration_ids"
+    ] == [
         "container-v1",
         "intent-v1",
     ]
-    assert subject["coverage_transition"]["after"]["expected_declaration_ids"] == [
+    assert assert_object(assert_object(subject["coverage_transition"])["after"])[
+        "expected_declaration_ids"
+    ] == [
         "container-v2",
         "intent-v2",
     ]
@@ -498,34 +538,62 @@ def _assert_provider_binding_authority_separation(
     before_by_role = _semantic_role_rows(before)
     after_by_role = _semantic_role_rows(after)
     assert (
-        before_by_role["container-runtime"]["declaration_definition_identity"]
-        != after_by_role["container-runtime"]["declaration_definition_identity"]
+        assert_object(before_by_role["container-runtime"])[
+            "declaration_definition_identity"
+        ]
+        != assert_object(after_by_role["container-runtime"])[
+            "declaration_definition_identity"
+        ]
     )
 
-    binding_delta = after["delta_from_previous"]["declarations"]["repository_evidence"][
-        "bindings"
-    ]
+    binding_delta = assert_object(
+        assert_object(
+            assert_object(assert_object(after["delta_from_previous"])["declarations"])[
+                "repository_evidence"
+            ]
+        )["bindings"]
+    )
     assert binding_delta["changed"] == []
     assert binding_delta["preserved"] == []
     assert binding_delta["removed"] == sorted(
-        row["binding_id"] for row in before_by_role.values()
+        assert_text(row["binding_id"]) for row in before_by_role.values()
     )
     assert binding_delta["added"] == sorted(
-        row["binding_id"] for row in after_by_role.values()
+        assert_text(row["binding_id"]) for row in after_by_role.values()
     )
 
     before_bindings = _binding_rows(before)
     after_bindings = _binding_rows(after)
     assert (
-        before_bindings[before_by_role["container-runtime"]["binding_id"]]["evidence"][
-            0
-        ]["path"]
+        assert_object(
+            assert_records(
+                assert_object(
+                    before_bindings[
+                        assert_text(
+                            assert_object(before_by_role["container-runtime"])[
+                                "binding_id"
+                            ]
+                        )
+                    ]
+                )["evidence"]
+            )[0]
+        )["path"]
         == "Dockerfile"
     )
     assert (
-        after_bindings[after_by_role["container-runtime"]["binding_id"]]["evidence"][0][
-            "path"
-        ]
+        assert_object(
+            assert_records(
+                assert_object(
+                    after_bindings[
+                        assert_text(
+                            assert_object(after_by_role["container-runtime"])[
+                                "binding_id"
+                            ]
+                        )
+                    ]
+                )["evidence"]
+            )[0]
+        )["path"]
         == "deploy/runtime.meta"
     )
 
@@ -552,7 +620,7 @@ def test_provider_order_is_not_discovery_identity(tmp_path: Path) -> None:
         second = codemap.discover_repository_declarations([a, b])
 
     assert first["observation_identity"] == second["observation_identity"]
-    assert [row["name"] for row in first["providers"]] == [
+    assert [row["name"] for row in assert_records(first["providers"])] == [
         "a-provider",
         "b-provider",
     ]
@@ -574,15 +642,16 @@ def test_discovery_namespaces_equal_opaque_subjects_by_provider(
         codemap.sync()
         packet = codemap.discover_repository_declarations(providers)
 
-    groups = packet["declarations"]["groups"]
+    groups = assert_records(assert_object(packet["declarations"])["groups"])
     assert [row["semantic_namespace"] for row in groups] == [
         "provider-a",
         "provider-b",
     ]
-    assert groups[0]["concept"] == groups[1]["concept"]
-    assert groups[0]["scope"] == groups[1]["scope"]
+    assert assert_object(groups[0])["concept"] == assert_object(groups[1])["concept"]
+    assert assert_object(groups[0])["scope"] == assert_object(groups[1])["scope"]
     assert (
-        groups[0]["semantic_subject_identity"] != groups[1]["semantic_subject_identity"]
+        assert_object(groups[0])["semantic_subject_identity"]
+        != assert_object(groups[1])["semantic_subject_identity"]
     )
 
 
@@ -627,7 +696,7 @@ def test_not_detected_provider_is_observable_without_claiming_absence(
             "enumerations": [],
         }
     ]
-    assert packet["declarations"]["groups"] == []
+    assert assert_object(packet["declarations"])["groups"] == []
 
 
 def test_detected_provider_failure_fails_closed_instead_of_returning_partial_data(
@@ -694,20 +763,24 @@ def test_discovery_delta_separates_provider_provenance_from_declaration_change(
             previous_observation=before,
         )
 
-    delta = after["delta_from_previous"]
+    delta = assert_object(after["delta_from_previous"])
     assert delta["providers"] == {
         "added": [],
         "removed": [],
         "changed": ["fixture-provider"],
     }
-    assert delta["declarations"]["changed_groups"] == []
+    assert assert_object(delta["declarations"])["changed_groups"] == []
     assert (
-        before["declarations"]["groups"][0]["semantic_subject_identity"]
-        == after["declarations"]["groups"][0]["semantic_subject_identity"]
+        assert_object(
+            assert_records(assert_object(before["declarations"])["groups"])[0]
+        )["semantic_subject_identity"]
+        == assert_object(
+            assert_records(assert_object(after["declarations"])["groups"])[0]
+        )["semantic_subject_identity"]
     )
     assert (
-        before["declarations"]["observation_identity"]
-        == after["declarations"]["observation_identity"]
+        assert_object(before["declarations"])["observation_identity"]
+        == assert_object(after["declarations"])["observation_identity"]
     )
     assert before["observation_identity"] != after["observation_identity"]
 
@@ -736,12 +809,23 @@ def test_discovery_delta_reuses_nested_repository_evidence_delta(
             previous_observation=before,
         )
 
-    nested = after["delta_from_previous"]["declarations"]
-    assert nested["changed_groups"][0]["value_changed_declaration_ids"] == ["value-1"]
-    assert nested["changed_groups"][0]["comparison_changed"] is True
-    changed_bindings = nested["repository_evidence"]["bindings"]["changed"]
+    nested = assert_object(assert_object(after["delta_from_previous"])["declarations"])
+    assert assert_object(assert_records(nested["changed_groups"])[0])[
+        "value_changed_declaration_ids"
+    ] == ["value-1"]
+    assert (
+        assert_object(assert_records(nested["changed_groups"])[0])["comparison_changed"]
+        is True
+    )
+    changed_bindings = assert_records(
+        assert_object(assert_object(nested["repository_evidence"])["bindings"])[
+            "changed"
+        ]
+    )
     assert len(changed_bindings) == 1
-    assert changed_bindings[0]["binding_id"].endswith("value-1")
+    assert assert_text(assert_object(changed_bindings[0])["binding_id"]).endswith(
+        "value-1"
+    )
 
 
 def test_previous_discovery_packet_is_tamper_checked(tmp_path: Path) -> None:
@@ -753,7 +837,7 @@ def test_previous_discovery_packet_is_tamper_checked(tmp_path: Path) -> None:
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.sync()
         previous = codemap.discover_repository_declarations([provider])
-        previous["providers"][0]["state"] = "tampered"
+        assert_object(assert_records(previous["providers"])[0])["state"] = "tampered"
         with pytest.raises(
             ValueError,
             match="previous declaration discovery identity mismatch",
@@ -802,7 +886,7 @@ def test_discovery_has_no_ambient_default_providers(tmp_path: Path) -> None:
         packet = codemap.discover_repository_declarations([])
 
     assert packet["providers"] == []
-    assert packet["declarations"]["groups"] == []
+    assert assert_object(packet["declarations"])["groups"] == []
 
 
 def test_cross_provider_group_identity_collision_fails_closed(tmp_path: Path) -> None:
@@ -1037,20 +1121,24 @@ def test_helper_input_delta_does_not_masquerade_as_declaration_delta(
             previous_observation=before,
         )
 
-    delta = after["delta_from_previous"]
+    delta = assert_object(after["delta_from_previous"])
     assert delta["providers"] == {
         "added": [],
         "removed": [],
         "changed": ["helper-provider"],
     }
-    assert delta["declarations"]["changed_groups"] == []
+    assert assert_object(delta["declarations"])["changed_groups"] == []
     assert (
-        before["declarations"]["groups"][0]["group_observation_identity"]
-        == after["declarations"]["groups"][0]["group_observation_identity"]
+        assert_object(
+            assert_records(assert_object(before["declarations"])["groups"])[0]
+        )["group_observation_identity"]
+        == assert_object(
+            assert_records(assert_object(after["declarations"])["groups"])[0]
+        )["group_observation_identity"]
     )
     assert (
-        before["declarations"]["observation_identity"]
-        != after["declarations"]["observation_identity"]
+        assert_object(before["declarations"])["observation_identity"]
+        != assert_object(after["declarations"])["observation_identity"]
     )
 
 
@@ -1087,15 +1175,15 @@ def test_provider_path_enumeration_is_bounded_tracked_and_has_no_raw_workspace(
         codemap.sync()
         packet = codemap.discover_repository_declarations([provider])
 
-    provider_row = packet["providers"][0]
+    provider_row = assert_records(packet["providers"])[0]
     assert provider_row["enumerations"] == [
         {
             "prefix": "helpers",
             "paths": ["helpers/a.meta", "helpers/b.meta"],
         }
     ]
-    assert packet["bounds"]["max_path_enumerations_per_provider"] == 32
-    assert packet["bounds"]["max_enumerated_paths_per_provider"] == 256
+    assert assert_object(packet["bounds"])["max_path_enumerations_per_provider"] == 32
+    assert assert_object(packet["bounds"])["max_enumerated_paths_per_provider"] == 256
 
 
 def test_provider_path_enumeration_delta_is_separate_from_declaration_delta(
@@ -1119,15 +1207,16 @@ def test_provider_path_enumeration_delta_is_separate_from_declaration_delta(
             previous_observation=before,
         )
 
-    delta = after["delta_from_previous"]
+    delta = assert_object(after["delta_from_previous"])
     assert delta["providers"] == {
         "added": [],
         "removed": [],
         "changed": ["enumerating-provider"],
     }
-    assert delta["declarations"]["changed_groups"] == []
+    assert assert_object(delta["declarations"])["changed_groups"] == []
     assert (
-        before["providers"][0]["enumerations"] != after["providers"][0]["enumerations"]
+        assert_object(assert_records(before["providers"])[0])["enumerations"]
+        != assert_object(assert_records(after["providers"])[0])["enumerations"]
     )
 
 
@@ -1195,7 +1284,7 @@ def test_provider_path_enumeration_respects_pruned_repository_scope(
         packet = codemap.discover_repository_declarations([provider])
 
     assert provider.paths == ("visible.meta",)
-    assert packet["providers"][0]["enumerations"] == [
+    assert assert_object(assert_records(packet["providers"])[0])["enumerations"] == [
         {"prefix": "", "paths": ["visible.meta"]}
     ]
 
@@ -1216,6 +1305,7 @@ class _UnstableEnumerationProvider:
 
 def test_provider_path_enumeration_requires_deterministic_repository_order(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -1226,8 +1316,10 @@ def test_provider_path_enumeration_requires_deterministic_repository_order(
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.sync()
         original = codemap._declaration_provider_paths
-        codemap._declaration_provider_paths = lambda prefix: tuple(
-            reversed(original(prefix))
+        monkeypatch.setattr(
+            codemap,
+            "_declaration_provider_paths",
+            lambda prefix: tuple(reversed(original(prefix))),
         )
         with pytest.raises(
             RepositoryDeclarationProviderError,
@@ -1354,15 +1446,18 @@ def test_provider_evidence_validation_rejects_duplicate_input_index_rows(
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.sync()
         packet = codemap.discover_repository_declarations([provider])
-        provider_row = packet["providers"][0]
-        provider_row["inputs"].append(dict(provider_row["inputs"][0]))
+        provider_row = assert_records(packet["providers"])[0]
+        assert_array(provider_row["inputs"]).append(
+            dict(assert_records(provider_row["inputs"])[0])
+        )
         try:
             from hashmarks.codemap.repository_declaration_discovery import (
                 _validate_provider_evidence_revisions,
             )
 
             _validate_provider_evidence_revisions(
-                packet["providers"], packet["declarations"]
+                assert_records(packet["providers"]),
+                assert_object(packet["declarations"]),
             )
         except ValueError as exc:
             assert "provider input paths are duplicated" in str(exc)
@@ -1381,8 +1476,10 @@ def test_provider_revalidation_rejects_duplicate_input_rows_before_reread(
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.sync()
         packet = codemap.discover_repository_declarations([provider])
-        observation = packet["providers"][0]
-        observation["inputs"].append(dict(observation["inputs"][0]))
+        observation = assert_records(packet["providers"])[0]
+        assert_array(observation["inputs"]).append(
+            dict(assert_records(observation["inputs"])[0])
+        )
         from hashmarks.codemap.repository_declaration_provider import (
             validate_repository_declaration_provider_inputs,
         )
@@ -1394,7 +1491,7 @@ def test_provider_revalidation_rejects_duplicate_input_rows_before_reread(
             validate_repository_declaration_provider_inputs(
                 codemap._declaration_provider_member_read,
                 codemap._declaration_provider_paths,
-                packet["providers"],
+                assert_records(packet["providers"]),
             )
 
 
@@ -1412,8 +1509,10 @@ def test_provider_revalidation_rejects_duplicate_enumeration_prefixes(
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.sync()
         packet = codemap.discover_repository_declarations([provider])
-        observation = packet["providers"][0]
-        observation["enumerations"].append(dict(observation["enumerations"][0]))
+        observation = assert_records(packet["providers"])[0]
+        assert_array(observation["enumerations"]).append(
+            dict(assert_records(observation["enumerations"])[0])
+        )
         from hashmarks.codemap.repository_declaration_provider import (
             validate_repository_declaration_provider_inputs,
         )
@@ -1425,7 +1524,7 @@ def test_provider_revalidation_rejects_duplicate_enumeration_prefixes(
             validate_repository_declaration_provider_inputs(
                 codemap._declaration_provider_member_read,
                 codemap._declaration_provider_paths,
-                packet["providers"],
+                assert_records(packet["providers"]),
             )
 
 
@@ -1440,17 +1539,19 @@ def test_previous_discovery_rejects_authenticated_nested_repository_divergence(
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.sync()
         previous = codemap.discover_repository_declarations([provider])
-        previous["declarations"]["repository"] = dict(
-            previous["declarations"]["repository"]
+        assert_object(previous["declarations"])["repository"] = dict(
+            assert_object(assert_object(previous["declarations"])["repository"])
         )
-        previous["declarations"]["repository"]["repository_identity"] = "sha256:foreign"
-        previous["declarations"]["observation_identity"] = (
+        assert_object(assert_object(previous["declarations"])["repository"])[
+            "repository_identity"
+        ] = "sha256:foreign"
+        assert_object(previous["declarations"])["observation_identity"] = (
             "sha256:"
             + codemap._packet_digest(
                 "hashmarks.repository-declarations.v1",
                 {
                     key: value
-                    for key, value in previous["declarations"].items()
+                    for key, value in assert_object(previous["declarations"]).items()
                     if key not in {"observation_identity", "delta_from_previous"}
                 },
             )

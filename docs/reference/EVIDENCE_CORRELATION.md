@@ -83,6 +83,14 @@ with CodeMap(".") as codemap:
 
 Schema: **`hashmarks.evidence-correlation.v2`**.
 
+The CLI exposes the same request through `hashmarks correlate-evidence
+--input-json request.json`. The JSON object requires `bundles` and accepts
+`path_mappings`, `relationship_limit_per_path`, `include_relationships` and
+`previous_correlation`. Omitted options retain the CodeMap defaults. Unknown
+fields are rejected. Use `--presentation structured`, `compact` or `text` to
+include a projection alongside the canonical correlation packet. The existing
+MCP `correlate_evidence` tool exposes the same observation contract.
+
 The result contains the original claims, resolution state, canonical repository evidence from the existing repository-evidence-binding authority, source-equivalence state, completeness, provenance-bearing repository identities, and an overall correlation identity. `definition_options` retains the normalized relationship request (`include_relationships` and `relationship_limit_per_path`, which is null when relationships were not requested). A previous v2 packet is checked against its retained definition inputs, anchor-to-binding references, source-equivalence and completeness projections, and same-target correspondence before delta comparison; v1 packets are not accepted as replay input. This does not re-resolve historical anchors against the current repository state.
 
 ## Anchor contract
