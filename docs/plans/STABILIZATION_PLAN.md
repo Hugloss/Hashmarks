@@ -1,6 +1,10 @@
 # Canonical architecture stabilization and trustworthy backend baseline
 
-Status: ACTIVE. The user approved this completion target on 2026-10-18.
+Status: COMPLETE. The user approved this completion target on 2026-10-18.
+All S1–S6 requirements are fulfilled; see
+[`STABILIZATION_REPORT.md`](../qualification/STABILIZATION_REPORT.md) for exact
+source identities, 4,995 passing cases, full quality gates, the three public
+workflows and 1,109 required witnesses. Broad backend 5/5 remains deferred.
 This is the active delivery plan. It supersedes the exhaustive completion gates
 in `CANONICAL_COMPONENT_REWRITE_PLAN.md`; that document retains implementation
 history, design rationale and the later twenty-capability research backlog.
@@ -107,6 +111,13 @@ File-size weighting may regroup nodes without changing membership; compare
 grouping-independent membership before reuse. Keep original execution identities
 and explicit comparability evidence. The external agent executes those fixed
 groups; do not add a Hashmarks runner, scheduler or resume store for this work.
+
+Repository Git-index hygiene checks require a real checkout. A source ZIP
+deliberately has no Git metadata, so run those exact selected nodes against the
+real read-only Git checkout after proving its production/test/configuration
+inputs match the final extraction. Record that context and conserve membership;
+do not synthesize Git metadata, weaken the assertion or skip the check. Other
+source behavior and public workflow checks remain on the independent extraction.
 
 Existing genuine dependency/native capture replay tests are part of regression
 proof. Run focused fresh native captures only if native producer integration

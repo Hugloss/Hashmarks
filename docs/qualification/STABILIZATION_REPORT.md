@@ -1,6 +1,6 @@
 # Architecture stabilization and backend baseline
 
-Status: INCOMPLETE — final candidate validation is running.
+Status: COMPLETE — the revised stabilization target is fulfilled.
 Scope approved by the user on 2026-10-18:
 [`STABILIZATION_PLAN.md`](../plans/STABILIZATION_PLAN.md), S1–S6.
 This report does not claim backend 5/5 or release certification.
@@ -11,12 +11,12 @@ for later optimization and do not block stabilization correctness.
 
 | Requirement | Current final-candidate result | Required proof |
 | --- | --- | --- |
-| S1 canonical ownership | PENDING | Existing component, architecture, binding and lifecycle contracts in the full selected regression run; owner map and obsolete API removal |
+| S1 canonical ownership | PASS | All 23 owner contracts and existing architecture/input-binding/lifecycle tests pass in complete selected regression membership; retired root APIs remain removed |
 | S2 configured quality | PASS | Full Ty/Pyright: zero errors; preflight: zero lint debt; lock convergence and source compilation pass |
-| S3 deterministic regressions | PENDING | Complete final 64-shard selection, all named batches and selected membership, no unresolved selected-test failures |
+| S3 deterministic regressions | PASS | 4,995 executed cases; 3,562/3,562 selected nodes; 64/64 shards; 16/16 groups; zero skips, missing members or unresolved failures |
 | S4 representative public workflows | PASS; budget advisory recorded | All three before/after API/CLI/official MCP workflows pass required correctness gates and all 1,109/1,109 frozen witnesses; maximum reply 6,131 estimated tokens |
-| S5 source artifact | ADMITTED; final drift check pending | Deterministic ZIP and extraction below; actual import/producer identity and frozen membership admitted |
-| S6 handoff | PENDING | This report completed with exact results and limitations |
+| S5 source artifact | PASS | All 1,232 archive/extraction members and modes verified; import/producer identity and exact current production/test/config/oracle inputs agree |
+| S6 handoff | COMPLETE | This report records exact evidence, comparable execution contexts, advisory cost and deferred limitations |
 
 Final source ZIP:
 `.hashmarks/canonical-component-rewrite/stabilization-candidate-03/source.zip`.
@@ -35,7 +35,7 @@ are verified in `stabilization-final/comparability.json`,
 The original execution grouping is retained with grouping-independent membership
 identity `sha256:0a898b4948ab5d3de3d95a4d542a515e2a2b15062026e3b4fb5ab97bd6b97daf`.
 The fixed public witness set has 1,109 required units, frozen before acquisition.
-Complete logs and witness closure fill the remaining rows from actual results
+Complete logs and witness closure fill the acceptance rows from actual results
 or explicitly proven byte-identical inputs, retaining original execution identity.
 
 Quality command: `make agent-preflight lock-check typecheck compile`.
@@ -57,8 +57,34 @@ the edited file and pass on candidate 02 with batches 9–10. Batch 11 then caug
 two missing entries in the central documentation catalog. Both entries are now
 present, all documentation tests pass from the extraction, and candidate 03
 changes documentation only. Batch 11 and remaining batches 12–15 run on candidate
-03 with the original frozen membership. This is external QA execution;
-Hashmarks chooses no execution grouping or resume behavior.
+03 with the original frozen membership. A Git-index hygiene check cannot run
+inside a Git-less source archive; that exact selected node passes in the real
+read-only checkout after code/test/config input equivalence is proved. Other
+members remain on the extraction. No assertion is weakened and no member is
+skipped. This is external QA execution; Hashmarks chooses no execution grouping
+or resume behavior.
+
+## Complete regression result
+
+`stabilization-final/regression-audit.json` closes all **3,562 selected nodes**
+over **64 shards / 16 logical batches**, comprising **4,995 executed pytest
+cases**. There are zero skips, failed batches, missing selected nodes, runtime
+XML membership mismatches or qualified-source changes. Completed comparable
+batches retain their actual candidate identity; the edited test file and failed
+groups were re-executed. No original failure is relabeled as a passing run.
+
+The fixed membership and isolation checks are in `comparability.json` and
+`documentation-comparability.json`. Source and Git-context results are retained
+in `regression.log`, `regression-docs-fix.log`, `regression-git-context.log`,
+per-shard XML, and `git-context/comparability.json`. The read-only Git-index
+check uses the real checkout, while source behavior uses the independent
+extraction with identical production and test bytes.
+
+The existing 23-component architecture inventory, constructor/import-direction
+and wrong-owner controls, binding/lifecycle regressions, stale/ambiguity/denied-
+evidence checks and retired-root-API guards are included in that full membership.
+This establishes the supported stabilization contracts, not exhaustive private-
+helper locality or complete semantic backend capability coverage.
 
 ## Representative workflow results
 

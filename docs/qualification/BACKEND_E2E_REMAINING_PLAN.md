@@ -23,19 +23,26 @@ qualification requirement. The executable owner is
 4,000-token results and failure notes below remain bound to their original
 policies and identities. Do not relabel them or weaken any other requirement.
 
-## Current development priority: finish the stabilization delivery
+## Stabilization complete; research remains deferred
+
+The user-approved S1–S6 milestone is complete. The
+[`stabilization report`](STABILIZATION_REPORT.md) records 4,995 passing cases,
+all selected membership, full configured typing/quality checks, representative
+CLI/MCP proof and 1,109/1,109 required witnesses. Actual maximum reply size is
+6,131 estimated tokens, retained as an advisory improvement item. Do not resume
+this research backlog automatically or claim all twenty capabilities at 5/5.
 
 The current implementation handoff is
 [Canonical component rewrite](../plans/CANONICAL_COMPONENT_REWRITE_PLAN.md).
 The user authorizes a breaking Python API and removal of compatibility paths.
-Implementation is in progress under the user's explicit instruction. Earlier
+The stabilization delivery is complete under the user's revised scope. Earlier
 source-binding/cache/source-read/manifest/metadata repairs are implemented.
 All 23 canonical component owners are implemented; CodeMap now owns composition
 and resource lifetime. All 95 public operations in the frozen rewrite baseline
 map to current named component operations, with no retired root callables.
 Current full configured Ty and Pyright pass. This is implementation and scoped
 proof, not complete architecture acceptance or backend 5/5 qualification.
-Follow S1–S6 in the stabilization plan. Complete current deterministic membership,
+S1–S6 in the stabilization plan qualify current deterministic membership,
 the fixed representative public set, quality gates and source artifact/report.
 Full per-private-stage correspondence/locality and broad qualification below are
 deferred. Do not restart CR-02 or relabel historical reports with the current

@@ -39,7 +39,7 @@ This is the single catalog for the current maintained documentation in `docs/`.
 
 ## Plans
 
-- [`plans/STABILIZATION_PLAN.md`](plans/STABILIZATION_PLAN.md) — active finite delivery: canonical ownership, current typing/regressions, representative public evidence and an advisory response-size target.
+- [`plans/STABILIZATION_PLAN.md`](plans/STABILIZATION_PLAN.md) — completed finite delivery: canonical ownership, current typing/regressions, representative public evidence and an advisory response-size target.
 - [`plans/CANONICAL_COMPONENT_REWRITE_PLAN.md`](plans/CANONICAL_COMPONENT_REWRITE_PLAN.md) — component rewrite design/history and separately deferred broad 5/5 qualification; stabilization is the active finish line.
 - [`plans/CANONICAL_OWNER_CONSOLIDATION_PLAN.md`](plans/CANONICAL_OWNER_CONSOLIDATION_PLAN.md) — superseded bounded owner-consolidation plan and source-binding/cache repair background.
 - [`plans/HM_OBS_REPOSITORY_EVIDENCE_OWNER_CENSUS.md`](plans/HM_OBS_REPOSITORY_EVIDENCE_OWNER_CENSUS.md) — diagnostic-to-repository canonical owners, focused baseline, local regressions and standalone follow-on bundles.

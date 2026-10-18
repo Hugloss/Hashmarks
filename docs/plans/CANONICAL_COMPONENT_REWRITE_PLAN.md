@@ -1,9 +1,15 @@
 # Canonical component rewrite: stabilization delivery and later 5/5 research
 
-**Active completion target: architecture stabilization and a trustworthy backend
-baseline, approved by the user on 2026-10-18.** Follow
-[`STABILIZATION_PLAN.md`](STABILIZATION_PLAN.md), S1–S6, for the finite remaining
-delivery checklist. Exhaustive corpora, per-private-stage proof, broad economics,
+**Stabilization target COMPLETE, as approved by the user on 2026-10-18.**
+Canonical architecture stabilization and the trustworthy backend baseline pass
+S1–S6: 4,995 executed cases / 3,562 selected nodes / 64 shards / 16 groups,
+zero skips or missing members; full typing/hygiene/lock/compile checks pass;
+three genuine public workflows close all 1,109 required witnesses. See
+[`STABILIZATION_REPORT.md`](../qualification/STABILIZATION_REPORT.md).
+
+The completed finite delivery plan is
+[`STABILIZATION_PLAN.md`](STABILIZATION_PLAN.md), S1–S6, for the finite
+delivery checklist and reproducible acceptance. Exhaustive corpora, per-private-stage proof, broad economics,
 unseen heldouts and all twenty capability rows reaching 5/5 are a separate,
 nonblocking research backlog. Their evaluator requirements and incomplete
 ratings remain unchanged; this milestone does not claim backend 5/5.
@@ -114,7 +120,7 @@ Pair semantics, broader relevant-test review,
 metric eligibility and capability review remain unqualified; the campaign is
 unchanged.
 
-Current stabilization completion work:
+Completed stabilization acceptance:
 
 | Work | What still needs proof |
 | --- | --- |
