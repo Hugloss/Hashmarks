@@ -14,8 +14,10 @@ acceptance requirements remain unchanged.
 Current position, updated 2026-10-18: all **23 canonical component owners**
 are implemented. `CodeMap` composes them and owns resource lifetime; domain
 operations and caches belong to named components. Current full configured Ty
-and Pyright checks pass. The latest independently extracted verification ring
-passes 96 tests; the earlier boundary/evaluator candidate passed 212. The handler
+and Pyright checks pass. The latest independently extracted retrieval/declaration
+ring passes 109 tests; the earlier initializer/evaluator candidate passed 154.
+Four selected configuration workflows over three repositories pass every
+admitted API/CLI/official MCP gate. The handler
 suite pins twelve source-reviewed genuine workflows over three repositories.
 Current selected API/CLI/official MCP replays close AsyncAPI and registration
 verification disclosure; Iterable still omits its independently nominated test
@@ -2287,6 +2289,185 @@ CR-20 configuration initializer evidence — 2026-10-18:
   Source admission validates all four. The first admission attempt hashed an
   entire multiline call where the existing contract requires the first source
   line; the corrected first-line and full-span hashes are retained separately.
+- Fresh acquisition with the stronger model oracle passes every admitted common
+  before/after API/CLI/official MCP gate for all three affected workflows, with
+  maximum compact/text initial sizes 2,684 (field schema), 3,126 (computed field)
+  and 2,526 (SQL field type) tokens (`cr21-model-extended-public/summary.json`).
+  Aggregate qualification remains INCOMPLETE. The exact frozen original
+  declaration/interface/handler test bytes also pass all 70 cases against the
+  complete changed production tree (`cr21-keyword-frozen-tests.xml`), while the
+  three new controls fail on the independently extracted frozen parent
+  (`cr21-keyword-frozen-parent.xml`). Overlays and source origins are explicit.
+- A same-source/request/bounds economics comparison retains two warmups/nine
+  samples and a parent repeat (`cr21-keyword-economics/summary.json`). Medians
+  are 14.62 / 14.37 / 15.68 ms; payload bytes 19,327 / 19,662 / 19,327. Source
+  field count, keyword names/omissions, runtime uncertainty and store counters
+  are identical; only the repaired side exposes the required provider name.
+  This is a bounded new-fact cost measurement, not full product economics.
+- Full current nominated locality acquisition covers 1,160 requests / 1,157
+  distinct targets, with zero observation errors or missing prior targets
+  (`cr21-current-locality-accounting/summary.json`). It includes all shared
+  initializer/function syntax and source-selection stages as explicit additional
+  measurement scope. Fresh Pyright capture qualifies 173 callers without
+  errors; 391 of 421 unresolved repository sites have exact source/range/unique
+  producer-endpoint correspondence (`cr21-locality-native-current/`). The
+  remaining 30 include regex/metadata/dictionary/super calls and five inherited
+  AST visitor calls. Unknowns remain unknown. There are still 35 incomplete
+  caller observations over eleven symbols and 8,469 external/unindexed sites;
+  the caller bound is already the supported 1,024 maximum. This is current
+  measured incompleteness, not architecture closure or permission to inspect
+  dependency implementations. Earlier locality numbers remain historical.
+
+CR-22 explicit file disclosure — 2026-10-18:
+
+- The four-case configuration acquisition retains one new genuine failure:
+  stateful-provider cleanup after the change drops the explicitly resolved
+  `litestar/di.py` path from retrieval results. All required boundary, verifier,
+  freshness, authority and size checks pass. The first three workflows pass
+  their admitted common gates; aggregate status remains FAIL
+  (`cr21-configuration-public/summary.json`).
+- Three neutral saturation cases reproduce the missing file at limits 1, 3 and
+  20 (`cr22-literal-file-parent.xml`). Classification: REFACTOR INTERNALLY. Tasks
+  now retains a current, visible file locator when the caller resolved a literal
+  path but no named declaration is admitted for disclosure. This composes the
+  existing target/visibility/freshness owners and never invents a declaration or
+  changes edit/verification authority. The source identity remains file-scoped.
+- The focused retrieval/ambiguity/privacy ring passes 68 cases, with two
+  official-MCP cases explicitly pending (`cr22-literal-file-controls.xml`).
+  Denied paths stay hidden, outline-only paths reveal no body, and full/initial
+  responses preserve the existing ownership proof and selected verifier. One
+  optional TypedDict test access was corrected after full typing identified it;
+  fresh full typing/extracted/official transport qualification follows.
+- The exact candidate `cr22-resolved-file-source/source.zip`, SHA-256
+  `77c649ceda755899b984fe1b5d2fcd22603457635c058e29808a39f6a3303cc5`,
+  source identity
+  `sha256:17bf0dbbbd0f45ef0da886e988bbeeb7db4df5511901026f43a7ab6e481a0ab5`,
+  observer
+  `sha256:02ff7e5080dea31f72b715288a02904541708e4cebd1c28fe53950a46fa68fa5`,
+  passes all 109 named extracted tests, including both official MCP cases
+  (`cr22-file-extracted.xml`). The three neutral cases fail on the exact frozen
+  parent with import origin and producer asserted
+  (`cr22-literal-file-frozen-parent.xml`). Full configured Ty/Pyright,
+  preflight, lock convergence and compileall pass.
+- All four genuine configuration workflows now pass every admitted common
+  before/after API/CLI/official MCP gate (`cr22-configuration-public/summary.json`).
+  Maximum required compact/text sizes are 3,257, 2,526, 2,902 and 3,154 tokens.
+  The stateful-provider source path is visible without establishing an edit
+  owner. Aggregate status remains INCOMPLETE for the eight pending workflows,
+  semantic/adversarial/native/witness review and capability admission. The
+  retained Iterable failure and five heldout ambiguity failures are not closed.
+- Exact retained-artifact regrading of all four outcomes passes with observer
+  construction and subprocess launch forbidden
+  (`cr22-configuration-pure-regrade.json`). Production, tests, evaluator, oracles
+  and tool configuration are byte-identical to the CR-22 source snapshot after
+  these proof paragraphs; they do not rebind older source or oracle reports.
+- Paired requested-identifier/supplement locality retains complete caller bounds.
+  Fresh Pyright captures for both callers qualify all twenty nominated unresolved
+  repository sites at exact source ranges and unique producer-claimed endpoints
+  (`cr22-file-native/site-correspondence-normalized.json`). No new helper or
+  selection owner is introduced; this does not rebind the broader CR-21 census.
+- The same genuine stateful-provider source/task/bounds with two warmups/nine
+  samples and parent repeat exposes a real cost
+  (`cr22-file-economics/summary.json`): medians 948.4 / 2,315.7 / 954.0 ms,
+  full-response bytes 25,622 / 24,576 / 25,622. Only the repaired side retains the
+  requested file in retrieval. Owner remains unknown and selected verifier is
+  unchanged. Additional file-scoped reference disclosure increases repository
+  work. The measurement is explicit and does not establish an economics win;
+  output-preserving reuse remains a follow-up, without suppressing source facts.
+
+CR-23 internal-stage inventory leads — 2026-10-18:
+
+- A source-only CR-00/current census retains 2,342 original and 2,456 current
+  CodeMap function definitions (`cr23-introduced-stage-inventory/summary.json`).
+  There are 173 new short-name and 692 changed-location leads, including public
+  renames, moved code, properties, overloads and real new stages. These are
+  source investigation leads, not counts of new responsibilities or migration
+  defects. The explicit public-operation table accounts for 89 of those leads;
+  one is type-only and three are overload declarations. Original public review
+  provenance/execution stays historical rather than being rebound.
+- Remaining runtime leads require actual semantic migration/stage classification,
+  exact owning tests and pre/post baseline correspondence. Name coincidence,
+  source movement, full typing or the 95-operation public review cannot close
+  that work. This inventory makes the still-open CR-11 population inspectable;
+  it does not weaken the architecture acceptance gate.
+
+CR-24 stable AST binding artifacts — 2026-10-18:
+
+- Read-only profiling of the genuine stateful-provider task records about 26.2
+  million Python calls. Repeated export-binding analysis dominates: 3,927
+  module-binding scans invoke approximately 1.06 million recursive write checks
+  (`cr24-profile/profile.pstats`). A separate input probe confirms one exact
+  source/symbol request is observed twice in the same read scope, but indirect
+  source scopes differ; their results cannot be merged indiscriminately
+  (`cr24-verification-repetition/summary.json`).
+- Classification: REFACTOR INTERNALLY. The existing Python export-syntax owner
+  now supplies a read-only per-snapshot binding artifact. Ordered bindings and
+  declaration identity share the same canonical qualification rules; one module
+  statement-write analysis serves multiple queried names. Imports consumes the
+  binding/declaration value once instead of rescanning the same tree twice.
+  A 256-entry disposable projection cache binds absolute path, full stable AST
+  metadata identity and the actual tree. Existing Source freshness/visibility
+  qualification still runs; the artifact is acceleration, not identity or new
+  repository authority. Source-only AST APIs remain uncached.
+- The first preserved import/authority/verification ring passes 85 tests.
+  Extended binding/order/scope/workspace controls pass 118, including definition
+  headers, lambda/comprehension scopes, match/exception captures, conditional
+  imports, star imports, annotation ordering and changed AST inputs
+  (`cr24-binding-controls-02.xml`). Two additional direct controls preserve stub
+  uncertainty and reject a changed re-export during an active read scope
+  (`cr24-binding-freshness.xml`). Full typing passes after correcting the new
+  test to construct the canonical Imports owner rather than assume a public root
+  attribute. No source oracle, task, threshold, bound or ranking rule changes.
+  Exact-artifact, preservation, genuine transport and comparable economics
+  qualification remain pending for this new candidate.
+- Frozen candidate `cr24-binding-artifact-source/source.zip`, SHA-256
+  `236e7d38f0a1f01d13278e5a859db26578644756c7f68b7c0a97ffc0ba3f783c`,
+  source identity
+  `sha256:da7153fef098049f18cab45025e5a3892201673467eed5009da863150669d830`,
+  observer
+  `sha256:2dcb0b1aa90f1132ed68b641115742fcb624eb8ea4b9249ba8b0d9da1694b325`,
+  passes 148 independently extracted import/binding/verification/locality tests
+  (`cr24-binding-extracted.xml`). Exact frozen parent test bytes pass all 94
+  preserved cases against the complete new production tree
+  (`cr24-frozen-tests.xml`). A read-only differential compares all 70 actual
+  module/name binding queries from the genuine task with the frozen original
+  syntax rule; kind, targets and declaration identity agree
+  (`cr24-binding-differential/summary.json`).
+- Same-source/task/bounds economics retain two warmups/nine samples and parent
+  repeat: 2,720.5 / 1,087.8 / 2,582.8 ms, with identical 24,576-byte full replies
+  and file-row reads 4,172 / 2,893 / 4,172
+  (`cr24-binding-economics/conservation-summary.json`). Original full/context/
+  initial identities are validated against each actual producer. Recomputing
+  only implementation-bound context and derived identities under a common
+  comparison producer makes full and decoded-initial bytes identical. File
+  disclosure, source facts, ordering, unknowns and authority remain unchanged.
+  This closes the measured regression substantially for one workload, not the
+  full cold/warm/incremental/economics population.
+- Paired locality covers all five changed existing binding stages and four
+  introduced artifact stages at matching depth-three/1,024 bounds. Every scope
+  has zero unresolved repository calls and complete caller bounds
+  (`cr24-binding-locality/summary.json`). Fresh producer captures are retained as
+  supplemental observations, not a vacuous zero-site qualification substitute.
+  Full configured typing and preflight pass; genuine transport requalification
+  is still running against this exact artifact.
+
+CR-25 declaration CLI error boundary — 2026-10-18:
+
+- Broader deterministic validation passes batches 0 and 1 at the CR-24 source,
+  then stops in batch 2/shard 8: 73 cases pass and the existing centralized CLI
+  exception-owner guard fails. The earlier declaration-selection migration left
+  a leaf `try/except ValueError` in `_repository_declarations_code`
+  (`cr24-dev-tests-remaining.log`). This failure is retained and no guard is
+  weakened. The frozen 64-shard selection has 3,494 test nodes.
+- Classification: REFACTOR INTERNALLY. Provider construction now occurs inside
+  the existing `_call_codemap` request/error boundary; JSON reading stays with
+  its original input adapter and the redundant leaf translation is removed.
+  Focused exception/declaration CLI controls pass 23 cases, with six MCP cases
+  explicitly outside that initial scope (`cr25-cli-declaration-controls.xml`).
+  A direct invalid-source CLI request proves caller-visible validation errors
+  still reach the shared boundary. Current typing, exact-artifact and named
+  deterministic batch requalification follow; completed old-source batches
+  remain proof for their original source, not silently rebound after this fix.
 
 Next work after this checkpoint:
 

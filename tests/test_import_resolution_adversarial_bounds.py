@@ -3,6 +3,8 @@ from pathlib import Path
 import pytest
 
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.decision_session import DecisionRefreshRequired
+from hashmarks.codemap.import_resolution import RepositoryImports
 
 
 def _write(root: Path, path: str, text: str) -> None:
@@ -30,6 +32,50 @@ def test_reexport_cycle_remains_unresolved(tmp_path: Path) -> None:
 
     assert owners == ["pkg/__init__.py"]
     assert ambiguous is True
+
+
+def test_stub_declaration_does_not_gain_runtime_export_authority(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "module.pyi", "class Public: ...\n")
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        imports = RepositoryImports(codemap.source)
+        assert imports._python_export_binding("module.pyi", "Public") == (
+            "unknown",
+            [],
+        )
+        assert imports._python_export_is_declaration("module.pyi", "Public") is True
+
+
+def test_binding_artifact_cannot_hide_a_reexport_change_within_read_scope(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "pkg/__init__.py", "from .left import Public\n")
+    _write(tmp_path, "pkg/left.py", "class Public: pass\n")
+    _write(tmp_path, "pkg/right.py", "class Public: pass\n")
+    _write(tmp_path, "use.py", "from pkg import Public\n")
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        imports = RepositoryImports(codemap.source)
+        with imports.reads.session():
+            owners, unresolved = imports._resolve_import_owner_evidence(
+                "use.py", "pkg.Public"
+            )
+            assert owners == ["pkg/__init__.py", "pkg/left.py"]
+            assert unresolved is False
+            (tmp_path / "pkg/__init__.py").write_text(
+                "if flag:\n    from .right import Public\n"
+            )
+            with pytest.raises(DecisionRefreshRequired):
+                imports._resolve_import_owner_evidence("use.py", "pkg.Public")
+        codemap.index.sync(["pkg/__init__.py"])
+        owners, unresolved = imports._resolve_import_owner_evidence(
+            "use.py", "pkg.Public"
+        )
+        assert owners == ["pkg/__init__.py"]
+        assert unresolved is True
+        assert imports.reads.depth == 0
 
 
 def test_two_module_reexport_cycle_keeps_only_the_facade(tmp_path: Path) -> None:

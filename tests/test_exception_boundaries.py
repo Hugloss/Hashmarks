@@ -72,6 +72,25 @@ def test_repository_cli_boundary_translates_only_expected_request_errors(
         )
 
 
+def test_declaration_source_request_uses_the_shared_cli_error_boundary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("HASHMARKS_NO_UPDATE_CHECK", "1")
+    request = tmp_path / "interface.json"
+    request.write_text('{"paths": ["source.py"], "unsupported": true}')
+    with pytest.raises(SystemExit, match="only supported source options"):
+        cli.main(
+            [
+                "repository-declarations",
+                "--workspace",
+                str(tmp_path),
+                "--python-interface-json",
+                str(request),
+            ]
+        )
+
+
 def test_repository_cli_boundary_retries_known_transient_races_once_centrally(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

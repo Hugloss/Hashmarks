@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import posixpath
 from collections import deque
 from collections.abc import Mapping
@@ -11,8 +12,8 @@ from hashmarks.python_ast_cache import read_python_ast
 
 from .python_exports import (
     AllExportStatus,
-    python_export_binding,
-    python_export_is_declaration,
+    PythonExportBinding,
+    python_export_bindings,
     python_import_alias_targets,
     python_reexport_targets,
     static_all_exports,
@@ -38,18 +39,22 @@ class _OwnerWalk:
     ) -> list[str] | None:
         resolver = self.resolver
         decision = resolver.files.decide(facade_path)
-        if not decision.index or decision.evidence_visibility.value != "source":
+        qualified = decision.index and decision.evidence_visibility.value == "source"
+        if not qualified:
             self.symbol_unresolved = True
         symbols = resolver.reads.symbols_for_path(facade_path)
         has_local_symbol = any(
             str(symbol.get("name") or "") == exported_name for symbol in symbols
         )
-        kind, binding_targets = resolver._python_export_binding(
-            facade_path, exported_name
+        observed = (
+            resolver._python_export_observation(facade_path, exported_name)
+            if facade_path.endswith(".py")
+            else PythonExportBinding("unknown")
         )
+        kind, binding_targets = observed.kind, list(observed.targets)
         if kind in {"local", "module"}:
             self.leaves.add(facade_path)
-            if resolver._python_export_is_declaration(facade_path, exported_name):
+            if qualified and observed.declaration is not None:
                 self.symbol_leaves.add((facade_path, exported_name))
             return None
         targets = (
@@ -275,12 +280,7 @@ class RepositoryImports:
         decision = self.files.decide(path)
         if not decision.index or decision.evidence_visibility.value != "source":
             return False
-        self.source.ensure_current(path)
-        try:
-            tree = read_python_ast(self.workspace / path).tree
-        except (OSError, UnicodeError, SyntaxError, ValueError):
-            return False
-        return python_export_is_declaration(tree, name)
+        return self._python_export_observation(path, name).declaration is not None
 
     def _resolve_import_symbol_evidence(
         self, source_path: str, target: str
@@ -333,12 +333,25 @@ class RepositoryImports:
         """
         if not facade_path.endswith(".py") or not exported_name:
             return "unknown", []
+        observed = self._python_export_observation(facade_path, exported_name)
+        return observed.kind, list(observed.targets)
+
+    def _python_export_observation(
+        self, facade_path: str, exported_name: str
+    ) -> PythonExportBinding:
+        """Project binding and declaration facts from one stable AST snapshot."""
+        if not exported_name:
+            return PythonExportBinding("unknown")
         self.source.ensure_current(facade_path)
         try:
-            tree = read_python_ast(self.workspace / facade_path).tree
+            snapshot = read_python_ast(self.workspace / facade_path)
         except (OSError, UnicodeError, SyntaxError, ValueError):
-            return "unknown", []
-        return python_export_binding(tree, exported_name)
+            return PythonExportBinding("unknown")
+        return python_export_bindings(
+            os.path.abspath(os.fspath(self.workspace / facade_path)),
+            snapshot.identity,
+            snapshot.tree,
+        ).binding(exported_name)
 
     def _python_star_export_authority(
         self, facade_path: str, target: str, exported_name: str

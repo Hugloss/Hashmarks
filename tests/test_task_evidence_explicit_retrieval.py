@@ -126,6 +126,76 @@ def test_denied_requested_target_is_not_disclosed_by_ordering(tmp_path: Path) ->
     assert packet["ownership"]["owner"] is None
 
 
+@pytest.mark.parametrize("limit", [1, 3, 20])
+def test_resolved_file_without_named_declaration_survives_saturated_retrieval(
+    tmp_path: Path,
+    limit: int,
+) -> None:
+    (tmp_path / "app.py").write_text(
+        "class Dispatcher:\n    def install(self): return 1\n"
+    )
+    (tmp_path / "tests").mkdir()
+    for index in range(30):
+        (tmp_path / f"tests/test_noise_{index}.py").write_text(
+            "from app import Dispatcher\n"
+            "def test_handler_registration_paths(): return Dispatcher().install()\n"
+        )
+    task = "Handler registration hooks repeat for multiple paths in app.py."
+    with CodeMap(tmp_path) as repository:
+        repository.index.sync()
+        action = repository.tasks.action_map(task, limit=limit)
+        packet = repository.tasks.evidence(task, limit=limit)
+        initial = read_initial_projection(
+            decode_initial_packet(
+                repository.tasks.evidence(task, limit=limit, result_mode="initial")
+            )
+        )
+    for observed in (packet, initial):
+        assert observed["explicit_target"]["status"] == "resolved"
+        assert observed["explicit_target"]["path"] == "app.py"
+        rows = observed["retrieval"]["results"]
+        assert rows[0]["path"] == "app.py"
+        assert not rows[0].get("symbol")
+        assert not rows[0].get("start_line")
+        assert len(rows) <= limit
+        assert observed["retrieval"]["ownership_authority"] is False
+        assert observed["ownership"]["owner"] == action["admitted_edit"]
+        assert (
+            observed["ownership"]["authority_proof_identity"]
+            == action["ownership_authority"]["authority_proof_identity"]
+        )
+        assert observed["verification"]["selected"] is not None
+        assert action["verify"] is not None
+        assert observed["verification"]["selected"]["path"] == action["verify"]["path"]
+
+
+@pytest.mark.parametrize("visibility", ["deny", "outline"])
+def test_literal_file_fallback_respects_source_visibility(
+    tmp_path: Path,
+    visibility: str,
+) -> None:
+    (tmp_path / "app.py").write_text(
+        "class Dispatcher:\n    def install(self): return 'DO_NOT_DISCLOSE_BODY'\n"
+    )
+    (tmp_path / ".hashmarks-context.toml").write_text(
+        f"[[rule]]\npattern='app.py'\nvisibility='{visibility}'\n"
+    )
+    (tmp_path / "noise.py").write_text("def handler_registration_paths(): return 1\n")
+    with CodeMap(tmp_path) as repository:
+        repository.index.sync()
+        packet = repository.tasks.evidence(
+            "Handler registration hooks repeat for multiple paths in app.py."
+        )
+    assert "DO_NOT_DISCLOSE_BODY" not in str(packet)
+    rows = packet["retrieval"]["results"]
+    if visibility == "deny":
+        assert all(row["path"] != "app.py" for row in rows)
+    else:
+        assert rows[0]["path"] == "app.py"
+        assert rows[0].get("evidence_visibility") == "outline"
+        assert not rows[0].get("symbol")
+
+
 @pytest.mark.parametrize("result_mode", ["default", "initial"])
 def test_literal_path_precedes_same_named_methods_without_unique_ownership(
     tmp_path: Path, result_mode: str

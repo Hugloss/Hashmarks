@@ -281,17 +281,6 @@ def _repository_declarations_code(args: Namespace) -> int:
         if args.python_interface_json
         else None
     )
-    try:
-        providers = source_declaration_providers(
-            "discovery",
-            {
-                "python_backend_paths": args.python_backend_path,
-                "include_class_fields": args.include_class_fields,
-                "python_interface": interface,
-            },
-        )
-    except ValueError as exc:
-        raise RepositoryCliError(str(exc)) from exc
     previous = (
         _read_json_object(args.previous_observation, option="--previous-observation")
         if args.previous_observation
@@ -301,7 +290,14 @@ def _repository_declarations_code(args: Namespace) -> int:
         args,
         lambda codemap: codemap.declarations.operation(
             [],
-            providers=providers,
+            providers=source_declaration_providers(
+                "discovery",
+                {
+                    "python_backend_paths": args.python_backend_path,
+                    "include_class_fields": args.include_class_fields,
+                    "python_interface": interface,
+                },
+            ),
             previous_observation=previous,
             result_mode="discovery",
         ),

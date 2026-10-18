@@ -850,6 +850,22 @@ class TaskEvidenceRetrievalMixin:
             )
             if self._task_evidence_requested_locator_key(row) not in known
         )
+        if (
+            not exact
+            and self._task_evidence_declaration_visible(literal_path)
+            and self.index.is_current(literal_path)
+        ):
+            visibility = self._task_evidence_visibility(literal_path)
+            assert visibility is not None
+            exact.append(
+                {
+                    "path": literal_path,
+                    "evidence_visibility": visibility.value,
+                    "canonical_rank": canonical_rank,
+                    "retrieval_supplement": "resolved-literal-path",
+                    "score_basis": "literal-path",
+                }
+            )
         return exact, complete, terms
 
     def _task_evidence_literal_identifier_supplements(
