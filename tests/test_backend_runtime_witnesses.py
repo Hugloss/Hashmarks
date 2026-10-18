@@ -218,8 +218,10 @@ def test_retained_runtime_grading_requires_actual_artifact_bytes(
 def test_pseudo_callable_is_retained_as_a_metric_miss(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
+    # Generator expressions retain a separate frame; Python 3.12+ inlines list
+    # comprehensions, which would stop exercising unsupported pseudo-callables.
     capture = _capture(
-        source, "def process():\n    return [1 / 0 for value in [1]]\n", "process()"
+        source, "def process():\n    return list(1 / 0 for value in [1])\n", "process()"
     )
     oracle = freeze_runtime_oracles(
         source, capture, repository="repo", bundle_id="runtime:1"

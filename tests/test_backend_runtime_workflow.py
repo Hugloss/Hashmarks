@@ -61,8 +61,10 @@ def runtime_corpus(tmp_path_factory: pytest.TempPathFactory) -> Corpus:
     base = tmp_path_factory.mktemp("runtime-corpus")
     sources: dict[str, Path] = {}
     definitions, labels, requests, oracles = {}, {}, {}, {}
+    # Keep a real unsupported generator frame on Python versions that inline
+    # list comprehensions, including Python 3.14.
     for stage, text in (
-        ("before", "def handler():\n    return [1 / 0 for value in [1]]\n"),
+        ("before", "def handler():\n    return list(1 / 0 for value in [1])\n"),
         ("after", "def handler():\n    return 2\n"),
     ):
         source = base / stage
@@ -150,6 +152,7 @@ def runtime_corpus(tmp_path_factory: pytest.TempPathFactory) -> Corpus:
     write_json(
         base / "grader.json", {"schema": GRADER_SCHEMA, "cases": {"handler": rule}}
     )
+    load_corpus(suite, sources)
     return suite, sources
 
 
@@ -258,7 +261,7 @@ def test_runtime_source_admission_rejects_unproved_or_omitted_units(
     workflow = assert_object(assert_array(suite["workflows"])[0])
     rule = assert_object(assert_object(grader["cases"])["handler"])
     if change == "membership":
-        workflow["debug_frame_units"] = ["before:frame-0"]
+        assert_array(workflow["debug_frame_units"]).pop()
     elif change == "oracle":
         assert_array(
             assert_object(assert_object(rule["runtime_oracles"])["before"])["frames"]
