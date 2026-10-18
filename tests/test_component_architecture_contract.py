@@ -200,6 +200,7 @@ FAMILY_MODULES = {
             "task_evidence_retrieval",
             "task_evidence_scoped_method",
             "task_evidence_fields",
+            "task_evidence_source_context",
             "configuration_evidence",
         )
     },

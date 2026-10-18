@@ -417,6 +417,8 @@ def _retrieval_locator(value: object, path: str) -> None:
         "same_name_declarations",
         "direct_call_declarations",
         "field_declarations",
+        "source_observation",
+        "source_selection",
     ):
         if key in row:
             _record(row[key], f"{path}.{key}")

@@ -819,6 +819,7 @@ class TaskEvidenceRetrievalMixin:
         self._task_evidence_attach_enclosing_functions(result)
         self._task_evidence_attach_direct_call_declarations(result)
         self._task_evidence_attach_field_declarations(result)
+        self._task_evidence_attach_source_context(result)
         self._task_evidence_attach_candidate_verifiers(result, task)
 
     def _task_evidence_requested_identifiers(

@@ -4236,6 +4236,189 @@
               "path": "faststream/_internal/di/config.py"
             }
           }
+        ],
+        "initial_checks": [
+          {
+            "id": "initial-provider-keyword-reference",
+            "pointer": "/retrieval/results/*/field_declarations/groups/*",
+            "predicate": "includes_scoped_record",
+            "source_paths": [
+              "faststream/_internal/di/config.py"
+            ],
+            "support": "supported",
+            "value": {
+              "pointer": "/value/fields/*",
+              "record": {
+                "default": {
+                  "callee": {
+                    "name": "field",
+                    "state": "name-syntax"
+                  },
+                  "first_argument_reference": {
+                    "state": "not-supplied"
+                  },
+                  "has_argument_expansion": false,
+                  "keyword_names": [
+                    "default"
+                  ],
+                  "keyword_names_omitted": 0,
+                  "keyword_reference_scope": "returned-direct-keyword-values",
+                  "keyword_references": [
+                    {
+                      "keyword": "default",
+                      "reference": {
+                        "name": "dependency_provider",
+                        "state": "name-syntax"
+                      }
+                    }
+                  ],
+                  "positional_count": 0,
+                  "runtime_binding": "not-established",
+                  "state": "direct-call-syntax"
+                },
+                "end_line": 33,
+                "line": 33,
+                "name": "provider",
+                "runtime_validation": "not-established"
+              },
+              "scope": {
+                "scope": {
+                  "class_line": 30,
+                  "class_name_syntax": "FastDependsConfig",
+                  "path": "faststream/_internal/di/config.py"
+                }
+              }
+            }
+          },
+          {
+            "authority_check": true,
+            "id": "initial-runtime-field-roles-unknown",
+            "pointer": "/retrieval/results/*/field_declarations/groups/*/value/runtime_field_roles",
+            "predicate": "all_equal",
+            "source_paths": [
+              "faststream/_internal/di/config.py"
+            ],
+            "support": "supported",
+            "value": "unknown"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-no-runtime-class-identity",
+            "pointer": "/retrieval/results/*/field_declarations/groups/*/value/class_identity",
+            "predicate": "all_equal",
+            "source_paths": [
+              "faststream/_internal/di/config.py"
+            ],
+            "support": "supported",
+            "value": "not-established"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-declaration-state",
+            "pointer": "/retrieval/results/*/field_declarations/state",
+            "predicate": "all_equal",
+            "source_paths": [
+              "faststream/_internal/di/config.py"
+            ],
+            "support": "supported",
+            "value": "observed"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-semantic-coverage",
+            "pointer": "/retrieval/results/*/field_declarations/coverage",
+            "predicate": "all_equal",
+            "source_paths": [
+              "faststream/_internal/di/config.py"
+            ],
+            "support": "supported",
+            "value": "incomplete"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-no-owner-authority",
+            "pointer": "/retrieval/results/*/field_declarations/ownership_authority",
+            "predicate": "all_equal",
+            "source_paths": [
+              "faststream/_internal/di/config.py"
+            ],
+            "support": "supported",
+            "value": false
+          },
+          {
+            "authority_check": true,
+            "id": "initial-no-negative-authority",
+            "pointer": "/retrieval/results/*/field_declarations/negative_evidence_admissible",
+            "predicate": "all_equal",
+            "source_paths": [
+              "faststream/_internal/di/config.py"
+            ],
+            "support": "supported",
+            "value": false
+          },
+          {
+            "authority_check": true,
+            "id": "initial-runtime-binding-unknown",
+            "pointer": "/retrieval/results/*/field_declarations/groups/*/value/runtime_binding",
+            "predicate": "all_equal",
+            "source_paths": [
+              "faststream/_internal/di/config.py"
+            ],
+            "support": "supported",
+            "value": "not-established"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-inherited-fields-unknown",
+            "pointer": "/retrieval/results/*/field_declarations/groups/*/value/inherited_fields",
+            "predicate": "all_equal",
+            "source_paths": [
+              "faststream/_internal/di/config.py"
+            ],
+            "support": "supported",
+            "value": "not-established"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-correspondence-unresolved",
+            "pointer": "/retrieval/results/*/field_declarations/groups/*/correspondence/state",
+            "predicate": "all_equal",
+            "source_paths": [
+              "faststream/_internal/di/config.py"
+            ],
+            "support": "supported",
+            "value": "unresolved"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-absence-unknown",
+            "pointer": "/retrieval/results/*/field_declarations/groups/*/absence/state",
+            "predicate": "all_equal",
+            "source_paths": [
+              "faststream/_internal/di/config.py"
+            ],
+            "support": "supported",
+            "value": "unknown"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-source-revision",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_scoped_record",
+            "source_paths": [
+              "faststream/_internal/di/config.py"
+            ],
+            "support": "supported",
+            "value": {
+              "pointer": "/field_declarations",
+              "record": {
+                "source_revision": "7fe0976e39c762088bb8b04ca64f1c6b49cc69f4e8e768fc3919afb36bbd5a3c"
+              },
+              "scope": {
+                "path": "faststream/_internal/di/config.py"
+              }
+            }
+          }
         ]
       },
       "before": {
@@ -4246,6 +4429,189 @@
             "predicate": "includes_record",
             "value": {
               "path": "faststream/_internal/di/config.py"
+            }
+          }
+        ],
+        "initial_checks": [
+          {
+            "id": "initial-provider-keyword-reference",
+            "pointer": "/retrieval/results/*/field_declarations/groups/*",
+            "predicate": "includes_scoped_record",
+            "source_paths": [
+              "faststream/_internal/di/config.py"
+            ],
+            "support": "supported",
+            "value": {
+              "pointer": "/value/fields/*",
+              "record": {
+                "default": {
+                  "callee": {
+                    "name": "field",
+                    "state": "name-syntax"
+                  },
+                  "first_argument_reference": {
+                    "state": "not-supplied"
+                  },
+                  "has_argument_expansion": false,
+                  "keyword_names": [
+                    "default_factory"
+                  ],
+                  "keyword_names_omitted": 0,
+                  "keyword_reference_scope": "returned-direct-keyword-values",
+                  "keyword_references": [
+                    {
+                      "keyword": "default_factory",
+                      "reference": {
+                        "name": "Provider",
+                        "state": "name-syntax"
+                      }
+                    }
+                  ],
+                  "positional_count": 0,
+                  "runtime_binding": "not-established",
+                  "state": "direct-call-syntax"
+                },
+                "end_line": 33,
+                "line": 33,
+                "name": "provider",
+                "runtime_validation": "not-established"
+              },
+              "scope": {
+                "scope": {
+                  "class_line": 30,
+                  "class_name_syntax": "FastDependsConfig",
+                  "path": "faststream/_internal/di/config.py"
+                }
+              }
+            }
+          },
+          {
+            "authority_check": true,
+            "id": "initial-runtime-field-roles-unknown",
+            "pointer": "/retrieval/results/*/field_declarations/groups/*/value/runtime_field_roles",
+            "predicate": "all_equal",
+            "source_paths": [
+              "faststream/_internal/di/config.py"
+            ],
+            "support": "supported",
+            "value": "unknown"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-no-runtime-class-identity",
+            "pointer": "/retrieval/results/*/field_declarations/groups/*/value/class_identity",
+            "predicate": "all_equal",
+            "source_paths": [
+              "faststream/_internal/di/config.py"
+            ],
+            "support": "supported",
+            "value": "not-established"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-declaration-state",
+            "pointer": "/retrieval/results/*/field_declarations/state",
+            "predicate": "all_equal",
+            "source_paths": [
+              "faststream/_internal/di/config.py"
+            ],
+            "support": "supported",
+            "value": "observed"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-semantic-coverage",
+            "pointer": "/retrieval/results/*/field_declarations/coverage",
+            "predicate": "all_equal",
+            "source_paths": [
+              "faststream/_internal/di/config.py"
+            ],
+            "support": "supported",
+            "value": "incomplete"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-no-owner-authority",
+            "pointer": "/retrieval/results/*/field_declarations/ownership_authority",
+            "predicate": "all_equal",
+            "source_paths": [
+              "faststream/_internal/di/config.py"
+            ],
+            "support": "supported",
+            "value": false
+          },
+          {
+            "authority_check": true,
+            "id": "initial-no-negative-authority",
+            "pointer": "/retrieval/results/*/field_declarations/negative_evidence_admissible",
+            "predicate": "all_equal",
+            "source_paths": [
+              "faststream/_internal/di/config.py"
+            ],
+            "support": "supported",
+            "value": false
+          },
+          {
+            "authority_check": true,
+            "id": "initial-runtime-binding-unknown",
+            "pointer": "/retrieval/results/*/field_declarations/groups/*/value/runtime_binding",
+            "predicate": "all_equal",
+            "source_paths": [
+              "faststream/_internal/di/config.py"
+            ],
+            "support": "supported",
+            "value": "not-established"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-inherited-fields-unknown",
+            "pointer": "/retrieval/results/*/field_declarations/groups/*/value/inherited_fields",
+            "predicate": "all_equal",
+            "source_paths": [
+              "faststream/_internal/di/config.py"
+            ],
+            "support": "supported",
+            "value": "not-established"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-correspondence-unresolved",
+            "pointer": "/retrieval/results/*/field_declarations/groups/*/correspondence/state",
+            "predicate": "all_equal",
+            "source_paths": [
+              "faststream/_internal/di/config.py"
+            ],
+            "support": "supported",
+            "value": "unresolved"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-absence-unknown",
+            "pointer": "/retrieval/results/*/field_declarations/groups/*/absence/state",
+            "predicate": "all_equal",
+            "source_paths": [
+              "faststream/_internal/di/config.py"
+            ],
+            "support": "supported",
+            "value": "unknown"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-source-revision",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_scoped_record",
+            "source_paths": [
+              "faststream/_internal/di/config.py"
+            ],
+            "support": "supported",
+            "value": {
+              "pointer": "/field_declarations",
+              "record": {
+                "source_revision": "7d194d835425e34494902bf5f308065d53ee7713b93713117a2a1bb80c0b0eec"
+              },
+              "scope": {
+                "path": "faststream/_internal/di/config.py"
+              }
             }
           }
         ]

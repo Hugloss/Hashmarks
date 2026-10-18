@@ -13,6 +13,26 @@ authority or sufficient verification. The performance changes do not assert
 reproduced runtime failures. Distinct commit identities are recorded; independent
 problem-distinctness review remains required.
 
+The retained CR-36 source qualification now covers all twelve workflows through
+API/CLI/official MCP, with 1,698 required source witnesses passing. It remains
+INCOMPLETE for semantic/capability review. A later CR-38 candidate separately
+qualifies the default-provider declaration in initial task replies: exact
+before/after initializer references remain visible and required compact/text
+replies stay within 4,000 tokens. Its source-authored correspondence check covers
+60 observations and rejects 32 mutations. Those are scoped observer proofs;
+runtime provider identity and causal test relevance remain unqualified. Reports
+retain their original candidate identities under
+`.hashmarks/canonical-component-rewrite/`; results from the two candidates must
+not be combined into a same-candidate capability pass.
+
+The default-provider case now has twelve initial checks per revision, copied
+from its pre-existing source-authored declaration oracle and supplemented by
+revision/uncertainty/authority checks. Its required membership is 216 initial
+fact witnesses across API and all CLI/MCP formats. Retained broken captures fail
+these checks; repaired captures pass. `initial-field-oracle-review.json` records
+the source-review and original/new oracle identities. This addition preserves
+all previous checks and keeps semantic review and metric eligibility false.
+
 The source records bind exact commits, complete archive content identities,
 archive SHA-256 and nominated file byte hashes. A path marked absent is absent
 from that exact source tree; this does not establish semantic absence. Three

@@ -470,6 +470,7 @@ def project_initial_task(
                 "direct_call_declarations",
                 "supplement",
                 "field_declarations",
+                "source_selection",
             )
             if key in row
         }
@@ -481,6 +482,7 @@ def project_initial_task(
             {},
             assertion="producer_claim",
         )
+        _project_initial_source_context(p, row, (*ref, "retrieval", "results", index))
     relevance = verification.get("relevance")
     if isinstance(relevance, Mapping):
         rows = relevance.get("candidates", [])
@@ -528,6 +530,73 @@ def _initial_field_declarations_text(rows: list[dict[str, Any]]) -> list[str]:
     ]
 
 
+def _source_context_view(
+    observation: Mapping[str, object], ref: str
+) -> dict[str, object]:
+    """Display exact anchors and qualification; reference remaining native metadata."""
+    return {
+        "metadata_ref": ref,
+        **{
+            key: observation[key]
+            for key in (
+                "member",
+                "freshness",
+                "availability",
+                "completeness",
+                "truncation",
+                "requested_lines",
+                "line_anchors",
+                "line_coverage",
+                "negative_evidence",
+                "authority",
+                "execution_effect",
+            )
+            if key in observation
+        },
+    }
+
+
+def _project_initial_source_context(
+    p: _Projection, row: Mapping[str, object], ref: tuple[object, ...]
+) -> None:
+    observation = row.get("source_observation")
+    if isinstance(observation, Mapping):
+        source_ref = (*ref, "source_observation")
+        pointer = "/" + "/".join(
+            str(part).replace("~", "~0").replace("/", "~1") for part in source_ref
+        )
+        p.add(
+            "source",
+            "task_source_excerpts",
+            _source_context_view(observation, pointer),
+            source_ref,
+            {},
+            assertion="observed_fact",
+        )
+
+
+def _initial_source_context_text(rows: list[dict[str, Any]]) -> list[str]:
+    return [
+        (
+            f"Source observation @ /retrieval/results/{index}/source_observation: "
+            + json.dumps(
+                _source_context_view(
+                    row["source_observation"],
+                    f"/retrieval/results/{index}/source_observation",
+                ),
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            if isinstance(row.get("source_observation"), Mapping)
+            else ""
+        )
+        + f"\nSource selection @ /retrieval/results/{index}/source_selection: "
+        + json.dumps(row["source_selection"], sort_keys=True, separators=(",", ":"))
+        for index, row in enumerate(rows)
+        if isinstance(row.get("source_selection"), Mapping)
+    ]
+
+
 def initial_evidence_text(packet: Mapping[str, object]) -> str:
     """Describe admitted initial locators; their native qualifications still govern."""
     from hashmarks.codemap.task_evidence_initial import decode_initial_collection
@@ -566,6 +635,7 @@ def initial_evidence_text(packet: Mapping[str, object]) -> str:
         )
     lines.extend(declaration_scopes_text(retrieval.get("results", [])))
     lines.extend(_initial_field_declarations_text(retrieval.get("results", [])))
+    lines.extend(_initial_source_context_text(retrieval.get("results", [])))
     lines.extend(initial_semantic_relationship_text(packet))
     relevance = verification.get("relevance")
     if isinstance(relevance, Mapping):

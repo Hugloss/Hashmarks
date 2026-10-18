@@ -32,6 +32,7 @@ from .task_evidence_discrimination import (
 from .task_evidence_fields import TaskEvidenceFieldsMixin
 from .task_evidence_retrieval import TaskEvidenceRetrievalMixin
 from .task_evidence_scoped_method import TaskEvidenceScopedMethodMixin
+from .task_evidence_source_context import TaskEvidenceSourceContextMixin
 from .task_evidence_types import SourceReadPending
 
 if TYPE_CHECKING:
@@ -108,6 +109,7 @@ class TaskEvidencePacketMixin(
     TaskEvidenceRetrievalMixin,
     TaskEvidenceScopedMethodMixin,
     TaskEvidenceFieldsMixin,
+    TaskEvidenceSourceContextMixin,
     ConfigurationEvidenceMixin,
     DecisionPacketMixin,
     ReadScopeOwner,

@@ -3087,15 +3087,108 @@ CR-38 bound initial field disclosure and preserve metadata — 2026-10-18:
   now omitted, and unchanged initial rows are preserved when no field is
   excluded. Current exact-artifact, full typing and genuine size qualification
   follow; no initial-sufficiency or 5/5 claim is made at this checkpoint.
+- Exact candidate `cr38-field-initial/source.zip`, SHA-256
+  `4212a13d3a956db2b5556e0146dba9bb550a85a6f7141641016f56cf5028607d`,
+  source identity
+  `sha256:1fe61c595d5f8543412dc82778a443cc61d31d3da55ebfcd788378bf30af8224`,
+  observer
+  `sha256:7fc74c6b4401d94cbd451ca267350b70357fed472ce9ad59281025526483fe91`,
+  passes 195 independent extracted affected tests and all 142 unchanged
+  predecessor tests over the complete new production tree, with zero skips.
+  The three deliberately changed constructor/dependency-contract test owners are
+  named in `cr38-original-field-tests-receipt.json`; no compatibility shim is
+  used. Full configured Ty/Pyright, preflight, lock convergence and compileall
+  pass. This result prose postdates the archive; the observed production and
+  test bytes remain frozen.
+- The fresh genuine provider workflow passes every admitted before/after
+  API/CLI/official MCP gate (`cr38-provider-genuine/summary.json`). All 114
+  source witnesses pass; maximum required initial cost is 4,000 tokens,
+  including MCP's complete text/structured reply. Pure artifact regrading passes
+  with observer construction and process launch forbidden
+  (`cr38-provider-pure-regrade.json`). The aggregate remains INCOMPLETE for the
+  eleven unselected workflows and independent capability/eligibility review.
+- A separate source-authored correspondence check starts from the exact earlier
+  CR-35 reviewed line-33 declarations and file hashes, without using observer
+  outputs to construct expected values. Both revisions, full/initial API,
+  CLI/MCP and their readable views pass all 60 observations, with exact native
+  metadata recovery. All 32 wrong-revision/keyword/reference/line/path,
+  missing-field, strengthened-runtime and strengthened-coverage mutations reject
+  (`cr38-field-correspondence.json`). The before `default_factory=Provider` and
+  after `default=dependency_provider` facts now appear in initial replies. This
+  does not establish shared runtime provider identity, causal relevant-test
+  coverage, the other initial-sufficiency gaps, or any complete 5/5 row.
+- Comparable depth-three/1,024-bound locality observations cover the two
+  constructor/orchestration stages before and after, plus four field-disclosure
+  stages (`cr38-field-locality/summary.json`). All eight observations finish
+  without incomplete caller bounds. Constructor and group projection resolve
+  their repository calls, but the orchestration still has 16 unresolved calls,
+  selector/composition scopes each retain the known regex-data call, and the
+  attach stage retains two mixin calls. This is INCOMPLETE architecture evidence;
+  these counts are per scope, overlap, and are not distinct-defect totals.
+
+CR-39 admit the source-authored initial provider oracle — 2026-10-18:
+
+- The existing before/after declaration oracle already pins the exact provider
+  field, class scope, line 33, initializer keyword/reference and runtime unknowns.
+  The corpus now checks those same source-authored values in initial task replies,
+  with exact revision, incomplete coverage, unresolved correspondence/absence,
+  and non-owner/non-negative-authority checks. Twelve checks per stage define
+  216 required API/CLI/official MCP initial witness units before reacquisition
+  (`cr39-required-initial-witnesses.json`). No task, source, prior oracle value or
+  JSON scalar type, membership, threshold, review flag or eligibility flag changes.
+- Pure regrading of the retained captures rejects all 216 units on the broken
+  CR-36 source and passes all 216 on CR-38. Twenty-six missing/changed/strengthened
+  fact mutations also reject (`cr39-initial-oracle-recheck.json`). The evaluator
+  constructs no observer or process. Original receipts/outcomes remain intact;
+  the new oracle has its own identity and does not retroactively rebind them.
+- All twelve workflows and twenty-four source trees pass source admission under
+  the augmented grader. Display, complete task/causal-test and capability review
+  remain incomplete. Fresh acquisition under the new grader identity follows;
+  a passing narrow initial source fact is not a complete task-sufficiency claim.
+- Fresh candidate `cr39-initial-oracle/source.zip`, SHA-256
+  `43086d4c04631c2ed75a0417f7441a415d810fe4e62e9eaf026f7fee1eaff2e9`,
+  source identity
+  `sha256:0ddc283c20ba054e71e3a9f9f3a1e0f9e5267b0dd96c642eebe72375a0e850fb`,
+  retains the CR-38 observer/evaluator implementations and augments only the
+  source-authored oracle/docs. All 48 independent extracted grader/source-workflow
+  tests pass, zero skips (`cr39-oracle-extracted.xml`). No production, test or
+  evaluator Python changes are required for this oracle addition.
+- Its fresh before/after API/CLI/official MCP acquisition passes every admitted
+  common gate, including the newly exercised `initial_evidence` gate
+  (`cr39-provider-genuine/summary.json`). All 216/216 required initial witnesses
+  are artifact/source-bound and PASS, zero missing
+  (`cr39-initial-witness-accounting.json`); all 114 source-line witnesses also
+  pass. Maximum required initial reply cost is 3,998 tokens. Observer-free pure
+  regrading reproduces the outcomes and complete witness membership
+  (`cr39-provider-pure-regrade.json`).
+- Independent source-reviewed correspondence over these fresh artifacts again
+  passes 60 native/readable observations and rejects 32 corruptions
+  (`cr39-field-correspondence.json`). The eleven unselected workflows and
+  independent display/task/causal-test/eligibility/capability reviews keep the
+  overall result INCOMPLETE. Passing this source slice does not change any
+  review or eligibility flag. Completed CR-39 acquisition has no live handle to
+  restart. Result prose postdates the archive; qualified input bytes stay frozen.
 
 Next work after this checkpoint:
 
-1. Complete independent semantic/causal-test/adversarial review and required
+1. CR-39 closes the provider initial-source oracle and all 216 required witnesses
+   on its fresh immutable candidate. Preserve that proof and continue the
+   missing cached-yield guard evidence and independently relevant-test gaps.
+   The ordinary call index cannot supply the guard: a reviewed local probe finds
+   43 indexed edges in the genuine `litestar/di.py`; lines 63–67 contain only the
+   exception constructor call at 66, while the required condition is line 65
+   (`cr39-guard-reference-probe/edges.json`). Reuse canonical source evidence for
+   this gap; do not invent a call edge, infer runtime behavior or add a second
+   backend analysis framework. Complete independent
+   semantic/causal-test/adversarial review and required
    witness membership for all twelve configuration slices, then acquire the
    complete selected population on one final candidate. The two missing source
    slices and generic source-line acquisition/replay/witness integration are
    implemented at CR-34; do not redo them or add a redundant production parser.
    Source spelling still does not prove runtime provider/filter behavior.
+   The complete CR-36 acquisition is retained; do not restart it. The separate
+   CR-38 provider acquisition closes that selected source-disclosure/size defect,
+   while the cached-yield guard and causal relevant-test gaps remain open.
    CR-31/32 close the measured repeated-work concern for the retained warm task;
    broader cold/churn economics and the unresolved locality site remain open.
 2. Complete the configuration capability review and the five missing source
