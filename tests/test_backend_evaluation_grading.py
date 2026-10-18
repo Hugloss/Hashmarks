@@ -534,6 +534,59 @@ def test_scoped_sites_cannot_mix_declarations_or_pass_empty_oracles() -> None:
         grade_facts("scopes", {"packet": packet}, {"checks": [check]})
 
 
+@pytest.mark.parametrize(
+    "mutation", [None, "wrong-path", "wrong-revision", "split-scope"]
+)
+def test_positive_scoped_alternatives_keep_their_own_source_binding(
+    mutation: str | None,
+) -> None:
+    from scripts.repository_evaluation.fact_grading import grade_facts
+
+    binding = {"path": "tests/test_worker.py", "revision": "exact"}
+    check = {
+        "id": "relevant-existing-test",
+        "pointer": "/selected/*",
+        "predicate": "includes_scoped_record",
+        "value": {
+            "scope": binding,
+            "pointer": "/tests/*",
+            "record": {"symbol": "test_sync"},
+        },
+        "alternative_records": [
+            {
+                "pointer": "/candidates/*",
+                "value": {
+                    "scope": binding,
+                    "pointer": "/tests/*",
+                    "record": {"symbol": "test_async"},
+                },
+            },
+        ],
+        "support": "supported",
+    }
+    candidate = {**binding, "tests": [{"symbol": "test_async"}]}
+    packet = {"selected": [], "candidates": [candidate]}
+    if mutation == "wrong-path":
+        candidate["path"] = "tests/test_other.py"
+    elif mutation == "wrong-revision":
+        candidate["revision"] = "stale"
+    elif mutation == "split-scope":
+        packet["candidates"] = [
+            {**binding, "tests": []},
+            {
+                "path": "tests/other.py",
+                "revision": "exact",
+                "tests": [{"symbol": "test_async"}],
+            },
+        ]
+    assert grade_facts("scopes", {"packet": packet}, {"checks": [check]})[
+        "classification"
+    ] == ("PASS" if mutation is None else "OTHER_FAILURE")
+    check["authority_check"] = True
+    with pytest.raises(ValueError, match="positive source-fact"):
+        grade_facts("scopes", {"packet": packet}, {"checks": [check]})
+
+
 def test_initial_source_oracle_reads_lossless_tables_without_hydrating_missing_facts() -> (
     None
 ):

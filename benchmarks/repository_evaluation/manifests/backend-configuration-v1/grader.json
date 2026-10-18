@@ -5278,6 +5278,94 @@
             "value": {
               "path": "faststream/_internal/fastapi/get_dependant.py"
             }
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/verification/relevance/candidates/*/test_declarations",
+                "value": {
+                  "pointer": "/declarations/*",
+                  "record": {
+                    "end_line": 25,
+                    "start_line": 8,
+                    "symbol": "test_get_fastapi_dependant_has_faststream_fields"
+                  },
+                  "scope": {
+                    "coverage": "incomplete",
+                    "negative_evidence_admissible": false,
+                    "path": "tests/fastapi/test_get_dependant.py",
+                    "source_revision": "ee9c0f523736ba31e84b92024ce2d58ffd0b14f11ca8a8ca431166649c3ee736",
+                    "verification_selection_authority": false
+                  }
+                }
+              }
+            ],
+            "id": "reviewed-existing-test",
+            "pointer": "/verification/relevance/candidates/*",
+            "predicate": "includes_scoped_record",
+            "source_paths": [
+              "faststream/_internal/fastapi/get_dependant.py",
+              "tests/fastapi/test_get_dependant.py"
+            ],
+            "support": "supported",
+            "value": {
+              "pointer": "",
+              "record": {
+                "test_symbol": "test_get_fastapi_dependant_has_faststream_fields"
+              },
+              "scope": {
+                "edit_relationship": "unestablished",
+                "negative_evidence_admissible": false,
+                "path": "tests/fastapi/test_get_dependant.py",
+                "test_revision": "ee9c0f523736ba31e84b92024ce2d58ffd0b14f11ca8a8ca431166649c3ee736",
+                "verification_selection_authority": false
+              }
+            }
+          }
+        ],
+        "initial_checks": [
+          {
+            "alternative_records": [
+              {
+                "pointer": "/verification/relevance/candidates/*/test_declarations",
+                "value": {
+                  "pointer": "/declarations/*",
+                  "record": {
+                    "end_line": 25,
+                    "start_line": 8,
+                    "symbol": "test_get_fastapi_dependant_has_faststream_fields"
+                  },
+                  "scope": {
+                    "coverage": "incomplete",
+                    "negative_evidence_admissible": false,
+                    "path": "tests/fastapi/test_get_dependant.py",
+                    "source_revision": "ee9c0f523736ba31e84b92024ce2d58ffd0b14f11ca8a8ca431166649c3ee736",
+                    "verification_selection_authority": false
+                  }
+                }
+              }
+            ],
+            "id": "initial-reviewed-existing-test",
+            "pointer": "/verification/relevance/candidates/*",
+            "predicate": "includes_scoped_record",
+            "source_paths": [
+              "faststream/_internal/fastapi/get_dependant.py",
+              "tests/fastapi/test_get_dependant.py"
+            ],
+            "support": "supported",
+            "value": {
+              "pointer": "",
+              "record": {
+                "test_symbol": "test_get_fastapi_dependant_has_faststream_fields"
+              },
+              "scope": {
+                "edit_relationship": "unestablished",
+                "negative_evidence_admissible": false,
+                "path": "tests/fastapi/test_get_dependant.py",
+                "test_revision": "ee9c0f523736ba31e84b92024ce2d58ffd0b14f11ca8a8ca431166649c3ee736",
+                "verification_selection_authority": false
+              }
+            }
           }
         ]
       },
@@ -6235,6 +6323,36 @@
             }
           ]
         }
+      },
+      "task_source_labels": {
+        "after": [
+          {
+            "declaration_line": 69,
+            "end_line": 159,
+            "path": "faststream/_internal/fastapi/get_dependant.py",
+            "sha256": "ed7ed542dca257e7cdaf2a58a8eacba8c9241ca9253d5af97abff3da8a0eb407",
+            "start_line": 69,
+            "symbol": "_patch_fastapi_dependent"
+          },
+          {
+            "declaration_line": 8,
+            "end_line": 25,
+            "path": "tests/fastapi/test_get_dependant.py",
+            "sha256": "bcf94fab34ddc0097060e2a9afd1aa9bbde0f2f3bb16b27bd6eff89070eee118",
+            "start_line": 8,
+            "symbol": "test_get_fastapi_dependant_has_faststream_fields"
+          }
+        ],
+        "before": [
+          {
+            "declaration_line": 52,
+            "end_line": 141,
+            "path": "faststream/_internal/fastapi/get_dependant.py",
+            "sha256": "7e9329d97ebdbc46b86951ad8d4062c56e3da819c69f9a3c6678f63f0294cd32",
+            "start_line": 52,
+            "symbol": "_patch_fastapi_dependent"
+          }
+        ]
       }
     },
     "faststream-non-init-dependant-fields": {
@@ -6934,6 +7052,162 @@
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
             "value": "tests/unit/test_di.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/verification/relevance/candidates/*",
+                "value": {
+                  "pointer": "",
+                  "record": {
+                    "test_symbol": "test_bound_sync_generator_method_detection"
+                  },
+                  "scope": {
+                    "edit_relationship": "unestablished",
+                    "negative_evidence_admissible": false,
+                    "path": "tests/unit/test_di.py",
+                    "test_revision": "ecffad43a20e8ad89170f882b50327d36204550eae71ccbae76056379c4b49b0",
+                    "verification_selection_authority": false
+                  }
+                }
+              },
+              {
+                "pointer": "/verification/relevance/candidates/*/test_declarations",
+                "value": {
+                  "pointer": "/declarations/*",
+                  "record": {
+                    "end_line": 336,
+                    "start_line": 319,
+                    "symbol": "test_bound_async_generator_method_detection"
+                  },
+                  "scope": {
+                    "coverage": "incomplete",
+                    "negative_evidence_admissible": false,
+                    "path": "tests/unit/test_di.py",
+                    "source_revision": "ecffad43a20e8ad89170f882b50327d36204550eae71ccbae76056379c4b49b0",
+                    "verification_selection_authority": false
+                  }
+                }
+              },
+              {
+                "pointer": "/verification/relevance/candidates/*/test_declarations",
+                "value": {
+                  "pointer": "/declarations/*",
+                  "record": {
+                    "end_line": 353,
+                    "start_line": 339,
+                    "symbol": "test_bound_sync_generator_method_detection"
+                  },
+                  "scope": {
+                    "coverage": "incomplete",
+                    "negative_evidence_admissible": false,
+                    "path": "tests/unit/test_di.py",
+                    "source_revision": "ecffad43a20e8ad89170f882b50327d36204550eae71ccbae76056379c4b49b0",
+                    "verification_selection_authority": false
+                  }
+                }
+              }
+            ],
+            "id": "reviewed-existing-test",
+            "pointer": "/verification/relevance/candidates/*",
+            "predicate": "includes_scoped_record",
+            "source_paths": [
+              "litestar/di.py",
+              "tests/unit/test_di.py"
+            ],
+            "support": "supported",
+            "value": {
+              "pointer": "",
+              "record": {
+                "test_symbol": "test_bound_async_generator_method_detection"
+              },
+              "scope": {
+                "edit_relationship": "unestablished",
+                "negative_evidence_admissible": false,
+                "path": "tests/unit/test_di.py",
+                "test_revision": "ecffad43a20e8ad89170f882b50327d36204550eae71ccbae76056379c4b49b0",
+                "verification_selection_authority": false
+              }
+            }
+          }
+        ],
+        "initial_checks": [
+          {
+            "alternative_records": [
+              {
+                "pointer": "/verification/relevance/candidates/*",
+                "value": {
+                  "pointer": "",
+                  "record": {
+                    "test_symbol": "test_bound_sync_generator_method_detection"
+                  },
+                  "scope": {
+                    "edit_relationship": "unestablished",
+                    "negative_evidence_admissible": false,
+                    "path": "tests/unit/test_di.py",
+                    "test_revision": "ecffad43a20e8ad89170f882b50327d36204550eae71ccbae76056379c4b49b0",
+                    "verification_selection_authority": false
+                  }
+                }
+              },
+              {
+                "pointer": "/verification/relevance/candidates/*/test_declarations",
+                "value": {
+                  "pointer": "/declarations/*",
+                  "record": {
+                    "end_line": 336,
+                    "start_line": 319,
+                    "symbol": "test_bound_async_generator_method_detection"
+                  },
+                  "scope": {
+                    "coverage": "incomplete",
+                    "negative_evidence_admissible": false,
+                    "path": "tests/unit/test_di.py",
+                    "source_revision": "ecffad43a20e8ad89170f882b50327d36204550eae71ccbae76056379c4b49b0",
+                    "verification_selection_authority": false
+                  }
+                }
+              },
+              {
+                "pointer": "/verification/relevance/candidates/*/test_declarations",
+                "value": {
+                  "pointer": "/declarations/*",
+                  "record": {
+                    "end_line": 353,
+                    "start_line": 339,
+                    "symbol": "test_bound_sync_generator_method_detection"
+                  },
+                  "scope": {
+                    "coverage": "incomplete",
+                    "negative_evidence_admissible": false,
+                    "path": "tests/unit/test_di.py",
+                    "source_revision": "ecffad43a20e8ad89170f882b50327d36204550eae71ccbae76056379c4b49b0",
+                    "verification_selection_authority": false
+                  }
+                }
+              }
+            ],
+            "id": "initial-reviewed-existing-test",
+            "pointer": "/verification/relevance/candidates/*",
+            "predicate": "includes_scoped_record",
+            "source_paths": [
+              "litestar/di.py",
+              "tests/unit/test_di.py"
+            ],
+            "support": "supported",
+            "value": {
+              "pointer": "",
+              "record": {
+                "test_symbol": "test_bound_async_generator_method_detection"
+              },
+              "scope": {
+                "edit_relationship": "unestablished",
+                "negative_evidence_admissible": false,
+                "path": "tests/unit/test_di.py",
+                "test_revision": "ecffad43a20e8ad89170f882b50327d36204550eae71ccbae76056379c4b49b0",
+                "verification_selection_authority": false
+              }
+            }
           }
         ]
       },
@@ -7649,6 +7923,44 @@
             }
           ]
         }
+      },
+      "task_source_labels": {
+        "after": [
+          {
+            "declaration_line": 44,
+            "end_line": 99,
+            "path": "litestar/di.py",
+            "sha256": "dd6f36e2e51f9c545dad2f91e597747188bf3a61c5a54935db0986e1d57e226f",
+            "start_line": 44,
+            "symbol": "Provide.__init__"
+          },
+          {
+            "declaration_line": 319,
+            "end_line": 336,
+            "path": "tests/unit/test_di.py",
+            "sha256": "1da59a72b99a205bebd39d650db85a0bd2521ff2be77762ca067ee8b42e3b9c2",
+            "start_line": 319,
+            "symbol": "test_bound_async_generator_method_detection"
+          },
+          {
+            "declaration_line": 339,
+            "end_line": 353,
+            "path": "tests/unit/test_di.py",
+            "sha256": "5d66b820f8ea3d4d53a8e2e73947071decd2ccdfd16a7c43655ecdf563869202",
+            "start_line": 339,
+            "symbol": "test_bound_sync_generator_method_detection"
+          }
+        ],
+        "before": [
+          {
+            "declaration_line": 44,
+            "end_line": 98,
+            "path": "litestar/di.py",
+            "sha256": "2adb4332e2531f71ecd5e335729e7bb6c24a698333bc86d7352c947dcb630622",
+            "start_line": 44,
+            "symbol": "Provide.__init__"
+          }
+        ]
       }
     },
     "litestar-cached-yield-provider": {
@@ -7660,6 +7972,299 @@
             "predicate": "includes_record",
             "value": {
               "path": "litestar/di.py"
+            }
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/verification/relevance/candidates/*/test_declarations",
+                "value": {
+                  "pointer": "/declarations/*",
+                  "record": {
+                    "end_line": 167,
+                    "start_line": 165,
+                    "symbol": "test_raises_when_generator_dependency_is_cached"
+                  },
+                  "scope": {
+                    "coverage": "incomplete",
+                    "negative_evidence_admissible": false,
+                    "path": "tests/unit/test_di.py",
+                    "source_revision": "d636d2da34caf5630e238aae7858ed1ce555c714f3ce4c1f150a5e8af3abf51e",
+                    "verification_selection_authority": false
+                  }
+                }
+              }
+            ],
+            "id": "reviewed-existing-test",
+            "pointer": "/verification/relevance/candidates/*",
+            "predicate": "includes_scoped_record",
+            "source_paths": [
+              "litestar/di.py",
+              "tests/unit/test_di.py"
+            ],
+            "support": "supported",
+            "value": {
+              "pointer": "",
+              "record": {
+                "test_symbol": "test_raises_when_generator_dependency_is_cached"
+              },
+              "scope": {
+                "edit_relationship": "unestablished",
+                "negative_evidence_admissible": false,
+                "path": "tests/unit/test_di.py",
+                "test_revision": "d636d2da34caf5630e238aae7858ed1ce555c714f3ce4c1f150a5e8af3abf51e",
+                "verification_selection_authority": false
+              }
+            }
+          }
+        ],
+        "initial_checks": [
+          {
+            "id": "initial-reviewed-source-line-65",
+            "pointer": "/retrieval/results/*/source_observation/line_anchors/*",
+            "predicate": "includes_scoped_record",
+            "source_paths": [
+              "litestar/di.py"
+            ],
+            "support": "supported",
+            "value": {
+              "pointer": "/context_excerpt/*",
+              "record": {
+                "line": 65,
+                "text": "        if has_generator_dependency and use_cache:",
+                "truncated_left": false,
+                "truncated_right": false
+              },
+              "scope": {
+                "line": 65,
+                "line_sha256": "35bdd0c34953a994be1e16a603f552b8ead16fe621589bfa8165daf80d4627ff",
+                "member_revision": "26970ddefb66215c7e2d3db3eb4975435f903bc7ab140af70a3370275597adf9",
+                "path": "litestar/di.py",
+                "state": "observed"
+              }
+            }
+          },
+          {
+            "id": "initial-reviewed-source-line-66",
+            "pointer": "/retrieval/results/*/source_observation/line_anchors/*",
+            "predicate": "includes_scoped_record",
+            "source_paths": [
+              "litestar/di.py"
+            ],
+            "support": "supported",
+            "value": {
+              "pointer": "/context_excerpt/*",
+              "record": {
+                "line": 66,
+                "text": "            raise ImproperlyConfiguredException(",
+                "truncated_left": false,
+                "truncated_right": false
+              },
+              "scope": {
+                "line": 66,
+                "line_sha256": "55008e714c7332fadd84120654896cb325b8ac3b38e085bc0178cfa20b13d8c2",
+                "member_revision": "26970ddefb66215c7e2d3db3eb4975435f903bc7ab140af70a3370275597adf9",
+                "path": "litestar/di.py",
+                "state": "observed"
+              }
+            }
+          },
+          {
+            "id": "initial-reviewed-source-line-67",
+            "pointer": "/retrieval/results/*/source_observation/line_anchors/*",
+            "predicate": "includes_scoped_record",
+            "source_paths": [
+              "litestar/di.py"
+            ],
+            "support": "supported",
+            "value": {
+              "pointer": "/context_excerpt/*",
+              "record": {
+                "line": 67,
+                "text": "                \"Cannot cache generator dependency, consider using Lifespan Context instead.\"",
+                "truncated_left": false,
+                "truncated_right": false
+              },
+              "scope": {
+                "member_revision": "26970ddefb66215c7e2d3db3eb4975435f903bc7ab140af70a3370275597adf9",
+                "path": "litestar/di.py",
+                "state": "observed"
+              }
+            }
+          },
+          {
+            "authority_check": true,
+            "id": "initial-source-path",
+            "pointer": "/retrieval/results/*/source_observation/member/path",
+            "predicate": "all_equal",
+            "source_paths": [
+              "litestar/di.py"
+            ],
+            "support": "supported",
+            "value": "litestar/di.py"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-source-revision",
+            "pointer": "/retrieval/results/*/source_observation/member/member_revision",
+            "predicate": "all_equal",
+            "source_paths": [
+              "litestar/di.py"
+            ],
+            "support": "supported",
+            "value": "26970ddefb66215c7e2d3db3eb4975435f903bc7ab140af70a3370275597adf9"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-member-present",
+            "pointer": "/retrieval/results/*/source_observation/member/state",
+            "predicate": "all_equal",
+            "source_paths": [
+              "litestar/di.py"
+            ],
+            "support": "supported",
+            "value": "known-present"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-source-visible",
+            "pointer": "/retrieval/results/*/source_observation/member/evidence_visibility",
+            "predicate": "all_equal",
+            "source_paths": [
+              "litestar/di.py"
+            ],
+            "support": "supported",
+            "value": "source"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-source-observed",
+            "pointer": "/retrieval/results/*/source_observation/availability",
+            "predicate": "all_equal",
+            "source_paths": [
+              "litestar/di.py"
+            ],
+            "support": "supported",
+            "value": "observed"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-line-coverage",
+            "pointer": "/retrieval/results/*/source_observation/line_coverage",
+            "predicate": "all_equal",
+            "source_paths": [
+              "litestar/di.py"
+            ],
+            "support": "supported",
+            "value": "complete"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-source-completeness",
+            "pointer": "/retrieval/results/*/source_observation/completeness",
+            "predicate": "all_equal",
+            "source_paths": [
+              "litestar/di.py"
+            ],
+            "support": "supported",
+            "value": "complete"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-source-untruncated",
+            "pointer": "/retrieval/results/*/source_observation/truncation",
+            "predicate": "all_equal",
+            "source_paths": [
+              "litestar/di.py"
+            ],
+            "support": "supported",
+            "value": "complete"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-source-negative-unqualified",
+            "pointer": "/retrieval/results/*/source_observation/negative_evidence",
+            "predicate": "all_equal",
+            "source_paths": [
+              "litestar/di.py"
+            ],
+            "support": "supported",
+            "value": "not-admissible"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-selection-incomplete",
+            "pointer": "/retrieval/results/*/source_selection/coverage",
+            "predicate": "all_equal",
+            "source_paths": [
+              "litestar/di.py"
+            ],
+            "support": "supported",
+            "value": "incomplete"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-selection-not-owner",
+            "pointer": "/retrieval/results/*/source_selection/ownership_authority",
+            "predicate": "all_equal",
+            "source_paths": [
+              "litestar/di.py"
+            ],
+            "support": "supported",
+            "value": false
+          },
+          {
+            "authority_check": true,
+            "id": "initial-selection-not-negative",
+            "pointer": "/retrieval/results/*/source_selection/negative_evidence_admissible",
+            "predicate": "all_equal",
+            "source_paths": [
+              "litestar/di.py"
+            ],
+            "support": "supported",
+            "value": false
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/verification/relevance/candidates/*/test_declarations",
+                "value": {
+                  "pointer": "/declarations/*",
+                  "record": {
+                    "end_line": 167,
+                    "start_line": 165,
+                    "symbol": "test_raises_when_generator_dependency_is_cached"
+                  },
+                  "scope": {
+                    "coverage": "incomplete",
+                    "negative_evidence_admissible": false,
+                    "path": "tests/unit/test_di.py",
+                    "source_revision": "d636d2da34caf5630e238aae7858ed1ce555c714f3ce4c1f150a5e8af3abf51e",
+                    "verification_selection_authority": false
+                  }
+                }
+              }
+            ],
+            "id": "initial-reviewed-existing-test",
+            "pointer": "/verification/relevance/candidates/*",
+            "predicate": "includes_scoped_record",
+            "source_paths": [
+              "litestar/di.py",
+              "tests/unit/test_di.py"
+            ],
+            "support": "supported",
+            "value": {
+              "pointer": "",
+              "record": {
+                "test_symbol": "test_raises_when_generator_dependency_is_cached"
+              },
+              "scope": {
+                "edit_relationship": "unestablished",
+                "negative_evidence_admissible": false,
+                "path": "tests/unit/test_di.py",
+                "test_revision": "d636d2da34caf5630e238aae7858ed1ce555c714f3ce4c1f150a5e8af3abf51e",
+                "verification_selection_authority": false
+              }
             }
           }
         ]
@@ -7673,6 +8278,165 @@
             "value": {
               "path": "litestar/di.py"
             }
+          }
+        ],
+        "initial_checks": [
+          {
+            "id": "initial-reviewed-source-line-74",
+            "pointer": "/retrieval/results/*/source_observation/line_anchors/*",
+            "predicate": "includes_scoped_record",
+            "source_paths": [
+              "litestar/di.py"
+            ],
+            "support": "supported",
+            "value": {
+              "pointer": "/context_excerpt/*",
+              "record": {
+                "line": 74,
+                "text": "        self.use_cache = use_cache",
+                "truncated_left": false,
+                "truncated_right": false
+              },
+              "scope": {
+                "line": 74,
+                "line_sha256": "5928f4381c4a37bfe2172230331c82f4a0270725dd028c5731ad01959a7710d8",
+                "member_revision": "709f765c929561f281230c6560cb56852993455298880870e5a0637370774f6b",
+                "path": "litestar/di.py",
+                "state": "observed"
+              }
+            }
+          },
+          {
+            "authority_check": true,
+            "id": "initial-source-path",
+            "pointer": "/retrieval/results/*/source_observation/member/path",
+            "predicate": "all_equal",
+            "source_paths": [
+              "litestar/di.py"
+            ],
+            "support": "supported",
+            "value": "litestar/di.py"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-source-revision",
+            "pointer": "/retrieval/results/*/source_observation/member/member_revision",
+            "predicate": "all_equal",
+            "source_paths": [
+              "litestar/di.py"
+            ],
+            "support": "supported",
+            "value": "709f765c929561f281230c6560cb56852993455298880870e5a0637370774f6b"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-member-present",
+            "pointer": "/retrieval/results/*/source_observation/member/state",
+            "predicate": "all_equal",
+            "source_paths": [
+              "litestar/di.py"
+            ],
+            "support": "supported",
+            "value": "known-present"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-source-visible",
+            "pointer": "/retrieval/results/*/source_observation/member/evidence_visibility",
+            "predicate": "all_equal",
+            "source_paths": [
+              "litestar/di.py"
+            ],
+            "support": "supported",
+            "value": "source"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-source-observed",
+            "pointer": "/retrieval/results/*/source_observation/availability",
+            "predicate": "all_equal",
+            "source_paths": [
+              "litestar/di.py"
+            ],
+            "support": "supported",
+            "value": "observed"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-line-coverage",
+            "pointer": "/retrieval/results/*/source_observation/line_coverage",
+            "predicate": "all_equal",
+            "source_paths": [
+              "litestar/di.py"
+            ],
+            "support": "supported",
+            "value": "complete"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-source-completeness",
+            "pointer": "/retrieval/results/*/source_observation/completeness",
+            "predicate": "all_equal",
+            "source_paths": [
+              "litestar/di.py"
+            ],
+            "support": "supported",
+            "value": "complete"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-source-untruncated",
+            "pointer": "/retrieval/results/*/source_observation/truncation",
+            "predicate": "all_equal",
+            "source_paths": [
+              "litestar/di.py"
+            ],
+            "support": "supported",
+            "value": "complete"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-source-negative-unqualified",
+            "pointer": "/retrieval/results/*/source_observation/negative_evidence",
+            "predicate": "all_equal",
+            "source_paths": [
+              "litestar/di.py"
+            ],
+            "support": "supported",
+            "value": "not-admissible"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-selection-incomplete",
+            "pointer": "/retrieval/results/*/source_selection/coverage",
+            "predicate": "all_equal",
+            "source_paths": [
+              "litestar/di.py"
+            ],
+            "support": "supported",
+            "value": "incomplete"
+          },
+          {
+            "authority_check": true,
+            "id": "initial-selection-not-owner",
+            "pointer": "/retrieval/results/*/source_selection/ownership_authority",
+            "predicate": "all_equal",
+            "source_paths": [
+              "litestar/di.py"
+            ],
+            "support": "supported",
+            "value": false
+          },
+          {
+            "authority_check": true,
+            "id": "initial-selection-not-negative",
+            "pointer": "/retrieval/results/*/source_selection/negative_evidence_admissible",
+            "predicate": "all_equal",
+            "source_paths": [
+              "litestar/di.py"
+            ],
+            "support": "supported",
+            "value": false
           }
         ]
       },
@@ -8618,6 +9382,36 @@
             }
           ]
         }
+      },
+      "task_source_labels": {
+        "after": [
+          {
+            "declaration_line": 40,
+            "end_line": 89,
+            "path": "litestar/di.py",
+            "sha256": "540031dbc9256e1eed92a96a537780743fee071d6ff83e7163620c817c1eb165",
+            "start_line": 40,
+            "symbol": "Provide.__init__"
+          },
+          {
+            "declaration_line": 165,
+            "end_line": 167,
+            "path": "tests/unit/test_di.py",
+            "sha256": "3078002d821800c69bb30814af294b2e9942cd8c39711b70f15bad902b4628c8",
+            "start_line": 158,
+            "symbol": "test_raises_when_generator_dependency_is_cached"
+          }
+        ],
+        "before": [
+          {
+            "declaration_line": 40,
+            "end_line": 75,
+            "path": "litestar/di.py",
+            "sha256": "989a3ce7cc023d26e13503b955fd76e0444cc24699f07590d4f3aa2c83a6b51e",
+            "start_line": 40,
+            "symbol": "Provide.__init__"
+          }
+        ]
       }
     },
     "litestar-named-dependency-markers": {
@@ -9317,6 +10111,162 @@
             "pointer": "/verification/relevance/candidates/*/path",
             "predicate": "includes",
             "value": "tests/unit/test_di.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/verification/relevance/candidates/*",
+                "value": {
+                  "pointer": "",
+                  "record": {
+                    "test_symbol": "test_stateful_async_generator_with_cleanup"
+                  },
+                  "scope": {
+                    "edit_relationship": "unestablished",
+                    "negative_evidence_admissible": false,
+                    "path": "tests/unit/test_di.py",
+                    "test_revision": "a4160c26bb0ab2622afcdde035352902627f1c4b82f1fb1d81cf36ddff69e397",
+                    "verification_selection_authority": false
+                  }
+                }
+              },
+              {
+                "pointer": "/verification/relevance/candidates/*/test_declarations",
+                "value": {
+                  "pointer": "/declarations/*",
+                  "record": {
+                    "end_line": 277,
+                    "start_line": 242,
+                    "symbol": "test_stateful_sync_generator_with_cleanup"
+                  },
+                  "scope": {
+                    "coverage": "incomplete",
+                    "negative_evidence_admissible": false,
+                    "path": "tests/unit/test_di.py",
+                    "source_revision": "a4160c26bb0ab2622afcdde035352902627f1c4b82f1fb1d81cf36ddff69e397",
+                    "verification_selection_authority": false
+                  }
+                }
+              },
+              {
+                "pointer": "/verification/relevance/candidates/*/test_declarations",
+                "value": {
+                  "pointer": "/declarations/*",
+                  "record": {
+                    "end_line": 316,
+                    "start_line": 281,
+                    "symbol": "test_stateful_async_generator_with_cleanup"
+                  },
+                  "scope": {
+                    "coverage": "incomplete",
+                    "negative_evidence_admissible": false,
+                    "path": "tests/unit/test_di.py",
+                    "source_revision": "a4160c26bb0ab2622afcdde035352902627f1c4b82f1fb1d81cf36ddff69e397",
+                    "verification_selection_authority": false
+                  }
+                }
+              }
+            ],
+            "id": "reviewed-existing-test",
+            "pointer": "/verification/relevance/candidates/*",
+            "predicate": "includes_scoped_record",
+            "source_paths": [
+              "litestar/di.py",
+              "tests/unit/test_di.py"
+            ],
+            "support": "supported",
+            "value": {
+              "pointer": "",
+              "record": {
+                "test_symbol": "test_stateful_sync_generator_with_cleanup"
+              },
+              "scope": {
+                "edit_relationship": "unestablished",
+                "negative_evidence_admissible": false,
+                "path": "tests/unit/test_di.py",
+                "test_revision": "a4160c26bb0ab2622afcdde035352902627f1c4b82f1fb1d81cf36ddff69e397",
+                "verification_selection_authority": false
+              }
+            }
+          }
+        ],
+        "initial_checks": [
+          {
+            "alternative_records": [
+              {
+                "pointer": "/verification/relevance/candidates/*",
+                "value": {
+                  "pointer": "",
+                  "record": {
+                    "test_symbol": "test_stateful_async_generator_with_cleanup"
+                  },
+                  "scope": {
+                    "edit_relationship": "unestablished",
+                    "negative_evidence_admissible": false,
+                    "path": "tests/unit/test_di.py",
+                    "test_revision": "a4160c26bb0ab2622afcdde035352902627f1c4b82f1fb1d81cf36ddff69e397",
+                    "verification_selection_authority": false
+                  }
+                }
+              },
+              {
+                "pointer": "/verification/relevance/candidates/*/test_declarations",
+                "value": {
+                  "pointer": "/declarations/*",
+                  "record": {
+                    "end_line": 277,
+                    "start_line": 242,
+                    "symbol": "test_stateful_sync_generator_with_cleanup"
+                  },
+                  "scope": {
+                    "coverage": "incomplete",
+                    "negative_evidence_admissible": false,
+                    "path": "tests/unit/test_di.py",
+                    "source_revision": "a4160c26bb0ab2622afcdde035352902627f1c4b82f1fb1d81cf36ddff69e397",
+                    "verification_selection_authority": false
+                  }
+                }
+              },
+              {
+                "pointer": "/verification/relevance/candidates/*/test_declarations",
+                "value": {
+                  "pointer": "/declarations/*",
+                  "record": {
+                    "end_line": 316,
+                    "start_line": 281,
+                    "symbol": "test_stateful_async_generator_with_cleanup"
+                  },
+                  "scope": {
+                    "coverage": "incomplete",
+                    "negative_evidence_admissible": false,
+                    "path": "tests/unit/test_di.py",
+                    "source_revision": "a4160c26bb0ab2622afcdde035352902627f1c4b82f1fb1d81cf36ddff69e397",
+                    "verification_selection_authority": false
+                  }
+                }
+              }
+            ],
+            "id": "initial-reviewed-existing-test",
+            "pointer": "/verification/relevance/candidates/*",
+            "predicate": "includes_scoped_record",
+            "source_paths": [
+              "litestar/di.py",
+              "tests/unit/test_di.py"
+            ],
+            "support": "supported",
+            "value": {
+              "pointer": "",
+              "record": {
+                "test_symbol": "test_stateful_sync_generator_with_cleanup"
+              },
+              "scope": {
+                "edit_relationship": "unestablished",
+                "negative_evidence_admissible": false,
+                "path": "tests/unit/test_di.py",
+                "test_revision": "a4160c26bb0ab2622afcdde035352902627f1c4b82f1fb1d81cf36ddff69e397",
+                "verification_selection_authority": false
+              }
+            }
           }
         ]
       },
@@ -10166,6 +11116,44 @@
             }
           ]
         }
+      },
+      "task_source_labels": {
+        "after": [
+          {
+            "declaration_line": 44,
+            "end_line": 98,
+            "path": "litestar/di.py",
+            "sha256": "2adb4332e2531f71ecd5e335729e7bb6c24a698333bc86d7352c947dcb630622",
+            "start_line": 44,
+            "symbol": "Provide.__init__"
+          },
+          {
+            "declaration_line": 242,
+            "end_line": 277,
+            "path": "tests/unit/test_di.py",
+            "sha256": "15c2cde994b1d5165297ffaf87b71f47487902844e15663fbe64d81e8a4f664f",
+            "start_line": 241,
+            "symbol": "test_stateful_sync_generator_with_cleanup"
+          },
+          {
+            "declaration_line": 281,
+            "end_line": 316,
+            "path": "tests/unit/test_di.py",
+            "sha256": "9e27262cd72b77a647d8fe8618a2a85ebda62d068d38a416dcd06f353d724bde",
+            "start_line": 280,
+            "symbol": "test_stateful_async_generator_with_cleanup"
+          }
+        ],
+        "before": [
+          {
+            "declaration_line": 44,
+            "end_line": 95,
+            "path": "litestar/di.py",
+            "sha256": "0919c551db0687825d123ba4d496e5eb4d5201d9062fdeab07a980f04d5115a5",
+            "start_line": 44,
+            "symbol": "Provide.__init__"
+          }
+        ]
       }
     }
   },

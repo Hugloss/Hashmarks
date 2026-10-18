@@ -5,15 +5,26 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping
+from copy import deepcopy
 from pathlib import Path
 
 import pytest
-from contract_assertions import assert_array, assert_object, assert_records
+from contract_assertions import (
+    assert_array,
+    assert_integer,
+    assert_object,
+    assert_records,
+)
 
 from hashmarks.codemap import CodeMap
-from hashmarks.codemap.task_evidence_initial import decode_initial_packet
+from hashmarks.codemap.task_evidence_initial import (
+    decode_initial_packet,
+    encode_initial_packet,
+    initial_packet_identity,
+)
 from hashmarks.digest import FILE_DOMAIN, hash_file
 from hashmarks.evidence_presentation import FORMATS, presentation_response
+from hashmarks.python_ast_cache import PythonAstSnapshot
 
 TASK = "A cached stream adapter accepts unsupported settings. Inspect adapter.py."
 GUARD = "        if has_stream and use_cache:"
@@ -191,3 +202,249 @@ def test_incomplete_ast_lookup_is_visible_even_without_selected_lines(
         )["presentation"]
     )["text"]
     assert '"candidate_nodes_truncated":true' in str(text)
+
+
+def _pointer(value: object, pointer: str) -> object:
+    for part in pointer.lstrip("/").split("/") if pointer else []:
+        key = part.replace("~1", "/").replace("~0", "~")
+        value = (
+            value[int(key)] if isinstance(value, list) else assert_object(value)[key]
+        )
+    return value
+
+
+@pytest.mark.parametrize("format", ["compact", "text"])
+def test_source_view_recovers_every_native_value_and_future_metadata(
+    tmp_path: Path, format: str
+) -> None:
+    _write(tmp_path)
+    with CodeMap(tmp_path) as repository:
+        repository.index.sync()
+        packet = decode_initial_packet(
+            repository.tasks.evidence(TASK, result_mode="initial")
+        )
+    source = _source(packet)
+    source["future/key~"] = {"false": False, "zero": 0.0, "unknown": None}
+    packet["evidence_packet_identity"] = initial_packet_identity(packet)
+    wire = encode_initial_packet(packet)
+    response = presentation_response(
+        "task_evidence", wire, result_mode="initial", format=format
+    )
+    projection = assert_object(response["presentation"])
+    if format == "compact":
+        group = next(
+            group
+            for group in assert_records(projection["groups"])
+            if group["family"] == "source"
+        )
+        view = assert_object(assert_records(group["findings"])[0]["details"])
+    else:
+        line = next(
+            line
+            for line in str(projection["text"]).splitlines()
+            if line.startswith("Source observation @ ")
+        )
+        view = assert_object(json.loads(line.partition(": ")[2]))
+    recovered = deepcopy(assert_object(_pointer(packet, str(view["metadata_ref"]))))
+    displayed = deepcopy(view)
+    shared = assert_object(displayed.pop("line_anchor_qualifiers", {}))
+    anchors = []
+    for raw_anchor in assert_records(displayed["line_anchors"]):
+        anchor = {**shared, **raw_anchor}
+        context_shared = assert_object(anchor.pop("context_excerpt_qualifiers", {}))
+        anchor["context_excerpt"] = [
+            {**context_shared, **row}
+            for row in assert_records(anchor["context_excerpt"])
+        ]
+        anchors.append(anchor)
+    displayed["line_anchors"] = anchors
+    recovered.update(
+        {key: value for key, value in displayed.items() if key != "metadata_ref"}
+    )
+    assert json.dumps(recovered, sort_keys=True) == json.dumps(source, sort_keys=True)
+    assert displayed["line_anchors"] == source["line_anchors"]
+    assert view["freshness"] == source["freshness"]
+    assert view["negative_evidence"] == source["negative_evidence"]
+    assert decode_initial_packet(assert_object(response["result"])) == packet
+
+
+def test_task_source_packet_is_the_canonical_source_observation(tmp_path: Path) -> None:
+    _write(tmp_path)
+    with CodeMap(tmp_path) as repository:
+        repository.index.sync()
+        packet = repository.tasks.evidence(TASK)
+        observed = _source(packet)
+        expected = repository.source.observe(
+            "adapter.py",
+            lines=tuple(
+                assert_integer(line)
+                for line in assert_array(observed["requested_lines"])
+            ),
+            anchor_context_lines=1,
+            max_bytes=262_144,
+        )
+    assert _source(packet) == expected
+
+
+def test_source_change_between_candidate_lookup_and_observation_restarts_the_task(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from hashmarks.codemap import task_evidence_source_context
+
+    _write(tmp_path)
+    original = task_evidence_source_context.read_python_ast
+    changed = False
+
+    def read(path: Path) -> PythonAstSnapshot:
+        nonlocal changed
+        snapshot = original(path)
+        if not changed:
+            changed = True
+            _write(tmp_path, guard="        if has_stream and not use_cache:")
+        return snapshot
+
+    monkeypatch.setattr(task_evidence_source_context, "read_python_ast", read)
+    with CodeMap(tmp_path) as repository:
+        repository.index.sync()
+        packet = repository.tasks.evidence(TASK, result_mode="initial")
+    source = _source(packet)
+    assert changed
+    assert (
+        assert_object(source["member"])["member_revision"]
+        == hash_file(tmp_path / "adapter.py", domain=FILE_DOMAIN).hash
+    )
+    assert "if has_stream and not use_cache:" in json.dumps(source)
+
+
+def test_output_format_directive_does_not_change_source_selection(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path)
+    with CodeMap(tmp_path) as repository:
+        repository.index.sync()
+        before = _source(repository.tasks.evidence(TASK))
+        after = _source(
+            repository.tasks.evidence(
+                TASK + " Return exactly JSON.", result_mode="initial"
+            )
+        )
+    assert before == after
+
+
+@pytest.mark.parametrize("state", ["unsupported", "unknown"])
+def test_source_refusal_overrides_current_index_hints_before_ast_lookup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, state: str
+) -> None:
+    from hashmarks.codemap import task_evidence_source_context
+
+    _write(tmp_path)
+    with CodeMap(tmp_path) as repository:
+        repository.index.sync()
+        assert repository.index.is_current("adapter.py")
+
+        def member(
+            path: str, *, include_bytes: bool = False
+        ) -> tuple[dict[str, object], bytes | None]:
+            return {"path": path, "state": state, "reason": "source-refused"}, None
+
+        def forbidden(path: Path) -> PythonAstSnapshot:
+            raise AssertionError("source refusal must prevent AST byte reads")
+
+        monkeypatch.setattr(repository.source, "member", member)
+        monkeypatch.setattr(task_evidence_source_context, "read_python_ast", forbidden)
+        packet = repository.tasks.evidence(TASK, result_mode="initial")
+    assert "source_observation" not in json.dumps(_logical(packet))
+
+
+@pytest.mark.parametrize(
+    "transport", ["cli", pytest.param("mcp", marks=pytest.mark.host_mcp_sdk)]
+)
+def test_initial_source_context_survives_real_transports(
+    tmp_path: Path, transport: str
+) -> None:
+    from scripts.repository_evaluation.backend_matrix import INITIAL_TOKEN_CEILING
+    from scripts.repository_evaluation.backend_transport import capture_cli, capture_mcp
+
+    _write(tmp_path)
+    state = tmp_path / ".hashmarks"
+    with CodeMap(tmp_path, state_dir=state) as repository:
+        repository.index.sync()
+        expected = _source(repository.tasks.evidence(TASK, result_mode="initial"))
+    capture = capture_cli if transport == "cli" else capture_mcp
+    rows = capture(
+        tmp_path,
+        state,
+        {
+            "operation": "task_evidence",
+            "inputs": {"task": TASK, "result_mode": "initial"},
+        },
+    )
+    assert len(rows) == len(FORMATS)
+    for row in rows:
+        response = assert_object(row["response"])
+        assert _source(assert_object(response.get("result", response))) == expected
+        if row["format"] != "none":
+            assert GUARD in json.dumps(response["presentation"])
+        if row["format"] in {"compact", "text"}:
+            assert row["estimated_tokens"] <= INITIAL_TOKEN_CEILING
+
+
+def test_compact_source_qualifiers_preserve_missing_and_json_distinct_values(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path)
+    with CodeMap(tmp_path) as repository:
+        repository.index.sync()
+        packet = decode_initial_packet(
+            repository.tasks.evidence(TASK, result_mode="initial")
+        )
+    source = _source(packet)
+    original_anchor = deepcopy(assert_records(source["line_anchors"])[0])
+    anchors = []
+    for index, value in enumerate([False, 0, 0.0, None]):
+        anchor = deepcopy(original_anchor)
+        anchor["line"] = index + 10
+        anchor["future_value"] = value
+        if index != 3:
+            anchor["optional_value"] = None
+        context = assert_records(anchor["context_excerpt"])
+        for ordinal, row in enumerate(context):
+            row["future_value"] = [False, 0, None][ordinal % 3]
+            if ordinal:
+                row["optional_value"] = None
+        anchors.append(anchor)
+    source["line_anchors"] = anchors
+    source["future_source_qualification"] = {"unknown": None, "zero": 0.0}
+    packet["evidence_packet_identity"] = initial_packet_identity(packet)
+    wire = encode_initial_packet(packet)
+    response = presentation_response(
+        "task_evidence", wire, result_mode="initial", format="compact"
+    )
+    projection = assert_object(response["presentation"])
+    group = next(
+        row for row in assert_records(projection["groups"]) if row["family"] == "source"
+    )
+    finding = assert_records(group["findings"])[0]
+    details = deepcopy(assert_object(finding["details"]))
+    shared = assert_object(details.pop("line_anchor_qualifiers"))
+    assert "future_value" not in shared
+    assert "optional_value" not in shared
+    restored = []
+    for raw_anchor in assert_records(details["line_anchors"]):
+        anchor = {**shared, **raw_anchor}
+        context_shared = assert_object(anchor.pop("context_excerpt_qualifiers", {}))
+        anchor["context_excerpt"] = [
+            {**context_shared, **row}
+            for row in assert_records(anchor["context_excerpt"])
+        ]
+        restored.append(anchor)
+    assert json.dumps(restored, sort_keys=True) == json.dumps(anchors, sort_keys=True)
+    assert len(json.dumps(finding["details"])) < len(
+        json.dumps({**details, "line_anchors": anchors})
+    )
+    assert not any(
+        row["source_ref"] == assert_array(finding["source_refs"])[0]
+        for row in assert_records(projection["source_context"])
+    )
+    assert decode_initial_packet(assert_object(response["result"])) == packet
+    assert decode_initial_packet(wire) == packet

@@ -1,6 +1,29 @@
 # Backend 5/5 research backlog
 
-## Current development priority: implement the canonical component rewrite
+**Deferred and nonblocking for stabilization, approved by the user on
+2026-10-18.** The active completion target is
+[`STABILIZATION_PLAN.md`](../plans/STABILIZATION_PLAN.md), S1–S6: canonical
+responsibility boundaries, current typing/regressions, supported evidence
+correctness, fixed representative CLI/MCP proof and one independent source
+extraction. Exhaustive corpora, all twenty capabilities at 5/5, every-private-
+stage locality, broad economics, unseen heldouts and release packaging proof
+remain here for separately requested increments. None is silently counted as
+complete. The original matrix minima, review flags, oracles and failed evidence
+remain unchanged; no evaluator is weakened to manufacture a higher rating.
+
+The 6,000-token budget is advisory for the active stabilization milestone,
+following the user's latest clarification. Preserve actual size measurements
+and any older evaluator `initial_size: false` result. Optimize that cost in a
+later increment; do not hide admitted facts or delay stabilization for size alone.
+
+**Current user-approved initial-response ceiling: 6,000 tokens (2026-10-18).**
+The user explicitly changed this acceptance target while retaining every other
+qualification requirement. The executable owner is
+`scripts.repository_evaluation.backend_matrix.INITIAL_TOKEN_CEILING`. Historical
+4,000-token results and failure notes below remain bound to their original
+policies and identities. Do not relabel them or weaken any other requirement.
+
+## Current development priority: finish the stabilization delivery
 
 The current implementation handoff is
 [Canonical component rewrite](../plans/CANONICAL_COMPONENT_REWRITE_PLAN.md).
@@ -12,10 +35,105 @@ and resource lifetime. All 95 public operations in the frozen rewrite baseline
 map to current named component operations, with no retired root callables.
 Current full configured Ty and Pyright pass. This is implementation and scoped
 proof, not complete architecture acceptance or backend 5/5 qualification.
-Follow the latest implementation checkpoint in the component plan: continue
-CR-11 operation/direct-test/baseline correspondence and locality qualification,
-then CR-12 current full membership, comparable economics and exact artifacts.
-Do not restart CR-02 or relabel historical reports with the current observer.
+Follow S1–S6 in the stabilization plan. Complete current deterministic membership,
+the fixed representative public set, quality gates and source artifact/report.
+Full per-private-stage correspondence/locality and broad qualification below are
+deferred. Do not restart CR-02 or relabel historical reports with the current
+observer. Earlier "next" instructions below retain their historical/research
+scope and do not override the active stabilization finish line.
+
+The CR-41 checkpoint now qualifies default-provider and cached-yield initial
+source facts on one extracted candidate: 264 affected and 179 unchanged
+predecessor tests pass; all 468 required initial witnesses pass through real
+API/CLI/official MCP. The largest required reply is 5,333 tokens. Full configured
+typing remains green. Independent source correspondence passes 120 observations
+and rejects 56 mutations. Selected source omissions are closed; causal relevant-
+test review, the other configuration workflows on this candidate, broader
+corpora/oracles, architecture acceptance and final same-candidate qualification
+remain open. Exact identities and receipts are in the component plan's CR-41
+checkpoint. These scoped results establish no capability at 5/5.
+
+The CR-41 extension now completes all twelve configuration workflows: common
+API/CLI/official MCP gates and all 1,698 required source witnesses pass, with
+maximum reply cost still 5,333 tokens. CR-43 subsequently adds source-bound test
+declarations and retains exact test identity in readable initial replies without
+changing selected tests or resolving ties. Its extraction passes 296 affected
+tests and all 287 unchanged predecessor tests; whole-project typing and hygiene
+pass. Its five-workflow genuine acquisition now passes all admitted common gates
+and all 540 independently required source/test witnesses, with maximum initial
+reply 5,748 tokens. The original metadata and sender workflows also pass every
+admitted public gate on CR-43, with maxima 4,527 and 5,251 tokens and all 108
+original initial witnesses passing. These selected disclosure/budget failures
+are closed. Do not combine different candidates into a capability pass. Broad
+independent review, the other configuration workflows on CR-43, architecture
+acceptance and final qualification remain open.
+
+CR-43's complete twelve-workflow extension has now finished: all admitted common
+gates, 1,698 source witnesses and the 540 selected task/test witnesses pass,
+max 5,748 tokens. CR-44/45 subsequently repair explicit project-provenance loss
+and a benchmark that could hide missing links behind perfect project recall.
+CR-46 fixes genuine same-name package publication without choosing ambiguous
+dependency targets; 234 extracted and 230 unchanged predecessor tests pass,
+along with full typing and hygiene. These repairs keep independent candidate
+identities. Architecture/internal-stage qualification, missing genuine corpora,
+independent semantic/causal/adversarial review and final same-candidate evidence
+remain required before any overall 5/5 claim.
+
+CR-48 subsequently repairs read-scope entry/exit cleanup after diagnostic failure:
+all 158 extracted and 155 unchanged predecessor tests pass, with current typing,
+source/read binding and hygiene green. Fourteen lifecycle/freshness stages have
+explicit reviewed test/source correspondence; complete architecture locality and
+other internal stages remain open. CR-49 adds twelve source-pinned data-boundary
+nominations across three repositories and twenty-four exact trees. Its 53 lexical
+declarations/809 source sites pass integrity checks, but exact pair semantics,
+causal test relevance, executable workflows and capability review remain
+INCOMPLETE on that checkpoint. CR-50 admits the twelve source workflows with
+143 exact physical-line facts and 24 direct call/argument observations. Source
+admission passes and 1,289 assertion mutations are rejected without constructing
+the observer. Public acquisition/witness closure and semantic/test/adversarial
+review remain open; all review flags remain false and the campaign is unchanged.
+The four other missing populations and final qualification remain.
+
+CR-50's extraction passes 217 evaluator/source/boundary tests and 47 primitive
+read/cache tests, zero skips. The first three data workflows pass admitted common
+API/CLI/official MCP gates with 912/912 required source/call witnesses and a
+maximum initial reply of 5,544 tokens. The same-candidate twelve-workflow public
+extension is in progress. Source-only test review records exact declarations
+and assertions while preserving missing-before tests, unproven KeyError test
+relevance and runtime sensitivity as gaps. This is no capability promotion.
+
+CR-51 adds two direct read-owner behavior tests and independently passes a
+52-test primitive/source/cache/negative-evidence ring. Fourteen primitive stages
+now have reviewed baseline/current/owning-test correspondence. Production,
+evaluator and CR-50 executable oracle identities are unchanged. Broader locality
+and architecture families remain open; the source-only test review is retained
+in `backend-data-v1/test-source-review.json` without changing executable gates.
+
+CR-50's full data inventory then reproduces a 6,285-token official MCP compact
+failure on the Iterable workflow. CR-52 factors only identical displayed source
+qualifiers and removes only exact duplicate source qualification context; every
+line, digest, optional field and uncertainty remains recoverable. Focused repair
+tests (66), typing and preflight pass. The frozen extraction passes 208 affected
+tests, zero skips. Fresh genuine Iterable acquisition now passes every admitted
+common API/CLI/official MCP gate and 324/324 source/call witnesses, max 5,923
+tokens. The old 6,285-token receipt is preserved. Unchanged predecessor tests
+record 295 passes and one flat-shape recovery assertion failure; the updated
+independent recovery tests prove all values and unknowns survive shared
+qualifiers. The repaired twelve-case extension now passes every admitted common
+API/CLI/official MCP gate and 3,873/3,873 source/call witnesses, zero missing or
+failed, max 5,923 tokens. Pure source/artifact/receipt regrading passes; broader
+semantic/capability qualification and the full same-candidate finish remain open.
+The complete current affected ring subsequently passes 297 tests from the
+exact CR-52 extraction, zero skips. This closes the representation repair's
+affected regression proof; it does not replace full project qualification.
+
+CR-53 subsequently repairs a generic disclosure omission: a selected lexical
+test name no longer hides distinct matching test declarations in the same file.
+Its extraction passes 204 affected and 203 unchanged predecessor tests. Fresh
+keyed-null API/CLI/official MCP proof passes all admitted common gates, 354
+original source/call witnesses and 18 new source-reviewed after-test witnesses,
+max 5,173 tokens. Canonical selection is unchanged. The before counterpart,
+runtime sensitivity and full capability review remain unqualified.
 
 The broad twenty-capability 5/5 target below is retained as a later research and
 qualification track. Its minima, oracles, review requirements, failed evidence

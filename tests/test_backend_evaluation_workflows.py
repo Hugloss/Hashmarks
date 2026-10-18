@@ -99,6 +99,54 @@ def corpus(tmp_path: Path) -> tuple[Path, dict[str, Path]]:
     return suite_path, sources
 
 
+def test_initial_size_grades_complete_visible_bytes_at_the_user_approved_boundary(
+    corpus: tuple[Path, dict[str, Path]],
+) -> None:
+    from hashmarks.codemap import CodeMap
+    from hashmarks.codemap.python_ast import estimate_tokens
+    from hashmarks.evidence_presentation import presentation_response
+    from scripts.repository_evaluation.backend_grading import validate_transport_capture
+    from scripts.repository_evaluation.backend_workflows import _transport_grade
+    from scripts.repository_evaluation.common import canonical_sha256
+
+    suite_path, sources = corpus
+    rule = json.loads(suite_path.with_name("grader.json").read_text())["cases"][
+        "handler"
+    ]
+    with CodeMap(sources["before"]) as repository:
+        repository.index.sync()
+        full = repository.tasks.evidence("Change handler in backend.py")
+        initial = repository.tasks.evidence(
+            "Change handler in backend.py", result_mode="initial"
+        )
+    response = presentation_response(
+        "task_evidence", initial, result_mode="initial", format="compact"
+    )
+    encoded = json.dumps(response)
+    for tokens, expected in ((5999, True), (6000, True), (6001, False)):
+        visible = encoded + " " * (tokens * 4 - len(encoded.encode("utf-8")))
+        capture = {
+            "transport": "cli",
+            "format": "compact",
+            "response": response,
+            "consumer_visible_response": visible,
+            "utf8_bytes": len(visible.encode("utf-8")),
+            "estimated_tokens": estimate_tokens(visible),
+            "capture_identity": "sha256:"
+            + canonical_sha256({"transport": "cli", "text": visible}),
+        }
+        validate_transport_capture(capture)
+        result = _transport_grade(
+            [capture],
+            rule,
+            sources["before"],
+            initial=True,
+            source_identity=full["evidence_packet_identity"],
+        )
+        assert result["grades"][0]["initial_size"] is expected
+        assert result["grades"][0]["parity"] is True
+
+
 def test_api_revision_workflow_cannot_qualify_missing_transports_or_breadth(
     corpus: tuple[Path, dict[str, Path]], tmp_path: Path
 ) -> None:

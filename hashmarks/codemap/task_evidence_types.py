@@ -32,6 +32,8 @@ class TaskCandidate(TypedDict):
     namespace_overlap: NotRequired[int]
     task_anchor_terms: NotRequired[list[str]]
     test_symbol: NotRequired[str | None]
+    test_revision: NotRequired[str]
+    test_declarations: NotRequired[dict[str, object]]
     plausibility: NotRequired[str]
     discriminator: NotRequired[str]
     reference_strength: NotRequired[str]

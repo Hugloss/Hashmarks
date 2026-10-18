@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from itertools import zip_longest
 from pathlib import Path
@@ -17,7 +18,7 @@ if TYPE_CHECKING:
         _VerificationRelevanceState,
     )
     from .repository_tasks import RepositoryTasks
-    from .task_evidence_types import RetrievalLocator, TaskEvidenceDraft
+    from .task_evidence_types import RetrievalLocator, TaskCandidate, TaskEvidenceDraft
 
 
 class TaskEvidenceScopedMethodMixin:
@@ -494,11 +495,15 @@ class TaskEvidenceScopedMethodMixin:
                 str(candidate["path"]), 0
             )
             candidate.update(filename_candidates.get(str(candidate["path"]), {}))
-            candidate.update(
-                codemap.verification._verification_task_keyword_syntax(
-                    state, str(candidate["path"]), keyword_observations
+            # Optional disclosure must not refresh a stale verifier and restart
+            # the canonical selection. The task packet's closing fence retains
+            # that selected binding and reports its staleness independently.
+            if codemap.index.is_current(str(candidate["path"])):
+                candidate.update(
+                    codemap.verification._verification_task_keyword_syntax(
+                        state, str(candidate["path"]), keyword_observations
+                    )
                 )
-            )
         candidates.sort(
             key=lambda candidate: codemap._task_evidence_candidate_verifier_score(
                 candidate, source_symbol=str(row.get("symbol") or ""), source_path=path
@@ -853,6 +858,7 @@ class TaskEvidenceScopedMethodMixin:
                 ordered, relevance.get("selected"), limit
             )
         ]
+        codemap._task_evidence_attach_test_declarations(task, relevance["candidates"])
         relevance["candidate_disclosure"] = {
             "basis": "indexed-source-candidates-and-task-matches",
             "source_locator_bound": 3,
@@ -864,6 +870,100 @@ class TaskEvidenceScopedMethodMixin:
             "omitted_candidates": max(0, len(ordered) - len(relevance["candidates"])),
             "verification_selection_authority": False,
             "negative_evidence_admissible": False,
+        }
+
+    def _task_evidence_attach_test_declarations(
+        self, task: str, candidates: Sequence[TaskCandidate]
+    ) -> None:
+        for candidate in candidates:
+            declarations = self._task_evidence_matching_test_declarations(
+                task, candidate
+            )
+            if declarations is not None:
+                candidate["test_declarations"] = declarations
+
+    def _task_evidence_matching_test_declarations(
+        self, task: str, row: Mapping[str, object]
+    ) -> dict[str, object] | None:
+        """Disclose bounded name matches while preserving the selected test identity."""
+        from .query_primitives import _TASK_STOPWORDS
+
+        codemap = cast("RepositoryTasks", self)
+        path = str(row["path"])
+        if not codemap._task_evidence_declaration_visible(path):
+            return None
+        member = codemap.reads.file_row(path)
+        if member is None or not codemap.index.is_current(path):
+            return None
+        terms, truncated = codemap.search._task_natural_term_candidates(
+            codemap._task_evidence_retrieval_query(task), include_derivations=True
+        )
+        groups = codemap._task_evidence_distinct_query_groups(
+            tuple(
+                tuple(
+                    variant
+                    for variant in codemap.search._task_natural_term_variants(
+                        term, include_derivations=True
+                    )
+                    if variant in terms
+                )
+                for term in codemap._task_query(task).terms
+                if term not in _TASK_STOPWORDS
+            )
+        )
+        matches = []
+        for symbol in codemap.reads.symbols_for_path(path):
+            name = str(symbol.get("name") or "")
+            if not name.startswith("test_") or symbol.get("kind") not in {
+                "function",
+                "method",
+            }:
+                continue
+            matched = tuple(
+                index
+                for index, group in enumerate(groups)
+                if codemap._task_evidence_natural_match_count(
+                    str(symbol.get("qualname") or name), (group,)
+                )
+            )
+            if len(matched) >= 2:
+                matches.append((matched, symbol))
+        frequencies = Counter(index for matched, _ in matches for index in matched)
+        matches.sort(
+            key=lambda item: (
+                -len(item[0]),
+                sum(frequencies[index] for index in item[0]),
+                cast("int", item[1]["start_line"]),
+                str(item[1]["qualname"]),
+            )
+        )
+        # A selected lexical name does not account for distinct matching
+        # declarations in that module. Preserve those bounded alternatives
+        # without replacing the producer's selected test identity.
+        if not any(
+            symbol["name"] != row.get("test_symbol") for _, symbol in matches
+        ) or not codemap.index.is_current(path):
+            return None
+        return {
+            "path": path,
+            "source_revision": member["file_digest"],
+            "basis": "indexed-task-name-matches",
+            "coverage": "incomplete",
+            "query_terms_truncated": truncated,
+            "observed": len(matches),
+            "returned": min(len(matches), 3),
+            "omitted": max(0, len(matches) - 3),
+            "bound": 3,
+            "verification_selection_authority": False,
+            "negative_evidence_admissible": False,
+            "declarations": [
+                {
+                    "symbol": symbol["qualname"],
+                    "start_line": symbol["start_line"],
+                    "end_line": symbol["end_line"],
+                }
+                for _, symbol in matches[:3]
+            ],
         }
 
     def _task_evidence_verification_subject_rows(

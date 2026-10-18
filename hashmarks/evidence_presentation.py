@@ -14,7 +14,8 @@ from typing import Any, Literal, TypedDict, Unpack, cast, get_args
 from hashmarks.evidence_presentation_task import (
     compact_initial_declarations,
     compact_initial_groups,
-    compact_initial_relationships,
+    compact_initial_record_contexts,
+    compact_initial_source_qualifiers,
     compact_initial_verification_qualifiers,
     initial_evidence_text,
     project_initial_task,
@@ -1525,8 +1526,9 @@ def present_repository_evidence(
     if initial:
         result["reference_space"] = "decoded-initial-data"
         compact_initial_groups(groups)
-        compact_initial_relationships(result)
+        compact_initial_record_contexts(result)
         if format == "compact":
+            compact_initial_source_qualifiers(groups)
             compact_initial_declarations(groups)
             compact_initial_verification_qualifiers(groups)
     if format == "text":

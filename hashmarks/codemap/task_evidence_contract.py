@@ -157,7 +157,11 @@ def _locator(value: object, path: str) -> None:
             )
     if "roles" in row:
         _strings(row["roles"], f"{path}.roles")
-    _fields(row, path, str, (), ("evidence_visibility", "selection_reason"))
+    if "test_declarations" in row:
+        _record(row["test_declarations"], f"{path}.test_declarations")
+    _fields(
+        row, path, str, (), ("evidence_visibility", "selection_reason", "test_revision")
+    )
     _fields(row, path, int, (), ("namespace_overlap",))
     for key in ("reference_symbols", "task_anchor_terms", "indirect_reference_symbols"):
         if key in row:

@@ -1,0 +1,395 @@
+{
+  "controls": [
+    {
+      "family": "checks",
+      "id": "litestar-bound-method-providers",
+      "mutation": "none",
+      "state": "PASS"
+    },
+    {
+      "family": "checks",
+      "id": "litestar-bound-method-providers",
+      "mutation": "path",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "checks",
+      "id": "litestar-bound-method-providers",
+      "mutation": "revision",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "checks",
+      "id": "litestar-bound-method-providers",
+      "mutation": "symbol",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "checks",
+      "id": "litestar-bound-method-providers",
+      "mutation": "range",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "checks",
+      "id": "litestar-bound-method-providers",
+      "mutation": "selection",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "checks",
+      "id": "litestar-bound-method-providers",
+      "mutation": "negative",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "checks",
+      "id": "litestar-bound-method-providers",
+      "mutation": "scope",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "initial_checks",
+      "id": "litestar-bound-method-providers",
+      "mutation": "none",
+      "state": "PASS"
+    },
+    {
+      "family": "initial_checks",
+      "id": "litestar-bound-method-providers",
+      "mutation": "path",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "initial_checks",
+      "id": "litestar-bound-method-providers",
+      "mutation": "revision",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "initial_checks",
+      "id": "litestar-bound-method-providers",
+      "mutation": "symbol",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "initial_checks",
+      "id": "litestar-bound-method-providers",
+      "mutation": "range",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "initial_checks",
+      "id": "litestar-bound-method-providers",
+      "mutation": "selection",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "initial_checks",
+      "id": "litestar-bound-method-providers",
+      "mutation": "negative",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "initial_checks",
+      "id": "litestar-bound-method-providers",
+      "mutation": "scope",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "checks",
+      "id": "litestar-stateful-callable-cleanup",
+      "mutation": "none",
+      "state": "PASS"
+    },
+    {
+      "family": "checks",
+      "id": "litestar-stateful-callable-cleanup",
+      "mutation": "path",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "checks",
+      "id": "litestar-stateful-callable-cleanup",
+      "mutation": "revision",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "checks",
+      "id": "litestar-stateful-callable-cleanup",
+      "mutation": "symbol",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "checks",
+      "id": "litestar-stateful-callable-cleanup",
+      "mutation": "range",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "checks",
+      "id": "litestar-stateful-callable-cleanup",
+      "mutation": "selection",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "checks",
+      "id": "litestar-stateful-callable-cleanup",
+      "mutation": "negative",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "checks",
+      "id": "litestar-stateful-callable-cleanup",
+      "mutation": "scope",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "initial_checks",
+      "id": "litestar-stateful-callable-cleanup",
+      "mutation": "none",
+      "state": "PASS"
+    },
+    {
+      "family": "initial_checks",
+      "id": "litestar-stateful-callable-cleanup",
+      "mutation": "path",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "initial_checks",
+      "id": "litestar-stateful-callable-cleanup",
+      "mutation": "revision",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "initial_checks",
+      "id": "litestar-stateful-callable-cleanup",
+      "mutation": "symbol",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "initial_checks",
+      "id": "litestar-stateful-callable-cleanup",
+      "mutation": "range",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "initial_checks",
+      "id": "litestar-stateful-callable-cleanup",
+      "mutation": "selection",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "initial_checks",
+      "id": "litestar-stateful-callable-cleanup",
+      "mutation": "negative",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "initial_checks",
+      "id": "litestar-stateful-callable-cleanup",
+      "mutation": "scope",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "checks",
+      "id": "litestar-cached-yield-provider",
+      "mutation": "none",
+      "state": "PASS"
+    },
+    {
+      "family": "checks",
+      "id": "litestar-cached-yield-provider",
+      "mutation": "path",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "checks",
+      "id": "litestar-cached-yield-provider",
+      "mutation": "revision",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "checks",
+      "id": "litestar-cached-yield-provider",
+      "mutation": "symbol",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "checks",
+      "id": "litestar-cached-yield-provider",
+      "mutation": "range",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "checks",
+      "id": "litestar-cached-yield-provider",
+      "mutation": "selection",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "checks",
+      "id": "litestar-cached-yield-provider",
+      "mutation": "negative",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "checks",
+      "id": "litestar-cached-yield-provider",
+      "mutation": "scope",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "initial_checks",
+      "id": "litestar-cached-yield-provider",
+      "mutation": "none",
+      "state": "PASS"
+    },
+    {
+      "family": "initial_checks",
+      "id": "litestar-cached-yield-provider",
+      "mutation": "path",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "initial_checks",
+      "id": "litestar-cached-yield-provider",
+      "mutation": "revision",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "initial_checks",
+      "id": "litestar-cached-yield-provider",
+      "mutation": "symbol",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "initial_checks",
+      "id": "litestar-cached-yield-provider",
+      "mutation": "range",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "initial_checks",
+      "id": "litestar-cached-yield-provider",
+      "mutation": "selection",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "initial_checks",
+      "id": "litestar-cached-yield-provider",
+      "mutation": "negative",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "initial_checks",
+      "id": "litestar-cached-yield-provider",
+      "mutation": "scope",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "checks",
+      "id": "faststream-dependant-constructor-metadata",
+      "mutation": "none",
+      "state": "PASS"
+    },
+    {
+      "family": "checks",
+      "id": "faststream-dependant-constructor-metadata",
+      "mutation": "path",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "checks",
+      "id": "faststream-dependant-constructor-metadata",
+      "mutation": "revision",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "checks",
+      "id": "faststream-dependant-constructor-metadata",
+      "mutation": "symbol",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "checks",
+      "id": "faststream-dependant-constructor-metadata",
+      "mutation": "range",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "checks",
+      "id": "faststream-dependant-constructor-metadata",
+      "mutation": "selection",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "checks",
+      "id": "faststream-dependant-constructor-metadata",
+      "mutation": "negative",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "checks",
+      "id": "faststream-dependant-constructor-metadata",
+      "mutation": "scope",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "initial_checks",
+      "id": "faststream-dependant-constructor-metadata",
+      "mutation": "none",
+      "state": "PASS"
+    },
+    {
+      "family": "initial_checks",
+      "id": "faststream-dependant-constructor-metadata",
+      "mutation": "path",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "initial_checks",
+      "id": "faststream-dependant-constructor-metadata",
+      "mutation": "revision",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "initial_checks",
+      "id": "faststream-dependant-constructor-metadata",
+      "mutation": "symbol",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "initial_checks",
+      "id": "faststream-dependant-constructor-metadata",
+      "mutation": "range",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "initial_checks",
+      "id": "faststream-dependant-constructor-metadata",
+      "mutation": "selection",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "initial_checks",
+      "id": "faststream-dependant-constructor-metadata",
+      "mutation": "negative",
+      "state": "OTHER_FAILURE"
+    },
+    {
+      "family": "initial_checks",
+      "id": "faststream-dependant-constructor-metadata",
+      "mutation": "scope",
+      "state": "OTHER_FAILURE"
+    }
+  ],
+  "new_grader_sha256": "0c9eaf23860757e4a615a071586b1603f3aa81f036f4200e59a450fa43d5316a",
+  "original_grader_sha256": "eb08679282d53a7b5464c02786efa459f16ece9adbd942c89ef91d8ba14303cf",
+  "schema": "hashmarks.configuration-test-declaration-oracle-review.v1",
+  "scope": "same six exact reviewed tests through unique locator or source-bound bounded declaration; static relevance only; ambiguity remains unresolved",
+  "source_review_sha256": "476e36bd2ea7fbc5b374a8c3027ff91c38d67c7f05bbc35ed9097b8bf8713240",
+  "status": "INCOMPLETE",
+  "unchanged_tasks_sources_tests_populations_review_flags_eligibility_and_thresholds": true
+}

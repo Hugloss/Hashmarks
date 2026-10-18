@@ -60,7 +60,10 @@ def test_scale_generator_preserves_graph_reachability(
     assert source["depths"] == {
         f"npm:@scale/p{index:04d}": depth for index, depth in enumerate(depths, start=1)
     }
-    assert len(source["edges"]) == 4
+    assert (
+        len(source["edges"])
+        == {"chain": 4, "fanout": 4, "fanin": 6, "diamond": 5}[shape]
+    )
 
 
 def test_scale_generator_replaces_existing_corpus_and_rejects_unknown_shape(
@@ -78,3 +81,115 @@ def test_scale_generator_replaces_existing_corpus_and_rejects_unknown_shape(
     assert not stale.exists()
     with pytest.raises(ValueError, match="unknown"):
         generate(base, public, secret, sizes=[2], shapes=["unknown"], contracts=1)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        None,
+        "missing",
+        "all-missing",
+        "duplicate",
+        "invented",
+        "wrong-kind",
+        "wrong-producer",
+    ],
+)
+def test_scale_success_requires_exact_explicit_relationships(
+    mutation: str | None,
+) -> None:
+    from scripts.score_cross_repository_scale import _score_frozen_packet
+
+    edges = [
+        {
+            "from": "client",
+            "to": "root",
+            "kind": "api",
+            "producer": "declared-project-links",
+        },
+        {
+            "from": "client",
+            "to": "root",
+            "kind": "contract",
+            "producer": "declared-project-links",
+        },
+    ]
+    expected = {
+        "projects": ["client"],
+        "depths": {"client": 1},
+        "edges": [["client", "root", "api"], ["client", "root", "contract"]],
+    }
+    if mutation == "missing":
+        edges.pop()
+    elif mutation == "all-missing":
+        edges.clear()
+    elif mutation == "duplicate":
+        edges.append(dict(edges[0]))
+    elif mutation == "invented":
+        edges.append(
+            {
+                "from": "client",
+                "to": "unrelated",
+                "kind": "api",
+                "producer": "declared-project-links",
+            }
+        )
+    elif mutation == "wrong-kind":
+        edges[1]["kind"] = "other"
+    elif mutation == "wrong-producer":
+        edges[1]["producer"] = "unqualified"
+    item = {
+        "task": {
+            "id": "explicit-pair",
+            "shape": "parallel",
+            "projects": 2,
+            "kind": "source",
+        },
+        "packet": {
+            "projects": ["client"],
+            "project_impact": {
+                "affected": [{"project": "client", "depth": 1}],
+                "edges": edges,
+            },
+        },
+        "record": {
+            "economics": {"evidence_bytes": 1, "decision_latency_ms": 1},
+            "record_identity": "fixture",
+        },
+        "setup_ms": 1,
+    }
+    result = _score_frozen_packet(item, expected)
+    assert (
+        result["project_recall"]
+        == result["project_precision"]
+        == result["provenance_recall"]
+        == 1.0
+    )
+    assert result["fully_correct"] is (mutation is None)
+
+
+def test_shared_input_oracle_retains_contract_and_parallel_path_evidence(
+    tmp_path: Path,
+) -> None:
+    public, secret = tmp_path / "public.json", tmp_path / "secret.json"
+    generate(
+        tmp_path / "repos", public, secret, sizes=[5], shapes=["diamond"], contracts=1
+    )
+    tasks = json.loads(secret.read_text())["tasks"]
+    shared = next(row for row in tasks if row["id"].endswith("-shared"))
+    expected = {
+        ("npm:@scale/p0001", "npm:@scale/p0000", "diamond-left"),
+        ("npm:@scale/p0002", "npm:@scale/p0000", "diamond-right"),
+        ("npm:@scale/p0003", "npm:@scale/p0001", "diamond-join"),
+        ("npm:@scale/p0003", "npm:@scale/p0002", "diamond-join"),
+        ("npm:@scale/p0004", "npm:@scale/p0003", "diamond-left"),
+        *(
+            (
+                f"npm:@scale/p{index:04d}",
+                "shared-input:contracts/contract-0.yaml",
+                "contract",
+            )
+            for index in (0, 1, 4)
+        ),
+    }
+    assert {tuple(row) for row in shared["edges"]} == expected

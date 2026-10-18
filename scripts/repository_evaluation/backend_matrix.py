@@ -11,7 +11,7 @@ from .backend_grading import witness_identity
 SCHEMA = "hashmarks.backend-evidence-matrix.v5"
 MIN_WORKFLOWS = 12
 MIN_REPOSITORIES = 3
-INITIAL_TOKEN_CEILING = 4_000
+INITIAL_TOKEN_CEILING = 6_000
 
 CAPABILITIES = (
     "Exact backend owner localization",

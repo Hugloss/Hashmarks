@@ -133,7 +133,10 @@ def _check(packet: object, rule: Mapping[str, Any]) -> dict[str, object]:
     ):
         raise ValueError("ordered fact values require a nonempty expected array")
     alternatives = rule.get("alternative_records", [])
-    if alternatives and (predicate != "includes_record" or rule.get("authority_check")):
+    if alternatives and (
+        predicate not in {"includes_record", "includes_scoped_record"}
+        or rule.get("authority_check")
+    ):
         raise ValueError("alternative records are only positive source-fact checks")
     records = [(pointer, expected, values)]
     for alternative in alternatives:
@@ -153,7 +156,10 @@ def _check(packet: object, rule: Mapping[str, Any]) -> dict[str, object]:
             any(_matches_record(value, record_expected) for value in record_values)
             for _, record_expected, record_values in records
         ),
-        "includes_scoped_record": lambda: _includes_scoped_record(values, expected),
+        "includes_scoped_record": lambda: any(
+            _includes_scoped_record(record_values, record_expected)
+            for _, record_expected, record_values in records
+        ),
         "all_equal": lambda: (
             bool(values) and all(_json_equal(value, expected) for value in values)
         ),

@@ -1,0 +1,14 @@
+{
+  "checks_per_stage": {
+    "after": 15,
+    "before": 13
+  },
+  "new_grader_sha256": "d71c2dbca355a165f2e54f207d05853fd72808b6cb6f2692789506e3fbe13eda",
+  "original_grader_sha256": "61d1bf05050ae2cc0585b2a85d7d0f92f957446b57e56876039fe6b0fa842e29",
+  "problem": "litestar-cached-yield-provider",
+  "schema": "hashmarks.configuration-initial-source-oracle-review.v1",
+  "scope": "exact source-reviewed initial cache assignment and conditional/error lines; no inferred runtime guard enforcement, missing-before guard, causal test sufficiency or capability promotion",
+  "source_review_sha256": "ca880f55c7a82037b4eecd95fea66c7c1496c1d23a00f4a79377cd09606c20c5",
+  "status": "INCOMPLETE",
+  "unchanged_original_checks_tasks_sources_membership_and_review_flags": true
+}

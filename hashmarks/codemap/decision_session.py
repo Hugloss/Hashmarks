@@ -294,16 +294,12 @@ class DecisionScope:
         self, *, diagnostics: bool, allow_incomplete: bool
     ) -> int:
         observation = self.ready(_allow_incomplete=allow_incomplete)
-        self._diagnostics_enabled = bool(diagnostics)
         self._diagnostics_started_ns = time.perf_counter_ns() if diagnostics else 0
         self._diagnostics_stack.clear()
         self._diagnostics_spans.clear()
         self._diagnostics_producers.clear()
         self._diagnostics_sequence = 0
         generation = self._store.generation()
-        self._observation = observation
-        self._generation = generation
-        self._scope = ReadScope(generation, observation)
         self._clear_decision_session_caches()
         self._stats = {
             "task_result_hit": 0,
@@ -336,16 +332,23 @@ class DecisionScope:
             "ownership_import_paths_miss": 0,
         }
         self._store.reset_read_counters()
+        self._observation = observation
+        self._generation = generation
+        self._scope = ReadScope(generation, observation)
+        self._diagnostics_enabled = bool(diagnostics)
         return generation
 
     def _finish_decision_session(self) -> None:
-        if self._diagnostics_enabled:
-            self._diagnostics_last = self._decision_diagnostics_receipt()
-        self._diagnostics_enabled = False
-        self._generation = None
-        self._scope = None
-        self._observation = None
-        self._clear_decision_session_caches()
+        try:
+            if self._diagnostics_enabled:
+                self._diagnostics_last = None
+                self._diagnostics_last = self._decision_diagnostics_receipt()
+        finally:
+            self._diagnostics_enabled = False
+            self._generation = None
+            self._scope = None
+            self._observation = None
+            self._clear_decision_session_caches()
 
     def _decision_session_entry_generation(
         self,

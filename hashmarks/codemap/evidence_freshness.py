@@ -423,10 +423,10 @@ class EvidenceFreshnessMixin:
         seen = set(project_ids)
         frontier = sorted(project_ids)
         affected: list[dict[str, object]] = []
-        edges: list[dict[str, object]] = []
-        edge_keys: set[tuple[str, str, str, str]] = set()
+        observed_targets: set[str] = set()
         for depth in range(1, max_depth + 1):
             nxt: list[str] = []
+            observed_targets.update(frontier)
             for current in frontier:
                 for edge in reverse.get(current, ()):
                     source = str(edge.get("source") or "")
@@ -434,18 +434,41 @@ class EvidenceFreshnessMixin:
                         continue
                     seen.add(source)
                     affected.append({"project": source, "depth": depth})
-                    self._append_compact_project_edge(edge, source, edges, edge_keys)
                     if len(affected) >= limit:
                         return {
                             "roots": sorted(project_ids),
                             "affected": affected,
-                            "edges": edges,
+                            "edges": self._selected_project_provenance(
+                                reverse, observed_targets, seen - project_ids
+                            ),
                         }
                     nxt.append(source)
             if not nxt:
                 break
             frontier = sorted(nxt)
-        return {"roots": sorted(project_ids), "affected": affected, "edges": edges}
+        return {
+            "roots": sorted(project_ids),
+            "affected": affected,
+            "edges": self._selected_project_provenance(
+                reverse, observed_targets, seen - project_ids
+            ),
+        }
+
+    def _selected_project_provenance(
+        self,
+        reverse: dict[str, list[dict[str, object]]],
+        observed_targets: set[str],
+        selected: set[str],
+    ) -> list[dict[str, object]]:
+        """Keep distinct explicit edges among the already selected bounded projects."""
+        edges: list[dict[str, object]] = []
+        keys: set[tuple[str, str, str, str]] = set()
+        for target in sorted(observed_targets):
+            for edge in reverse.get(target, ()):
+                source = str(edge.get("source") or "")
+                if source in selected:
+                    self._append_compact_project_edge(edge, source, edges, keys)
+        return edges
 
     def _reverse_project_edges(self) -> dict[str, list[dict[str, object]]]:
         reverse: dict[str, list[dict[str, object]]] = {}

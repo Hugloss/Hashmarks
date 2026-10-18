@@ -1,0 +1,74 @@
+{
+  "accepted_test_declaration": {
+    "declaration_line": 356,
+    "direct_assertions": [
+      {
+        "end_line": 370,
+        "line": 370,
+        "sha256": "69e0bdcd0a8dc347b73964d4aa20eb4af431b15813f1701bf1e6105db5fb2406",
+        "syntax": "assert value is None"
+      }
+    ],
+    "end_line": 370,
+    "nested_scope_assertions_excluded": true,
+    "path": "tests/brokers/kafka/test_publish.py",
+    "sha256": "1f099ea9f8a60c92816205bb530f491e441fd3525a140e5b2cbc922a9cc8d42d",
+    "start_line": 355,
+    "state": "source-declared",
+    "symbol": "TestPublish.test_publish_none_sends_a_real_tombstone"
+  },
+  "active_campaign_changed": false,
+  "before_counterpart": "not independently established; unchanged before oracle preserved",
+  "capability_reviewed": false,
+  "controls": [
+    {
+      "mode": "declaration",
+      "mutation": "path",
+      "state": "REJECTED"
+    },
+    {
+      "mode": "declaration",
+      "mutation": "revision",
+      "state": "REJECTED"
+    },
+    {
+      "mode": "declaration",
+      "mutation": "symbol",
+      "state": "REJECTED"
+    },
+    {
+      "mode": "declaration",
+      "mutation": "missing",
+      "state": "REJECTED"
+    },
+    {
+      "mode": "selected-name",
+      "mutation": "path",
+      "state": "REJECTED"
+    },
+    {
+      "mode": "selected-name",
+      "mutation": "revision",
+      "state": "REJECTED"
+    },
+    {
+      "mode": "selected-name",
+      "mutation": "symbol",
+      "state": "REJECTED"
+    },
+    {
+      "mode": "selected-name",
+      "mutation": "missing",
+      "state": "REJECTED"
+    }
+  ],
+  "id": "faststream-keyed-none-tombstone",
+  "observer_outputs_used_to_derive_expected_fact": false,
+  "original_grader_sha256": "4e784335f7904fb8644fe38ceb2c20370fcc180f9ef835565bc6b78f2edbd18f",
+  "schema": "hashmarks.data-verification-declaration-review.v1",
+  "scope": "source relevance of existing after-change test declaration only; no execution/sufficiency or canonical selection authority",
+  "source_relevance": "Test publishes literal None with nonempty key, consumes raw_message.value and asserts None; same commit adds branch syntax. Runtime sensitivity/harness behavior is unexecuted.",
+  "status": "INCOMPLETE",
+  "test_revision": "1eb8ce5667b50c98729672e3c0f13b24dc70c84278e53d5a8792590a124337ff",
+  "test_source_review_sha256": "596711121271586bd66958793fe3f9916d3f4af7359ab658cd131d20277104f5"
+}

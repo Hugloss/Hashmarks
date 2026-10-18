@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import tomllib
+from collections import Counter
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -125,13 +126,43 @@ class NpmProjectGraphProvider(ProjectGraphProvider):
         self, workspace: Path, rows: list[tuple[Path, dict[str, Any]]]
     ) -> tuple[list[ProjectNode], dict[str, str]]:
         nodes = [self._npm_node(workspace, manifest, value) for manifest, value in rows]
-        return nodes, {str(node.metadata["name"]): node.project_id for node in nodes}
+        counts = Counter(str(node.metadata["name"]) for node in nodes)
+        qualified = [
+            ProjectNode(
+                project_id="npm:declaration:"
+                + json.dumps(
+                    [node.metadata["name"], node.manifest],
+                    separators=(",", ":"),
+                    ensure_ascii=False,
+                ),
+                kind=node.kind,
+                root=node.root,
+                manifest=node.manifest,
+                producer=node.producer,
+                metadata={
+                    **node.metadata,
+                    "name_resolution": "ambiguous"
+                    if counts[str(node.metadata["name"])] > 1
+                    else "unique",
+                },
+            )
+            if counts[str(node.metadata["name"])] > 1
+            or str(node.metadata["name"]).startswith("declaration:")
+            else node
+            for node in nodes
+        ]
+        return qualified, {
+            str(node.metadata["name"]): node.project_id
+            for node in qualified
+            if counts[str(node.metadata["name"])] == 1
+        }
 
     def _npm_edges(
         self,
         workspace: Path,
         rows: list[tuple[Path, dict[str, Any]]],
         names: dict[str, str],
+        sources: dict[str, str],
     ) -> list[ProjectEdge]:
         edges: list[ProjectEdge] = []
         fields = (
@@ -141,7 +172,7 @@ class NpmProjectGraphProvider(ProjectGraphProvider):
             "optionalDependencies",
         )
         for manifest, value in rows:
-            source = f"npm:{self._npm_name(workspace, manifest, value)}"
+            source = sources[_rel(workspace, manifest)]
             for field_name in fields:
                 deps = value.get(field_name)
                 if not isinstance(deps, dict):
@@ -159,7 +190,20 @@ class NpmProjectGraphProvider(ProjectGraphProvider):
     def collect(self, workspace: Path) -> ProjectGraphEvidence:
         rows, warnings = self._package_rows(workspace)
         nodes, names = self._npm_nodes(workspace, rows)
-        edges = self._npm_edges(workspace, rows, names)
+        ambiguous = sorted(
+            {
+                str(node.metadata["name"])
+                for node in nodes
+                if node.metadata.get("name_resolution") == "ambiguous"
+            }
+        )
+        warnings.extend(
+            f"ambiguous npm package name: {name}; dependency target unresolved"
+            for name in ambiguous
+        )
+        edges = self._npm_edges(
+            workspace, rows, names, {node.manifest: node.project_id for node in nodes}
+        )
         return ProjectGraphEvidence(
             self.name, tuple(nodes), tuple(edges), tuple(warnings)
         )

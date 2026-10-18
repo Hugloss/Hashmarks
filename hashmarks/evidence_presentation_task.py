@@ -14,6 +14,15 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from .evidence_presentation import _Projection
 
+_INITIAL_VERIFICATION_QUALIFIERS = (
+    "reference_strength",
+    "direct_reference",
+    "indirect_reference",
+    "verification_selection_authority",
+    "edit_relationship",
+    "negative_evidence_admissible",
+)
+
 
 def _task_owner_display_qualified(
     ownership: Mapping[str, object],
@@ -193,24 +202,30 @@ def project_task(
         p.nested(related, "resource_lifecycle", (*ref, "related"), ctx)
 
 
-def compact_initial_relationships(result: dict[str, Any]) -> None:
-    """Retain relationship values once, with explicit references for duplicates."""
+def compact_initial_record_contexts(result: dict[str, Any]) -> None:
+    """Retain exact qualifications once beside the record they qualify."""
     from hashmarks.evidence_presentation_text import (
         initial_semantic_relationship_details,
     )
 
     for group in result["groups"]:
-        if group.get("finding_qualifiers", {}).get("kind") != "scip_semantic_discovery":
+        kind = group.get("finding_qualifiers", {}).get("kind")
+        if kind not in {
+            "scip_semantic_discovery",
+            "initial_verification_locator",
+            "task_source_excerpts",
+        }:
             continue
         for finding in group["findings"]:
             native = finding["details"]
             ref = finding["source_refs"][0]
-            details, refs = initial_semantic_relationship_details(native)
-            finding["details"] = {
-                "record": details,
-                "value_refs": refs,
-                "value_ref_base": ref,
-            }
+            if kind == "scip_semantic_discovery":
+                details, refs = initial_semantic_relationship_details(native)
+                finding["details"] = {
+                    "record": details,
+                    "value_refs": refs,
+                    "value_ref_base": ref,
+                }
             context = finding.get("source_context", {})
             qualification = context.get("record_qualification", {})
             if len(context) == 1 and _initial_qualification_repeated(
@@ -261,6 +276,63 @@ def compact_initial_groups(groups: list[dict[str, Any]]) -> None:
                 finding.pop(key)
             if not finding.get("source_context"):
                 finding.pop("source_context", None)
+
+
+def _factor_source_records(
+    container: dict[str, Any], key: str, qualifier_key: str
+) -> None:
+    """Factor only present, JSON-identical fields and keep every record in order."""
+    rows = container.get(key)
+    if (
+        not isinstance(rows, list)
+        or len(rows) < 2
+        or not all(isinstance(row, dict) for row in rows)
+        or qualifier_key in container
+    ):
+        return
+
+    def encoded(value: object) -> bytes:
+        return json.dumps(
+            value, sort_keys=True, ensure_ascii=False, separators=(",", ":")
+        ).encode("utf-8")
+
+    common = {
+        field: value
+        for field, value in rows[0].items()
+        if all(field in row and encoded(row[field]) == encoded(value) for row in rows)
+    }
+    if not common:
+        return
+    projected = [
+        {field: value for field, value in row.items() if field not in common}
+        for row in rows
+    ]
+    if len(encoded({key: projected, qualifier_key: common})) >= len(
+        encoded({key: rows})
+    ):
+        return
+    container[key] = projected
+    container[qualifier_key] = common
+
+
+def compact_initial_source_qualifiers(groups: list[dict[str, Any]]) -> None:
+    """Shared qualifiers apply to each displayed source record, never missing rows."""
+    for group in groups:
+        if group["family"] != "source":
+            continue
+        for finding in group["findings"]:
+            details = finding.get("details")
+            if not isinstance(details, dict):
+                continue
+            anchors = details.get("line_anchors")
+            if not isinstance(anchors, list):
+                continue
+            for anchor in anchors:
+                if isinstance(anchor, dict):
+                    _factor_source_records(
+                        anchor, "context_excerpt", "context_excerpt_qualifiers"
+                    )
+            _factor_source_records(details, "line_anchors", "line_anchor_qualifiers")
 
 
 def _compact_initial_field_declarations(groups: list[dict[str, Any]]) -> None:
@@ -328,8 +400,12 @@ def _initial_verification_qualifier_table(
     details: list[dict[str, Any]],
 ) -> tuple[list[str], list[list[object]], list[dict[str, Any]]] | None:
     """Encode repeated qualifier combinations without changing any supplied value."""
-    columns = ["reference_strength", "direct_reference", "indirect_reference"]
-    if not all(all(key in row for key in columns) for row in details):
+    columns = [
+        key
+        for key in _INITIAL_VERIFICATION_QUALIFIERS
+        if all(key in row for row in details)
+    ]
+    if not columns:
         return None
     keys: dict[str, int] = {}
     qualifiers: list[list[object]] = []
@@ -373,7 +449,7 @@ def compact_initial_verification_qualifiers(groups: list[dict[str, Any]]) -> Non
         details = [finding["details"] for finding in group["findings"]]
         common = {
             key: details[0][key]
-            for key in ("reference_strength", "direct_reference", "indirect_reference")
+            for key in _INITIAL_VERIFICATION_QUALIFIERS
             if key in details[0]
             and all(
                 key in row and json.dumps(row[key]) == json.dumps(details[0][key])
@@ -393,6 +469,22 @@ def compact_initial_verification_qualifiers(groups: list[dict[str, Any]]) -> Non
         for row in details:
             for key in common:
                 row.pop(key)
+
+
+def _initial_verification_locator(row: Mapping[str, Any]) -> dict[str, Any]:
+    """Retain supplied test identity and qualifiers without resolving uncertainty."""
+    return {
+        key: row[key]
+        for key in (
+            "path",
+            "qualname",
+            "test_symbol",
+            "test_revision",
+            "test_declarations",
+            *_INITIAL_VERIFICATION_QUALIFIERS,
+        )
+        if key in row
+    }
 
 
 def project_initial_task(
@@ -489,21 +581,10 @@ def project_initial_task(
         if isinstance(relevance.get("candidates_encoding"), dict):
             rows = decode_initial_collection(rows, relevance["candidates_encoding"])
         for index, row in enumerate(rows):
-            locator = {
-                key: row[key]
-                for key in (
-                    "path",
-                    "qualname",
-                    "reference_strength",
-                    "direct_reference",
-                    "indirect_reference",
-                )
-                if key in row
-            }
             p.add(
                 "verification",
                 "initial_verification_locator",
-                locator,
+                _initial_verification_locator(row),
                 (*ref, "verification", "relevance", "candidates", index),
                 {},
                 assertion="producer_claim",
@@ -643,8 +724,14 @@ def initial_evidence_text(packet: Mapping[str, object]) -> str:
         if isinstance(relevance.get("candidates_encoding"), dict):
             rows = decode_initial_collection(rows, relevance["candidates_encoding"])
         for index, row in enumerate(rows):
+            locator = json.dumps(
+                _initial_verification_locator(row),
+                sort_keys=True,
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
             lines.append(
-                f"Verification candidate: {row['path']}; reference: {row.get('reference_strength', 'unknown')}; direct: {row.get('direct_reference', 'unknown')}; indirect: {row.get('indirect_reference', 'unknown')} (@ /verification/relevance/candidates/{index})."
+                f"Verification candidate: {locator} (@ /verification/relevance/candidates/{index})."
             )
     lines.append(
         "Qualification details remain in the native packet. Omissions: /initial_projection/omissions; omissions do not establish absence. Verification is relevance evidence; tests were not executed."

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import ast
 import re
-from collections import defaultdict
+from collections import Counter, defaultdict
 from collections.abc import Mapping, Sequence
 from itertools import islice
 from typing import TYPE_CHECKING, cast
@@ -72,6 +72,12 @@ class TaskEvidenceSourceContextMixin:
         if len(groups) < 2:
             return None
         self.source.ensure_current(path)
+        member, _ = self.source.member(path)
+        if (
+            member.get("state") != "known-present"
+            or member.get("evidence_visibility") != "source"
+        ):
+            return None
         try:
             if (self.workspace / path).stat().st_size > _MAX_SOURCE_BYTES:
                 return None
@@ -79,6 +85,9 @@ class TaskEvidenceSourceContextMixin:
         except (OSError, UnicodeError, SyntaxError, ValueError):
             return None
         self.source.ensure_current(path)
+        current_member, _ = self.source.member(path)
+        if current_member != member:
+            return None
         names, nodes_truncated = _loaded_names(snapshot.tree)
         excluded = _declared_field_spans(row)
         selected = self._task_source_ranked_lines(names, groups, excluded)
@@ -108,18 +117,30 @@ class TaskEvidenceSourceContextMixin:
             self = cast("RepositoryTasks", self)
         candidates = [
             (
-                self._task_evidence_natural_match_count(
-                    " ".join(sorted(words)), groups
+                tuple(
+                    index
+                    for index, group in enumerate(groups)
+                    if self._task_evidence_natural_match_count(
+                        " ".join(sorted(words)), (group,)
+                    )
                 ),
                 line,
             )
             for line, words in names.items()
             if not any(start <= line <= end for start, end in excluded)
         ]
+        frequencies = Counter(index for matched, _ in candidates for index in matched)
         return [
             line
-            for score, line in sorted(candidates, key=lambda row: (-row[0], row[1]))
-            if score >= 2
+            for matched, line in sorted(
+                candidates,
+                key=lambda row: (
+                    -len(row[0]),
+                    sum(frequencies[index] for index in row[0]),
+                    row[1],
+                ),
+            )
+            if matched
         ]
 
     def _task_evidence_attach_source_context(self, packet: TaskEvidenceDraft) -> None:
@@ -153,6 +174,6 @@ class TaskEvidenceSourceContextMixin:
         observation = codemap.source.observe(
             path, lines=selected[0], anchor_context_lines=1, max_bytes=_MAX_SOURCE_BYTES
         )
-        if codemap.index.is_current(path):
+        if codemap.index.is_current(path) and observation["availability"] == "observed":
             row["source_observation"] = observation
             row["source_selection"] = selected[1]

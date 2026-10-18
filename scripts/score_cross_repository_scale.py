@@ -107,27 +107,25 @@ def _diamond_edges(count: int) -> list[tuple[int, int, str]]:
 def _reverse_expected(
     edges: Iterable[tuple[int, int, str]], roots: set[int], max_depth: int
 ) -> tuple[dict[int, int], list[tuple[int, int, str]]]:
-    reverse: dict[int, list[tuple[int, str]]] = {}
-    for source, target, kind in edges:
-        reverse.setdefault(target, []).append((source, kind))
-    seen = set(roots)
-    frontier = sorted(roots)
+    declared = tuple(edges)
+    reachable = set(roots)
     depths: dict[int, int] = {}
-    admitted_edges: list[tuple[int, int, str]] = []
     for depth in range(1, max_depth + 1):
-        nxt: list[int] = []
-        for current in frontier:
-            for source, kind in sorted(reverse.get(current, [])):
-                if source in seen:
-                    continue
-                seen.add(source)
-                depths[source] = depth
-                nxt.append(source)
-                admitted_edges.append((source, current, kind))
-        if not nxt:
+        discovered = {
+            source for source, target, _ in declared if target in reachable
+        } - reachable
+        if not discovered:
             break
-        frontier = sorted(nxt)
-    return depths, admitted_edges
+        depths.update(dict.fromkeys(discovered, depth))
+        reachable.update(discovered)
+    observed_targets = roots | {
+        project for project, depth in depths.items() if depth < max_depth
+    }
+    return depths, sorted(
+        (source, target, kind)
+        for source, target, kind in declared
+        if source in depths and target in observed_targets
+    )
 
 
 def _write_scenario_repository(
@@ -199,7 +197,11 @@ def _shared_scenario(
     depth_budget: int,
 ) -> tuple[dict, dict]:
     shared_roots = {0, min(count - 1, 1), count - 1}
-    shared_depths, shared_edges = _reverse_expected(edges, shared_roots, depth_budget)
+    shared_depths, shared_edges = _reverse_expected(
+        [*edges, *((project, -1, "contract") for project in shared_roots)],
+        {-1},
+        depth_budget,
+    )
     shared_id = f"{shape}-{count}-shared"
     public_shared = {
         "id": shared_id,
@@ -213,14 +215,16 @@ def _shared_scenario(
     }
     secret_shared = {
         "id": shared_id,
-        # roots themselves appear in affected projects for a shared input.
-        "projects": sorted(
-            {_project_id(i) for i in shared_roots}
-            | {_project_id(i) for i in shared_depths}
-        ),
-        "depths": {_project_id(i): 1 for i in shared_roots}
-        | {_project_id(i): d + 1 for i, d in shared_depths.items()},
-        "edges": [[_project_id(s), _project_id(t), k] for s, t, k in shared_edges],
+        "projects": sorted(_project_id(i) for i in shared_depths),
+        "depths": {_project_id(i): depth for i, depth in shared_depths.items()},
+        "edges": [
+            [
+                _project_id(source),
+                f"shared-input:{changed}" if target == -1 else _project_id(target),
+                kind,
+            ]
+            for source, target, kind in shared_edges
+        ],
     }
     return public_shared, secret_shared
 
@@ -346,6 +350,30 @@ def _freeze_task_packet(
     }
 
 
+def _relationship_measurement(rows: list[object], expected: dict) -> dict[str, object]:
+    """Grade exact explicit relationships independently of project/depth recall."""
+    expected_edges = {tuple(edge) for edge in expected["edges"]}
+    actual_edges = {
+        (
+            str(edge.get("from") or ""),
+            str(edge.get("to") or ""),
+            str(edge.get("kind") or ""),
+        )
+        for edge in rows
+        if isinstance(edge, dict)
+    }
+    return {
+        "producer_complete": all(
+            isinstance(edge, dict) and edge.get("producer") == "declared-project-links"
+            for edge in rows
+        ),
+        "expected_relationships": len(expected_edges),
+        "reported_relationships": len(rows),
+        "relationships_complete": actual_edges == expected_edges
+        and len(rows) == len(actual_edges),
+    }
+
+
 def _score_frozen_packet(item: dict, expected: dict) -> dict:
     task = item["task"]
     packet = item["packet"]
@@ -379,10 +407,7 @@ def _score_frozen_packet(item: dict, expected: dict) -> dict:
     rows = fragment.get("edges", [])
     if not isinstance(rows, list):
         raise ValueError("project impact edges must be a list")
-    producer_complete = all(
-        isinstance(edge, dict) and edge.get("producer") == "declared-project-links"
-        for edge in rows
-    )
+    relationships = _relationship_measurement(rows, expected)
     refresh_ok = True
     if task["kind"] == "shared-input":
         refresh = packet.get("project_refresh")
@@ -402,7 +427,7 @@ def _score_frozen_packet(item: dict, expected: dict) -> dict:
         "expected_provenance_rows": len(expected_depths),
         "reported_provenance_rows": len(affected),
         "provenance_recall": provenance_recall,
-        "producer_complete": producer_complete,
+        **relationships,
         "refresh_correct": refresh_ok,
         "packet_bytes": item["record"]["economics"]["evidence_bytes"],
         "impact_ms": item["record"]["economics"]["decision_latency_ms"],
@@ -410,7 +435,8 @@ def _score_frozen_packet(item: dict, expected: dict) -> dict:
         "fully_correct": project_recall == 1.0
         and project_precision == 1.0
         and provenance_recall == 1.0
-        and producer_complete
+        and relationships["producer_complete"] is True
+        and relationships["relationships_complete"] is True
         and refresh_ok,
         "record_identity": item["record"]["record_identity"],
     }

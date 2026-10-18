@@ -33,6 +33,54 @@ these checks; repaired captures pass. `initial-field-oracle-review.json` records
 the source-review and original/new oracle identities. This addition preserves
 all previous checks and keeps semantic review and metric eligibility false.
 
+`initial-source-oracle-review.json` adds independently source-authored cached-yield
+initial checks: the before-change cache assignment and the after-change guard,
+raise and message, with exact member revisions and anchor digests. Thirteen
+before and fifteen after checks make 252 required fact witnesses. Combined with
+the unchanged 216 provider witnesses, the selected CR-41 candidate passes all
+468 through API/CLI/official MCP. Every admitted common gate passes; the largest
+required initial reply is 5,333 tokens under the user-authorized 6,000 ceiling.
+Independent source correspondence passes 120 observations and rejects 56
+mutations. This closes selected source disclosure, not runtime provider behavior
+or causal test relevance. Full suite and capability review remain INCOMPLETE;
+review and eligibility flags stay false. Historical results above retain their
+own identities and policies.
+
+`verification-source-oracle-review.json` separately records six existing
+after-change test declarations for four problems: bound-method classification,
+stateful cleanup, cached generators and dependency metadata construction.
+Expected tests come from direct source imports/calls and exact declarations,
+not observer rankings. Before counterparts remain unresolved; either reviewed
+sync/async regression is admitted where both apply. Additive full/initial checks
+bind the test path, symbol and revision together with unchanged uncertainty.
+Task source labels include the exact reviewed test ranges. Original source
+oracles, tasks, populations, eligibility and capability-review flags remain
+unchanged. Static relevance does not establish execution or test sufficiency.
+
+`verification-declaration-oracle-review.json` admits the same six declarations
+through either a unique test locator or a bounded declaration context. Scoped
+alternatives keep each candidate's own path, revision and exact declaration
+range together; they cannot borrow another record's binding. Eight positive
+controls pass and 56 corruptions reject. A null selected symbol remains unknown.
+This extends observable test disclosure and leaves all review/eligibility flags
+false; it does not establish test sufficiency or before-change counterparts.
+
+CR-43 qualifies five selected genuine workflows through before/after API,
+CLI and official MCP: all admitted common gates and all 540 independently
+required source/test witnesses pass. Maximum required initial reply is 5,748
+tokens. Independent readable/source correspondence passes 150 observations and
+rejects 126 mutations. The remaining seven configuration workflows have their
+earlier CR-41 proof, which does not establish CR-43 qualification. Full semantic,
+causal-test and capability review remain INCOMPLETE.
+
+The subsequent complete CR-43 extension now covers all twelve workflows and
+reuses the five completed receipts. All admitted common gates pass; maximum
+required initial reply remains 5,748 tokens. Pure regrading closes all 1,698
+source-fact/presentation witnesses and all 540 selected task/test witnesses,
+zero missing. These results supersede only the earlier unselected-workflow gap.
+Independent semantic/causal-test/capability review remains INCOMPLETE, and later
+project repairs retain their separate observer identities.
+
 The source records bind exact commits, complete archive content identities,
 archive SHA-256 and nominated file byte hashes. A path marked absent is absent
 from that exact source tree; this does not establish semantic absence. Three

@@ -1,0 +1,600 @@
+{
+  "cases": [
+    {
+      "accepted_test_declarations": [
+        {
+          "assertions": [
+            {
+              "line": 333,
+              "syntax": "provide.has_async_generator_dependency is True"
+            },
+            {
+              "line": 334,
+              "syntax": "provide.has_sync_generator_dependency is False"
+            },
+            {
+              "line": 336,
+              "syntax": "provide.has_sync_callable is True"
+            }
+          ],
+          "constructor_or_function_call_lines": [
+            330
+          ],
+          "declaration_line": 319,
+          "direct_import": {
+            "line": 7,
+            "module": "litestar.di",
+            "symbol": "Provide"
+          },
+          "end_line": 336,
+          "exception_expectations": [],
+          "path": "tests/unit/test_di.py",
+          "sha256": "1da59a72b99a205bebd39d650db85a0bd2521ff2be77762ca067ee8b42e3b9c2",
+          "start_line": 319,
+          "symbol": "test_bound_async_generator_method_detection"
+        },
+        {
+          "assertions": [
+            {
+              "line": 350,
+              "syntax": "provide.has_sync_generator_dependency is True"
+            },
+            {
+              "line": 351,
+              "syntax": "provide.has_async_generator_dependency is False"
+            },
+            {
+              "line": 353,
+              "syntax": "provide.has_sync_callable is True"
+            }
+          ],
+          "constructor_or_function_call_lines": [
+            347
+          ],
+          "declaration_line": 339,
+          "direct_import": {
+            "line": 7,
+            "module": "litestar.di",
+            "symbol": "Provide"
+          },
+          "end_line": 353,
+          "exception_expectations": [],
+          "path": "tests/unit/test_di.py",
+          "sha256": "5d66b820f8ea3d4d53a8e2e73947071decd2ccdfd16a7c43655ecdf563869202",
+          "start_line": 339,
+          "symbol": "test_bound_sync_generator_method_detection"
+        }
+      ],
+      "before_test_relation": "unresolved; no counterpart assertion added",
+      "capability_reviewed": false,
+      "checks": {
+        "checks": {
+          "alternative_records": [
+            {
+              "pointer": "/verification/relevance/candidates/*",
+              "value": {
+                "edit_relationship": "unestablished",
+                "negative_evidence_admissible": false,
+                "path": "tests/unit/test_di.py",
+                "test_revision": "ecffad43a20e8ad89170f882b50327d36204550eae71ccbae76056379c4b49b0",
+                "test_symbol": "test_bound_sync_generator_method_detection",
+                "verification_selection_authority": false
+              }
+            }
+          ],
+          "id": "reviewed-existing-test",
+          "pointer": "/verification/relevance/candidates/*",
+          "predicate": "includes_record",
+          "source_paths": [
+            "litestar/di.py",
+            "tests/unit/test_di.py"
+          ],
+          "support": "supported",
+          "value": {
+            "edit_relationship": "unestablished",
+            "negative_evidence_admissible": false,
+            "path": "tests/unit/test_di.py",
+            "test_revision": "ecffad43a20e8ad89170f882b50327d36204550eae71ccbae76056379c4b49b0",
+            "test_symbol": "test_bound_async_generator_method_detection",
+            "verification_selection_authority": false
+          }
+        },
+        "initial_checks": {
+          "alternative_records": [
+            {
+              "pointer": "/verification/relevance/candidates/*",
+              "value": {
+                "edit_relationship": "unestablished",
+                "negative_evidence_admissible": false,
+                "path": "tests/unit/test_di.py",
+                "test_revision": "ecffad43a20e8ad89170f882b50327d36204550eae71ccbae76056379c4b49b0",
+                "test_symbol": "test_bound_sync_generator_method_detection",
+                "verification_selection_authority": false
+              }
+            }
+          ],
+          "id": "initial-reviewed-existing-test",
+          "pointer": "/verification/relevance/candidates/*",
+          "predicate": "includes_record",
+          "source_paths": [
+            "litestar/di.py",
+            "tests/unit/test_di.py"
+          ],
+          "support": "supported",
+          "value": {
+            "edit_relationship": "unestablished",
+            "negative_evidence_admissible": false,
+            "path": "tests/unit/test_di.py",
+            "test_revision": "ecffad43a20e8ad89170f882b50327d36204550eae71ccbae76056379c4b49b0",
+            "test_symbol": "test_bound_async_generator_method_detection",
+            "verification_selection_authority": false
+          }
+        }
+      },
+      "id": "litestar-bound-method-providers",
+      "production_source_labels": [
+        {
+          "declaration_line": 44,
+          "end_line": 99,
+          "path": "litestar/di.py",
+          "sha256": "dd6f36e2e51f9c545dad2f91e597747188bf3a61c5a54935db0986e1d57e226f",
+          "start_line": 44,
+          "symbol": "Provide.__init__"
+        }
+      ],
+      "relationship_scope": "explicit test import and direct constructor/function call, plus exact source declarations and assertions; not runtime path, defect sensitivity or test sufficiency",
+      "source": "litestar-bound-method-providers-after",
+      "source_identity": "sha256:edd889b011e42bd9e52a75c8ec9882f12ef3793a500e83580f1ad502d2d21974:1403",
+      "stage": "after",
+      "test_file_sha256": "d3c4c6eed2a95362a461ec85ec5c3f5bfeb48e5aeafc33315d5719a565dde8ef",
+      "test_path": "tests/unit/test_di.py",
+      "test_revision": "ecffad43a20e8ad89170f882b50327d36204550eae71ccbae76056379c4b49b0"
+    },
+    {
+      "accepted_test_declarations": [
+        {
+          "assertions": [
+            {
+              "line": 248,
+              "syntax": "provide.has_sync_generator_dependency is True"
+            },
+            {
+              "line": 249,
+              "syntax": "provide.has_async_generator_dependency is False"
+            },
+            {
+              "line": 253,
+              "syntax": "isinstance(gen1, Generator)"
+            },
+            {
+              "line": 256,
+              "syntax": "session1 == 1"
+            },
+            {
+              "line": 257,
+              "syntax": "factory.call_count == 1"
+            },
+            {
+              "line": 258,
+              "syntax": "factory.cleanup_count == 0"
+            },
+            {
+              "line": 262,
+              "syntax": "isinstance(gen2, Generator)"
+            },
+            {
+              "line": 265,
+              "syntax": "session2 == 2"
+            },
+            {
+              "line": 266,
+              "syntax": "factory.call_count == 2"
+            },
+            {
+              "line": 267,
+              "syntax": "factory.cleanup_count == 0"
+            },
+            {
+              "line": 272,
+              "syntax": "factory.cleanup_count == 1"
+            },
+            {
+              "line": 277,
+              "syntax": "factory.cleanup_count == 2"
+            }
+          ],
+          "constructor_or_function_call_lines": [
+            245
+          ],
+          "declaration_line": 242,
+          "direct_import": {
+            "line": 7,
+            "module": "litestar.di",
+            "symbol": "Provide"
+          },
+          "end_line": 277,
+          "exception_expectations": [
+            {
+              "line": 270,
+              "syntax": "with pytest.raises(StopIteration):\n    next(gen1)"
+            },
+            {
+              "line": 275,
+              "syntax": "with pytest.raises(StopIteration):\n    next(gen2)"
+            }
+          ],
+          "path": "tests/unit/test_di.py",
+          "sha256": "15c2cde994b1d5165297ffaf87b71f47487902844e15663fbe64d81e8a4f664f",
+          "start_line": 241,
+          "symbol": "test_stateful_sync_generator_with_cleanup"
+        },
+        {
+          "assertions": [
+            {
+              "line": 287,
+              "syntax": "provide.has_sync_generator_dependency is False"
+            },
+            {
+              "line": 288,
+              "syntax": "provide.has_async_generator_dependency is True"
+            },
+            {
+              "line": 292,
+              "syntax": "isinstance(gen1, AsyncGenerator)"
+            },
+            {
+              "line": 295,
+              "syntax": "session1 == 1"
+            },
+            {
+              "line": 296,
+              "syntax": "factory.call_count == 1"
+            },
+            {
+              "line": 297,
+              "syntax": "factory.cleanup_count == 0"
+            },
+            {
+              "line": 301,
+              "syntax": "isinstance(gen2, AsyncGenerator)"
+            },
+            {
+              "line": 304,
+              "syntax": "session2 == 2"
+            },
+            {
+              "line": 305,
+              "syntax": "factory.call_count == 2"
+            },
+            {
+              "line": 306,
+              "syntax": "factory.cleanup_count == 0"
+            },
+            {
+              "line": 311,
+              "syntax": "factory.cleanup_count == 1"
+            },
+            {
+              "line": 316,
+              "syntax": "factory.cleanup_count == 2"
+            }
+          ],
+          "constructor_or_function_call_lines": [
+            284
+          ],
+          "declaration_line": 281,
+          "direct_import": {
+            "line": 7,
+            "module": "litestar.di",
+            "symbol": "Provide"
+          },
+          "end_line": 316,
+          "exception_expectations": [
+            {
+              "line": 309,
+              "syntax": "with pytest.raises(StopAsyncIteration):\n    await gen1.__anext__()"
+            },
+            {
+              "line": 314,
+              "syntax": "with pytest.raises(StopAsyncIteration):\n    await gen2.__anext__()"
+            }
+          ],
+          "path": "tests/unit/test_di.py",
+          "sha256": "9e27262cd72b77a647d8fe8618a2a85ebda62d068d38a416dcd06f353d724bde",
+          "start_line": 280,
+          "symbol": "test_stateful_async_generator_with_cleanup"
+        }
+      ],
+      "before_test_relation": "unresolved; no counterpart assertion added",
+      "capability_reviewed": false,
+      "checks": {
+        "checks": {
+          "alternative_records": [
+            {
+              "pointer": "/verification/relevance/candidates/*",
+              "value": {
+                "edit_relationship": "unestablished",
+                "negative_evidence_admissible": false,
+                "path": "tests/unit/test_di.py",
+                "test_revision": "a4160c26bb0ab2622afcdde035352902627f1c4b82f1fb1d81cf36ddff69e397",
+                "test_symbol": "test_stateful_async_generator_with_cleanup",
+                "verification_selection_authority": false
+              }
+            }
+          ],
+          "id": "reviewed-existing-test",
+          "pointer": "/verification/relevance/candidates/*",
+          "predicate": "includes_record",
+          "source_paths": [
+            "litestar/di.py",
+            "tests/unit/test_di.py"
+          ],
+          "support": "supported",
+          "value": {
+            "edit_relationship": "unestablished",
+            "negative_evidence_admissible": false,
+            "path": "tests/unit/test_di.py",
+            "test_revision": "a4160c26bb0ab2622afcdde035352902627f1c4b82f1fb1d81cf36ddff69e397",
+            "test_symbol": "test_stateful_sync_generator_with_cleanup",
+            "verification_selection_authority": false
+          }
+        },
+        "initial_checks": {
+          "alternative_records": [
+            {
+              "pointer": "/verification/relevance/candidates/*",
+              "value": {
+                "edit_relationship": "unestablished",
+                "negative_evidence_admissible": false,
+                "path": "tests/unit/test_di.py",
+                "test_revision": "a4160c26bb0ab2622afcdde035352902627f1c4b82f1fb1d81cf36ddff69e397",
+                "test_symbol": "test_stateful_async_generator_with_cleanup",
+                "verification_selection_authority": false
+              }
+            }
+          ],
+          "id": "initial-reviewed-existing-test",
+          "pointer": "/verification/relevance/candidates/*",
+          "predicate": "includes_record",
+          "source_paths": [
+            "litestar/di.py",
+            "tests/unit/test_di.py"
+          ],
+          "support": "supported",
+          "value": {
+            "edit_relationship": "unestablished",
+            "negative_evidence_admissible": false,
+            "path": "tests/unit/test_di.py",
+            "test_revision": "a4160c26bb0ab2622afcdde035352902627f1c4b82f1fb1d81cf36ddff69e397",
+            "test_symbol": "test_stateful_sync_generator_with_cleanup",
+            "verification_selection_authority": false
+          }
+        }
+      },
+      "id": "litestar-stateful-callable-cleanup",
+      "production_source_labels": [
+        {
+          "declaration_line": 44,
+          "end_line": 98,
+          "path": "litestar/di.py",
+          "sha256": "2adb4332e2531f71ecd5e335729e7bb6c24a698333bc86d7352c947dcb630622",
+          "start_line": 44,
+          "symbol": "Provide.__init__"
+        }
+      ],
+      "relationship_scope": "explicit test import and direct constructor/function call, plus exact source declarations and assertions; not runtime path, defect sensitivity or test sufficiency",
+      "source": "litestar-stateful-callable-cleanup-after",
+      "source_identity": "sha256:28abe2f79328bb9b935d56a0c72f3fe973fc87918dd2c2d6a654c9d1825f5fa6:1400",
+      "stage": "after",
+      "test_file_sha256": "75dc315eec700fb5d548dd9b781aa6140f16e471d1c88d8998603b7fc86c58d6",
+      "test_path": "tests/unit/test_di.py",
+      "test_revision": "a4160c26bb0ab2622afcdde035352902627f1c4b82f1fb1d81cf36ddff69e397"
+    },
+    {
+      "accepted_test_declarations": [
+        {
+          "assertions": [],
+          "constructor_or_function_call_lines": [
+            167
+          ],
+          "declaration_line": 165,
+          "direct_import": {
+            "line": 6,
+            "module": "litestar.di",
+            "symbol": "Provide"
+          },
+          "end_line": 167,
+          "exception_expectations": [
+            {
+              "line": 166,
+              "syntax": "with pytest.raises(ImproperlyConfiguredException):\n    Provide(dep, use_cache=True)"
+            }
+          ],
+          "path": "tests/unit/test_di.py",
+          "sha256": "3078002d821800c69bb30814af294b2e9942cd8c39711b70f15bad902b4628c8",
+          "start_line": 158,
+          "symbol": "test_raises_when_generator_dependency_is_cached"
+        }
+      ],
+      "before_test_relation": "unresolved; no counterpart assertion added",
+      "capability_reviewed": false,
+      "checks": {
+        "checks": {
+          "id": "reviewed-existing-test",
+          "pointer": "/verification/relevance/candidates/*",
+          "predicate": "includes_record",
+          "source_paths": [
+            "litestar/di.py",
+            "tests/unit/test_di.py"
+          ],
+          "support": "supported",
+          "value": {
+            "edit_relationship": "unestablished",
+            "negative_evidence_admissible": false,
+            "path": "tests/unit/test_di.py",
+            "test_revision": "d636d2da34caf5630e238aae7858ed1ce555c714f3ce4c1f150a5e8af3abf51e",
+            "test_symbol": "test_raises_when_generator_dependency_is_cached",
+            "verification_selection_authority": false
+          }
+        },
+        "initial_checks": {
+          "id": "initial-reviewed-existing-test",
+          "pointer": "/verification/relevance/candidates/*",
+          "predicate": "includes_record",
+          "source_paths": [
+            "litestar/di.py",
+            "tests/unit/test_di.py"
+          ],
+          "support": "supported",
+          "value": {
+            "edit_relationship": "unestablished",
+            "negative_evidence_admissible": false,
+            "path": "tests/unit/test_di.py",
+            "test_revision": "d636d2da34caf5630e238aae7858ed1ce555c714f3ce4c1f150a5e8af3abf51e",
+            "test_symbol": "test_raises_when_generator_dependency_is_cached",
+            "verification_selection_authority": false
+          }
+        }
+      },
+      "id": "litestar-cached-yield-provider",
+      "production_source_labels": [
+        {
+          "declaration_line": 40,
+          "end_line": 89,
+          "path": "litestar/di.py",
+          "sha256": "540031dbc9256e1eed92a96a537780743fee071d6ff83e7163620c817c1eb165",
+          "start_line": 40,
+          "symbol": "Provide.__init__"
+        }
+      ],
+      "relationship_scope": "explicit test import and direct constructor/function call, plus exact source declarations and assertions; not runtime path, defect sensitivity or test sufficiency",
+      "source": "litestar-cached-yield-provider-after",
+      "source_identity": "sha256:238218771c77647e5aac17437009817d637c1f0c45d3b8a67c6aaf8bb9fcb654:1228",
+      "stage": "after",
+      "test_file_sha256": "76f1c1f51ff8268be968bc1ba1d3e0eae682fb2517fa551569df0ab24978c2a8",
+      "test_path": "tests/unit/test_di.py",
+      "test_revision": "d636d2da34caf5630e238aae7858ed1ce555c714f3ce4c1f150a5e8af3abf51e"
+    },
+    {
+      "accepted_test_declarations": [
+        {
+          "assertions": [
+            {
+              "line": 20,
+              "syntax": "dependant.call is handler"
+            },
+            {
+              "line": 21,
+              "syntax": "len(dependant.dependencies) == 1"
+            },
+            {
+              "line": 22,
+              "syntax": "dependant.dependencies[0].call is dependency"
+            },
+            {
+              "line": 23,
+              "syntax": "dependant.model.__name__ == 'handler'"
+            },
+            {
+              "line": 24,
+              "syntax": "dependant.custom_fields == {}"
+            },
+            {
+              "line": 25,
+              "syntax": "[field.field_name for field in dependant.flat_params] == ['message']"
+            }
+          ],
+          "constructor_or_function_call_lines": [
+            18
+          ],
+          "declaration_line": 8,
+          "direct_import": {
+            "line": 5,
+            "module": "faststream._internal.fastapi.get_dependant",
+            "symbol": "get_fastapi_dependant"
+          },
+          "end_line": 25,
+          "exception_expectations": [],
+          "path": "tests/fastapi/test_get_dependant.py",
+          "sha256": "bcf94fab34ddc0097060e2a9afd1aa9bbde0f2f3bb16b27bd6eff89070eee118",
+          "start_line": 8,
+          "symbol": "test_get_fastapi_dependant_has_faststream_fields"
+        }
+      ],
+      "before_test_relation": "unresolved; no counterpart assertion added",
+      "capability_reviewed": false,
+      "checks": {
+        "checks": {
+          "id": "reviewed-existing-test",
+          "pointer": "/verification/relevance/candidates/*",
+          "predicate": "includes_record",
+          "source_paths": [
+            "faststream/_internal/fastapi/get_dependant.py",
+            "tests/fastapi/test_get_dependant.py"
+          ],
+          "support": "supported",
+          "value": {
+            "edit_relationship": "unestablished",
+            "negative_evidence_admissible": false,
+            "path": "tests/fastapi/test_get_dependant.py",
+            "test_revision": "ee9c0f523736ba31e84b92024ce2d58ffd0b14f11ca8a8ca431166649c3ee736",
+            "test_symbol": "test_get_fastapi_dependant_has_faststream_fields",
+            "verification_selection_authority": false
+          }
+        },
+        "initial_checks": {
+          "id": "initial-reviewed-existing-test",
+          "pointer": "/verification/relevance/candidates/*",
+          "predicate": "includes_record",
+          "source_paths": [
+            "faststream/_internal/fastapi/get_dependant.py",
+            "tests/fastapi/test_get_dependant.py"
+          ],
+          "support": "supported",
+          "value": {
+            "edit_relationship": "unestablished",
+            "negative_evidence_admissible": false,
+            "path": "tests/fastapi/test_get_dependant.py",
+            "test_revision": "ee9c0f523736ba31e84b92024ce2d58ffd0b14f11ca8a8ca431166649c3ee736",
+            "test_symbol": "test_get_fastapi_dependant_has_faststream_fields",
+            "verification_selection_authority": false
+          }
+        }
+      },
+      "id": "faststream-dependant-constructor-metadata",
+      "production_source_labels": [
+        {
+          "declaration_line": 69,
+          "end_line": 159,
+          "path": "faststream/_internal/fastapi/get_dependant.py",
+          "sha256": "ed7ed542dca257e7cdaf2a58a8eacba8c9241ca9253d5af97abff3da8a0eb407",
+          "start_line": 69,
+          "symbol": "_patch_fastapi_dependent"
+        }
+      ],
+      "relationship_scope": "explicit test import and direct constructor/function call, plus exact source declarations and assertions; not runtime path, defect sensitivity or test sufficiency",
+      "source": "faststream-dependant-constructor-metadata-after",
+      "source_identity": "sha256:22b54379dfbb33818bf606b46313ec9b50f7d1ace66a57d5e16d5b905a0e27f3:2110",
+      "stage": "after",
+      "test_file_sha256": "e3576bd8c52fd5e257bb7bee2e9f63d77ee2906767803ed9e98a31527af18c6e",
+      "test_path": "tests/fastapi/test_get_dependant.py",
+      "test_revision": "ee9c0f523736ba31e84b92024ce2d58ffd0b14f11ca8a8ca431166649c3ee736"
+    }
+  ],
+  "earlier_test_source_review_sha256": "38ab463748e525f9188411a2fcafe12ee7d05ac9dff90a6f7876096b0dce1d6a",
+  "new_grader_sha256": "eb08679282d53a7b5464c02786efa459f16ece9adbd942c89ef91d8ba14303cf",
+  "observer_outputs_used_for_expected_tests": false,
+  "original_grader_sha256": "d71c2dbca355a165f2e54f207d05853fd72808b6cb6f2692789506e3fbe13eda",
+  "original_suite_sha256": "36f908b1377fe7f92c77056a74949aace6c7128c2675686fea3ff0ba415365f6",
+  "remaining_unqualified": [
+    "default provider shared identity",
+    "non-init field defect sensitivity",
+    "performance task sensitivity",
+    "remaining test relations",
+    "before counterparts",
+    "runtime/capability/holdout/adversary review"
+  ],
+  "schema": "hashmarks.configuration-verification-source-review.v1",
+  "scope": "four independently source-related after-change test disclosures; all original facts/review/eligibility/population preserved; no runtime execution or sufficiency claim",
+  "status": "INCOMPLETE"
+}
