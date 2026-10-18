@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.30.0 — Explicit Python API owners and backend evidence
+
+- Replace the flat `CodeMap` Python API with named components for indexing, source, search, context, ownership, verification, tasks, changes, declarations, dependencies, and other repository evidence. `CodeMap` remains the composition root and context manager; retired flat methods have no compatibility aliases. See [Public API and stability](docs/reference/API_STABILITY.md) for the migration contract.
+- Advance task evidence to `hashmarks.task-evidence.v5`, with separate retrieval, ownership, source, verification, freshness, and ambiguity evidence. Add bounded initial disclosure, exact source excerpts, and candidate/test declaration context while keeping retrieval relevance separate from ownership proof.
+- Add selected Python backend and interface declarations for handler decorators, inputs, returns, model/class fields, environment expressions, and caller-nominated producer/consumer pairs. Expose explicit declaration discovery through CLI/MCP with current source revisions, bounded coverage, and unresolved runtime semantics.
+- Add source-bound LSP/SCIP relationship, call-site, hover, and symbol metadata observations, plus exact changed-line and external-diagnostic correspondence. Preserve producer claims, source equivalence, incomplete coverage, and runtime uncertainty as separate facts.
+- Expand read-only MCP evidence with exact source observations, evidence bindings, findings, structural locality, and explicit endpoint comparisons. Share operation schemas, defaults, error reasons, and tool identities across adapters; add structured/compact/text presentations, caller-selected tool/query surfaces, and machine-readable readiness.
+- Strengthen atomic index publication, generation-bound read scopes, watcher and worktree continuity, post-change freshness, project-name ambiguity, and explicit project provenance. Preserve verifier freshness and qualified source evidence through compact presentation and service transport.
+- Add the optional `syntax` extra for bundled Tree-sitter language support and extend backend workflow and public-surface regression coverage. Python remains `>=3.11`, and the optional MCP dependency remains `mcp>=2.2.0`. Repository qualification and exported evaluation evidence do not establish measured agent-performance improvements.
+
+### Upgrade notes
+
+- Migrate Python calls such as `codemap.sync()` to `codemap.index.sync()`, `codemap.outline(...)` to `codemap.source.outline(...)`, `codemap.source(...)` to `codemap.source.read(...)`, `codemap.task_evidence(...)` to `codemap.tasks.evidence(...)`, and `codemap.discover_repository_declarations(...)` to `codemap.declarations.discover(...)`. Python service clients also use named component families.
+- Update task-evidence consumers for the current v5 packet. The initial profile uses `hashmarks.task-evidence-initial.v2` and is a bounded projection of the default evidence. Post-change operations reject obsolete task-evidence packets before synchronization; obtain a fresh current packet before continuing.
+- Import structural-locality comparison from `hashmarks.codemap.structural_locality_delta`; the former callable package alias is removed. Generated caches remain disposable, and incompatible native caches require fresh import. See the [API reference](docs/reference/API_STABILITY.md) and [native evidence compatibility notes](docs/reference/STATIC_INTERFACE_EVIDENCE.md) for details.
+
 ## 0.26.1 — Repository evidence without hidden name authority
 
 - Remove archive, legacy, deprecated, and vendor directory spellings from retrieval and ownership decisions. Preserve ambiguity for competing owners and follow qualified package re-exports through bounded import evidence.
