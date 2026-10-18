@@ -372,7 +372,7 @@ The MCP server never stores a "previous" dependency or declaration observation o
 
 `repository_declarations` accepts producer-normalized declaration groups. Semantic extraction, grouping, normalized values, correspondence, and coverage remain provider claims; Hashmarks binds them to current exact repository evidence and reports canonical equality/difference, ambiguity, coverage-qualified absence, identity, freshness, and factual deltas without selecting a winning declaration. See [Repository declarations](../reference/REPOSITORY_DECLARATIONS.md).
 
-Python integrations may use the public declaration-provider SPI and `CodeMap.discover_repository_declarations(...)` before transport. MCP intentionally does not dynamically import or execute those Python providers; external adapters pass their normalized groups into `repository_declarations`. A provider detection miss or provider execution failure therefore cannot be hidden inside MCP as declaration absence.
+Python integrations may use the public declaration-provider SPI and `CodeMap.declarations.discover(...)` before transport. MCP intentionally does not dynamically import or execute those Python providers; external adapters pass their normalized groups into `repository_declarations`. A provider detection miss or provider execution failure therefore cannot be hidden inside MCP as declaration absence.
 
 ## Freshness and concurrency
 
