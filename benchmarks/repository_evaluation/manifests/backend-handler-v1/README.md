@@ -20,9 +20,36 @@ surfaces have been inspected separately, but are relevance candidates only:
 `tests/test_custom_route_class.py`, `tests/test_sse.py`, and
 `tests/asgi/testcase.py`. They do not establish sufficient regression coverage.
 
-Next, review exact causal owners and test declarations, freeze bounded
-handler/decorator/input/return/branch facts with byte-exact source references,
-and declare unsupported or dynamic facts explicitly. Then integrate with the
-existing backend evaluator and qualify API/CLI/official MCP, current native
-producers, source changes, staleness, reopen and semantic adversaries. Reusing
-an existing problem for another capability adds no distinct-problem breadth.
+`suite.json` and `grader.json` now contain twelve source-reviewed workflows over
+the three repositories: explicit AsyncAPI route-call syntax, included-stream
+handler annotations, Annotated handler input/decorator/body observations, and
+exact source calls/arguments involved in the other genuine changes.
+They reuse the existing backend workflow runner, declaration/boundary surfaces,
+source admission and artifact-bound pure graders. Exact source references are
+frozen independently of observer output. All capability review flags remain
+false. These selected static slices do not establish full handler semantics,
+runtime wiring, registration, branch behavior or sufficient verification.
+
+Run the existing materializer with this suite and the three caller-selected
+repository checkouts, then pass its `sources.json` to the existing runner:
+
+```sh
+uv run --frozen python -m scripts.repository_evaluation.materialize_backend \
+  --repository fastapi=/path/to/fastapi \
+  --repository litestar=/path/to/litestar \
+  --repository faststream=/path/to/faststream \
+  --suite benchmarks/repository_evaluation/manifests/backend-handler-v1/suite.json \
+  --output-dir .hashmarks/backend-e2e/handlers
+
+uv run --frozen python -m scripts.repository_evaluation.run_backend \
+  --suite benchmarks/repository_evaluation/manifests/backend-handler-v1/suite.json \
+  --sources-file .hashmarks/backend-e2e/handlers/sources.json \
+  --output-dir .hashmarks/backend-e2e/handler-qualification
+```
+
+Missing transports, semantic slices or adversaries remain incomplete.
+
+Next, complete review of causal ownership and input/return/branch coverage beyond
+these bounded source facts, then qualify the population through API/CLI/official MCP,
+current native producers, source changes, staleness, reopen and semantic
+adversaries. Reusing a problem for another capability adds no distinct breadth.

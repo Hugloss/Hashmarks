@@ -12,6 +12,7 @@ from hashmarks.digest import FILE_DOMAIN, hash_file
 from .backend_corpus import (
     confined_file,
     confined_path,
+    declaration_source_paths,
     task_source_labels,
     workflow_changed_paths,
 )
@@ -232,7 +233,7 @@ def stage_fact_witnesses(
             "declarations",
             "declaration_observations",
             "declaration_oracles",
-            "python_backend_paths",
+            None,
         ),
         ("structural", "structural_observations", "structural_oracles", None),
     ):
@@ -241,9 +242,13 @@ def stage_fact_witnesses(
         if inputs is None or oracle is None:
             continue
         paths = (
-            inputs[path_key]
-            if path_key is not None
-            else [label["path"] for label in oracle["source_labels"]]
+            declaration_source_paths(inputs)
+            if family == "declarations"
+            else (
+                inputs[path_key]
+                if path_key is not None
+                else [label["path"] for label in oracle["source_labels"]]
+            )
         )
         bindings = tuple(
             {

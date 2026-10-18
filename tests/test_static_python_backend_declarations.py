@@ -125,6 +125,82 @@ def test_environment_key_reads_not_runtime_resolution_and_no_secret_defaults(
     assert all(row["negative_evidence_admissible"] is False for row in values)
 
 
+def test_initializer_keyword_references_preserve_names_and_runtime_uncertainty(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "class Config:\n"
+        "    provider: Provider = field(default_factory=make_provider)\n"
+        "    shared: Provider = field(default=providers.shared, fallback=choose())\n"
+        "    secret: str = field(default='DO_NOT_COPY_SECRET')\n",
+    )
+    packet = _observe(
+        tmp_path,
+        StaticPythonBackendDeclarations(
+            paths=(PATH,),
+            include_model_fields=False,
+            include_environment_reads=False,
+            include_class_fields=True,
+        ),
+    )
+    value = _value(_groups(packet)["python-annotated-class-syntax"][0])
+    fields = {row["name"]: row for row in value["fields"]}
+    assert fields["provider"]["default"]["keyword_references"] == [
+        {
+            "keyword": "default_factory",
+            "reference": {"state": "name-syntax", "name": "make_provider"},
+        }
+    ]
+    assert fields["shared"]["default"]["keyword_references"] == [
+        {
+            "keyword": "default",
+            "reference": {
+                "state": "member-syntax",
+                "receiver": "providers",
+                "name": "shared",
+            },
+        },
+        {"keyword": "fallback", "reference": {"state": "dynamic-or-unsupported"}},
+    ]
+    assert (
+        fields["shared"]["default"]["keyword_reference_scope"]
+        == "returned-direct-keyword-values"
+    )
+    assert fields["shared"]["default"]["runtime_binding"] == "not-established"
+    assert value["runtime_field_roles"] == "unknown"
+    assert "DO_NOT_COPY_SECRET" not in str(packet)
+    assert "keyword_references" not in fields["secret"]["default"]
+
+
+def test_initializer_keyword_reference_bound_does_not_claim_expanded_values(
+    tmp_path: Path,
+) -> None:
+    keywords = ", ".join(f"k{index}=provider{index}" for index in range(10))
+    _write(
+        tmp_path,
+        f"class Config:\n    provider: Provider = field({keywords}, **extras)\n",
+    )
+    packet = _observe(
+        tmp_path,
+        StaticPythonBackendDeclarations(
+            paths=(PATH,),
+            include_model_fields=False,
+            include_environment_reads=False,
+            include_class_fields=True,
+        ),
+    )
+    value = _value(_groups(packet)["python-annotated-class-syntax"][0])
+    default = value["fields"][0]["default"]
+    assert [row["keyword"] for row in default["keyword_references"]] == [
+        f"k{index}" for index in range(8)
+    ]
+    assert default["keyword_names_omitted"] == 2
+    assert default["has_argument_expansion"] is True
+    assert default["runtime_binding"] == "not-established"
+    assert value["negative_evidence_admissible"] is False
+
+
 def test_missing_selected_file_does_not_prove_absent_config(tmp_path: Path) -> None:
     _write(tmp_path, "import os\nvalue = os.getenv('A')\n")
     packet = _observe(

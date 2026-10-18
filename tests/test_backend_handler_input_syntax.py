@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 from dataclasses import replace
 from pathlib import Path
 
@@ -9,7 +10,10 @@ import pytest
 from contract_assertions import assert_object, assert_records
 
 from hashmarks.codemap import ChangeImpactOptions, CodeMap
-from hashmarks.codemap.handler_input_syntax import MAX_HANDLER_PARAMETERS
+from hashmarks.codemap.handler_input_syntax import (
+    MAX_HANDLER_PARAMETERS,
+    handler_input_syntax,
+)
 from hashmarks.codemap.repository_declaration_provider import (
     RepositoryDeclarationProviderError,
 )
@@ -22,6 +26,31 @@ from hashmarks.mcp_surface import HashmarksMcpSurface
 
 PATH = "service.py"
 TASK = "Change request handling for the backend route"
+
+
+def test_signature_default_reference_is_syntax_without_provider_resolution() -> None:
+    declaration = ast.parse(
+        "def handle(provider: Provider = Depends(dependency=providers.current)):\n"
+        "    return provider\n"
+    ).body[0]
+    assert isinstance(declaration, ast.FunctionDef)
+    observed = handler_input_syntax(declaration)
+    parameter = assert_records(observed["parameters"])[0]
+    default = assert_object(parameter["default"])
+    assert default["keyword_references"] == [
+        {
+            "keyword": "dependency",
+            "reference": {
+                "state": "member-syntax",
+                "receiver": "providers",
+                "name": "current",
+            },
+        }
+    ]
+    assert default["runtime_binding"] == "not-established"
+    assert observed["dependency_resolution"] == "not-established"
+    assert observed["runtime_request_validation"] == "unknown"
+    assert observed["negative_evidence_admissible"] is False
 
 
 def _write(root: Path, content: str) -> None:

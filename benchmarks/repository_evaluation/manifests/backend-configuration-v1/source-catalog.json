@@ -1,0 +1,741 @@
+{
+  "cases": [
+    {
+      "after": "fastapi-request-parameter-dependency-flattening-after",
+      "before": "fastapi-request-parameter-dependency-flattening-before",
+      "candidate_owner_path": "fastapi/dependencies/utils.py",
+      "candidate_test_path": "tests/test_dependency_cache.py",
+      "capability_reviewed": false,
+      "id": "fastapi-request-parameter-dependency-flattening",
+      "problem_id": "cc96fd3a7cf74972b57a6439f22d858a2ae42c8f",
+      "problem_source": "https://github.com/fastapi/fastapi/commit/cc96fd3a7cf74972b57a6439f22d858a2ae42c8f",
+      "repository": "fastapi",
+      "runtime_validation": "not-established",
+      "semantic_reviewed": false,
+      "source_inputs": {
+        "after": [
+          {
+            "bytes": 42042,
+            "path": "fastapi/dependencies/utils.py",
+            "sha256": "95ad496b3661dd77c94d610034710857aa8b69660fd8caa79541764871081624",
+            "state": "source-present"
+          },
+          {
+            "bytes": 2787,
+            "path": "tests/test_dependency_cache.py",
+            "sha256": "480df7b33fa74cc709dbd67d65ffcdb69565a04de01186f0750776fcde533601",
+            "state": "source-present"
+          }
+        ],
+        "before": [
+          {
+            "bytes": 41293,
+            "path": "fastapi/dependencies/utils.py",
+            "sha256": "f226d7d5062e705d687795eeabb0f920d5376ac7c30bd8f974f6f788d40b9de6",
+            "state": "source-present"
+          },
+          {
+            "bytes": 2787,
+            "path": "tests/test_dependency_cache.py",
+            "sha256": "480df7b33fa74cc709dbd67d65ffcdb69565a04de01186f0750776fcde533601",
+            "state": "source-present"
+          }
+        ]
+      },
+      "task": "Request-parameter dependency inspection repeats flattening work."
+    },
+    {
+      "after": "fastapi-body-dependency-flattening-after",
+      "before": "fastapi-body-dependency-flattening-before",
+      "candidate_owner_path": "fastapi/dependencies/utils.py",
+      "candidate_test_path": "tests/test_dependency_contextmanager.py",
+      "capability_reviewed": false,
+      "id": "fastapi-body-dependency-flattening",
+      "problem_id": "23e4a10434cf61438c4508d94404680bdcd8bf59",
+      "problem_source": "https://github.com/fastapi/fastapi/commit/23e4a10434cf61438c4508d94404680bdcd8bf59",
+      "repository": "fastapi",
+      "runtime_validation": "not-established",
+      "semantic_reviewed": false,
+      "source_inputs": {
+        "after": [
+          {
+            "bytes": 41293,
+            "path": "fastapi/dependencies/utils.py",
+            "sha256": "f226d7d5062e705d687795eeabb0f920d5376ac7c30bd8f974f6f788d40b9de6",
+            "state": "source-present"
+          },
+          {
+            "bytes": 11763,
+            "path": "tests/test_dependency_contextmanager.py",
+            "sha256": "6a935c48d0851c3c878924cc153b03e636ebed1a091c4fb1265e8198c7ff1527",
+            "state": "source-present"
+          }
+        ],
+        "before": [
+          {
+            "bytes": 41066,
+            "path": "fastapi/dependencies/utils.py",
+            "sha256": "596bc4b09501b46f42805283bda2aa74e2b57e758b8929aa0176e972154bbdcd",
+            "state": "source-present"
+          },
+          {
+            "bytes": 11763,
+            "path": "tests/test_dependency_contextmanager.py",
+            "sha256": "6a935c48d0851c3c878924cc153b03e636ebed1a091c4fb1265e8198c7ff1527",
+            "state": "source-present"
+          }
+        ]
+      },
+      "task": "Body-field dependency inspection repeats flattening work."
+    },
+    {
+      "after": "fastapi-repeat-dependency-bookkeeping-after",
+      "before": "fastapi-repeat-dependency-bookkeeping-before",
+      "candidate_owner_path": "fastapi/dependencies/utils.py",
+      "candidate_test_path": "tests/test_dependency_cache.py",
+      "capability_reviewed": false,
+      "id": "fastapi-repeat-dependency-bookkeeping",
+      "problem_id": "7134121a7113df50d18b186c586666733e8510f2",
+      "problem_source": "https://github.com/fastapi/fastapi/commit/7134121a7113df50d18b186c586666733e8510f2",
+      "repository": "fastapi",
+      "runtime_validation": "not-established",
+      "semantic_reviewed": false,
+      "source_inputs": {
+        "after": [
+          {
+            "bytes": 41066,
+            "path": "fastapi/dependencies/utils.py",
+            "sha256": "596bc4b09501b46f42805283bda2aa74e2b57e758b8929aa0176e972154bbdcd",
+            "state": "source-present"
+          },
+          {
+            "bytes": 2787,
+            "path": "tests/test_dependency_cache.py",
+            "sha256": "480df7b33fa74cc709dbd67d65ffcdb69565a04de01186f0750776fcde533601",
+            "state": "source-present"
+          }
+        ],
+        "before": [
+          {
+            "bytes": 40831,
+            "path": "fastapi/dependencies/utils.py",
+            "sha256": "fe1d9ae1bbd3da03e6bc5bd5496ab541beafcd81af0a0c7cedb4153665fa0fb0",
+            "state": "source-present"
+          },
+          {
+            "bytes": 2787,
+            "path": "tests/test_dependency_cache.py",
+            "sha256": "480df7b33fa74cc709dbd67d65ffcdb69565a04de01186f0750776fcde533601",
+            "state": "source-present"
+          }
+        ]
+      },
+      "task": "Dependency traversal keeps repeat bookkeeping for already visited declarations."
+    },
+    {
+      "after": "fastapi-dependency-model-memory-after",
+      "before": "fastapi-dependency-model-memory-before",
+      "candidate_owner_path": "fastapi/dependencies/models.py",
+      "candidate_test_path": "tests/test_dependency_models.py",
+      "capability_reviewed": false,
+      "id": "fastapi-dependency-model-memory",
+      "problem_id": "027082950068d6e3897b5422ab6cde3168f7d8b0",
+      "problem_source": "https://github.com/fastapi/fastapi/commit/027082950068d6e3897b5422ab6cde3168f7d8b0",
+      "repository": "fastapi",
+      "runtime_validation": "not-established",
+      "semantic_reviewed": false,
+      "source_inputs": {
+        "after": [
+          {
+            "bytes": 8123,
+            "path": "fastapi/dependencies/models.py",
+            "sha256": "cf67c1c8ca5a2f1d99947aeed1e4759ad95402cc59f5d96758a1955ce06e0182",
+            "state": "source-present"
+          },
+          {
+            "bytes": 5575,
+            "path": "tests/test_dependency_models.py",
+            "sha256": "660a2b49a79d7c3973922212e7b75ebda5ccdc3cbb1048e2a1bb84c3be3be50e",
+            "state": "source-present"
+          }
+        ],
+        "before": [
+          {
+            "bytes": 7250,
+            "path": "fastapi/dependencies/models.py",
+            "sha256": "5cf22411aba41da4da173f4ba1e23d7ff4fede8b4e015928382d75dd3a456d62",
+            "state": "source-present"
+          },
+          {
+            "path": "tests/test_dependency_models.py",
+            "semantic_absence": "not-established",
+            "state": "known-absent-in-exact-source-tree"
+          }
+        ]
+      },
+      "task": "Dependency declarations retain repeated derived metadata."
+    },
+    {
+      "after": "litestar-bound-method-providers-after",
+      "before": "litestar-bound-method-providers-before",
+      "candidate_owner_path": "litestar/di.py",
+      "candidate_test_path": "tests/unit/test_di.py",
+      "capability_reviewed": false,
+      "id": "litestar-bound-method-providers",
+      "problem_id": "7670d49924379867b9a3e8ce721518a53bc210c7",
+      "problem_source": "https://github.com/litestar-org/litestar/commit/7670d49924379867b9a3e8ce721518a53bc210c7",
+      "repository": "litestar",
+      "runtime_validation": "not-established",
+      "semantic_reviewed": false,
+      "source_inputs": {
+        "after": [
+          {
+            "bytes": 6403,
+            "path": "litestar/di.py",
+            "sha256": "b785ed3aef69bbc0bcb9257e956adb90a2bfe592ac6b2527f989330e4a2545ff",
+            "state": "source-present"
+          },
+          {
+            "bytes": 10000,
+            "path": "tests/unit/test_di.py",
+            "sha256": "d3c4c6eed2a95362a461ec85ec5c3f5bfeb48e5aeafc33315d5719a565dde8ef",
+            "state": "source-present"
+          }
+        ],
+        "before": [
+          {
+            "bytes": 6334,
+            "path": "litestar/di.py",
+            "sha256": "5319d47c1cefe8c55d82a0c83ff94d612c5daf262ea6f3d5a77602bba8b76c77",
+            "state": "source-present"
+          },
+          {
+            "bytes": 8657,
+            "path": "tests/unit/test_di.py",
+            "sha256": "75dc315eec700fb5d548dd9b781aa6140f16e471d1c88d8998603b7fc86c58d6",
+            "state": "source-present"
+          }
+        ]
+      },
+      "task": "Bound methods are classified as callable instances when inspecting dependency providers."
+    },
+    {
+      "after": "litestar-stateful-callable-cleanup-after",
+      "before": "litestar-stateful-callable-cleanup-before",
+      "candidate_owner_path": "litestar/di.py",
+      "candidate_test_path": "tests/unit/test_di.py",
+      "capability_reviewed": false,
+      "id": "litestar-stateful-callable-cleanup",
+      "problem_id": "ce25bff4bb5956af8731ab51024bcdbe5ba5a3c3",
+      "problem_source": "https://github.com/litestar-org/litestar/commit/ce25bff4bb5956af8731ab51024bcdbe5ba5a3c3",
+      "repository": "litestar",
+      "runtime_validation": "not-established",
+      "semantic_reviewed": false,
+      "source_inputs": {
+        "after": [
+          {
+            "bytes": 6334,
+            "path": "litestar/di.py",
+            "sha256": "5319d47c1cefe8c55d82a0c83ff94d612c5daf262ea6f3d5a77602bba8b76c77",
+            "state": "source-present"
+          },
+          {
+            "bytes": 8657,
+            "path": "tests/unit/test_di.py",
+            "sha256": "75dc315eec700fb5d548dd9b781aa6140f16e471d1c88d8998603b7fc86c58d6",
+            "state": "source-present"
+          }
+        ],
+        "before": [
+          {
+            "bytes": 6216,
+            "path": "litestar/di.py",
+            "sha256": "bdba46b06a37723b80968d39f079c9e85c59679f599ea1df1a07aa26e7c50a20",
+            "state": "source-present"
+          },
+          {
+            "bytes": 4909,
+            "path": "tests/unit/test_di.py",
+            "sha256": "ad71aafad61db48bdcb7e174b057744d5990bd1f7d8a7fadaeb1fce90d5ec051",
+            "state": "source-present"
+          }
+        ]
+      },
+      "task": "Stateful callable providers lose declared cleanup behavior."
+    },
+    {
+      "after": "litestar-cached-yield-provider-after",
+      "before": "litestar-cached-yield-provider-before",
+      "candidate_owner_path": "litestar/di.py",
+      "candidate_test_path": "tests/unit/test_di.py",
+      "capability_reviewed": false,
+      "id": "litestar-cached-yield-provider",
+      "problem_id": "2612798456dada20c15ae3c0d5676a62195abe7a",
+      "problem_source": "https://github.com/litestar-org/litestar/commit/2612798456dada20c15ae3c0d5676a62195abe7a",
+      "repository": "litestar",
+      "runtime_validation": "not-established",
+      "semantic_reviewed": false,
+      "source_inputs": {
+        "after": [
+          {
+            "bytes": 4115,
+            "path": "litestar/di.py",
+            "sha256": "f3201763ec85d57ee7097ea4ff00af6595953aeef40bd07a916cb6a636ef4406",
+            "state": "source-present"
+          },
+          {
+            "bytes": 4596,
+            "path": "tests/unit/test_di.py",
+            "sha256": "76f1c1f51ff8268be968bc1ba1d3e0eae682fb2517fa551569df0ab24978c2a8",
+            "state": "source-present"
+          }
+        ],
+        "before": [
+          {
+            "bytes": 3326,
+            "path": "litestar/di.py",
+            "sha256": "fc5e601d509efd282437a48d58b40edc592eb57cbd747f01d1f02ce91cafcc8d",
+            "state": "source-present"
+          },
+          {
+            "bytes": 4316,
+            "path": "tests/unit/test_di.py",
+            "sha256": "c0be2a0a46f61533dd0a131b608b9d99af38ec5de3403f8b148c09ca69b16e70",
+            "state": "source-present"
+          }
+        ]
+      },
+      "task": "A cached yield dependency accepts unsupported provider configuration."
+    },
+    {
+      "after": "litestar-named-dependency-markers-after",
+      "before": "litestar-named-dependency-markers-before",
+      "candidate_owner_path": "litestar/di.py",
+      "candidate_test_path": "tests/unit/test_kwargs/test_param_markers.py",
+      "capability_reviewed": false,
+      "id": "litestar-named-dependency-markers",
+      "problem_id": "bea9a04b3131bafed498464ab7985e0acfea6db7",
+      "problem_source": "https://github.com/litestar-org/litestar/commit/bea9a04b3131bafed498464ab7985e0acfea6db7",
+      "repository": "litestar",
+      "runtime_validation": "not-established",
+      "semantic_reviewed": false,
+      "source_inputs": {
+        "after": [
+          {
+            "bytes": 6883,
+            "path": "litestar/di.py",
+            "sha256": "8458ce16267ed2e63a49713b7c576e29caa4d5859666c664a6fe096e650a4d0c",
+            "state": "source-present"
+          },
+          {
+            "bytes": 13546,
+            "path": "tests/unit/test_kwargs/test_param_markers.py",
+            "sha256": "da2d8459998e3d5ebc8f15cb76eb747efc7cde7e9e6f4ebf6f88dc7a2d74cf27",
+            "state": "source-present"
+          }
+        ],
+        "before": [
+          {
+            "bytes": 6359,
+            "path": "litestar/di.py",
+            "sha256": "608c274bea8da26a963045cbb3dfd8d651d60ec665ce9fe06e7d6e5cb80852c6",
+            "state": "source-present"
+          },
+          {
+            "bytes": 12737,
+            "path": "tests/unit/test_kwargs/test_param_markers.py",
+            "sha256": "ed3dcd6c3e8517173662e772af23ef382a1610f61540d9f2f6b6db572d03158a",
+            "state": "source-present"
+          }
+        ]
+      },
+      "task": "Dependency-name and validation markers need explicit declarations."
+    },
+    {
+      "after": "faststream-default-dependency-provider-after",
+      "before": "faststream-default-dependency-provider-before",
+      "candidate_owner_path": "faststream/_internal/di/config.py",
+      "candidate_test_path": "tests/utils/context/test_depends.py",
+      "capability_reviewed": false,
+      "id": "faststream-default-dependency-provider",
+      "problem_id": "13cd19273849cb2cc7f675e80294df87183b799c",
+      "problem_source": "https://github.com/ag2ai/faststream/commit/13cd19273849cb2cc7f675e80294df87183b799c",
+      "repository": "faststream",
+      "runtime_validation": "not-established",
+      "semantic_reviewed": false,
+      "source_inputs": {
+        "after": [
+          {
+            "bytes": 4452,
+            "path": "faststream/_internal/di/config.py",
+            "sha256": "055a6a9f976e96c31820cc53b9543df738e68043333ebdd03807295a9e36aa1c",
+            "state": "source-present"
+          },
+          {
+            "bytes": 1252,
+            "path": "tests/utils/context/test_depends.py",
+            "sha256": "cc01726624c029024a90dc729ff4d9a27f621b73824eab7fb8a4ed3b16f2b055",
+            "state": "source-present"
+          }
+        ],
+        "before": [
+          {
+            "bytes": 4428,
+            "path": "faststream/_internal/di/config.py",
+            "sha256": "0a0cc38fc7d1b94f49a489f8593af4e2b08613857601ac3bed6f13f78d16cb6e",
+            "state": "source-present"
+          },
+          {
+            "bytes": 1252,
+            "path": "tests/utils/context/test_depends.py",
+            "sha256": "cc01726624c029024a90dc729ff4d9a27f621b73824eab7fb8a4ed3b16f2b055",
+            "state": "source-present"
+          }
+        ]
+      },
+      "task": "Default dependency configuration creates a separate provider instance."
+    },
+    {
+      "after": "faststream-composed-context-provider-after",
+      "before": "faststream-composed-context-provider-before",
+      "candidate_owner_path": "faststream/_internal/context/composition.py",
+      "candidate_test_path": "tests/utils/context/test_composition.py",
+      "capability_reviewed": false,
+      "id": "faststream-composed-context-provider",
+      "problem_id": "bee90b9b41748e04598c12230550de4ba72815f5",
+      "problem_source": "https://github.com/ag2ai/faststream/commit/bee90b9b41748e04598c12230550de4ba72815f5",
+      "repository": "faststream",
+      "runtime_validation": "not-established",
+      "semantic_reviewed": false,
+      "source_inputs": {
+        "after": [
+          {
+            "bytes": 2788,
+            "path": "faststream/_internal/context/composition.py",
+            "sha256": "d1ca2b32c0098898cc73a0c68b56cd057638aa8d2470e433308aa3a591929fc4",
+            "state": "source-present"
+          },
+          {
+            "bytes": 1080,
+            "path": "tests/utils/context/test_composition.py",
+            "sha256": "37c30fa2876a2b054048a77d4c4b41193717f99ca9a2ce482a1c8b369040e0b7",
+            "state": "source-present"
+          }
+        ],
+        "before": [
+          {
+            "path": "faststream/_internal/context/composition.py",
+            "semantic_absence": "not-established",
+            "state": "known-absent-in-exact-source-tree"
+          },
+          {
+            "path": "tests/utils/context/test_composition.py",
+            "semantic_absence": "not-established",
+            "state": "known-absent-in-exact-source-tree"
+          }
+        ]
+      },
+      "task": "Context providers need explicit composition across nominated context repositories."
+    },
+    {
+      "after": "faststream-non-init-dependant-fields-after",
+      "before": "faststream-non-init-dependant-fields-before",
+      "candidate_owner_path": "faststream/_internal/fastapi/get_dependant.py",
+      "candidate_test_path": "tests/fastapi/test_get_dependant.py",
+      "capability_reviewed": false,
+      "id": "faststream-non-init-dependant-fields",
+      "problem_id": "3e13a0431db0bac071cbe6c11101f8c25b83946d",
+      "problem_source": "https://github.com/ag2ai/faststream/commit/3e13a0431db0bac071cbe6c11101f8c25b83946d",
+      "repository": "faststream",
+      "runtime_validation": "not-established",
+      "semantic_reviewed": false,
+      "source_inputs": {
+        "after": [
+          {
+            "bytes": 6817,
+            "path": "faststream/_internal/fastapi/get_dependant.py",
+            "sha256": "19607814dec2c0046f3db0462c5d7997a34ca9508d90c6bea4bc449129fc71c2",
+            "state": "source-present"
+          },
+          {
+            "bytes": 762,
+            "path": "tests/fastapi/test_get_dependant.py",
+            "sha256": "e3576bd8c52fd5e257bb7bee2e9f63d77ee2906767803ed9e98a31527af18c6e",
+            "state": "source-present"
+          }
+        ],
+        "before": [
+          {
+            "bytes": 6787,
+            "path": "faststream/_internal/fastapi/get_dependant.py",
+            "sha256": "bc41691d0880458259d35f77b045dcbde315d1ada0d28f366c8e74c1620cbe2c",
+            "state": "source-present"
+          },
+          {
+            "bytes": 762,
+            "path": "tests/fastapi/test_get_dependant.py",
+            "sha256": "e3576bd8c52fd5e257bb7bee2e9f63d77ee2906767803ed9e98a31527af18c6e",
+            "state": "source-present"
+          }
+        ]
+      },
+      "task": "Copying dependency declarations forwards fields that their constructor does not accept."
+    },
+    {
+      "after": "faststream-dependant-constructor-metadata-after",
+      "before": "faststream-dependant-constructor-metadata-before",
+      "candidate_owner_path": "faststream/_internal/fastapi/get_dependant.py",
+      "candidate_test_path": "tests/fastapi/test_get_dependant.py",
+      "capability_reviewed": false,
+      "id": "faststream-dependant-constructor-metadata",
+      "problem_id": "d9aa36f5697c5044a7598999754a07c6c23bd30d",
+      "problem_source": "https://github.com/ag2ai/faststream/commit/d9aa36f5697c5044a7598999754a07c6c23bd30d",
+      "repository": "faststream",
+      "runtime_validation": "not-established",
+      "semantic_reviewed": false,
+      "source_inputs": {
+        "after": [
+          {
+            "bytes": 6787,
+            "path": "faststream/_internal/fastapi/get_dependant.py",
+            "sha256": "bc41691d0880458259d35f77b045dcbde315d1ada0d28f366c8e74c1620cbe2c",
+            "state": "source-present"
+          },
+          {
+            "bytes": 762,
+            "path": "tests/fastapi/test_get_dependant.py",
+            "sha256": "e3576bd8c52fd5e257bb7bee2e9f63d77ee2906767803ed9e98a31527af18c6e",
+            "state": "source-present"
+          }
+        ],
+        "before": [
+          {
+            "bytes": 6264,
+            "path": "faststream/_internal/fastapi/get_dependant.py",
+            "sha256": "93a5de7b58fe74987b988dede40129529e85d2f5f26d04e7c27ab62e359acff6",
+            "state": "source-present"
+          },
+          {
+            "path": "tests/fastapi/test_get_dependant.py",
+            "semantic_absence": "not-established",
+            "state": "known-absent-in-exact-source-tree"
+          }
+        ]
+      },
+      "task": "Dependency-declaration adaptation forwards incompatible constructor metadata."
+    }
+  ],
+  "distinct_problem_reviewed": false,
+  "problem_count": 12,
+  "qualification_effect": "none; not active campaign membership and no capability rating",
+  "remaining_proof": [
+    "source-focused causal/semantic and test-relevance review, including existing before tests",
+    "independent eligibility/oracle/display/adversarial review",
+    "real API/CLI/official MCP/native before/after acquisition with edit/stale/rebuild/reopen controls",
+    "exact artifact-bound witness closure and final candidate qualification"
+  ],
+  "repository_count": 3,
+  "reserved_holdouts": [
+    {
+      "commit": "7bcb78d10d818b05791a34b41d6e84f0e8871013",
+      "independence": "not-established",
+      "problem_source": "https://github.com/fastapi/fastapi/commit/7bcb78d10d818b05791a34b41d6e84f0e8871013",
+      "repository": "fastapi",
+      "restriction": "Do not extract, inspect or run this nominated change during product tuning. Source exposure/contamination audit and independent final review are required before any unseen-holdout claim.",
+      "source_oracle": "not-reviewed",
+      "state": "reserved-candidate-metadata-only"
+    },
+    {
+      "commit": "dadb6d168f442fdce0e866f12dfe62cf2baaec68",
+      "independence": "not-established",
+      "problem_source": "https://github.com/litestar-org/litestar/commit/dadb6d168f442fdce0e866f12dfe62cf2baaec68",
+      "repository": "litestar",
+      "restriction": "Do not extract, inspect or run this nominated change during product tuning. Source exposure/contamination audit and independent final review are required before any unseen-holdout claim.",
+      "source_oracle": "not-reviewed",
+      "state": "reserved-candidate-metadata-only"
+    },
+    {
+      "commit": "590a4cde76a02d08bb0eef32345ddffdb8632f27",
+      "independence": "not-established",
+      "problem_source": "https://github.com/ag2ai/faststream/commit/590a4cde76a02d08bb0eef32345ddffdb8632f27",
+      "repository": "faststream",
+      "restriction": "Do not extract, inspect or run this nominated change during product tuning. Source exposure/contamination audit and independent final review are required before any unseen-holdout claim.",
+      "source_oracle": "not-reviewed",
+      "state": "reserved-candidate-metadata-only"
+    }
+  ],
+  "schema": "hashmarks.backend-configuration-source-catalog.v1",
+  "scope": "capability 11 source intake only; pinned genuine changes, candidate declarations/tests, no observer outputs or runtime wiring claim",
+  "source_identity_authority": "repository_content_identity over exact Git archive plus archive and selected-file SHA-256",
+  "sources": {
+    "fastapi-body-dependency-flattening-after": {
+      "archive_sha256": "0161e8f15f1288296ca2019064c8ddade347c56283ac95e16938cc1bff130428",
+      "commit": "23e4a10434cf61438c4508d94404680bdcd8bf59",
+      "content_identity": "sha256:81a185020a65044497f5d5ba9560543d11b1bbeebcad623d73c4fbb905f2a3aa:3131",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "fastapi-body-dependency-flattening-before": {
+      "archive_sha256": "e1dc20f847b406b7d545cc76ce5166f70b4cfa29896d92a2daf717c3c0a11e80",
+      "commit": "7ac0f1b541b8df5921b45486a5c72a49965d00af",
+      "content_identity": "sha256:6ec3c2f38a3d25c2f9e1b57be537e40c60f11a100931e8dd9077080001a7518e:3131",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "fastapi-dependency-model-memory-after": {
+      "archive_sha256": "7bb093e47fe12cd6f4e629db314acd8dc23fac1fc7b36098e57f20fea2b1262e",
+      "commit": "027082950068d6e3897b5422ab6cde3168f7d8b0",
+      "content_identity": "sha256:4ecb7b1b292928e20ef99d7aeb071a0b3e3b6703c086b633458da6140094ff1e:3130",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "fastapi-dependency-model-memory-before": {
+      "archive_sha256": "7fd75e7ad554438f34a0ca4b4f6a5ffb68f4b7a60d54088d6ab43ac6af80a957",
+      "commit": "ae031be7b5a2df589f63f4d25389cf07b7b8fc86",
+      "content_identity": "sha256:50077ceea9aa3854771e882a97951618da4612b644e4037842f18695b7e04fb5:3129",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "fastapi-repeat-dependency-bookkeeping-after": {
+      "archive_sha256": "2909c91a6f6e15db233e34b49e05a843bddca62eaa1f23da385c005afd72b2b9",
+      "commit": "7134121a7113df50d18b186c586666733e8510f2",
+      "content_identity": "sha256:42017585e18ba0cd7e3aa8c4b587b1ba3bcca4d7c1c636992138c39943b86f01:3131",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "fastapi-repeat-dependency-bookkeeping-before": {
+      "archive_sha256": "9d583e776a84196cf9ec9ff32b3f2ac789a430d2650251ace71d8c5d5011639c",
+      "commit": "415d37fa6f5cbd2b44dabb71a443d21ff21507b2",
+      "content_identity": "sha256:308ee093da2a56b36cf3566a28e829c66d8696aa1789d54caff470fb5c94cbc3:3131",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "fastapi-request-parameter-dependency-flattening-after": {
+      "archive_sha256": "c86dd0e5475b458dab064aeca8800c97eb1318524d1cf100c1844102ad0d7b0b",
+      "commit": "cc96fd3a7cf74972b57a6439f22d858a2ae42c8f",
+      "content_identity": "sha256:47b72c06253a9f104581110f7106eb8d2ee332d1d4daee640dd58938c2a1b5ec:3131",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "fastapi-request-parameter-dependency-flattening-before": {
+      "archive_sha256": "b752823a02cdb153808b259d96ee19970d65d8cf3a880ef66f959c7b34a6e616",
+      "commit": "ac068db630b6447a90d89ae43695fc8900a3c0e6",
+      "content_identity": "sha256:052a027a13065cadc21fb0538fb8ff106ba03e0c2e61adc5c18262354c59ff42:3131",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "faststream-composed-context-provider-after": {
+      "archive_sha256": "fd5f6d445dbeaa412aee8ebe41aa7f8764dd43cbf7fcb9b396b8d75c09dcb305",
+      "commit": "bee90b9b41748e04598c12230550de4ba72815f5",
+      "content_identity": "sha256:446a39cbd40ea8133a5ce36d2477d4ff47125a293788359eafc9fadb544c5f33:2131",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive"
+    },
+    "faststream-composed-context-provider-before": {
+      "archive_sha256": "7c0735b9a044e924c64541c1103c58cbd67e6da219fdeadeb331ed019a0ee096",
+      "commit": "acb80d35e7ef1be5a03e3af364b00406e032a43f",
+      "content_identity": "sha256:f2b28f7cfa2052f60e0a2f502fc6eb5d058a1948fb514890bc99aafd4a14b8aa:2129",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive"
+    },
+    "faststream-default-dependency-provider-after": {
+      "archive_sha256": "0628a116b65eb952e00299f78ebe9cc74c3f37273f6a3f1e10e884544e22d014",
+      "commit": "13cd19273849cb2cc7f675e80294df87183b799c",
+      "content_identity": "sha256:304dca377bccb9f0049721f3827c5e778ea8825fcd7f51a16141f9a582adb997:1805",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive"
+    },
+    "faststream-default-dependency-provider-before": {
+      "archive_sha256": "75eaeb69ced052ff49585c794332727ab0773000499358115340400d52d6954b",
+      "commit": "3f60f4aca96dc3864ebeee7e97161e19a8f6ab92",
+      "content_identity": "sha256:c4cb762edd886f95f8c113da3c3a28a6c2f3b0dbcde5160d87b69e1a6d95d315:1805",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive"
+    },
+    "faststream-dependant-constructor-metadata-after": {
+      "archive_sha256": "b7bd58273dfd0768f9ce8b8bfdcc801d93e36fc5d2ca6c82eb4e79380c3c54cd",
+      "commit": "d9aa36f5697c5044a7598999754a07c6c23bd30d",
+      "content_identity": "sha256:22b54379dfbb33818bf606b46313ec9b50f7d1ace66a57d5e16d5b905a0e27f3:2110",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive"
+    },
+    "faststream-dependant-constructor-metadata-before": {
+      "archive_sha256": "b785bcba17e5bbfee45f7c5eeb3e68fac146867e9a43565beb91c4c1da1b49b1",
+      "commit": "74528d258ac840c653686ef1ef260cf8a0b8d4cb",
+      "content_identity": "sha256:9219915facfe9e62a28c0960c09a3c7b20a37e349117b215e463a193ea2a2eb8:2108",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive"
+    },
+    "faststream-non-init-dependant-fields-after": {
+      "archive_sha256": "89d42336a2fbf387a7a882b41d9d43a950ef66a4380d78f8ea7b12611aed9049",
+      "commit": "3e13a0431db0bac071cbe6c11101f8c25b83946d",
+      "content_identity": "sha256:bbc1b057d83d7ec05b8b347d9febd79eaa53351d10963bc3ab156fcef446d12d:2122",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive"
+    },
+    "faststream-non-init-dependant-fields-before": {
+      "archive_sha256": "c41a4c2eafbd087a324f27b6722adcc2b076a95a467b39f7be363c4faa29865b",
+      "commit": "92696a021f4fe6e66e7147d2f86777019c242275",
+      "content_identity": "sha256:6c2ba2f0837458b224f75095046d7cb713cbd9759d813140c623fcbaa1c85cf0:2113",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive"
+    },
+    "litestar-bound-method-providers-after": {
+      "archive_sha256": "026735b9d710a6b31b967bc9752b786f83ce36892ea634fb9b240f22077c4722",
+      "commit": "7670d49924379867b9a3e8ce721518a53bc210c7",
+      "content_identity": "sha256:edd889b011e42bd9e52a75c8ec9882f12ef3793a500e83580f1ad502d2d21974:1403",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive"
+    },
+    "litestar-bound-method-providers-before": {
+      "archive_sha256": "37eb3cd261cc53c9e7bfc8e81fd26f7c6baf8e27202fef2f1f27e022989d75a7",
+      "commit": "b379144aba7faae95a985e719ea3794510a2b364",
+      "content_identity": "sha256:66c7bca48ddeecdaf7986b96f5196023a1415aa81e3b7a298bde5d5df96a1d2c:1403",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive"
+    },
+    "litestar-cached-yield-provider-after": {
+      "archive_sha256": "3b2002694b9d522c5c37729543bc60d63e66285f908227d60f09b2bdd5368d43",
+      "commit": "2612798456dada20c15ae3c0d5676a62195abe7a",
+      "content_identity": "sha256:238218771c77647e5aac17437009817d637c1f0c45d3b8a67c6aaf8bb9fcb654:1228",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive"
+    },
+    "litestar-cached-yield-provider-before": {
+      "archive_sha256": "a74825b608992ebaeb742860a23508774018747ca51b00fa7f54da5204f080f1",
+      "commit": "d304baf61c7f0a695a6badf355563a7a553fb01d",
+      "content_identity": "sha256:4cfa8c3260c34cebb0f9e772998f1946609f81a06888bfc1d674d251191f3be6:1228",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive"
+    },
+    "litestar-named-dependency-markers-after": {
+      "archive_sha256": "391e3b6defe8a51fbe9d9d62b897b9767378a960248250b7ac81cfa520546598",
+      "commit": "bea9a04b3131bafed498464ab7985e0acfea6db7",
+      "content_identity": "sha256:8f57e9100ea2a9540363ff1afd5f94ab6455577ec1f9a010f3fb638ccb8d5a52:1387",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive"
+    },
+    "litestar-named-dependency-markers-before": {
+      "archive_sha256": "16c1f05b461b35c41ed62a92c501646af48ada339e38d5e838ec2879a2be142c",
+      "commit": "409abb2b0e7b5fde20aa56ddc624a1c736999d8c",
+      "content_identity": "sha256:675f5936274fdf7313e73a80951aed10dc624de59c236cc2825173163a1fcdfb:1387",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive"
+    },
+    "litestar-stateful-callable-cleanup-after": {
+      "archive_sha256": "ab3b0319b5b3f338f5662957b3ee83a6e0740e8e47400f1622aafe41c237a23a",
+      "commit": "ce25bff4bb5956af8731ab51024bcdbe5ba5a3c3",
+      "content_identity": "sha256:28abe2f79328bb9b935d56a0c72f3fe973fc87918dd2c2d6a654c9d1825f5fa6:1400",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive"
+    },
+    "litestar-stateful-callable-cleanup-before": {
+      "archive_sha256": "8ccea3fa7482e10fb9b6ce13a439389c9fec9c5d316a65d6aa5bd382a9804d0f",
+      "commit": "7dc6b46236b69d277d296240c7297577b54108b6",
+      "content_identity": "sha256:b039ebe88f1910eaf21579358c16903163cc4e1b0d09adbf566429e2619cdbac:1400",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive"
+    }
+  },
+  "status": "INCOMPLETE"
+}

@@ -1268,6 +1268,22 @@
                       "max_length"
                     ],
                     "keyword_names_omitted": 0,
+                    "keyword_reference_scope": "returned-direct-keyword-values",
+                    "keyword_references": [
+                      {
+                        "keyword": "default_factory",
+                        "reference": {
+                          "name": "str",
+                          "state": "name-syntax"
+                        }
+                      },
+                      {
+                        "keyword": "max_length",
+                        "reference": {
+                          "state": "dynamic-or-unsupported"
+                        }
+                      }
+                    ],
                     "positional_count": 0,
                     "runtime_binding": "not-established",
                     "state": "direct-call-syntax"
@@ -1356,6 +1372,22 @@
                       "max_length"
                     ],
                     "keyword_names_omitted": 0,
+                    "keyword_reference_scope": "returned-direct-keyword-values",
+                    "keyword_references": [
+                      {
+                        "keyword": "default_factory",
+                        "reference": {
+                          "name": "str",
+                          "state": "name-syntax"
+                        }
+                      },
+                      {
+                        "keyword": "max_length",
+                        "reference": {
+                          "state": "dynamic-or-unsupported"
+                        }
+                      }
+                    ],
                     "positional_count": 0,
                     "runtime_binding": "not-established",
                     "state": "direct-call-syntax"
@@ -2411,6 +2443,16 @@
                       "default_factory"
                     ],
                     "keyword_names_omitted": 0,
+                    "keyword_reference_scope": "returned-direct-keyword-values",
+                    "keyword_references": [
+                      {
+                        "keyword": "default_factory",
+                        "reference": {
+                          "name": "int_factory",
+                          "state": "name-syntax"
+                        }
+                      }
+                    ],
                     "positional_count": 0,
                     "runtime_binding": "not-established",
                     "state": "direct-call-syntax"
@@ -4273,6 +4315,22 @@
                       "sa_type"
                     ],
                     "keyword_names_omitted": 0,
+                    "keyword_reference_scope": "returned-direct-keyword-values",
+                    "keyword_references": [
+                      {
+                        "keyword": "primary_key",
+                        "reference": {
+                          "state": "dynamic-or-unsupported"
+                        }
+                      },
+                      {
+                        "keyword": "sa_type",
+                        "reference": {
+                          "name": "Integer",
+                          "state": "name-syntax"
+                        }
+                      }
+                    ],
                     "positional_count": 0,
                     "runtime_binding": "not-established",
                     "state": "direct-call-syntax"

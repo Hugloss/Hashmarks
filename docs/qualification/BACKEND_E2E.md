@@ -161,8 +161,13 @@ retains its readable tables. Rows preserve declaration
 order, exact ranges, future fields and field absence. All already-bounded initial
 verification alternatives are displayed; a second five-row presentation cap does
 not hide a relevant test. Unresolved task ownership may expose fresh test candidates
-around three retrieved source declarations, with qualified reference or explicitly
-weak source-identifier/task matches. Those candidates do not change edit/verification
+around three retrieved source locators, with qualified reference or explicitly
+weak source-identifier/task matches. A file-only locator reuses the bounded
+file-symbol reference observation; its basis retains a null declaration and
+range, exact source revision and search bounds. A module filename can nominate
+a bounded test-path probe, but only qualified import/use evidence establishes
+a reference. Hidden paths cannot consume that probe's source-visible slots.
+Those candidates do not change edit/verification
 selection or establish coverage, sufficiency, runtime behavior or repository absence.
 The full packet and projection have distinct identities. Re-observing the full
 mode may observe changed source, so consumers must compare the supplied full
@@ -212,6 +217,23 @@ commits, full repository-content identities and independently reviewed source
 range hashes. Its expectations distinguish direct annotations, initializer
 syntax and base expressions from runtime validation and inherited fields.
 The remaining acquired model problems are not admitted by this baseline.
+
+Initializer calls also retain direct name/member references for the already
+returned keyword prefix when that prefix contains such a reference. Dynamic or
+literal values stay unsupported as references, literal defaults remain hidden,
+and argument expansion/omission counts remain explicit. These are source
+identifier expressions, not resolved provider objects, configuration precedence
+or runtime dependency wiring. This observer-owned syntax extends the shared
+default-expression owner rather than adding another configuration resolver.
+
+`backend-model-v1/initializer-reference-source-oracles.json` records the source-
+authored extension of four exact initializer records in three existing model
+cases. Every previous expectation is retained; the extension additionally
+requires the direct keyword references. The original parent passes its original
+oracle, while its richer successor is measured against these stronger records.
+Both old-field and new-reference mutations are rejected. Tasks, source labels,
+test expectations, eligibility, review flags and acceptance thresholds are
+unchanged; older reports retain their original oracle identities.
 
 `source-oracles-expanded.json` separately reviews seven genuine problems across
 the same three repositories, including inherited datetime declarations,
@@ -374,6 +396,13 @@ def/class/lambda subtrees are outside the declared body scope. Site truncation,
 omitted functions and unsupported callee expressions remain explicit.
 Nested functions selected by the reported line are observed as separate indexed
 declarations; their sites never become sites of the enclosing function.
+
+Call argument disclosure keeps at most eight positional and eight keyword
+arguments. Arguments intersecting the caller-reported lines take priority inside
+that bound; returned arguments retain source order and original positional
+indices. Counts and truncation still account for every omitted argument, and
+expansion presence is observed over the full call. This source projection does
+not resolve callees, infer runtime argument binding, or establish negative facts.
 
 These observations can show `cancel`, `ack`, `commit` or `rollback` spelling in
 source. They do not establish the receiver's API identity, actual execution,

@@ -8,14 +8,16 @@ calls, or establishes task, message, transaction or execution ownership.
 from __future__ import annotations
 
 import ast
+import heapq
 import math
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, TypeVar
 
 MAX_BOUNDARY_FUNCTIONS = 4
 MAX_BOUNDARY_SITES = 32
 MAX_BOUNDARY_ARGUMENTS = 8
 MAX_BOUNDARY_LITERAL_CHARS = 128
+_Argument = TypeVar("_Argument", ast.expr, ast.keyword)
 
 
 def _identifier(node: ast.expr) -> str | None:
@@ -90,7 +92,27 @@ def _keyword_argument(node: ast.keyword) -> dict[str, object]:
     }
 
 
-def _call_arguments(node: ast.Call) -> dict[str, object]:
+def _reported_arguments(
+    arguments: Sequence[_Argument], span: Mapping[str, Any]
+) -> list[tuple[int, _Argument]]:
+    """Prefer reported source lines inside the same bound; emit source order."""
+    if len(arguments) <= MAX_BOUNDARY_ARGUMENTS:
+        return list(enumerate(arguments))
+    selected = heapq.nsmallest(
+        MAX_BOUNDARY_ARGUMENTS,
+        enumerate(arguments),
+        key=lambda item: (
+            not (
+                item[1].lineno <= span["end_line"]
+                and (item[1].end_lineno or item[1].lineno) >= span["start_line"]
+            ),
+            item[0],
+        ),
+    )
+    return sorted(selected, key=lambda item: item[0])
+
+
+def _call_arguments(node: ast.Call, span: Mapping[str, Any]) -> dict[str, object]:
     """Describe source arguments without evaluating values or binding a call."""
     positional = [
         {
@@ -100,11 +122,11 @@ def _call_arguments(node: ast.Call) -> dict[str, object]:
                 argument.value if isinstance(argument, ast.Starred) else argument
             ),
         }
-        for position, argument in enumerate(node.args[:MAX_BOUNDARY_ARGUMENTS])
+        for position, argument in _reported_arguments(node.args, span)
     ]
     keywords = [
         _keyword_argument(argument)
-        for argument in node.keywords[:MAX_BOUNDARY_ARGUMENTS]
+        for _, argument in _reported_arguments(node.keywords, span)
     ]
     omitted_positional = max(0, len(node.args) - len(positional))
     omitted_keywords = max(0, len(node.keywords) - len(keywords))
@@ -121,8 +143,9 @@ def _call_arguments(node: ast.Call) -> dict[str, object]:
 
 
 class _BoundarySites(ast.NodeVisitor):
-    def __init__(self) -> None:
+    def __init__(self, span: Mapping[str, Any]) -> None:
         self.sites: list[dict[str, Any]] = []
+        self.span = span
 
     def _add(
         self,
@@ -188,7 +211,7 @@ class _BoundarySites(ast.NodeVisitor):
             )
             or any(keyword.arg is None for keyword in node.keywords),
             **(
-                {"argument_syntax": _call_arguments(node)}
+                {"argument_syntax": _call_arguments(node, self.span)}
                 if node.args or node.keywords
                 else {}
             ),
@@ -251,7 +274,7 @@ class _BoundarySites(ast.NodeVisitor):
 def _function_sites(
     node: ast.FunctionDef | ast.AsyncFunctionDef, span: Mapping[str, Any]
 ) -> dict[str, Any]:
-    visitor = _BoundarySites()
+    visitor = _BoundarySites(span)
     for statement in node.body:
         visitor.visit(statement)
     # Prefer facts on caller-reported lines, without claiming an edit or an

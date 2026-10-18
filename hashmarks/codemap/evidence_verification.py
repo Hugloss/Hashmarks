@@ -59,10 +59,15 @@ class _VerificationRelevanceState:
     reference_indexes: dict[str, _VerificationReferenceIndex | None] = field(
         default_factory=dict
     )
+    # One observation only; copied endpoints replay the cached uncertainty too.
+    import_owner_evidence: dict[tuple[str, str], tuple[frozenset[str], bool]] = field(
+        default_factory=dict
+    )
     unresolved_reference_identity_paths: set[str] = field(default_factory=set)
     unresolved_verifier_identity_paths: set[str] = field(default_factory=set)
     qualified_attribute_refs: dict[str, set[str]] = field(default_factory=dict)
     lexical_test_paths: tuple[str, ...] | None = None
+    module_test_paths: tuple[str, ...] | None = None
 
     def record_unresolved_reference(self, path: str) -> None:
         """Keep caller uncertainty separate from uncertainty in verifier identity."""
@@ -339,9 +344,19 @@ class RepositoryVerification(
     ) -> set[str]:
         if TYPE_CHECKING:
             self = cast("RepositoryVerification", self)
-        resolved_paths, unresolved_identity = (
-            self.imports._resolve_import_owner_evidence(ref_path, target)
-        )
+        key = (ref_path, target)
+        observed = state.import_owner_evidence.get(key)
+        if observed is None:
+            paths, unresolved = self.imports._resolve_import_owner_evidence(
+                ref_path, target
+            )
+            if not paths and not unresolved:
+                paths = sorted(
+                    self._verification_relative_import_paths(ref_path, target)
+                )
+            observed = (frozenset() if unresolved else frozenset(paths), unresolved)
+            state.import_owner_evidence[key] = observed
+        resolved_paths, unresolved_identity = observed
         if unresolved_identity and RepositoryDomain.TEST in set(
             classify_repository_path(ref_path)
         ):
@@ -350,8 +365,6 @@ class RepositoryVerification(
             # The resolver's facade path is an observed import location, not
             # proof of the underlying exported symbol's owner.
             return set()
-        if not resolved_paths:
-            resolved_paths = self._verification_relative_import_paths(ref_path, target)
         return set(resolved_paths)
 
     def _verification_exact_import_paths(
@@ -563,12 +576,28 @@ class RepositoryVerification(
             limit_per_target=1025,
             preferred_paths=self._verification_test_paths(state)[:4096],
         )
+        local_paths = self._verification_module_test_paths(state)
+        local = (
+            self.store.refs_many_for_paths(
+                selected_symbols, local_paths, limit_per_target=1025
+            )
+            if local_paths
+            else {}
+        )
         bounded: dict[str, list[Mapping[str, object]]] = {}
         for symbol in selected_symbols:
             refs: list[Mapping[str, object]] = list(raw.get(symbol, ()))
             if len(refs) > 1024:
                 state.search_bound_reasons.add("direct-reverse-ref-limit")
-            bounded[symbol] = refs[:1024]
+            scoped = list(local.get(symbol, ()))
+            if len(scoped) > 1024:
+                state.search_bound_reasons.add("module-test-reverse-ref-limit")
+            merged = {
+                self._verification_ref_identity(ref): ref for ref in [*scoped, *refs]
+            }
+            if len(merged) > 1024:
+                state.search_bound_reasons.add("merged-direct-ref-limit")
+            bounded[symbol] = list(merged.values())[:1024]
         return bounded
 
     def _verification_targeted_direct_refs(
@@ -590,9 +619,13 @@ class RepositoryVerification(
         merged: list[Mapping[str, object]] = []
         seen: set[tuple[str, int, str, str]] = set()
         test_paths = set(self._verification_test_paths(state))
+        local_paths = set(self._verification_module_test_paths(state))
         ordered = sorted(
             [*raw_targeted[:1024], *existing],
-            key=lambda row: str(row.get("path") or "") not in test_paths,
+            key=lambda row: (
+                str(row.get("path") or "") not in local_paths,
+                str(row.get("path") or "") not in test_paths,
+            ),
         )
         for ref in ordered:
             key = self._verification_ref_identity(ref)
@@ -988,6 +1021,25 @@ class RepositoryVerification(
             )
         return state.lexical_test_paths
 
+    def _verification_module_test_paths(
+        self, state: _VerificationRelevanceState
+    ) -> tuple[str, ...]:
+        """Nominate module-filename matches; import/source proof still qualifies refs."""
+        if state.module_test_paths is None:
+            stem = Path(state.edit_path).stem
+            names = {f"test_{stem}", f"{stem}_test"}
+            paths = tuple(
+                path
+                for path in self._verification_test_paths(state)
+                if Path(path).stem in names
+                and self.files.decide(path).evidence_visibility
+                is EvidenceVisibility.SOURCE
+            )
+            if len(paths) > 64:
+                state.search_bound_reasons.add("module-test-path-limit")
+            state.module_test_paths = paths[:64]
+        return state.module_test_paths
+
     def _verification_test_lexical_rows(
         self, state: _VerificationRelevanceState
     ) -> list[dict[str, object]]:
@@ -1262,6 +1314,8 @@ class RepositoryVerification(
             "bounds": {
                 "returned_candidates": limit,
                 "reverse_refs_per_symbol": 1024,
+                "module_test_paths": 64,
+                "module_test_reverse_refs_per_symbol": 1024,
                 "edit_symbols": 16,
                 "indirect_source_paths": 64,
                 "indirect_symbols_per_source": 16,

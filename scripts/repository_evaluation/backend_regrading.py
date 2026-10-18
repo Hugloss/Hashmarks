@@ -9,7 +9,12 @@ from typing import Any
 from hashmarks.digest import FILE_DOMAIN, hash_file
 
 from .backend_boundary import _grade as _boundary_grade
-from .backend_corpus import confined_file, confined_path, workflow_changed_paths
+from .backend_corpus import (
+    confined_file,
+    confined_path,
+    declaration_source_paths,
+    workflow_changed_paths,
+)
 from .backend_declarations import _grade as _declaration_grade
 from .backend_gates import combine_required, presentation_conformance
 from .backend_grading import _gates, component_summary, validate_transport_capture
@@ -249,7 +254,7 @@ def _component(
         paths = _paths(
             inputs["changed_paths"]
             if family == "boundary"
-            else inputs["python_backend_paths"]
+            else declaration_source_paths(inputs)
         )
     api = grader(source, _object(_read(root, "api.json")), rule, paths)
     observations = {}

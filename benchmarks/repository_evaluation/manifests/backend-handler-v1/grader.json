@@ -1,0 +1,3066 @@
+{
+  "cases": {
+    "fastapi-frontend-dependency-response": {
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "fastapi/routing.py"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_frontend.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "fastapi/routing.py"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_frontend.py"
+          }
+        ]
+      },
+      "delta_checks": [
+        {
+          "authority_check": true,
+          "id": "changed-owner-current",
+          "pointer": "/path_changes/*/revision",
+          "predicate": "includes",
+          "value": "d627324833db816495724676538d59a6bb6009be3ddf433c79fe801cfcea599e"
+        }
+      ],
+      "expected_owner_path": "fastapi/routing.py",
+      "function_boundary_oracles": {
+        "after": {
+          "checks": [
+            {
+              "id": "direct-call-source",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/sites/*",
+                "record": {
+                  "callee_identifier_syntax": "route.app.get_response_for_scope",
+                  "end_line": 2201,
+                  "line": 2201,
+                  "syntax_kind": "call"
+                },
+                "scope": {
+                  "state": "source-index-bound",
+                  "subject": "fastapi/routing.py::_FrontendRouteGroup.handle"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "runtime-boundary-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "authority_check": true,
+              "id": "callee-resolution-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/callee_resolution",
+              "predicate": "all_equal",
+              "value": "not-established"
+            }
+          ],
+          "literal_source_line_sha256": "fcb56fac9812baa3c33dea9c714671d2ace7212415e5548adb6fdfae76745e65",
+          "reported_span": {
+            "end_line": 2201,
+            "path": "fastapi/routing.py",
+            "start_line": 2201
+          },
+          "site_source_label": {
+            "end_line": 2201,
+            "path": "fastapi/routing.py",
+            "sha256": "fcb56fac9812baa3c33dea9c714671d2ace7212415e5548adb6fdfae76745e65",
+            "start_line": 2201
+          },
+          "source": "fastapi-frontend-dependency-response-after",
+          "source_label": {
+            "declaration_line": 2171,
+            "end_line": 2207,
+            "path": "fastapi/routing.py",
+            "sha256": "e88fe8af032d3004eed7c190b6b65a45b108a9a47e90268ce6382593bca8eb2f",
+            "start_line": 2171,
+            "symbol": "_FrontendRouteGroup.handle"
+          }
+        },
+        "before": {
+          "checks": [
+            {
+              "id": "direct-call-source",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/sites/*",
+                "record": {
+                  "callee_identifier_syntax": "route.handle",
+                  "end_line": 2193,
+                  "line": 2193,
+                  "syntax_kind": "call"
+                },
+                "scope": {
+                  "state": "source-index-bound",
+                  "subject": "fastapi/routing.py::_FrontendRouteGroup.handle"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "runtime-boundary-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "authority_check": true,
+              "id": "callee-resolution-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/callee_resolution",
+              "predicate": "all_equal",
+              "value": "not-established"
+            }
+          ],
+          "literal_source_line_sha256": "261a98a667fccb7a5c33f6773cb1f581262d34a69196d36043295dee1baf3859",
+          "reported_span": {
+            "end_line": 2193,
+            "path": "fastapi/routing.py",
+            "start_line": 2193
+          },
+          "site_source_label": {
+            "end_line": 2193,
+            "path": "fastapi/routing.py",
+            "sha256": "261a98a667fccb7a5c33f6773cb1f581262d34a69196d36043295dee1baf3859",
+            "start_line": 2193
+          },
+          "source": "fastapi-frontend-dependency-response-before",
+          "source_label": {
+            "declaration_line": 2163,
+            "end_line": 2195,
+            "path": "fastapi/routing.py",
+            "sha256": "2683524ff4c3017b690a3d960e1ed7bd9acd62407f8d204063728b17df235741",
+            "start_line": 2163,
+            "symbol": "_FrontendRouteGroup.handle"
+          }
+        }
+      },
+      "qualification_scope": "directly inspected repository call syntax and relevant test assertions only; no runtime wiring, registration, causality, sufficient-test or complete contract claim",
+      "source_labels": {
+        "after": [
+          {
+            "declaration_line": 2171,
+            "end_line": 2207,
+            "path": "fastapi/routing.py",
+            "sha256": "e88fe8af032d3004eed7c190b6b65a45b108a9a47e90268ce6382593bca8eb2f",
+            "start_line": 2171,
+            "symbol": "_FrontendRouteGroup.handle"
+          }
+        ],
+        "before": [
+          {
+            "declaration_line": 2163,
+            "end_line": 2195,
+            "path": "fastapi/routing.py",
+            "sha256": "2683524ff4c3017b690a3d960e1ed7bd9acd62407f8d204063728b17df235741",
+            "start_line": 2163,
+            "symbol": "_FrontendRouteGroup.handle"
+          }
+        ]
+      },
+      "verification_oracles": {
+        "after": {
+          "basis": "inspected pinned endpoint/handler/configuration assertions; existing before test is relevant without claiming the later regression was covered",
+          "runtime_coverage": "not-established",
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "declaration_line": 502,
+            "end_line": 523,
+            "path": "tests/test_frontend.py",
+            "sha256": "6ddce5a83f69b3234428f891fcbfa5a89a239a3b0a56b58649b2b87be6c3d9a3",
+            "start_line": 502,
+            "symbol": "test_frontend_dependency_response_headers_and_background_tasks"
+          },
+          "verification_execution": "not-observed"
+        },
+        "before": {
+          "basis": "inspected pinned endpoint/handler/configuration assertions; existing before test is relevant without claiming the later regression was covered",
+          "runtime_coverage": "not-established",
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "declaration_line": 270,
+            "end_line": 302,
+            "path": "tests/test_frontend.py",
+            "sha256": "03f854fecdddb8019f873c8adcad78ac297d3d57624b6be0375a91e849a81005",
+            "start_line": 270,
+            "symbol": "test_app_frontend_dependencies_protect_root_asset_and_fallback"
+          },
+          "verification_execution": "not-observed"
+        }
+      }
+    },
+    "fastapi-included-stream-type": {
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "fastapi/routing.py"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_stream_bare_type.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "fastapi/routing.py"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_stream_bare_type.py"
+          }
+        ]
+      },
+      "declaration_oracles": {
+        "after": {
+          "checks": [
+            {
+              "id": "handler-stream_bare_async",
+              "pointer": "/declarations/groups/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/declarations/0/value",
+                "record": {
+                  "argument_state": "literal",
+                  "decorator_method": "get",
+                  "handler_declared_name": "stream_bare_async",
+                  "handler_kind": "async",
+                  "literal_argument": "/items/stream-bare-async"
+                },
+                "scope": {
+                  "scope": {
+                    "decorator_line": 17,
+                    "handler_syntax": "stream_bare_async",
+                    "path": "tests/test_stream_bare_type.py"
+                  }
+                }
+              }
+            },
+            {
+              "id": "return-stream_bare_async",
+              "pointer": "/declarations/groups/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/declarations/0/value/static_input_syntax/return_annotation",
+                "record": {
+                  "end_line": 18,
+                  "start_line": 18,
+                  "state": "direct-annotation-syntax",
+                  "text": "AsyncIterable"
+                },
+                "scope": {
+                  "scope": {
+                    "decorator_line": 17,
+                    "handler_syntax": "stream_bare_async",
+                    "path": "tests/test_stream_bare_type.py"
+                  }
+                }
+              }
+            },
+            {
+              "id": "handler-stream_bare_sync",
+              "pointer": "/declarations/groups/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/declarations/0/value",
+                "record": {
+                  "argument_state": "literal",
+                  "decorator_method": "get",
+                  "handler_declared_name": "stream_bare_sync",
+                  "handler_kind": "sync",
+                  "literal_argument": "/items/stream-bare-sync"
+                },
+                "scope": {
+                  "scope": {
+                    "decorator_line": 22,
+                    "handler_syntax": "stream_bare_sync",
+                    "path": "tests/test_stream_bare_type.py"
+                  }
+                }
+              }
+            },
+            {
+              "id": "return-stream_bare_sync",
+              "pointer": "/declarations/groups/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/declarations/0/value/static_input_syntax/return_annotation",
+                "record": {
+                  "end_line": 23,
+                  "start_line": 23,
+                  "state": "direct-annotation-syntax",
+                  "text": "Iterable"
+                },
+                "scope": {
+                  "scope": {
+                    "decorator_line": 22,
+                    "handler_syntax": "stream_bare_sync",
+                    "path": "tests/test_stream_bare_type.py"
+                  }
+                }
+              }
+            },
+            {
+              "id": "handler-stream_events_jsonl",
+              "pointer": "/declarations/groups/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/declarations/0/value",
+                "record": {
+                  "argument_state": "literal",
+                  "decorator_method": "get",
+                  "handler_declared_name": "stream_events_jsonl",
+                  "handler_kind": "async",
+                  "literal_argument": "/events-jsonl"
+                },
+                "scope": {
+                  "scope": {
+                    "decorator_line": 30,
+                    "handler_syntax": "stream_events_jsonl",
+                    "path": "tests/test_stream_bare_type.py"
+                  }
+                }
+              }
+            },
+            {
+              "id": "return-stream_events_jsonl",
+              "pointer": "/declarations/groups/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/declarations/0/value/static_input_syntax/return_annotation",
+                "record": {
+                  "end_line": 31,
+                  "start_line": 31,
+                  "state": "direct-annotation-syntax",
+                  "text": "AsyncIterable[Item]"
+                },
+                "scope": {
+                  "scope": {
+                    "decorator_line": 30,
+                    "handler_syntax": "stream_events_jsonl",
+                    "path": "tests/test_stream_bare_type.py"
+                  }
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "runtime-validation-unknown",
+              "pointer": "/declarations/groups/*/declarations/*/value/static_input_syntax/runtime_request_validation",
+              "predicate": "all_equal",
+              "value": "unknown"
+            }
+          ],
+          "source": "fastapi-included-stream-type-after",
+          "source_labels": [
+            {
+              "declaration_line": 18,
+              "end_line": 19,
+              "path": "tests/test_stream_bare_type.py",
+              "sha256": "d1e468879b234a8116729f869a450dae1adc8c868a166ea11a2193234cc63090",
+              "start_line": 17,
+              "symbol": "stream_bare_async"
+            },
+            {
+              "declaration_line": 23,
+              "end_line": 24,
+              "path": "tests/test_stream_bare_type.py",
+              "sha256": "22b8a81ad1cea20b3eef1f40f88a63c723cf269a0056fe0bec51ee1a4d6dbcf0",
+              "start_line": 22,
+              "symbol": "stream_bare_sync"
+            },
+            {
+              "declaration_line": 31,
+              "end_line": 32,
+              "path": "tests/test_stream_bare_type.py",
+              "sha256": "08d5ceef9eef3f4b99764c45ce77fa971d54bd8cb8ff5ac2265372e251ebebcf",
+              "start_line": 30,
+              "symbol": "stream_events_jsonl"
+            }
+          ]
+        },
+        "before": {
+          "checks": [
+            {
+              "id": "handler-stream_bare_async",
+              "pointer": "/declarations/groups/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/declarations/0/value",
+                "record": {
+                  "argument_state": "literal",
+                  "decorator_method": "get",
+                  "handler_declared_name": "stream_bare_async",
+                  "handler_kind": "async",
+                  "literal_argument": "/items/stream-bare-async"
+                },
+                "scope": {
+                  "scope": {
+                    "decorator_line": 16,
+                    "handler_syntax": "stream_bare_async",
+                    "path": "tests/test_stream_bare_type.py"
+                  }
+                }
+              }
+            },
+            {
+              "id": "return-stream_bare_async",
+              "pointer": "/declarations/groups/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/declarations/0/value/static_input_syntax/return_annotation",
+                "record": {
+                  "end_line": 17,
+                  "start_line": 17,
+                  "state": "direct-annotation-syntax",
+                  "text": "AsyncIterable"
+                },
+                "scope": {
+                  "scope": {
+                    "decorator_line": 16,
+                    "handler_syntax": "stream_bare_async",
+                    "path": "tests/test_stream_bare_type.py"
+                  }
+                }
+              }
+            },
+            {
+              "id": "handler-stream_bare_sync",
+              "pointer": "/declarations/groups/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/declarations/0/value",
+                "record": {
+                  "argument_state": "literal",
+                  "decorator_method": "get",
+                  "handler_declared_name": "stream_bare_sync",
+                  "handler_kind": "sync",
+                  "literal_argument": "/items/stream-bare-sync"
+                },
+                "scope": {
+                  "scope": {
+                    "decorator_line": 21,
+                    "handler_syntax": "stream_bare_sync",
+                    "path": "tests/test_stream_bare_type.py"
+                  }
+                }
+              }
+            },
+            {
+              "id": "return-stream_bare_sync",
+              "pointer": "/declarations/groups/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/declarations/0/value/static_input_syntax/return_annotation",
+                "record": {
+                  "end_line": 22,
+                  "start_line": 22,
+                  "state": "direct-annotation-syntax",
+                  "text": "Iterable"
+                },
+                "scope": {
+                  "scope": {
+                    "decorator_line": 21,
+                    "handler_syntax": "stream_bare_sync",
+                    "path": "tests/test_stream_bare_type.py"
+                  }
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "runtime-validation-unknown",
+              "pointer": "/declarations/groups/*/declarations/*/value/static_input_syntax/runtime_request_validation",
+              "predicate": "all_equal",
+              "value": "unknown"
+            }
+          ],
+          "source": "fastapi-included-stream-type-before",
+          "source_labels": [
+            {
+              "declaration_line": 17,
+              "end_line": 18,
+              "path": "tests/test_stream_bare_type.py",
+              "sha256": "d1e468879b234a8116729f869a450dae1adc8c868a166ea11a2193234cc63090",
+              "start_line": 16,
+              "symbol": "stream_bare_async"
+            },
+            {
+              "declaration_line": 22,
+              "end_line": 23,
+              "path": "tests/test_stream_bare_type.py",
+              "sha256": "22b8a81ad1cea20b3eef1f40f88a63c723cf269a0056fe0bec51ee1a4d6dbcf0",
+              "start_line": 21,
+              "symbol": "stream_bare_sync"
+            }
+          ]
+        }
+      },
+      "delta_checks": [
+        {
+          "authority_check": true,
+          "id": "changed-owner-current",
+          "pointer": "/path_changes/*/revision",
+          "predicate": "includes",
+          "value": "359989bb49345adc08d8a97a225d88e700b8b8b0cdd462cd7dd94ad51909e3a8"
+        }
+      ],
+      "expected_owner_path": "fastapi/routing.py",
+      "qualification_scope": "source-reviewed owner/test relevance plus selected source syntax; no runtime registration, validation, compatibility or sufficient-test claim",
+      "source_labels": {
+        "after": [
+          {
+            "declaration_line": 953,
+            "end_line": 1115,
+            "path": "fastapi/routing.py",
+            "sha256": "32b2f5120273c7f76d9c859d2d40c84f3ce8f3472350bc6147faa5295802ced4",
+            "start_line": 953,
+            "symbol": "_populate_api_route_state"
+          }
+        ],
+        "before": [
+          {
+            "declaration_line": 953,
+            "end_line": 1114,
+            "path": "fastapi/routing.py",
+            "sha256": "04411341215bfed991ac805b26594bf1e4fa81438a875df5e12e2ac5a0fda8b7",
+            "start_line": 953,
+            "symbol": "_populate_api_route_state"
+          }
+        ]
+      },
+      "verification_oracles": {
+        "after": {
+          "basis": "directly inspected endpoint/dependency assertions in the pinned test; execution and sufficiency not asserted",
+          "runtime_coverage": "not-established",
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "declaration_line": 56,
+            "end_line": 61,
+            "path": "tests/test_stream_bare_type.py",
+            "sha256": "0d9dc33644ebee83936c0e4fa8f79beb89d2f2f30247da7df4caaa5f74132ea4",
+            "start_line": 56,
+            "symbol": "test_jsonl_router_typed_stream"
+          },
+          "verification_execution": "not-observed"
+        },
+        "before": {
+          "basis": "directly inspected endpoint/dependency assertions in the pinned test; execution and sufficiency not asserted",
+          "runtime_coverage": "not-established",
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "declaration_line": 29,
+            "end_line": 34,
+            "path": "tests/test_stream_bare_type.py",
+            "sha256": "0e915e21ca167bdb3d07701f1ff470eb36117da2ac4f9ee97aee1f7c30452ff2",
+            "start_line": 29,
+            "symbol": "test_stream_bare_async_iterable"
+          },
+          "verification_execution": "not-observed"
+        }
+      }
+    },
+    "fastapi-iterable-response-options": {
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "fastapi/routing.py"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_skip_defaults.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "fastapi/routing.py"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_skip_defaults.py"
+          }
+        ]
+      },
+      "delta_checks": [
+        {
+          "authority_check": true,
+          "id": "changed-owner-current",
+          "pointer": "/path_changes/*/revision",
+          "predicate": "includes",
+          "value": "456f9b1ef3680182564eaff00ba12636a32386d793c93eb0aa2bc80d7b0636d7"
+        }
+      ],
+      "expected_owner_path": "fastapi/routing.py",
+      "function_boundary_oracles": {
+        "after": {
+          "checks": [
+            {
+              "id": "direct-call-source",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/sites/*",
+                "record": {
+                  "callee_identifier_syntax": "get_stream_item_type",
+                  "end_line": 1078,
+                  "line": 1078,
+                  "syntax_kind": "call"
+                },
+                "scope": {
+                  "state": "source-index-bound",
+                  "subject": "fastapi/routing.py::_populate_api_route_state"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "runtime-boundary-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "authority_check": true,
+              "id": "callee-resolution-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/callee_resolution",
+              "predicate": "all_equal",
+              "value": "not-established"
+            }
+          ],
+          "literal_source_line_sha256": "aaed5c1cb23d8574201ab6d1d05fbdb1a29b7d658fdff7cec174e458a30f80a7",
+          "reported_span": {
+            "end_line": 1078,
+            "path": "fastapi/routing.py",
+            "start_line": 1078
+          },
+          "site_source_label": {
+            "end_line": 1078,
+            "path": "fastapi/routing.py",
+            "sha256": "aaed5c1cb23d8574201ab6d1d05fbdb1a29b7d658fdff7cec174e458a30f80a7",
+            "start_line": 1078
+          },
+          "source": "fastapi-iterable-response-options-after",
+          "source_label": {
+            "declaration_line": 953,
+            "end_line": 1115,
+            "path": "fastapi/routing.py",
+            "sha256": "6764aa75703ea243378769ce2706fe633073cf7a18c34a9d37e6f8c80ac39964",
+            "start_line": 953,
+            "symbol": "_populate_api_route_state"
+          }
+        },
+        "before": {
+          "checks": [
+            {
+              "id": "direct-call-source",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/sites/*",
+                "record": {
+                  "callee_identifier_syntax": "get_stream_item_type",
+                  "end_line": 995,
+                  "line": 995,
+                  "syntax_kind": "call"
+                },
+                "scope": {
+                  "state": "source-index-bound",
+                  "subject": "fastapi/routing.py::_populate_api_route_state"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "runtime-boundary-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "authority_check": true,
+              "id": "callee-resolution-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/callee_resolution",
+              "predicate": "all_equal",
+              "value": "not-established"
+            }
+          ],
+          "literal_source_line_sha256": "aaed5c1cb23d8574201ab6d1d05fbdb1a29b7d658fdff7cec174e458a30f80a7",
+          "reported_span": {
+            "end_line": 995,
+            "path": "fastapi/routing.py",
+            "start_line": 995
+          },
+          "site_source_label": {
+            "end_line": 995,
+            "path": "fastapi/routing.py",
+            "sha256": "aaed5c1cb23d8574201ab6d1d05fbdb1a29b7d658fdff7cec174e458a30f80a7",
+            "start_line": 995
+          },
+          "source": "fastapi-iterable-response-options-before",
+          "source_label": {
+            "declaration_line": 953,
+            "end_line": 1115,
+            "path": "fastapi/routing.py",
+            "sha256": "32b2f5120273c7f76d9c859d2d40c84f3ce8f3472350bc6147faa5295802ced4",
+            "start_line": 953,
+            "symbol": "_populate_api_route_state"
+          }
+        }
+      },
+      "qualification_scope": "directly inspected repository call syntax and relevant test assertions only; no runtime wiring, registration, causality, sufficient-test or complete contract claim",
+      "source_labels": {
+        "after": [
+          {
+            "declaration_line": 953,
+            "end_line": 1115,
+            "path": "fastapi/routing.py",
+            "sha256": "6764aa75703ea243378769ce2706fe633073cf7a18c34a9d37e6f8c80ac39964",
+            "start_line": 953,
+            "symbol": "_populate_api_route_state"
+          }
+        ],
+        "before": [
+          {
+            "declaration_line": 953,
+            "end_line": 1115,
+            "path": "fastapi/routing.py",
+            "sha256": "32b2f5120273c7f76d9c859d2d40c84f3ce8f3472350bc6147faa5295802ced4",
+            "start_line": 953,
+            "symbol": "_populate_api_route_state"
+          }
+        ]
+      },
+      "verification_oracles": {
+        "after": {
+          "basis": "inspected pinned endpoint/handler/configuration assertions; existing before test is relevant without claiming the later regression was covered",
+          "runtime_coverage": "not-established",
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "declaration_line": 113,
+            "end_line": 115,
+            "path": "tests/test_skip_defaults.py",
+            "sha256": "d079fa976960a1912cdc8caaeca613c2d310016a3adf367984413b5d6b037f9e",
+            "start_line": 113,
+            "symbol": "test_return_iterable_exclude_unset"
+          },
+          "verification_execution": "not-observed"
+        },
+        "before": {
+          "basis": "inspected pinned endpoint/handler/configuration assertions; existing before test is relevant without claiming the later regression was covered",
+          "runtime_coverage": "not-established",
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "declaration_line": 76,
+            "end_line": 78,
+            "path": "tests/test_skip_defaults.py",
+            "sha256": "e7e96f80e1a83a2245240302cb06366a8e77beec7516a1264b1aa4178ccb9e36",
+            "start_line": 76,
+            "symbol": "test_return_exclude_unset"
+          },
+          "verification_execution": "not-observed"
+        }
+      }
+    },
+    "fastapi-route-handler-wrapping": {
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "fastapi/routing.py"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_route_handler_wrapping.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "fastapi/routing.py"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_custom_route_class.py"
+          }
+        ]
+      },
+      "delta_checks": [
+        {
+          "authority_check": true,
+          "id": "changed-owner-current",
+          "pointer": "/path_changes/*/revision",
+          "predicate": "includes",
+          "value": "091525233025eed44735e1d2c4bf056681dd9482e33e3395ebed42ed983c7e5b"
+        }
+      ],
+      "expected_owner_path": "fastapi/routing.py",
+      "function_boundary_oracles": {
+        "after": {
+          "checks": [
+            {
+              "id": "direct-call-source",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/sites/*",
+                "record": {
+                  "callee_identifier_syntax": "effective_context.app",
+                  "end_line": 1308,
+                  "line": 1308,
+                  "syntax_kind": "call"
+                },
+                "scope": {
+                  "state": "source-index-bound",
+                  "subject": "fastapi/routing.py::APIRoute.handle"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "runtime-boundary-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "authority_check": true,
+              "id": "callee-resolution-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/callee_resolution",
+              "predicate": "all_equal",
+              "value": "not-established"
+            }
+          ],
+          "literal_source_line_sha256": "7bfe75da54df53ec9a73cc500cb78534856cddbd89d51fbeb79e3f37984d3428",
+          "reported_span": {
+            "end_line": 1308,
+            "path": "fastapi/routing.py",
+            "start_line": 1308
+          },
+          "site_source_label": {
+            "end_line": 1308,
+            "path": "fastapi/routing.py",
+            "sha256": "7bfe75da54df53ec9a73cc500cb78534856cddbd89d51fbeb79e3f37984d3428",
+            "start_line": 1308
+          },
+          "source": "fastapi-route-handler-wrapping-after",
+          "source_label": {
+            "declaration_line": 1294,
+            "end_line": 1310,
+            "path": "fastapi/routing.py",
+            "sha256": "6522436750d8e3108118fd94c438d4eb88bb9fddef273ab82e549aa1f86ac0c9",
+            "start_line": 1294,
+            "symbol": "APIRoute.handle"
+          }
+        },
+        "before": {
+          "checks": [
+            {
+              "id": "direct-call-source",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/sites/*",
+                "record": {
+                  "callee_identifier_syntax": "self.get_route_handler",
+                  "end_line": 1309,
+                  "line": 1309,
+                  "syntax_kind": "call"
+                },
+                "scope": {
+                  "state": "source-index-bound",
+                  "subject": "fastapi/routing.py::APIRoute.handle"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "runtime-boundary-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "authority_check": true,
+              "id": "callee-resolution-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/callee_resolution",
+              "predicate": "all_equal",
+              "value": "not-established"
+            }
+          ],
+          "literal_source_line_sha256": "a4c6d1f6f651692fa325f5d1f5115ae1a0336ba4bdba16aeafee884339473f63",
+          "reported_span": {
+            "end_line": 1309,
+            "path": "fastapi/routing.py",
+            "start_line": 1309
+          },
+          "site_source_label": {
+            "end_line": 1309,
+            "path": "fastapi/routing.py",
+            "sha256": "a4c6d1f6f651692fa325f5d1f5115ae1a0336ba4bdba16aeafee884339473f63",
+            "start_line": 1309
+          },
+          "source": "fastapi-route-handler-wrapping-before",
+          "source_label": {
+            "declaration_line": 1294,
+            "end_line": 1314,
+            "path": "fastapi/routing.py",
+            "sha256": "017b4704d4a03bb3f70d8c79eff6c896f30f9dad42b04beff6728a9e4189967f",
+            "start_line": 1294,
+            "symbol": "APIRoute.handle"
+          }
+        }
+      },
+      "qualification_scope": "directly inspected repository call syntax and relevant test assertions only; no runtime wiring, registration, causality, sufficient-test or complete contract claim",
+      "source_labels": {
+        "after": [
+          {
+            "declaration_line": 1294,
+            "end_line": 1310,
+            "path": "fastapi/routing.py",
+            "sha256": "6522436750d8e3108118fd94c438d4eb88bb9fddef273ab82e549aa1f86ac0c9",
+            "start_line": 1294,
+            "symbol": "APIRoute.handle"
+          }
+        ],
+        "before": [
+          {
+            "declaration_line": 1294,
+            "end_line": 1314,
+            "path": "fastapi/routing.py",
+            "sha256": "017b4704d4a03bb3f70d8c79eff6c896f30f9dad42b04beff6728a9e4189967f",
+            "start_line": 1294,
+            "symbol": "APIRoute.handle"
+          }
+        ]
+      },
+      "verification_oracles": {
+        "after": {
+          "basis": "inspected pinned endpoint/handler/configuration assertions; existing before test is relevant without claiming the later regression was covered",
+          "runtime_coverage": "not-established",
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "declaration_line": 10,
+            "end_line": 54,
+            "path": "tests/test_route_handler_wrapping.py",
+            "sha256": "00c78f25895d51eb4c76059d8d6af823110925f56f211d99354a3c596ca77e94",
+            "start_line": 9,
+            "symbol": "test_endpoint_wrapper_does_not_accumulate_across_requests"
+          },
+          "verification_execution": "not-observed"
+        },
+        "before": {
+          "basis": "inspected pinned endpoint/handler/configuration assertions; existing before test is relevant without claiming the later regression was covered",
+          "runtime_coverage": "not-established",
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "declaration_line": 58,
+            "end_line": 61,
+            "path": "tests/test_custom_route_class.py",
+            "sha256": "b4f8c4df2cab64bc4727cd1539f7fec0270682f7ea26bf2a7281ae27fb84886a",
+            "start_line": 50,
+            "symbol": "test_get_path"
+          },
+          "verification_execution": "not-observed"
+        }
+      }
+    },
+    "fastapi-router-context-threads": {
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "fastapi/routing.py"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_router_include_context.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "fastapi/routing.py"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_router_include_context.py"
+          }
+        ]
+      },
+      "delta_checks": [
+        {
+          "authority_check": true,
+          "id": "changed-owner-current",
+          "pointer": "/path_changes/*/revision",
+          "predicate": "includes",
+          "value": "af1f41241ba6ce8f34fdd027f750b6f5cf2a240885860537aba800d58266a6f0"
+        }
+      ],
+      "expected_owner_path": "fastapi/routing.py",
+      "function_boundary_oracles": {
+        "after": {
+          "checks": [
+            {
+              "id": "direct-call-source",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/sites/*",
+                "record": {
+                  "callee_identifier_syntax": "effective_candidates.append",
+                  "end_line": 1603,
+                  "line": 1603,
+                  "syntax_kind": "call"
+                },
+                "scope": {
+                  "state": "source-index-bound",
+                  "subject": "fastapi/routing.py::_IncludedRouter.effective_candidates"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "runtime-boundary-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "authority_check": true,
+              "id": "callee-resolution-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/callee_resolution",
+              "predicate": "all_equal",
+              "value": "not-established"
+            }
+          ],
+          "literal_source_line_sha256": "b90777b5fd395099928bdc1a85adcc0135d2f4d4387ecd314dc1628376c6367f",
+          "reported_span": {
+            "end_line": 1603,
+            "path": "fastapi/routing.py",
+            "start_line": 1603
+          },
+          "site_source_label": {
+            "end_line": 1603,
+            "path": "fastapi/routing.py",
+            "sha256": "b90777b5fd395099928bdc1a85adcc0135d2f4d4387ecd314dc1628376c6367f",
+            "start_line": 1603
+          },
+          "source": "fastapi-router-context-threads-after",
+          "source_label": {
+            "declaration_line": 1587,
+            "end_line": 1610,
+            "path": "fastapi/routing.py",
+            "sha256": "4f34ecd04857053cc19a43333bf850565cff01eea79a96b09575d6f4640104ba",
+            "start_line": 1587,
+            "symbol": "_IncludedRouter.effective_candidates"
+          }
+        },
+        "before": {
+          "checks": [
+            {
+              "id": "direct-call-source",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/sites/*",
+                "record": {
+                  "callee_identifier_syntax": "self._effective_candidates.append",
+                  "end_line": 1596,
+                  "line": 1596,
+                  "syntax_kind": "call"
+                },
+                "scope": {
+                  "state": "source-index-bound",
+                  "subject": "fastapi/routing.py::_IncludedRouter.effective_candidates"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "runtime-boundary-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "authority_check": true,
+              "id": "callee-resolution-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/callee_resolution",
+              "predicate": "all_equal",
+              "value": "not-established"
+            }
+          ],
+          "literal_source_line_sha256": "4d0672a99d619c959c1cff10262966ec6561c50676862a0f755671a21dddf82b",
+          "reported_span": {
+            "end_line": 1596,
+            "path": "fastapi/routing.py",
+            "start_line": 1596
+          },
+          "site_source_label": {
+            "end_line": 1596,
+            "path": "fastapi/routing.py",
+            "sha256": "4d0672a99d619c959c1cff10262966ec6561c50676862a0f755671a21dddf82b",
+            "start_line": 1596
+          },
+          "source": "fastapi-router-context-threads-before",
+          "source_label": {
+            "declaration_line": 1583,
+            "end_line": 1602,
+            "path": "fastapi/routing.py",
+            "sha256": "c9a50154a0ef26e026e683ee8ca063692d6c76c522a7bcfc37501915dcece740",
+            "start_line": 1583,
+            "symbol": "_IncludedRouter.effective_candidates"
+          }
+        }
+      },
+      "qualification_scope": "directly inspected repository call syntax and relevant test assertions only; no runtime wiring, registration, causality, sufficient-test or complete contract claim",
+      "source_labels": {
+        "after": [
+          {
+            "declaration_line": 1587,
+            "end_line": 1610,
+            "path": "fastapi/routing.py",
+            "sha256": "4f34ecd04857053cc19a43333bf850565cff01eea79a96b09575d6f4640104ba",
+            "start_line": 1587,
+            "symbol": "_IncludedRouter.effective_candidates"
+          }
+        ],
+        "before": [
+          {
+            "declaration_line": 1583,
+            "end_line": 1602,
+            "path": "fastapi/routing.py",
+            "sha256": "c9a50154a0ef26e026e683ee8ca063692d6c76c522a7bcfc37501915dcece740",
+            "start_line": 1583,
+            "symbol": "_IncludedRouter.effective_candidates"
+          }
+        ]
+      },
+      "verification_oracles": {
+        "after": {
+          "basis": "inspected pinned endpoint/handler/configuration assertions; existing before test is relevant without claiming the later regression was covered",
+          "runtime_coverage": "not-established",
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "declaration_line": 903,
+            "end_line": 932,
+            "path": "tests/test_router_include_context.py",
+            "sha256": "076e277dc333d63c3c7e21ce0b66ea561454ffd4ed6348792c2745586ca4959b",
+            "start_line": 903,
+            "symbol": "test_included_router_candidate_cache_is_thread_safe"
+          },
+          "verification_execution": "not-observed"
+        },
+        "before": {
+          "basis": "inspected pinned endpoint/handler/configuration assertions; existing before test is relevant without claiming the later regression was covered",
+          "runtime_coverage": "not-established",
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "declaration_line": 264,
+            "end_line": 281,
+            "path": "tests/test_router_include_context.py",
+            "sha256": "bf99ddfa9acbb520eaf424aca20541b0af46d8992ad1d1872027f401deb6f01d",
+            "start_line": 264,
+            "symbol": "test_nested_router_added_after_parent_inclusion_is_live"
+          },
+          "verification_execution": "not-observed"
+        }
+      }
+    },
+    "fastapi-stream-status-code": {
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "fastapi/routing.py"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_stream_status_code.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "fastapi/routing.py"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_sse.py"
+          }
+        ]
+      },
+      "delta_checks": [
+        {
+          "authority_check": true,
+          "id": "changed-owner-current",
+          "pointer": "/path_changes/*/revision",
+          "predicate": "includes",
+          "value": "8f0d72921edb42e2fef96276f48ea0c8aa2406ea0ee94c05e14c4ffab4f3cb50"
+        }
+      ],
+      "expected_owner_path": "fastapi/routing.py",
+      "function_boundary_oracles": {
+        "after": {
+          "checks": [
+            {
+              "id": "direct-call-source",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/sites/*",
+                "record": {
+                  "callee_identifier_syntax": "StreamingResponse",
+                  "end_line": 640,
+                  "line": 636,
+                  "syntax_kind": "call"
+                },
+                "scope": {
+                  "state": "source-index-bound",
+                  "subject": "fastapi/routing.py::get_request_handler.app"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "runtime-boundary-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "authority_check": true,
+              "id": "callee-resolution-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/callee_resolution",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "id": "stream-media-type",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*/sites/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/argument_syntax/keywords/*",
+                "record": {
+                  "name": "media_type",
+                  "value": {
+                    "kind": "string",
+                    "state": "literal-syntax",
+                    "value": "text/event-stream"
+                  }
+                },
+                "scope": {
+                  "callee_identifier_syntax": "StreamingResponse",
+                  "end_line": 640,
+                  "line": 636,
+                  "syntax_kind": "call"
+                }
+              }
+            }
+          ],
+          "literal_source_line_sha256": "624c5a147f8b0b9b4e524844bb19b8916f5e2b75638b3da8716c39a4307ef6b8",
+          "reported_span": {
+            "end_line": 640,
+            "path": "fastapi/routing.py",
+            "start_line": 636
+          },
+          "site_source_label": {
+            "end_line": 640,
+            "path": "fastapi/routing.py",
+            "sha256": "2f8f3846df1a178b0efeac35c19ccf133c62350314d36970f3c4f8cfee84c733",
+            "start_line": 636
+          },
+          "source": "fastapi-stream-status-code-after",
+          "source_label": {
+            "declaration_line": 404,
+            "end_line": 757,
+            "path": "fastapi/routing.py",
+            "sha256": "a3518cbaa76806b92d0bb46b69c2e46f24bfa275a2817652f788c984ac1aecc0",
+            "start_line": 404,
+            "symbol": "get_request_handler.app"
+          }
+        },
+        "before": {
+          "checks": [
+            {
+              "id": "direct-call-source",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/sites/*",
+                "record": {
+                  "callee_identifier_syntax": "StreamingResponse",
+                  "end_line": 637,
+                  "line": 633,
+                  "syntax_kind": "call"
+                },
+                "scope": {
+                  "state": "source-index-bound",
+                  "subject": "fastapi/routing.py::get_request_handler.app"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "runtime-boundary-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "authority_check": true,
+              "id": "callee-resolution-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/callee_resolution",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "id": "problem-keyword-source",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*/sites/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/argument_syntax/keywords/*",
+                "record": {
+                  "name": "background",
+                  "name_state": "literal",
+                  "value": {
+                    "identifier": "solved_result.background_tasks",
+                    "state": "identifier-syntax"
+                  }
+                },
+                "scope": {
+                  "callee_identifier_syntax": "StreamingResponse",
+                  "end_line": 637,
+                  "line": 633,
+                  "syntax_kind": "call"
+                }
+              }
+            },
+            {
+              "id": "stream-media-type",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*/sites/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/argument_syntax/keywords/*",
+                "record": {
+                  "name": "media_type",
+                  "value": {
+                    "kind": "string",
+                    "state": "literal-syntax",
+                    "value": "text/event-stream"
+                  }
+                },
+                "scope": {
+                  "callee_identifier_syntax": "StreamingResponse",
+                  "end_line": 637,
+                  "line": 633,
+                  "syntax_kind": "call"
+                }
+              }
+            }
+          ],
+          "literal_source_line_sha256": "581c1de9f17f7086b4ac6e5f5ad8a15dd44d105a4f22204580009037b4133c65",
+          "reported_span": {
+            "end_line": 636,
+            "path": "fastapi/routing.py",
+            "start_line": 636
+          },
+          "site_source_label": {
+            "end_line": 637,
+            "path": "fastapi/routing.py",
+            "sha256": "bf50e32db81002f3dfcbddd67719c1c5ac0ab5946e5cbf052e926550d10976f7",
+            "start_line": 633
+          },
+          "source": "fastapi-stream-status-code-before",
+          "source_label": {
+            "declaration_line": 404,
+            "end_line": 751,
+            "path": "fastapi/routing.py",
+            "sha256": "0e6390e6b22abcfb84ef42e7f0a7d593d28f2aac193c3ba47faa890587bb5506",
+            "start_line": 404,
+            "symbol": "get_request_handler.app"
+          }
+        }
+      },
+      "qualification_scope": "directly inspected repository call syntax and relevant test assertions only; no runtime wiring, registration, causality, sufficient-test or complete contract claim",
+      "source_labels": {
+        "after": [
+          {
+            "declaration_line": 404,
+            "end_line": 757,
+            "path": "fastapi/routing.py",
+            "sha256": "a3518cbaa76806b92d0bb46b69c2e46f24bfa275a2817652f788c984ac1aecc0",
+            "start_line": 404,
+            "symbol": "get_request_handler.app"
+          }
+        ],
+        "before": [
+          {
+            "declaration_line": 404,
+            "end_line": 751,
+            "path": "fastapi/routing.py",
+            "sha256": "0e6390e6b22abcfb84ef42e7f0a7d593d28f2aac193c3ba47faa890587bb5506",
+            "start_line": 404,
+            "symbol": "get_request_handler.app"
+          }
+        ]
+      },
+      "verification_oracles": {
+        "after": {
+          "basis": "inspected pinned endpoint/handler/configuration assertions; existing before test is relevant without claiming the later regression was covered",
+          "runtime_coverage": "not-established",
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "declaration_line": 152,
+            "end_line": 154,
+            "path": "tests/test_stream_status_code.py",
+            "sha256": "c0be798b2d842f523dea64828a67da8ffb33090522f3ad23d259d938b9299468",
+            "start_line": 138,
+            "symbol": "test_status_code"
+          },
+          "verification_execution": "not-observed"
+        },
+        "before": {
+          "basis": "inspected pinned endpoint/handler/configuration assertions; existing before test is relevant without claiming the later regression was covered",
+          "runtime_coverage": "not-established",
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "declaration_line": 115,
+            "end_line": 133,
+            "path": "tests/test_sse.py",
+            "sha256": "eb0c24079c95729915dc965470ac28e5c029456223b60ee0623c49d11a81fc8a",
+            "start_line": 115,
+            "symbol": "test_async_generator_with_model"
+          },
+          "verification_execution": "not-observed"
+        }
+      }
+    },
+    "faststream-asyncapi-try-route": {
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "faststream/_internal/fastapi/router.py"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/asyncapi/test_fastapi_router.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "faststream/_internal/fastapi/router.py"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/asyncapi/test_fastapi_router.py"
+          }
+        ]
+      },
+      "declaration_oracles": {
+        "after": {
+          "checks": [
+            {
+              "id": "route-call-0",
+              "pointer": "/declarations/groups/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/declarations/0/value",
+                "record": {
+                  "argument_state": "dynamic-or-unsupported",
+                  "handler_argument_syntax": "serve_asyncapi_schema",
+                  "handler_resolution": "unresolved",
+                  "literal_argument": null,
+                  "method_syntax": "get",
+                  "object_name": "docs_router",
+                  "runtime_registration": "not-established"
+                },
+                "scope": {
+                  "scope": {
+                    "call_line": 439,
+                    "path": "faststream/_internal/fastapi/router.py"
+                  }
+                }
+              }
+            },
+            {
+              "id": "route-call-1",
+              "pointer": "/declarations/groups/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/declarations/0/value",
+                "record": {
+                  "argument_state": "dynamic-or-unsupported",
+                  "handler_argument_syntax": "download_app_json_schema",
+                  "handler_resolution": "unresolved",
+                  "literal_argument": null,
+                  "method_syntax": "get",
+                  "object_name": "docs_router",
+                  "runtime_registration": "not-established"
+                },
+                "scope": {
+                  "scope": {
+                    "call_line": 440,
+                    "path": "faststream/_internal/fastapi/router.py"
+                  }
+                }
+              }
+            },
+            {
+              "id": "route-call-2",
+              "pointer": "/declarations/groups/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/declarations/0/value",
+                "record": {
+                  "argument_state": "dynamic-or-unsupported",
+                  "handler_argument_syntax": "download_app_yaml_schema",
+                  "handler_resolution": "unresolved",
+                  "literal_argument": null,
+                  "method_syntax": "get",
+                  "object_name": "docs_router",
+                  "runtime_registration": "not-established"
+                },
+                "scope": {
+                  "scope": {
+                    "call_line": 441,
+                    "path": "faststream/_internal/fastapi/router.py"
+                  }
+                }
+              }
+            },
+            {
+              "id": "route-call-3",
+              "pointer": "/declarations/groups/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/declarations/0/value",
+                "record": {
+                  "argument_state": "dynamic-or-unsupported",
+                  "handler_argument_syntax": "try_asyncapi_schema",
+                  "handler_resolution": "unresolved",
+                  "literal_argument": null,
+                  "method_syntax": "post",
+                  "object_name": "docs_router",
+                  "runtime_registration": "not-established"
+                },
+                "scope": {
+                  "scope": {
+                    "call_line": 470,
+                    "path": "faststream/_internal/fastapi/router.py"
+                  }
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "runtime-registration-unknown",
+              "pointer": "/declarations/groups/*/declarations/*/value/runtime_registration",
+              "predicate": "all_equal",
+              "value": "not-established"
+            }
+          ],
+          "source": "faststream-asyncapi-try-route-after",
+          "source_labels": [
+            {
+              "end_line": 439,
+              "path": "faststream/_internal/fastapi/router.py",
+              "sha256": "94434b762577759377f376ac5d3d9c9866334cd310e4e29ee4905f5f839620ce",
+              "start_line": 439
+            },
+            {
+              "end_line": 440,
+              "path": "faststream/_internal/fastapi/router.py",
+              "sha256": "836c697e38b9150aa0c116216b298a234af11dba41a4d1acb282e239305d2cf2",
+              "start_line": 440
+            },
+            {
+              "end_line": 441,
+              "path": "faststream/_internal/fastapi/router.py",
+              "sha256": "5839752324683b0d41542abd673e53f4a4bfd0470c62a3954035f7ad66ff6532",
+              "start_line": 441
+            },
+            {
+              "end_line": 472,
+              "path": "faststream/_internal/fastapi/router.py",
+              "sha256": "a507f853874ac8d515b0c524bf7bc760113a797fae751a5d580af6a9d2fbabbc",
+              "start_line": 470
+            }
+          ]
+        },
+        "before": {
+          "checks": [
+            {
+              "id": "route-call-0",
+              "pointer": "/declarations/groups/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/declarations/0/value",
+                "record": {
+                  "argument_state": "dynamic-or-unsupported",
+                  "handler_argument_syntax": "serve_asyncapi_schema",
+                  "handler_resolution": "unresolved",
+                  "literal_argument": null,
+                  "method_syntax": "get",
+                  "object_name": "docs_router",
+                  "runtime_registration": "not-established"
+                },
+                "scope": {
+                  "scope": {
+                    "call_line": 436,
+                    "path": "faststream/_internal/fastapi/router.py"
+                  }
+                }
+              }
+            },
+            {
+              "id": "route-call-1",
+              "pointer": "/declarations/groups/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/declarations/0/value",
+                "record": {
+                  "argument_state": "dynamic-or-unsupported",
+                  "handler_argument_syntax": "download_app_json_schema",
+                  "handler_resolution": "unresolved",
+                  "literal_argument": null,
+                  "method_syntax": "get",
+                  "object_name": "docs_router",
+                  "runtime_registration": "not-established"
+                },
+                "scope": {
+                  "scope": {
+                    "call_line": 437,
+                    "path": "faststream/_internal/fastapi/router.py"
+                  }
+                }
+              }
+            },
+            {
+              "id": "route-call-2",
+              "pointer": "/declarations/groups/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/declarations/0/value",
+                "record": {
+                  "argument_state": "dynamic-or-unsupported",
+                  "handler_argument_syntax": "download_app_yaml_schema",
+                  "handler_resolution": "unresolved",
+                  "literal_argument": null,
+                  "method_syntax": "get",
+                  "object_name": "docs_router",
+                  "runtime_registration": "not-established"
+                },
+                "scope": {
+                  "scope": {
+                    "call_line": 438,
+                    "path": "faststream/_internal/fastapi/router.py"
+                  }
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "runtime-registration-unknown",
+              "pointer": "/declarations/groups/*/declarations/*/value/runtime_registration",
+              "predicate": "all_equal",
+              "value": "not-established"
+            }
+          ],
+          "source": "faststream-asyncapi-try-route-before",
+          "source_labels": [
+            {
+              "end_line": 436,
+              "path": "faststream/_internal/fastapi/router.py",
+              "sha256": "94434b762577759377f376ac5d3d9c9866334cd310e4e29ee4905f5f839620ce",
+              "start_line": 436
+            },
+            {
+              "end_line": 437,
+              "path": "faststream/_internal/fastapi/router.py",
+              "sha256": "836c697e38b9150aa0c116216b298a234af11dba41a4d1acb282e239305d2cf2",
+              "start_line": 437
+            },
+            {
+              "end_line": 438,
+              "path": "faststream/_internal/fastapi/router.py",
+              "sha256": "5839752324683b0d41542abd673e53f4a4bfd0470c62a3954035f7ad66ff6532",
+              "start_line": 438
+            }
+          ]
+        }
+      },
+      "delta_checks": [
+        {
+          "authority_check": true,
+          "id": "changed-owner-current",
+          "pointer": "/path_changes/*/revision",
+          "predicate": "includes",
+          "value": "aace7c31d0e7bae6ed7d218d667ee8e2f651d9156f292ab926ebb7776bf9e85b"
+        }
+      ],
+      "expected_owner_path": "faststream/_internal/fastapi/router.py",
+      "qualification_scope": "source-reviewed owner/test relevance plus selected source syntax; no runtime registration, validation, compatibility or sufficient-test claim",
+      "source_labels": {
+        "after": [
+          {
+            "declaration_line": 384,
+            "end_line": 474,
+            "path": "faststream/_internal/fastapi/router.py",
+            "sha256": "4ef47508e1e106b3c869fcec4524c6426b2f3baad78b14efff0cf093ff9226a6",
+            "start_line": 384,
+            "symbol": "StreamRouter._asyncapi_router"
+          }
+        ],
+        "before": [
+          {
+            "declaration_line": 382,
+            "end_line": 439,
+            "path": "faststream/_internal/fastapi/router.py",
+            "sha256": "5e7567815ed567ed664e4439bcbc4c00e6ff5b205751622dfdf1ad11c6301d83",
+            "start_line": 382,
+            "symbol": "StreamRouter._asyncapi_router"
+          }
+        ]
+      },
+      "verification_oracles": {
+        "after": {
+          "basis": "directly inspected endpoint/dependency assertions in the pinned test; execution and sufficiency not asserted",
+          "runtime_coverage": "not-established",
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "declaration_line": 74,
+            "end_line": 102,
+            "path": "tests/asyncapi/test_fastapi_router.py",
+            "sha256": "fa4b391ea7619f2becc73fcae32f8990361d5f2555fe14ba20d7ff67c8c35dce",
+            "start_line": 73,
+            "symbol": "test_fastapi_asyncapi_try_it_out_delivers_message"
+          },
+          "verification_execution": "not-observed"
+        },
+        "before": {
+          "basis": "directly inspected endpoint/dependency assertions in the pinned test; execution and sufficiency not asserted",
+          "runtime_coverage": "not-established",
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "declaration_line": 48,
+            "end_line": 68,
+            "path": "tests/asyncapi/test_fastapi_router.py",
+            "sha256": "536dc41252e1eb25b104b2ea89b0075f3f3787670ba426c3a12b42321b9a5bb3",
+            "start_line": 47,
+            "symbol": "test_fastapi_asyncapi_routes"
+          },
+          "verification_execution": "not-observed"
+        }
+      }
+    },
+    "faststream-nested-router-context": {
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "faststream/_internal/fastapi/router.py"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/brokers/base/fastapi.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "faststream/_internal/fastapi/router.py"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/brokers/base/fastapi.py"
+          }
+        ]
+      },
+      "delta_checks": [
+        {
+          "authority_check": true,
+          "id": "changed-owner-current",
+          "pointer": "/path_changes/*/revision",
+          "predicate": "includes",
+          "value": "bc93ba74695d6ed638c1101d6e60c31d76555d91c7ebcfaa6906610d7c181ea8"
+        }
+      ],
+      "expected_owner_path": "faststream/_internal/fastapi/router.py",
+      "function_boundary_oracles": {
+        "after": {
+          "checks": [
+            {
+              "id": "direct-call-source",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/sites/*",
+                "record": {
+                  "callee_identifier_syntax": "TypeError",
+                  "end_line": 476,
+                  "line": 476,
+                  "syntax_kind": "call"
+                },
+                "scope": {
+                  "state": "source-index-bound",
+                  "subject": "faststream/_internal/fastapi/router.py::StreamRouter.include_router"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "runtime-boundary-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "authority_check": true,
+              "id": "callee-resolution-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/callee_resolution",
+              "predicate": "all_equal",
+              "value": "not-established"
+            }
+          ],
+          "literal_source_line_sha256": "9778847493ceb4a2c55efbff051a8149739095d9371843a905a75aa7c949dbac",
+          "reported_span": {
+            "end_line": 476,
+            "path": "faststream/_internal/fastapi/router.py",
+            "start_line": 476
+          },
+          "site_source_label": {
+            "end_line": 476,
+            "path": "faststream/_internal/fastapi/router.py",
+            "sha256": "9778847493ceb4a2c55efbff051a8149739095d9371843a905a75aa7c949dbac",
+            "start_line": 476
+          },
+          "source": "faststream-nested-router-context-after",
+          "source_label": {
+            "declaration_line": 441,
+            "end_line": 476,
+            "path": "faststream/_internal/fastapi/router.py",
+            "sha256": "6aa576cd1ba9cfea73177fc92e865c7daa185de0097110e1ee06ae7ba06fc81b",
+            "start_line": 441,
+            "symbol": "StreamRouter.include_router"
+          }
+        },
+        "before": {
+          "checks": [
+            {
+              "id": "direct-call-source",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/sites/*",
+                "record": {
+                  "callee_identifier_syntax": null,
+                  "end_line": 484,
+                  "line": 473,
+                  "syntax_kind": "call"
+                },
+                "scope": {
+                  "state": "source-index-bound",
+                  "subject": "faststream/_internal/fastapi/router.py::StreamRouter.include_router"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "runtime-boundary-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "authority_check": true,
+              "id": "callee-resolution-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/callee_resolution",
+              "predicate": "all_equal",
+              "value": "not-established"
+            }
+          ],
+          "literal_source_line_sha256": "be8d517ee6ae0f50b49065843a038334ee3c5a4c134b2712a6c5ac8fee5ba16a",
+          "reported_span": {
+            "end_line": 484,
+            "path": "faststream/_internal/fastapi/router.py",
+            "start_line": 473
+          },
+          "site_source_label": {
+            "end_line": 484,
+            "path": "faststream/_internal/fastapi/router.py",
+            "sha256": "0de84f95975d8967ac6138b3437b44e805427c51f7e66082a490182b5ae61049",
+            "start_line": 473
+          },
+          "source": "faststream-nested-router-context-before",
+          "source_label": {
+            "declaration_line": 441,
+            "end_line": 484,
+            "path": "faststream/_internal/fastapi/router.py",
+            "sha256": "ab1fa2d6ca64d10cbc2f1472dfcc1ef9ac80ff4f0a2d7ab835ab1e7c94a196f1",
+            "start_line": 441,
+            "symbol": "StreamRouter.include_router"
+          }
+        }
+      },
+      "qualification_scope": "directly inspected repository call syntax and relevant test assertions only; no runtime wiring, registration, causality, sufficient-test or complete contract claim",
+      "source_labels": {
+        "after": [
+          {
+            "declaration_line": 441,
+            "end_line": 476,
+            "path": "faststream/_internal/fastapi/router.py",
+            "sha256": "6aa576cd1ba9cfea73177fc92e865c7daa185de0097110e1ee06ae7ba06fc81b",
+            "start_line": 441,
+            "symbol": "StreamRouter.include_router"
+          }
+        ],
+        "before": [
+          {
+            "declaration_line": 441,
+            "end_line": 484,
+            "path": "faststream/_internal/fastapi/router.py",
+            "sha256": "ab1fa2d6ca64d10cbc2f1472dfcc1ef9ac80ff4f0a2d7ab835ab1e7c94a196f1",
+            "start_line": 441,
+            "symbol": "StreamRouter.include_router"
+          }
+        ]
+      },
+      "verification_oracles": {
+        "after": {
+          "basis": "inspected pinned endpoint/handler/configuration assertions; existing before test is relevant without claiming the later regression was covered",
+          "runtime_coverage": "not-established",
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "declaration_line": 811,
+            "end_line": 827,
+            "path": "tests/brokers/base/fastapi.py",
+            "sha256": "54b011488b697c95bfd13180b19b6260170943786b8cf024436b188da564497f",
+            "start_line": 811,
+            "symbol": "FastAPILocalTestcase.test_nested_stream_router_raises"
+          },
+          "verification_execution": "not-observed"
+        },
+        "before": {
+          "basis": "inspected pinned endpoint/handler/configuration assertions; existing before test is relevant without claiming the later regression was covered",
+          "runtime_coverage": "not-established",
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "declaration_line": 795,
+            "end_line": 819,
+            "path": "tests/brokers/base/fastapi.py",
+            "sha256": "45a515166533ac876f9b1b0d79e7ebff2767122ef5442684889b6f3ae6f0b8f1",
+            "start_line": 795,
+            "symbol": "FastAPILocalTestcase.test_nested_router"
+          },
+          "verification_execution": "not-observed"
+        }
+      }
+    },
+    "faststream-schema-response-content-type": {
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "faststream/asgi/factories/asyncapi/route.py"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/asgi/test_app.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "faststream/asgi/factories/asyncapi/route.py"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/asgi/testcase.py"
+          }
+        ]
+      },
+      "delta_checks": [
+        {
+          "authority_check": true,
+          "id": "changed-owner-current",
+          "pointer": "/path_changes/*/revision",
+          "predicate": "includes",
+          "value": "9dd4735b1017afcaf584e05a02960d0b92b4c4d7cc767fa2cdf3f277ecee160f"
+        }
+      ],
+      "expected_owner_path": "faststream/asgi/factories/asyncapi/route.py",
+      "function_boundary_oracles": {
+        "after": {
+          "checks": [
+            {
+              "id": "direct-call-source",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/sites/*",
+                "record": {
+                  "callee_identifier_syntax": "make_asyncapi_asgi",
+                  "end_line": 95,
+                  "line": 77,
+                  "syntax_kind": "call"
+                },
+                "scope": {
+                  "state": "source-index-bound",
+                  "subject": "faststream/asgi/factories/asyncapi/route.py::AsyncAPIRoute.__call__"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "runtime-boundary-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "authority_check": true,
+              "id": "callee-resolution-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/callee_resolution",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "id": "problem-keyword-source",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*/sites/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/argument_syntax/keywords/*",
+                "record": {
+                  "name": "try_it_out_path",
+                  "name_state": "literal",
+                  "value": {
+                    "identifier": "self.try_it_out_path",
+                    "state": "identifier-syntax"
+                  }
+                },
+                "scope": {
+                  "callee_identifier_syntax": "make_asyncapi_asgi",
+                  "end_line": 95,
+                  "line": 77,
+                  "syntax_kind": "call"
+                }
+              }
+            }
+          ],
+          "literal_source_line_sha256": "fc4c209c3519f1f947146e7be11c3f5c6123cfb3b34d036605bd3b4a135e18af",
+          "reported_span": {
+            "end_line": 94,
+            "path": "faststream/asgi/factories/asyncapi/route.py",
+            "start_line": 94
+          },
+          "site_source_label": {
+            "end_line": 95,
+            "path": "faststream/asgi/factories/asyncapi/route.py",
+            "sha256": "4b2b6ec4638b5646cfd47621b58c67fb870a2d45a6a786e264c6d5876a4d50bf",
+            "start_line": 77
+          },
+          "source": "faststream-schema-response-content-type-after",
+          "source_label": {
+            "declaration_line": 76,
+            "end_line": 95,
+            "path": "faststream/asgi/factories/asyncapi/route.py",
+            "sha256": "cc22bb4410b3dc5070171b9f4f0fa5e7f5fda4b93bb91d1249ba55c604300c50",
+            "start_line": 76,
+            "symbol": "AsyncAPIRoute.__call__"
+          }
+        },
+        "before": {
+          "checks": [
+            {
+              "id": "direct-call-source",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/sites/*",
+                "record": {
+                  "callee_identifier_syntax": "make_asyncapi_asgi",
+                  "end_line": 91,
+                  "line": 72,
+                  "syntax_kind": "call"
+                },
+                "scope": {
+                  "state": "source-index-bound",
+                  "subject": "faststream/asgi/factories/asyncapi/route.py::AsyncAPIRoute.__call__"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "runtime-boundary-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "authority_check": true,
+              "id": "callee-resolution-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/callee_resolution",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "id": "problem-keyword-source",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*/sites/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/argument_syntax/keywords/*",
+                "record": {
+                  "name": "try_it_out_url",
+                  "name_state": "literal",
+                  "value": {
+                    "identifier": "self.try_it_out_url",
+                    "state": "identifier-syntax"
+                  }
+                },
+                "scope": {
+                  "callee_identifier_syntax": "make_asyncapi_asgi",
+                  "end_line": 91,
+                  "line": 72,
+                  "syntax_kind": "call"
+                }
+              }
+            }
+          ],
+          "literal_source_line_sha256": "311433b94adc4cea12676401f92e680d8dd268a40c3cbb7375dc9bc796ea6abf",
+          "reported_span": {
+            "end_line": 90,
+            "path": "faststream/asgi/factories/asyncapi/route.py",
+            "start_line": 90
+          },
+          "site_source_label": {
+            "end_line": 91,
+            "path": "faststream/asgi/factories/asyncapi/route.py",
+            "sha256": "dc934b363a605723afcab14f4caeb471491c21394bf16f644ed7c1c7fffa851f",
+            "start_line": 72
+          },
+          "source": "faststream-schema-response-content-type-before",
+          "source_label": {
+            "declaration_line": 71,
+            "end_line": 91,
+            "path": "faststream/asgi/factories/asyncapi/route.py",
+            "sha256": "c79dd7fe73cc8c0aac1a44e624017ee2e96da012426d10fa63db48cb3a4fa49e",
+            "start_line": 71,
+            "symbol": "AsyncAPIRoute.__call__"
+          }
+        }
+      },
+      "qualification_scope": "directly inspected repository call syntax and relevant test assertions only; no runtime wiring, registration, causality, sufficient-test or complete contract claim",
+      "source_labels": {
+        "after": [
+          {
+            "declaration_line": 76,
+            "end_line": 95,
+            "path": "faststream/asgi/factories/asyncapi/route.py",
+            "sha256": "cc22bb4410b3dc5070171b9f4f0fa5e7f5fda4b93bb91d1249ba55c604300c50",
+            "start_line": 76,
+            "symbol": "AsyncAPIRoute.__call__"
+          }
+        ],
+        "before": [
+          {
+            "declaration_line": 71,
+            "end_line": 91,
+            "path": "faststream/asgi/factories/asyncapi/route.py",
+            "sha256": "c79dd7fe73cc8c0aac1a44e624017ee2e96da012426d10fa63db48cb3a4fa49e",
+            "start_line": 71,
+            "symbol": "AsyncAPIRoute.__call__"
+          }
+        ]
+      },
+      "verification_oracles": {
+        "after": {
+          "basis": "inspected pinned endpoint/handler/configuration assertions; existing before test is relevant without claiming the later regression was covered",
+          "runtime_coverage": "not-established",
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "declaration_line": 73,
+            "end_line": 85,
+            "path": "tests/asgi/test_app.py",
+            "sha256": "bd2b02914b79ccd7faac18346dd394fad57ba64c0c8571a5ef002b70bba3833d",
+            "start_line": 73,
+            "symbol": "test_asyncapi_json_custom_path"
+          },
+          "verification_execution": "not-observed"
+        },
+        "before": {
+          "basis": "inspected pinned endpoint/handler/configuration assertions; existing before test is relevant without claiming the later regression was covered",
+          "runtime_coverage": "not-established",
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "declaration_line": 95,
+            "end_line": 108,
+            "path": "tests/asgi/testcase.py",
+            "sha256": "730464b68a4d6f417ba31a590f0e5f48946da5d1bfc5eeaf4593cfbe4e3b588d",
+            "start_line": 94,
+            "symbol": "AsgiTestcase.test_asyncapi_asgi"
+          },
+          "verification_execution": "not-observed"
+        }
+      }
+    },
+    "litestar-annotated-handler-parameters": {
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "litestar/_kwargs/kwargs_model.py"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/unit/test_kwargs/test_param_markers.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "litestar/_kwargs/kwargs_model.py"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/unit/test_kwargs/test_param_markers.py"
+          }
+        ]
+      },
+      "delta_checks": [
+        {
+          "authority_check": true,
+          "id": "changed-owner-current",
+          "pointer": "/path_changes/*/revision",
+          "predicate": "includes",
+          "value": "bb0196305cd59b018e0c70fa16e95bddb27c7394f2ed594c89d5ae7b6a1b3ca0"
+        }
+      ],
+      "expected_owner_path": "litestar/_kwargs/kwargs_model.py",
+      "function_boundary_oracles": {
+        "after": {
+          "checks": [
+            {
+              "id": "handler-decorator",
+              "pointer": "/changed_line_evidence/observations/*/decorator_associations/associations/*/decorator_context/observations/*/callee_syntax",
+              "predicate": "includes_record",
+              "value": {
+                "name_syntax": "get",
+                "state": "simple-name"
+              }
+            },
+            {
+              "id": "handler-input-unknowns",
+              "pointer": "/changed_line_evidence/observations/*/decorator_associations/associations/*/handler_input_context",
+              "predicate": "includes_record",
+              "value": {
+                "coverage": "incomplete",
+                "cross_artifact_correspondence": "unresolved",
+                "dependency_resolution": "not-established",
+                "parameters_observed": 1,
+                "runtime_request_validation": "unknown"
+              }
+            },
+            {
+              "id": "literal-return-branch-unknown",
+              "pointer": "/changed_line_evidence/observations/*/decorator_associations/associations/*/handler_body_context",
+              "predicate": "includes_record",
+              "value": {
+                "coverage": "incomplete",
+                "cross_artifact_correspondence": "unresolved",
+                "runtime_response_shape": "unknown"
+              }
+            },
+            {
+              "id": "parameter-foo",
+              "pointer": "/changed_line_evidence/observations/*/decorator_associations/associations/*/handler_input_context/parameters/*",
+              "predicate": "includes_record",
+              "value": {
+                "annotation": {
+                  "end_line": 307,
+                  "start_line": 307,
+                  "state": "direct-annotation-syntax",
+                  "text": "Annotated[str, 'arbitrary metadata']"
+                },
+                "kind": "positional-or-keyword",
+                "name": "foo"
+              }
+            }
+          ],
+          "literal_source_line_sha256": "99ad1f7eb566d31f709caa4177fbf51b0dfd916f057477508bd160f318fcedc3",
+          "reported_span": {
+            "end_line": 306,
+            "path": "tests/unit/test_kwargs/test_param_markers.py",
+            "start_line": 306
+          },
+          "source": "litestar-annotated-handler-parameters-after",
+          "source_label": {
+            "declaration_line": 307,
+            "end_line": 308,
+            "path": "tests/unit/test_kwargs/test_param_markers.py",
+            "sha256": "0e132524ab139538679b48b772701a8cfff7e8eed8651792747111638928b5ee",
+            "start_line": 306,
+            "symbol": "test_annotated_metadata_does_not_shadow_dependency.handler"
+          }
+        },
+        "before": {
+          "checks": [
+            {
+              "id": "handler-decorator",
+              "pointer": "/changed_line_evidence/observations/*/decorator_associations/associations/*/decorator_context/observations/*/callee_syntax",
+              "predicate": "includes_record",
+              "value": {
+                "name_syntax": "get",
+                "state": "simple-name"
+              }
+            },
+            {
+              "id": "handler-input-unknowns",
+              "pointer": "/changed_line_evidence/observations/*/decorator_associations/associations/*/handler_input_context",
+              "predicate": "includes_record",
+              "value": {
+                "coverage": "incomplete",
+                "cross_artifact_correspondence": "unresolved",
+                "dependency_resolution": "not-established",
+                "parameters_observed": 1,
+                "runtime_request_validation": "unknown"
+              }
+            },
+            {
+              "id": "literal-return-branch-unknown",
+              "pointer": "/changed_line_evidence/observations/*/decorator_associations/associations/*/handler_body_context",
+              "predicate": "includes_record",
+              "value": {
+                "coverage": "incomplete",
+                "cross_artifact_correspondence": "unresolved",
+                "runtime_response_shape": "unknown"
+              }
+            },
+            {
+              "id": "parameter-dep",
+              "pointer": "/changed_line_evidence/observations/*/decorator_associations/associations/*/handler_input_context/parameters/*",
+              "predicate": "includes_record",
+              "value": {
+                "annotation": {
+                  "end_line": 128,
+                  "start_line": 128,
+                  "state": "direct-annotation-syntax",
+                  "text": "dict[str, int]"
+                },
+                "kind": "positional-or-keyword",
+                "name": "dep"
+              }
+            }
+          ],
+          "literal_source_line_sha256": "0074198f7e55f67ea13b273a1e76351026c6dd5b2d42c94594907bca2d95fa7a",
+          "reported_span": {
+            "end_line": 127,
+            "path": "tests/unit/test_kwargs/test_param_markers.py",
+            "start_line": 127
+          },
+          "source": "litestar-annotated-handler-parameters-before",
+          "source_label": {
+            "declaration_line": 128,
+            "end_line": 129,
+            "path": "tests/unit/test_kwargs/test_param_markers.py",
+            "sha256": "81ee0b1cad05c08d840ed7b7ec033c2806063e936334f608324b7cfa566f981f",
+            "start_line": 127,
+            "symbol": "test_explicit_form_dependency.handler"
+          }
+        }
+      },
+      "qualification_scope": "source-reviewed owner/test relevance plus selected source syntax; no runtime registration, validation, compatibility or sufficient-test claim",
+      "source_labels": {
+        "after": [
+          {
+            "declaration_line": 480,
+            "end_line": 524,
+            "path": "litestar/_kwargs/kwargs_model.py",
+            "sha256": "3f237b1ac6eea6d22b292cb82be3be6a6fcf9b9ccb3f3eaba3d229b6244c4bfb",
+            "start_line": 479,
+            "symbol": "KwargsModel._validate_raw_kwargs"
+          }
+        ],
+        "before": [
+          {
+            "declaration_line": 480,
+            "end_line": 521,
+            "path": "litestar/_kwargs/kwargs_model.py",
+            "sha256": "a0a21b9a315e7151b635c04d662140f866c932ca6a0d9062e15ee7a22e119890",
+            "start_line": 479,
+            "symbol": "KwargsModel._validate_raw_kwargs"
+          }
+        ]
+      },
+      "verification_oracles": {
+        "after": {
+          "basis": "directly inspected endpoint/dependency assertions in the pinned test; execution and sufficiency not asserted",
+          "runtime_coverage": "not-established",
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "declaration_line": 301,
+            "end_line": 313,
+            "path": "tests/unit/test_kwargs/test_param_markers.py",
+            "sha256": "32a1f41d50a1fa7efb6c30cd5b0508ee1036989079e18e49c81c0f0dc2927618",
+            "start_line": 301,
+            "symbol": "test_annotated_metadata_does_not_shadow_dependency"
+          },
+          "verification_execution": "not-observed"
+        },
+        "before": {
+          "basis": "directly inspected endpoint/dependency assertions in the pinned test; execution and sufficiency not asserted",
+          "runtime_coverage": "not-established",
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "declaration_line": 118,
+            "end_line": 135,
+            "path": "tests/unit/test_kwargs/test_param_markers.py",
+            "sha256": "cf04075b4c47aa4f33fd3d43219142afa88b8c8a47af8f71a0f77922e6d32368",
+            "start_line": 118,
+            "symbol": "test_explicit_form_dependency"
+          },
+          "verification_execution": "not-observed"
+        }
+      }
+    },
+    "litestar-handler-registration-once": {
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "litestar/app.py"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/unit/test_app.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "litestar/app.py"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/unit/test_app.py"
+          }
+        ]
+      },
+      "delta_checks": [
+        {
+          "authority_check": true,
+          "id": "changed-owner-current",
+          "pointer": "/path_changes/*/revision",
+          "predicate": "includes",
+          "value": "e22ca506647eb99b9fe8d41b263ac96245437926750c1c2e5e55aa1eea8fcf67"
+        }
+      ],
+      "expected_owner_path": "litestar/app.py",
+      "function_boundary_oracles": {
+        "after": {
+          "checks": [
+            {
+              "id": "direct-call-source",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/sites/*",
+                "record": {
+                  "callee_identifier_syntax": "registered_route_handlers.add",
+                  "end_line": 698,
+                  "line": 698,
+                  "syntax_kind": "call"
+                },
+                "scope": {
+                  "state": "source-index-bound",
+                  "subject": "litestar/app.py::Litestar._build_routes"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "runtime-boundary-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "authority_check": true,
+              "id": "callee-resolution-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/callee_resolution",
+              "predicate": "all_equal",
+              "value": "not-established"
+            }
+          ],
+          "literal_source_line_sha256": "405a97fbe48f2c011ad88bfcb4b0d507da65edfa943105c7f23fcb9fdb4cfec9",
+          "reported_span": {
+            "end_line": 698,
+            "path": "litestar/app.py",
+            "start_line": 698
+          },
+          "site_source_label": {
+            "end_line": 698,
+            "path": "litestar/app.py",
+            "sha256": "405a97fbe48f2c011ad88bfcb4b0d507da65edfa943105c7f23fcb9fdb4cfec9",
+            "start_line": 698
+          },
+          "source": "litestar-handler-registration-once-after",
+          "source_label": {
+            "declaration_line": 660,
+            "end_line": 703,
+            "path": "litestar/app.py",
+            "sha256": "7f5a621057efea3bf7767bc3d409482aed7172485f48d1e25ad83c709837fe82",
+            "start_line": 660,
+            "symbol": "Litestar._build_routes"
+          }
+        },
+        "before": {
+          "checks": [
+            {
+              "id": "direct-call-source",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/sites/*",
+                "record": {
+                  "callee_identifier_syntax": "route_handler.on_registration",
+                  "end_line": 690,
+                  "line": 690,
+                  "syntax_kind": "call"
+                },
+                "scope": {
+                  "state": "source-index-bound",
+                  "subject": "litestar/app.py::Litestar._build_routes"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "runtime-boundary-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "authority_check": true,
+              "id": "callee-resolution-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/callee_resolution",
+              "predicate": "all_equal",
+              "value": "not-established"
+            }
+          ],
+          "literal_source_line_sha256": "0847eb111ab8f48e9d93e363cca01a3744abbdc250018e73b1e297e3a7e8aff2",
+          "reported_span": {
+            "end_line": 690,
+            "path": "litestar/app.py",
+            "start_line": 690
+          },
+          "site_source_label": {
+            "end_line": 690,
+            "path": "litestar/app.py",
+            "sha256": "0847eb111ab8f48e9d93e363cca01a3744abbdc250018e73b1e297e3a7e8aff2",
+            "start_line": 690
+          },
+          "source": "litestar-handler-registration-once-before",
+          "source_label": {
+            "declaration_line": 660,
+            "end_line": 695,
+            "path": "litestar/app.py",
+            "sha256": "a9c863335f9ee8f324a29b3f1603a95e505d074dd772960f40dd252fc78792f6",
+            "start_line": 660,
+            "symbol": "Litestar._build_routes"
+          }
+        }
+      },
+      "qualification_scope": "directly inspected repository call syntax and relevant test assertions only; no runtime wiring, registration, causality, sufficient-test or complete contract claim",
+      "source_labels": {
+        "after": [
+          {
+            "declaration_line": 660,
+            "end_line": 703,
+            "path": "litestar/app.py",
+            "sha256": "7f5a621057efea3bf7767bc3d409482aed7172485f48d1e25ad83c709837fe82",
+            "start_line": 660,
+            "symbol": "Litestar._build_routes"
+          }
+        ],
+        "before": [
+          {
+            "declaration_line": 660,
+            "end_line": 695,
+            "path": "litestar/app.py",
+            "sha256": "a9c863335f9ee8f324a29b3f1603a95e505d074dd772960f40dd252fc78792f6",
+            "start_line": 660,
+            "symbol": "Litestar._build_routes"
+          }
+        ]
+      },
+      "verification_oracles": {
+        "after": {
+          "basis": "inspected pinned endpoint/handler/configuration assertions; existing before test is relevant without claiming the later regression was covered",
+          "runtime_coverage": "not-established",
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "declaration_line": 431,
+            "end_line": 449,
+            "path": "tests/unit/test_app.py",
+            "sha256": "08f84cfdc7d2570e8a7dda390e1303dc0cf1f2230dd9ffe8cf8dc671d3c01ca8",
+            "start_line": 431,
+            "symbol": "test_handler_registration_on_registration_called_only_once"
+          },
+          "verification_execution": "not-observed"
+        },
+        "before": {
+          "basis": "inspected pinned endpoint/handler/configuration assertions; existing before test is relevant without claiming the later regression was covered",
+          "runtime_coverage": "not-established",
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "declaration_line": 320,
+            "end_line": 334,
+            "path": "tests/unit/test_app.py",
+            "sha256": "43e01eb9d2a260ed30e61ea950351aa2848a9feebc91e758f7b957515af557f6",
+            "start_line": 320,
+            "symbol": "test_registering_route_handler_generates_openapi_docs"
+          },
+          "verification_execution": "not-observed"
+        }
+      }
+    },
+    "litestar-websocket-guard-forwarding": {
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "litestar/handlers/websocket_handlers/listener.py"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/unit/test_handlers/test_websocket_handlers/test_listeners.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "litestar/handlers/websocket_handlers/listener.py"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/unit/test_handlers/test_websocket_handlers/test_listeners.py"
+          }
+        ]
+      },
+      "delta_checks": [
+        {
+          "authority_check": true,
+          "id": "changed-owner-current",
+          "pointer": "/path_changes/*/revision",
+          "predicate": "includes",
+          "value": "c96076105fe6677b03401933a446578337c407e442fc9404b13105dc8e8fc16f"
+        }
+      ],
+      "expected_owner_path": "litestar/handlers/websocket_handlers/listener.py",
+      "function_boundary_oracles": {
+        "after": {
+          "checks": [
+            {
+              "id": "direct-call-source",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/sites/*",
+                "record": {
+                  "callee_identifier_syntax": "WebsocketListenerRouteHandler",
+                  "end_line": 546,
+                  "line": 524,
+                  "syntax_kind": "call"
+                },
+                "scope": {
+                  "state": "source-index-bound",
+                  "subject": "litestar/handlers/websocket_handlers/listener.py::websocket_listener.decorator"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "runtime-boundary-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "authority_check": true,
+              "id": "callee-resolution-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/callee_resolution",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "id": "problem-keyword-source",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*/sites/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/argument_syntax/keywords/*",
+                "record": {
+                  "name": "guards",
+                  "name_state": "literal",
+                  "value": {
+                    "identifier": "guards",
+                    "state": "identifier-syntax"
+                  }
+                },
+                "scope": {
+                  "callee_identifier_syntax": "WebsocketListenerRouteHandler",
+                  "end_line": 546,
+                  "line": 524,
+                  "syntax_kind": "call"
+                }
+              }
+            }
+          ],
+          "literal_source_line_sha256": "664dbbd787ae5e46aeed774a99313cf79461f76111a19589d3b275fbad3049ea",
+          "reported_span": {
+            "end_line": 532,
+            "path": "litestar/handlers/websocket_handlers/listener.py",
+            "start_line": 532
+          },
+          "site_source_label": {
+            "end_line": 546,
+            "path": "litestar/handlers/websocket_handlers/listener.py",
+            "sha256": "01dd8407ed99d8bf9a87866cd0a51a22a3c100b87c69b24db7751d4d850804de",
+            "start_line": 524
+          },
+          "source": "litestar-websocket-guard-forwarding-after",
+          "source_label": {
+            "declaration_line": 523,
+            "end_line": 546,
+            "path": "litestar/handlers/websocket_handlers/listener.py",
+            "sha256": "fbcc9b8b36075ec9f636a45a9a6b84a28f1034c17782039b8998a0714f6841f9",
+            "start_line": 523,
+            "symbol": "websocket_listener.decorator"
+          }
+        },
+        "before": {
+          "checks": [
+            {
+              "id": "direct-call-source",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/sites/*",
+                "record": {
+                  "callee_identifier_syntax": "WebsocketListenerRouteHandler",
+                  "end_line": 546,
+                  "line": 524,
+                  "syntax_kind": "call"
+                },
+                "scope": {
+                  "state": "source-index-bound",
+                  "subject": "litestar/handlers/websocket_handlers/listener.py::websocket_listener.decorator"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "runtime-boundary-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "authority_check": true,
+              "id": "callee-resolution-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/callee_resolution",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "id": "problem-keyword-source",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*/sites/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/argument_syntax/keywords/*",
+                "record": {
+                  "name": "guard",
+                  "name_state": "literal",
+                  "value": {
+                    "identifier": "guards",
+                    "state": "identifier-syntax"
+                  }
+                },
+                "scope": {
+                  "callee_identifier_syntax": "WebsocketListenerRouteHandler",
+                  "end_line": 546,
+                  "line": 524,
+                  "syntax_kind": "call"
+                }
+              }
+            }
+          ],
+          "literal_source_line_sha256": "db54997f0cb86d8aa74a8225ab32fb6d1efe32440e572db10c2084b2e8bba42d",
+          "reported_span": {
+            "end_line": 532,
+            "path": "litestar/handlers/websocket_handlers/listener.py",
+            "start_line": 532
+          },
+          "site_source_label": {
+            "end_line": 546,
+            "path": "litestar/handlers/websocket_handlers/listener.py",
+            "sha256": "d540e9294c604dfbdcaa6ae0de68173cb8b9be45215dcbd4400a240450d5f1ab",
+            "start_line": 524
+          },
+          "source": "litestar-websocket-guard-forwarding-before",
+          "source_label": {
+            "declaration_line": 523,
+            "end_line": 546,
+            "path": "litestar/handlers/websocket_handlers/listener.py",
+            "sha256": "bf9533151d08329bd40921e83d959d9d311896b92758ccbe3a028281f514ad74",
+            "start_line": 523,
+            "symbol": "websocket_listener.decorator"
+          }
+        }
+      },
+      "qualification_scope": "directly inspected repository call syntax and relevant test assertions only; no runtime wiring, registration, causality, sufficient-test or complete contract claim",
+      "source_labels": {
+        "after": [
+          {
+            "declaration_line": 523,
+            "end_line": 546,
+            "path": "litestar/handlers/websocket_handlers/listener.py",
+            "sha256": "fbcc9b8b36075ec9f636a45a9a6b84a28f1034c17782039b8998a0714f6841f9",
+            "start_line": 523,
+            "symbol": "websocket_listener.decorator"
+          }
+        ],
+        "before": [
+          {
+            "declaration_line": 523,
+            "end_line": 546,
+            "path": "litestar/handlers/websocket_handlers/listener.py",
+            "sha256": "bf9533151d08329bd40921e83d959d9d311896b92758ccbe3a028281f514ad74",
+            "start_line": 523,
+            "symbol": "websocket_listener.decorator"
+          }
+        ]
+      },
+      "verification_oracles": {
+        "after": {
+          "basis": "inspected pinned endpoint/handler/configuration assertions; existing before test is relevant without claiming the later regression was covered",
+          "runtime_coverage": "not-established",
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "declaration_line": 437,
+            "end_line": 452,
+            "path": "tests/unit/test_handlers/test_websocket_handlers/test_listeners.py",
+            "sha256": "d32b88fcc187fff3bdd1578a8249e69fa8b3971b8eb991fe05ede638ced234bc",
+            "start_line": 437,
+            "symbol": "test_websocket_listener_applies_guards"
+          },
+          "verification_execution": "not-observed"
+        },
+        "before": {
+          "basis": "inspected pinned endpoint/handler/configuration assertions; existing before test is relevant without claiming the later regression was covered",
+          "runtime_coverage": "not-established",
+          "scope": "source-reviewed-test-file-relevance",
+          "source_label": {
+            "declaration_line": 74,
+            "end_line": 83,
+            "path": "tests/unit/test_handlers/test_websocket_handlers/test_listeners.py",
+            "sha256": "8ea68f1d0f9759af8f96c47293bc09b59b8feab465280cbfb98e0831d80e9e7e",
+            "start_line": 73,
+            "symbol": "test_listener_receive_bytes"
+          },
+          "verification_execution": "not-observed"
+        }
+      }
+    }
+  },
+  "schema": "hashmarks.repository-evaluation-grader.v1",
+  "suite": "backend-handler-source-v1"
+}

@@ -834,6 +834,153 @@ def test_failed_declaration_fact_cannot_be_masked_by_successful_task(
     assert outcome["declaration_observations"]["after"]["gates"]["facts"] is False
 
 
+def _add_interface_observations(suite_path: Path, sources: dict[str, Path]) -> None:
+    suite = json.loads(suite_path.read_text())
+    grader_path = suite_path.parent / "grader.json"
+    grader = json.loads(grader_path.read_text())
+    workflow = suite["workflows"][0]
+    rule = grader["cases"]["handler"]
+    workflow["declaration_observations"] = {}
+    rule["declaration_oracles"] = {}
+    for stage in ("before", "after"):
+        path = sources[stage] / "backend.py"
+        statement = f'api.post("/{stage}")(handler)\n'.encode()
+        path.write_bytes(path.read_bytes() + statement)
+        suite["sources"][stage]["content_identity"] = repository_content_identity(
+            sources[stage]
+        )
+        workflow["declaration_observations"][stage] = {
+            "groups": [],
+            "result_mode": "discovery",
+            "python_interface": {"paths": ["backend.py"], "route_objects": ["api"]},
+        }
+        rule["declaration_oracles"][stage] = {
+            "source": stage,
+            "source_labels": [
+                {
+                    "path": "backend.py",
+                    "start_line": 3,
+                    "end_line": 3,
+                    "sha256": hashlib.sha256(statement).hexdigest(),
+                }
+            ],
+            "checks": [
+                {
+                    "id": "explicit-route-call",
+                    "pointer": "/declarations/groups/*/declarations/*/value",
+                    "predicate": "includes_record",
+                    "value": {
+                        "method_syntax": "post",
+                        "literal_argument": f"/{stage}",
+                        "handler_argument_syntax": "handler",
+                        "handler_resolution": "unresolved",
+                        "runtime_registration": "not-established",
+                    },
+                }
+            ],
+        }
+    rule["delta_checks"][0]["value"] = hash_file(
+        sources["after"] / "backend.py", domain=FILE_DOMAIN
+    ).hash
+    write_json(suite_path, suite)
+    write_json(grader_path, grader)
+
+
+def test_interface_workflow_keeps_artifact_bound_facts_and_pure_regrading(
+    corpus: tuple[Path, dict[str, Path]],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from scripts.repository_evaluation.backend_regrading import verify_task_summary
+
+    suite_path, sources = corpus
+    _add_interface_observations(suite_path, sources)
+    report = run_backend(
+        sources=sources,
+        suite_path=suite_path,
+        output_dir=tmp_path / "interface",
+        transports=(),
+    )
+    outcome = report["outcomes"][0]
+    assert outcome["gates"]["facts"] is True
+    assert outcome["gates"]["cli"] is None
+    assert outcome["gates"]["mcp"] is None
+    suite, grader = load_corpus(suite_path, sources)
+    for stage in ("before", "after"):
+        assert outcome["declaration_observations"][stage]["gates"]["facts"] is True
+        witnesses = [
+            w
+            for w in outcome["gate_witnesses"]
+            if w["gate"] == "declarations_facts" and w["stage"] == stage
+        ]
+        assert witnesses and all(w["state"] == "PASS" for w in witnesses)
+        assert all(w["source_bindings"][0]["path"] == "backend.py" for w in witnesses)
+
+    def forbidden(*_args: object, **_kwargs: object) -> None:
+        pytest.fail("pure regrading must not instantiate the observer")
+
+    monkeypatch.setattr("hashmarks.codemap.engine.CodeMap.__init__", forbidden)
+    verify_task_summary(
+        tmp_path / "interface/handler/observations",
+        suite["workflows"][0],
+        grader["cases"]["handler"],
+        sources,
+        outcome,
+    )
+
+
+def test_failed_interface_declaration_fact_cannot_be_masked_by_task_facts(
+    corpus: tuple[Path, dict[str, Path]],
+    tmp_path: Path,
+) -> None:
+    suite_path, sources = corpus
+    _add_interface_observations(suite_path, sources)
+    path = suite_path.parent / "grader.json"
+    grader = json.loads(path.read_text())
+    grader["cases"]["handler"]["declaration_oracles"]["after"]["checks"][0]["value"][
+        "literal_argument"
+    ] = "/wrong"
+    write_json(path, grader)
+    report = run_backend(
+        sources=sources,
+        suite_path=suite_path,
+        output_dir=tmp_path / "interface-failed",
+        transports=(),
+    )
+    outcome = report["outcomes"][0]
+    assert outcome["after"]["classification"] == "PASS"
+    assert outcome["declaration_observations"]["after"]["gates"]["facts"] is False
+    assert outcome["gates"]["facts"] is False
+
+
+@pytest.mark.parametrize(
+    "mutation", ["unlabeled-path", "unknown-option", "missing-stage", "wrong-source"]
+)
+def test_interface_workflow_requires_exact_source_and_oracle_membership(
+    corpus: tuple[Path, dict[str, Path]],
+    mutation: str,
+) -> None:
+    suite_path, sources = corpus
+    _add_interface_observations(suite_path, sources)
+    suite = json.loads(suite_path.read_text())
+    grader_path = suite_path.parent / "grader.json"
+    grader = json.loads(grader_path.read_text())
+    request = suite["workflows"][0]["declaration_observations"]["after"]
+    oracle = grader["cases"]["handler"]["declaration_oracles"]
+    if mutation == "unlabeled-path":
+        request["python_interface"]["paths"].append("unlabeled.py")
+    elif mutation == "unknown-option":
+        request["python_interface"]["runtime_registration"] = True
+    elif mutation == "missing-stage":
+        del oracle["after"]
+    else:
+        oracle["after"]["source"] = "before"
+    write_json(suite_path, suite)
+    write_json(grader_path, grader)
+    with pytest.raises(ValueError):
+        load_corpus(suite_path, sources)
+
+
 @pytest.mark.parametrize(
     "mutation",
     [

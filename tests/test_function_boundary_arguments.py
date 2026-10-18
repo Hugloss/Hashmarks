@@ -145,6 +145,51 @@ def test_argument_bounds_account_for_omissions_and_hidden_expansion(
     assert call["has_argument_expansion"] is True
 
 
+def test_reported_argument_lines_survive_the_existing_bounded_projection(
+    tmp_path: Path,
+) -> None:
+    positional = "".join(f"        {index},\n" for index in range(12))
+    keywords = "".join(f"        field_{index}=value_{index},\n" for index in range(12))
+    (tmp_path / "service.py").write_text(
+        "def process():\n    message.send(\n" + positional + keywords + "    )\n"
+    )
+    with CodeMap(tmp_path) as repo:
+        repo.index.sync()
+        packet = repo.changes.task_impact(
+            "Inspect caller-reported source lines",
+            ["service.py"],
+            options=ChangeImpactOptions(
+                changed_line_spans=[
+                    {"path": "service.py", "start_line": 14, "end_line": 14},
+                    {"path": "service.py", "start_line": 26, "end_line": 26},
+                ]
+            ),
+        )
+    evidence = assert_object(packet["changed_line_evidence"])
+    observations = assert_records(evidence["observations"])
+    assert len(observations) == 2
+    for observation, key, expected in (
+        (observations[0], "positional", 11),
+        (observations[1], "keywords", "field_11"),
+    ):
+        syntax = assert_object(observation["function_boundary_syntax"])
+        function = assert_records(syntax["observations"])[0]
+        call = next(
+            site
+            for site in assert_records(function["sites"])
+            if site["syntax_kind"] == "call"
+        )
+        arguments = assert_object(call["argument_syntax"])
+        rows = assert_records(arguments[key])
+        assert len(rows) == 8
+        assert rows[-1]["position" if key == "positional" else "name"] == expected
+        assert arguments["omitted_positional_count"] == 4
+        assert arguments["omitted_keyword_count"] == 4
+        assert arguments["truncation"] == "truncated"
+        assert arguments["runtime_binding"] == "not-established"
+        assert syntax["negative_evidence_admissible"] is False
+
+
 def test_oversized_nonfinite_and_unsupported_literals_remain_unknown(
     tmp_path: Path,
 ) -> None:

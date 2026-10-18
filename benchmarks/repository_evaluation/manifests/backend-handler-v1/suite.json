@@ -1,0 +1,985 @@
+{
+  "grader_file": "grader.json",
+  "pending_catalog_workflows": [],
+  "qualification_scope": "Twelve source-reviewed genuine changes over three repositories. Explicit source paths and bounded declaration/boundary facts; no complete handler semantics, runtime contract, verification sufficiency or capability qualification. Required missing evidence remains FAIL/INCOMPLETE.",
+  "schema": "hashmarks.backend-evidence-workflows.v2",
+  "sources": {
+    "fastapi-frontend-dependency-response-after": {
+      "commit": "d62354434b2e508fe89024213b220ca8e67dea5e",
+      "content_identity": "sha256:ee55ff2c006c3d9384ac2c2324a294980aa77e044749f0fed690917501b4f9e2:3137",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "fastapi-frontend-dependency-response-before": {
+      "commit": "1d211b9c1009d577f39fa2b19b10d9a93a72a0ed",
+      "content_identity": "sha256:ee07c0ecb11869c82f3e9c5bdc287e4862cbacdddae764e218af7aa8f2580dcb:3137",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "fastapi-included-stream-type-after": {
+      "commit": "ad03e117c0010a563067740c97cb7ab011cb5174",
+      "content_identity": "sha256:2f49bfff7d463050ef0d0e5f37965691adde1aabd336379c99fec6d0d0696e9a:3134",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "fastapi-included-stream-type-before": {
+      "commit": "98b12fe56f97107e71a20fc1cf334ccfa590efb5",
+      "content_identity": "sha256:79d575c4866977dd7f0ed0a2da2fa8e9a7ec45e7696fb4ed7bc2767edf620ef3:3134",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "fastapi-iterable-response-options-after": {
+      "commit": "d6537f774b0e80e376e2cf4e0fa998a38c6d0c09",
+      "content_identity": "sha256:df4f016032a76da5d2cf29af9f1495356b42c1c79b493145b23db0ad61d03e32:3135",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "fastapi-iterable-response-options-before": {
+      "commit": "0f3d3b2f9f09f04fe612d4b7db32485170c9f1dd",
+      "content_identity": "sha256:ccf6682ec80563d9b74bfd2cc89c8a31afda4a96c35f00d7340a037661fda23a:3135",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "fastapi-route-handler-wrapping-after": {
+      "commit": "ac88f563db5f4d3300d43355eca728c93ed9ffe2",
+      "content_identity": "sha256:a4c2eb516102f094d0e164273d2750f73ff4ac5f54267cd421680e0d7a6e4054:3169",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "fastapi-route-handler-wrapping-before": {
+      "commit": "bd41128123fd08d693f5541e27c550eebe20f8b0",
+      "content_identity": "sha256:6afc1c568a3cda8c4e0eb415bdebab2d682df1340ca01eeccc78c1169b386e3d:3168",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "fastapi-router-context-threads-after": {
+      "commit": "7fe315c21afb8a57a2b559772e0f7ced7e5d071a",
+      "content_identity": "sha256:9fd02ac87b42709b98c16b366673c04f85130209f003c12929605ff26bc34aa0:3131",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "fastapi-router-context-threads-before": {
+      "commit": "c48e67b1ce9c03fc9bd4b1ac72350e51ad5a6e8a",
+      "content_identity": "sha256:9a2c4db0184357542dce2520c0f613d5d4b3fb950a1a7ae13f82d557533e96fc:3131",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "fastapi-stream-status-code-after": {
+      "commit": "e92a0dc3ce5ecbebb8655dbe5465cb61d48f9fc0",
+      "content_identity": "sha256:1fe24849ff6f86a3a96dda19b6d7e90bcf34611c1ebb3444daf16fb5e2bb2c51:3137",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "fastapi-stream-status-code-before": {
+      "commit": "6215d8a6f3fed4eef63fe9d1ae600c12f62bd881",
+      "content_identity": "sha256:096d9f50ec265f730b8f1b20693bc6f60abed94c990a469e28e5fae39efeaa9e:3136",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "faststream-asyncapi-try-route-after": {
+      "commit": "05437ced0ce408a120d053801306ca211ea175c5",
+      "content_identity": "sha256:2f67c1650ec80b169aae7283009b47ca8af26fd0cb487411c3312131886e4a76:2018",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive"
+    },
+    "faststream-asyncapi-try-route-before": {
+      "commit": "eaefd6ce942b938ae49ba538a38bbe210645714d",
+      "content_identity": "sha256:0326406217b100fab07e2e5334d829284ed84dc54d9c23d87ff5fbcbe43bf679:2018",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive"
+    },
+    "faststream-nested-router-context-after": {
+      "commit": "9bf1271938abe7276765934917a2f37c4c8e7032",
+      "content_identity": "sha256:1b7e5e9383eff382e21654920794b5e8d2b8fa737068aca4c7ccc625743b43c4:1958",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive"
+    },
+    "faststream-nested-router-context-before": {
+      "commit": "e9efa0170b87787a416272a4e28fbe7b54732c10",
+      "content_identity": "sha256:b9881f6143ede2ddf7063b712a317c5946e719911b0ec7e7d9fe619df2b0a7e1:1958",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive"
+    },
+    "faststream-schema-response-content-type-after": {
+      "commit": "739189070cd1eadfb2d26750f775a99560431c93",
+      "content_identity": "sha256:b50abd76aea7a0d608da8efd4ac868ced006e3ee249f2388ced046dc534979bf:2089",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive"
+    },
+    "faststream-schema-response-content-type-before": {
+      "commit": "f5b12e6af991b551c1d77aba85cd0a1c23ee87c5",
+      "content_identity": "sha256:cd282726bb2009db8e1ca884632983043cb4a7c1dd63b310db42ab7e6c3cbae0:2088",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive"
+    },
+    "litestar-annotated-handler-parameters-after": {
+      "commit": "96de3b0ebf38f9de91d50068e2a99bc2d40da8da",
+      "content_identity": "sha256:0f0cabe325f34c984f0428dff4206f1910664ff9750b7fdaa8df35f0d6620a59:1387",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive"
+    },
+    "litestar-annotated-handler-parameters-before": {
+      "commit": "78cb64adfab0d22b9ffa8cf9ed663fdd45916e2d",
+      "content_identity": "sha256:ebd1f838b3ab825907c1b0822212a4d2a6432ee37b23285d4e5c65957195ad64:1387",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive"
+    },
+    "litestar-handler-registration-once-after": {
+      "commit": "326e988d949886482cc06a001544e53e31c5532a",
+      "content_identity": "sha256:a9057be72de5e0b3a7a3241db9c457431ee867f17f957e890a8700025525a250:1388",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive"
+    },
+    "litestar-handler-registration-once-before": {
+      "commit": "d63f917fda7a50dcb18c68cb37e73f235cde517d",
+      "content_identity": "sha256:56d3f0e16120c230ef1bab376575a0ead62d118c74775c22d001853d34cdd6e3:1388",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive"
+    },
+    "litestar-websocket-guard-forwarding-after": {
+      "commit": "946d6b7d0ed2a7cb74a7a65be677ae38ae655e94",
+      "content_identity": "sha256:e1ced64e910af7dd4cde7e1e021019491b76bb98d819032bea23403c1a62f71a:1399",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive"
+    },
+    "litestar-websocket-guard-forwarding-before": {
+      "commit": "59800ae06b591e3f5bf581d22981125e11ec98b9",
+      "content_identity": "sha256:fc173f7d9ad7831b191076be90aed6b8db5988ffd6d6b684c45f6487ae616c91:1399",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive"
+    }
+  },
+  "suite": "backend-handler-source-v1",
+  "workflows": [
+    {
+      "after": "faststream-asyncapi-try-route-after",
+      "before": "faststream-asyncapi-try-route-before",
+      "capabilities": [
+        8
+      ],
+      "capability_proofs": {
+        "8": {
+          "reason": "selected source syntax only; complete handler semantics and adversaries remain unqualified",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "faststream/_internal/fastapi/router.py"
+      ],
+      "declaration_observations": {
+        "after": {
+          "groups": [],
+          "python_interface": {
+            "include_input_contract_syntax": true,
+            "include_literal_shape_syntax": true,
+            "paths": [
+              "faststream/_internal/fastapi/router.py"
+            ],
+            "route_objects": [
+              "docs_router"
+            ]
+          },
+          "result_mode": "discovery"
+        },
+        "before": {
+          "groups": [],
+          "python_interface": {
+            "include_input_contract_syntax": true,
+            "include_literal_shape_syntax": true,
+            "paths": [
+              "faststream/_internal/fastapi/router.py"
+            ],
+            "route_objects": [
+              "docs_router"
+            ]
+          },
+          "result_mode": "discovery"
+        }
+      },
+      "id": "faststream-asyncapi-try-route",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "initial semantic sufficiency oracle not independently reviewed"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "explicit caller-nominated source owner; no answer-blind recall claim"
+        }
+      },
+      "native_required": false,
+      "problem_id": "05437ced0ce408a120d053801306ca211ea175c5",
+      "repository": "faststream",
+      "task": "The AsyncAPI try-it-out POST endpoint is missing from faststream/_internal/fastapi/router.py.",
+      "transitions": [
+        {
+          "after_path": "faststream/_internal/fastapi/router.py",
+          "before_path": "faststream/_internal/fastapi/router.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "fastapi-included-stream-type-after",
+      "before": "fastapi-included-stream-type-before",
+      "capabilities": [
+        8
+      ],
+      "capability_proofs": {
+        "8": {
+          "reason": "selected source syntax only; complete handler semantics and adversaries remain unqualified",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "fastapi/routing.py",
+        "tests/test_stream_bare_type.py"
+      ],
+      "declaration_observations": {
+        "after": {
+          "groups": [],
+          "python_interface": {
+            "include_input_contract_syntax": true,
+            "include_literal_shape_syntax": true,
+            "paths": [
+              "tests/test_stream_bare_type.py"
+            ],
+            "route_objects": [
+              "app",
+              "router"
+            ]
+          },
+          "result_mode": "discovery"
+        },
+        "before": {
+          "groups": [],
+          "python_interface": {
+            "include_input_contract_syntax": true,
+            "include_literal_shape_syntax": true,
+            "paths": [
+              "tests/test_stream_bare_type.py"
+            ],
+            "route_objects": [
+              "app",
+              "router"
+            ]
+          },
+          "result_mode": "discovery"
+        }
+      },
+      "id": "fastapi-included-stream-type",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "initial semantic sufficiency oracle not independently reviewed"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "explicit caller-nominated source owner; no answer-blind recall claim"
+        }
+      },
+      "native_required": false,
+      "problem_id": "ad03e117c0010a563067740c97cb7ab011cb5174",
+      "repository": "fastapi",
+      "task": "Inspect the stream item type lost by include_router in fastapi/routing.py.",
+      "transitions": [
+        {
+          "after_path": "fastapi/routing.py",
+          "before_path": "fastapi/routing.py",
+          "kind": "modify"
+        },
+        {
+          "after_path": "tests/test_stream_bare_type.py",
+          "before_path": "tests/test_stream_bare_type.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "litestar-annotated-handler-parameters-after",
+      "before": "litestar-annotated-handler-parameters-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 306,
+              "path": "tests/unit/test_kwargs/test_param_markers.py",
+              "start_line": 306
+            }
+          ],
+          "changed_paths": [
+            "tests/unit/test_kwargs/test_param_markers.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 127,
+              "path": "tests/unit/test_kwargs/test_param_markers.py",
+              "start_line": 127
+            }
+          ],
+          "changed_paths": [
+            "tests/unit/test_kwargs/test_param_markers.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        8
+      ],
+      "capability_proofs": {
+        "8": {
+          "reason": "selected source syntax only; complete handler semantics and adversaries remain unqualified",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "litestar/_kwargs/kwargs_model.py",
+        "tests/unit/test_kwargs/test_param_markers.py"
+      ],
+      "id": "litestar-annotated-handler-parameters",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "initial semantic sufficiency oracle not independently reviewed"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "explicit caller-nominated source owner; no answer-blind recall claim"
+        }
+      },
+      "native_required": false,
+      "problem_id": "96de3b0ebf38f9de91d50068e2a99bc2d40da8da",
+      "repository": "litestar",
+      "task": "Inspect Annotated metadata shadowing dependency or path parameters in litestar/_kwargs/kwargs_model.py.",
+      "transitions": [
+        {
+          "after_path": "litestar/_kwargs/kwargs_model.py",
+          "before_path": "litestar/_kwargs/kwargs_model.py",
+          "kind": "modify"
+        },
+        {
+          "after_path": "tests/unit/test_kwargs/test_param_markers.py",
+          "before_path": "tests/unit/test_kwargs/test_param_markers.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "fastapi-route-handler-wrapping-after",
+      "before": "fastapi-route-handler-wrapping-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 1308,
+              "path": "fastapi/routing.py",
+              "start_line": 1308
+            }
+          ],
+          "changed_paths": [
+            "fastapi/routing.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 1309,
+              "path": "fastapi/routing.py",
+              "start_line": 1309
+            }
+          ],
+          "changed_paths": [
+            "fastapi/routing.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        8
+      ],
+      "capability_proofs": {
+        "8": {
+          "reason": "bounded direct source-call facts; complete handler contract semantics and adversaries still unqualified",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "fastapi/routing.py"
+      ],
+      "id": "fastapi-route-handler-wrapping",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "initial semantic sufficiency not independently qualified"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "explicit production path; no answer-blind owner recall claim"
+        }
+      },
+      "native_required": false,
+      "problem_id": "ac88f563db5f4d3300d43355eca728c93ed9ffe2",
+      "repository": "fastapi",
+      "task": "Repeated wrapping of included-router endpoints in fastapi/routing.py.",
+      "transitions": [
+        {
+          "after_path": "fastapi/routing.py",
+          "before_path": "fastapi/routing.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "fastapi-router-context-threads-after",
+      "before": "fastapi-router-context-threads-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 1603,
+              "path": "fastapi/routing.py",
+              "start_line": 1603
+            }
+          ],
+          "changed_paths": [
+            "fastapi/routing.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 1596,
+              "path": "fastapi/routing.py",
+              "start_line": 1596
+            }
+          ],
+          "changed_paths": [
+            "fastapi/routing.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        8
+      ],
+      "capability_proofs": {
+        "8": {
+          "reason": "bounded direct source-call facts; complete handler contract semantics and adversaries still unqualified",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "fastapi/routing.py"
+      ],
+      "id": "fastapi-router-context-threads",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "initial semantic sufficiency not independently qualified"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "explicit production path; no answer-blind owner recall claim"
+        }
+      },
+      "native_required": false,
+      "problem_id": "7fe315c21afb8a57a2b559772e0f7ced7e5d071a",
+      "repository": "fastapi",
+      "task": "Concurrent included-route candidate rebuilding in fastapi/routing.py.",
+      "transitions": [
+        {
+          "after_path": "fastapi/routing.py",
+          "before_path": "fastapi/routing.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "fastapi-iterable-response-options-after",
+      "before": "fastapi-iterable-response-options-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 1078,
+              "path": "fastapi/routing.py",
+              "start_line": 1078
+            }
+          ],
+          "changed_paths": [
+            "fastapi/routing.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 995,
+              "path": "fastapi/routing.py",
+              "start_line": 995
+            }
+          ],
+          "changed_paths": [
+            "fastapi/routing.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        8
+      ],
+      "capability_proofs": {
+        "8": {
+          "reason": "bounded direct source-call facts; complete handler contract semantics and adversaries still unqualified",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "fastapi/routing.py"
+      ],
+      "id": "fastapi-iterable-response-options",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "initial semantic sufficiency not independently qualified"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "explicit production path; no answer-blind owner recall claim"
+        }
+      },
+      "native_required": false,
+      "problem_id": "d6537f774b0e80e376e2cf4e0fa998a38c6d0c09",
+      "repository": "fastapi",
+      "task": "Iterable response-model options are ignored in fastapi/routing.py.",
+      "transitions": [
+        {
+          "after_path": "fastapi/routing.py",
+          "before_path": "fastapi/routing.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "fastapi-stream-status-code-after",
+      "before": "fastapi-stream-status-code-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 640,
+              "path": "fastapi/routing.py",
+              "start_line": 636
+            }
+          ],
+          "changed_paths": [
+            "fastapi/routing.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 636,
+              "path": "fastapi/routing.py",
+              "start_line": 636
+            }
+          ],
+          "changed_paths": [
+            "fastapi/routing.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        8
+      ],
+      "capability_proofs": {
+        "8": {
+          "reason": "bounded direct source-call facts; complete handler contract semantics and adversaries still unqualified",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "fastapi/routing.py"
+      ],
+      "id": "fastapi-stream-status-code",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "initial semantic sufficiency not independently qualified"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "explicit production path; no answer-blind owner recall claim"
+        }
+      },
+      "native_required": false,
+      "problem_id": "e92a0dc3ce5ecbebb8655dbe5465cb61d48f9fc0",
+      "repository": "fastapi",
+      "task": "SSE and JSONL endpoint status codes are ignored in fastapi/routing.py.",
+      "transitions": [
+        {
+          "after_path": "fastapi/routing.py",
+          "before_path": "fastapi/routing.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "fastapi-frontend-dependency-response-after",
+      "before": "fastapi-frontend-dependency-response-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 2201,
+              "path": "fastapi/routing.py",
+              "start_line": 2201
+            }
+          ],
+          "changed_paths": [
+            "fastapi/routing.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 2193,
+              "path": "fastapi/routing.py",
+              "start_line": 2193
+            }
+          ],
+          "changed_paths": [
+            "fastapi/routing.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        8
+      ],
+      "capability_proofs": {
+        "8": {
+          "reason": "bounded direct source-call facts; complete handler contract semantics and adversaries still unqualified",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "fastapi/routing.py"
+      ],
+      "id": "fastapi-frontend-dependency-response",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "initial semantic sufficiency not independently qualified"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "explicit production path; no answer-blind owner recall claim"
+        }
+      },
+      "native_required": false,
+      "problem_id": "d62354434b2e508fe89024213b220ca8e67dea5e",
+      "repository": "fastapi",
+      "task": "Frontend dependencies lose response headers and background tasks in fastapi/routing.py.",
+      "transitions": [
+        {
+          "after_path": "fastapi/routing.py",
+          "before_path": "fastapi/routing.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "litestar-handler-registration-once-after",
+      "before": "litestar-handler-registration-once-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 698,
+              "path": "litestar/app.py",
+              "start_line": 698
+            }
+          ],
+          "changed_paths": [
+            "litestar/app.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 690,
+              "path": "litestar/app.py",
+              "start_line": 690
+            }
+          ],
+          "changed_paths": [
+            "litestar/app.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        8
+      ],
+      "capability_proofs": {
+        "8": {
+          "reason": "bounded direct source-call facts; complete handler contract semantics and adversaries still unqualified",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "litestar/app.py"
+      ],
+      "id": "litestar-handler-registration-once",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "initial semantic sufficiency not independently qualified"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "explicit production path; no answer-blind owner recall claim"
+        }
+      },
+      "native_required": false,
+      "problem_id": "326e988d949886482cc06a001544e53e31c5532a",
+      "repository": "litestar",
+      "task": "Handler registration hooks repeat for multiple paths in litestar/app.py.",
+      "transitions": [
+        {
+          "after_path": "litestar/app.py",
+          "before_path": "litestar/app.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "litestar-websocket-guard-forwarding-after",
+      "before": "litestar-websocket-guard-forwarding-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 532,
+              "path": "litestar/handlers/websocket_handlers/listener.py",
+              "start_line": 532
+            }
+          ],
+          "changed_paths": [
+            "litestar/handlers/websocket_handlers/listener.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 532,
+              "path": "litestar/handlers/websocket_handlers/listener.py",
+              "start_line": 532
+            }
+          ],
+          "changed_paths": [
+            "litestar/handlers/websocket_handlers/listener.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        8
+      ],
+      "capability_proofs": {
+        "8": {
+          "reason": "bounded direct source-call facts; complete handler contract semantics and adversaries still unqualified",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "litestar/handlers/websocket_handlers/listener.py"
+      ],
+      "id": "litestar-websocket-guard-forwarding",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "initial semantic sufficiency not independently qualified"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "explicit production path; no answer-blind owner recall claim"
+        }
+      },
+      "native_required": false,
+      "problem_id": "946d6b7d0ed2a7cb74a7a65be677ae38ae655e94",
+      "repository": "litestar",
+      "task": "Websocket guards are not forwarded by litestar/handlers/websocket_handlers/listener.py.",
+      "transitions": [
+        {
+          "after_path": "litestar/handlers/websocket_handlers/listener.py",
+          "before_path": "litestar/handlers/websocket_handlers/listener.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "faststream-schema-response-content-type-after",
+      "before": "faststream-schema-response-content-type-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 94,
+              "path": "faststream/asgi/factories/asyncapi/route.py",
+              "start_line": 94
+            }
+          ],
+          "changed_paths": [
+            "faststream/asgi/factories/asyncapi/route.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 90,
+              "path": "faststream/asgi/factories/asyncapi/route.py",
+              "start_line": 90
+            }
+          ],
+          "changed_paths": [
+            "faststream/asgi/factories/asyncapi/route.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        8
+      ],
+      "capability_proofs": {
+        "8": {
+          "reason": "bounded direct source-call facts; complete handler contract semantics and adversaries still unqualified",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "faststream/asgi/factories/asyncapi/route.py"
+      ],
+      "id": "faststream-schema-response-content-type",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "initial semantic sufficiency not independently qualified"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "explicit production path; no answer-blind owner recall claim"
+        }
+      },
+      "native_required": false,
+      "problem_id": "739189070cd1eadfb2d26750f775a99560431c93",
+      "repository": "faststream",
+      "task": "Inspect AsyncAPI endpoint configuration forwarding in faststream/asgi/factories/asyncapi/route.py.",
+      "transitions": [
+        {
+          "after_path": "faststream/asgi/factories/asyncapi/route.py",
+          "before_path": "faststream/asgi/factories/asyncapi/route.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "faststream-nested-router-context-after",
+      "before": "faststream-nested-router-context-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 476,
+              "path": "faststream/_internal/fastapi/router.py",
+              "start_line": 476
+            }
+          ],
+          "changed_paths": [
+            "faststream/_internal/fastapi/router.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 484,
+              "path": "faststream/_internal/fastapi/router.py",
+              "start_line": 473
+            }
+          ],
+          "changed_paths": [
+            "faststream/_internal/fastapi/router.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        8
+      ],
+      "capability_proofs": {
+        "8": {
+          "reason": "bounded direct source-call facts; complete handler contract semantics and adversaries still unqualified",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "faststream/_internal/fastapi/router.py"
+      ],
+      "id": "faststream-nested-router-context",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "initial semantic sufficiency not independently qualified"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "explicit production path; no answer-blind owner recall claim"
+        }
+      },
+      "native_required": false,
+      "problem_id": "9bf1271938abe7276765934917a2f37c4c8e7032",
+      "repository": "faststream",
+      "task": "Nested StreamRouter inclusion yields invalid dependency context; inspect the explicit rejection in faststream/_internal/fastapi/router.py.",
+      "transitions": [
+        {
+          "after_path": "faststream/_internal/fastapi/router.py",
+          "before_path": "faststream/_internal/fastapi/router.py",
+          "kind": "modify"
+        }
+      ]
+    }
+  ]
+}

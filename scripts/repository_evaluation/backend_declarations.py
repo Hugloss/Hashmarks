@@ -10,12 +10,16 @@ from pathlib import Path
 from typing import Any, cast
 
 from hashmarks.codemap import CodeMap
-from hashmarks.codemap.static_python_backend_declarations import (
-    StaticPythonBackendDeclarations,
+from hashmarks.codemap.repository_declaration_selection import (
+    source_declaration_providers,
 )
 from hashmarks.digest import FILE_DOMAIN, hash_file
 
-from .backend_corpus import confined_file
+from .backend_corpus import (
+    confined_file,
+    declaration_source_paths,
+    declaration_source_selection,
+)
 from .backend_gates import fact_state, presentation_conformance
 from .backend_grading import component_summary, validate_transport_capture
 from .backend_transport import capture_cli, capture_mcp
@@ -81,19 +85,17 @@ def observe_declarations(
     transports: tuple[str, ...],
 ) -> dict[str, Any]:
     """Compose existing source/API/transport owners with independent fact checks."""
-    paths = inputs["python_backend_paths"]
+    paths = declaration_source_paths(inputs)
+    providers = source_declaration_providers(
+        "discovery", declaration_source_selection(inputs)
+    )
     with CodeMap(workspace, state_dir=state) as codemap:
         packet = cast(
             "dict[str, Any]",
             codemap.declarations.operation(
                 inputs["groups"],
                 result_mode=inputs["result_mode"],
-                providers=(
-                    StaticPythonBackendDeclarations(
-                        paths=tuple(paths),
-                        include_class_fields=inputs["include_class_fields"],
-                    ),
-                ),
+                providers=providers,
             ),
         )
     write_json(output / "api.json", packet)

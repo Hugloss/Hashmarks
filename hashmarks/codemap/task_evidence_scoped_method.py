@@ -407,6 +407,13 @@ class TaskEvidenceScopedMethodMixin:
             return None
         if not codemap._task_evidence_declaration_visible(path):
             return None
+        if all(row.get(key) is None for key in ("symbol", "start_line", "end_line")):
+            return {
+                "kind": "file",
+                "qualname": None,
+                "start_line": None,
+                "end_line": None,
+            }
         matches = [
             symbol
             for symbol in codemap.reads.symbols_for_path(path)
@@ -419,7 +426,7 @@ class TaskEvidenceScopedMethodMixin:
     def _task_evidence_candidate_verifiers(
         self, task: str, row: Mapping[str, object]
     ) -> list[dict[str, object]]:
-        """References to an observed declaration do not prove its behavior ownership."""
+        """Disclose source references without proving behavior ownership."""
         from .query_primitives import _query_terms
         from .repository_domains import RepositoryDomain, classify_repository_path
         from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
@@ -444,9 +451,7 @@ class TaskEvidenceScopedMethodMixin:
         }
         subject_terms = sorted(
             state.task_terms.intersection(
-                _query_terms(
-                    str(subject["qualname"]) + " " + str(row.get("symbol") or "")
-                )
+                _query_terms(str(subject["qualname"] or Path(path).stem))
             )
         )
         lexical = (
@@ -471,9 +476,7 @@ class TaskEvidenceScopedMethodMixin:
             state, subject_terms
         )
         state.candidate_paths.update(filename_candidates)
-        codemap.verification._verification_collect_direct_references(
-            state, [str(subject["qualname"])]
-        )
+        codemap._task_evidence_collect_source_references(state, subject)
         test_modules = codemap._task_evidence_test_module_references(state)
         state.source_ref_paths.update(test_modules)
         codemap.verification._verification_collect_indirect_references(state)
@@ -492,6 +495,9 @@ class TaskEvidenceScopedMethodMixin:
         )
         basis = {
             "path": path,
+            "scope": "indexed-source-declaration"
+            if subject["qualname"]
+            else "indexed-source-file",
             "symbol": subject["qualname"],
             "start_line": subject["start_line"],
             "end_line": subject["end_line"],
@@ -553,6 +559,23 @@ class TaskEvidenceScopedMethodMixin:
             and all(codemap.index.is_current(name) for name in test_modules)
             else []
         )
+
+    def _task_evidence_collect_source_references(
+        self,
+        state: _VerificationRelevanceState,
+        subject: Mapping[str, object],
+    ) -> None:
+        """Keep file-symbol bounds distinct from exact declaration selection."""
+        codemap = cast("RepositoryTasks", self)
+        if subject["qualname"]:
+            symbols = [str(subject["qualname"])]
+        else:
+            symbols, complete = codemap.verification._verification_edit_symbols(
+                state.edit_path, None
+            )
+            if not complete:
+                state.search_bound_reasons.add("edit-file-symbol-limit")
+        codemap.verification._verification_collect_direct_references(state, symbols)
 
     def _task_evidence_test_module_references(
         self, state: _VerificationRelevanceState

@@ -160,3 +160,51 @@ def test_source_identifier_scout_keeps_late_test_body_without_claiming_reference
     assert candidate["direct_reference"] is False
     assert candidate.get("verification_selection_authority") is False
     assert candidate.get("edit_relationship") == "unestablished"
+
+
+def test_file_locator_keeps_qualified_module_test_without_deciding_authority(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "app.py").write_text(
+        '"""Handler registration hooks for multiple paths."""\n'
+        "class Dispatcher:\n    def install(self): return 1\n"
+    )
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/test_app.py").write_text(
+        "from app import Dispatcher\ndef test_result(): assert Dispatcher().install() == 1\n"
+    )
+    for n in range(30):
+        (tmp_path / f"tests/test_noise_{n}.py").write_text(
+            "from app import Dispatcher\ndef test_handler_registration_paths(): assert Dispatcher().install() == 1\n"
+        )
+    task = "Inspect app.py registration"
+    with CodeMap(tmp_path) as repo:
+        repo.index.sync()
+        action = repo.tasks.action_map(task)
+        packet = repo.tasks.evidence(task)
+    locator = next(
+        row for row in packet["retrieval"]["results"] if row["path"] == "app.py"
+    )
+    assert not locator.get("symbol")
+    relevance = packet["verification"]["relevance"]
+    candidate = next(
+        row for row in relevance["candidates"] if row["path"] == "tests/test_app.py"
+    )
+    bases = assert_records(candidate.get("source_candidate_basis"))
+    file_basis = next(
+        basis
+        for basis in bases
+        if basis["path"] == "app.py" and basis.get("scope") == "indexed-source-file"
+    )
+    assert file_basis["symbol"] is None
+    assert file_basis["start_line"] is None and file_basis["end_line"] is None
+    assert file_basis["direct_reference"] is True
+    assert "Dispatcher" in assert_array(file_basis["reference_symbols"])
+    assert candidate.get("verification_selection_authority") is False
+    assert candidate.get("negative_evidence_admissible") is False
+    assert relevance["selection_changed"] is False
+    assert packet["ownership"]["owner"] is None
+    assert action["edit"] is not None and action["edit"]["path"] == "app.py"
+    assert packet["verification"]["selected"] is not None
+    assert action["verify"] is not None
+    assert packet["verification"]["selected"]["path"] == action["verify"]["path"]

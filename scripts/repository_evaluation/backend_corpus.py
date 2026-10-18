@@ -9,8 +9,8 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from hashmarks.codemap.static_python_backend_declarations import (
-    StaticPythonBackendDeclarations,
+from hashmarks.codemap.repository_declaration_selection import (
+    source_declaration_providers,
 )
 from hashmarks.python_ast_cache import read_python_ast
 from hashmarks.test_shards import repository_content_identity
@@ -367,18 +367,8 @@ def _check_declaration_revision(
 ) -> None:
     if not isinstance(request, dict) or not isinstance(oracle, dict):
         raise ValueError("backend declaration inputs and oracles must be objects")
-    paths = request.get("python_backend_paths")
-    if (
-        set(request)
-        != {"groups", "result_mode", "python_backend_paths", "include_class_fields"}
-        or request["groups"] != []
-        or request["result_mode"] != "discovery"
-        or not isinstance(paths, list)
-    ):
-        raise ValueError("backend declaration inputs differ from admitted source scope")
-    StaticPythonBackendDeclarations(
-        paths=tuple(paths), include_class_fields=request["include_class_fields"]
-    )
+    declaration_source_selection(request)
+    paths = declaration_source_paths(request)
     if (
         oracle.get("source") != source
         or not oracle.get("checks")
@@ -401,6 +391,40 @@ def _check_declaration_revision(
         raise ValueError("backend declaration paths require independent source labels")
     for label in oracle["source_labels"]:
         _check_label(root, label)
+
+
+def declaration_source_selection(request: Mapping[str, Any]) -> dict[str, Any]:
+    """Admit explicit existing provider requests without deriving source facts."""
+    required = {"groups", "result_mode"}
+    backend = {"python_backend_paths", "include_class_fields"}
+    shapes = [
+        required | backend,
+        required | {"python_interface"},
+        required | backend | {"python_interface"},
+    ]
+    if (
+        set(request) not in shapes
+        or request.get("groups") != []
+        or request.get("result_mode") != "discovery"
+    ):
+        raise ValueError("backend declaration inputs differ from admitted source scope")
+    selection = {key: value for key, value in request.items() if key not in required}
+    source_declaration_providers("discovery", selection)
+    return selection
+
+
+def declaration_source_paths(request: Mapping[str, Any]) -> list[str]:
+    """Exact caller-nominated path membership, shared by acquisition and regrade."""
+    paths = request.get("python_backend_paths", [])
+    interface = request.get("python_interface", {})
+    if not isinstance(paths, list) or not isinstance(interface, dict):
+        raise ValueError("backend declaration source paths require explicit arrays")
+    selected = interface.get("paths", [])
+    if not isinstance(selected, list) or not all(
+        isinstance(path, str) for path in [*paths, *selected]
+    ):
+        raise ValueError("backend declaration source paths require string arrays")
+    return sorted(set(paths) | set(selected))
 
 
 def task_source_labels(rule: dict[str, Any], stage: str) -> list[dict[str, Any]]:
