@@ -10,7 +10,7 @@ from scripts.agent_evaluation.repository_quality import (
 
 
 def _case(**overrides: object) -> dict[str, object]:
-    value = {
+    value: dict[str, object] = {
         "schema": "hashmarks.repository-quality-case.v1",
         "case_id": "case-1",
         "repository_identity": "sha256:repo",

@@ -3,9 +3,12 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from typing import TypedDict
 
 import pytest
+from contract_assertions import assert_records, assert_text
 
+from hashmarks.codemap import CodeMap
 from scripts.repository_evaluation.compare_runs import compare_runs
 from scripts.repository_evaluation.grade_cases import grade_run
 from scripts.repository_evaluation.merge_runs import merge_runs
@@ -117,6 +120,10 @@ def test_repository_evaluation_receipt_rejects_target_repository_identity_drift(
         run_cases(workspace=repo, cases_path=cases, receipts_dir=receipts)
 
 
+class SelectionOptions(TypedDict, total=False):
+    shard_count: int
+
+
 @pytest.mark.parametrize(
     ("case_rows", "options", "message"),
     [
@@ -138,7 +145,7 @@ def test_repository_evaluation_receipt_rejects_target_repository_identity_drift(
 def test_repository_evaluation_rejects_invalid_selection_contract(
     tmp_path: Path,
     case_rows: list[object],
-    options: dict[str, int],
+    options: SelectionOptions,
     message: str,
 ) -> None:
     repo = tmp_path / "repo"
@@ -499,6 +506,15 @@ def test_profile_comparison_uses_same_version_noise_floor() -> None:
 
     def doc(median: int) -> dict[str, object]:
         return {
+            "schema": "hashmarks.repository-evaluation-profile.v1",
+            "cases_sha256": "sha256:cases",
+            "repository_identity": "sha256:repository",
+            "producer_implementation_identity": "sha256:observer",
+            "evaluator_implementation_identity": "sha256:evaluator",
+            "warmups": 2,
+            "samples": 9,
+            "shard_count": 1,
+            "shard_index": 0,
             "cases": [
                 {
                     "id": "x",
@@ -506,18 +522,18 @@ def test_profile_comparison_uses_same_version_noise_floor() -> None:
                     "semantic_fingerprint": "sha256:same",
                     "semantic_stable": True,
                 }
-            ]
+            ],
         }
 
     result = compare_profiles(
         baseline=doc(100), candidate=doc(94), repeat=doc(96), minimum_gain_pct=3.0
     )
-    assert result["cases"][0]["same_version_noise_pct"] == 4.0
-    assert result["cases"][0]["decision"] == "WIN"
+    assert assert_records(result["cases"])[0]["same_version_noise_pct"] == 4.0
+    assert assert_records(result["cases"])[0]["decision"] == "WIN"
     noisy = compare_profiles(
         baseline=doc(100), candidate=doc(94), repeat=doc(93), minimum_gain_pct=3.0
     )
-    assert noisy["cases"][0]["decision"] == "NOISE_BAND"
+    assert assert_records(noisy["cases"])[0]["decision"] == "NOISE_BAND"
 
 
 def test_profile_comparison_uses_per_case_noise_not_global_p90() -> None:
@@ -525,6 +541,15 @@ def test_profile_comparison_uses_per_case_noise_not_global_p90() -> None:
 
     def doc(x: int, y: int) -> dict[str, object]:
         return {
+            "schema": "hashmarks.repository-evaluation-profile.v1",
+            "cases_sha256": "sha256:cases",
+            "repository_identity": "sha256:repository",
+            "producer_implementation_identity": "sha256:observer",
+            "evaluator_implementation_identity": "sha256:evaluator",
+            "warmups": 2,
+            "samples": 9,
+            "shard_count": 1,
+            "shard_index": 0,
             "cases": [
                 {
                     "id": "stable",
@@ -538,7 +563,7 @@ def test_profile_comparison_uses_per_case_noise_not_global_p90() -> None:
                     "semantic_fingerprint": "sha256:n",
                     "semantic_stable": True,
                 },
-            ]
+            ],
         }
 
     result = compare_profiles(
@@ -547,9 +572,9 @@ def test_profile_comparison_uses_per_case_noise_not_global_p90() -> None:
         repeat=doc(100, 60),
         minimum_gain_pct=3.0,
     )
-    rows = {row["id"]: row for row in result["cases"]}
+    rows = {row["id"]: row for row in assert_records(result["cases"])}
     assert result["noise_floor_percent"] == 40.0
-    assert "diagnostic only" in result["noise_floor_authority"]
+    assert "diagnostic only" in assert_text(result["noise_floor_authority"])
     assert rows["stable"]["required_gain_pct"] == 3.0
     assert rows["stable"]["decision"] == "WIN"
 
@@ -696,7 +721,7 @@ def test_paired_profile_interleaves_semantics_and_fails_closed_on_noise(
     timings = iter([100, 100, 100, 100, 100, 140, 100, 60, 100, 140])
     original = profiles._run_action
 
-    def fake(codemap: object, case: dict[str, object]) -> tuple[float, str]:
+    def fake(codemap: CodeMap, case: dict[str, object]) -> tuple[float, str]:
         elapsed, _ = original(codemap, case)
         with contextlib.suppress(StopIteration):
             elapsed = next(timings)

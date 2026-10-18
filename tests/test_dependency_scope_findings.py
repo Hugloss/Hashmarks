@@ -1,6 +1,8 @@
 from pathlib import Path
 from unittest.mock import patch
 
+from contract_assertions import assert_object, assert_records
+
 from hashmarks.codemap import CodeMap
 
 
@@ -49,11 +51,11 @@ def test_explicit_findings_do_not_read_pruned_dependency_implementation(
             side_effect=AssertionError("pruned dependency source must not be read"),
         ):
             direct = codemap.ownership.import_findings([rel])
-        assert direct["summary"]["files_considered"] == 0
+        assert assert_object(direct["summary"])["files_considered"] == 0
         assert direct["findings"] == []
 
         projected = codemap.ownership.findings([rel])
-        assert projected["summary"]["findings"] == 0
+        assert assert_object(projected["summary"])["findings"] == 0
         assert projected["findings"] == []
 
 
@@ -73,7 +75,7 @@ def test_explicit_findings_respect_context_policy_index_denial(tmp_path: Path) -
         codemap.index.sync()
         assert rel not in codemap.store.paths()
         result = codemap.ownership.import_findings([rel])
-        assert result["summary"]["files_considered"] == 0
+        assert assert_object(result["summary"])["files_considered"] == 0
         assert result["findings"] == []
 
 
@@ -87,6 +89,9 @@ def test_findings_scope_pruning_is_segment_aware(tmp_path: Path) -> None:
         codemap.index.sync()
         assert rel in codemap.store.paths()
         result = codemap.ownership.findings([rel])
-        assert result["summary"]["findings"] == 1
-        assert result["findings"][0]["path"] == rel
-        assert result["findings"][0]["code"] == "python-dynamic-module-identity-bypass"
+        assert assert_object(result["summary"])["findings"] == 1
+        assert assert_records(result["findings"])[0]["path"] == rel
+        assert (
+            assert_records(result["findings"])[0]["code"]
+            == "python-dynamic-module-identity-bypass"
+        )

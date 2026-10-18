@@ -24,10 +24,7 @@ from .scip_relationship_adapter import scip_import_provenance
 from .typescript_resolver import TypeScriptResolverProvider
 
 if TYPE_CHECKING:
-    from .decision_session import DecisionScope
     from .project_graph import ProjectEdge, ProjectNode
-    from .repository_file_discovery import RepositoryFiles
-    from .repository_index_store import WorkspaceMapStore
     from .repository_source import RepositorySource
 
 
@@ -55,20 +52,17 @@ class RepositoryNativeEvidence(EvidenceFreshnessMixin):
 
     def __init__(
         self,
-        files: RepositoryFiles,
         source: RepositorySource,
-        reads: DecisionScope,
-        store: WorkspaceMapStore,
         producers: NativeEvidenceProducers | None = None,
     ) -> None:
-        self.files = files
+        self.files = source.files
         self.source = source
-        self.reads = reads
-        self.store = store
-        self.workspace = files.workspace
+        self.reads = source.reads
+        self.store = source.store
+        self.workspace = source.workspace
         self.producers = (
             NativeEvidenceProducers(
-                default_project_graph_providers(files.visible_manifests)
+                default_project_graph_providers(self.files.visible_manifests)
             )
             if producers is None
             else producers

@@ -12,6 +12,16 @@ First-party callers migrate with each owner; a partially migrated development
 tree is not a released dual API. Serialized evidence meaning, independent source
 oracles, freshness and authority do not change merely because a Python call moves.
 
+Qualification handoffs remain owned by `hashmarks.qualification_units`.
+`validate_native_qualification_repository_binding(root, handoff)` re-proves the
+current repository content, selected membership, classification and producer
+identities after validating the retained envelope. The existing development
+command `python -m scripts.qualification_handoff --root PATH --validate FILE`
+exposes that check with validation-only authority. The former `promotion_receipt`
+API and `scripts.promotion_gate` command are removed without compatibility
+aliases. Ruff requirements/configuration belong to `pyproject.toml`; tool
+execution receipts, release decisions and certification remain external.
+
 `CodeMap.files` is already a read-only `RepositoryFiles` reference. The component
 can be constructed without CodeMap or storage, canonicalizes its workspace and
 explicit policy path once, and retains lexical member/symlink admission rules.
@@ -30,6 +40,10 @@ Read sessions now use `CodeMap.reads.session()` and yield an immutable
 `CodeMap.reads.diagnostics()` and `.stats()`. Root session/query-cache helpers are
 removed. Generation drift still fails closed; task freshness preparation belongs
 to task entry points rather than a method-name dispatcher inside the read owner.
+Opt-in diagnostic producer keys include the concrete component's module and
+qualified class name followed by the method name. Source and Bindings `observe`
+calls therefore remain separate measurements. These labels and timings describe
+runtime diagnostics only and carry no repository or execution authority.
 
 Source operations use `CodeMap.source.outline()`, `.symbol()`, `.read()`, `.grep()`,
 `.observe()`, `.scoped_occurrences()` and `.scoped_literals()`. The source component
@@ -45,11 +59,33 @@ from their explicit lower repository inputs. Their retired root operations are
 removed; reverse-cache validity stays with Relationships and native publication
 uses the existing store transaction and generation.
 
+Independent construction derives redundant authority inputs from their owner:
+`DecisionScope(index)`, `RepositorySource(index, reads)`,
+`RepositoryImports(source)`, `RepositoryNativeEvidence(source)`,
+`RepositorySearch(native)`, `RepositoryVerification(imports)`,
+`RepositoryCorrelation(bindings)` and `RepositoryRelationships(imports, native)`.
+Source rejects a read scope belonging to another Index, and Index reuses the
+store's canonical workspace binding. Multi-owner compositions require the same
+read-scope authority. Independent, internally consistent readers of one shared
+durable store remain supported; their read scopes cannot be mixed in one packet.
+
 Structural operations use `CodeMap.structure.search()` and `.locality()`, with
 their existing evidence schemas and bounds. The old root methods are removed.
-`structural_locality_delta` remains exported from `hashmarks.codemap`; its direct
-defining import is now `hashmarks.codemap.structural_locality_delta`. Packet
-comparison does not import the live structural component.
+Pure packet comparisons are imported from their defining modules:
+`hashmarks.codemap.structural_locality_delta.structural_locality_delta` and
+`hashmarks.codemap.semantic_relationship_delta.semantic_relationship_delta`.
+Their former package-level callable aliases are removed because Python submodule
+imports overwrite same-named package attributes. The defining imports preserve
+function identity across import orders without loading the live components.
+
+Native call-site evidence keeps producer item-range qualification independent
+from `declaration_context`. The latter reports lexical containment in one
+uniquely indexed declaration only when the index and current member revision
+agree. It preserves the producer's raw range and any `outside-caller-item`
+state. Lexical containment establishes neither runtime caller identity nor
+dispatch, reachability or negative evidence. Position/range validation is owned
+by the pure relationship model and shared by the live source resolver and LSP
+adapters.
 
 Retrieval uses `CodeMap.search.find()`, `.packet()`, `.find_task()`,
 `.task_query_views()`, `.formulate_task_query()` and `.query_route()`. Retrieval
@@ -71,12 +107,79 @@ surface. Task convenience views share the normalized observation rather than
 calling back from Verification to Tasks. Candidate-local test observations retain
 their own source basis and cannot overwrite task-owner-bound reference facts.
 
+Verification prioritizes canonically classified test paths inside the existing
+reverse-reference window. Other paths fill its remaining capacity; preference
+does not filter the repository scope or increase the 1,024-row evidence bound.
+The extra lookahead row still detects truncation. Reference caches bind their
+generation, short target and exact preference set, so a different ordering cannot
+reuse an incompatible prefix. Import/re-export identity, shadowing, freshness
+and completeness still qualify every claimed direct relationship.
+
 Task packets and briefs now use `CodeMap.tasks.evidence()`, `.action_brief()`,
 `.decision_packet()`, `.decision_brief()` and `.decision_brief_budget_sweep()`.
 The task component borrows Context and reuses its scoped task observation across
 all projections. Its Source comes from the supplied Search owner, rather than a
 second independently supplied source argument. Flat root packet methods and
 their inherited implementation paths are removed.
+
+Task declaration hints retain unique normalized word families, qualified-name
+order and the original locator's fields when context hints coincide. These
+ordering observations do not replace canonical Search ranking or edit authority.
+Advisory verification disclosure keeps the exact declaration and its observed
+parent class as distinct subjects with independent source bases. Three source
+locators can contribute up to six subjects; returned candidates remain bounded
+at eight. Reference/namespace authority remains independent from lexical
+declaration and filename similarity, and selected edit/test surfaces do not
+change merely because additional candidate evidence is disclosed.
+
+Changed-path operations use `CodeMap.changes.impact()`, `.task_impact()`,
+`.task_delta()`, `.refresh()`, `.refresh_brief()`, `.refresh_delta()`, `.brief()`,
+`.freshness_map()`, `.snapshot()`, `.delta()` and `.external_observation_freshness()`.
+Changes owns its read-scope-bound snapshot and impact reuse. A composed response
+rejects a publication change after its qualified input rather than mixing
+generations. Post-change before revisions are captured in one read scope. A
+source-drift recomputation retains those original values and re-observes only
+the current endpoint through `CodeMap.reads.observe()`. Member reconciliation
+checks and returns the exact Index publication; another writer invalidates that
+binding. Repeated source changes retain a typed failure and the existing bounded
+CLI/MCP recomputation contract. Pure diagnostic functions are imported from `diagnostic_observation`
+and `diagnostic_source_revision`; their root class aliases are removed.
+
+Aggregate operations use `CodeMap.cross_repository.packet()`,
+`CodeMap.economics.receipt()` and `CodeMap.views.profile()`, `.query()` and
+`.status()`. Profile formatting is a pure projection of an explicit snapshot.
+Economics compares that same current snapshot without recollecting an endpoint.
+Index observations use `CodeMap.index.derived_graph()`, `.status()` and
+`.publication_binding()`. Index status has schema `hashmarks.codemap-index-status.v1`
+and contains index facts; Views retains the full `hashmarks.codemap-status.v1`
+contract with native and watcher qualification. Their old root operations are
+removed; `CodeMap` inherits no domain implementation.
+
+`WorktreeOverlay` takes base Index, Search and DecisionScope capabilities followed
+by the caller-selected workspace, with keyword `worker_id` and optional immutable
+`artifact_db` location. It borrows no base CodeMap or mutable artifact store. Its
+local composition root is owned and closed by the overlay. Base generation and
+fingerprint drift reject both sync and fused reads until explicit resync.
+
+`CodeMap.verification.relationship_evidence()` retains the supplied elementary
+relationship-value contract. The separate graph composer over qualified
+owner/test facts is named `.ownership_relationships()`; task convenience views
+use it without changing the elementary relationship signature.
+
+Declarations use `CodeMap.declarations.observe()`, `.discover()`, `.operation()`,
+`.derivation_authority()` and `.explain()`. `RepositoryDeclarations` borrows
+Bindings and derives Source, Files and its read scope from that same binding
+owner. Providers are supplied for the current call; previous observations are
+comparison inputs and cannot restore provider or correspondence state. The old
+root operations are removed.
+
+Dependencies use `CodeMap.dependencies.observe()`, `.codemap()`, `.queries()`,
+`.import_correspondence()`, `.correlation()`, `.delta()`, `.derivation_authority()`
+and `.explain()`. `RepositoryDependencies` owns the existing internal dependency
+observation, correlation, derivation and endpoint-comparison implementations.
+It borrows Source, Imports and repository Correlation directly; it has no Tasks
+or root dependency. Producer syntax remains in adapters. The old root operations
+are removed.
 
 The supported Python API is:
 
@@ -95,11 +198,11 @@ Correlation uses `CodeMap.correlation.observe()` and `.delta()` on an independen
 
 The documented dependency-resolution observation/query surface uses `hashmarks.dependency-resolution.v3` and `hashmarks.dependency-resolution-delta.v3`; derivation and explanation use `hashmarks.dependency-resolution-derivation.v1` and `hashmarks.dependency-resolution-explain.v1`, and dependency evidence correlation uses `hashmarks.dependency-evidence-correlation.v2`; see [`DEPENDENCY_EVIDENCE.md`](DEPENDENCY_EVIDENCE.md). V3 makes semantic evidence authority explicit, keeps producer/source-format `kind` opaque, and binds producer provenance to observation identity rather than semantic definition identity. Dependency endpoint delta compares caller-supplied qualified endpoints directly and reports repository identity, repository generation, semantic, adapter, producer, physical-evidence, coverage, and ownership change axes independently. Repository identity change is evidence reported by the comparison, not a reason to reconstruct or search repository history. Earlier development shapes are not compatibility aliases or accepted readers.
 
-The documented `CodeMap.repository_declarations()` surface is supported Python API. Its schemas are `hashmarks.repository-declarations.v1` and `hashmarks.repository-declarations-delta.v1`; declaration derivation and explanation use `hashmarks.repository-declaration-derivation.v1` and `hashmarks.repository-declaration-explain.v1`; see [`REPOSITORY_DECLARATIONS.md`](REPOSITORY_DECLARATIONS.md). Semantic extraction, normalized values, correspondence, roles, and coverage remain provider claims; the repository-evidence binding, identity, freshness, ambiguity, qualified-absence, factual-delta, derivation, and explanation behavior is the Hashmarks contract. Direct declaration groups require a non-empty `semantic_namespace`; discovery binds that namespace to provider name. Groups/declarations expose deterministic `semantic_subject_identity` over `semantic_namespace + concept + scope`. A declaration may additionally provide a non-empty opaque `semantic_role`, producing `semantic_declaration_identity` over the subject identity plus that role; without a role no child semantic identity exists. Both semantic identities remain separate from exact declaration-definition and observation identity. Declaration delta exposes ambiguity-preserving `semantic_subjects` endpoint correlation and nested `semantic_declarations` only for explicitly role-tagged children.
+The documented `CodeMap.declarations.observe()` surface is supported Python API. Its schemas are `hashmarks.repository-declarations.v1` and `hashmarks.repository-declarations-delta.v1`; declaration derivation and explanation use `hashmarks.repository-declaration-derivation.v1` and `hashmarks.repository-declaration-explain.v1`; see [`REPOSITORY_DECLARATIONS.md`](REPOSITORY_DECLARATIONS.md). Semantic extraction, normalized values, correspondence, roles, and coverage remain provider claims; the repository-evidence binding, identity, freshness, ambiguity, qualified-absence, factual-delta, derivation, and explanation behavior is the Hashmarks contract. Direct declaration groups require a non-empty `semantic_namespace`; discovery binds that namespace to provider name. Groups/declarations expose deterministic `semantic_subject_identity` over `semantic_namespace + concept + scope`. A declaration may additionally provide a non-empty opaque `semantic_role`, producing `semantic_declaration_identity` over the subject identity plus that role; without a role no child semantic identity exists. Both semantic identities remain separate from exact declaration-definition and observation identity. Declaration delta exposes ambiguity-preserving `semantic_subjects` endpoint correlation and nested `semantic_declarations` only for explicitly role-tagged children.
 
 The local read-only MCP tools `dependency_codemap` and `repository_declarations` preserve their existing default observation responses. Both accept bounded `result_mode` projection: dependency supports `observation | explain | compare`, while declarations support `observation | explain`. Dependency `compare` requires an explicit caller-supplied `previous_observation` and returns the existing `hashmarks.dependency-resolution-delta.v3` schema; explain modes return the existing typed explain schemas. These are transport projections only: no server-side observation history is retained and no parallel CLI explain/compare command is part of the contract.
 
-The documented `RepositoryDeclarationProvider`, `RepositoryDeclarationProviderContext`, `RepositoryDeclarationProviderResult`, `RepositoryDeclarationProviderError`, and `CodeMap.discover_repository_declarations()` surface is also supported Python API. The provider context exposes bounded admitted-path enumeration via `paths(prefix)`, plus revision-bound `exists`, `read_bytes`, and `read_text`; it intentionally does not expose a raw repository filesystem path. Discovery uses the `hashmarks.repository-declaration-discovery.v1` and `hashmarks.repository-declaration-discovery-delta.v1` wrapper schemas. Providers are explicitly supplied Python objects; ambient entry-point loading and arbitrary provider execution inside MCP are not part of the public contract.
+The documented `RepositoryDeclarationProvider`, `RepositoryDeclarationProviderContext`, `RepositoryDeclarationProviderResult`, `RepositoryDeclarationProviderError`, and `CodeMap.declarations.discover()` surface is also supported Python API. The provider context exposes bounded admitted-path enumeration via `paths(prefix)`, plus revision-bound `exists`, `read_bytes`, and `read_text`; it intentionally does not expose a raw repository filesystem path. Discovery uses the `hashmarks.repository-declaration-discovery.v1` and `hashmarks.repository-declaration-discovery-delta.v1` wrapper schemas. Providers are explicitly supplied Python objects; ambient entry-point loading and arbitrary provider execution inside MCP are not part of the public contract.
 
 `CodeMap.tasks.evidence()` is the supported role-separated task-evidence API. Its default schema is `hashmarks.task-evidence.v5`: bounded retrieval, explicit-target evidence, ownership, verification, related evidence, freshness and provenance are distinct authority domains. Initial responses use `hashmarks.task-evidence-initial.v2` and retain the same facts through the initial packet codec; presentation bounds do not establish repository absence or ownership uniqueness.
 
@@ -223,6 +326,16 @@ call positions, source revision, generation, omissions and unqualified-call coun
 remain visible in every format. Runtime invocation remains unestablished and no
 negative-evidence authority is granted.
 
+Structural call qualification binds declared members to complete admitted file
+scopes and qualified import leaves. A bounded global name bucket cannot erase
+an independently qualified positive binding. Unqualified fallback searches keep
+their original bounds and uncertainty. Class members use the shared ordered
+declaration rule and must match the selected source range; conditional bindings,
+rebound receivers and unproven import frontiers remain unresolved. Every examined
+import/re-export binding must share the active indexed source generation; drift
+requires observation refresh. These are static declaration relationships, not
+proof of runtime dispatch or a complete execution path.
+
 Source-candidate test disclosure preserves source namespace locality before task
 words in a test directory. Declaration overlap is measured within one indexed
 test, rather than combining unrelated names throughout a large module. At least
@@ -241,11 +354,14 @@ Initial compact declaration tables bind their scope through the finding's exact
 each table; the complete native context, qualifiers and row values are retained.
 Compact tables expose structured `metadata`, `common`, `prefix`, `columns`,
 `extras` and `rows`, avoiding quoted JSON inside text. Text rendering retains its
-readable scope tables. The initial wire codec emits `json+zlib` for compressible
-semantic data and retains the uncompressed `json-string-table.v1` fallback.
+readable scope tables. The initial wire codec chooses the smaller of `json+zlib`
+(Base64) and `json+lzma-base85` for compressible semantic data, and retains the
+uncompressed `json-string-table.v1` fallback. This changes wire bytes only;
+decoded evidence, source references and semantic packet identity are identical.
 Decoders also accept existing `json-string-table.v1+zlib` packets. All compressed
-forms have the same 1 MiB allocation bound, exact decoded-byte count, stream
+forms have the same 1 MiB decoded-output bound, exact decoded-byte count, stream
 closure and semantic identity checks; direct JSON also rejects duplicate keys.
+LZMA decoding additionally limits dictionary memory to 16 MiB.
 
 Observed repository fact/evidence: distinct same-named callable declarations in
 one selected repository file.

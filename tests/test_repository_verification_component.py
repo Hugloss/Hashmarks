@@ -17,8 +17,8 @@ from hashmarks.codemap.verification_relevance_model import VerificationRequest
 
 def _verification(index: RepositoryIndex) -> RepositoryVerification:
     source = _source(index)
-    imports = RepositoryImports(index.files, source, source.reads, index.store)
-    return RepositoryVerification(source, imports)
+    imports = RepositoryImports(source)
+    return RepositoryVerification(imports)
 
 
 def test_direct_verifier_selects_reference_backed_test_and_rejects_expired_binding(
@@ -65,6 +65,47 @@ def test_unresolved_request_cannot_supply_an_admitted_edit(
         )
         with pytest.raises(ValueError, match="unresolved ownership"):
             verification.for_owner(request)
+
+
+@pytest.mark.parametrize("shadowed", [False, True])
+def test_source_reference_fanout_cannot_hide_a_qualified_test(
+    index: RepositoryIndex, shadowed: bool
+) -> None:
+    (index.workspace / "pkg").mkdir()
+    (index.workspace / "pkg/__init__.py").write_text("from .impl import Worker\n")
+    (index.workspace / "pkg/impl.py").write_text(
+        "class Worker:\n    def run(self): return 1\n"
+    )
+    (index.workspace / "a_callers.py").write_text(
+        "from pkg import Worker\n" + "Worker()\n" * 1030
+    )
+    (index.workspace / "tests").mkdir()
+    test_path = "tests/test_result.py"
+    (index.workspace / test_path).write_text(
+        "from pkg import Worker\n"
+        + ("Worker = object\n" if shadowed else "")
+        + "def test_result(): assert Worker().run() == 1\n"
+    )
+    index.sync()
+    verification = _verification(index)
+    with verification.reads.session() as scope:
+        packet = verification.for_owner(
+            VerificationRequest(
+                scope,
+                normalize_task_query("Inspect Worker"),
+                "nominated",
+                {"path": "pkg/impl.py", "name": "Worker"},
+                None,
+                (),
+            )
+        )
+    candidate = next(row for row in packet["candidates"] if row["path"] == test_path)
+    assert candidate.get("direct_reference") is not shadowed
+    if not shadowed:
+        assert candidate.get("reference_symbols") == ["Worker"]
+    assert packet.get("completeness") == "incomplete"
+    assert packet.get("negative_evidence_admissible") is False
+    assert not str(packet["selection_reason"]).startswith("unique")
 
 
 def test_verifier_import_does_not_load_tasks_ownership_or_facade() -> None:

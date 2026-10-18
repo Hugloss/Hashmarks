@@ -20,9 +20,9 @@ def test_standalone_import_resolver_qualifies_alias_and_reexport(
     (root / "facade.py").write_text("from owner import target as exported\n")
     (root / "consumer.py").write_text("from facade import exported as selected\n")
     index.sync()
-    reads = DecisionScope(index, index.store, index._observation_source)
-    source = RepositorySource(index.files, index, reads, index.store, index.file_store)
-    imports = RepositoryImports(index.files, source, reads, index.store)
+    reads = DecisionScope(index)
+    source = RepositorySource(index, reads)
+    imports = RepositoryImports(source)
     with reads.session():
         owners, ambiguous = imports._resolve_import_owner_evidence(
             "consumer.py", "facade.exported"

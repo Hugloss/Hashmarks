@@ -129,6 +129,35 @@ class TaskEvidenceRetrievalMixin:
             for variants in query_tokens
         )
 
+    @staticmethod
+    def _task_evidence_distinct_query_groups(
+        groups: Sequence[tuple[str, ...]],
+    ) -> tuple[tuple[str, ...], ...]:
+        """Count repeated forms of one normalized word family once."""
+        families: dict[str, tuple[str, ...]] = {}
+        for group in groups:
+            if group:
+                key = min(group, key=lambda value: (len(value), value))
+                families.setdefault(key, group)
+        return tuple(families.values())
+
+    @classmethod
+    def _task_evidence_ordered_name_matches(
+        cls, name: str, groups: Sequence[tuple[str, ...]]
+    ) -> int:
+        """Observe ordered lexical overlap in a declaration's qualified name."""
+        previous = [0] * (len(groups) + 1)
+        for part in cls._task_evidence_identifier_parts(name):
+            current = [0]
+            for index, group in enumerate(groups):
+                current.append(
+                    previous[index] + 1
+                    if cls._task_evidence_natural_part_matches(part, group)
+                    else max(current[-1], previous[index + 1])
+                )
+            previous = current
+        return previous[-1]
+
     @classmethod
     def _task_evidence_phrase_relevance(
         cls, parts: Sequence[str], query_tokens: Sequence[tuple[str, ...]]
@@ -305,6 +334,7 @@ class TaskEvidenceRetrievalMixin:
             )
             for word in re.findall(r"[A-Za-z]+", query.lower())
         )
+        query_tokens = self._task_evidence_distinct_query_groups(query_tokens)
         total, frequencies = self.reads.lexical_document_frequencies(terms)
         scoped = self._task_evidence_scoped_method_supplement(
             task, query_tokens, frequencies, total, existing_keys
@@ -411,7 +441,9 @@ class TaskEvidenceRetrievalMixin:
         rows = codemap.store.declaration_context_candidates(
             list(dict.fromkeys(group for group in query_tokens if group))[:32], paths
         )
-        eligible: list[tuple[int, float, str, str, dict[str, object]]] = []
+        eligible: list[
+            tuple[tuple[int, float, int, float], str, str, dict[str, object]]
+        ] = []
         for symbol in rows:
             path, name = str(symbol["path"]), str(symbol["name"])
             context = str(symbol["qualname"]) + " " + str(symbol["signature"])
@@ -431,9 +463,21 @@ class TaskEvidenceRetrievalMixin:
             )
             row["retrieval_supplement"] = "bounded-declaration-context"
             row["score_basis"] = "natural-declaration-context-relevance"
-            eligible.append((-matches, -score, path, str(symbol["qualname"]), row))
-        eligible.sort(key=lambda row: row[:4])
-        for _, _, path, _, row in eligible:
+            own = self._task_evidence_natural_match_count(name, query_tokens)
+            coverage = own / max(1, len(self._task_evidence_identifier_parts(name)))
+            ordered = self._task_evidence_ordered_name_matches(
+                str(symbol["qualname"]), query_tokens
+            )
+            eligible.append(
+                (
+                    (-ordered, -coverage, -matches, -score),
+                    path,
+                    str(symbol["qualname"]),
+                    row,
+                )
+            )
+        eligible.sort(key=lambda row: row[:3])
+        for _, path, _, row in eligible:
             if codemap.index.is_current(path):
                 return row
         return None
@@ -451,7 +495,12 @@ class TaskEvidenceRetrievalMixin:
             cls._task_evidence_requested_locator_key(row) == lexical_key
             for row in natural
         ):
-            return natural
+            return [
+                dict(row, retrieval_supplement="bounded-declaration-context")
+                if cls._task_evidence_requested_locator_key(row) == lexical_key
+                else row
+                for row in natural
+            ]
         # A callable name is a stronger declaration hint than a class name.
         # Preserve the best existing callable and disclose one source position.
         named = next(

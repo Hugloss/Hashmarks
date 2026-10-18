@@ -21,7 +21,7 @@ from .dependency_resolution_correlation import DependencyResolutionCorrelationMi
 from .dependency_resolution_query import dependency_queries
 
 if TYPE_CHECKING:
-    from .engine import CodeMap
+    from .repository_dependencies import RepositoryDependencies
 
 _MAX_CONTEXTS = 64
 _MAX_INVENTORY = 16384
@@ -116,7 +116,7 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
     package manager, environment synchronizer, or dependency implementation scan.
     """
 
-    def dependency_resolution_evidence(
+    def observe(
         self,
         snapshot: Mapping[str, object],
     ) -> dict[str, object]:
@@ -139,7 +139,7 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
     ) -> dict[str, object]:
         """Qualify a multi-context dependency observation without executing its producer."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryDependencies", self)
         producer_packet, scope_packet, contexts, context_set = (
             self._dependency_header_v3(snapshot)
         )
@@ -402,7 +402,7 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
         self, observation: Mapping[str, object]
     ) -> None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryDependencies", self)
         self._require_qualified_dependency_observation_v3(observation)
         binding = cast("Mapping[str, object]", observation["repository_binding"])
         if binding[
@@ -1223,7 +1223,7 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
 
     def _dependency_repository_inputs(self, value: object) -> list[dict[str, object]]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryDependencies", self)
         rows = _objects(value, label="repository_inputs", limit=_MAX_INPUTS)
         result: list[dict[str, object]] = []
         seen: set[str] = set()
@@ -1260,7 +1260,7 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
             )
         return sorted(result, key=lambda row: str(row["path"]))
 
-    def dependency_resolution_queries(
+    def queries(
         self,
         observation: Mapping[str, object],
         requests: Sequence[Mapping[str, object]],
@@ -1268,7 +1268,7 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
         self._require_current_dependency_observation_v3(observation)
         return dependency_queries(observation, requests)
 
-    def dependency_codemap(
+    def codemap(
         self,
         snapshot: Mapping[str, object],
         queries: Sequence[Mapping[str, object]] = (),
@@ -1278,7 +1278,7 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
     ) -> dict[str, object]:
         """Execute one canonical dependency operation independent of transport."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryDependencies", self)
         mode = require_operation_mode("dependency_codemap", result_mode)
         if mode != "observation" and queries:
             raise ValueError("queries require result_mode=observation")
@@ -1289,12 +1289,12 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
                 "previous_observation is only valid for result_mode=compare"
             )
 
-        observation = self.dependency_resolution_evidence(snapshot)
+        observation = self.observe(snapshot)
         if mode == "explain":
-            result = self.dependency_resolution_explain(observation)
+            result = self.explain(observation)
         elif mode == "compare":
             assert previous_observation is not None
-            result = self.dependency_resolution_delta(previous_observation, observation)
+            result = self.delta(previous_observation, observation)
         else:
             result = {
                 "schema": operation_schema("dependency_codemap", mode),
@@ -1305,7 +1305,7 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
                 "causation": "not-inferred",
             }
             if queries:
-                result["queries"] = self.dependency_resolution_queries(
+                result["queries"] = self.queries(
                     observation,
                     queries,
                 )

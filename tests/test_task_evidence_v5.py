@@ -829,7 +829,7 @@ def test_task_evidence_supplements_account_for_displaced_canonical_hits(
         action = codemap.tasks.action_map(task, limit=20)
         packet = codemap.tasks.evidence(task, limit=20, token_budget=256)
         tight = codemap.tasks.evidence(task, limit=9, token_budget=256)
-        delta = codemap.task_post_change_delta(
+        delta = codemap.changes.task_delta(
             task, [owner.relative_to(tmp_path)], previous_evidence=packet
         )
 
@@ -869,9 +869,7 @@ def test_task_evidence_supplements_account_for_displaced_canonical_hits(
     )
     assert retrieval.get("supplemental_results") == len(supplements)
     assert retrieval.get("supplemental_authority") is False
-    assert retrieval["ordering"] == (
-        "natural-identifier-matches-then-canonical-retrieval"
-    )
+    assert retrieval["ordering"] == ("natural-source-matches-then-canonical-retrieval")
     assert retrieval["bounds"]["canonical_completeness"] == "incomplete"
     assert retrieval["bounds"]["canonical_truncation"] == "truncated"
     assert "task-result-limit" in retrieval["bounds"]["bound_reasons"]
@@ -881,8 +879,15 @@ def test_task_evidence_supplements_account_for_displaced_canonical_hits(
         for row in supplements
     )
     assert all(
-        row.get("supplement") == "bounded-natural-language" for row in supplements
+        row.get("supplement") == "bounded-declaration-context" for row in supplements
     )
+    # The requested prefix is declared in the method signature. Its context
+    # qualification remains visible even when name retrieval found it too.
+    assert (
+        supplements[0].get("symbol"),
+        supplements[0].get("start_line"),
+        supplements[0].get("end_line"),
+    ) == ("WorkspaceMapStore.paths_under", 2, 3)
     assert all(row.get("evidence_visibility") == "source" for row in supplements)
     assert all(not row.get("supplement") for row in tight["retrieval"]["results"])
     assert "canonical_omitted_results" not in tight["retrieval"]

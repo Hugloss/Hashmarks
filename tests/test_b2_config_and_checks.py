@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from contract_assertions import assert_object
+
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.repository_domains import (
     RepositoryDomain,
@@ -53,7 +55,7 @@ def test_explicit_config_task_uses_verification_backed_active_locality(
         codemap.index.sync()
         action = codemap.tasks.action_map(task)
 
-    assert action["edit"]["path"] == "src/widget/policy.toml"
+    assert assert_object(action["edit"])["path"] == "src/widget/policy.toml"
 
 
 def test_checks_spec_can_be_selected_as_verification(tmp_path: Path) -> None:
@@ -80,8 +82,8 @@ def test_checks_spec_can_be_selected_as_verification(tmp_path: Path) -> None:
         codemap.index.sync()
         action = codemap.tasks.action_map(task)
 
-    assert action["edit"]["path"] == "src/widget/engine.py"
-    assert action["verify"]["path"] == "checks/widget/contract_spec.py"
+    assert assert_object(action["edit"])["path"] == "src/widget/engine.py"
+    assert assert_object(action["verify"])["path"] == "checks/widget/contract_spec.py"
 
 
 def test_test_prefixed_python_module_under_src_is_not_test_domain() -> None:

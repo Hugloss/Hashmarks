@@ -213,7 +213,7 @@ class VerificationOwnershipMixin:
         return unowned, ambiguous
 
     @operation_response("verification_ownership")
-    def relationship_evidence(
+    def ownership_relationships(
         self,
         task: str,
         action: Mapping[str, object],

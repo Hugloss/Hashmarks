@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from typing import TYPE_CHECKING
 
 from scripts.agent_evaluation import emit_process_work_traces as M
@@ -21,6 +23,7 @@ def test_emitter_freezes_answer_blind_not_run_work_trace(tmp_path: Path) -> None
     public.write_text(
         json.dumps({"tasks": [{"id": "a", "query": "A implementation test"}]})
     )
+
     secret.write_text(
         json.dumps({"tasks": [{"id": "a", "expected_files": ["src/a.py"]}]})
     )
@@ -33,3 +36,16 @@ def test_emitter_freezes_answer_blind_not_run_work_trace(tmp_path: Path) -> None
         ]
         == "not-run"
     )
+
+
+def test_emitter_direct_cli_imports_canonical_owner_from_another_directory(
+    tmp_path: Path,
+) -> None:
+    result = subprocess.run(
+        [sys.executable, M.__file__, "--help"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert "--trace-dir" in result.stdout

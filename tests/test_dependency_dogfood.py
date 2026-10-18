@@ -148,7 +148,7 @@ def _query(
     request: dict[str, object],
 ) -> dict[str, object]:
     return assert_records(
-        codemap.dependency_resolution_queries(observation, [request])["results"]
+        codemap.dependencies.queries(observation, [request])["results"]
     )[0]
 
 
@@ -287,13 +287,9 @@ def test_real_producer_dependency_change_dogfood(
     after_module = None
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.dependency_resolution_evidence(
-            _observation(producer, before_state)
-        )
-        after = codemap.dependency_resolution_evidence(
-            _observation(producer, after_state)
-        )
-        delta = codemap.dependency_resolution_delta(before, after)
+        before = codemap.dependencies.observe(_observation(producer, before_state))
+        after = codemap.dependencies.observe(_observation(producer, after_state))
+        delta = codemap.dependencies.delta(before, after)
         before_root = assert_records(before["roots"])[0]["node_id"]
         after_root = assert_records(after["roots"])[0]["node_id"]
         before_graph = _query(
@@ -384,13 +380,9 @@ def test_real_maven_transitive_upgrade_dogfood_preserves_large_graph_delta(
 ) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.dependency_resolution_evidence(
-            _realworld_maven_observation("before")
-        )
-        after = codemap.dependency_resolution_evidence(
-            _realworld_maven_observation("after")
-        )
-        delta = codemap.dependency_resolution_delta(before, after)
+        before = codemap.dependencies.observe(_realworld_maven_observation("before"))
+        after = codemap.dependencies.observe(_realworld_maven_observation("after"))
+        delta = codemap.dependencies.delta(before, after)
 
         before_okhttp = _dummy_selection(before, "com.squareup.okhttp3:okhttp")
         after_okhttp = _dummy_selection(after, "com.squareup.okhttp3:okhttp")
@@ -481,13 +473,13 @@ def test_real_maven_mediation_changes_only_transitive_selections(
 ) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.dependency_resolution_evidence(
+        before = codemap.dependencies.observe(
             _maven_scenario_observation("mediation", "before")
         )
-        after = codemap.dependency_resolution_evidence(
+        after = codemap.dependencies.observe(
             _maven_scenario_observation("mediation", "after")
         )
-        delta = codemap.dependency_resolution_delta(before, after)
+        delta = codemap.dependencies.delta(before, after)
         before_graph = _query(
             codemap,
             before,
@@ -542,13 +534,13 @@ def test_real_maven_exclusion_removes_complete_transitive_branch(
 ) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.dependency_resolution_evidence(
+        before = codemap.dependencies.observe(
             _maven_scenario_observation("exclusion", "before")
         )
-        after = codemap.dependency_resolution_evidence(
+        after = codemap.dependencies.observe(
             _maven_scenario_observation("exclusion", "after")
         )
-        delta = codemap.dependency_resolution_delta(before, after)
+        delta = codemap.dependencies.delta(before, after)
 
         removed_absence = [
             _query(
@@ -595,13 +587,13 @@ def test_real_maven_bom_upgrade_changes_many_versions_without_component_churn(
 ) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.dependency_resolution_evidence(
+        before = codemap.dependencies.observe(
             _maven_scenario_observation("bom-upgrade", "before")
         )
-        after = codemap.dependency_resolution_evidence(
+        after = codemap.dependencies.observe(
             _maven_scenario_observation("bom-upgrade", "after")
         )
-        delta = codemap.dependency_resolution_delta(before, after)
+        delta = codemap.dependencies.delta(before, after)
 
     direct_components = _direct_components(before, "compile")
     changed_versions = _changed_component_versions(before, after)
@@ -631,13 +623,9 @@ def test_real_maven_multi_module_change_propagates_across_contexts(
 ) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.dependency_resolution_evidence(
-            _maven_multi_module_observation("before")
-        )
-        after = codemap.dependency_resolution_evidence(
-            _maven_multi_module_observation("after")
-        )
-        delta = codemap.dependency_resolution_delta(before, after)
+        before = codemap.dependencies.observe(_maven_multi_module_observation("before"))
+        after = codemap.dependencies.observe(_maven_multi_module_observation("after"))
+        delta = codemap.dependencies.delta(before, after)
 
         before_graphs = {
             context: _query(
@@ -695,9 +683,7 @@ def test_real_maven_profile_contexts_remain_isolated(
 ) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        observation = codemap.dependency_resolution_evidence(
-            _maven_profile_observation()
-        )
+        observation = codemap.dependencies.observe(_maven_profile_observation())
         root_id = _root_id(observation, "default")
 
         with pytest.raises(
@@ -771,9 +757,7 @@ def test_real_uv_grouped_edges_do_not_duplicate_topology_paths(
 ) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        observation = codemap.dependency_resolution_evidence(
-            _observation("uv", "grouped")
-        )
+        observation = codemap.dependencies.observe(_observation("uv", "grouped"))
         root_id = assert_records(observation["roots"])[0]["node_id"]
         selection = _dummy_selection(observation, "dummy-dep")
         paths = _query(
@@ -803,11 +787,9 @@ def test_real_uv_grouped_dependency_dogfood(
 ) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.dependency_resolution_evidence(
-            _observation("uv", before_state)
-        )
-        after = codemap.dependency_resolution_evidence(_observation("uv", after_state))
-        delta = codemap.dependency_resolution_delta(before, after)
+        before = codemap.dependencies.observe(_observation("uv", before_state))
+        after = codemap.dependencies.observe(_observation("uv", after_state))
+        delta = codemap.dependencies.delta(before, after)
         present = before if before_state == "grouped" else after
         absent = after if after_state == "absent" else before
         selection = _dummy_selection(present, "dummy-dep")

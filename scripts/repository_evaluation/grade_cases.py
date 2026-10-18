@@ -79,7 +79,7 @@ def _grade_case(
 ) -> dict[str, object]:
     result = item.get("result")
     if isinstance(result, Mapping) and "checks" in rule:
-        return grade_facts(case_id, result, rule)
+        return dict(grade_facts(case_id, result, rule))
     action = result.get("action") if isinstance(result, Mapping) else None
     if not isinstance(action, Mapping):
         raise ValueError(f"missing task action result for {case_id}")
@@ -163,7 +163,10 @@ def grade_run(
     rows: list[dict[str, object]] = []
     seen: set[str] = set()
 
-    for item in run.get("cases", []):
+    cases = run.get("cases", [])
+    if not isinstance(cases, list):
+        raise ValueError("repository evaluation cases must be a list")
+    for item in cases:
         if not isinstance(item, Mapping):
             raise ValueError("repository evaluation run case must be an object")
         case_id = str(item.get("id") or "")

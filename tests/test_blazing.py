@@ -4,6 +4,8 @@ import threading
 import time
 from typing import TYPE_CHECKING, Never
 
+import pytest
+
 from hashmarks.client import IdentityClient
 from hashmarks.daemon import IdentityDaemon
 from hashmarks.engine import IdentityEngine

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from .client import DaemonCompatibilityError, DaemonUnavailableError, IdentityClient
 from .digest import Digest
 from .engine import IdentityEngine
+from .generation_domain import require_generation
 from .inputs import InputManifest
 from .schema import IDENTITY_SCHEMA
 from .snapshot import Snapshot
@@ -17,6 +18,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from .codemap import CodeMap
+    from .watcher import NativeLinuxBatchWatcher, WatchdogBatchWatcher
 
 
 class RepositoryIdentityMode(str, Enum):
@@ -56,7 +58,9 @@ class RepositoryIdentity:
             raise ValueError("local_observer must be reconcile, watcher, or manual")
         self.local_observer = local_observer
         self._engine: IdentityEngine | None = None
-        self._local_watcher = None
+        self._local_watcher: NativeLinuxBatchWatcher | WatchdogBatchWatcher | None = (
+            None
+        )
         self._manifest_handles: dict[str, str] = {}
         self._daemon_confirmed = False
         self._codemap = None
@@ -149,15 +153,20 @@ class RepositoryIdentity:
 
     @staticmethod
     def _snapshot_from_response(response: Mapping[str, object]) -> Snapshot:
+        size = response["size"]
+        if type(size) is not int:
+            raise ValueError("snapshot size must be an integer")
+        generation = response.get("generation")
+        if generation is not None:
+            generation = require_generation(generation, field="snapshot generation")
+        observed_paths = response.get("observed_paths", [])
+        if not isinstance(observed_paths, list):
+            raise ValueError("snapshot observed_paths must be an array")
         return Snapshot(
-            digest=Digest(hash=str(response["hash"]), size=int(response["size"])),
+            digest=Digest(hash=str(response["hash"]), size=size),
             manifest_fingerprint=str(response["manifest"]),
-            generation=None
-            if response.get("generation") is None
-            else int(response["generation"]),
-            observed_paths=tuple(
-                str(path) for path in response.get("observed_paths", [])
-            ),
+            generation=generation,
+            observed_paths=tuple(str(path) for path in observed_paths),
             mode=str(response.get("mode", "daemon")),
         )
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
 import pytest
@@ -81,7 +82,10 @@ def test_bounded_reference_search_cannot_report_no_verification_candidate(
         codemap.index.sync()
 
         def refs_many(
-            targets: list[str], *, limit_per_target: int
+            targets: list[str],
+            *,
+            limit_per_target: int,
+            preferred_paths: Iterable[str] = (),
         ) -> dict[str, list[dict[str, object]]]:
             targets = list(targets)
             if limit_per_target == _DIRECT_REF_LIMIT + 1:
@@ -144,7 +148,10 @@ def test_bounded_reference_search_cannot_manufacture_unique_verifier(
         codemap.index.sync()
 
         def refs_many(
-            targets: list[str], *, limit_per_target: int
+            targets: list[str],
+            *,
+            limit_per_target: int,
+            preferred_paths: Iterable[str] = (),
         ) -> dict[str, list[dict[str, object]]]:
             targets = list(targets)
             if limit_per_target == _DIRECT_REF_LIMIT + 1:
@@ -194,7 +201,10 @@ def test_exhausted_verification_search_can_still_authorize_absence(
         codemap.index.sync()
 
         def refs_many(
-            targets: list[str], *, limit_per_target: int
+            targets: list[str],
+            *,
+            limit_per_target: int,
+            preferred_paths: Iterable[str] = (),
         ) -> dict[str, list[dict[str, object]]]:
             return {symbol: [] for symbol in targets}
 

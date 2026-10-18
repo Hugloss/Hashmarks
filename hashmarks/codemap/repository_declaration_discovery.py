@@ -21,7 +21,7 @@ from .repository_declaration_provider import (
 from .repository_observation import packet_digest
 
 if TYPE_CHECKING:
-    from .engine import CodeMap
+    from .repository_declarations import RepositoryDeclarations
 
 _SCHEMA = operation_schema("repository_declarations", "discovery")
 _DELTA_SCHEMA = "hashmarks.repository-declaration-discovery-delta.v1"
@@ -195,7 +195,7 @@ class RepositoryDeclarationDiscoveryMixin(ReadScopeOwner):
         include_bytes: bool,
     ) -> tuple[dict[str, object], bytes | None]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryDeclarations", self)
         return self.source.member(
             path,
             include_bytes=include_bytes,
@@ -203,7 +203,7 @@ class RepositoryDeclarationDiscoveryMixin(ReadScopeOwner):
 
     def _declaration_provider_paths(self, prefix: str) -> tuple[str, ...]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryDeclarations", self)
         visible = (
             item.rel
             for item in self.files.iter_files(prefix)
@@ -216,7 +216,7 @@ class RepositoryDeclarationDiscoveryMixin(ReadScopeOwner):
         packet: Mapping[str, object],
     ) -> str:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryDeclarations", self)
         declarations = packet.get("declarations")
         if not isinstance(declarations, Mapping):
             raise ValueError("declaration discovery declarations must be an object")
@@ -242,7 +242,7 @@ class RepositoryDeclarationDiscoveryMixin(ReadScopeOwner):
         previous: Mapping[str, object],
     ) -> None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryDeclarations", self)
         if previous.get("schema") != _SCHEMA:
             raise ValueError(f"previous discovery must use schema {_SCHEMA}")
         identity = previous.get("observation_identity")
@@ -311,7 +311,7 @@ class RepositoryDeclarationDiscoveryMixin(ReadScopeOwner):
         return packet
 
     @decision_scoped
-    def discover_repository_declarations(
+    def discover(
         self,
         providers: Sequence[RepositoryDeclarationProvider],
         *,
@@ -319,7 +319,7 @@ class RepositoryDeclarationDiscoveryMixin(ReadScopeOwner):
     ) -> dict[str, object]:
         """Run caller-selected declaration providers and qualify their output."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryDeclarations", self)
 
         previous_declarations = self._previous_declaration_packet(previous_observation)
         groups, provider_observations = collect_repository_declaration_providers(
@@ -332,7 +332,7 @@ class RepositoryDeclarationDiscoveryMixin(ReadScopeOwner):
             self._declaration_provider_paths,
             provider_observations,
         )
-        declarations = self.repository_declarations(
+        declarations = self.observe(
             groups,
             previous_observation=previous_declarations,
         )

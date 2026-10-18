@@ -41,9 +41,9 @@ def test_uv_lock_adapter_preserves_selection_source_and_factual_delta(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.dependency_resolution_evidence(before_raw)
-        after = codemap.dependency_resolution_evidence(after_raw)
-        delta = codemap.dependency_resolution_delta(before, after)
+        before = codemap.dependencies.observe(before_raw)
+        after = codemap.dependencies.observe(after_raw)
+        delta = codemap.dependencies.delta(before, after)
 
     before_dep = next(
         row
@@ -72,9 +72,9 @@ def test_uv_lock_adapter_preserves_relationship_and_inventory_change(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.dependency_resolution_evidence(before_raw)
-        after = codemap.dependency_resolution_evidence(after_raw)
-        delta = codemap.dependency_resolution_delta(before, after)
+        before = codemap.dependencies.observe(before_raw)
+        after = codemap.dependencies.observe(after_raw)
+        delta = codemap.dependencies.delta(before, after)
 
     assert before["definition_identity"] == after["definition_identity"]
     assert len(assert_array(delta["inventory_added"])) == 1
@@ -143,13 +143,13 @@ def test_uv_lock_adapter_includes_every_committed_lock_dependency_group(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        observation = codemap.dependency_resolution_evidence(raw)
+        observation = codemap.dependencies.observe(raw)
         root_id = next(
             row["node_id"]
             for row in assert_records(observation["roots"])
             if assert_text(row["node_id"]).startswith("hashmarks:")
         )
-        queries = codemap.dependency_resolution_queries(
+        queries = codemap.dependencies.queries(
             observation,
             [{"operation": "dependencies", "node_id": root_id, "context": "lock"}],
         )
@@ -393,13 +393,13 @@ source = { virtual = "." }
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.dependency_resolution_evidence(
+        before = codemap.dependencies.observe(
             uv_lock_dependency_observation(lock=base.encode())
         )
-        after = codemap.dependency_resolution_evidence(
+        after = codemap.dependencies.observe(
             uv_lock_dependency_observation(lock=constrained.encode())
         )
-        delta = codemap.dependency_resolution_delta(before, after)
+        delta = codemap.dependencies.delta(before, after)
 
     assert before["scope"] == {"requires_python": ">=3.11"}
     assert after["scope"] == {
@@ -439,13 +439,13 @@ source = { virtual = "." }
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.dependency_resolution_evidence(
+        before = codemap.dependencies.observe(
             uv_lock_dependency_observation(lock=before_lock)
         )
-        after = codemap.dependency_resolution_evidence(
+        after = codemap.dependencies.observe(
             uv_lock_dependency_observation(lock=after_lock)
         )
-        delta = codemap.dependency_resolution_delta(before, after)
+        delta = codemap.dependencies.delta(before, after)
 
     assert before["definition_identity"] == after["definition_identity"]
     assert before["resolution_identity"] == after["resolution_identity"]

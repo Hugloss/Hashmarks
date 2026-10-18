@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from contract_assertions import assert_object, assert_records
+
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.semantic_relationship_model import (
     validate_relationship_observation,
@@ -62,12 +64,12 @@ def _read_source_metadata(cm: CodeMap) -> dict:
     validate_relationship_observation(packet)
     claims = [
         claim
-        for producer in packet["observations"]
-        for claim in producer["claims"]
+        for producer in assert_records(packet["observations"])
+        for claim in assert_records(producer["claims"])
         if claim["kind"] == "implementation"
     ]
     assert len(claims) == 1
-    return claims[0]["source"]
+    return assert_object(claims[0]["source"])
 
 
 def test_metadata_survives_native_index_reopen_and_is_not_graph_authority(

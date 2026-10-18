@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from pathlib import Path
 from typing import Never
 
 import pytest
 
 from hashmarks.cas import CAS
+from hashmarks.digest import Digest
 from hashmarks.directory_store import DirectoryDigestStore
 from hashmarks.engine import IdentityEngine
 from hashmarks.file_store import FileDigestStore
@@ -155,7 +155,7 @@ def test_verify_rehashes_bytes_but_preserves_canonical_identity(
     real_hash_file = file_store_module.hash_file
     calls = {"count": 0}
 
-    def counting_hash_file(path: Path) -> str:
+    def counting_hash_file(path: Path) -> Digest:
         calls["count"] += 1
         return real_hash_file(path)
 
@@ -250,7 +250,7 @@ def test_file_hash_retries_if_file_changes_during_read(
     real_hash_file = file_store_module.hash_file
     calls = {"count": 0}
 
-    def mutating_hash_file(path: Path) -> str:
+    def mutating_hash_file(path: Path) -> Digest:
         digest = real_hash_file(path)
         if calls["count"] == 0:
             Path(path).write_text("B")
@@ -283,7 +283,7 @@ def test_observation_change_during_reconciliation_is_retried(
     original = tree._directory_digest
     calls = {"count": 0}
 
-    def changing_once(rel: str, *, verify: bool) -> str:
+    def changing_once(rel: str, *, verify: bool) -> Digest:
         result = original(rel, verify=verify)
         if calls["count"] == 0:
             tracker.mark_dirty(["a.txt"])
@@ -355,8 +355,8 @@ def test_selected_file_manifest_uses_one_batched_store_lookup(
     original = store._rows_many
 
     def counting_rows_many(
-        workspace_key: Path, relpaths: list[str]
-    ) -> list[dict[str, object]]:
+        workspace_key: str, relpaths: list[str]
+    ) -> dict[str, tuple[int, int, int, int, int, int, str]]:
         calls["count"] += 1
         return original(workspace_key, relpaths)
 

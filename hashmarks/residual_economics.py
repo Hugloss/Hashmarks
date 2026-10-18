@@ -8,6 +8,7 @@ from pathlib import Path
 from .product_acceptance import scale_class_contract
 from .qualification_economics import qualification_classification_economics
 from .repository_diagnostics import (
+    RepositoryQueryDiagnostics,
     bounded_top_n_candidate_profile,
     related_query_reuse_receipt,
     repository_query_runtime_diagnostics,
@@ -51,7 +52,7 @@ def changed_impact_economics_receipt(
         ) as codemap:
             sync = codemap.index.sync()
             started = time.perf_counter_ns()
-            result = codemap.task_change_impact(task, normalized)
+            result = codemap.changes.task_impact(task, normalized)
             elapsed = time.perf_counter_ns() - started
     project = result.get("project_impact") if isinstance(result, Mapping) else None
     total_affected = (
@@ -74,7 +75,7 @@ def changed_impact_economics_receipt(
 
 def _isolated_query_receipts(
     workspace: Path, task: str, limit: int
-) -> dict[str, dict[str, object]]:
+) -> dict[str, RepositoryQueryDiagnostics]:
     return {
         query: repository_query_runtime_diagnostics(
             workspace, query=query, task=task, limit=limit
@@ -84,7 +85,7 @@ def _isolated_query_receipts(
 
 
 def _isolated_totals(
-    receipts: Mapping[str, Mapping[str, object]],
+    receipts: Mapping[str, RepositoryQueryDiagnostics],
 ) -> dict[str, int | float]:
     query_work = [row["query_work"] for row in receipts.values()]
     return {

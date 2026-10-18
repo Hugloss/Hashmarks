@@ -14,8 +14,8 @@ from hashmarks.codemap.repository_source import RepositorySource
 
 
 def _source(index: RepositoryIndex) -> RepositorySource:
-    reads = DecisionScope(index, index.store, index._observation_source)
-    return RepositorySource(index.files, index, reads, index.store, index.file_store)
+    reads = DecisionScope(index)
+    return RepositorySource(index, reads)
 
 
 def test_source_observes_an_admitted_unindexed_member(index: RepositoryIndex) -> None:

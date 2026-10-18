@@ -60,7 +60,9 @@ class TaskVerificationMixin(ReadScopeOwner):
         bounded = self.verification.bounded_relevance(relevance, candidate_limit)
         edit_paths = sorted(set(self.verification._verification_edit_paths(action)))
         authority = self.ownership.repository_graph(edit_paths) if edit_paths else None
-        return self.verification.relationship_evidence(task, action, bounded, authority)
+        return self.verification.ownership_relationships(
+            task, action, bounded, authority
+        )
 
     @diagnostic_producer
     def explain_verification_selection(

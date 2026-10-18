@@ -37,7 +37,7 @@ def fake_maven_wrapper() -> Callable[[Path], Path]:
 
 
 @pytest.fixture(scope="session")
-def native_dependency_corpus(tmp_path_factory: object) -> Path:
+def native_dependency_corpus(tmp_path_factory: pytest.TempPathFactory) -> Path:
     import os
 
     from native_evidence_support import CORPUS
@@ -52,7 +52,7 @@ def native_dependency_corpus(tmp_path_factory: object) -> Path:
 
 
 @pytest.fixture(scope="session")
-def native_scip_corpus(tmp_path_factory: object) -> Path:
+def native_scip_corpus(tmp_path_factory: pytest.TempPathFactory) -> Path:
     import os
 
     from native_evidence_support import SCIP_CORPUS
@@ -69,7 +69,7 @@ def native_scip_corpus(tmp_path_factory: object) -> Path:
 
 
 @pytest.fixture(scope="session")
-def native_lsp_corpus(tmp_path_factory: object) -> Path:
+def native_lsp_corpus(tmp_path_factory: pytest.TempPathFactory) -> Path:
     import os
 
     from native_evidence_support import LSP_CORPUS
@@ -95,7 +95,7 @@ def native_lsp_corpus(tmp_path_factory: object) -> Path:
 
 
 @pytest.fixture(scope="session")
-def repository_qualification_plan() -> object:
+def repository_qualification_plan() -> dict[str, object]:
     """One immutable repository qualification snapshot for read-only contract tests."""
     from hashmarks.qualification_units import qualification_owner_plan
 
@@ -103,7 +103,9 @@ def repository_qualification_plan() -> object:
 
 
 @pytest.fixture(scope="session")
-def repository_qualification_handoff(repository_qualification_plan: object) -> object:
+def repository_qualification_handoff(
+    repository_qualification_plan: dict[str, object],
+) -> dict[str, object]:
     """Project the shared qualification snapshot without rescanning repository source."""
     from hashmarks.qualification_units import _native_qualification_handoff_from_plan
 
@@ -122,7 +124,9 @@ def _host_capabilities() -> dict[str, bool]:
     }
 
 
-def pytest_collection_modifyitems(config: object, items: list[object]) -> None:
+def pytest_collection_modifyitems(
+    config: pytest.Config, items: list[pytest.Item]
+) -> None:
     """Qualify optional SDK tests and the additional constrained-host exclusions."""
     import os
 

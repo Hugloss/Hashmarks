@@ -15,7 +15,7 @@ from .repository_observation import packet_digest
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from .engine import CodeMap
+    from .repository_changes import RepositoryChanges
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,7 +51,7 @@ class EvidenceFreshnessMapMixin(ReadScopeOwner):
 
     def _freshness_identity(self, kind: str, payload: object) -> str:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryChanges", self)
         return "sha256:" + packet_digest(
             f"hashmarks.evidence-freshness.{kind}.v1",
             payload,
@@ -73,7 +73,7 @@ class EvidenceFreshnessMapMixin(ReadScopeOwner):
         changed_rows: Sequence[object],
     ) -> list[dict[str, object]]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryChanges", self)
         paths = [
             str(row.get("path") or "")
             for row in changed_rows
@@ -101,7 +101,7 @@ class EvidenceFreshnessMapMixin(ReadScopeOwner):
         expected_task_identity: str,
     ) -> tuple[str, str]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryChanges", self)
         if previous_map.get("schema") != FRESHNESS_MAP_SCHEMA:
             raise ValueError(
                 "previous_map must be a hashmarks.evidence-freshness-map.v1 packet"
@@ -235,7 +235,7 @@ class EvidenceFreshnessMapMixin(ReadScopeOwner):
         limit: int,
     ) -> dict[str, object]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryChanges", self)
         member = normalize_relative_path(raw_member, allow_root=False)
         explanation = self.tasks.explain_verification_selection(
             task,
@@ -277,7 +277,7 @@ class EvidenceFreshnessMapMixin(ReadScopeOwner):
         project_impact: object,
     ) -> dict[str, object] | None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryChanges", self)
         if not isinstance(project_impact, Mapping):
             return None
         expanded = expand_project_impact(project_impact)
@@ -364,7 +364,7 @@ class EvidenceFreshnessMapMixin(ReadScopeOwner):
         return prior
 
     @diagnostic_producer
-    def evidence_freshness_map(
+    def freshness_map(
         self,
         task: str,
         changed_paths: Sequence[str | Path],
@@ -376,8 +376,8 @@ class EvidenceFreshnessMapMixin(ReadScopeOwner):
         options = options or FRESHNESS_MAP_DEFAULT_OPTIONS
         """Return current and prior freshness without persisting duplicate truth."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        impact = self.task_change_impact(
+            self = cast("RepositoryChanges", self)
+        impact = self.task_impact(
             task,
             changed_paths,
             limit=options.limit,
@@ -388,83 +388,86 @@ class EvidenceFreshnessMapMixin(ReadScopeOwner):
                 project_impact_encoding="compact",
             ),
         )
-        action = self.tasks.action_map(
-            task,
-            limit=options.limit,
-            per_role=options.per_role,
-        )
-        verify = (
-            action.get("verify") if isinstance(action.get("verify"), Mapping) else None
-        )
-        selected_member = str(verify.get("path") or "") if verify else ""
-        selected_explanation = self.tasks.explain_verification_selection(
-            task,
-            selected_member or None,
-            limit=options.limit,
-            candidate_limit=16,
-        )
-        generation, identity_generation, stale = self.reads.generation_status()
-        scope = _FreshnessScope(
-            repository_identity=self.reads.repository_identity(),
-            task_identity=packet_digest("hashmarks.task.v1", {"task": task}),
-            continuity_state=freshness_state(stale),
-        )
-
-        entries = [
-            self._ownership_freshness_entry(
-                scope,
-                self._ownership_projection(action),
-            ),
-            self._impact_freshness_entry(scope, impact),
-            self._verification_freshness_entry(
-                scope,
-                selected_member,
-                selected_explanation,
-            ),
-        ]
-        entries.extend(
-            self._negative_verification_freshness_entry(
-                scope,
+        with self.reads.session(expected_generation=self._impact_generation(impact)):
+            action = self.tasks.action_map(
                 task,
-                raw_member,
-                options.limit,
+                limit=options.limit,
+                per_role=options.per_role,
             )
-            for raw_member in negative_members
-        )
+            verify = (
+                action.get("verify")
+                if isinstance(action.get("verify"), Mapping)
+                else None
+            )
+            selected_member = str(verify.get("path") or "") if verify else ""
+            selected_explanation = self.tasks.explain_verification_selection(
+                task,
+                selected_member or None,
+                limit=options.limit,
+                candidate_limit=16,
+            )
+            generation, identity_generation, stale = self.reads.generation_status()
+            scope = _FreshnessScope(
+                repository_identity=self.reads.repository_identity(),
+                task_identity=packet_digest("hashmarks.task.v1", {"task": task}),
+                continuity_state=freshness_state(stale),
+            )
 
-        cross_repository = self._cross_repository_freshness_entry(
-            scope, impact.get("project_impact")
-        )
-        if cross_repository is not None:
-            entries.append(cross_repository)
+            entries = [
+                self._ownership_freshness_entry(
+                    scope,
+                    self._ownership_projection(action),
+                ),
+                self._impact_freshness_entry(scope, impact),
+                self._verification_freshness_entry(
+                    scope,
+                    selected_member,
+                    selected_explanation,
+                ),
+            ]
+            entries.extend(
+                self._negative_verification_freshness_entry(
+                    scope,
+                    task,
+                    raw_member,
+                    options.limit,
+                )
+                for raw_member in negative_members
+            )
 
-        prior = self._prior_freshness_rows(
-            entries,
-            previous_map,
-            task_identity=scope.task_identity,
-        )
-        payload: dict[str, object] = {
-            "schema": FRESHNESS_MAP_SCHEMA,
-            "repository": {
-                "repository_identity": scope.repository_identity,
-                "codemap_generation": generation,
-                "identity_generation": identity_generation,
-                "continuity": scope.continuity_state,
-            },
-            "task_identity": scope.task_identity,
-            "entries": entries,
-            "authority": "repository-intelligence-only",
-            "storage": "derived-not-persisted",
-            "execution_effect": "none",
-        }
-        if prior:
-            payload["prior"] = prior
-        payload["freshness_map_identity"] = self._freshness_identity(
-            "map",
-            {
-                "repository_identity": scope.repository_identity,
+            cross_repository = self._cross_repository_freshness_entry(
+                scope, impact.get("project_impact")
+            )
+            if cross_repository is not None:
+                entries.append(cross_repository)
+
+            prior = self._prior_freshness_rows(
+                entries,
+                previous_map,
+                task_identity=scope.task_identity,
+            )
+            payload: dict[str, object] = {
+                "schema": FRESHNESS_MAP_SCHEMA,
+                "repository": {
+                    "repository_identity": scope.repository_identity,
+                    "codemap_generation": generation,
+                    "identity_generation": identity_generation,
+                    "continuity": scope.continuity_state,
+                },
                 "task_identity": scope.task_identity,
                 "entries": entries,
-            },
-        )
-        return payload
+                "authority": "repository-intelligence-only",
+                "storage": "derived-not-persisted",
+                "execution_effect": "none",
+            }
+            if prior:
+                payload["prior"] = prior
+            payload["freshness_map_identity"] = self._freshness_identity(
+                "map",
+                {
+                    "repository_identity": scope.repository_identity,
+                    "task_identity": scope.task_identity,
+                    "entries": entries,
+                },
+            )
+            return payload

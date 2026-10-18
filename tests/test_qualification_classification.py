@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from contract_assertions import assert_array, assert_text
+
 from hashmarks.qualification_classification import (
     classification_map,
     classify_nodeids,
@@ -21,9 +23,9 @@ def test_repository_classification_is_deterministic_identity_bound_and_inspectab
     first = classify_nodeids(root, nodeids)
     second = classify_nodeids(root, nodeids)
     assert first == second
-    assert first["classification_identity"].startswith("sha256:")
-    assert first["policy_identity"].startswith("sha256:")
-    assert len(first["classifications"]) == len(nodeids)
+    assert assert_text(first["classification_identity"]).startswith("sha256:")
+    assert assert_text(first["policy_identity"]).startswith("sha256:")
+    assert len(assert_array(first["classifications"])) == len(nodeids)
 
 
 def test_classification_policy_is_code_owned_and_root_independent(
@@ -70,8 +72,8 @@ def test_policy_classifies_process_and_empirical_from_shard_constants() -> None:
         == "empirical-benchmark"
     )
     plan = qualification_owner_plan(root)
-    assert plan["classification_identity"].startswith("sha256:")
-    assert plan["classification_policy_identity"].startswith("sha256:")
+    assert assert_text(plan["classification_identity"]).startswith("sha256:")
+    assert assert_text(plan["classification_policy_identity"]).startswith("sha256:")
 
 
 def test_unmatched_new_test_node_fails_closed(tmp_path: Path) -> None:

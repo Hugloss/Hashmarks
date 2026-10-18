@@ -4,22 +4,49 @@ import argparse
 import hashlib
 import json
 import logging
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, TypedDict
 
 from hashmarks._command_output import log_command_output
+from scripts._module_loader import import_sibling
 
 logger = logging.getLogger(__name__)
 
-try:
-    from scripts._module_loader import import_sibling
-except ModuleNotFoundError:  # direct script execution
-    from _module_loader import import_sibling
-
-collect = import_sibling("metrics_agent_corpus", __package__).collect
+if TYPE_CHECKING:
+    from scripts.agent_evaluation.metrics_agent_corpus import (
+        CorpusMetricsReport,
+        collect,
+    )
+else:
+    collect = import_sibling("metrics_agent_corpus", __package__).collect
 
 SCHEMA = "hashmarks.agent-suite-metrics.v1"
 PROTOCOL_SCHEMA = "hashmarks.agent-suite-protocol.v1"
+
+
+class ProtocolRepository(TypedDict):
+    name: str
+    workspace_fingerprint: str
+    corpus_sha256: str
+    tasks: int
+
+
+class SuiteProtocol(TypedDict):
+    schema: str
+    retrieval: str
+    budget: int
+    limit: int
+    repositories: list[ProtocolRepository]
+
+
+class SuiteMetricsReport(TypedDict):
+    schema: str
+    benchmark_protocol: SuiteProtocol
+    benchmark_protocol_identity: str
+    parameters: dict[str, int]
+    summary: dict[str, int | float]
+    repositories: list[CorpusMetricsReport]
 
 
 def _sha256_file(path: Path) -> str:
@@ -30,7 +57,7 @@ def _sha256_file(path: Path) -> str:
     return "sha256:" + digest.hexdigest()
 
 
-def _protocol_identity(protocol: dict[str, object]) -> str:
+def _protocol_identity(protocol: Mapping[str, object]) -> str:
     payload = json.dumps(protocol, sort_keys=True, separators=(",", ":")).encode(
         "utf-8"
     )
@@ -61,7 +88,7 @@ def _validate_repository_roots(repos: list[tuple[str, Path, Path]]) -> None:
                 )
 
 
-def _weighted(results: list[dict[str, Any]], key: str) -> float:
+def _weighted(results: list[CorpusMetricsReport], key: str) -> float:
     total_tasks = sum(int(row["parameters"]["tasks"]) for row in results)
     if total_tasks <= 0:
         return 0.0
@@ -76,16 +103,16 @@ def _weighted(results: list[dict[str, Any]], key: str) -> float:
 
 def collect_suite(
     repos: list[tuple[str, Path, Path]], *, budget: int = 1200, limit: int = 20
-) -> dict[str, object]:
+) -> SuiteMetricsReport:
     if not repos:
         raise ValueError("at least one repository is required")
     _validate_repository_roots(repos)
-    reports: list[dict[str, Any]] = []
+    reports: list[CorpusMetricsReport] = []
     for name, workspace, corpus in repos:
         report = collect(workspace, corpus, budget=budget, limit=limit)
         reports.append({"name": name, **report})
     total_tasks = sum(int(row["parameters"]["tasks"]) for row in reports)
-    protocol_repositories = []
+    protocol_repositories: list[ProtocolRepository] = []
     for (name, _workspace, corpus), report in zip(repos, reports, strict=False):
         protocol_repositories.append(
             {
@@ -95,7 +122,7 @@ def collect_suite(
                 "tasks": int(report["parameters"]["tasks"]),
             }
         )
-    protocol = {
+    protocol: SuiteProtocol = {
         "schema": PROTOCOL_SCHEMA,
         "retrieval": "CodeMap.search.find_task + CodeMap.context.build",
         "budget": int(budget),

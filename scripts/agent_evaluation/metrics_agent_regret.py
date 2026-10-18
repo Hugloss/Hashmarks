@@ -2,19 +2,21 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import logging
-
-from hashmarks._command_output import log_command_output
-
-try:
-    from scripts._module_loader import import_sibling
-except ModuleNotFoundError:  # direct script execution
-    from _module_loader import import_sibling
 import json
+import logging
 from collections import Counter
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, TypedDict, TypeGuard
+
+from hashmarks._command_output import log_command_output
+from scripts._module_loader import import_sibling
+
+if TYPE_CHECKING:
+    from scripts.agent_evaluation.metrics_agent_trace import TraceEvent, load_trace
+else:
+    load_trace = import_sibling("metrics_agent_trace", __package__).load_trace
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +41,85 @@ SEARCH_KINDS = {
 }
 
 
-def _load_trace_module() -> object:
-    return import_sibling("metrics_agent_trace", __package__)
+class RetrievalEvidence(TypedDict):
+    schema: str
+    task_id: str
+    task_revision: str
+    repository_identity: str
+    evidence_authority_identity: str
+    required_paths: list[str]
+
+
+class RequiredDiscovery(TypedDict):
+    path: str
+    event_index: int
+    tokens_before_discovery: int
+
+
+class RepeatedQuery(TypedDict):
+    query: str
+    event_index: int
+    estimated_tokens: int
+
+
+class RepeatedRead(TypedDict):
+    path: str
+    event_index: int
+    estimated_tokens: int
+
+
+class RegretSummary(TypedDict):
+    required_path_count: int
+    required_paths_discovered: int
+    required_evidence_complete: bool
+    missing_required_paths: list[str]
+    tokens_before_first_required_evidence: int | None
+    events_before_first_required_evidence: int | None
+    searches_before_first_required_evidence: int | None
+    reads_before_first_required_evidence: int | None
+    tokens_before_all_required_evidence: int | None
+    events_before_all_required_evidence: int | None
+    searches_before_all_required_evidence: int | None
+    reads_before_all_required_evidence: int | None
+    duplicate_queries: int
+    duplicate_query_estimated_tokens: int
+    duplicate_reads: int
+    duplicate_read_estimated_tokens: int
+    irrelevant_reads: int
+    irrelevant_read_estimated_tokens: int
+    total_estimated_exploration_tokens: int
+    navigation_ms_before_first_required_evidence: float | None
+    navigation_ms_before_all_required_evidence: float | None
+    total_navigation_ms: float | None
+
+
+class ObservedOpportunities(TypedDict):
+    repeated_queries: list[RepeatedQuery]
+    repeated_reads: list[RepeatedRead]
+    note: str
+
+
+class RegretReport(TypedDict):
+    schema: str
+    trace_sha256: str
+    evidence_sha256: str
+    task_id: str
+    task_revision: str
+    repository_identity: str
+    mode: str
+    run_id: object
+    evidence_authority_identity: str
+    summary: RegretSummary
+    required_discovery_order: list[RequiredDiscovery]
+    observed_opportunities: ObservedOpportunities
+
+
+class RegretComparison(TypedDict):
+    schema: str
+    task_id: str
+    baseline: RegretReport
+    hashmarks: RegretReport
+    reductions: dict[str, int]
 
 
 def _sha256(path: Path) -> str:
@@ -63,8 +142,7 @@ def _relative_path(value: str, field: str, path: Path) -> str:
     return normalized
 
 
-def load_evidence(path: Path) -> dict[str, object]:
-    value = json.loads(path.read_text(encoding="utf-8"))
+def _validate_evidence(value: object, path: Path) -> TypeGuard[RetrievalEvidence]:
     if not isinstance(value, dict) or value.get("schema") != EVIDENCE_SCHEMA:
         raise ValueError(f"unsupported retrieval evidence schema: {path}")
     for field in (
@@ -86,13 +164,21 @@ def load_evidence(path: Path) -> dict[str, object]:
     if len(set(normalized)) != len(normalized):
         raise ValueError(f"required_paths contains duplicates: {path}")
     value["required_paths"] = normalized
+    return True
+
+
+def load_evidence(path: Path) -> RetrievalEvidence:
+    value: object = json.loads(path.read_text(encoding="utf-8"))
+    if not _validate_evidence(value, path):
+        raise ValueError(f"invalid retrieval evidence: {path}")
     return value
 
 
-def _event_paths(event: dict[str, object]) -> list[str]:
+def _event_paths(event: TraceEvent) -> list[str]:
     values: list[str] = []
-    if isinstance(event.get("path"), str):
-        values.append(event["path"])
+    path = event.get("path")
+    if isinstance(path, str):
+        values.append(path)
     for field in ("paths", "returned_paths", "evidence_paths"):
         raw = event.get(field)
         if isinstance(raw, list):
@@ -107,8 +193,8 @@ def _event_paths(event: dict[str, object]) -> list[str]:
     return normalized
 
 
-def _event_tokens(event: dict[str, object]) -> int:
-    return int(event.get("estimated_tokens", 0))
+def _event_tokens(event: TraceEvent) -> int:
+    return event.get("estimated_tokens", 0)
 
 
 @dataclass
@@ -134,11 +220,11 @@ class RegretObservations:
     irrelevant_reads: int = 0
     duplicate_query_tokens: int = 0
     duplicate_read_tokens: int = 0
-    required_discovery_order: list[dict[str, Any]] = field(default_factory=list)
-    repeated_queries: list[dict[str, Any]] = field(default_factory=list)
-    repeated_reads: list[dict[str, Any]] = field(default_factory=list)
+    required_discovery_order: list[RequiredDiscovery] = field(default_factory=list)
+    repeated_queries: list[RepeatedQuery] = field(default_factory=list)
+    repeated_reads: list[RepeatedRead] = field(default_factory=list)
 
-    def _observe_timing(self, event: dict[str, object]) -> int | None:
+    def _observe_timing(self, event: TraceEvent) -> int | None:
         started = event.get("started_at_ns")
         finished = event.get("finished_at_ns")
         if isinstance(started, int) and self.navigation_start_ns is None:
@@ -149,7 +235,7 @@ class RegretObservations:
             )
         return started if isinstance(started, int) else None
 
-    def _observe_query(self, index: int, event: dict[str, object], tokens: int) -> None:
+    def _observe_query(self, index: int, event: TraceEvent, tokens: int) -> None:
         query = event.get("query")
         if not isinstance(query, str) or not query.strip():
             return
@@ -201,7 +287,7 @@ class RegretObservations:
             self.all_tokens = self.cumulative_tokens
             self.all_evidence_started_ns = started_at_ns
 
-    def observe(self, index: int, event: dict[str, object]) -> None:
+    def observe(self, index: int, event: TraceEvent) -> None:
         kind = event["kind"]
         tokens = _event_tokens(event)
         paths = _event_paths(event)
@@ -220,7 +306,7 @@ class RegretObservations:
             self.reads_before_all += int(kind in READ_KINDS)
         self.cumulative_tokens += tokens
 
-    def summary(self) -> dict[str, object]:
+    def summary(self) -> RegretSummary:
         missing = sorted(self.required - self.discovered)
         return {
             "required_path_count": len(self.required),
@@ -270,9 +356,8 @@ def _elapsed_ms(start: int | None, finish: int | None) -> float | None:
     return None if start is None or finish is None else (finish - start) / 1_000_000.0
 
 
-def analyze(trace_path: Path, evidence_path: Path) -> dict[str, object]:
-    trace_module = _load_trace_module()
-    trace = trace_module.load_trace(trace_path)
+def analyze(trace_path: Path, evidence_path: Path) -> RegretReport:
+    trace = load_trace(trace_path)
     evidence = load_evidence(evidence_path)
     for field in ("task_id", "task_revision", "repository_identity"):
         if trace.get(field) != evidence[field]:
@@ -303,9 +388,14 @@ def analyze(trace_path: Path, evidence_path: Path) -> dict[str, object]:
     }
 
 
-def compare(
-    baseline: dict[str, object], hashmarks: dict[str, object]
-) -> dict[str, object]:
+def _comparison_metric(summary: Mapping[str, object], key: str) -> int:
+    value = summary[key]
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise ValueError(f"complete regret report lacks integer metric: {key}")
+    return value
+
+
+def compare(baseline: RegretReport, hashmarks: RegretReport) -> RegretComparison:
     for field in ("task_id", "task_revision", "repository_identity", "evidence_sha256"):
         if baseline.get(field) != hashmarks.get(field):
             raise ValueError(f"regret comparison {field} mismatch")
@@ -329,7 +419,10 @@ def compare(
         "irrelevant_reads",
         "irrelevant_read_estimated_tokens",
     )
-    reductions = {key + "_reduction": int(b[key]) - int(h[key]) for key in metric_keys}
+    reductions = {
+        key + "_reduction": _comparison_metric(b, key) - _comparison_metric(h, key)
+        for key in metric_keys
+    }
     return {
         "schema": "hashmarks.agent-retrieval-regret-comparison.v2",
         "task_id": baseline["task_id"],

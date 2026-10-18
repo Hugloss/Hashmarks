@@ -3,6 +3,8 @@ from __future__ import annotations
 import copy
 from pathlib import Path
 
+from contract_assertions import assert_array, assert_object, assert_records
+
 from hashmarks.adapters import uv_lock_dependency_observation
 from hashmarks.codemap.engine import CodeMap
 
@@ -105,31 +107,57 @@ def test_uv_repository_input_path_move_preserves_resolution_and_source_bytes(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.dependency_resolution_evidence(before_raw)
+        before = codemap.dependencies.observe(before_raw)
 
         old_path.unlink()
         new_path.write_bytes(lock)
         codemap.index.sync(["before/uv.lock", "after/uv.lock"])
-        after = codemap.dependency_resolution_evidence(after_raw)
-        delta = codemap.dependency_resolution_delta(before, after)
+        after = codemap.dependencies.observe(after_raw)
+        delta = codemap.dependencies.delta(before, after)
 
     assert before["definition_identity"] == after["definition_identity"]
     assert before["resolution_identity"] == after["resolution_identity"]
     assert before["observation_identity"] != after["observation_identity"]
-    assert before["repository_inputs"][0]["source_equivalence"] == "unknown"
-    assert after["repository_inputs"][0]["source_equivalence"] == "unknown"
-    assert before["repository_inputs"][0]["observed_member_revision"] is not None
-    assert after["repository_inputs"][0]["observed_member_revision"] is not None
     assert (
-        before["repository_inputs"][0]["observed_member_revision"]
-        == after["repository_inputs"][0]["observed_member_revision"]
+        assert_object(assert_array(before["repository_inputs"])[0])[
+            "source_equivalence"
+        ]
+        == "unknown"
+    )
+    assert (
+        assert_object(assert_array(after["repository_inputs"])[0])["source_equivalence"]
+        == "unknown"
+    )
+    assert (
+        assert_object(assert_array(before["repository_inputs"])[0])[
+            "observed_member_revision"
+        ]
+        is not None
+    )
+    assert (
+        assert_object(assert_array(after["repository_inputs"])[0])[
+            "observed_member_revision"
+        ]
+        is not None
+    )
+    assert (
+        assert_object(assert_array(before["repository_inputs"])[0])[
+            "observed_member_revision"
+        ]
+        == assert_object(assert_array(after["repository_inputs"])[0])[
+            "observed_member_revision"
+        ]
     )
     assert delta["comparability"] == "comparable"
-    assert delta["change_axes"]["semantic_resolution"] == "unchanged"
-    assert delta["change_axes"]["repository_inputs"] == "changed"
-    assert delta["change_axes"]["physical_evidence_topology"] == "unchanged"
-    assert delta["change_axes"]["physical_evidence_content"] == "unchanged"
-    assert delta["change_axes"]["repository_generation"] == "unchanged"
+    assert assert_object(delta["change_axes"])["semantic_resolution"] == "unchanged"
+    assert assert_object(delta["change_axes"])["repository_inputs"] == "changed"
+    assert (
+        assert_object(delta["change_axes"])["physical_evidence_topology"] == "unchanged"
+    )
+    assert (
+        assert_object(delta["change_axes"])["physical_evidence_content"] == "unchanged"
+    )
+    assert assert_object(delta["change_axes"])["repository_generation"] == "unchanged"
 
 
 def test_identical_repository_input_bytes_keep_distinct_path_authority(
@@ -151,21 +179,25 @@ def test_identical_repository_input_bytes_keep_distinct_path_authority(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        observation = codemap.dependency_resolution_evidence(raw)
-        derivation = codemap.dependency_resolution_derivation_authority(observation)
+        observation = codemap.dependencies.observe(raw)
+        derivation = codemap.dependencies.derivation_authority(observation)
 
-    assert [row["path"] for row in observation["repository_inputs"]] == [
+    assert [
+        row["path"] for row in assert_records(observation["repository_inputs"])
+    ] == [
         "one/uv.lock",
         "two/uv.lock",
     ]
     observed_revisions = {
-        row["observed_member_revision"] for row in observation["repository_inputs"]
+        row["observed_member_revision"]
+        for row in assert_records(observation["repository_inputs"])
     }
     assert None not in observed_revisions
     assert len(observed_revisions) == 1
-    assert {row["source_equivalence"] for row in observation["repository_inputs"]} == {
-        "unknown"
-    }
+    assert {
+        row["source_equivalence"]
+        for row in assert_records(observation["repository_inputs"])
+    } == {"unknown"}
     assert derivation["repository_inputs"] == observation["repository_inputs"]
 
 
@@ -174,26 +206,28 @@ def test_evidence_source_disappearance_degrades_qualification_not_semantics(
 ) -> None:
     before_raw = _source_loss_snapshot()
     after_raw = copy.deepcopy(before_raw)
-    after_raw["evidence_sources"] = [after_raw["evidence_sources"][0]]
-    after_raw["evidence_sources"][0]["completeness"] = "incomplete"
+    after_raw["evidence_sources"] = [assert_array(after_raw["evidence_sources"])[0]]
+    assert_object(after_raw["evidence_sources"][0])["completeness"] = "incomplete"
     for family in ("selections", "inventory", "coverage"):
-        for row in after_raw[family]:
+        for row in assert_records(after_raw[family]):
             row["evidence_sources"] = ["fixture:primary"]
-    for row in after_raw["coverage"]:
+    for row in assert_records(after_raw["coverage"]):
         row["completeness"] = "incomplete"
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.dependency_resolution_evidence(before_raw)
-        after = codemap.dependency_resolution_evidence(after_raw)
-        delta = codemap.dependency_resolution_delta(before, after)
+        before = codemap.dependencies.observe(before_raw)
+        after = codemap.dependencies.observe(after_raw)
+        delta = codemap.dependencies.delta(before, after)
 
     assert before["definition_identity"] == after["definition_identity"]
     assert before["resolution_identity"] == after["resolution_identity"]
     assert before["observation_identity"] != after["observation_identity"]
     assert delta["comparability"] == "comparable"
-    assert delta["change_axes"]["semantic_resolution"] == "unchanged"
-    assert delta["change_axes"]["physical_evidence_topology"] == "changed"
-    assert delta["change_axes"]["physical_evidence_content"] == "unknown"
-    assert delta["change_axes"]["evidence_qualification"] == "changed"
-    assert delta["change_axes"]["coverage"] == "changed"
+    assert assert_object(delta["change_axes"])["semantic_resolution"] == "unchanged"
+    assert (
+        assert_object(delta["change_axes"])["physical_evidence_topology"] == "changed"
+    )
+    assert assert_object(delta["change_axes"])["physical_evidence_content"] == "unknown"
+    assert assert_object(delta["change_axes"])["evidence_qualification"] == "changed"
+    assert assert_object(delta["change_axes"])["coverage"] == "changed"

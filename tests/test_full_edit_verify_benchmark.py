@@ -5,6 +5,22 @@ import pytest
 from scripts.agent_evaluation import full_edit_verify_benchmark as benchmark
 
 
+def test_packet_acquisition_uses_real_canonical_components(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "owner.py").write_text("def owner():\n    return 1\n", encoding="utf-8")
+
+    packets, elapsed = benchmark.packet_all(
+        Path(__file__).resolve().parents[1],
+        repo,
+        [{"id": "one", "query": "change owner.py"}],
+    )
+
+    assert set(packets) == {"one"}
+    assert packets["one"]["edit"]["path"] == "owner.py"
+    assert elapsed >= 0
+
+
 def test_run_lane_measures_first_edit_and_controlled_recovery(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -7,11 +7,15 @@ The current implementation handoff is
 The user authorizes a breaking Python API and removal of compatibility paths.
 Implementation is in progress under the user's explicit instruction. Earlier
 source-binding/cache/source-read/manifest/metadata repairs are implemented.
-Files, identity observation access, Index, DecisionScope and Source are
-independent components with bounded proof. The remaining domains and broad
-qualification are unfinished.
-Follow the implementation checkpoint in the component plan and continue CR-02
-rather than replaying the captured baseline or already repaired defects.
+All 23 canonical component owners are implemented; CodeMap now owns composition
+and resource lifetime. All 95 public operations in the frozen rewrite baseline
+map to current named component operations, with no retired root callables.
+Current full configured Ty and Pyright pass. This is implementation and scoped
+proof, not complete architecture acceptance or backend 5/5 qualification.
+Follow the latest implementation checkpoint in the component plan: continue
+CR-11 operation/direct-test/baseline correspondence and locality qualification,
+then CR-12 current full membership, comparable economics and exact artifacts.
+Do not restart CR-02 or relabel historical reports with the current observer.
 
 The broad twenty-capability 5/5 target below is retained as a later research and
 qualification track. Its minima, oracles, review requirements, failed evidence

@@ -407,9 +407,6 @@ class TaskEvidenceScopedMethodMixin:
             return None
         if not codemap._task_evidence_declaration_visible(path):
             return None
-        parent = codemap._task_evidence_retrieved_class_scope(path, row)
-        if parent is not None:
-            return parent
         matches = [
             symbol
             for symbol in codemap.reads.symbols_for_path(path)
@@ -438,6 +435,13 @@ class TaskEvidenceScopedMethodMixin:
         state = codemap.verification._verification_state(
             codemap._task_query(task), path, "", ()
         )
+        state.task_terms = {
+            variant
+            for term in state.task_terms
+            for variant in codemap.search._task_natural_term_variants(
+                term, include_derivations=True
+            )
+        }
         subject_terms = sorted(
             state.task_terms.intersection(
                 _query_terms(
@@ -446,7 +450,11 @@ class TaskEvidenceScopedMethodMixin:
             )
         )
         lexical = (
-            codemap.reads.lexical_file_candidates(subject_terms, limit=65)
+            codemap.reads.lexical_file_candidates(
+                subject_terms,
+                limit=65,
+                paths=codemap.verification._verification_test_paths(state),
+            )
             if subject_terms
             else []
         )
@@ -590,9 +598,7 @@ class TaskEvidenceScopedMethodMixin:
             self._task_evidence_test_declaration_matches(
                 {
                     **row,
-                    "task_anchor_terms": list(
-                        _query_terms(source_symbol.rsplit(".", 1)[-1])
-                    ),
+                    "task_anchor_terms": list(_query_terms(source_symbol)),
                 },
                 fallback=0,
             )
@@ -601,12 +607,12 @@ class TaskEvidenceScopedMethodMixin:
         )
         return (
             score[0],
-            int(row.get("source_filename_prefix_match") is True),
             score[1],
+            source_overlap if source_overlap >= 2 else 0,
+            int(row.get("source_filename_prefix_match") is True),
             self._task_evidence_problem_filename_matches(
                 row, source_symbol=source_symbol, source_path=source_path
             ),
-            source_overlap if source_overlap >= 2 else 0,
             self._task_evidence_test_directory_matches(row),
             cast("int", row.get("subject_term_matches", 0)),
             declaration_matches,
@@ -737,6 +743,7 @@ class TaskEvidenceScopedMethodMixin:
             if RepositoryDomain.TEST
             not in classify_repository_path(str(row.get("path") or ""))
         ][:3]
+        source_rows = codemap._task_evidence_verification_subject_rows(source_rows)
         candidate_groups = [
             codemap._task_evidence_candidate_verifiers(task, row) for row in source_rows
         ]
@@ -794,7 +801,9 @@ class TaskEvidenceScopedMethodMixin:
         ]
         relevance["candidate_disclosure"] = {
             "basis": "indexed-source-candidates-and-task-matches",
-            "subject_bound": 3,
+            "source_locator_bound": 3,
+            "subject_bound": 6,
+            "observed_subjects": len(source_rows),
             "returned_bound": limit,
             "observed_candidates": len(ordered),
             "returned_candidates": len(relevance["candidates"]),
@@ -802,6 +811,28 @@ class TaskEvidenceScopedMethodMixin:
             "verification_selection_authority": False,
             "negative_evidence_admissible": False,
         }
+
+    def _task_evidence_verification_subject_rows(
+        self, rows: Sequence[Mapping[str, object]]
+    ) -> list[Mapping[str, object]]:
+        """Retain exact declarations and independently observed parent contexts."""
+        codemap = cast("RepositoryTasks", self)
+        subjects: dict[tuple[str, str], Mapping[str, object]] = {}
+        for row in rows:
+            path = str(row.get("path") or "")
+            subjects.setdefault((path, str(row.get("symbol") or "")), row)
+            parent = codemap._task_evidence_retrieved_class_scope(path, row)
+            if parent is not None and parent["qualname"] != row.get("symbol"):
+                subjects.setdefault(
+                    (path, str(parent["qualname"])),
+                    {
+                        "path": path,
+                        "symbol": parent["qualname"],
+                        "start_line": parent["start_line"],
+                        "end_line": parent["end_line"],
+                    },
+                )
+        return list(subjects.values())
 
     def _task_evidence_named_class_scope(
         self, task: str

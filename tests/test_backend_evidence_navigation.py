@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -25,7 +26,7 @@ PATH = "backend.py"
 def _observe(repo: Path, *, guidance: bool) -> dict:
     with CodeMap(repo) as codemap:
         codemap.index.sync()
-        return codemap.discover_repository_declarations(
+        return codemap.declarations.discover(
             [
                 StaticPythonBackendDeclarations(
                     paths=(PATH,),
@@ -174,17 +175,17 @@ def test_default_provider_identity_is_not_modified_without_opt_in(
     _write(tmp_path, "import os\nx = os.getenv('K')\n")
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        implicit = codemap.discover_repository_declarations(
+        implicit = codemap.declarations.discover(
             [StaticPythonBackendDeclarations(paths=(PATH,))]
         )
-        explicit_false = codemap.discover_repository_declarations(
+        explicit_false = codemap.declarations.discover(
             [
                 StaticPythonBackendDeclarations(
                     paths=(PATH,), include_evidence_navigation=False
                 )
             ]
         )
-        opt_in = codemap.discover_repository_declarations(
+        opt_in = codemap.declarations.discover(
             [
                 StaticPythonBackendDeclarations(
                     paths=(PATH,), include_evidence_navigation=True
@@ -200,8 +201,9 @@ def test_default_provider_identity_is_not_modified_without_opt_in(
 @pytest.mark.parametrize("invalid", [None, 0, 1, "yes", [], {}])
 def test_navigation_requires_exact_bool_at_admission(invalid: object) -> None:
     with pytest.raises(ValueError, match="include_evidence_navigation"):
-        StaticPythonBackendDeclarations(
-            paths=(PATH,), include_evidence_navigation=invalid
+        replace(
+            StaticPythonBackendDeclarations(paths=(PATH,)),
+            include_evidence_navigation=invalid,
         )
 
 
@@ -214,12 +216,10 @@ def test_source_revision_delta_includes_guidance_without_cached_old_ranges(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.discover_repository_declarations([provider])
+        before = codemap.declarations.discover([provider])
         _write(tmp_path, "import os\nx = os.getenv(make_key())\n")
         codemap.index.sync([PATH])
-        after = codemap.discover_repository_declarations(
-            [provider], previous_observation=before
-        )
+        after = codemap.declarations.discover([provider], previous_observation=before)
     guide = _values(after, "python-env-access-syntax")[0]["evidence_navigation"]
     assert guide["source_inspection_recommended"] is True
     assert guide["read_requests"][0]["start_line"] == 2
@@ -237,7 +237,7 @@ def test_visibility_blocks_source_guidance_without_leaking_literals(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         with pytest.raises(RepositoryDeclarationProviderError):
-            codemap.discover_repository_declarations(
+            codemap.declarations.discover(
                 [
                     StaticPythonBackendDeclarations(
                         paths=(PATH,), include_evidence_navigation=True

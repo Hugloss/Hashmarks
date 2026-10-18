@@ -8,7 +8,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, TypedDict
 
 from hashmarks._command_output import log_command_output
 from hashmarks.codemap import (
@@ -31,6 +31,20 @@ PROTOCOL_SCHEMA = "hashmarks.worker-behavior-ab-protocol.v1"
 FAMILY = "hashmarks-worker-behavior-a"
 
 
+class _BehaviorScore(TypedDict):
+    summary: dict[str, int | float]
+    tasks: list[dict[str, object]]
+
+
+class _RepositoryReport(TypedDict):
+    name: str
+    workspace: str
+    public_task_sha256: str
+    hidden_corpus_sha256: str
+    direct_edit: _BehaviorScore
+    uncertainty_gated: _BehaviorScore
+
+
 def _identity(value: object) -> str:
     payload = json.dumps(
         value, sort_keys=True, separators=(",", ":"), ensure_ascii=True
@@ -47,7 +61,10 @@ def _entry_state(
         with CodeMap(source) as codemap:
             codemap.index.sync()
             value = codemap.tasks.entry_points(query, limit=limit)
-    recommended = [row for row in value.get("recommended", []) if isinstance(row, dict)]
+    raw_recommended = value.get("recommended", [])
+    if not isinstance(raw_recommended, list):
+        raise ValueError("recommended entries must be a list")
+    recommended = [row for row in raw_recommended if isinstance(row, dict)]
     ambiguity = value.get("ambiguity", {})
     if not isinstance(ambiguity, dict):
         ambiguity = {}
@@ -125,13 +142,13 @@ def run_worker(
     )
 
 
-def _score(tasks: list[dict[str, Any]], output: dict[str, Any]) -> dict[str, object]:
+def _score(tasks: list[dict[str, Any]], output: dict[str, Any]) -> _BehaviorScore:
     by_id = {
         str(row.get("id") or ""): row
         for row in output.get("tasks", [])
         if isinstance(row, dict)
     }
-    rows = []
+    rows: list[dict[str, object]] = []
     for task in tasks:
         task_id = str(task.get("id") or task.get("query") or "")
         expected = {str(value) for value in task.get("expected_files") or ()}
@@ -219,9 +236,9 @@ def _run_policy_workers(
     return outputs
 
 
-def _summary_totals(reports: list[dict[str, object]]) -> dict[str, int]:
-    def total(policy: str, key: str) -> int:
-        return sum(int(repo[policy]["summary"][key]) for repo in reports)  # type: ignore[index]
+def _summary_totals(reports: list[_RepositoryReport]) -> dict[str, int]:
+    def total(policy: Literal["direct_edit", "uncertainty_gated"], key: str) -> int:
+        return sum(int(repo[policy]["summary"][key]) for repo in reports)
 
     return {
         "tasks": total("direct_edit", "tasks"),
@@ -235,7 +252,7 @@ def _summary_totals(reports: list[dict[str, object]]) -> dict[str, int]:
 
 def collect(root: Path, *, limit: int = 20) -> dict[str, object]:
     repos = materialize_challenge(root / "challenge")
-    reports = []
+    reports: list[_RepositoryReport] = []
     for name, workspace, corpus, public_path in repos:
         outputs = _run_policy_workers(root, name, workspace, public_path, limit)
 

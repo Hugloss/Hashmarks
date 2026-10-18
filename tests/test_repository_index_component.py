@@ -81,6 +81,30 @@ def test_readiness_does_not_repair_an_incomplete_build(index: RepositoryIndex) -
     assert index.store.meta("sync.build_state") == "COMPLETE"
 
 
+def test_member_reconciliation_rejects_a_competing_publication_before_writing(
+    index: RepositoryIndex,
+) -> None:
+    source = index.workspace / "owner.py"
+    source.write_text("def original(): return 1\n")
+    first = index.sync()
+    source.write_text("def replacement(): return 2\n")
+    with index.store.publication_transaction():
+        index.store.bump_generation()
+    competing_generation = index.store.generation()
+
+    with pytest.raises(RuntimeError, match="changed before expected decision session"):
+        index.reconcile_path("owner.py", expected_generation=first.generation)
+
+    assert index.store.generation() == competing_generation
+    assert index.store.symbol("original")
+    assert not index.store.symbol("replacement")
+    published = index.reconcile_path(
+        "owner.py", expected_generation=competing_generation
+    )
+    assert published == index.store.generation() > competing_generation
+    assert index.store.symbol("replacement")
+
+
 def test_admission_and_index_support_remain_separate(index: RepositoryIndex) -> None:
     (index.workspace / "owner.py").write_text("def owner(): pass\n")
     (index.workspace / "contract.proto").write_text("message Contract {}\n")

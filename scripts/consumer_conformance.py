@@ -26,11 +26,11 @@ def main(argv: list[str] | None = None) -> int:
         "certification_authority": "external",
     }
     log_command_output(logger, json.dumps(payload, indent=2, sort_keys=True))
-    return (
-        0
-        if all(row["result"]["valid"] == row["expected_valid"] for row in vectors)
-        else 2
-    )
+    for row in vectors:
+        result = row["result"]
+        if not isinstance(result, dict) or result.get("valid") != row["expected_valid"]:
+            return 2
+    return 0
 
 
 if __name__ == "__main__":

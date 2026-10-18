@@ -72,6 +72,8 @@ class RepositoryContext(WorkContextProjection, ReadScopeOwner):
         relationships: RepositoryRelationships,
         cache: ContextCache,
     ) -> None:
+        if search.reads is not source.reads or relationships.reads is not source.reads:
+            raise ValueError("Context inputs must share one repository read scope")
         self.source = source
         self.search = search
         self.relationships = relationships

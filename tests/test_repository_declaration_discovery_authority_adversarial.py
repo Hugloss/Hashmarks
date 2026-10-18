@@ -505,18 +505,18 @@ def test_detection_lifecycle_adds_and_removes_claims_without_inventing_absence(
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        not_detected = codemap.discover_repository_declarations([provider])
+        not_detected = codemap.declarations.discover([provider])
 
         marker.write_text("enabled\n", encoding="utf-8")
         codemap.index.sync(["provider.marker"])
-        collected = codemap.discover_repository_declarations(
+        collected = codemap.declarations.discover(
             [provider],
             previous_observation=not_detected,
         )
 
         marker.unlink()
         codemap.index.sync(["provider.marker"])
-        removed = codemap.discover_repository_declarations(
+        removed = codemap.declarations.discover(
             [provider],
             previous_observation=collected,
         )
@@ -574,12 +574,12 @@ def test_warning_text_is_wrapper_provenance_until_coverage_explicitly_downgrades
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        base = codemap.discover_repository_declarations([base_provider])
-        warned = codemap.discover_repository_declarations(
+        base = codemap.declarations.discover([base_provider])
+        warned = codemap.declarations.discover(
             [warning_provider],
             previous_observation=base,
         )
-        incomplete = codemap.discover_repository_declarations(
+        incomplete = codemap.declarations.discover(
             [incomplete_provider],
             previous_observation=warned,
         )
@@ -629,12 +629,12 @@ def test_enumerated_source_move_changes_definition_without_value_churn(
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        before = codemap.discover_repository_declarations([provider])
+        before = codemap.declarations.discover([provider])
 
         moved = repo / "owners" / "b.meta"
         source.replace(moved)
         codemap.index.sync(["owners/a.meta", "owners/b.meta"])
-        after = codemap.discover_repository_declarations(
+        after = codemap.declarations.discover(
             [provider],
             previous_observation=before,
         )
@@ -690,18 +690,18 @@ def _generated_ownership_lifecycle(
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        present = codemap.discover_repository_declarations([provider])
+        present = codemap.declarations.discover([provider])
 
         generated.unlink()
         codemap.index.sync(["owners/generated.meta"])
-        absent = codemap.discover_repository_declarations(
+        absent = codemap.declarations.discover(
             [provider],
             previous_observation=present,
         )
 
         generated.write_text("team-b\n", encoding="utf-8")
         codemap.index.sync(["owners/generated.meta"])
-        restored = codemap.discover_repository_declarations(
+        restored = codemap.declarations.discover(
             [provider],
             previous_observation=absent,
         )
@@ -862,14 +862,12 @@ def _ownership_uncertainty_packets(
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        baseline = codemap.discover_repository_declarations(
-            [_OwnershipUncertaintyProvider()]
-        )
+        baseline = codemap.declarations.discover([_OwnershipUncertaintyProvider()])
 
         generated.write_text("team-a | team-b\n", encoding="utf-8")
         policy.unlink()
         codemap.index.sync(["owners/catalog.meta", ".github/CODEOWNERS"])
-        stressed = codemap.discover_repository_declarations(
+        stressed = codemap.declarations.discover(
             [
                 _OwnershipUncertaintyProvider(
                     coverage_state="incomplete",
@@ -1041,14 +1039,14 @@ def _policy_multiplicity_packets(
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        baseline = codemap.discover_repository_declarations([provider])
+        baseline = codemap.declarations.discover([provider])
 
         policy.write_text(
             "* team-a\n/components/* team-a\n/components/specific team-b\n",
             encoding="utf-8",
         )
         codemap.index.sync([".github/CODEOWNERS"])
-        stressed = codemap.discover_repository_declarations(
+        stressed = codemap.declarations.discover(
             [provider],
             previous_observation=baseline,
         )
@@ -1201,14 +1199,14 @@ def _namespace_isolation_packets(
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        provider_a = codemap.discover_repository_declarations(
+        provider_a = codemap.declarations.discover(
             [_NamespacedOwnershipProvider("provider-a")]
         )
-        provider_b = codemap.discover_repository_declarations(
+        provider_b = codemap.declarations.discover(
             [_NamespacedOwnershipProvider("provider-b")],
             previous_observation=provider_a,
         )
-        provider_b_version = codemap.discover_repository_declarations(
+        provider_b_version = codemap.declarations.discover(
             [
                 _NamespacedOwnershipProvider(
                     "provider-b",
@@ -1217,7 +1215,7 @@ def _namespace_isolation_packets(
             ],
             previous_observation=provider_b,
         )
-        provider_b_scope = codemap.discover_repository_declarations(
+        provider_b_scope = codemap.declarations.discover(
             [
                 _NamespacedOwnershipProvider(
                     "provider-b",

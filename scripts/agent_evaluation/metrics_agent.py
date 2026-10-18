@@ -7,6 +7,7 @@ import tempfile
 import time
 from collections.abc import Callable
 from pathlib import Path
+from typing import TypeVar
 
 from hashmarks._command_output import log_command_output
 from hashmarks.codemap import CodeMap
@@ -15,9 +16,10 @@ from hashmarks.codemap.python_ast import estimate_tokens
 logger = logging.getLogger(__name__)
 
 SCHEMA = "hashmarks.agent-metrics.v1"
+_T = TypeVar("_T")
 
 
-def _timed(fn: Callable[[], object]) -> tuple[object, float]:
+def _timed(fn: Callable[[], _T]) -> tuple[_T, float]:
     started = time.perf_counter()
     value = fn()
     return value, time.perf_counter() - started
@@ -80,7 +82,7 @@ def collect(*, files: int = 1000, budget: int = 1000) -> dict[str, object]:
             syncs["edit"], seconds["one_file_reindex"] = _timed(
                 lambda: codemap.index.sync([target_path])
             )
-            stats = codemap.status()
+            stats = codemap.views.status()
 
         return {
             "schema": SCHEMA,

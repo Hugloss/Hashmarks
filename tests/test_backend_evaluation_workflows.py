@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from contract_assertions import assert_object
 
 from hashmarks.digest import FILE_DOMAIN, hash_file
 from hashmarks.test_shards import repository_content_identity
@@ -383,7 +384,7 @@ def test_independent_display_failure_is_a_hard_gate_and_has_exact_oracle_pointer
     assert witnesses and all(row["state"] == "FAIL" for row in witnesses)
     for witness in witnesses:
         (check,) = pointer_values(grader, witness["oracle_pointer"])
-        assert check["id"] == witness["check_id"]
+        assert assert_object(check)["id"] == witness["check_id"]
     suite, frozen = load_corpus(suite_path, sources)
     verify_task_summary(
         tmp_path / "display/handler/observations",
@@ -1239,7 +1240,7 @@ def test_initial_is_the_first_public_task_request_at_each_revision(
     def capture(
         _workspace: object, _state: object, case: dict[str, object]
     ) -> list[object]:
-        requests.append(case["inputs"]["result_mode"])
+        requests.append(assert_object(case["inputs"])["result_mode"])
         return []
 
     monkeypatch.setattr(backend_workflows, "capture_cli", capture)

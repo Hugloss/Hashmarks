@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING, cast
 
 from hashmarks.symbolic_identity import symbolic_nomination_record, symbolic_task_terms
 
+from .decision_session import ReadScopeOwner, decision_scoped
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
@@ -16,7 +18,7 @@ if TYPE_CHECKING:
     from .model import SearchHit
 
 
-class RetrievalDiagnosticsMixin:
+class RetrievalDiagnosticsMixin(ReadScopeOwner):
     def _symbolic_task_nomination(self, task: str) -> dict[str, object]:
         if TYPE_CHECKING:
             self = cast("RepositorySearch", self)
@@ -119,6 +121,16 @@ class RetrievalDiagnosticsMixin:
         if repeats > 20:
             raise ValueError("repeats must be <= 20")
 
+        self.prepare_task(task, limit)
+        return self._observe_retrieval_stability(task, limit=limit, repeats=repeats)
+
+    @decision_scoped
+    def _observe_retrieval_stability(
+        self, task: str, *, limit: int, repeats: int
+    ) -> dict[str, object]:
+        """Compare replays within one prepared repository publication."""
+        if TYPE_CHECKING:
+            self = cast("RepositorySearch", self)
         generation = self.store.generation()
         cache_key = (generation, task, int(limit))
         original_cached = self._task_result_cache.get(cache_key)
@@ -313,6 +325,16 @@ class RetrievalDiagnosticsMixin:
             self = cast("RepositorySearch", self)
         if limit < 1:
             raise ValueError("limit must be >= 1")
+        self.prepare_task(task, limit)
+        return self._observe_retrieval_explanation(task, limit=limit)
+
+    @decision_scoped
+    def _observe_retrieval_explanation(
+        self, task: str, *, limit: int
+    ) -> dict[str, object]:
+        """Keep selected hits and explanatory lanes on the same publication."""
+        if TYPE_CHECKING:
+            self = cast("RepositorySearch", self)
         selected = self.find_task(task, limit=limit)
         selected_paths = {hit.path for hit in selected}
         views = self.task_query_views(task)

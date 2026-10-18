@@ -23,12 +23,12 @@ from .semantic_relationship_model import (
     content_identity,
     direct_claim,
     portable_copy,
+    validated_position,
+    validated_range,
 )
 from .semantic_relationship_source import (
     RelationshipSourceResolver,
     uri_member,
-    validated_position,
-    validated_range,
 )
 
 CAPTURE_SCHEMA = "hashmarks.lsp-relationship-capture.v1"

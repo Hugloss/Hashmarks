@@ -214,7 +214,7 @@ def _dependency_codemap_code(args: Namespace) -> int:
     )
     value = _call_codemap(
         args,
-        lambda codemap: codemap.dependency_codemap(
+        lambda codemap: codemap.dependencies.codemap(
             snapshot, queries, previous_observation=previous, result_mode=mode
         ),
     )
@@ -261,9 +261,7 @@ def _repository_intelligence_query_code(args: Namespace) -> int:
     )
     value = _call_codemap(
         args,
-        lambda codemap: codemap.repository_intelligence_query(
-            surface, task, paths, options=options
-        ),
+        lambda codemap: codemap.views.query(surface, task, paths, options=options),
     )
     # The canonical query owns its presentation envelope, unlike other operations.
     native = validate_operation_response("repository_intelligence_query", value)
@@ -272,10 +270,28 @@ def _repository_intelligence_query_code(args: Namespace) -> int:
 
 
 def _repository_declarations_code(args: Namespace) -> int:
-    from .codemap.static_python_backend_declarations import (
-        StaticPythonBackendDeclarations,
-    )
+    from .codemap.repository_declaration_selection import source_declaration_providers
 
+    if args.python_backend_path is None and args.python_interface_json is None:
+        raise RepositoryCliError(
+            "select --python-backend-path or --python-interface-json"
+        )
+    interface = (
+        _read_json_object(args.python_interface_json, option="--python-interface-json")
+        if args.python_interface_json
+        else None
+    )
+    try:
+        providers = source_declaration_providers(
+            "discovery",
+            {
+                "python_backend_paths": args.python_backend_path,
+                "include_class_fields": args.include_class_fields,
+                "python_interface": interface,
+            },
+        )
+    except ValueError as exc:
+        raise RepositoryCliError(str(exc)) from exc
     previous = (
         _read_json_object(args.previous_observation, option="--previous-observation")
         if args.previous_observation
@@ -283,14 +299,9 @@ def _repository_declarations_code(args: Namespace) -> int:
     )
     value = _call_codemap(
         args,
-        lambda codemap: codemap.repository_declarations_operation(
+        lambda codemap: codemap.declarations.operation(
             [],
-            providers=(
-                StaticPythonBackendDeclarations(
-                    paths=tuple(args.python_backend_path),
-                    include_class_fields=args.include_class_fields,
-                ),
-            ),
+            providers=providers,
             previous_observation=previous,
             result_mode="discovery",
         ),
@@ -396,7 +407,7 @@ def _map_watch(args: Namespace) -> int:
 
 
 def _map_status(args: Namespace) -> int:
-    value = _call_codemap(args, lambda codemap: codemap.status())
+    value = _call_codemap(args, lambda codemap: codemap.views.status())
     _print(value)
     return 0
 
@@ -544,7 +555,7 @@ def _structural_locality_code(args: Namespace) -> int:
 
 
 def _structural_locality_delta_code(args: Namespace) -> int:
-    from .codemap import structural_locality_delta
+    from .codemap.structural_locality_delta import structural_locality_delta
 
     before = _read_json_object(args.before, option="--before")
     after = _read_json_object(args.after, option="--after")
@@ -640,7 +651,7 @@ def _changed_line_span_args(values: list[str] | None) -> list[dict[str, object]]
 def _change_impact_code(args: Namespace) -> int:
     value = _call_codemap(
         args,
-        lambda codemap: codemap.task_change_impact(
+        lambda codemap: codemap.changes.task_impact(
             args.task,
             args.changed,
             limit=args.limit,
@@ -662,7 +673,7 @@ def _post_change_code(args: Namespace) -> int:
     previous = _read_json_object(args.previous_evidence, option="--previous-evidence")
     value = _call_codemap(
         args,
-        lambda codemap: codemap.task_post_change_delta(
+        lambda codemap: codemap.changes.task_delta(
             args.task,
             args.changed,
             previous_evidence=previous,
@@ -1183,12 +1194,15 @@ def add_repository_cli(
     _add_json_observation_cli(sub, add_common_arguments=add_common_arguments)
     declarations = sub.add_parser(
         "repository-declarations",
-        help="observe source declarations in explicitly selected Python backend files",
+        help="observe declarations in explicitly selected Python source files",
     )
     add_common_arguments(declarations, inherited=True)
     _add_evidence_presentation_cli(declarations)
+    declarations.add_argument("--python-backend-path", action="append", metavar="PATH")
     declarations.add_argument(
-        "--python-backend-path", action="append", required=True, metavar="PATH"
+        "--python-interface-json",
+        metavar="FILE",
+        help="JSON object selecting interface paths, receiver names and syntax options",
     )
     declarations.add_argument("--include-class-fields", action="store_true")
     declarations.add_argument(

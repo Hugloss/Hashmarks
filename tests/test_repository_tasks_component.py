@@ -23,7 +23,7 @@ from hashmarks.codemap.task_evidence_initial import decode_initial_packet
 @pytest.fixture
 def tasks(index: RepositoryIndex) -> Iterator[RepositoryTasks]:
     ownership = _ownership(index)
-    verification = RepositoryVerification(ownership.source, ownership.imports)
+    verification = RepositoryVerification(ownership.imports)
     cache = ContextCache(index.workspace.parent / "task-context-cache")
     try:
         context = RepositoryContext(

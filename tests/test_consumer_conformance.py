@@ -130,7 +130,9 @@ def test_consumer_bundle_returns_small_normalized_repository_projection() -> Non
     envelope, contract = _bundle(identity)
     checked = validate_native_consumer_bundle(envelope, contract)
     assert checked["valid"] is True
+    assert "authority" in checked
     assert checked["authority"] == "repository-intelligence-only"
+    assert "normalized" in checked
     normalized = assert_object(checked["normalized"])
     assert assert_object(normalized["producer"])["implementation_identity"] == identity
     assert (
@@ -276,6 +278,7 @@ def test_invalid_bundle_never_emits_normalized_projection() -> None:
     checked = validate_native_consumer_bundle(envelope, contract)
     assert checked["valid"] is False
     assert "envelope:invalid-codemap-generation" in assert_array(checked["reasons"])
+    assert "normalized" in checked
     assert checked["normalized"] is None
 
 

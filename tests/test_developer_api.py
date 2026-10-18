@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+from contract_assertions import assert_integer, assert_object
 from pytest import CaptureFixture, MonkeyPatch
 
 from hashmarks import (
@@ -154,7 +155,7 @@ def test_registered_manifest_is_uploaded_once_and_reused_hot(
     calls = {"count": 0}
     original = daemon.engine.file_store._metadata
 
-    def counting(path: str) -> object:
+    def counting(path: Path) -> object:
         calls["count"] += 1
         return original(path)
 
@@ -178,8 +179,8 @@ def test_stats_expose_cache_and_incremental_counters(tmp_path: Path) -> None:
         identity.snapshot(File("a.txt"))
         stats = identity.stats()
     assert stats["schema"] == "fastidentity.identity.v1"
-    assert stats["file_store"]["content_hashes"] >= 1
-    assert "manifest_digest_calls" in stats["merkle"]
+    assert assert_integer(assert_object(stats["file_store"])["content_hashes"]) >= 1
+    assert "manifest_digest_calls" in assert_object(stats["merkle"])
 
 
 def test_daemon_mode_is_explicitly_required_when_requested(tmp_path: Path) -> None:

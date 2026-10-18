@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from contract_assertions import assert_object, assert_records
+
 from hashmarks.codemap.engine import CodeMap
 
 
@@ -37,11 +39,11 @@ def test_identical_span_bytes_keep_distinct_repository_path_authority(
             include_relationships=False,
         )
 
-    rows = {row["binding_id"]: row for row in packet["bindings"]}
+    rows = {row["binding_id"]: row for row in assert_records(packet["bindings"])}
     first = rows["path:a"]
     second = rows["path:b"]
-    first_evidence = first["evidence"][0]
-    second_evidence = second["evidence"][0]
+    first_evidence = assert_records(first["evidence"])[0]
+    second_evidence = assert_records(second["evidence"])[0]
 
     assert first_evidence["path"] == "a.py"
     assert second_evidence["path"] == "b.py"
@@ -83,10 +85,10 @@ def test_same_content_path_relocation_is_definition_change_not_content_change(
             binding_delta_before=before,
         )
 
-    before_binding = before["bindings"][0]
-    after_binding = after["bindings"][0]
-    before_evidence = before_binding["evidence"][0]
-    after_evidence = after_binding["evidence"][0]
+    before_binding = assert_records(before["bindings"])[0]
+    after_binding = assert_records(after["bindings"])[0]
+    before_evidence = assert_records(before_binding["evidence"])[0]
+    after_evidence = assert_records(after_binding["evidence"])[0]
 
     assert before_evidence["path"] == "a.py"
     assert after_evidence["path"] == "b.py"
@@ -101,12 +103,12 @@ def test_same_content_path_relocation_is_definition_change_not_content_change(
         != after_binding["binding_observation_identity"]
     )
 
-    changed = delta["bindings"]["changed"][0]
+    changed = assert_records(assert_object(delta["bindings"])["changed"])[0]
     assert changed["binding_id"] == "moved"
-    assert changed["definition"]["state"] == "changed"
-    assert changed["direct_evidence"]["state"] == "preserved"
-    assert changed["locator_evidence"]["state"] == "preserved"
-    assert changed["member_evidence"]["state"] == "preserved"
+    assert assert_object(changed["definition"])["state"] == "changed"
+    assert assert_object(changed["direct_evidence"])["state"] == "preserved"
+    assert assert_object(changed["locator_evidence"])["state"] == "preserved"
+    assert assert_object(changed["member_evidence"])["state"] == "preserved"
     assert coverage["binding_impacts"] == [
         {
             "binding_id": "moved",

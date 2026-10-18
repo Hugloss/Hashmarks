@@ -26,7 +26,9 @@ def test_collect_gradle_projects_normalizes_workspace_projects(
         "invalid",
     ]
 
-    def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+    def fake_run(
+        *args: list[str], **kwargs: list[str]
+    ) -> subprocess.CompletedProcess[str]:
         assert kwargs["cwd"] == tmp_path
         return subprocess.CompletedProcess(
             args[0],
@@ -82,7 +84,7 @@ def test_collect_gradle_projects_reports_failed_or_invalid_result(
 def test_collect_gradle_projects_reports_process_error(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    def fail(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+    def fail(*args: list[str], **kwargs: list[str]) -> subprocess.CompletedProcess[str]:
         raise OSError("cannot start")
 
     monkeypatch.setattr(subprocess, "run", fail)

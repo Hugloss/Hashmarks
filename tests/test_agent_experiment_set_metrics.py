@@ -2,21 +2,15 @@ from __future__ import annotations
 
 import hashlib
 import json
-from types import ModuleType
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING
 
 import pytest
 
+from scripts.agent_evaluation import metrics_agent_experiment as experiment_metrics
+from scripts.agent_evaluation import metrics_agent_experiment_set as experiment_sets
+
 if TYPE_CHECKING:
     from pathlib import Path
-
-_MODULE = __import__(
-    "scripts.agent_evaluation.metrics_agent_experiment_set", fromlist=["*"]
-)
-
-
-def _load() -> ModuleType:
-    return _MODULE
 
 
 def _digest(path: Path) -> str:
@@ -172,8 +166,7 @@ def _set(tmp_path: Path, *, experiments: int = 2, tasks_each: int = 2) -> Path:
 def test_set_aggregates_exact_tokens_but_does_not_overclaim_breadth(
     tmp_path: Path,
 ) -> None:
-    module = _load()
-    report = module.run_experiment_set(_set(tmp_path))
+    report = experiment_sets.run_experiment_set(_set(tmp_path))
     assert report["summary"]["aggregate_model_input_token_reduction"] == 0.4
     assert report["summary"]["internal_controlled_claim_eligible"] is True
     assert report["summary"]["public_broad_claim_eligible"] is False
@@ -182,8 +175,34 @@ def test_set_aggregates_exact_tokens_but_does_not_overclaim_breadth(
     assert report["summary"]["unique_task_count"] == 4
 
 
+@pytest.mark.parametrize("policy", [None, False, [], 0, "unknown"])
+def test_set_rejects_non_object_replication_policy(
+    tmp_path: Path, policy: object
+) -> None:
+    path = _set(tmp_path, experiments=1, tasks_each=1)
+    payload = json.loads(path.read_text())
+    payload["replication_policy"] = policy
+    path.write_text(json.dumps(payload))
+
+    with pytest.raises(ValueError, match="replication_policy must be an object"):
+        experiment_sets.run_experiment_set(path)
+
+
+def test_unknown_reduction_cannot_enter_qualified_aggregate(tmp_path: Path) -> None:
+    path = _experiment(tmp_path, 0)
+    report = experiment_metrics.run_experiment(path, strict_raw_evidence=True)
+    assert report["comparison"]["summary"]["token_reduction_claim_eligible"] is True
+    report["comparison"]["summary"]["average_model_input_token_reduction"] = None
+    state = experiment_sets._SetAggregation()
+
+    with pytest.raises(ValueError, match="lacks aggregate model-input token reduction"):
+        state.admit_report(report["experiment_id"], _digest(path), report)
+
+    assert state.experiment_reports == []
+    assert state.total_baseline_tokens == state.total_hashmarks_tokens == 0
+
+
 def test_set_rejects_model_config_drift(tmp_path: Path) -> None:
-    module = _load()
     set_path = _set(tmp_path, experiments=1)
     payload = json.loads(set_path.read_text())
     drift = _experiment(tmp_path / "drift", 9, model_config="sha256:other")
@@ -195,11 +214,10 @@ def test_set_rejects_model_config_drift(tmp_path: Path) -> None:
     )
     set_path.write_text(json.dumps(payload))
     with pytest.raises(ValueError, match="model_config_identity mismatch"):
-        module.run_experiment_set(set_path)
+        experiment_sets.run_experiment_set(set_path)
 
 
 def test_set_rejects_task_policy_drift(tmp_path: Path) -> None:
-    module = _load()
     set_path = _set(tmp_path, experiments=1)
     payload = json.loads(set_path.read_text())
     drift = _experiment(tmp_path / "drift", 9, task_policy="sha256:other-policy")
@@ -211,11 +229,10 @@ def test_set_rejects_task_policy_drift(tmp_path: Path) -> None:
     )
     set_path.write_text(json.dumps(payload))
     with pytest.raises(ValueError, match="task_policy_identity mismatch"):
-        module.run_experiment_set(set_path)
+        experiment_sets.run_experiment_set(set_path)
 
 
 def test_set_rejects_duplicate_experiment_id(tmp_path: Path) -> None:
-    module = _load()
     set_path = _set(tmp_path, experiments=1)
     payload = json.loads(set_path.read_text())
     duplicate = _experiment(tmp_path / "duplicate", 0, repo="sha256:other-repo")
@@ -227,11 +244,10 @@ def test_set_rejects_duplicate_experiment_id(tmp_path: Path) -> None:
     )
     set_path.write_text(json.dumps(payload))
     with pytest.raises(ValueError, match="duplicate experiment_id"):
-        module.run_experiment_set(set_path)
+        experiment_sets.run_experiment_set(set_path)
 
 
 def test_set_rejects_reused_task_identity_for_padding(tmp_path: Path) -> None:
-    module = _load()
     first = _experiment(tmp_path / "e1", 1, repo="sha256:same")
     second = _experiment(tmp_path / "e2", 2, repo="sha256:same")
     payload = json.loads(second.read_text())
@@ -281,11 +297,10 @@ def test_set_rejects_reused_task_identity_for_padding(tmp_path: Path) -> None:
         )
     )
     with pytest.raises(ValueError, match="task identity reused"):
-        module.run_experiment_set(set_path)
+        experiment_sets.run_experiment_set(set_path)
 
 
 def test_set_binds_exact_experiment_manifest_bytes(tmp_path: Path) -> None:
-    module = _load()
     set_path = _set(tmp_path, experiments=1)
     payload = json.loads(set_path.read_text())
     experiment_path = tmp_path / payload["experiments"][0]["manifest"]
@@ -293,17 +308,18 @@ def test_set_binds_exact_experiment_manifest_bytes(tmp_path: Path) -> None:
     experiment["runner_version"] = "mutated-after-set-created"
     experiment_path.write_text(json.dumps(experiment))
     with pytest.raises(ValueError, match="experiment manifest digest mismatch"):
-        module.run_experiment_set(set_path)
+        experiment_sets.run_experiment_set(set_path)
 
 
 def test_public_broad_claim_requires_fixed_breadth_floors(tmp_path: Path) -> None:
-    module = _load()
-    report = module.run_experiment_set(_set(tmp_path, experiments=3, tasks_each=10))
+    report = experiment_sets.run_experiment_set(
+        _set(tmp_path, experiments=3, tasks_each=10)
+    )
     assert report["summary"]["experiment_count"] == 3
     assert report["summary"]["repository_count"] == 3
     assert report["summary"]["unique_task_count"] == 30
     assert report["summary"]["public_broad_claim_eligible"] is True
-    assert module.gate(report, require_public_broad_claim=True) == []
+    assert experiment_sets.gate(report, require_public_broad_claim=True) == []
 
 
 def _replicated_set(tmp_path: Path, *, repeats: int = 3) -> Path:
@@ -347,32 +363,28 @@ def _replicated_set(tmp_path: Path, *, repeats: int = 3) -> Path:
 def test_v2_replication_reports_repeat_variance_and_descriptive_ci(
     tmp_path: Path,
 ) -> None:
-    module = _load()
-    report = module.run_experiment_set(_replicated_set(tmp_path))
+    report = experiment_sets.run_experiment_set(_replicated_set(tmp_path))
     rep = report["summary"]["replication"]
     assert report["schema"] == "hashmarks.agent-experiment-set-report.v2"
     assert rep["statistical_claim_eligible"] is True
     assert rep["group_count"] == 1
     assert rep["groups"][0]["repeat_count"] == 3
-    assert (
-        rep["descriptive_confidence_interval"]["scope"]
-        == "exact-retained-experiments-only"
-    )
-    assert rep["descriptive_confidence_interval"]["lower"] == pytest.approx(0.4)
-    assert rep["descriptive_confidence_interval"]["upper"] == pytest.approx(0.4)
+    interval = rep["descriptive_confidence_interval"]
+    assert interval is not None
+    assert interval["scope"] == "exact-retained-experiments-only"
+    assert interval["lower"] == pytest.approx(0.4)
+    assert interval["upper"] == pytest.approx(0.4)
 
 
 def test_v2_replication_requires_minimum_repeats(tmp_path: Path) -> None:
-    module = _load()
-    report = module.run_experiment_set(_replicated_set(tmp_path, repeats=2))
+    report = experiment_sets.run_experiment_set(_replicated_set(tmp_path, repeats=2))
     assert report["summary"]["replication"]["statistical_claim_eligible"] is False
 
 
 def test_v2_requires_explicit_replication_group(tmp_path: Path) -> None:
-    module = _load()
     path = _replicated_set(tmp_path)
     payload = json.loads(path.read_text())
     del payload["experiments"][0]["replication_group"]
     path.write_text(json.dumps(payload))
     with pytest.raises(ValueError, match="replication_group"):
-        module.run_experiment_set(path)
+        experiment_sets.run_experiment_set(path)

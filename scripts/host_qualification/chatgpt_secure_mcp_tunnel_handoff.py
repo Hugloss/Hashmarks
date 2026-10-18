@@ -20,10 +20,13 @@ from hashmarks.mcp_contract import (
 from hashmarks.mcp_launch import installed_mcp_command
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent
+REPOSITORY_ROOT = SCRIPTS_DIR.parent
+if str(REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPOSITORY_ROOT))
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-from mcp_host_gate_common import (  # noqa: E402 - standalone script path setup
+from scripts.mcp_host_gate_common import (  # noqa: E402 - standalone script path setup
     HostGateError,
     completed_at,
     run,

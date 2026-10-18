@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
 
 import pytest
 
 from scripts.repository_evaluation.backend_matrix import capability_matrix
 from scripts.repository_evaluation.common import CASES_SCHEMA, GRADER_SCHEMA
+from scripts.repository_evaluation.fact_grading import FactGrade
 from scripts.repository_evaluation.grade_cases import grade_run
 from scripts.repository_evaluation.run_cases import run_cases
 
@@ -61,7 +61,7 @@ def test_class_oracle_scopes_revision_but_checks_authority_of_all_class_records(
             "class_declarations": {**context, "source_revision": "other-revision"},
         },
     ]
-    checks = [
+    checks: list[dict[str, object]] = [
         {
             "id": key,
             "pointer": "/retrieval/results/*/class_declarations/" + key,
@@ -85,7 +85,7 @@ def test_class_oracle_scopes_revision_but_checks_authority_of_all_class_records(
         }
     )
 
-    def grade() -> dict:
+    def grade() -> FactGrade:
         return grade_facts(
             "classes", {"packet": {"retrieval": {"results": rows}}}, {"checks": checks}
         )

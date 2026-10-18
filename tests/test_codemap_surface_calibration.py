@@ -5,6 +5,7 @@ import shutil
 from typing import TYPE_CHECKING
 
 import pytest
+from contract_assertions import assert_object
 
 from benchmarks.codemap_surface_calibration import (
     _lexical_rows,
@@ -190,11 +191,11 @@ def test_decision_session_reuses_evidence_primitives_without_caching_final_packe
             stats = codemap.reads.stats()
         assert first["task"] != second["task"]
         assert (
-            first["identity"]["codemap_generation"]
-            == second["identity"]["codemap_generation"]
+            assert_object(first["identity"])["codemap_generation"]
+            == assert_object(second["identity"])["codemap_generation"]
         )
         assert sum(stats.values()) > 0
-        assert first["decision_metrics"]["session_active"] is True
+        assert assert_object(first["decision_metrics"])["session_active"] is True
 
 
 def test_calibration_aggregate_requires_every_matching_group() -> None:
@@ -324,7 +325,7 @@ def test_weak_generic_contract_anchor_fails_closed_but_identifier_anchor_resolve
         )
     assert generic["ambiguity"]["ambiguous"] is True
     assert generic["ambiguity"]["reason"] == "weak-task-anchor"
-    assert anchored["edit"]["path"] == "game_tape_observability.py"
+    assert assert_object(anchored["edit"])["path"] == "game_tape_observability.py"
     assert anchored["ambiguity"]["ambiguous"] is False
 
 

@@ -336,7 +336,12 @@ def _validate_host_capture(
         capture.get("model"),
         capture.get("variant"),
     )
-    if not all(isinstance(v, str) and v for v in (case, model, variant)):
+    if (
+        not isinstance(case, str)
+        or not isinstance(model, str)
+        or not isinstance(variant, str)
+        or not all((case, model, variant))
+    ):
         raise ValueError("host captures require case_id, model and variant")
     if model not in models or (case, variant) not in trial_by_key:
         raise ValueError("unexpected host capture")

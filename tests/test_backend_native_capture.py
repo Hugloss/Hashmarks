@@ -62,7 +62,10 @@ def specimen(tmp_path: Path) -> tuple[Path, Path, dict[str, object]]:
     revisions = {
         "backend.py": hash_file(source / "backend.py", domain=FILE_DOMAIN).hash
     }
-    definition = {"repository": "controlled-fixture", "commit": "fixture"}
+    definition: dict[str, object] = {
+        "repository": "controlled-fixture",
+        "commit": "fixture",
+    }
     write_json(
         capture / "backend-binding.json",
         {

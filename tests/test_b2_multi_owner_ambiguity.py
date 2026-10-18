@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from contract_assertions import assert_object
+
 from hashmarks.codemap import CodeMap
 
 
@@ -54,8 +56,8 @@ def test_dual_live_task_local_owners_require_discrimination(tmp_path: Path) -> N
     assert action["ambiguity"]["reason"] == "multiple-task-local-structural-owners"
     assert len(action["ambiguity"]["task_local_structural_owners"]) == 2
     assert action["ownership_authority"]["owner_resolved"] is False
-    assert packet["discrimination"]["needed"] is True
-    assert packet["discrimination"]["reason"] == "competing-action-roles"
+    assert assert_object(packet["discrimination"])["needed"] is True
+    assert assert_object(packet["discrimination"])["reason"] == "competing-action-roles"
 
 
 def test_multiple_task_local_tests_for_same_candidate_remain_unproven(
@@ -87,6 +89,6 @@ def test_multiple_task_local_tests_for_same_candidate_remain_unproven(
     ]
     assert action["ownership_authority"]["owner_resolved"] is False
     assert action["ownership_authority"]["candidate_owner"] == "src/feature/engine.py"
-    assert packet["edit"]["path"] == "src/feature/engine.py"
-    assert packet["discrimination"]["needed"] is True
-    assert packet["discrimination"]["reason"] == "ownership-unresolved"
+    assert assert_object(packet["edit"])["path"] == "src/feature/engine.py"
+    assert assert_object(packet["discrimination"])["needed"] is True
+    assert assert_object(packet["discrimination"])["reason"] == "ownership-unresolved"

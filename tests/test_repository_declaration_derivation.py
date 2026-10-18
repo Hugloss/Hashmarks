@@ -4,6 +4,7 @@ import copy
 from pathlib import Path
 
 import pytest
+from contract_assertions import assert_array, assert_object, assert_records, assert_text
 
 from hashmarks import CodeMap
 
@@ -90,42 +91,51 @@ def test_declaration_derivation_traces_exact_repository_evidence(
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        packet = codemap.repository_declarations([group])
-        derivation = codemap.repository_declaration_derivation_authority(packet)
+        packet = codemap.declarations.observe([group])
+        derivation = codemap.declarations.derivation_authority(packet)
 
     assert derivation["schema"] == "hashmarks.repository-declaration-derivation.v1"
     assert derivation["observation_identity"] == packet["observation_identity"]
     assert (
         derivation["repository_evidence_identity"]
-        == packet["repository_evidence"]["bindings_identity"]
+        == assert_object(packet["repository_evidence"])["bindings_identity"]
     )
     assert derivation["semantic_value_authority"] == "provider-claimed"
     assert derivation["interpretation_authority"] == "consumer-owned"
 
-    group_authority = derivation["groups"][0]
+    group_authority = assert_records(derivation["groups"])[0]
     assert group_authority["group_id"] == "runtime-python"
     assert group_authority["semantic_namespace"] == "fixture"
     assert (
         group_authority["semantic_subject_identity"]
-        == packet["groups"][0]["semantic_subject_identity"]
+        == assert_object(assert_records(packet["groups"])[0])[
+            "semantic_subject_identity"
+        ]
     )
-    by_id = {row["declaration_id"]: row for row in group_authority["declarations"]}
+    by_id = {
+        row["declaration_id"]: row
+        for row in assert_records(group_authority["declarations"])
+    }
     assert all(
         row["semantic_subject_identity"] == group_authority["semantic_subject_identity"]
         for row in by_id.values()
     )
     assert by_id["python-intent"]["semantic_role"] == {"kind": "project-intent"}
-    assert by_id["python-intent"]["semantic_declaration_identity"].startswith("sha256:")
+    assert assert_text(
+        by_id["python-intent"]["semantic_declaration_identity"]
+    ).startswith("sha256:")
     assert by_id["python-container"]["semantic_role"] == {"kind": "container-runtime"}
-    assert by_id["python-container"]["semantic_declaration_identity"].startswith(
-        "sha256:"
-    )
-    assert {row["repository_evidence"][0]["path"] for row in by_id.values()} == {
+    assert assert_text(
+        by_id["python-container"]["semantic_declaration_identity"]
+    ).startswith("sha256:")
+    assert {
+        assert_records(row["repository_evidence"])[0]["path"] for row in by_id.values()
+    } == {
         "pyproject.toml",
         "Dockerfile",
     }
     assert all(
-        row["binding_observation_identity"].startswith("sha256:")
+        assert_text(row["binding_observation_identity"]).startswith("sha256:")
         for row in by_id.values()
     )
 
@@ -141,29 +151,36 @@ def test_declaration_explain_is_endpoint_local_after_repository_advances(
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        packet = codemap.repository_declarations([group])
+        packet = codemap.declarations.observe([group])
         original_repository = copy.deepcopy(packet["repository"])
 
         path.write_text("owner: team-b\n", encoding="utf-8")
         codemap.index.sync(["owner.yaml"])
 
-        explanation = codemap.repository_declaration_explain(packet)
+        explanation = codemap.declarations.explain(packet)
 
     assert explanation["schema"] == "hashmarks.repository-declaration-explain.v1"
     assert (
-        explanation["semantic_result"]["observation_identity"]
+        assert_object(explanation["semantic_result"])["observation_identity"]
         == packet["observation_identity"]
     )
-    assert explanation["semantic_result"]["group_count"] == 1
-    assert explanation["semantic_result"]["declaration_count"] == 1
+    assert assert_object(explanation["semantic_result"])["group_count"] == 1
+    assert assert_object(explanation["semantic_result"])["declaration_count"] == 1
     assert (
-        explanation["semantic_result"]["groups"][0]["semantic_namespace"] == "fixture"
+        assert_records(assert_object(explanation["semantic_result"])["groups"])[0][
+            "semantic_namespace"
+        ]
+        == "fixture"
     )
     assert (
-        explanation["semantic_result"]["groups"][0]["semantic_subject_identity"]
-        == packet["groups"][0]["semantic_subject_identity"]
+        assert_records(assert_object(explanation["semantic_result"])["groups"])[0][
+            "semantic_subject_identity"
+        ]
+        == assert_object(assert_records(packet["groups"])[0])[
+            "semantic_subject_identity"
+        ]
     )
-    assert explanation["derivation"]["repository"] == original_repository
+    assert assert_object(explanation["derivation"])["repository"] == original_repository
 
 
 def test_declaration_derivation_rejects_resigned_nested_identity_tamper(
@@ -176,20 +193,20 @@ def test_declaration_derivation_rejects_resigned_nested_identity_tamper(
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        packet = codemap.repository_declarations([group])
+        packet = codemap.declarations.observe([group])
         tampered = copy.deepcopy(packet)
-        tampered["groups"][0]["declarations"][0]["producer"] = {
-            "kind": "forged-provider"
-        }
-        tampered["observation_identity"] = codemap._declaration_packet_identity(
-            tampered
+        assert_records(assert_records(tampered["groups"])[0]["declarations"])[0][
+            "producer"
+        ] = {"kind": "forged-provider"}
+        tampered["observation_identity"] = (
+            codemap.declarations._declaration_packet_identity(tampered)
         )
 
         with pytest.raises(
             ValueError,
             match="declaration observation identity mismatch",
         ):
-            codemap.repository_declaration_derivation_authority(tampered)
+            codemap.declarations.derivation_authority(tampered)
 
 
 def test_declaration_derivation_rejects_resigned_semantic_subject_tamper(
@@ -202,18 +219,20 @@ def test_declaration_derivation_rejects_resigned_semantic_subject_tamper(
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        packet = codemap.repository_declarations([group])
+        packet = codemap.declarations.observe([group])
         tampered = copy.deepcopy(packet)
-        tampered["groups"][0]["semantic_subject_identity"] = "sha256:" + ("0" * 64)
-        tampered["groups"][0]["declarations"][0]["semantic_subject_identity"] = (
-            "sha256:" + ("0" * 64)
-        )
-        tampered["observation_identity"] = codemap._declaration_packet_identity(
-            tampered
+        assert_object(assert_records(tampered["groups"])[0])[
+            "semantic_subject_identity"
+        ] = "sha256:" + ("0" * 64)
+        assert_records(assert_records(tampered["groups"])[0]["declarations"])[0][
+            "semantic_subject_identity"
+        ] = "sha256:" + ("0" * 64)
+        tampered["observation_identity"] = (
+            codemap.declarations._declaration_packet_identity(tampered)
         )
 
         with pytest.raises(ValueError, match="semantic subject identity mismatch"):
-            codemap.repository_declaration_derivation_authority(tampered)
+            codemap.declarations.derivation_authority(tampered)
 
 
 def test_declaration_derivation_rejects_resigned_semantic_role_tamper(
@@ -235,19 +254,21 @@ def test_declaration_derivation_rejects_resigned_semantic_role_tamper(
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        packet = codemap.repository_declarations([group])
+        packet = codemap.declarations.observe([group])
         tampered = copy.deepcopy(packet)
-        declaration = tampered["groups"][0]["declarations"][0]
+        declaration = assert_records(
+            assert_records(tampered["groups"])[0]["declarations"]
+        )[0]
         declaration["semantic_role"] = {"kind": "different-role"}
-        tampered["observation_identity"] = codemap._declaration_packet_identity(
-            tampered
+        tampered["observation_identity"] = (
+            codemap.declarations._declaration_packet_identity(tampered)
         )
 
         with pytest.raises(
             ValueError,
             match="semantic declaration identity mismatch",
         ):
-            codemap.repository_declaration_derivation_authority(tampered)
+            codemap.declarations.derivation_authority(tampered)
 
 
 def test_declaration_derivation_rejects_orphan_semantic_declaration_identity(
@@ -260,19 +281,21 @@ def test_declaration_derivation_rejects_orphan_semantic_declaration_identity(
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        packet = codemap.repository_declarations([group])
+        packet = codemap.declarations.observe([group])
         tampered = copy.deepcopy(packet)
-        declaration = tampered["groups"][0]["declarations"][0]
+        declaration = assert_records(
+            assert_records(tampered["groups"])[0]["declarations"]
+        )[0]
         declaration["semantic_declaration_identity"] = "sha256:" + ("0" * 64)
-        tampered["observation_identity"] = codemap._declaration_packet_identity(
-            tampered
+        tampered["observation_identity"] = (
+            codemap.declarations._declaration_packet_identity(tampered)
         )
 
         with pytest.raises(
             ValueError,
             match="semantic declaration identity without semantic_role",
         ):
-            codemap.repository_declaration_derivation_authority(tampered)
+            codemap.declarations.derivation_authority(tampered)
 
 
 def test_declaration_derivation_rejects_resigned_projection_mismatch(
@@ -285,15 +308,15 @@ def test_declaration_derivation_rejects_resigned_projection_mismatch(
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        packet = codemap.repository_declarations([group])
+        packet = codemap.declarations.observe([group])
         tampered = copy.deepcopy(packet)
         tampered["observer"] = {"state": "forged"}
-        tampered["observation_identity"] = codemap._declaration_packet_identity(
-            tampered
+        tampered["observation_identity"] = (
+            codemap.declarations._declaration_packet_identity(tampered)
         )
 
         with pytest.raises(ValueError, match="observer projection mismatch"):
-            codemap.repository_declaration_derivation_authority(tampered)
+            codemap.declarations.derivation_authority(tampered)
 
 
 def test_declaration_derivation_rejects_resigned_duplicate_group(
@@ -306,15 +329,17 @@ def test_declaration_derivation_rejects_resigned_duplicate_group(
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        packet = codemap.repository_declarations([group])
+        packet = codemap.declarations.observe([group])
         tampered = copy.deepcopy(packet)
-        tampered["groups"].append(copy.deepcopy(tampered["groups"][0]))
-        tampered["observation_identity"] = codemap._declaration_packet_identity(
-            tampered
+        assert_array(tampered["groups"]).append(
+            copy.deepcopy(assert_records(tampered["groups"])[0])
+        )
+        tampered["observation_identity"] = (
+            codemap.declarations._declaration_packet_identity(tampered)
         )
 
         with pytest.raises(ValueError, match="duplicate group_id"):
-            codemap.repository_declaration_derivation_authority(tampered)
+            codemap.declarations.derivation_authority(tampered)
 
 
 def test_declaration_derivation_rejects_resigned_noncanonical_order(
@@ -333,15 +358,15 @@ def test_declaration_derivation_rejects_resigned_noncanonical_order(
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        packet = codemap.repository_declarations([group])
+        packet = codemap.declarations.observe([group])
         tampered = copy.deepcopy(packet)
-        tampered["groups"][0]["declarations"].reverse()
-        tampered["observation_identity"] = codemap._declaration_packet_identity(
-            tampered
+        assert_array(assert_records(tampered["groups"])[0]["declarations"]).reverse()
+        tampered["observation_identity"] = (
+            codemap.declarations._declaration_packet_identity(tampered)
         )
 
         with pytest.raises(ValueError, match="declarations are not canonical"):
-            codemap.repository_declaration_derivation_authority(tampered)
+            codemap.declarations.derivation_authority(tampered)
 
 
 def test_declaration_producer_change_preserves_definition_but_changes_derivation(
@@ -353,7 +378,7 @@ def test_declaration_producer_change_preserves_definition_but_changes_derivation
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        before = codemap.repository_declarations(
+        before = codemap.declarations.observe(
             [
                 _group(
                     [
@@ -367,7 +392,7 @@ def test_declaration_producer_change_preserves_definition_but_changes_derivation
                 )
             ]
         )
-        after = codemap.repository_declarations(
+        after = codemap.declarations.observe(
             [
                 _group(
                     [
@@ -381,11 +406,11 @@ def test_declaration_producer_change_preserves_definition_but_changes_derivation
                 )
             ]
         )
-        before_derivation = codemap.repository_declaration_derivation_authority(before)
-        after_derivation = codemap.repository_declaration_derivation_authority(after)
+        before_derivation = codemap.declarations.derivation_authority(before)
+        after_derivation = codemap.declarations.derivation_authority(after)
 
-    before_row = before["groups"][0]["declarations"][0]
-    after_row = after["groups"][0]["declarations"][0]
+    before_row = assert_records(assert_records(before["groups"])[0]["declarations"])[0]
+    after_row = assert_records(assert_records(after["groups"])[0]["declarations"])[0]
     assert (
         before_row["declaration_definition_identity"]
         == after_row["declaration_definition_identity"]
@@ -412,17 +437,17 @@ def test_declaration_evidence_definition_change_is_explicit_authority_change(
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        before = codemap.repository_declarations(
+        before = codemap.declarations.observe(
             [_group([_declaration("owner", "owner.yaml", "team-a", line=1)])]
         )
-        after = codemap.repository_declarations(
+        after = codemap.declarations.observe(
             [_group([_declaration("owner", "owner.yaml", "team-a", line=2)])]
         )
-        before_derivation = codemap.repository_declaration_derivation_authority(before)
-        after_derivation = codemap.repository_declaration_derivation_authority(after)
+        before_derivation = codemap.declarations.derivation_authority(before)
+        after_derivation = codemap.declarations.derivation_authority(after)
 
-    before_row = before["groups"][0]["declarations"][0]
-    after_row = after["groups"][0]["declarations"][0]
+    before_row = assert_records(assert_records(before["groups"])[0]["declarations"])[0]
+    after_row = assert_records(assert_records(after["groups"])[0]["declarations"])[0]
     assert (
         before_row["declaration_definition_identity"]
         != after_row["declaration_definition_identity"]
@@ -443,11 +468,15 @@ def test_declaration_explain_preserves_provider_claims_without_adapter_contract(
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        packet = codemap.repository_declarations([group])
-        explanation = codemap.repository_declaration_explain(packet)
+        packet = codemap.declarations.observe([group])
+        explanation = codemap.declarations.explain(packet)
 
-    declaration = explanation["derivation"]["groups"][0]["declarations"][0]
+    declaration = assert_records(
+        assert_records(assert_object(explanation["derivation"])["groups"])[0][
+            "declarations"
+        ]
+    )[0]
     assert declaration["producer"] == {"kind": "fixture-config"}
-    assert "adapter_semantics" not in declaration["producer"]
+    assert "adapter_semantics" not in assert_object(declaration["producer"])
     assert explanation["semantic_value_authority"] == "provider-claimed"
     assert explanation["interpretation_authority"] == "consumer-owned"

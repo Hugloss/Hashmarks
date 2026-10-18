@@ -9,7 +9,7 @@ from hashmarks.operation_contract import operation_schema
 from .repository_observation import packet_digest
 
 if TYPE_CHECKING:
-    from .engine import CodeMap
+    from .repository_declarations import RepositoryDeclarations
 
 _DERIVATION_SCHEMA = "hashmarks.repository-declaration-derivation.v1"
 _EXPLAIN_SCHEMA = operation_schema("repository_declarations", "explain")
@@ -18,12 +18,12 @@ _EXPLAIN_SCHEMA = operation_schema("repository_declarations", "explain")
 class RepositoryDeclarationDerivationMixin:
     """Explain declaration authority without reinterpreting provider semantics."""
 
-    def repository_declaration_derivation_authority(
+    def derivation_authority(
         self,
         observation: Mapping[str, object],
     ) -> dict[str, object]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryDeclarations", self)
         self._validate_declaration_observation(
             observation,
             name="declaration observation",
@@ -115,13 +115,13 @@ class RepositoryDeclarationDerivationMixin:
             "groups": group_authorities,
         }
 
-    def repository_declaration_explain(
+    def explain(
         self,
         observation: Mapping[str, object],
     ) -> dict[str, object]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        derivation = self.repository_declaration_derivation_authority(observation)
+            self = cast("RepositoryDeclarations", self)
+        derivation = self.derivation_authority(observation)
         groups = cast("list[Mapping[str, object]]", observation["groups"])
         declaration_count = sum(
             len(cast("list[object]", group["declarations"])) for group in groups

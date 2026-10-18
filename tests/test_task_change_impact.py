@@ -69,7 +69,7 @@ def test_task_change_impact_composes_owner_path_and_verification(
             "def apply_ember(value: str) -> str:\n    return 'new' if value == 'accepted' else value\n",
             encoding="utf-8",
         )
-        impact = codemap.task_change_impact(task, ["src/case/engine.py"])
+        impact = codemap.changes.task_impact(task, ["src/case/engine.py"])
 
     assert impact["schema"] == "hashmarks.task-change-impact.v1"
     assert impact["owner"] == "external"
@@ -104,7 +104,7 @@ def test_task_change_impact_config_root_is_typed_and_gets_verification(
         start = codemap.tasks.evidence(config_task["query"])
         candidate_path = _task_candidate_path(start)
         assert candidate_path.endswith("policy.toml")
-        impact = codemap.task_change_impact(config_task["query"], [candidate_path])
+        impact = codemap.changes.task_impact(config_task["query"], [candidate_path])
     changed = assert_object(assert_array(impact["changed"])[0])
     assert "contract" in assert_array(changed["roles"])
     assert "build_config" in assert_array(changed["roles"])
@@ -135,7 +135,7 @@ def test_task_change_impact_bounded_fanout_never_claims_complete_impact(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        impact = codemap.task_change_impact(
+        impact = codemap.changes.task_impact(
             "change shared implementation",
             ["src/core.py"],
             options=ChangeImpactOptions(impact_limit_per_surface=3, max_depth=3),
@@ -149,7 +149,7 @@ def test_task_change_impact_bounds_surfaces(tmp_path: Path) -> None:
     task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        impact = codemap.task_change_impact(
+        impact = codemap.changes.task_impact(
             task,
             ["src/case/engine.py"],
             options=ChangeImpactOptions(impact_limit_per_surface=1, max_depth=2),
@@ -170,7 +170,7 @@ def test_task_change_impact_never_discloses_denied_path(tmp_path: Path) -> None:
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        impact = codemap.task_change_impact(task, ["src/case/engine.py"])
+        impact = codemap.changes.task_impact(task, ["src/case/engine.py"])
     encoded = json.dumps(impact, sort_keys=True)
     assert "src/case/route.py" not in encoded
     assert (
@@ -332,7 +332,7 @@ def test_task_change_impact_reconstructs_same_package_go_owner_chain(
         start = codemap.tasks.evidence(task)
         assert _task_candidate_path(start) == "engine/engine.go"
         assert _task_verification_path(start) == "route/cobaltridgealpha_test.go"
-        impact = codemap.task_change_impact(task, ["engine/engine.go"])
+        impact = codemap.changes.task_impact(task, ["engine/engine.go"])
 
     implementation = [
         row["path"]
@@ -458,7 +458,7 @@ def test_task_change_impact_declared_project_provenance_and_shared_input_refresh
         codemap.native.enrich_projects(
             ("npm-package-graph", "maven-pom-graph", "declared-project-links")
         )
-        source_impact = codemap.task_change_impact(
+        source_impact = codemap.changes.task_impact(
             "backend api change", ["backend/src/Api.java"]
         )
         assert source_impact["projects"] == ["npm:@demo/mobile", "npm:@demo/web"]
@@ -478,7 +478,7 @@ def test_task_change_impact_declared_project_provenance_and_shared_input_refresh
         assert rows["npm:@demo/mobile"]["depth"] == 2
 
         (tmp_path / "openapi.yaml").write_text("openapi: 3.1.1\n", encoding="utf-8")
-        shared_impact = codemap.task_change_impact(
+        shared_impact = codemap.changes.task_impact(
             "openapi contract change", ["openapi.yaml"]
         )
 
@@ -529,7 +529,7 @@ def test_task_change_impact_project_provenance_is_bounded(tmp_path: Path) -> Non
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         codemap.native.enrich_projects(("npm-package-graph", "declared-project-links"))
-        impact = codemap.task_change_impact(
+        impact = codemap.changes.task_impact(
             "root value change",
             ["root/value.ts"],
             options=ChangeImpactOptions(impact_limit_per_surface=3),
@@ -584,14 +584,14 @@ def test_project_impact_limit_is_independent_and_reports_truncation(
         (root / "p0/src/index.ts").write_text(
             "export const value = 99;\n", encoding="utf-8"
         )
-        bounded = codemap.task_change_impact(
+        bounded = codemap.changes.task_impact(
             "update scale root",
             ["p0/src/index.ts"],
             options=ChangeImpactOptions(
                 max_depth=20, impact_limit_per_surface=2, project_impact_limit=3
             ),
         )
-        complete = codemap.task_change_impact(
+        complete = codemap.changes.task_impact(
             "update scale root",
             ["p0/src/index.ts"],
             options=ChangeImpactOptions(
@@ -646,7 +646,7 @@ def test_declared_shared_input_refresh_rebinds_freshness_without_recollecting_to
         monkeypatch.setattr(provider, "collect", counted_collect)
         before_generation = codemap.store.generation()
         (tmp_path / "contract.json").write_text('{"v":2}\n', encoding="utf-8")
-        impact = codemap.task_change_impact("contract changed", ["contract.json"])
+        impact = codemap.changes.task_impact("contract changed", ["contract.json"])
         impact_generation = codemap.store.generation()
 
     assert calls == 0
@@ -698,11 +698,11 @@ def test_declared_topology_change_recollects_provider(
             "[[link]]\nsource='npm:mobile'\ntarget='npm:frontend'\nkind='consumer'\n",
             encoding="utf-8",
         )
-        impact = codemap.task_change_impact(
+        impact = codemap.changes.task_impact(
             "declared topology changed", [".hashmarks-project-links.toml"]
         )
         impact_generation = codemap.store.generation()
-        source = codemap.task_change_impact("backend changed", ["backend/value.ts"])
+        source = codemap.changes.task_impact("backend changed", ["backend/value.ts"])
 
     assert calls == 1
     assert impact["generation"] == impact_generation
@@ -738,7 +738,7 @@ def test_unreported_shared_input_change_does_not_rebind_stale_project_evidence(
         codemap.index.sync()
         codemap.native.enrich_projects(("npm-package-graph", "declared-project-links"))
         (tmp_path / "contract.json").write_text('{"v":2}\n', encoding="utf-8")
-        impact = codemap.task_change_impact("backend changed", ["backend/value.ts"])
+        impact = codemap.changes.task_impact("backend changed", ["backend/value.ts"])
         fresh, reason = codemap.native._evidence_fresh(
             "project", "declared-project-links"
         )
@@ -774,12 +774,12 @@ def test_task_change_impact_compact_project_provenance_round_trips(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         codemap.native.enrich_projects(("npm-package-graph", "declared-project-links"))
-        verbose = codemap.task_change_impact(
+        verbose = codemap.changes.task_impact(
             "root value change",
             ["root/value.ts"],
             options=ChangeImpactOptions(project_impact_limit=20),
         )
-        compact = codemap.task_change_impact(
+        compact = codemap.changes.task_impact(
             "root value change",
             ["root/value.ts"],
             options=ChangeImpactOptions(
@@ -824,12 +824,12 @@ def test_task_change_impact_compact_preserves_multiple_edges_from_one_project(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         codemap.native.enrich_projects(("npm-package-graph", "declared-project-links"))
-        verbose = codemap.task_change_impact(
+        verbose = codemap.changes.task_impact(
             "both roots changed",
             changed,
             options=ChangeImpactOptions(project_impact_limit=20),
         )
-        compact = codemap.task_change_impact(
+        compact = codemap.changes.task_impact(
             "both roots changed",
             changed,
             options=ChangeImpactOptions(
@@ -857,7 +857,7 @@ def test_task_change_impact_rejects_unknown_project_impact_encoding(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         try:
-            codemap.task_change_impact(
+            codemap.changes.task_impact(
                 "ember",
                 ["src/case/engine.py"],
                 options=ChangeImpactOptions(project_impact_encoding="magic"),
@@ -888,14 +888,14 @@ def test_task_change_impact_rejects_invalid_bounds_before_refresh(
     task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         with pytest.raises(ValueError, match=message):
-            codemap.task_change_impact(task, ["src/case/engine.py"], options=options)
+            codemap.changes.task_impact(task, ["src/case/engine.py"], options=options)
 
 
 def test_task_change_impact_never_erases_reported_missing_path(tmp_path: Path) -> None:
     task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        impact = codemap.task_change_impact(
+        impact = codemap.changes.task_impact(
             task,
             ["src/case/engine.py", "src/case/deleted.py"],
         )
@@ -921,7 +921,7 @@ def test_stylesheet_changed_evidence_is_accounted_as_source(
     stylesheet.write_text(".widget { display: block; }\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        impact = codemap.task_change_impact(task, [stylesheet.relative_to(tmp_path)])
+        impact = codemap.changes.task_impact(task, [stylesheet.relative_to(tmp_path)])
 
     assert (
         assert_object(assert_array(impact["changed"])[0])["path"]

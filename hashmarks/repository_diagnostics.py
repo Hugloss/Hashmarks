@@ -5,8 +5,52 @@ import tempfile
 import time
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import TYPE_CHECKING, TypedDict
 
 from .python_ast_cache import ast_cache_info, clear_ast_cache, read_python_ast
+
+if TYPE_CHECKING:
+    from .codemap.model import SearchHit
+    from .codemap.repository_tasks import RepositoryTasks
+
+
+class _LimitProfile(TypedDict):
+    limit: int
+    result_count: int
+    bound_respected: bool
+    wall_time_ns: int
+    paths: list[str]
+
+
+class _RuntimeScan(TypedDict):
+    files: int
+    source_bytes: int
+    parsed_artifacts: int
+    reused_artifacts: int
+    seconds: float
+
+
+class _RuntimeQueryWork(TypedDict):
+    wall_time_ns: int
+    wall_time_ms: float
+    ast_parses: int
+    ast_cache_hits: int
+    candidate_count: int
+    evidence_files: int
+    evidence_bytes: int
+    graph_nodes_traversed: None
+
+
+class RepositoryQueryDiagnostics(TypedDict):
+    schema: str
+    query: str
+    task: str
+    limit: int
+    repository_scan: _RuntimeScan
+    query_work: _RuntimeQueryWork
+    availability: dict[str, bool]
+    boundary: str
+
 
 _QUERY_KINDS = frozenset({"find_task", "task_action_map", "task_decision_packet"})
 
@@ -100,13 +144,13 @@ def shared_python_ast_propagation_audit(
     }
 
 
-def _run_query(codemap: Any, query: str, task: str, limit: int) -> object:
+def _run_query(tasks: RepositoryTasks, query: str, task: str, limit: int) -> object:
     if query == "find_task":
-        return codemap.search.find_task(task, limit=limit)
+        return tasks.search.find_task(task, limit=limit)
     if query == "task_action_map":
-        return codemap.tasks.action_map(task, limit=limit)
+        return tasks.action_map(task, limit=limit)
     if query == "task_decision_packet":
-        return codemap.tasks.decision_packet(task, limit=limit)
+        return tasks.decision_packet(task, limit=limit)
     raise ValueError(f"unsupported repository-intelligence query: {query}")
 
 
@@ -159,7 +203,7 @@ def repository_query_runtime_diagnostics(
     query: str,
     task: str,
     limit: int = 20,
-) -> dict[str, object]:
+) -> RepositoryQueryDiagnostics:
     """Measure one isolated repository-intelligence query without execution telemetry."""
     if query not in _QUERY_KINDS:
         raise ValueError(f"unsupported repository-intelligence query: {query}")
@@ -182,7 +226,7 @@ def repository_query_runtime_diagnostics(
             clear_ast_cache()
             before = ast_cache_info()
             started_ns = time.perf_counter_ns()
-            result = _run_query(codemap, query, task, limit)
+            result = _run_query(codemap.tasks, query, task, limit)
             elapsed_ns = time.perf_counter_ns() - started_ns
             after = ast_cache_info()
 
@@ -237,18 +281,23 @@ def _delta_stats(
 
 
 def _related_query_session(
-    codemap: Any,
+    tasks: RepositoryTasks,
     task: str,
     limit: int,
-) -> tuple[object, dict[str, object], dict[str, object], dict[str, dict[str, int]]]:
-    with codemap.reads.session():
-        start = codemap.reads.stats()
-        found = codemap.search.find_task(task, limit=limit)
-        after_find = codemap.reads.stats()
-        action = codemap.tasks.action_map(task, limit=limit)
-        after_action = codemap.reads.stats()
-        packet = codemap.tasks.decision_packet(task, limit=limit)
-        after_packet = codemap.reads.stats()
+) -> tuple[
+    tuple[SearchHit, ...],
+    Mapping[str, object],
+    dict[str, object],
+    dict[str, dict[str, int]],
+]:
+    with tasks.reads.session():
+        start = tasks.reads.stats()
+        found = tasks.search.find_task(task, limit=limit)
+        after_find = tasks.reads.stats()
+        action = tasks.action_map(task, limit=limit)
+        after_action = tasks.reads.stats()
+        packet = tasks.decision_packet(task, limit=limit)
+        after_packet = tasks.reads.stats()
     deltas = {
         "find_task": _delta_stats(start, after_find),
         "task_action_map": _delta_stats(after_find, after_action),
@@ -291,7 +340,7 @@ def _action_role_paths(action: Mapping[str, object]) -> dict[str, str | None]:
 
 
 def _related_query_semantics(
-    found: object,
+    found: Sequence[SearchHit],
     action: Mapping[str, object],
     packet: Mapping[str, object],
 ) -> tuple[dict[str, object], bool]:
@@ -335,7 +384,9 @@ def related_query_reuse_receipt(
             artifact_db=state_dir / "artifacts.sqlite3",
         ) as codemap:
             codemap.index.sync()
-            found, action, packet, deltas = _related_query_session(codemap, task, limit)
+            found, action, packet, deltas = _related_query_session(
+                codemap.tasks, task, limit
+            )
 
     semantics, equivalent = _related_query_semantics(found, action, packet)
     return {
@@ -358,12 +409,12 @@ def related_query_reuse_receipt(
 
 
 def _profile_limit(
-    codemap: Any,
+    tasks: RepositoryTasks,
     task: str,
     limit: int,
-) -> dict[str, object]:
+) -> _LimitProfile:
     started_ns = time.perf_counter_ns()
-    rows = codemap.search.find_task(task, limit=limit)
+    rows = tasks.search.find_task(task, limit=limit)
     elapsed_ns = time.perf_counter_ns() - started_ns
     paths = [row.path for row in rows]
     return {
@@ -399,7 +450,9 @@ def bounded_top_n_candidate_profile(
             artifact_db=state_dir / "artifacts.sqlite3",
         ) as codemap:
             codemap.index.sync()
-            profiles = [_profile_limit(codemap, task, limit) for limit in normalized]
+            profiles = [
+                _profile_limit(codemap.tasks, task, limit) for limit in normalized
+            ]
 
     largest = profiles[-1]["paths"]
     prefix_checks = {

@@ -18,8 +18,6 @@ if TYPE_CHECKING:
     from hashmarks.client import RepositoryObservation
 
     from .indexing_lifecycle import RepositoryIndex
-    from .repository_index_store import WorkspaceMapStore
-    from .repository_observation import RepositoryObservationSource
     from .watch_continuity import WatchContinuityRecord
 
 
@@ -75,6 +73,40 @@ class DecisionRefreshRequired(RuntimeError):
         self.path = path
 
 
+class RepeatedSourceChangeError(RuntimeError):
+    """A member changed again after this read's single reconciliation."""
+
+    def __init__(self, path: str) -> None:
+        super().__init__(f"CodeMap path remained stale after refresh: {path}")
+        self.path = path
+
+
+def reconcile_decision(
+    method: Callable[Concatenate[_S, _P], _R],
+) -> Callable[Concatenate[_S, _P], _R]:
+    """Reconcile source drift outside the outermost repository observation.
+
+    Staged operations may reconcile inputs before opening their read scope.
+    Restart the complete operation when that scope encounters another changed
+    member; nested callers leave reconciliation to their existing outer owner.
+    """
+
+    @wraps(method)
+    def wrapped(self: _S, *args: _P.args, **kwargs: _P.kwargs) -> _R:
+        owner = self.reads
+        if owner._depth > 0:
+            return method(self, *args, **kwargs)
+
+        refreshed: set[str] = set()
+        while True:
+            try:
+                return method(self, *args, **kwargs)
+            except DecisionRefreshRequired as exc:
+                owner._reconcile_member(exc.path, refreshed)
+
+    return wrapped
+
+
 def _decision_scoped(
     method: Callable[Concatenate[_S, _P], _R], *, allow_incomplete: bool
 ) -> Callable[Concatenate[_S, _P], _R]:
@@ -82,23 +114,10 @@ def _decision_scoped(
 
     @wraps(method)
     def wrapped(self: _S, *args: _P.args, **kwargs: _P.kwargs) -> _R:
-        owner = self.reads
-        if owner._depth > 0:
-            with owner.session(_allow_incomplete=allow_incomplete):
-                return method(self, *args, **kwargs)
-
-        refreshed: set[str] = set()
-        while True:
-            try:
-                with owner.session(_allow_incomplete=allow_incomplete):
-                    return method(self, *args, **kwargs)
-            except DecisionRefreshRequired as exc:
-                if exc.path in refreshed:
-                    raise RuntimeError(
-                        f"CodeMap path remained stale after refresh: {exc.path}"
-                    ) from exc
-                refreshed.add(exc.path)
-                owner._index.reconcile_path(exc.path)
+        return self.reads.observe(
+            lambda _scope: method(self, *args, **kwargs),
+            _allow_incomplete=allow_incomplete,
+        )
 
     return wrapped
 
@@ -120,16 +139,19 @@ def incomplete_decision_scoped(
 def diagnostic_producer(
     method: Callable[Concatenate[_S, _P], _R],
 ) -> Callable[Concatenate[_S, _P], _R]:
-    """Measure one high-level repository-intelligence producer when diagnostics are active."""
+    """Measure a component's operation without merging same-named owners."""
 
     @wraps(method)
     def wrapped(self: _S, *args: _P.args, **kwargs: _P.kwargs) -> _R:
         owner = self.reads
         if not owner._diagnostics_enabled:
             return method(self, *args, **kwargs)
-        with owner.diagnostic_span(
-            getattr(method, "__name__", "unknown"), args, kwargs
-        ):
+        component = type(self)
+        producer = (
+            f"{component.__module__}.{component.__qualname__}."
+            f"{getattr(method, '__name__', 'unknown')}"
+        )
+        with owner.diagnostic_span(producer, args, kwargs):
             return method(self, *args, **kwargs)
 
     return wrapped
@@ -141,12 +163,10 @@ class DecisionScope:
     def __init__(
         self,
         index: RepositoryIndex,
-        store: WorkspaceMapStore,
-        observations: RepositoryObservationSource,
     ) -> None:
         self._index = index
-        self._store = store
-        self._observations = observations
+        self._store = index.store
+        self._observations = index.observation_source
         self.workspace = index.workspace
         self._scope: ReadScope | None = None
         self._depth = 0
@@ -159,7 +179,7 @@ class DecisionScope:
             tuple[int, tuple[str, ...]], tuple[int, tuple[dict[str, object], ...]]
         ] = {}
         self._refs_cache: dict[
-            tuple[int, str], tuple[int, tuple[dict[str, object], ...]]
+            tuple[int, str, tuple[str, ...]], tuple[int, tuple[dict[str, object], ...]]
         ] = {}
         self._edges_from_cache: dict[
             tuple[int, str, str], tuple[int, tuple[dict[str, object], ...]]
@@ -224,6 +244,10 @@ class DecisionScope:
     @property
     def observation(self) -> RepositoryObservation | None:
         return self._observation
+
+    @property
+    def index(self) -> RepositoryIndex:
+        return self._index
 
     @property
     def scope(self) -> ReadScope | None:
@@ -385,6 +409,47 @@ class DecisionScope:
             if self._depth == 0:
                 self._finish_decision_session()
 
+    def _reconcile_member(
+        self,
+        path: str,
+        refreshed: set[str],
+        *,
+        expected_generation: int | None = None,
+    ) -> int:
+        if path in refreshed:
+            raise RepeatedSourceChangeError(path)
+        refreshed.add(path)
+        return self._index.reconcile_path(path, expected_generation=expected_generation)
+
+    def observe(
+        self,
+        operation: Callable[[ReadScope], _R],
+        *,
+        expected_generation: int | None = None,
+        _allow_incomplete: bool = False,
+    ) -> _R:
+        """Recompute a repository read while preserving its caller's before values.
+
+        A source refresh publishes outside the read scope. Only that exact
+        publication may become the next expected generation; another writer
+        invalidates the observation rather than being silently adopted.
+        """
+        refreshed: set[str] = set()
+        while True:
+            try:
+                with self.session(
+                    expected_generation=expected_generation,
+                    _allow_incomplete=_allow_incomplete,
+                ) as scope:
+                    expected_generation = scope.generation
+                    return operation(scope)
+            except DecisionRefreshRequired as exc:
+                if self.depth:
+                    raise
+                expected_generation = self._reconcile_member(
+                    exc.path, refreshed, expected_generation=expected_generation
+                )
+
     @staticmethod
     def _diagnostic_normalize(value: object) -> object:
         if value is None or isinstance(value, (str, int, float, bool)):
@@ -485,7 +550,8 @@ class DecisionScope:
             "producers": producers,
             "spans": list(self._diagnostics_spans),
             "span_limit": 256,
-            "spans_truncated": len(self._diagnostics_spans) >= 256,
+            "spans_truncated": self._diagnostics_sequence
+            > len(self._diagnostics_spans),
             "reuse": reuse,
             "store_reads": store_reads,
             "storage": "derived-not-persisted",
@@ -619,28 +685,36 @@ class DecisionScope:
         targets: Iterable[str],
         *,
         limit_per_target: int,
+        preferred_paths: Iterable[str] = (),
     ) -> dict[str, list[dict[str, object]]]:
-        """Reuse per-target reverse-reference prefixes within one generation."""
+        """Reuse prefixes for one generation, short target and path preference."""
         unique = list(dict.fromkeys(str(target) for target in targets if target))
         if not unique:
             return {}
         requested = min(max(1, int(limit_per_target)), MAX_REFERENCE_QUERY_ROWS)
+        preferred = tuple(sorted(set(preferred_paths)))
         if self._depth <= 0:
-            return self._store.refs_many(unique, limit_per_target=requested)
+            return self._store.refs_many(
+                unique, limit_per_target=requested, preferred_paths=preferred
+            )
         generation = int(self._generation or self._store.generation())
         target_short = {target: target.rsplit(".", 1)[-1] for target in unique}
         missing_shorts = list(
             dict.fromkeys(
                 short
                 for short in target_short.values()
-                if (generation, short) not in self._refs_cache
-                or self._refs_cache[(generation, short)][0] < requested
+                if (generation, short, preferred) not in self._refs_cache
+                or self._refs_cache[(generation, short, preferred)][0] < requested
             )
         )
         if missing_shorts:
-            fetched = self._store.refs_many(missing_shorts, limit_per_target=requested)
+            fetched = self._store.refs_many(
+                missing_shorts,
+                limit_per_target=requested,
+                preferred_paths=preferred,
+            )
             for short in missing_shorts:
-                self._refs_cache[(generation, short)] = (
+                self._refs_cache[(generation, short, preferred)] = (
                     requested,
                     tuple(dict(row) for row in fetched.get(short, ())),
                 )
@@ -651,7 +725,7 @@ class DecisionScope:
             short = target_short[target]
             if short not in missing_set:
                 self._stats["refs_hit"] += 1
-            cached = self._refs_cache.get((generation, short))
+            cached = self._refs_cache.get((generation, short, preferred))
             result[target] = (
                 [] if cached is None else [dict(row) for row in cached[1][:requested]]
             )

@@ -8,6 +8,10 @@ import pytest
 from contract_assertions import assert_object, assert_records, assert_text
 
 from hashmarks import CodeMap
+from hashmarks.codemap.diagnostic_observation import external_diagnostic_observation
+from hashmarks.codemap.diagnostic_source_revision import (
+    diagnostic_source_revision_evidence,
+)
 from hashmarks.codemap.repository_delta import RepositoryGenerationBinding
 
 if TYPE_CHECKING:
@@ -112,7 +116,7 @@ def test_current_repository_does_not_rebind_diagnostic_to_edited_source(
     identity = assert_object(repository_evidence["repository"])
     generation = before["generation"]
     assert isinstance(generation, int)
-    diagnostic = repository.external_diagnostic_observation(
+    diagnostic = external_diagnostic_observation(
         producer="example-test",
         binding=RepositoryGenerationBinding(
             assert_text(identity["repository_identity"]), generation
@@ -122,7 +126,7 @@ def test_current_repository_does_not_rebind_diagnostic_to_edited_source(
         scope_paths=["src/service.py"],
         source_revisions={"src/service.py": original_revision},
     )
-    comparison = repository.diagnostic_source_revision_evidence(diagnostic, [current])
+    comparison = diagnostic_source_revision_evidence(diagnostic, [current])
     row = assert_records(comparison["rows"])[0]
     assert row["state"] == "different"
     assert row["producer_claimed_member_revision"] == original_revision

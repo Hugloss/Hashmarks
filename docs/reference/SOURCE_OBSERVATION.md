@@ -275,7 +275,7 @@ from hashmarks.codemap.repository_delta import (
     RepositoryGenerationBinding,
 )
 
-before = RepositoryDeltaMixin.external_diagnostic_observation(
+before = external_diagnostic_observation(
     producer="pyright",
     binding=RepositoryGenerationBinding("repository-id", 7),
     diagnostics=[
@@ -317,7 +317,7 @@ external producer claims to have observed**, independently of message, line,
 column, diagnostic identity, and collection completeness:
 
 ```python
-diagnostic = RepositoryDeltaMixin.external_diagnostic_observation(
+diagnostic = external_diagnostic_observation(
     producer="pyright",
     binding=RepositoryGenerationBinding("repo-id", 7),
     outcome="fail",
@@ -354,9 +354,7 @@ producer or letting Hashmarks track agent reads:
 
 ```python
 source = codemap.source.observe("src/example.py")
-evidence = RepositoryDeltaMixin.diagnostic_source_revision_evidence(
-    diagnostic, [source]
-)
+evidence = diagnostic_source_revision_evidence(diagnostic, [source])
 ```
 
 Schema: `hashmarks.diagnostic-source-revision-evidence.v1`. For each declared
@@ -412,7 +410,7 @@ from hashmarks.digest import FILE_DOMAIN, hash_bytes
 # rather than reading whichever bytes happen to exist when diagnostics arrive.
 captured_text = "print(missing)\r\n"
 revision = hash_bytes(captured_text.encode("utf-8"), domain=FILE_DOMAIN).hash
-diagnostic = RepositoryDeltaMixin.external_diagnostic_observation(
+diagnostic = external_diagnostic_observation(
     producer="pyright",
     binding=RepositoryGenerationBinding("repo-id", 7),
     environment_identity="producer-config-id",
@@ -489,7 +487,7 @@ report. A complete empty report remains distinct from an unavailable, partial,
 or missing report.
 
 ```python
-delta = RepositoryDeltaMixin.diagnostic_observation_delta(
+delta = diagnostic_observation_delta(
     diagnostic_before,
     diagnostic_after,
     changed_paths=["src/example.py"],
@@ -572,7 +570,7 @@ A caller retains the before and after source observations and supplies them
 together with the corresponding external diagnostic observations:
 
 ```python
-delta = RepositoryDeltaMixin.diagnostic_observation_delta(
+delta = diagnostic_observation_delta(
     diagnostic_before,
     diagnostic_after,
     before_source=source_before,

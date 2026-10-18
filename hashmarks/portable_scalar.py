@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from typing import Literal, TypeGuard, overload
+
 MAX_PORTABLE_INTEGER = (1 << 53) - 1
 
 
-def is_portable_nonnegative_integer(value: object) -> bool:
+def is_portable_nonnegative_integer(value: object) -> TypeGuard[int]:
     """Return whether value is losslessly portable through JSON number consumers."""
     return type(value) is int and 0 <= value <= MAX_PORTABLE_INTEGER
 
@@ -20,6 +22,18 @@ def require_optional_portable_nonnegative_integer(
     if value is None:
         return None
     return require_portable_nonnegative_integer(value, field=field)
+
+
+@overload
+def require_nonblank_string(
+    value: object, *, field: str, optional: Literal[False] = False
+) -> str: ...
+
+
+@overload
+def require_nonblank_string(
+    value: object, *, field: str, optional: bool
+) -> str | None: ...
 
 
 def require_nonblank_string(

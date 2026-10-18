@@ -3,26 +3,32 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from typing import Never
+from typing import Never, NotRequired, TypedDict
 
 import pytest
+from contract_assertions import assert_array, assert_object, assert_records
 
 from hashmarks.adapters import maven_dependency_observation
 from hashmarks.codemap.engine import CodeMap
+
+
+class _MavenRequest(TypedDict):
+    trees: dict[str, bytes]
+    inventories: dict[str, bytes]
+    complete_tree_contexts: NotRequired[tuple[object, ...]]
+    complete_inventory_contexts: NotRequired[tuple[object, ...]]
 
 
 def _complete_maven_observation(
     *,
     trees: dict[str, bytes],
     inventories: dict[str, bytes],
-    repository_inputs: tuple[str, ...] = (),
 ) -> dict[str, object]:
     return maven_dependency_observation(
         trees=trees,
         inventories=inventories,
         complete_tree_contexts=tuple(trees),
         complete_inventory_contexts=tuple(inventories),
-        repository_inputs=repository_inputs,
     )
 
 
@@ -94,11 +100,20 @@ def _inventory() -> bytes:
     ],
 )
 def test_maven_complete_context_requires_supplied_artifact(
-    kwargs: dict[str, object],
+    kwargs: _MavenRequest,
     message: str,
 ) -> None:
     with pytest.raises(ValueError, match=message):
-        maven_dependency_observation(**kwargs)
+        maven_dependency_observation(
+            trees=kwargs["trees"],
+            inventories=kwargs["inventories"],
+            complete_tree_contexts=tuple(
+                json.loads(json.dumps(kwargs.get("complete_tree_contexts", ())))
+            ),
+            complete_inventory_contexts=tuple(
+                json.loads(json.dumps(kwargs.get("complete_inventory_contexts", ())))
+            ),
+        )
 
 
 def test_maven_adapter_does_not_infer_complete_coverage_from_bytes(
@@ -109,30 +124,35 @@ def test_maven_adapter_does_not_infer_complete_coverage_from_bytes(
         inventories={"compile": _inventory()},
     )
     assert (
-        raw["producer"]["adapter_semantics"] == "hashmarks.maven-dependency-adapter.v1"
+        assert_object(raw["producer"])["adapter_semantics"]
+        == "hashmarks.maven-dependency-adapter.v1"
     )
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        observation = codemap.dependency_resolution_evidence(raw)
-        missing_component = codemap.dependency_resolution_queries(
-            observation,
-            [{"operation": "component", "component_id": "missing"}],
-        )["results"][0]
-        missing_inventory = codemap.dependency_resolution_queries(
-            observation,
-            [
-                {
-                    "operation": "inventory",
-                    "node_id": "missing@1",
-                    "context": "compile",
-                }
-            ],
-        )["results"][0]
+        observation = codemap.dependencies.observe(raw)
+        missing_component = assert_records(
+            codemap.dependencies.queries(
+                observation,
+                [{"operation": "component", "component_id": "missing"}],
+            )["results"]
+        )[0]
+        missing_inventory = assert_records(
+            codemap.dependencies.queries(
+                observation,
+                [
+                    {
+                        "operation": "inventory",
+                        "node_id": "missing@1",
+                        "context": "compile",
+                    }
+                ],
+            )["results"]
+        )[0]
 
     coverage = {
         row["kind"]: row["completeness"]
-        for row in observation["coverage"]
+        for row in assert_records(observation["coverage"])
         if row["context"] == "compile"
     }
     assert coverage == {
@@ -166,15 +186,17 @@ def test_maven_selection_coverage_requires_all_supplied_sources_complete(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        observation = codemap.dependency_resolution_evidence(raw)
-        missing = codemap.dependency_resolution_queries(
-            observation,
-            [{"operation": "component", "component_id": "missing"}],
-        )["results"][0]
+        observation = codemap.dependencies.observe(raw)
+        missing = assert_records(
+            codemap.dependencies.queries(
+                observation,
+                [{"operation": "component", "component_id": "missing"}],
+            )["results"]
+        )[0]
 
     selection_coverage = next(
         row
-        for row in observation["coverage"]
+        for row in assert_records(observation["coverage"])
         if row["context"] == "compile" and row["kind"] == "selection"
     )
     assert selection_coverage["completeness"] == "incomplete"
@@ -219,17 +241,17 @@ def test_maven_adapter_preserves_inventory_topology_and_module_ambiguity(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        observation = codemap.dependency_resolution_evidence(raw)
+        observation = codemap.dependencies.observe(raw)
 
-    inventory = {row["node_id"] for row in observation["inventory"]}
+    inventory = {row["node_id"] for row in assert_records(observation["inventory"])}
     graph = {
         endpoint
-        for row in observation["relationships"]
+        for row in assert_records(observation["relationships"])
         for endpoint in (row["source"], row["target"])
     }
     assert "example.extra:inventory-only:jar:3.0" in inventory
     assert "example.extra:inventory-only:jar:3.0" not in graph
-    ownership = observation["module_ownership"][0]
+    ownership = assert_records(observation["module_ownership"])[0]
     assert ownership["module"] == "shared.module"
     assert ownership["state"] == "resolved-ambiguous"
     assert ownership["owners"] == [
@@ -250,9 +272,9 @@ def test_maven_adapter_keeps_context_separate_from_effective_scope(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        observation = codemap.dependency_resolution_evidence(raw)
+        observation = codemap.dependencies.observe(raw)
 
-    edge = observation["relationships"][0]
+    edge = assert_records(observation["relationships"])[0]
     assert edge["context"] == "runtime"
     assert edge["effective_scope"] == "compile"
 
@@ -271,15 +293,15 @@ def test_maven_adapter_preserves_classifier_as_selection_identity(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        observation = codemap.dependency_resolution_evidence(raw)
+        observation = codemap.dependencies.observe(raw)
 
-    assert [row["node_id"] for row in observation["selections"]] == [
+    assert [row["node_id"] for row in assert_records(observation["selections"])] == [
         "io.netty:native:jar:linux-x86_64:1.0",
         "io.netty:native:jar:osx-x86_64:1.0",
     ]
-    assert {row["component_id"] for row in observation["selections"]} == {
-        "io.netty:native"
-    }
+    assert {
+        row["component_id"] for row in assert_records(observation["selections"])
+    } == {"io.netty:native"}
 
 
 def test_maven_adapter_is_execution_free(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -294,7 +316,7 @@ def test_maven_adapter_is_execution_free(monkeypatch: pytest.MonkeyPatch) -> Non
         inventories={"compile": _inventory()},
     )
 
-    assert raw["producer"]["kind"] == "maven-dependency-artifacts"
+    assert assert_object(raw["producer"])["kind"] == "maven-dependency-artifacts"
     assert raw["scope"] == {}
     assert raw["contexts"] == ["compile"]
 
@@ -307,7 +329,7 @@ def test_maven_distinct_same_byte_artifacts_keep_distinct_sources() -> None:
         inventories={"compile": inventory, "runtime": inventory},
     )
 
-    sources = {row["source_id"]: row for row in raw["evidence_sources"]}
+    sources = {row["source_id"]: row for row in assert_records(raw["evidence_sources"])}
     assert set(sources) == {
         "tree:compile",
         "tree:runtime",
@@ -357,12 +379,14 @@ def test_maven_adapter_relationship_change_is_not_selection_change(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        before = codemap.dependency_resolution_evidence(before_raw)
-        after = codemap.dependency_resolution_evidence(after_raw)
-        delta = codemap.dependency_resolution_delta(before, after)
+        before = codemap.dependencies.observe(before_raw)
+        after = codemap.dependencies.observe(after_raw)
+        delta = codemap.dependencies.delta(before, after)
 
-    assert "example.libs:shared:jar:2.0" not in delta["selections_added"]
-    assert "example.libs:shared:jar:2.0" not in delta["selections_removed"]
+    assert "example.libs:shared:jar:2.0" not in assert_array(delta["selections_added"])
+    assert "example.libs:shared:jar:2.0" not in assert_array(
+        delta["selections_removed"]
+    )
     assert delta["relationships_added"]
     assert delta["relationships_removed"]
 
@@ -382,16 +406,16 @@ def test_maven_adapter_preserves_inventory_without_module_metadata(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        observation = codemap.dependency_resolution_evidence(raw)
+        observation = codemap.dependencies.observe(raw)
 
-    assert [row["node_id"] for row in observation["inventory"]] == [
+    assert [row["node_id"] for row in assert_records(observation["inventory"])] == [
         "example.libs:owned:jar:3.0",
         "example.root:parent:pom:1.0",
         "example.scala:scala-module_2.13:jar:2.0",
     ]
-    assert [row["module"] for row in observation["module_ownership"]] == [
-        "example.owned"
-    ]
+    assert [
+        row["module"] for row in assert_records(observation["module_ownership"])
+    ] == ["example.owned"]
 
 
 def test_maven_adapter_does_not_overclaim_module_ownership_completeness(
@@ -408,21 +432,26 @@ def test_maven_adapter_does_not_overclaim_module_ownership_completeness(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        observation = codemap.dependency_resolution_evidence(raw)
+        observation = codemap.dependencies.observe(raw)
 
     coverage = {
-        row["kind"]: row for row in observation["coverage"] if row["context"] == "test"
+        row["kind"]: row
+        for row in assert_records(observation["coverage"])
+        if row["context"] == "test"
     }
     assert coverage["resolved-inventory"]["completeness"] == "complete"
     assert coverage["module-ownership"]["completeness"] == "incomplete"
     negative = {
         row["kind"]: row
-        for row in observation["negative_evidence"]
+        for row in assert_records(observation["negative_evidence"])
         if row["context"] == "test"
     }
     assert negative["resolved-inventory"]["state"] == "admissible-within-declared-scope"
     assert negative["module-ownership"]["state"] == "not-admissible"
-    assert observation["module_ownership"][0]["completeness"] == "incomplete"
+    assert (
+        assert_records(observation["module_ownership"])[0]["completeness"]
+        == "incomplete"
+    )
 
 
 def test_maven_pom_inventory_does_not_make_module_coverage_incomplete(
@@ -439,16 +468,18 @@ def test_maven_pom_inventory_does_not_make_module_coverage_incomplete(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        observation = codemap.dependency_resolution_evidence(raw)
+        observation = codemap.dependencies.observe(raw)
 
     coverage = {
         row["kind"]: row
-        for row in observation["coverage"]
+        for row in assert_records(observation["coverage"])
         if row["context"] == "compile"
     }
     assert coverage["resolved-inventory"]["completeness"] == "complete"
     assert coverage["module-ownership"]["completeness"] == "complete"
-    assert observation["module_ownership"][0]["completeness"] == "complete"
+    assert (
+        assert_records(observation["module_ownership"])[0]["completeness"] == "complete"
+    )
 
 
 def test_maven_duplicate_inventory_rows_do_not_overclaim_module_completeness(
@@ -462,12 +493,14 @@ def test_maven_duplicate_inventory_rows_do_not_overclaim_module_completeness(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        observation = codemap.dependency_resolution_evidence(raw)
+        observation = codemap.dependencies.observe(raw)
 
     coverage = {
-        row["kind"]: row for row in observation["coverage"] if row["context"] == "test"
+        row["kind"]: row
+        for row in assert_records(observation["coverage"])
+        if row["context"] == "test"
     }
-    assert len(observation["inventory"]) == 1
+    assert len(assert_records(observation["inventory"])) == 1
     assert coverage["module-ownership"]["completeness"] == "complete"
 
 
@@ -483,12 +516,14 @@ def test_maven_duplicate_module_annotation_cannot_hide_unannotated_inventory(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        observation = codemap.dependency_resolution_evidence(raw)
+        observation = codemap.dependencies.observe(raw)
 
     coverage = {
-        row["kind"]: row for row in observation["coverage"] if row["context"] == "test"
+        row["kind"]: row
+        for row in assert_records(observation["coverage"])
+        if row["context"] == "test"
     }
-    assert len(observation["inventory"]) == 2
+    assert len(assert_records(observation["inventory"])) == 2
     assert coverage["module-ownership"]["completeness"] == "incomplete"
 
 
@@ -503,13 +538,16 @@ def test_maven_conflicting_duplicate_module_annotations_preserve_ambiguity(
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        observation = codemap.dependency_resolution_evidence(raw)
+        observation = codemap.dependencies.observe(raw)
 
     ownership = {
-        row["module"]: row["owners"] for row in observation["module_ownership"]
+        row["module"]: row["owners"]
+        for row in assert_records(observation["module_ownership"])
     }
     coverage = {
-        row["kind"]: row for row in observation["coverage"] if row["context"] == "test"
+        row["kind"]: row
+        for row in assert_records(observation["coverage"])
+        if row["context"] == "test"
     }
     assert ownership == {
         "example.one": ["example.libs:owned:jar:3.0"],
@@ -556,7 +594,7 @@ def test_maven_adapter_ignores_colon_bearing_maven_log_noise(noise: str) -> None
 
     raw = _complete_maven_observation(trees={}, inventories={"test": inventory})
 
-    assert [row["node_id"] for row in raw["inventory"]] == [
+    assert [row["node_id"] for row in assert_records(raw["inventory"])] == [
         "example.libs:valid:jar:3.0"
     ]
 
@@ -600,11 +638,13 @@ def test_maven_header_only_inventory_is_complete_empty_evidence(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        observation = codemap.dependency_resolution_evidence(raw)
-        result = codemap.dependency_resolution_queries(
-            observation,
-            [{"operation": "inventory", "node_id": "absent", "context": "test"}],
-        )["results"][0]
+        observation = codemap.dependencies.observe(raw)
+        result = assert_records(
+            codemap.dependencies.queries(
+                observation,
+                [{"operation": "inventory", "node_id": "absent", "context": "test"}],
+            )["results"]
+        )[0]
     assert result["result"] == []
     assert result["negative_evidence"] == "admissible-within-declared-scope"
     assert result["producer_authority"] == "caller-claimed"
@@ -619,11 +659,11 @@ def test_maven_genuine_none_marker_is_complete_empty_evidence(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        observation = codemap.dependency_resolution_evidence(raw)
+        observation = codemap.dependencies.observe(raw)
     assert observation["inventory"] == []
     assert {
         row["kind"]: row["state"]
-        for row in observation["negative_evidence"]
+        for row in assert_records(observation["negative_evidence"])
         if row["context"] == "test"
     }["resolved-inventory"] == "admissible-within-declared-scope"
 
@@ -635,9 +675,11 @@ def test_maven_list_strips_producer_ansi_without_changing_source_digest() -> Non
         b"\x1b[0;1;33m (auto)\x1b[m\n"
     )
     raw = _complete_maven_observation(trees={}, inventories={"test": inventory})
-    assert raw["inventory"][0]["node_id"] == "example.libs:valid:jar:3.0"
-    assert raw["module_ownership"][0]["module"] == "valid.name"
-    assert raw["evidence_sources"][0]["producer_digest"] == (
+    assert (
+        assert_records(raw["inventory"])[0]["node_id"] == "example.libs:valid:jar:3.0"
+    )
+    assert assert_records(raw["module_ownership"])[0]["module"] == "valid.name"
+    assert assert_records(raw["evidence_sources"])[0]["producer_digest"] == (
         "sha256:" + hashlib.sha256(inventory).hexdigest()
     )
 

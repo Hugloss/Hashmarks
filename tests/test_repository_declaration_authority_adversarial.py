@@ -106,12 +106,12 @@ def test_declaration_evidence_path_move_is_definition_change_not_value_change(
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        before = codemap.repository_declarations([before_group])
+        before = codemap.declarations.observe([before_group])
 
         new_path.parent.mkdir()
         old_path.replace(new_path)
         codemap.index.sync(["owner-secondary.yaml", "moved/owner-secondary.yaml"])
-        after = codemap.repository_declarations(
+        after = codemap.declarations.observe(
             [after_group],
             previous_observation=before,
         )
@@ -167,18 +167,18 @@ def _loss_restoration_packets(
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        present = codemap.repository_declarations([group])
+        present = codemap.declarations.observe([group])
 
         secondary.unlink()
         codemap.index.sync(["owner-secondary.yaml"])
-        missing = codemap.repository_declarations(
+        missing = codemap.declarations.observe(
             [group],
             previous_observation=present,
         )
 
         secondary.write_text("owner: team-a\n", encoding="utf-8")
         codemap.index.sync(["owner-secondary.yaml"])
-        restored = codemap.repository_declarations(
+        restored = codemap.declarations.observe(
             [group],
             previous_observation=missing,
         )
@@ -369,8 +369,8 @@ def test_declaration_producer_provenance_change_is_observation_only(
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        before = codemap.repository_declarations([before_group])
-        after = codemap.repository_declarations(
+        before = codemap.declarations.observe([before_group])
+        after = codemap.declarations.observe(
             [after_group],
             previous_observation=before,
         )
@@ -461,10 +461,8 @@ def test_correspondence_basis_change_is_group_observation_only(
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        before = codemap.repository_declarations(
-            [_group(declarations, basis_version="1")]
-        )
-        after = codemap.repository_declarations(
+        before = codemap.declarations.observe([_group(declarations, basis_version="1")])
+        after = codemap.declarations.observe(
             [_group(declarations, basis_version="2")],
             previous_observation=before,
         )

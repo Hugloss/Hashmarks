@@ -5,8 +5,10 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Protocol
 
 import pytest
+from contract_assertions import assert_object
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.index_watch import (
@@ -53,16 +55,27 @@ def _wait_for_clean_map(workspace: Path, *, symbol: str | None = None) -> bool:
     deadline = time.monotonic() + 5
     while time.monotonic() < deadline:
         with CodeMap(workspace) as reader:
-            status = reader.status()
+            status = reader.views.status()
             symbol_ready = symbol is None or bool(reader.store.symbol(symbol))
             files_ready = symbol is not None or status["files"] == 3
-            if status["watcher"]["state"] == "clean" and symbol_ready and files_ready:
+            if (
+                assert_object(status["watcher"])["state"] == "clean"
+                and symbol_ready
+                and files_ready
+            ):
                 return True
         time.sleep(0.03)
     return False
 
 
-def _stop_watcher(proc: subprocess.Popen) -> None:
+class _WatcherProcess(Protocol):
+    def poll(self) -> int | None: ...
+    def send_signal(self, signal: int, /) -> None: ...
+    def wait(self, timeout: float) -> int: ...
+    def kill(self) -> None: ...
+
+
+def _stop_watcher(proc: _WatcherProcess) -> None:
     if proc.poll() is not None:
         return
     proc.send_signal(2)
@@ -96,10 +109,7 @@ class _TimeoutProcess:
         self.calls.append(("kill",))
 
 
-class _ExitedProcess:
-    def __init__(self) -> None:
-        self.calls: list[tuple[object, ...]] = []
-
+class _ExitedProcess(_TimeoutProcess):
     def poll(self) -> int | None:
         self.calls.append(("poll",))
         return 0
@@ -108,7 +118,7 @@ class _ExitedProcess:
 def test_watcher_shutdown_is_bounded_and_kills_after_timeout() -> None:
     proc = _TimeoutProcess()
 
-    _stop_watcher(proc)  # type: ignore[arg-type]
+    _stop_watcher(proc)
 
     assert proc.calls == [
         ("poll",),
@@ -122,7 +132,7 @@ def test_watcher_shutdown_is_bounded_and_kills_after_timeout() -> None:
 def test_watcher_shutdown_does_nothing_after_process_exit() -> None:
     proc = _ExitedProcess()
 
-    _stop_watcher(proc)  # type: ignore[arg-type]
+    _stop_watcher(proc)
 
     assert proc.calls == [("poll",)]
 
@@ -155,21 +165,21 @@ def test_watcher_continuity_is_one_atomic_freshness_authority(
         codemap.store.set_meta("watcher_pid", "999999")
         codemap.store.set_meta("watcher_state", "dirty")
         codemap.store.set_meta("watcher_heartbeat_unix", "0")
-        status = codemap.status()
+        status = codemap.views.status()
         assert status["daemon_generation_changed"] is False
-        assert status["watcher"]["state"] == "clean"
-        assert status["watcher"]["fence"] == session.fence
+        assert assert_object(status["watcher"])["state"] == "clean"
+        assert assert_object(status["watcher"])["fence"] == session.fence
 
         session.tracker.mark_dirty(["src/auth.py"])
         session.publish()
-        assert codemap.status()["daemon_generation_changed"] is True
+        assert codemap.views.status()["daemon_generation_changed"] is True
 
         session.tracker.mark_unknown("synthetic overflow")
         session.publish()
-        status = codemap.status()
+        status = codemap.views.status()
         assert status["daemon_generation_changed"] is None
-        assert status["watcher"]["state"] == "unknown"
-        assert status["watcher"]["reason"] == "synthetic overflow"
+        assert assert_object(status["watcher"])["state"] == "unknown"
+        assert assert_object(status["watcher"])["reason"] == "synthetic overflow"
 
 
 def test_clean_watcher_observation_only_covers_its_published_codemap_generation(
@@ -187,14 +197,17 @@ def test_clean_watcher_observation_only_covers_its_published_codemap_generation(
         session.acquire()
         assert session.tracker.mark_reconciled(expected_generation=0)
         session.publish()
-        assert codemap.status()["daemon_generation_changed"] is False
+        assert codemap.views.status()["daemon_generation_changed"] is False
 
         with codemap.store.publication_transaction():
             codemap.store.bump_generation()
 
-        status = codemap.status()
+        status = codemap.views.status()
         assert status["daemon_generation_changed"] is None
-        assert status["watcher"]["codemap_generation"] != status["generation"]
+        assert (
+            assert_object(status["watcher"])["codemap_generation"]
+            != status["generation"]
+        )
 
 
 def test_inactive_watcher_observation_cannot_authorize_current_state(
@@ -213,10 +226,10 @@ def test_inactive_watcher_observation_cannot_authorize_current_state(
         assert session.tracker.mark_reconciled(expected_generation=0)
         session.publish(active=False)
 
-        status = codemap.status()
+        status = codemap.views.status()
         assert status["daemon_generation_changed"] is None
-        assert status["watcher"]["active"] is False
-        assert status["watcher"]["pid"] is None
+        assert assert_object(status["watcher"])["active"] is False
+        assert assert_object(status["watcher"])["pid"] is None
 
 
 def test_second_live_watcher_cannot_claim_continuity_authority(

@@ -11,7 +11,7 @@ import hashlib
 import json
 from copy import deepcopy
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 from hashmarks import CodeMap
 from hashmarks.codemap.static_python_backend_declarations import (
@@ -22,6 +22,12 @@ SCHEMA = "hashmarks.backend-navigation-ablation.v1"
 MANIFEST_SCHEMA = "hashmarks.backend-navigation-cases.v1"
 MAX_CASES = 16
 MAX_EXPORT_BYTES = 4_194_304
+
+
+class BackendSettings(TypedDict):
+    paths: tuple[str, ...]
+    include_model_fields: bool
+    include_environment_reads: bool
 
 
 def _encode(value: object) -> bytes:
@@ -166,15 +172,15 @@ def export_cases(repo: Path, manifest: dict[str, object]) -> dict[str, object]:
     with CodeMap(repo) as codemap:
         codemap.index.sync()
         for case in cases:
-            settings = {
+            settings: BackendSettings = {
                 "paths": tuple(case["paths"]),
                 "include_model_fields": case["model_fields"],
                 "include_environment_reads": case["environment_reads"],
             }
-            baseline = codemap.discover_repository_declarations(
+            baseline = codemap.declarations.discover(
                 [StaticPythonBackendDeclarations(**settings)]
             )
-            treatment = codemap.discover_repository_declarations(
+            treatment = codemap.declarations.discover(
                 [
                     StaticPythonBackendDeclarations(
                         **settings, include_evidence_navigation=True
@@ -194,9 +200,14 @@ def export_cases(repo: Path, manifest: dict[str, object]) -> dict[str, object]:
                 )
             if baseline["repository"] != treatment["repository"]:
                 raise ValueError("navigation arms have divergent repository authority")
-            if any("evidence_navigation" in row["value"] for row in before) or any(
+            declarations = treatment["declarations"]
+            assert isinstance(declarations, dict)
+            if any(
+                isinstance(row["value"], dict) and "evidence_navigation" in row["value"]
+                for row in before
+            ) or any(
                 "evidence_navigation" not in row["declarations"][0]["value"]
-                for row in treatment["declarations"]["groups"]
+                for row in declarations["groups"]
             ):
                 raise ValueError("ablation arms are not exact navigation off/on")
             identity = _digest(

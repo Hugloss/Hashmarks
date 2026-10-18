@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from contract_assertions import assert_integer, assert_object, assert_records
+
 from hashmarks.codemap.engine import CodeMap
 
 
@@ -50,13 +52,13 @@ def test_unrelated_repository_generation_change_preserves_binding_observation(
             binding_delta_before=before,
         )
 
-    before_repository = before["repository"]
-    after_repository = after["repository"]
-    before_binding = before["bindings"][0]
-    after_binding = after["bindings"][0]
+    before_repository = assert_object(before["repository"])
+    after_repository = assert_object(after["repository"])
+    before_binding = assert_records(before["bindings"])[0]
+    after_binding = assert_records(after["bindings"])[0]
 
-    assert (
-        before_repository["codemap_generation"] < after_repository["codemap_generation"]
+    assert assert_integer(before_repository["codemap_generation"]) < assert_integer(
+        after_repository["codemap_generation"]
     )
     assert before_repository["source_identity"] != after_repository["source_identity"]
     assert before["bindings_identity"] != after["bindings_identity"]
@@ -70,18 +72,23 @@ def test_unrelated_repository_generation_change_preserves_binding_observation(
         == after_binding["binding_observation_identity"]
     )
 
-    assert delta["observer"]["changed"] is False
+    assert assert_object(delta["observer"])["changed"] is False
     assert delta["bindings"] == {
         "added": [],
         "removed": [],
         "preserved": ["consumer"],
         "changed": [],
     }
-    assert delta["repository"]["before"] == before_repository
-    assert delta["repository"]["after"] == after_repository
+    assert assert_object(delta["repository"])["before"] == before_repository
+    assert assert_object(delta["repository"])["after"] == after_repository
 
-    assert coverage["classification"]["outside_declared_bindings"] == ["unrelated.py"]
-    assert coverage["classification"]["bound_member_precision_unknown"] == []
+    assert assert_object(coverage["classification"])["outside_declared_bindings"] == [
+        "unrelated.py"
+    ]
+    assert (
+        assert_object(coverage["classification"])["bound_member_precision_unknown"]
+        == []
+    )
     assert coverage["binding_impacts"] == []
-    assert coverage["coverage"]["state"] == "complete"
-    assert coverage["coverage"]["outside_classification"] == "known"
+    assert assert_object(coverage["coverage"])["state"] == "complete"
+    assert assert_object(coverage["coverage"])["outside_classification"] == "known"

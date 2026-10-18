@@ -22,12 +22,12 @@ def packet(
     with CodeMap(workspace) as cm:
         cm.index.sync()
         entry = cm.tasks.entry_points(query, limit=limit)
-        rec = [r for r in entry.get("recommended", []) if isinstance(r, dict)]
-        ambiguity = (
-            entry.get("ambiguity", {})
-            if isinstance(entry.get("ambiguity"), dict)
-            else {}
-        )
+        recommended = entry.get("recommended", [])
+        if not isinstance(recommended, list):
+            raise ValueError("recommended entries must be a list")
+        rec = [r for r in recommended if isinstance(r, dict)]
+        raw_ambiguity = entry.get("ambiguity", {})
+        ambiguity = raw_ambiguity if isinstance(raw_ambiguity, dict) else {}
         alternatives = [
             dict(r) for r in ambiguity.get("alternatives", []) if isinstance(r, dict)
         ]

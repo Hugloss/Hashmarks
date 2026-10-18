@@ -282,10 +282,10 @@ def test_persistent_grep_returns_only_candidate_lines_and_respects_outline_only(
 def test_find_auto_indexes_cold_repo(tmp_path: Path) -> None:
     _write_repo(tmp_path)
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        assert codemap.status()["files"] == 0
+        assert codemap.views.status()["files"] == 0
         hits = codemap.search.find("AuthService")
         assert hits
-        assert codemap.status()["files"] == 3
+        assert codemap.views.status()["files"] == 3
 
 
 def test_polyglot_advisory_outlines_are_provenance_bounded(tmp_path: Path) -> None:
@@ -497,7 +497,7 @@ print(json.dumps({
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.index.sync()
         result = codemap.structure.search("$A.login($B)", language="python")
-        status = codemap.status()
+        status = codemap.views.status()
     assert result["available"] is True
     assert assert_object(assert_records(result["matches"])[0])["path"] == "src/auth.py"
     assert assert_object(assert_records(result["matches"])[0])["range"] == [4, 4]
@@ -770,7 +770,7 @@ def test_scip_evidence_is_ignored_after_codemap_generation_changes(
         )
         codemap.index.sync(["src/auth.py"])
         refs = codemap.relationships.refs("AuthService")
-        status = codemap.status()
+        status = codemap.views.status()
     assert refs["native_references"] == []
     scip_status = [
         row
@@ -1447,7 +1447,7 @@ def test_pyright_native_edges_are_generation_bound_and_become_stale(
         codemap.index.sync(("src/app.py",))
         deps_after = codemap.relationships.deps("src/app.py")
         assert deps_after["native_file_edges"] == []
-        status = codemap.status()
+        status = codemap.views.status()
         pyright_status = [
             row
             for row in assert_records(status["native_evidence"])
@@ -2270,7 +2270,7 @@ def test_index_preflight_and_economics_report_measured_surfaces_without_executio
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         preflight = codemap.index.preflight()
         result = codemap.index.sync()
-        status = codemap.status()
+        status = codemap.views.status()
     assert assert_number(preflight["indexable_files"]) >= 3
     assert preflight["estimated_lexical_rows"] is None
     assert assert_object(assert_object(preflight["surfaces"])["source"])["files"] == 1

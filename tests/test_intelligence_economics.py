@@ -4,6 +4,8 @@ import threading
 import time
 from typing import TYPE_CHECKING
 
+from contract_assertions import assert_array, assert_integer, assert_object
+
 from hashmarks import CodeMap
 from hashmarks.codemap.change_impact import ChangeImpactOptions
 from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
@@ -30,18 +32,18 @@ def test_economics_receipt_measures_hashmarks_owned_evidence_only(
     _source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        receipt = codemap.intelligence_economics_receipt(task, ["src/owner.py"])
+        receipt = codemap.economics.receipt(task, ["src/owner.py"])
     assert receipt["schema"] == "hashmarks.intelligence-economics-receipt.v1"
-    rows = receipt["profile_economics"]
+    rows = assert_object(receipt["profile_economics"])
     assert (
-        rows["compact"]["serialized_bytes"]
-        < rows["standard"]["serialized_bytes"]
-        < rows["audit"]["serialized_bytes"]
+        assert_integer(assert_object(rows["compact"])["serialized_bytes"])
+        < assert_integer(assert_object(rows["standard"])["serialized_bytes"])
+        < assert_integer(assert_object(rows["audit"])["serialized_bytes"])
     )
-    assert rows["compact"]["saved_vs_audit_bytes"] > 0
-    assert receipt["evidence_counts"]["changed_paths"] == 1
-    assert receipt["measurement"]["unit"] == "serialized-json-utf8-bytes"
-    excluded = set(receipt["measurement"]["excluded"])
+    assert assert_integer(assert_object(rows["compact"])["saved_vs_audit_bytes"]) > 0
+    assert assert_object(receipt["evidence_counts"])["changed_paths"] == 1
+    assert assert_object(receipt["measurement"])["unit"] == "serialized-json-utf8-bytes"
+    excluded = set(assert_array(assert_object(receipt["measurement"])["excluded"]))
     assert {
         "model-tokens",
         "tool-calls",
@@ -58,9 +60,9 @@ def test_economics_receipt_is_deterministic_and_identity_bound(tmp_path: Path) -
     _source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        first = codemap.intelligence_economics_receipt(task, ["src/owner.py"])
-        second = codemap.intelligence_economics_receipt(task, ["src/owner.py"])
-        snapshot = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
+        first = codemap.economics.receipt(task, ["src/owner.py"])
+        second = codemap.economics.receipt(task, ["src/owner.py"])
+        snapshot = codemap.changes.snapshot(task, ["src/owner.py"])
     assert first == second
     assert first["source_snapshot_identity"] == snapshot["snapshot_identity"]
 
@@ -71,23 +73,23 @@ def test_economics_receipt_delta_economics_use_existing_delta_authority(
     source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        previous = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
+        previous = codemap.changes.snapshot(task, ["src/owner.py"])
         source.write_text("def widget(): return 'new'\n", encoding="utf-8")
         codemap.index.sync(["src/owner.py"])
-        receipt = codemap.intelligence_economics_receipt(
+        receipt = codemap.economics.receipt(
             task, ["src/owner.py"], previous_snapshot=previous
         )
-    delta = receipt["delta_economics"]
+    delta = assert_object(receipt["delta_economics"])
     assert delta["from_snapshot_identity"] == previous["snapshot_identity"]
     assert delta["to_snapshot_identity"] == receipt["source_snapshot_identity"]
-    assert delta["delta_bytes"] > 0
-    assert delta["retransmit_pair_bytes"] > 0
+    assert assert_integer(delta["delta_bytes"]) > 0
+    assert assert_integer(delta["retransmit_pair_bytes"]) > 0
 
 
 def test_economics_receipt_applies_typed_impact_bounds(tmp_path: Path) -> None:
     _source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        receipt = codemap.intelligence_economics_receipt(
+        receipt = codemap.economics.receipt(
             task,
             ["src/owner.py"],
             options=ChangeImpactOptions(
@@ -96,8 +98,8 @@ def test_economics_receipt_applies_typed_impact_bounds(tmp_path: Path) -> None:
             ),
         )
 
-    assert receipt["bounds"]["depth"] == 1
-    assert receipt["bounds"]["per_surface"] == 2
+    assert assert_object(receipt["bounds"])["depth"] == 1
+    assert assert_object(receipt["bounds"])["per_surface"] == 2
 
 
 def test_query_facade_exposes_economics_without_changing_receipt(
@@ -106,10 +108,8 @@ def test_query_facade_exposes_economics_without_changing_receipt(
     _source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        direct = codemap.intelligence_economics_receipt(task, ["src/owner.py"])
-        query = codemap.repository_intelligence_query(
-            "economics", task, ["src/owner.py"]
-        )
+        direct = codemap.economics.receipt(task, ["src/owner.py"])
+        query = codemap.views.query("economics", task, ["src/owner.py"])
     assert query["producer_schema"] == "hashmarks.intelligence-economics-receipt.v1"
     assert query["result"] == direct
 

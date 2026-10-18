@@ -10,9 +10,10 @@ import shutil
 import subprocess
 import sys
 import time
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, NotRequired, TypedDict
 
 from hashmarks._command_output import log_command_output
 
@@ -55,6 +56,53 @@ class CollectionConfig:
     timeout_s: int = 900
     lanes: tuple[str, ...] = LANES
     max_tasks: int | None = None
+
+
+class ModelRunResult(TypedDict):
+    returncode: int
+    elapsed_ms: float
+    final: object
+    usage: dict[str, int | None]
+    events_sha256: str
+    stderr_sha256: str
+
+
+class CodexRunResult(ModelRunResult):
+    lane: str
+    task_id: str
+    command: list[str]
+    final_message_present: bool
+    parse_error: str | None
+
+
+class CodexTaskScore(TypedDict):
+    id: object
+    completed: bool
+    correct_first_edit: bool
+    correct_verification: bool
+    first_edit_target: str | None
+    verification_target: str | None
+    elapsed_ms: float
+    usage: dict[str, int | None]
+
+
+class CodexScore(TypedDict):
+    summary: dict[str, int | float]
+    tasks: list[CodexTaskScore]
+    raw_runs: NotRequired[list[CodexRunResult]]
+
+
+class CodexRepositoryReport(TypedDict):
+    name: str
+    public_task_sha256: str
+    hidden_corpus_sha256: str
+    lanes: dict[str, CodexScore]
+
+
+def _process_output_text(value: str | bytes | None) -> str:
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value or ""
 
 
 def _identity(v: object) -> str:
@@ -118,7 +166,7 @@ def _walk_json(value: object) -> Iterator[dict[str, object]]:
 
 
 def _usage_from_jsonl(text: str) -> dict[str, int | None]:
-    totals = {
+    totals: dict[str, int | None] = {
         "input_tokens": None,
         "cached_input_tokens": None,
         "output_tokens": None,
@@ -135,7 +183,7 @@ def _usage_from_jsonl(text: str) -> dict[str, int | None]:
         for d in _walk_json(obj):
             for key in totals:
                 val = d.get(key)
-                if isinstance(val, int) and val >= 0:
+                if isinstance(val, int) and not isinstance(val, bool) and val >= 0:
                     best[key] = max(best.get(key, 0), val)
     totals.update(best)
     return totals
@@ -147,7 +195,7 @@ def _run_one(
     task: dict[str, str],
     workspace: Path,
     run_dir: Path,
-) -> dict[str, object]:
+) -> CodexRunResult:
     run_dir.mkdir(parents=True, exist_ok=True)
     schema = run_dir / "output.schema.json"
     final = run_dir / "final.json"
@@ -181,6 +229,8 @@ def _run_one(
             cmd,
             input=prompt,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             capture_output=True,
             timeout=config.timeout_s,
             env=dict(os.environ),
@@ -190,11 +240,11 @@ def _run_one(
         err = cp.stderr
     except subprocess.TimeoutExpired as exc:
         rc = 124
-        out = exc.stdout or ""
-        err = (exc.stderr or "") + "\nTIMEOUT"
+        out = _process_output_text(exc.stdout)
+        err = _process_output_text(exc.stderr) + "\nTIMEOUT"
     elapsed = (time.perf_counter() - t) * 1000
-    events.write_text(out)
-    stderr.write_text(err)
+    events.write_bytes(out.encode("utf-8"))
+    stderr.write_bytes(err.encode("utf-8"))
     parsed = None
     parse_error = None
     if final.is_file():
@@ -218,18 +268,19 @@ def _run_one(
 
 
 def _score(
-    repo_name: str, hidden: list[dict[str, Any]], runs: list[dict[str, object]]
-) -> dict[str, object]:
+    repo_name: str, hidden: list[dict[str, Any]], runs: list[CodexRunResult]
+) -> CodexScore:
     expected_verify = {
         "python-orders": "tests/test_orders.py",
         "typescript-dashboard": "tests/MetricsPanel.test.tsx",
         "release-contracts": "tests/test_release_contract.py",
     }[repo_name]
     by_id = {str(r["task_id"]): r for r in runs}
-    rows = []
+    rows: list[CodexTaskScore] = []
     for t in hidden:
         r = by_id[str(t["id"])]
-        final = r.get("final") if isinstance(r.get("final"), dict) else {}
+        raw_final = r["final"]
+        final = raw_final if isinstance(raw_final, dict) else {}
         exp = {str(x) for x in t.get("expected_files", [])}
         edit = str(final.get("first_edit_target") or "")
         verify = str(final.get("verification_target") or "")
@@ -297,7 +348,7 @@ def collect(
         if config.max_tasks is not None:
             public = public[: config.max_tasks]
             hidden = hidden[: config.max_tasks]
-        repo = {
+        repo: CodexRepositoryReport = {
             "name": name,
             "public_task_sha256": _sha256_bytes(public_path.read_bytes()),
             "hidden_corpus_sha256": _sha256_bytes(corpus.read_bytes()),
@@ -318,7 +369,7 @@ def collect(
             repo["lanes"][lane] = _score(name, hidden, runs)
             repo["lanes"][lane]["raw_runs"] = runs
         reports.append(repo)
-    summary = {
+    summary: dict[str, int | float] = {
         "repositories": len(reports),
         "tasks": sum(
             int(r["lanes"][config.lanes[0]]["summary"]["tasks"]) for r in reports

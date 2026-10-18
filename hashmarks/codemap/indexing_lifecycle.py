@@ -362,6 +362,7 @@ class RepositoryIndex(IndexWatchMixin):
         observation_source: RepositoryObservationSource,
         max_index_bytes: int = _MAX_INDEX_BYTES,
     ) -> None:
+        store.bind_workspace(files.workspace)
         self.files = files
         self.workspace = files.workspace
         self.state_dir = store.db_path.parent
@@ -375,6 +376,10 @@ class RepositoryIndex(IndexWatchMixin):
         self._python_import_roots = _python_source_roots_from_pyprojects(
             self.workspace, () if root_manifest is None else (root_manifest.path,)
         )
+
+    @property
+    def observation_source(self) -> RepositoryObservationSource:
+        return self._observation_source
 
     @property
     def max_index_bytes(self) -> int:
@@ -1375,6 +1380,64 @@ class RepositoryIndex(IndexWatchMixin):
             "shared_artifact_db": str(self.artifacts.db_path),
         }
 
+    @property
+    def artifact_db_path(self) -> Path:
+        return self.artifacts.db_path
+
+    def publication_binding(self) -> tuple[int, str | None]:
+        generation = self.store.generation()
+        fingerprint = self.store.meta("workspace_fingerprint")
+        if generation != self.store.generation():
+            raise RuntimeError(
+                "CodeMap generation changed during publication observation"
+            )
+        return generation, fingerprint
+
+    def status(self) -> dict[str, object]:
+        """Report index-owned publication/build facts without native qualification."""
+        generation = self.store.generation()
+        last_sync = self.store.meta("last_sync_unix")
+        economics = self.store.meta("sync.economics")
+        facts: dict[str, object] = {
+            "schema": "hashmarks.codemap-index-status.v1",
+            "workspace": str(self.workspace),
+            "state_dir": str(self.store.db_path.parent),
+            "generation": generation,
+            "workspace_fingerprint": self.store.meta("workspace_fingerprint"),
+            "last_sync_unix": None if last_sync is None else float(last_sync or 0),
+            "artifact_db": str(self.artifact_db_path),
+            "artifact_count": self.artifacts.count(),
+            "build": self._codemap_build_state(),
+            "last_index_economics": json.loads(economics) if economics else None,
+            **self.store.stats(),
+        }
+        if generation != self.store.generation():
+            raise RuntimeError(
+                "CodeMap generation changed during index status observation"
+            )
+        return facts
+
+    def derived_graph(self, path: str | None = None) -> dict[str, object]:
+        """Observe derived index nodes under one published generation."""
+        self.ensure_ready()
+        normalized = (
+            None if path is None else normalize_relative_path(path, allow_root=False)
+        )
+        if normalized is not None:
+            self.reconcile_path(normalized)
+        generation = self.store.generation()
+        nodes = self.store.derived_nodes(normalized)
+        if generation != self.store.generation():
+            raise RuntimeError(
+                "CodeMap generation changed during derived graph observation"
+            )
+        return {
+            "schema": "hashmarks.codemap-derived-graph.v1",
+            "generation": generation,
+            "path": normalized,
+            "nodes": nodes,
+        }
+
     def watch_continuity(self) -> WatchContinuityRecord | None:
         return WatchContinuityRecord.from_json(
             self.store.meta(WATCH_CONTINUITY_META, "") or ""
@@ -1432,21 +1495,29 @@ class RepositoryIndex(IndexWatchMixin):
             )
         )
 
-    def reconcile_path(self, relpath: str) -> None:
+    def reconcile_path(
+        self, relpath: str, *, expected_generation: int | None = None
+    ) -> int:
         rel = normalize_relative_path(relpath, allow_root=False)
         with self.store.publication_transaction():
+            generation = self.store.generation()
+            if expected_generation is not None and generation != expected_generation:
+                raise RuntimeError(
+                    "CodeMap generation changed before expected decision session "
+                    f"({expected_generation} -> {generation})"
+                )
             if not self.needs_reconcile(rel):
-                return
+                return generation
             row = self.store.file_row(rel)
             path = self.workspace / rel
             if self._path_unavailable(rel, path):
                 if row is None:
-                    return
+                    return generation
                 self.store.delete_paths((rel,))
             else:
                 language = _language_for_path(path)
                 if language is None:
-                    return
+                    return generation
                 decision = self.files.decide(rel)
                 digest = self.file_store.digest(
                     path,
@@ -1465,6 +1536,7 @@ class RepositoryIndex(IndexWatchMixin):
             self.store.set_meta(
                 "workspace_fingerprint", self._workspace_fingerprint_from_store()
             )
+            return self.store.generation()
 
     def ensure_ready(
         self, *, _allow_incomplete: bool = False

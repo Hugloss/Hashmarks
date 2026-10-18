@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from contract_assertions import assert_present
+
 from hashmarks.codemap import CodeMap
 
 
@@ -39,10 +41,10 @@ def test_exact_qualified_identifier_is_not_displaced_by_test_structural_walk(
         codemap.index.sync()
         action = codemap.tasks.action_map("optimize WorkspaceMapStore.paths_under")
 
-    assert action["edit"]["path"] == "pkg/repository_index_store.py"
+    assert assert_present(action["edit"])["path"] == "pkg/repository_index_store.py"
     assert action["edit"] is not None
     assert "qualname" in action["edit"]
-    assert action["edit"]["qualname"] == "WorkspaceMapStore.paths_under"
+    assert assert_present(action["edit"])["qualname"] == "WorkspaceMapStore.paths_under"
     assert action["ambiguity"]["ambiguous"] is False
     assert action["ownership_resolution"] is None
 
@@ -73,11 +75,12 @@ def test_exact_method_identifier_is_not_displaced_by_import_continuation(
         codemap.index.sync()
         action = codemap.tasks.action_map("optimize _sync_remove_stale_paths")
 
-    assert action["edit"]["path"] == "pkg/indexing_lifecycle.py"
+    assert assert_present(action["edit"])["path"] == "pkg/indexing_lifecycle.py"
     assert action["edit"] is not None
     assert "qualname" in action["edit"]
     assert (
-        action["edit"]["qualname"] == "IndexingLifecycleMixin._sync_remove_stale_paths"
+        assert_present(action["edit"])["qualname"]
+        == "IndexingLifecycleMixin._sync_remove_stale_paths"
     )
     assert action["ambiguity"]["ambiguous"] is False
     assert action["ownership_resolution"] is None
@@ -126,7 +129,7 @@ def test_generic_task_keeps_structural_owner_resolution(tmp_path: Path) -> None:
         codemap.index.sync()
         action = codemap.tasks.action_map("Fix ember accepted response behavior owner")
 
-    assert action["edit"]["path"] == "src/case/engine.py"
+    assert assert_present(action["edit"])["path"] == "src/case/engine.py"
     assert action["ownership_resolution"] is not None
     assert "path" in action["ownership_resolution"]
     assert action["ownership_resolution"]["path"] == "src/case/engine.py"
@@ -150,8 +153,8 @@ def test_exact_verification_symbol_does_not_become_edit_authority(
         codemap.index.sync()
         action = codemap.tasks.action_map("fix test_run_task_contract behavior")
 
-    assert action["edit"]["path"] == "src/worker.py"
-    assert action["edit"]["path"] != "tests/test_worker.py"
+    assert assert_present(action["edit"])["path"] == "src/worker.py"
+    assert assert_present(action["edit"])["path"] != "tests/test_worker.py"
     assert action["ambiguity"]["ambiguous"] is False
 
 
@@ -165,7 +168,7 @@ def test_literal_path_remains_authoritative_without_structural_displacement(
         codemap.index.sync()
         action = codemap.tasks.action_map("optimize src/worker.py")
 
-    assert action["edit"]["path"] == "src/worker.py"
+    assert assert_present(action["edit"])["path"] == "src/worker.py"
     assert action["ownership_resolution"] is None
     assert action["ambiguity"]["ambiguous"] is False
 
@@ -207,10 +210,10 @@ def test_comment_only_lexical_match_cannot_override_active_exact_symbol(
         codemap.index.sync()
         action = codemap.tasks.action_map("optimize active_target")
 
-    assert action["edit"]["path"] == "src/live.py"
+    assert assert_present(action["edit"])["path"] == "src/live.py"
     assert action["edit"] is not None
     assert "qualname" in action["edit"]
-    assert action["edit"]["qualname"] == "active_target"
+    assert assert_present(action["edit"])["qualname"] == "active_target"
     assert action["ambiguity"]["ambiguous"] is False
 
 
@@ -245,14 +248,17 @@ def test_test_shaped_source_can_recover_edit_authority_from_exact_production_imp
         codemap.index.sync()
         action = codemap.tasks.action_map("fix runtime_probe")
 
-    assert action["edit"]["path"] == "pkg/test_support.py"
+    assert assert_present(action["edit"])["path"] == "pkg/test_support.py"
     assert action["edit"] is not None
     assert "qualname" in action["edit"]
-    assert action["edit"]["qualname"] == "runtime_probe"
+    assert assert_present(action["edit"])["qualname"] == "runtime_probe"
     assert "reference_backed_source_projection" in action["edit"]
-    assert action["edit"]["reference_backed_source_projection"] is True
+    assert assert_present(action["edit"])["reference_backed_source_projection"] is True
     assert "reference_backed_source_path" in action["edit"]
-    assert action["edit"]["reference_backed_source_path"] == "pkg/consumer.py"
+    assert (
+        assert_present(action["edit"])["reference_backed_source_path"]
+        == "pkg/consumer.py"
+    )
     assert action["ambiguity"]["ambiguous"] is False
     assert action["ownership_authority"]["owner_resolved"] is True
 
@@ -286,12 +292,12 @@ def test_literal_path_constrains_exact_method_within_that_file(tmp_path: Path) -
         codemap.index.sync()
         action = codemap.tasks.action_map("fix src/store.py Store.paths_under")
 
-    assert action["edit"]["path"] == "src/store.py"
+    assert assert_present(action["edit"])["path"] == "src/store.py"
     assert action["edit"] is not None
     assert "qualname" in action["edit"]
-    assert action["edit"]["qualname"] == "Store.paths_under"
+    assert assert_present(action["edit"])["qualname"] == "Store.paths_under"
     assert "exact_identifier_projection" in action["edit"]
-    assert action["edit"]["exact_identifier_projection"] is True
+    assert assert_present(action["edit"])["exact_identifier_projection"] is True
     assert action["ambiguity"]["ambiguous"] is False
     assert action["ownership_authority"]["owner_resolved"] is True
 
@@ -313,15 +319,16 @@ def test_unique_exact_callable_can_discriminate_competing_verification_rows(
         codemap.index.sync()
         action = codemap.tasks.action_map("fix target_impl verification behavior")
 
-    assert action["edit"]["path"] == "src/generic.py"
+    assert assert_present(action["edit"])["path"] == "src/generic.py"
     assert action["edit"] is not None
     assert "qualname" in action["edit"]
-    assert action["edit"]["qualname"] == "target_impl"
+    assert assert_present(action["edit"])["qualname"] == "target_impl"
     assert "canonical_rank" in action["edit"]
-    assert action["edit"]["canonical_rank"] is not None
-    assert action["edit"]["canonical_rank"] > 2
+    rank = assert_present(action["edit"])["canonical_rank"]
+    assert rank is not None
+    assert rank > 2
     assert "exact_identifier_projection" in action["edit"]
-    assert action["edit"]["exact_identifier_projection"] is True
+    assert assert_present(action["edit"])["exact_identifier_projection"] is True
     assert action["ownership_resolution"] is None
     assert action["ambiguity"]["ambiguous"] is False
     assert action["ownership_authority"]["owner_resolved"] is True
@@ -431,7 +438,7 @@ def test_sentence_ending_period_preserves_explicit_path_target(tmp_path: Path) -
     assert packet["explicit_target"]["status"] == "resolved"
     assert packet["explicit_target"]["path"] == "src/worker.py"
     assert packet["explicit_target"]["basis"] == "literal-path"
-    assert packet["ownership"]["candidate"]["path"] == "src/worker.py"
+    assert assert_present(packet["ownership"]["candidate"])["path"] == "src/worker.py"
 
 
 def test_exact_filename_with_period_is_not_rebound_to_prefix(tmp_path: Path) -> None:
@@ -467,14 +474,14 @@ def test_literal_file_does_not_promote_retrieved_helper_to_symbol_owner(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         packet = codemap.tasks.evidence("Fix schema metadata in src/worker.py")
-    assert packet["ownership"]["candidate"]["path"] == "src/worker.py"
+    assert assert_present(packet["ownership"]["candidate"])["path"] == "src/worker.py"
     assert packet["explicit_target"]["basis"] == "literal-path"
     assert packet["explicit_target"]["symbol"] is None
     assert packet["ownership"]["candidate"] is not None
     assert "qualname" in packet["ownership"]["candidate"]
-    assert packet["ownership"]["candidate"]["qualname"] is None
+    assert assert_present(packet["ownership"]["candidate"])["qualname"] is None
     assert "start_line" in packet["ownership"]["candidate"]
-    assert packet["ownership"]["candidate"]["start_line"] is None
+    assert assert_present(packet["ownership"]["candidate"])["start_line"] is None
 
 
 def test_file_task_generic_options_does_not_establish_options_method(
@@ -492,7 +499,7 @@ def test_file_task_generic_options_does_not_establish_options_method(
     assert packet["explicit_target"]["symbol"] is None
     assert packet["ownership"]["candidate"] is not None
     assert "qualname" in packet["ownership"]["candidate"]
-    assert packet["ownership"]["candidate"]["qualname"] is None
+    assert assert_present(packet["ownership"]["candidate"])["qualname"] is None
 
 
 def test_qualified_lowercase_method_can_refine_literal_file_target(

@@ -109,8 +109,10 @@ def _available_sum(
     if not available:
         return False, None
     if types == (int,):
-        return True, sum(int(value) for value in values)
-    return True, sum(float(value) for value in values)
+        return True, sum(value for value in values if isinstance(value, int))
+    return True, sum(
+        float(value) for value in values if isinstance(value, (int, float))
+    )
 
 
 def summarize_lane(

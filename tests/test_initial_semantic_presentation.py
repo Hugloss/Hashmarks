@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
+from contract_assertions import assert_object
 
 from hashmarks import CodeMap
 from hashmarks.codemap.task_evidence_initial import (
@@ -21,7 +22,9 @@ from hashmarks.evidence_presentation import presentation_response
 def _pointer(value: object, pointer: str) -> object:
     for part in pointer.lstrip("/").split("/") if pointer else []:
         key = part.replace("~1", "/").replace("~0", "~")
-        value = value[int(key)] if isinstance(value, list) else value[key]
+        value = (
+            value[int(key)] if isinstance(value, list) else assert_object(value)[key]
+        )
     return value
 
 
@@ -32,7 +35,10 @@ def _read_record(view: dict[str, Any], native: dict[str, Any]) -> dict[str, Any]
         target = _pointer(record, parent)
         restored = deepcopy(_pointer(native, view["value_ref_base"] + source))
         decoded = key.replace("~1", "/").replace("~0", "~")
-        target[int(decoded) if isinstance(target, list) else decoded] = restored
+        if isinstance(target, list):
+            target[int(decoded)] = restored
+        else:
+            assert_object(target)[decoded] = restored
     return record
 
 

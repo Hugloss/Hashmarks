@@ -263,7 +263,7 @@ class DependencyResolutionDeltaMixin:
     """Compare two explicit qualified dependency observation endpoints."""
 
     @staticmethod
-    def dependency_resolution_delta(
+    def delta(
         before: Mapping[str, object],
         after: Mapping[str, object],
     ) -> dict[str, object]:

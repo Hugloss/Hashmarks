@@ -24,7 +24,7 @@ def _observe(root: Path, *, include: bool = True) -> dict:
     )
     with CodeMap(root) as cm:
         cm.index.sync()
-        return cm.discover_repository_declarations([provider])
+        return cm.declarations.discover([provider])
 
 
 def _group(packet: dict) -> dict:
@@ -156,7 +156,7 @@ def test_default_contract_is_unchanged_by_opt_in(tmp_path: Path) -> None:
     native = _observe(tmp_path, include=False)
     with CodeMap(tmp_path) as cm:
         cm.index.sync()
-        default = cm.discover_repository_declarations(
+        default = cm.declarations.discover(
             [StaticPythonInterfaceDeclarations(paths=("service.py",))]
         )
     assert native["observation_identity"] == default["observation_identity"]
@@ -237,7 +237,7 @@ def test_site_limit_fails_before_provider_publication(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as cm:
         cm.index.sync()
         with pytest.raises(RepositoryDeclarationProviderError, match="site bound"):
-            cm.discover_repository_declarations(
+            cm.declarations.discover(
                 [
                     StaticPythonInterfaceDeclarations(
                         paths=("service.py",),
@@ -246,10 +246,7 @@ def test_site_limit_fails_before_provider_publication(tmp_path: Path) -> None:
                 ]
             )
         assert (
-            assert_object(cm.discover_repository_declarations([])["declarations"])[
-                "groups"
-            ]
-            == []
+            assert_object(cm.declarations.discover([])["declarations"])["groups"] == []
         )
 
 
@@ -278,19 +275,17 @@ def test_site_bound_accepts_sixteen_and_rejects_seventeen(
     )
     with CodeMap(tmp_path) as cm:
         cm.index.sync()
-        before = cm.discover_repository_declarations([provider])
+        before = cm.declarations.discover([provider])
         assert len(_value(before)["static_body_syntax"][field]) == 16
         source.write_text(handler(17), encoding="utf-8")
         cm.index.sync(["service.py"])
         with pytest.raises(RepositoryDeclarationProviderError, match="site bound"):
-            cm.discover_repository_declarations([provider], previous_observation=before)
-        empty: dict[str, Any] = cm.discover_repository_declarations([])
+            cm.declarations.discover([provider], previous_observation=before)
+        empty: dict[str, Any] = cm.declarations.discover([])
         assert empty["declarations"]["groups"] == []
         source.write_text(handler(16), encoding="utf-8")
         cm.index.sync(["service.py"])
-        repaired = cm.discover_repository_declarations(
-            [provider], previous_observation=before
-        )
+        repaired = cm.declarations.discover([provider], previous_observation=before)
         assert _value(repaired) == _value(before)
 
 
@@ -328,12 +323,12 @@ def test_stale_source_cannot_reuse_old_literal_facts(tmp_path: Path) -> None:
     )
     with CodeMap(tmp_path) as cm:
         cm.index.sync()
-        first = cm.discover_repository_declarations([provider])
+        first = cm.declarations.discover([provider])
         source.write_text('@app.get("/x")\ndef x():\n    return {"new": 1}\n')
         with pytest.raises(RepositoryDeclarationProviderError, match="input changed"):
-            cm.discover_repository_declarations([provider], previous_observation=first)
+            cm.declarations.discover([provider], previous_observation=first)
         cm.index.sync(["service.py"])
-        second = cm.discover_repository_declarations(
+        second = cm.declarations.discover(
             [provider],
             previous_observation=first,
         )

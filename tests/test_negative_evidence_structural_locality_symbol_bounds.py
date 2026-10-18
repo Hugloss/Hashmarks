@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from contract_assertions import assert_object, assert_records
 
 from hashmarks.codemap import CodeMap
 
@@ -86,9 +87,11 @@ def authority(value):
             refresh=False,
         )
 
-    assert [row["symbol_id"] for row in packet["nodes"]] == ["pkg/core.py::authority"]
-    assert packet["dimensions"]["unresolved_call_count"] == 1
-    unresolved = packet["unresolved_calls"][0]
+    assert [row["symbol_id"] for row in assert_records(packet["nodes"])] == [
+        "pkg/core.py::authority"
+    ]
+    assert assert_object(packet["dimensions"])["unresolved_call_count"] == 1
+    unresolved = assert_records(packet["unresolved_calls"])[0]
     assert unresolved["target_text"] == "helper"
     assert unresolved["resolved_symbol_id"] is None
     assert unresolved["candidate_search"] == {
@@ -97,9 +100,11 @@ def authority(value):
         "negative_evidence_admissible": False,
         "uniqueness_admissible": False,
     }
-    target = helper["nodes"][0]
+    target = assert_records(helper["nodes"])[0]
     assert target["exact_caller_count"] == 0
-    assert target["unresolved_caller_candidates"][0]["candidate_search"] == {
+    assert assert_records(target["unresolved_caller_candidates"])[0][
+        "candidate_search"
+    ] == {
         "completeness": "incomplete",
         "truncation": "truncated",
         "negative_evidence_admissible": False,
@@ -130,11 +135,13 @@ def authority(value):
             max_depth=2,
         )
 
-    assert {row["symbol_id"] for row in packet["nodes"]} == {
+    assert {row["symbol_id"] for row in assert_records(packet["nodes"])} == {
         "pkg/core.py::authority",
         "pkg/core.py::helper",
     }
-    helper_edge = next(row for row in packet["edges"] if row["target_text"] == "helper")
+    helper_edge = next(
+        row for row in assert_records(packet["edges"]) if row["target_text"] == "helper"
+    )
     assert helper_edge["resolved_symbol_id"] == "pkg/core.py::helper"
     assert helper_edge["candidate_search"] == {
         "completeness": "complete",
@@ -157,6 +164,10 @@ class Worker:
     @staticmethod
     def helper(value):
         return value + 1
+
+# There is no unique declaration binding for the import to qualify first.
+if runtime_flag:
+    Worker = unknown
 """.lstrip(),
     )
     _write(
@@ -200,10 +211,15 @@ def authority(value):
             refresh=False,
         )
 
-    assert [row["symbol_id"] for row in packet["nodes"]] == ["pkg/core.py::authority"]
-    assert packet["dimensions"]["unresolved_call_count"] == 1
-    assert packet["dimensions"]["external_or_unindexed_call_count"] == 0
-    unresolved = packet["unresolved_calls"][0]
+    assert [row["symbol_id"] for row in assert_records(packet["nodes"])] == [
+        "pkg/core.py::authority"
+    ]
+    assert assert_object(packet["dimensions"])["unresolved_call_count"] == 1
+    assert assert_object(packet["dimensions"])["external_or_unindexed_call_count"] == 0
+    unresolved = assert_records(packet["unresolved_calls"])[0]
     assert unresolved["target_text"] == "W.helper"
-    assert unresolved["candidate_search"]["completeness"] == "incomplete"
-    assert unresolved["candidate_search"]["negative_evidence_admissible"] is False
+    assert assert_object(unresolved["candidate_search"])["completeness"] == "incomplete"
+    assert (
+        assert_object(unresolved["candidate_search"])["negative_evidence_admissible"]
+        is False
+    )

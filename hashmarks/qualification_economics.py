@@ -20,9 +20,12 @@ def _classification_changes(
 ) -> list[str]:
     if previous is None:
         return []
+    classifications = previous.get("classifications", [])
+    if not isinstance(classifications, list):
+        raise ValueError("previous classifications must be an array")
     before = {
         str(row["nodeid"]): str(row["kind"])
-        for row in previous.get("classifications", [])
+        for row in classifications
         if isinstance(row, Mapping)
     }
     after = {str(row["nodeid"]): str(row["kind"]) for row in rows}

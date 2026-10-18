@@ -66,7 +66,7 @@ def test_verification_summary_preserves_scope_and_hidden_alternatives(
         # Supply independently qualified observation values to their projection.
         # Task orchestration and owner nomination have separate direct tests.
         with codemap.reads.session():
-            graph = codemap.verification.relationship_evidence(
+            graph = codemap.verification.ownership_relationships(
                 "Change target42 in backend.py",
                 {"edit": {"path": "backend.py"}},
                 relevance,

@@ -4,6 +4,8 @@ import json
 from threading import RLock
 from typing import TYPE_CHECKING, Any, Literal, TypeVar, overload
 
+from hashmarks.codemap.diagnostic_observation import diagnostic_observation_delta
+
 from . import repository_retry
 from .codemap import ChangeImpactOptions, CodeMap
 from .codemap.change_impact import CHANGE_IMPACT_DEFAULT_REQUEST
@@ -19,8 +21,8 @@ from .codemap.repository_declaration_contract import (
     MAX_REQUEST_BYTES,
 )
 from .codemap.repository_declaration_provider import MAX_DISCOVERY_PACKET_BYTES
+from .codemap.repository_declaration_selection import source_declaration_providers
 from .codemap.repository_intelligence_query import RepositoryIntelligenceQueryOptions
-from .codemap.static_python_backend_declarations import StaticPythonBackendDeclarations
 from .codemap.task_evidence_types import (
     InitialTaskEvidenceEnvelope,
     PreviousTaskEvidence,
@@ -97,35 +99,6 @@ def _value_error_reason(message: str) -> str:
 def _surface_value_error(exc: ValueError) -> McpSurfaceError:
     message = str(exc)
     return McpSurfaceError(message, reason=_value_error_reason(message))
-
-
-def _source_declaration_providers(
-    mode: str, paths: list[str] | None, include_class_fields: bool
-) -> list[StaticPythonBackendDeclarations] | None:
-    if type(include_class_fields) is not bool:
-        raise McpSurfaceError("include_class_fields must be boolean")
-    if mode != "discovery":
-        if paths is not None or include_class_fields:
-            raise McpSurfaceError("source selection requires result_mode=discovery")
-        return None
-    if paths is None:
-        if include_class_fields:
-            raise McpSurfaceError("include_class_fields requires selected paths")
-        return []
-    bounded_paths = _bounded_json(
-        paths,
-        name="python_backend_paths",
-        maximum=MAX_REQUEST_BYTES,
-        expected_type=list,
-    )
-    try:
-        return [
-            StaticPythonBackendDeclarations(
-                paths=tuple(bounded_paths), include_class_fields=include_class_fields
-            )
-        ]
-    except ValueError as exc:
-        raise _surface_value_error(exc) from exc
 
 
 def _bounded_text(
@@ -407,7 +380,7 @@ class HashmarksMcpSurface:
         defaults = CHANGE_IMPACT_DEFAULT_REQUEST
         options = defaults.options
         return self._read(
-            lambda: self._map.task_change_impact(
+            lambda: self._map.changes.task_impact(
                 task,
                 paths,
                 limit=defaults.limit,
@@ -498,7 +471,7 @@ class HashmarksMcpSurface:
 
         def project() -> dict[str, object]:
             try:
-                return self._map.dependency_codemap(
+                return self._map.dependencies.codemap(
                     raw_snapshot,
                     bounded_queries,
                     previous_observation=previous,
@@ -515,8 +488,7 @@ class HashmarksMcpSurface:
         *,
         previous_observation: dict[str, Any] | None = None,
         result_mode: str = operation_default_mode("repository_declarations"),
-        python_backend_paths: list[str] | None = None,
-        include_class_fields: bool = False,
+        source_selection: dict[str, object] | None = None,
     ) -> dict[str, object]:
         """Project one core-owned declaration operation without changing semantics."""
         bounded_groups = _bounded_json(
@@ -526,9 +498,16 @@ class HashmarksMcpSurface:
             expected_type=list,
         )
         mode = _bounded_text(result_mode, name="result_mode", maximum=32)
-        providers = _source_declaration_providers(
-            mode, python_backend_paths, include_class_fields
+        selection = _bounded_json(
+            {} if source_selection is None else source_selection,
+            name="source_selection",
+            maximum=MAX_REQUEST_BYTES,
+            expected_type=dict,
         )
+        try:
+            providers = source_declaration_providers(mode, selection)
+        except ValueError as exc:
+            raise _surface_value_error(exc) from exc
         previous = (
             None
             if previous_observation is None
@@ -546,7 +525,7 @@ class HashmarksMcpSurface:
 
         def project() -> dict[str, object]:
             try:
-                return self._map.repository_declarations_operation(
+                return self._map.declarations.operation(
                     bounded_groups,
                     previous_observation=previous,
                     result_mode=mode,
@@ -585,7 +564,7 @@ class HashmarksMcpSurface:
 
         def project() -> dict[str, object]:
             try:
-                return self._map.repository_intelligence_query(
+                return self._map.views.query(
                     surface,
                     task,
                     paths,
@@ -791,7 +770,7 @@ class HashmarksMcpSurface:
         if result_mode == "bindings":
             self._map.index.sync()
             return self._map.bindings.delta(before, after)
-        return self._map.diagnostic_observation_delta(
+        return diagnostic_observation_delta(
             before, after, changed_paths=changed_paths, **diagnostic_options
         )
 
@@ -912,7 +891,7 @@ class HashmarksMcpSurface:
 
         def project() -> TaskPostChangeDelta:
             try:
-                return self._map.task_post_change_delta(
+                return self._map.changes.task_delta(
                     task,
                     paths,
                     previous_evidence=previous_evidence,

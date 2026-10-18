@@ -26,7 +26,7 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-from mcp_host_gate_common import (  # noqa: E402 - import follows standalone script path setup
+from scripts.mcp_host_gate_common import (  # noqa: E402 - import follows standalone script path setup
     validate_basic_qualification_proof,
 )
 

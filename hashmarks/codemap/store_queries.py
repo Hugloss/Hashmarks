@@ -245,7 +245,11 @@ class WorkspaceMapQueryMixin:
         return [dict(row) for row in rows]
 
     def refs_many(
-        self, targets: Iterable[str], *, limit_per_target: int = 100
+        self,
+        targets: Iterable[str],
+        *,
+        limit_per_target: int = 100,
+        preferred_paths: Iterable[str] = (),
     ) -> dict[str, list[dict]]:
         """Read bounded reverse-reference prefixes without scanning every same-name edge.
 
@@ -254,6 +258,9 @@ class WorkspaceMapQueryMixin:
         per-target bound.  Resolve each distinct short identity through the ordered
         covering index instead, so SQLite can stop at ``limit_per_target`` while
         preserving the established deterministic ``path,line`` prefix semantics.
+        A preferred path set changes ordering only: its references come first,
+        then other paths fill the same row limit. No references are filtered
+        out of the global observation scope merely for lacking preference.
         """
         if TYPE_CHECKING:
             self = cast("WorkspaceMapStore", self)
@@ -267,18 +274,42 @@ class WorkspaceMapQueryMixin:
         limit_per_target = min(int(limit_per_target), MAX_REFERENCE_QUERY_ROWS)
         target_short = {target: target.rsplit(".", 1)[-1] for target in unique_targets}
         unique_shorts = list(dict.fromkeys(target_short.values()))
+        preferred = sorted(set(preferred_paths))
+        prioritized = (
+            self.refs_many_for_paths(
+                unique_shorts, preferred, limit_per_target=limit_per_target
+            )
+            if preferred
+            else {}
+        )
         self._count_read("refs_many")
         by_short: dict[str, list[dict]] = {}
         with self._lock:
             for short in unique_shorts:
-                rows = self._db.execute(
-                    """SELECT e.*,f.evidence_visibility
+                head = prioritized.get(short, [])
+                remaining = limit_per_target - len(head)
+                exclusion = (
+                    " AND e.path NOT IN (SELECT value FROM json_each(?))"
+                    if preferred
+                    else ""
+                )
+                parameters = (
+                    (short, json.dumps(preferred), remaining)
+                    if preferred
+                    else (short, remaining)
+                )
+                rows = (
+                    self._db.execute(
+                        f"""SELECT e.*,f.evidence_visibility
                     FROM edge e JOIN file_map f ON f.path=e.path
-                    WHERE e.target_short=?
+                    WHERE e.target_short=?{exclusion}
                     ORDER BY e.path,e.line LIMIT ?""",
-                    (short, limit_per_target),
-                ).fetchall()
-                by_short[short] = [dict(row) for row in rows]
+                        parameters,
+                    ).fetchall()
+                    if remaining
+                    else []
+                )
+                by_short[short] = [*head, *(dict(row) for row in rows)]
         return {
             target: [dict(row) for row in by_short[target_short[target]]]
             for target in unique_targets
@@ -336,7 +367,7 @@ class WorkspaceMapQueryMixin:
             )
         if not unique_targets or not selected_paths:
             return {target: [] for target in unique_targets}
-        limit = min(int(limit_per_target), 1024)
+        limit = min(int(limit_per_target), MAX_REFERENCE_QUERY_ROWS)
         shorts = {target: target.rsplit(".", 1)[-1] for target in unique_targets}
         by_short: dict[str, list[dict]] = {}
         self._count_read("refs_many_for_paths")
@@ -759,7 +790,7 @@ class WorkspaceMapQueryMixin:
                     AND f.evidence_visibility IN ('source','outline')
                 GROUP BY s.path,s.qualname,s.start_line,s.end_line
                 HAVING context_matches>=2 AND context_matches>own_matches
-                ORDER BY context_matches DESC,s.path,s.start_line,s.qualname
+                ORDER BY own_matches DESC,context_matches DESC,s.path,s.start_line,s.qualname
                 LIMIT ?""",
                 (json.dumps(prefixes), json.dumps(list(paths)), limit),
             ).fetchall()

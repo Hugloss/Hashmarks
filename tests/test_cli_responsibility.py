@@ -157,10 +157,10 @@ def test_repository_context_defaults_have_one_owner() -> None:
     import inspect
 
     from hashmarks.codemap.context_defaults import REPOSITORY_CONTEXT_DEFAULTS
-    from hashmarks.codemap.repository_context import ContextPlanningMixin
+    from hashmarks.codemap.repository_context import RepositoryContext
     from hashmarks.repository_cli import add_repository_cli
 
-    signature = inspect.signature(ContextPlanningMixin.context)
+    signature = inspect.signature(RepositoryContext.build)
     assert (
         signature.parameters["token_budget"].default
         == REPOSITORY_CONTEXT_DEFAULTS.token_budget

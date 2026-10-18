@@ -20,7 +20,7 @@ TASK = "Change the backend handler's route declaration"
 
 
 def _change(cm: CodeMap) -> dict[str, object]:
-    return cm.task_change_impact(
+    return cm.changes.task_impact(
         TASK,
         [PATH],
         options=ChangeImpactOptions(
@@ -51,9 +51,9 @@ def test_body_context_reuses_existing_provider_oracle_and_exact_index(
     )
     with CodeMap(tmp_path) as cm:
         cm.index.sync()
-        plain = cm.task_change_impact(TASK, [PATH])
+        plain = cm.changes.task_impact(TASK, [PATH])
         augmented = _change(cm)
-        provider = cm.discover_repository_declarations(
+        provider = cm.declarations.discover(
             [
                 StaticPythonInterfaceDeclarations(
                     paths=(PATH,), include_literal_shape_syntax=True

@@ -9,7 +9,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 from hashmarks._command_output import log_command_output
 from hashmarks.codemap import (
@@ -26,6 +26,25 @@ SCHEMA = "hashmarks.blind-worker-ab.v2"
 PROTOCOL_SCHEMA = "hashmarks.blind-worker-ab-protocol.v2"
 CHALLENGE_FAMILY = "hashmarks-blind-worker-challenge-a"
 _WORD_RE = re.compile(r"[A-Za-z0-9_./-]+")
+
+
+class _GrepHit(TypedDict):
+    path: str
+    score: float
+
+
+class _EntryPointSummary(TypedDict):
+    entry_points_top1_rate: float
+    entry_points_top5_rate: float
+    entry_points_top20_all_expected_rate: float
+    entry_points_ambiguous_tasks: int
+    entry_points_top1_failures: int
+    entry_points_top1_failures_flagged_ambiguous: int
+    entry_points_top1_failure_ambiguity_recall: float
+    entry_points_successes_flagged_ambiguous: int
+    entry_points_success_ambiguity_rate: float
+
+
 _SKIP_ROOTS = {".git", ".hashmarks", ".venv", "node_modules"}
 
 
@@ -72,9 +91,9 @@ def _repository_files(workspace: Path) -> list[Path]:
     return sorted(out, key=lambda p: p.relative_to(workspace).as_posix())
 
 
-def _grep_worker(workspace: Path, query: str, *, limit: int) -> list[dict[str, object]]:
+def _grep_worker(workspace: Path, query: str, *, limit: int) -> list[_GrepHit]:
     terms = [term.lower() for term in _WORD_RE.findall(query) if len(term) > 1]
-    rows: list[dict[str, object]] = []
+    rows: list[_GrepHit] = []
     for path in _repository_files(workspace):
         rel = path.relative_to(workspace).as_posix()
         try:
@@ -109,6 +128,12 @@ def _hashmarks_worker(
     ]
 
 
+def _entry_list(value: object) -> list[object]:
+    if not isinstance(value, list):
+        raise ValueError("entry-point recommendations and canonical hits must be lists")
+    return value
+
+
 def _entry_points_worker(
     codemap: CodeMap, query: str, *, limit: int
 ) -> list[dict[str, object]]:
@@ -120,13 +145,14 @@ def _entry_points_worker(
     ambiguity_roles = (
         list(ambiguity.get("explicit_roles", [])) if isinstance(ambiguity, dict) else []
     )
-    canonical = value["canonical"]
+    canonical = _entry_list(value["canonical"])
+    recommended = _entry_list(value["recommended"])
     canonical_by_path = {
         str(row.get("path") or ""): row for row in canonical if isinstance(row, dict)
     }
     rows: list[dict[str, object]] = []
     seen: set[str] = set()
-    for entry in value["recommended"]:
+    for entry in recommended:
         if not isinstance(entry, dict):
             continue
         path = str(entry.get("path") or "")
@@ -465,7 +491,7 @@ def _benchmark_protocol(
     }
 
 
-def _entry_point_summary(repo_reports: list[dict[str, Any]]) -> dict[str, object]:
+def _entry_point_summary(repo_reports: list[dict[str, Any]]) -> _EntryPointSummary:
     entry_rows = [
         row
         for repo in repo_reports

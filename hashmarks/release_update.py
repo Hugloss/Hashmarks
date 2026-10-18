@@ -11,6 +11,7 @@ from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -66,7 +67,11 @@ def _request(url: str) -> Request:
     )
 
 
-def _read_bounded_response(response: Any, *, limit: int) -> bytes:
+class _ReleaseResponse(Protocol):
+    def read(self, size: int, /) -> bytes: ...
+
+
+def _read_bounded_response(response: _ReleaseResponse, *, limit: int) -> bytes:
     payload = response.read(limit + 1)
     if len(payload) > limit:
         raise ReleaseCheckError("release response exceeded the bounded size")

@@ -14,6 +14,9 @@ from .engine import CodeMap
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from .decision_session import DecisionScope
+    from .find_engine import RepositorySearch
+    from .indexing_lifecycle import RepositoryIndex
     from .model import SearchHit
 
 
@@ -56,12 +59,30 @@ class WorktreeOverlay:
     and fuse the worker-local delta ahead of unchanged canonical evidence.
     """
 
-    def __init__(self, base: CodeMap, worktree: str | Path, *, worker_id: str) -> None:
+    def __init__(
+        self,
+        base_index: RepositoryIndex,
+        base_search: RepositorySearch,
+        base_reads: DecisionScope,
+        worktree: str | Path,
+        *,
+        worker_id: str,
+        artifact_db: str | Path | None = None,
+    ) -> None:
         if not worker_id.strip():
             raise ValueError("worker_id must be non-empty")
-        self.base = base
+        if (
+            base_search.source.index is not base_index
+            or base_search.reads is not base_reads
+        ):
+            raise ValueError(
+                "overlay base index, search and read scope must share one repository authority"
+            )
+        self.base_index = base_index
+        self.base_search = base_search
+        self.base_reads = base_reads
         self.worktree = canonical_host_path(worktree)
-        if self.worktree == base.workspace:
+        if self.worktree == base_index.workspace:
             raise ValueError(
                 "worktree overlay must use a workspace distinct from the canonical base"
             )
@@ -72,7 +93,7 @@ class WorktreeOverlay:
         self.overlay = CodeMap(
             self.worktree,
             state_dir=state_dir,
-            artifact_db=base.artifacts.db_path,
+            artifact_db=artifact_db,
         )
         self.worker_id = worker_id
         self._changed: tuple[str, ...] = ()
@@ -104,8 +125,7 @@ class WorktreeOverlay:
         return tuple(values)
 
     def _base_authority(self) -> tuple[int, str]:
-        generation = self.base.store.generation()
-        fingerprint = self.base.store.meta("workspace_fingerprint")
+        generation, fingerprint = self.base_index.publication_binding()
         if not fingerprint:
             raise RuntimeError("canonical base has no published workspace fingerprint")
         return generation, fingerprint
@@ -114,13 +134,17 @@ class WorktreeOverlay:
         changed = self._normalize_paths(changed_paths)
         if not changed:
             raise ValueError("changed_paths must not be empty")
-        with self.base.reads.session():
+        with self.base_reads.session():
             base_generation, base_fingerprint = self._base_authority()
             result = self.overlay.index.sync(changed)
+            if self._base_authority() != (base_generation, base_fingerprint):
+                raise WorktreeOverlayBaseChangedError(
+                    "canonical base advanced during overlay sync"
+                )
         self._changed = changed
         self._stats = OverlayStats(
             worker_id=self.worker_id,
-            base_workspace=str(self.base.workspace),
+            base_workspace=str(self.base_index.workspace),
             base_generation=base_generation,
             base_workspace_fingerprint=base_fingerprint,
             worktree_workspace=str(self.worktree),
@@ -139,7 +163,7 @@ class WorktreeOverlay:
     def _require_bound_base(self) -> OverlayStats:
         if self._stats is None:
             raise RuntimeError("overlay has not been synced")
-        self.base.reads.ready()
+        self.base_reads.ready()
         generation, fingerprint = self._base_authority()
         if (
             generation != self._stats.base_generation
@@ -154,11 +178,11 @@ class WorktreeOverlay:
     def find_task(self, task: str, *, limit: int = 20) -> tuple[SearchHit, ...]:
         stats = self._require_bound_base()
         changed = set(self._changed)
-        with self.base.reads.session(expected_generation=stats.base_generation):
+        with self.base_reads.session(expected_generation=stats.base_generation):
             overlay_hits = list(self.overlay.search.find_task(task, limit=limit))
             base_hits = [
                 hit
-                for hit in self.base.search.find_task(task, limit=limit)
+                for hit in self.base_search.find_task(task, limit=limit)
                 if hit.path not in changed
             ]
             result: list[SearchHit] = []
@@ -171,4 +195,5 @@ class WorktreeOverlay:
                 result.append(hit)
                 if len(result) >= limit:
                     break
+            self._require_bound_base()
             return tuple(result)

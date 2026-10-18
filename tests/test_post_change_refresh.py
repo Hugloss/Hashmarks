@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from contract_assertions import assert_integer, assert_object
+
 from hashmarks.codemap.engine import CodeMap
 from hashmarks.codemap.post_change import PostChangeOptions
 
@@ -21,17 +23,21 @@ def test_post_change_refresh_is_changed_path_scoped_and_regenerates_packet(
             "target implementation test", token_budget=256
         )
         source.write_text("def target(value: int) -> int:\n    return value + 1\n")
-        refreshed = codemap.refresh_after_change(
+        refreshed = codemap.changes.refresh(
             "target implementation test", ["pkg/engine.py"], token_budget=256
         )
     assert refreshed["changed_paths"] == ["pkg/engine.py"]
     assert refreshed["scope"] == "changed-paths-only"
     assert refreshed["consumer_owner"] == "external"
-    assert refreshed["generation_after"] >= refreshed["generation_before"]
-    assert refreshed["sync"]["discovered"] == 1
+    assert assert_integer(refreshed["generation_after"]) >= assert_integer(
+        refreshed["generation_before"]
+    )
+    assert assert_object(refreshed["sync"])["discovered"] == 1
     assert (
-        refreshed["packet"]["identity"]["decision_generation"]
-        != before["identity"]["decision_generation"]
+        assert_object(assert_object(refreshed["packet"])["identity"])[
+            "decision_generation"
+        ]
+        != assert_object(before["identity"])["decision_generation"]
     )
 
 
@@ -46,7 +52,7 @@ def test_refresh_delta_omits_unchanged_action_anchors(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         source.write_text("def target(value: int) -> int:\n    return value + 1\n")
-        delta = codemap.refresh_after_change_delta(
+        delta = codemap.changes.refresh_delta(
             "target implementation test",
             ["pkg/engine.py"],
             options=PostChangeOptions(

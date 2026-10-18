@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from typing import TypeGuard
+
 MAX_PORTABLE_GENERATION = (1 << 53) - 1
 
 
-def is_valid_generation(value: object) -> bool:
+def is_valid_generation(value: object) -> TypeGuard[int]:
     """Return whether *value* is a lossless JSON-portable repository generation."""
     return type(value) is int and 0 <= value <= MAX_PORTABLE_GENERATION
 

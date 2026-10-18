@@ -248,7 +248,7 @@ MCP_TOOL_CONTRACTS = (
         "repository_declarations",
         (
             "Project repository declarations as observation or explanation, or discover "
-            "source syntax from explicitly selected Python backend paths. Preserve "
+            "source syntax from selected Python model or interface paths. Preserve "
             "provenance, ambiguity, coverage, and freshness."
         ),
         "repository_declarations",
@@ -758,6 +758,7 @@ async def _current_contract_summary(
     state_dir: str | None = None,
 ) -> dict[str, object]:
     from ._version import __version__
+    from .mcp_sdk_server import close_sdk_server
     from .mcp_server import build_server
 
     server = build_server(workspace, state_dir=state_dir)
@@ -765,8 +766,7 @@ async def _current_contract_summary(
         tools = await server.list_tools()
         return contract_summary(contract_from_tool_models(__version__, tools))
     finally:
-        surface = cast("HashmarksMcpSurface", server._hashmarks_surface)
-        surface.close()
+        close_sdk_server(server)
 
 
 def current_contract_summary(

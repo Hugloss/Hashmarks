@@ -384,7 +384,7 @@ class StringTableEncoding(TypedDict):
 
 
 class CompressedInitialEncoding(TypedDict):
-    kind: Literal["json-string-table.v1+zlib", "json+zlib"]
+    kind: Literal["json-string-table.v1+zlib", "json+zlib", "json+lzma-base85"]
     decoded_bytes: int
 
 

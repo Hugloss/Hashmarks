@@ -1,7 +1,7 @@
 from pathlib import Path
-from typing import Any
 
 import pytest
+from contract_assertions import assert_array, assert_object, assert_records, assert_text
 
 from hashmarks.cli import main
 from hashmarks.codemap import CodeMap
@@ -30,14 +30,16 @@ def test_authority_graph_composes_loader_cache_and_reader(tmp_path: Path) -> Non
         codemap.index.sync()
         graph = codemap.ownership.repository_graph()
     assert graph["schema"] == "hashmarks.authority-ownership-graph.v3"
-    relations = {e["relation"] for e in graph["edges"]}
+    relations = {e["relation"] for e in assert_records(graph["edges"])}
     assert {"loads-module", "owns-cache", "references-cache-owner"} <= relations
-    cache = next(n for n in graph["nodes"] if n["kind"] == "cache")
+    cache = next(n for n in assert_records(graph["nodes"]) if n["kind"] == "cache")
     assert cache["owner"] == "CACHE"
-    assert cache["id"] in graph["ambiguities"]
-    load = next(e for e in graph["edges"] if e["relation"] == "loads-module")
+    assert cache["id"] in assert_array(graph["ambiguities"])
+    load = next(
+        e for e in assert_records(graph["edges"]) if e["relation"] == "loads-module"
+    )
     assert load["risk"] == "python-duplicate-module-identity"
-    assert graph["boundary"].startswith("repository-evidence-only")
+    assert assert_text(graph["boundary"]).startswith("repository-evidence-only")
 
 
 def test_authority_graph_cli(
@@ -61,13 +63,17 @@ def test_authority_graph_v2_composes_exact_imported_invalidator(tmp_path: Path) 
         codemap.index.sync()
         graph = codemap.ownership.repository_graph()
     assert graph["schema"] == "hashmarks.authority-ownership-graph.v3"
-    edge = next(e for e in graph["edges"] if e["relation"] == "invalidates-cache")
+    edge = next(
+        e
+        for e in assert_records(graph["edges"])
+        if e["relation"] == "invalidates-cache"
+    )
     assert edge["source"] == "invalidator:maintenance.py:reset"
     assert edge["target"] == "cache:state.py:CACHE"
     assert edge["confidence"] == "qualified-symbol-import"
-    assert "cache:state.py:CACHE" not in graph["ambiguities"]
-    assert graph["summary"]["resolved_invalidation_owners"] == 1
-    assert graph["summary"]["unresolved_invalidation_owners"] == 0
+    assert "cache:state.py:CACHE" not in assert_array(graph["ambiguities"])
+    assert assert_object(graph["summary"])["resolved_invalidation_owners"] == 1
+    assert assert_object(graph["summary"])["unresolved_invalidation_owners"] == 0
 
 
 def test_authority_graph_v2_keeps_unqualified_same_name_invalidator_ambiguous(
@@ -81,10 +87,15 @@ def test_authority_graph_v2_keeps_unqualified_same_name_invalidator_ambiguous(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         graph = codemap.ownership.repository_graph()
-    assert not any(e["relation"] == "invalidates-cache" for e in graph["edges"])
-    assert set(graph["ambiguities"]) == {"cache:a.py:CACHE", "cache:b.py:CACHE"}
-    assert graph["summary"]["resolved_invalidation_owners"] == 0
-    assert graph["summary"]["unresolved_invalidation_owners"] == 2
+    assert not any(
+        e["relation"] == "invalidates-cache" for e in assert_records(graph["edges"])
+    )
+    assert set(assert_array(graph["ambiguities"])) == {
+        "cache:a.py:CACHE",
+        "cache:b.py:CACHE",
+    }
+    assert assert_object(graph["summary"])["resolved_invalidation_owners"] == 0
+    assert assert_object(graph["summary"])["unresolved_invalidation_owners"] == 2
 
 
 def test_authority_graph_v3_composes_unguarded_concurrency_risk_as_nomination(
@@ -98,18 +109,22 @@ def test_authority_graph_v3_composes_unguarded_concurrency_risk_as_nomination(
         codemap.index.sync()
         graph = codemap.ownership.repository_graph(["store.py"])
     assert graph["schema"] == "hashmarks.authority-ownership-graph.v3"
-    risk = next(n for n in graph["nodes"] if n["kind"] == "concurrency-risk")
+    risk = next(
+        n for n in assert_records(graph["nodes"]) if n["kind"] == "concurrency-risk"
+    )
     assert risk["path"] == "store.py" and risk["function"] == "bump"
     assert risk["guarded"] is False
     edge = next(
-        e for e in graph["edges"] if e["relation"] == "contains-concurrency-risk"
+        e
+        for e in assert_records(graph["edges"])
+        if e["relation"] == "contains-concurrency-risk"
     )
     assert edge["source"] == "file:store.py"
     assert edge["target"] == risk["id"]
     assert edge["risk"] == "python-read-modify-write-without-visible-guard"
-    assert graph["summary"]["concurrency_risks"] == 1
-    assert graph["summary"]["unguarded_concurrency_risks"] == 1
-    assert graph["boundary"].startswith("repository-evidence-only")
+    assert assert_object(graph["summary"])["concurrency_risks"] == 1
+    assert assert_object(graph["summary"])["unguarded_concurrency_risks"] == 1
+    assert assert_text(graph["boundary"]).startswith("repository-evidence-only")
 
 
 def test_authority_graph_v3_keeps_visible_guard_as_non_runtime_proof(
@@ -122,11 +137,13 @@ def test_authority_graph_v3_keeps_visible_guard_as_non_runtime_proof(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         graph = codemap.ownership.repository_graph(["store.py"])
-    risk = next(n for n in graph["nodes"] if n["kind"] == "concurrency-risk")
+    risk = next(
+        n for n in assert_records(graph["nodes"]) if n["kind"] == "concurrency-risk"
+    )
     assert risk["guarded"] is True
     assert risk["code"] == "python-read-modify-write-visible-guard"
-    assert graph["summary"]["concurrency_risks"] == 1
-    assert graph["summary"]["unguarded_concurrency_risks"] == 0
+    assert assert_object(graph["summary"])["concurrency_risks"] == 1
+    assert assert_object(graph["summary"])["unguarded_concurrency_risks"] == 0
 
 
 def test_repository_ownership_graph_materializes_repository_rows_once(
@@ -172,5 +189,10 @@ def test_scoped_repository_ownership_graph_reuses_rows_without_collapsing_eviden
         graph = codemap.ownership.repository_graph(["maintenance.py"])
 
     assert calls == 1
-    assert not any(item["relation"] == "owns-cache" for item in graph["edges"])
-    assert not any(item["relation"] == "invalidates-cache" for item in graph["edges"])
+    assert not any(
+        item["relation"] == "owns-cache" for item in assert_records(graph["edges"])
+    )
+    assert not any(
+        item["relation"] == "invalidates-cache"
+        for item in assert_records(graph["edges"])
+    )

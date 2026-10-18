@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import subprocess
-from types import SimpleNamespace
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import pytest
@@ -17,6 +17,8 @@ from hashmarks.codemap.repository_index_store import (
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from hashmarks.codemap.providers import StructuralNode, StructuralTree
 
 pytestmark = pytest.mark.host_git
 
@@ -44,13 +46,15 @@ def _repo(tmp_path: Path) -> Path:
 def test_clean_base_sync_publishes_shared_snapshot(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch: pytest.MonkeyPatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "cache"))
     repo = _repo(tmp_path)
     with CodeMap(repo) as codemap:
         result = codemap.index.sync()
     base = git_base_identity(repo)
     assert base is not None
     snapshot = default_base_snapshot(repo, base)
+    assert snapshot.is_relative_to(tmp_path / "cache")
     assert snapshot.is_file()
     assert result.overlay_paths == 0
 
@@ -58,7 +62,8 @@ def test_clean_base_sync_publishes_shared_snapshot(
 def test_sibling_worktree_reuses_clean_base_snapshot_and_keeps_dirty_overlay_local(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch: pytest.MonkeyPatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "cache"))
     repo = _repo(tmp_path)
     with CodeMap(repo) as codemap:
         first = codemap.index.sync()
@@ -93,7 +98,8 @@ def test_sibling_worktree_reuses_clean_base_snapshot_and_keeps_dirty_overlay_loc
 def test_assume_unchanged_path_must_match_snapshot_bytes_before_reuse(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch: pytest.MonkeyPatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "cache"))
     repo = _repo(tmp_path)
     with CodeMap(repo) as codemap:
         codemap.index.sync()
@@ -116,17 +122,39 @@ def test_assume_unchanged_path_must_match_snapshot_bytes_before_reuse(
         assert codemap.store.symbol("omega")
 
 
+class _EmptyNode:
+    type = "module"
+    start_byte = 0
+    end_byte = 0
+    start_point = (0, 0)
+    end_point = (0, 0)
+    children: tuple[StructuralNode, ...] = ()
+    named_children: tuple[StructuralNode, ...] = ()
+
+    def child_by_field_name(self, _name: str, /) -> None:
+        return None
+
+
+@dataclass
+class _EmptyTree:
+    root_node: StructuralNode
+
+
+class _EmptyParser:
+    def parse(self, _source: bytes, /) -> StructuralTree:
+        return _EmptyTree(_EmptyNode())
+
+
 def _range_provider(version: str) -> TreeSitterRangeProvider:
-    root = SimpleNamespace(named_children=())
-    parser = SimpleNamespace(parse=lambda source: SimpleNamespace(root_node=root))
-    return TreeSitterRangeProvider(lambda language: parser, version=version)
+    return TreeSitterRangeProvider(lambda _: _EmptyParser(), version=version)
 
 
 @pytest.mark.parametrize("next_provider", ["unavailable", "v2"])
 def test_base_snapshot_requires_current_parser_provider_identity(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, next_provider: str
 ) -> None:
-    monkeypatch: pytest.MonkeyPatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "cache"))
     repo = _repo(tmp_path)
     with CodeMap(repo, range_provider=_range_provider("v1")) as codemap:
         codemap.index.sync()
@@ -159,7 +187,8 @@ def test_base_snapshot_requires_current_parser_provider_identity(
 def test_base_snapshot_reprojects_current_python_module_identity(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch: pytest.MonkeyPatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "cache"))
     repo = tmp_path / "repo"
     repo.mkdir()
     subprocess.run(["git", "init", "-q", str(repo)], check=True)

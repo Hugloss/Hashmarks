@@ -10,10 +10,11 @@ from __future__ import annotations
 import base64
 import binascii
 import json
+import lzma
 import zlib
 from collections.abc import Mapping
 from copy import deepcopy
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from hashmarks.digest import hash_bytes
 from hashmarks.operation_contract import operation_schema, validate_operation_response
@@ -30,6 +31,7 @@ if TYPE_CHECKING:
     )
 
 _MAX_COMPRESSED_INITIAL_DECODED_BYTES = 1_048_576
+_MAX_INITIAL_LZMA_MEMORY_BYTES = 16_777_216
 
 
 def initial_packet_identity(packet: Mapping[str, object]) -> str:
@@ -81,6 +83,36 @@ def _initial_header(packet: Mapping[str, object], key: str) -> str:
     return value
 
 
+def _compressed_initial_data(
+    payload: bytes,
+) -> tuple[Literal["json+zlib", "json+lzma-base85"], str]:
+    """Choose the smaller wire representation without changing semantic data."""
+    deflated = base64.b64encode(zlib.compress(payload)).decode("ascii")
+    # Retain the complete payload history, bounded by the supported capacity.
+    # A larger dictionary only increases encoder memory for these packets.
+    dictionary_bytes = min(
+        _MAX_COMPRESSED_INITIAL_DECODED_BYTES,
+        max(4096, 1 << (len(payload) - 1).bit_length()),
+    )
+    packed = base64.b85encode(
+        lzma.compress(
+            payload,
+            filters=[
+                {
+                    "id": lzma.FILTER_LZMA2,
+                    "preset": 6,
+                    "dict_size": dictionary_bytes,
+                }
+            ],
+        )
+    ).decode("ascii")
+    return (
+        ("json+lzma-base85", packed)
+        if len(packed) < len(deflated)
+        else ("json+zlib", deflated)
+    )
+
+
 def encode_initial_packet(packet: Mapping[str, object]) -> InitialTaskEvidenceEnvelope:
     """Losslessly serialize semantic facts; compression never changes identity."""
     headers: InitialEnvelopeHeaders = {
@@ -125,13 +157,13 @@ def encode_initial_packet(packet: Mapping[str, object]) -> InitialTaskEvidenceEn
     # retain the uncompressed encoding and all their admitted fields.
     if len(payload) > _MAX_COMPRESSED_INITIAL_DECODED_BYTES:
         return original
-    compressed = base64.b64encode(zlib.compress(payload)).decode("ascii")
+    kind, compressed = _compressed_initial_data(payload)
     packed: CompressedInitialEnvelope = {
         "schema": headers["schema"],
         "source_evidence_identity": headers["source_evidence_identity"],
         "evidence_packet_identity": headers["evidence_packet_identity"],
         "encoding": {
-            "kind": "json+zlib",
+            "kind": kind,
             "decoded_bytes": len(payload),
         },
         "data": compressed,
@@ -150,20 +182,26 @@ def _unpack_initial(encoding: dict[str, object], data: object) -> object:
     ):
         raise ValueError("invalid compressed initial payload")
     try:
-        raw = base64.b64decode(data, validate=True)
-        decoder = zlib.decompressobj()
-        payload = decoder.decompress(raw, limit + 1)
-        if (
-            len(payload) != limit
-            or not decoder.eof
-            or decoder.unused_data
-            or decoder.unconsumed_tail
-        ):
+        if encoding["kind"] == "json+lzma-base85":
+            raw = base64.b85decode(data)
+            bounded = lzma.LZMADecompressor(memlimit=_MAX_INITIAL_LZMA_MEMORY_BYTES)
+            payload = bounded.decompress(raw, max_length=limit + 1)
+            incomplete = not bounded.eof or bool(bounded.unused_data)
+        else:
+            raw = base64.b64decode(data, validate=True)
+            decoder = zlib.decompressobj()
+            payload = decoder.decompress(raw, limit + 1)
+            incomplete = (
+                not decoder.eof
+                or bool(decoder.unused_data)
+                or bool(decoder.unconsumed_tail)
+            )
+        if len(payload) != limit or incomplete:
             raise ValueError(
                 "compressed initial payload differs from declared size or scope"
             )
         return json.loads(payload, object_pairs_hook=_unique_initial_object)
-    except (ValueError, zlib.error, binascii.Error) as exc:
+    except (ValueError, zlib.error, lzma.LZMAError, binascii.Error) as exc:
         raise ValueError("invalid compressed initial payload") from exc
 
 
@@ -227,9 +265,13 @@ def _unique_initial_object(items: list[tuple[str, Any]]) -> dict[str, Any]:
 def _decode_initial_data(encoding: object, data: object) -> object:
     if not isinstance(encoding, dict):
         raise ValueError("invalid initial encoding")
-    if encoding.get("kind") in ("json-string-table.v1+zlib", "json+zlib"):
+    if encoding.get("kind") in (
+        "json-string-table.v1+zlib",
+        "json+zlib",
+        "json+lzma-base85",
+    ):
         data = _unpack_initial(encoding, data)
-        if encoding["kind"] == "json+zlib":
+        if encoding["kind"] in ("json+zlib", "json+lzma-base85"):
             return data
         if (
             not isinstance(data, dict)

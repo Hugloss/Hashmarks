@@ -5,6 +5,7 @@ import hashlib
 import json
 import logging
 from pathlib import Path
+from typing import NotRequired, TypedDict
 
 from hashmarks._command_output import log_command_output
 from hashmarks.codemap import (
@@ -29,18 +30,61 @@ SCHEMA = "hashmarks.bm25-constrained-economics.v1"
 FAMILY = "hashmarks-constrained-bm25-a"
 
 
+class ConstrainedCandidate(TypedDict):
+    path: str
+    role: str
+    bm25_score: float
+    canonical_rank: int
+
+
+class ConstrainedTaskReport(TypedDict):
+    id: object
+    hashmarks_first: str | None
+    constrained_bm25_first: str | None
+    role_resolved_first: str | None
+    correct_hashmarks: bool
+    correct_constrained_bm25: bool
+    correct_role_resolved: bool
+    admitted_candidates: list[ConstrainedCandidate]
+
+
+class ConstrainedRepositoryReport(TypedDict):
+    name: str
+    public_task_sha256: str
+    hidden_corpus_sha256: str
+    tasks: list[ConstrainedTaskReport]
+
+
+class ConstrainedSummary(TypedDict):
+    repositories: int
+    tasks: int
+    current_hashmarks_correct_first: int
+    constrained_bm25_correct_first: int
+    role_resolved_correct_first: int
+    bm25_incremental_gain: NotRequired[int]
+    promotion_decision: NotRequired[str]
+
+
 def _task_report(
-    cm: object,
-    idx: int,
+    cm: CodeMap,
+    idx: FieldedBM25Index,
     task: dict[str, object],
     secret: dict[str, object],
     *,
     limit: int,
-) -> dict[str, object]:
+) -> ConstrainedTaskReport:
     query = task["query"]
-    expected = set(secret.get("expected_files") or ())
+    if not isinstance(query, str):
+        raise ValueError("benchmark query must be a string")
+    expected_files = secret.get("expected_files") or ()
+    if not isinstance(expected_files, (list, tuple, set)):
+        raise ValueError("expected benchmark files must be a collection")
+    expected = set(expected_files)
     entry = cm.tasks.entry_points(query, limit=limit)
-    recommended = [row for row in entry.get("recommended", []) if isinstance(row, dict)]
+    raw_recommended = entry.get("recommended", [])
+    if not isinstance(raw_recommended, list):
+        raise ValueError("task entry recommendations must be an array")
+    recommended = [row for row in raw_recommended if isinstance(row, dict)]
     hashmarks_first = str(recommended[0].get("path") or "") if recommended else None
     scores = {hit.path: hit.score for hit in idx.search(query, limit=100)}
     admitted = [
@@ -96,7 +140,7 @@ def _task_report(
 
 
 def collect(root: Path, limit: int = 20) -> dict[str, object]:
-    reports = []
+    reports: list[ConstrainedRepositoryReport] = []
     for name, ws, corpus, pub in materialize_challenge(root / "challenge"):
         hidden = _load_corpus(corpus)
         public = json.load(open(pub))["tasks"]
@@ -116,7 +160,7 @@ def collect(root: Path, limit: int = 20) -> dict[str, object]:
         )
     rows = [x for r in reports for x in r["tasks"]]
     n = len(rows)
-    summary = {
+    summary: ConstrainedSummary = {
         "repositories": len(reports),
         "tasks": n,
         "current_hashmarks_correct_first": sum(r["correct_hashmarks"] for r in rows),

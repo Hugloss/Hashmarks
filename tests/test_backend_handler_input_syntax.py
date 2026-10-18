@@ -43,7 +43,7 @@ def _declaration_value(result: dict[str, object]) -> dict[str, object]:
 
 
 def _change(cm: CodeMap) -> dict[str, object]:
-    return cm.task_change_impact(
+    return cm.changes.task_impact(
         TASK,
         [PATH],
         options=ChangeImpactOptions(
@@ -53,7 +53,7 @@ def _change(cm: CodeMap) -> dict[str, object]:
 
 
 def _provider(cm: CodeMap, *, enabled: bool) -> dict[str, object]:
-    return cm.discover_repository_declarations(
+    return cm.declarations.discover(
         [
             StaticPythonInterfaceDeclarations(
                 paths=(PATH,), include_input_contract_syntax=enabled
@@ -83,7 +83,7 @@ def test_shared_input_oracle_and_default_declaration_identity(tmp_path: Path) ->
         default = _provider(cm, enabled=False)
         explicit = _provider(cm, enabled=True)
         changed = _change(cm)
-        plain = cm.task_change_impact(TASK, [PATH])
+        plain = cm.changes.task_impact(TASK, [PATH])
     base_value = _declaration_value(default)
     with_input = _declaration_value(explicit)
     assert "static_input_syntax" not in base_value

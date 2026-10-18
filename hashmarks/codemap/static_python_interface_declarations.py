@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import ast
 from dataclasses import dataclass
+from typing import TypedDict
 
 from hashmarks.paths import normalize_relative_path
 
@@ -69,7 +70,9 @@ class _HandlerBodySyntax(ast.NodeVisitor):
                 for key in value.keys
             ):
                 keys = [
-                    key.value for key in value.keys if isinstance(key, ast.Constant)
+                    key.value
+                    for key in value.keys
+                    if isinstance(key, ast.Constant) and isinstance(key.value, str)
                 ]
         self.returns.append(
             (
@@ -114,9 +117,18 @@ class _HandlerBodySyntax(ast.NodeVisitor):
         self.generic_visit(node)
 
 
+class _HandlerBodyObservation(TypedDict):
+    authority: str
+    coverage: str
+    runtime_response_shape: str
+    cross_artifact_correspondence: str
+    literal_dictionary_returns: list[dict[str, object]]
+    literal_subscript_accesses: list[dict[str, object]]
+
+
 def _handler_body_syntax(
     declaration: ast.FunctionDef | ast.AsyncFunctionDef,
-) -> dict[str, object]:
+) -> _HandlerBodyObservation:
     visitor = _HandlerBodySyntax()
     for statement in declaration.body:
         visitor.visit(statement)
@@ -208,9 +220,13 @@ def _declaration_group(
     input_syntax = observed.get("static_input_syntax")
     extra_evidence: list[dict[str, object]] = []
     if body_syntax is not None:
+        assert isinstance(body_syntax, dict)
+        returns = body_syntax["literal_dictionary_returns"]
+        accesses = body_syntax["literal_subscript_accesses"]
+        assert isinstance(returns, list) and isinstance(accesses, list)
         sites = [
-            *body_syntax["literal_dictionary_returns"],
-            *body_syntax["literal_subscript_accesses"],
+            *returns,
+            *accesses,
         ]
         spans = sorted({(site["line"], site["end_line"]) for site in sites})
         extra_evidence = [
@@ -278,6 +294,95 @@ def _declaration_group(
     }
 
 
+def _curried_route_group(
+    path: str,
+    expression: ast.Call,
+    *,
+    route_objects: frozenset[str],
+    provider: str,
+) -> dict[str, object] | None:
+    """Describe an explicit route-call expression without resolving its handler."""
+    factory = expression.func
+    if not isinstance(factory, ast.Call):
+        return None
+    observed = _observed_decorator(
+        factory, route_objects=route_objects, tool_objects=frozenset()
+    )
+    if observed is None or observed["kind"] != "http-route-decorator":
+        return None
+    handler = (
+        expression.args[0].id
+        if len(expression.args) == 1
+        and isinstance(expression.args[0], ast.Name)
+        and not expression.keywords
+        else None
+    )
+    if handler is not None and len(handler) > _MAX_ACCESS_KEY_CHARS:
+        raise ValueError("route-call handler identifier exceeds syntax bound")
+    scope = {"path": path, "call_line": expression.lineno}
+    return {
+        "group_id": f"{path}:route-call:{expression.lineno}:{expression.col_offset}",
+        "concept": {"kind": "http-route-call", "syntax": "python-call"},
+        "scope": scope,
+        "correspondence": {
+            "state": "unresolved",
+            "basis": {
+                "producer": provider,
+                "reason": "call-syntax-does-not-prove-runtime-registration",
+            },
+        },
+        "declarations": [
+            {
+                "declaration_id": "direct-route-call",
+                "semantic_role": {"kind": "syntactic-route-call"},
+                "value_state": "resolved",
+                "value": {
+                    "object_name": observed["object_name"],
+                    "method_syntax": observed["decorator_method"],
+                    "argument_state": observed["argument_state"],
+                    "literal_argument": observed["literal_argument"],
+                    "handler_argument_syntax": handler,
+                    "handler_argument_state": "name-syntax"
+                    if handler is not None
+                    else "dynamic-or-unsupported",
+                    "handler_resolution": "unresolved",
+                    "runtime_registration": "not-established",
+                    "has_argument_expansion": any(
+                        isinstance(arg, ast.Starred)
+                        for arg in (*factory.args, *expression.args)
+                    )
+                    or any(
+                        keyword.arg is None
+                        for keyword in (*factory.keywords, *expression.keywords)
+                    ),
+                },
+                "producer": {
+                    "provider": provider,
+                    "parser": "python-ast",
+                    "authority": "direct-static-syntax-only",
+                },
+                "evidence": [
+                    {
+                        "path": path,
+                        "start_line": expression.lineno,
+                        "end_line": expression.end_lineno or expression.lineno,
+                    }
+                ],
+            }
+        ],
+        "coverage": {
+            "state": "incomplete",
+            "truncation": "complete",
+            "expected_declaration_ids": [],
+            "scope": scope,
+            "provenance": {
+                "producer": provider,
+                "reason": "selected-explicit-route-call-syntax-only",
+            },
+        },
+    }
+
+
 @dataclass(frozen=True, slots=True)
 class _SourceSyntaxOptions:
     include_body: bool = False
@@ -285,6 +390,29 @@ class _SourceSyntaxOptions:
 
 
 SOURCE_SYNTAX_DEFAULT_OPTIONS = _SourceSyntaxOptions()
+
+
+def _curried_route_groups(
+    path: str,
+    tree: ast.Module,
+    *,
+    route_objects: frozenset[str],
+    provider: str,
+    remaining: int,
+) -> list[dict[str, object]]:
+    """Collect bounded explicit expression statements in source order."""
+    groups: list[dict[str, object]] = []
+    for node in sorted(ast.walk(tree), key=lambda node: getattr(node, "lineno", 0)):
+        if not isinstance(node, ast.Expr) or not isinstance(node.value, ast.Call):
+            continue
+        group = _curried_route_group(
+            path, node.value, route_objects=route_objects, provider=provider
+        )
+        if group is not None:
+            groups.append(group)
+            if len(groups) > remaining:
+                raise ValueError("interface provider group bound exceeded")
+    return groups
 
 
 def _source_groups(
@@ -302,7 +430,7 @@ def _source_groups(
     for declaration in tree.body:
         if not isinstance(declaration, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
-        body_syntax: dict[str, object] | None = None
+        body_syntax: _HandlerBodyObservation | None = None
         input_syntax: dict[str, object] | None = None
         for ordinal, decorator in enumerate(declaration.decorator_list):
             observed = _observed_decorator(
@@ -338,6 +466,15 @@ def _source_groups(
             )
             if len(groups) > _MAX_GROUPS:
                 raise ValueError("interface provider group bound exceeded")
+    groups.extend(
+        _curried_route_groups(
+            path,
+            tree,
+            route_objects=route_objects,
+            provider=provider,
+            remaining=_MAX_GROUPS - len(groups),
+        )
+    )
     return groups, tree
 
 
@@ -577,10 +714,10 @@ def _paired_groups(
 
 @dataclass(frozen=True, slots=True)
 class StaticPythonInterfaceDeclarations:
-    """Selected-file AST observations for static decorator syntax only.
+    """Selected-file static decorator and explicit curried route-call syntax.
 
     A consumer explicitly instantiates and passes this provider to
-    CodeMap.discover_repository_declarations([provider]). No implicit loading,
+    CodeMap.declarations.discover([provider]). No implicit loading,
     filesystem scanning, process launch or persistent provider state occurs.
     """
 
@@ -673,7 +810,7 @@ class StaticPythonInterfaceDeclarations:
                 "provider": self.name,
                 "parser": "python-ast",
                 "file_scope": sorted(self.paths),
-                "semantics": "direct-decorator-syntax-not-runtime-registration",
+                "semantics": "direct-interface-syntax-not-runtime-registration",
                 **(
                     {"handler_body": "bounded-literal-syntax-not-response-contract"}
                     if self.include_literal_shape_syntax

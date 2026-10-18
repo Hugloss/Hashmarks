@@ -148,7 +148,7 @@ def _qualify_timed(
     snapshot: dict[str, object],
 ) -> tuple[dict[str, object], int]:
     started = time.perf_counter_ns()
-    packet = codemap.dependency_resolution_evidence(snapshot)
+    packet = codemap.dependencies.observe(snapshot)
     return packet, time.perf_counter_ns() - started
 
 
@@ -189,19 +189,19 @@ def _measure_real_transition(
         codemap,
         states[after_state]["snapshot"],
     )
-    explanation = codemap.dependency_resolution_explain(after)
-    delta = codemap.dependency_resolution_delta(before, after)
+    explanation = codemap.dependencies.explain(after)
+    delta = codemap.dependencies.delta(before, after)
     state_bytes_before = _directory_bytes(state_dir)
     operations = {
         "explain_after": _explicit_operation_metrics(
             codemap,
-            lambda: codemap.dependency_resolution_explain(after),
+            lambda: codemap.dependencies.explain(after),
             expected=explanation,
             iterations=iterations,
         ),
         "delta": _explicit_operation_metrics(
             codemap,
-            lambda: codemap.dependency_resolution_delta(before, after),
+            lambda: codemap.dependencies.delta(before, after),
             expected=delta,
             iterations=iterations,
         ),
@@ -450,13 +450,13 @@ def _fixture(root: Path, scale: int) -> tuple[Path, Path]:
 
 def _qualify_packets(codemap: CodeMap, scale: int) -> dict[str, dict[str, object]]:
     return {
-        "dependency_before": codemap.dependency_resolution_evidence(
+        "dependency_before": codemap.dependencies.observe(
             _dependency_snapshot(scale, changed=False)
         ),
-        "dependency_after": codemap.dependency_resolution_evidence(
+        "dependency_after": codemap.dependencies.observe(
             _dependency_snapshot(scale, changed=True)
         ),
-        "declaration": codemap.repository_declarations(_declaration_groups(scale)),
+        "declaration": codemap.declarations.observe(_declaration_groups(scale)),
     }
 
 
@@ -468,9 +468,9 @@ def _baseline_outputs(
     after = packets["dependency_after"]
     declaration = packets["declaration"]
     return {
-        "dependency_explain": codemap.dependency_resolution_explain(before),
-        "dependency_delta": codemap.dependency_resolution_delta(before, after),
-        "declaration_explain": codemap.repository_declaration_explain(declaration),
+        "dependency_explain": codemap.dependencies.explain(before),
+        "dependency_delta": codemap.dependencies.delta(before, after),
+        "declaration_explain": codemap.declarations.explain(declaration),
     }
 
 
@@ -490,8 +490,8 @@ def _explicit_operation_metrics(
         return original_observer(relpath, include_bytes=include_bytes)
 
     with patch.object(
-        codemap,
-        "_repository_member_observation",
+        codemap.source,
+        "member",
         side_effect=counted_observer,
     ):
         latency, peak, last = _measure_calls(operation, iterations=iterations)
@@ -599,15 +599,13 @@ def measure_derived_authority_economics(
             operations = {
                 "dependency_explain": _explicit_operation_metrics(
                     codemap,
-                    lambda: codemap.dependency_resolution_explain(
-                        packets["dependency_before"]
-                    ),
+                    lambda: codemap.dependencies.explain(packets["dependency_before"]),
                     expected=baselines["dependency_explain"],
                     iterations=iterations,
                 ),
                 "dependency_delta": _explicit_operation_metrics(
                     codemap,
-                    lambda: codemap.dependency_resolution_delta(
+                    lambda: codemap.dependencies.delta(
                         packets["dependency_before"],
                         packets["dependency_after"],
                     ),
@@ -616,9 +614,7 @@ def measure_derived_authority_economics(
                 ),
                 "declaration_explain": _explicit_operation_metrics(
                     codemap,
-                    lambda: codemap.repository_declaration_explain(
-                        packets["declaration"]
-                    ),
+                    lambda: codemap.declarations.explain(packets["declaration"]),
                     expected=baselines["declaration_explain"],
                     iterations=iterations,
                 ),

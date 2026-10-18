@@ -7,18 +7,57 @@ import ast
 import json
 import logging
 from pathlib import Path
+from typing import TypedDict
 
 from hashmarks._command_output import log_command_output
+from hashmarks.python_ast_cache import read_python_ast
 
 logger = logging.getLogger(__name__)
 
 
-def _definitions(tree: ast.AST) -> list[dict[str, object]]:
-    rows: list[dict[str, object]] = []
+class DefinitionSize(TypedDict):
+    kind: str
+    name: str
+    start_line: int
+    end_line: int
+    lines: int
+
+
+class SourceFileSize(TypedDict):
+    path: str
+    bytes: int
+    lines: int
+    definitions: int
+    largest_definition_lines: int
+    largest_definitions: list[DefinitionSize]
+
+
+class SourceReviewThresholds(TypedDict):
+    critical_file_lines: int
+    high_file_lines: int
+    review_file_lines: int
+    large_function_lines: int
+    note: str
+
+
+class SourceSizeAudit(TypedDict):
+    schema: str
+    authority: str
+    policy: SourceReviewThresholds
+    python_file_count: int
+    total_python_lines: int
+    critical_files: list[SourceFileSize]
+    high_files: list[SourceFileSize]
+    review_files: list[SourceFileSize]
+    top_files: list[SourceFileSize]
+
+
+def _definitions(tree: ast.AST) -> list[DefinitionSize]:
+    rows: list[DefinitionSize] = []
     for node in ast.walk(tree):
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             continue
-        end = getattr(node, "end_lineno", node.lineno)
+        end = node.end_lineno or node.lineno
         rows.append(
             {
                 "kind": type(node).__name__,
@@ -31,16 +70,16 @@ def _definitions(tree: ast.AST) -> list[dict[str, object]]:
     return rows
 
 
-def audit(root: Path) -> dict[str, object]:
-    files: list[dict[str, object]] = []
+def audit(root: Path) -> SourceSizeAudit:
+    files: list[SourceFileSize] = []
     for path in sorted((root / "hashmarks").rglob("*.py")):
-        text = path.read_text(encoding="utf-8")
-        tree = ast.parse(text, filename=str(path))
-        defs = _definitions(tree)
+        snapshot = read_python_ast(path)
+        text = snapshot.source
+        defs = _definitions(snapshot.tree)
         files.append(
             {
                 "path": path.relative_to(root).as_posix(),
-                "bytes": len(text.encode()),
+                "bytes": snapshot.size_bytes,
                 "lines": len(text.splitlines()),
                 "definitions": len(defs),
                 "largest_definition_lines": max(

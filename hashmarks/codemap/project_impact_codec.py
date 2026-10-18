@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -34,7 +35,20 @@ class _ImpactDictionary:
 
 
 def _mapping_rows(fragment: Mapping[str, object], key: str) -> list[dict[str, object]]:
-    return [dict(row) for row in fragment.get(key, []) if isinstance(row, dict)]
+    return [dict(row) for row in _values(fragment, key) if isinstance(row, dict)]
+
+
+def _values(fragment: Mapping[str, object], key: str) -> Iterable[object]:
+    values = fragment.get(key, [])
+    if not isinstance(values, Iterable):
+        raise TypeError(f"project impact {key} must be iterable")
+    return values
+
+
+def _integer(value: object) -> int:
+    if not isinstance(value, (str, bytes, bytearray, int, float)):
+        raise TypeError("project impact index/count must be an integer value")
+    return int(value)
 
 
 def _impact_dictionary(
@@ -78,7 +92,7 @@ def _compact_row(
     project = str(affected.get("project") or "")
     if not project:
         return None
-    depth = int(affected.get("depth") or 0)
+    depth = _integer(affected.get("depth") or 0)
     project_index = dictionary.project_index
     if edge is None:
         return [project_index[project], depth, -1, -1, -1]
@@ -97,7 +111,7 @@ def _compact_row(
 
 
 def compact_project_impact(fragment: Mapping[str, object]) -> dict[str, object]:
-    roots = [str(value) for value in fragment.get("roots", []) if value]
+    roots = [str(value) for value in _values(fragment, "roots") if value]
     affected = _mapping_rows(fragment, "affected")
     edges = _mapping_rows(fragment, "edges")
     dictionary = _impact_dictionary(roots, affected, edges)
@@ -118,8 +132,10 @@ def compact_project_impact(fragment: Mapping[str, object]) -> dict[str, object]:
         "producers": dictionary.producers,
         "roots": [project_index[value] for value in roots if value in project_index],
         "rows": rows,
-        "reported_affected": int(fragment.get("reported_affected") or len(affected)),
-        "total_affected": int(fragment.get("total_affected") or len(affected)),
+        "reported_affected": _integer(
+            fragment.get("reported_affected") or len(affected)
+        ),
+        "total_affected": _integer(fragment.get("total_affected") or len(affected)),
         "complete": bool(fragment.get("complete")),
     }
     if dictionary.confidences:
@@ -137,12 +153,12 @@ def _expanded_row(
     if not isinstance(raw, (list, tuple)) or len(raw) < 5:
         return None, None
     project_i, depth, target_i, kind_i, producer_i = (
-        int(raw[index]) for index in range(5)
+        _integer(raw[index]) for index in range(5)
     )
     project = _lookup(dictionary.projects, project_i)
     if not project:
         return None, None
-    affected = {"project": project, "depth": depth}
+    affected: dict[str, object] = {"project": project, "depth": depth}
     target = _lookup(dictionary.projects, target_i)
     if not target:
         return affected, None
@@ -153,7 +169,7 @@ def _expanded_row(
         "producer": _lookup(dictionary.producers, producer_i),
     }
     if len(raw) >= 6:
-        confidence = _lookup(dictionary.confidences, int(raw[5]))
+        confidence = _lookup(dictionary.confidences, _integer(raw[5]))
         if confidence:
             edge["confidence"] = confidence
     return affected, edge
@@ -163,25 +179,27 @@ def expand_project_impact(fragment: Mapping[str, object]) -> dict[str, object]:
     if fragment.get("schema") != COMPACT_PROJECT_IMPACT_SCHEMA:
         return dict(fragment)
     dictionary = _ImpactDictionary(
-        [str(value) for value in fragment.get("projects", [])],
-        [str(value) for value in fragment.get("kinds", [])],
-        [str(value) for value in fragment.get("producers", [])],
-        [str(value) for value in fragment.get("confidences", [])],
+        [str(value) for value in _values(fragment, "projects")],
+        [str(value) for value in _values(fragment, "kinds")],
+        [str(value) for value in _values(fragment, "producers")],
+        [str(value) for value in _values(fragment, "confidences")],
     )
     affected_by_project: dict[str, dict[str, object]] = {}
     edges: list[dict[str, object]] = []
-    for raw in fragment.get("rows", []):
+    for raw in _values(fragment, "rows"):
         affected_row, edge = _expanded_row(raw, dictionary)
         if affected_row is not None:
             project = str(affected_row["project"])
             current = affected_by_project.get(project)
-            if current is None or int(affected_row["depth"]) < int(current["depth"]):
+            if current is None or _integer(affected_row["depth"]) < _integer(
+                current["depth"]
+            ):
                 affected_by_project[project] = affected_row
         if edge is not None:
             edges.append(edge)
     affected = sorted(
         affected_by_project.values(),
-        key=lambda row: (int(row["depth"]), str(row["project"])),
+        key=lambda row: (_integer(row["depth"]), str(row["project"])),
     )
     edges.sort(
         key=lambda row: (
@@ -192,13 +210,16 @@ def expand_project_impact(fragment: Mapping[str, object]) -> dict[str, object]:
         )
     )
     roots = [
-        _lookup(dictionary.projects, int(index)) for index in fragment.get("roots", [])
+        _lookup(dictionary.projects, _integer(index))
+        for index in _values(fragment, "roots")
     ]
     return {
         "roots": [value for value in roots if value],
         "affected": affected,
         "edges": edges,
-        "reported_affected": int(fragment.get("reported_affected") or len(affected)),
-        "total_affected": int(fragment.get("total_affected") or len(affected)),
+        "reported_affected": _integer(
+            fragment.get("reported_affected") or len(affected)
+        ),
+        "total_affected": _integer(fragment.get("total_affected") or len(affected)),
         "complete": bool(fragment.get("complete")),
     }

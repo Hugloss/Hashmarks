@@ -56,7 +56,7 @@ def observe_boundary(
     """Use public APIs/transports with inputs separate from the exact oracle."""
     paths = inputs["changed_paths"]
     with CodeMap(workspace, state_dir=state) as codemap:
-        packet = codemap.task_change_impact(
+        packet = codemap.changes.task_impact(
             inputs["task"],
             paths,
             options=ChangeImpactOptions(

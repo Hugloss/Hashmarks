@@ -17,9 +17,9 @@ from hashmarks.codemap.repository_source import RepositorySource
 
 
 def _native(index: RepositoryIndex) -> RepositoryNativeEvidence:
-    reads = DecisionScope(index, index.store, index._observation_source)
-    source = RepositorySource(index.files, index, reads, index.store, index.file_store)
-    return RepositoryNativeEvidence(index.files, source, reads, index.store)
+    reads = DecisionScope(index)
+    source = RepositorySource(index, reads)
+    return RepositoryNativeEvidence(source)
 
 
 def test_project_evidence_is_disqualified_on_manifest_drift_without_publication(

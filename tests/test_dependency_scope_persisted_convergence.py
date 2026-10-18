@@ -2,10 +2,10 @@ import hashlib
 import json
 import tomllib
 from pathlib import Path
-from typing import Any
 from unittest.mock import patch
 
 import pytest
+from contract_assertions import assert_records
 
 from hashmarks.codemap import CodeMap
 
@@ -51,7 +51,7 @@ def test_global_queries_retire_historical_pruned_rows_before_returning_evidence(
         assert rel not in codemap.store.paths()
         with pytest.raises(KeyError, match="symbol not found"):
             codemap.source.symbol("dependency_impl")
-        assert codemap.derived_graph(rel)["nodes"] == []
+        assert codemap.index.derived_graph(rel)["nodes"] == []
         assert {hit.path for hit in codemap.search.find("owned")} == {"src/app.py"}
 
 
@@ -69,7 +69,10 @@ def test_stable_scope_identity_avoids_repeated_repository_map_scan(
             side_effect=AssertionError("stable scope must not rescan persisted paths"),
         ):
             assert {hit.path for hit in codemap.search.find("owned")} == {"src/app.py"}
-            assert codemap.source.symbol("owned")["matches"][0]["path"] == "src/app.py"
+            assert (
+                assert_records(codemap.source.symbol("owned")["matches"])[0]["path"]
+                == "src/app.py"
+            )
 
 
 @pytest.mark.parametrize("paths", [None, ["src/app.py"]])
@@ -82,7 +85,7 @@ def test_scope_reconciliation_persists_one_complete_conformance_snapshot(
         codemap.index.sync()
         codemap.store.set_meta("analysis_scope_conformance_identity", "old-scope")
         with patch.object(
-            codemap,
+            codemap.index,
             "_analysis_scope_conformance_payload",
             wraps=codemap.index._analysis_scope_conformance_payload,
         ) as observe:
@@ -135,7 +138,7 @@ def test_live_context_policy_deny_converges_without_reopening_codemap(
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.index.sync()
         assert (
-            codemap.source.symbol("hidden_owner")["matches"][0]["path"]
+            assert_records(codemap.source.symbol("hidden_owner")["matches"])[0]["path"]
             == "private/hidden.py"
         )
         (tmp_path / ".hashmarks-context.toml").write_text(
@@ -164,7 +167,7 @@ def test_live_context_policy_reallow_discovers_newly_admitted_paths(
             codemap.source.symbol("hidden_owner")
         policy.unlink()
         assert (
-            codemap.source.symbol("hidden_owner")["matches"][0]["path"]
+            assert_records(codemap.source.symbol("hidden_owner")["matches"])[0]["path"]
             == "private/hidden.py"
         )
 

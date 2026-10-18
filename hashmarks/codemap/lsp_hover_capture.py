@@ -10,7 +10,7 @@ import json
 from collections.abc import Mapping
 from typing import Any
 
-from .semantic_relationship_source import validated_range
+from .semantic_relationship_model import validated_range
 
 _MAX_HOVER_BYTES = 8_192
 _MAX_BLOCK_BYTES = 4_096

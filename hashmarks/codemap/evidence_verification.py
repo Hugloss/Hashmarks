@@ -13,6 +13,7 @@ from .decision_session import ReadScopeOwner, decision_scoped
 from .model import EvidenceVisibility
 from .query_primitives import _TASK_STOPWORDS, _query_terms
 from .repository_domains import RepositoryDomain, classify_repository_path
+from .repository_observation import evidence_identity
 from .task_evidence_contract import read_task_candidate
 from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 from .verification_explanation import VerificationExplanationMixin
@@ -35,7 +36,6 @@ if TYPE_CHECKING:
     from .decision_session import DecisionScope
     from .import_resolution import RepositoryImports
     from .query_router import NormalizedTaskQuery
-    from .repository_source import RepositorySource
     from .task_evidence_types import (
         VerificationRelevance,
     )
@@ -86,8 +86,8 @@ class RepositoryVerification(
 ):
     """Own source-qualified test relevance for supplied owner/candidate facts."""
 
-    def __init__(self, source: RepositorySource, imports: RepositoryImports) -> None:
-        self.source = source
+    def __init__(self, imports: RepositoryImports) -> None:
+        self.source = source = imports.source
         self.imports = imports
         self.store = source.store
         self.files = source.files
@@ -96,6 +96,36 @@ class RepositoryVerification(
     @property
     def reads(self) -> DecisionScope:
         return self.source.reads
+
+    def relationship_evidence(
+        self,
+        *,
+        source: str,
+        target: str,
+        classification: str,
+        relation_kind: str,
+        provenance: str,
+    ) -> dict[str, object]:
+        """Describe an objective repository relationship without consumer policy."""
+        if classification not in {"direct", "related", "unknown"}:
+            raise ValueError("unsupported verification relationship classification")
+        if not relation_kind.strip():
+            raise ValueError("verification relationship kind must be nonblank")
+        payload = {
+            "source": source,
+            "target": target,
+            "classification": classification,
+            "relation_kind": relation_kind,
+            "provenance": provenance,
+        }
+        return {
+            **payload,
+            "evidence_identity": evidence_identity(
+                "hashmarks.verification-relationship.v1", payload
+            ),
+            "authority": "repository-relationship-only",
+            "execution_effect": "none",
+        }
 
     def bounded_relevance(
         self, relevance: VerificationRelevance, candidate_limit: int
@@ -528,7 +558,11 @@ class RepositoryVerification(
     ) -> dict[str, list[Mapping[str, object]]]:
         if TYPE_CHECKING:
             self = cast("RepositoryVerification", self)
-        raw = self.reads.refs_many(selected_symbols, limit_per_target=1025)
+        raw = self.reads.refs_many(
+            selected_symbols,
+            limit_per_target=1025,
+            preferred_paths=self._verification_test_paths(state)[:4096],
+        )
         bounded: dict[str, list[Mapping[str, object]]] = {}
         for symbol in selected_symbols:
             refs: list[Mapping[str, object]] = list(raw.get(symbol, ()))
@@ -555,7 +589,12 @@ class RepositoryVerification(
             state.search_bound_reasons.add("targeted-reverse-ref-limit")
         merged: list[Mapping[str, object]] = []
         seen: set[tuple[str, int, str, str]] = set()
-        for ref in [*raw_targeted[:1024], *existing]:
+        test_paths = set(self._verification_test_paths(state))
+        ordered = sorted(
+            [*raw_targeted[:1024], *existing],
+            key=lambda row: str(row.get("path") or "") not in test_paths,
+        )
+        for ref in ordered:
             key = self._verification_ref_identity(ref)
             if key in seen:
                 continue

@@ -54,7 +54,8 @@ def test_verification_plan_rejects_context_denied_test_path(tmp_path: Path) -> N
         codemap.index.sync()
         assert rel not in codemap.store.paths()
         plan = codemap.verification.plan(rel)
-        assert plan["available"] is False
+        assert not plan["available"]
+        assert "reason" in plan
         assert plan["reason"] == "path-outside-analysis-scope"
 
 
@@ -70,7 +71,8 @@ def test_pruned_javascript_test_is_rejected_before_source_read(tmp_path: Path) -
             side_effect=AssertionError("dependency source must not be read"),
         ):
             plan = codemap.verification.plan(rel)
-        assert plan["available"] is False
+        assert not plan["available"]
+        assert "reason" in plan
         assert "reason" in plan
         assert plan["reason"] == "path-outside-analysis-scope"
 

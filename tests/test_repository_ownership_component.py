@@ -18,7 +18,7 @@ from hashmarks.codemap.task_action_types import TaskObservation
 
 def _ownership(index: RepositoryIndex) -> RepositoryOwnership:
     structure = _structure(index)
-    search = RepositorySearch(structure.source, structure.native)
+    search = RepositorySearch(structure.native)
     return RepositoryOwnership(structure.source, structure.imports, structure, search)
 
 

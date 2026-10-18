@@ -15,13 +15,6 @@ from .diagnostic_observation import (
 from .diagnostic_observation import (
     RepositoryGenerationBinding as RepositoryGenerationBinding,
 )
-from .diagnostic_observation import (
-    diagnostic_observation_delta,
-    external_diagnostic_observation,
-)
-from .diagnostic_source_revision import (
-    diagnostic_source_revision_evidence,
-)
 from .freshness_map import FreshnessMapOptions
 from .repository_observation import (
     evidence_identity,
@@ -38,7 +31,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from .decision_session import ReadScope
-    from .engine import CodeMap
+    from .repository_changes import RepositoryChanges
 
 
 @dataclass
@@ -74,7 +67,7 @@ class RepositoryDeltaMixin(ReadScopeOwner):
         self, changed_paths: Sequence[str | Path]
     ) -> dict[str, dict[str, object]]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryChanges", self)
         paths = tuple(
             dict.fromkeys(
                 normalize_relative_path(path, allow_root=False)
@@ -211,42 +204,6 @@ class RepositoryDeltaMixin(ReadScopeOwner):
             }
         return rows
 
-    diagnostic_source_revision_evidence = staticmethod(
-        diagnostic_source_revision_evidence
-    )
-
-    external_diagnostic_observation = staticmethod(external_diagnostic_observation)
-
-    def verification_relationship_evidence(
-        self,
-        *,
-        source: str,
-        target: str,
-        classification: str,
-        relation_kind: str,
-        provenance: str,
-    ) -> dict[str, object]:
-        """Describe an objective repository relationship without consumer policy."""
-        if classification not in {"direct", "related", "unknown"}:
-            raise ValueError("unsupported verification relationship classification")
-        if not relation_kind.strip():
-            raise ValueError("verification relationship kind must be nonblank")
-        payload = {
-            "source": source,
-            "target": target,
-            "classification": classification,
-            "relation_kind": relation_kind,
-            "provenance": provenance,
-        }
-        return {
-            **payload,
-            "evidence_identity": evidence_identity(
-                "hashmarks.verification-relationship.v1", payload
-            ),
-            "authority": "repository-relationship-only",
-            "execution_effect": "none",
-        }
-
     @staticmethod
     def external_observation_freshness(
         observation: Mapping[str, object],
@@ -255,7 +212,7 @@ class RepositoryDeltaMixin(ReadScopeOwner):
         current_generation: int,
         changed_paths: Sequence[str] = (),
         dependency_paths: Sequence[str] = (),
-        change_set_complete: bool = False,
+        change_set_complete: object = False,
     ) -> dict[str, object]:
         """Scoped external freshness; disjoint partial changes prove no absence."""
         if not isinstance(change_set_complete, bool):
@@ -300,10 +257,8 @@ class RepositoryDeltaMixin(ReadScopeOwner):
             "execution_effect": "none",
         }
 
-    diagnostic_observation_delta = staticmethod(diagnostic_observation_delta)
-
     @diagnostic_producer
-    def repository_intelligence_snapshot(
+    def snapshot(
         self,
         task: str,
         changed_paths: Sequence[str | Path],
@@ -321,13 +276,15 @@ class RepositoryDeltaMixin(ReadScopeOwner):
         deep copy so mutation cannot become shared authority.
         """
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryChanges", self)
         snapshot_key = None
         if self.reads.depth > 0:
             if self._snapshot_reuse.scope is not self.reads.scope:
                 self._snapshot_reuse.entries.clear()
                 self._snapshot_reuse.scope = self.reads.scope
-            generation = int(self.reads.generation or self.store.generation())
+            scope = self.reads.scope
+            assert scope is not None
+            generation = scope.generation
             snapshot_key = (
                 generation,
                 task,
@@ -340,10 +297,13 @@ class RepositoryDeltaMixin(ReadScopeOwner):
             cached = self._snapshot_reuse.entries.get(snapshot_key)
             if cached is not None:
                 self.reads.count("snapshot_hit")
-                return deepcopy(cached)
+                with self.reads.session(
+                    expected_generation=self._repository_generation(cached)
+                ):
+                    return deepcopy(cached)
             self.reads.count("snapshot_miss")
 
-        brief = self.change_intelligence_brief(
+        brief = self.brief(
             task,
             changed_paths,
             limit=limit,
@@ -351,44 +311,45 @@ class RepositoryDeltaMixin(ReadScopeOwner):
             impact_limit_per_surface=impact_limit_per_surface,
             max_depth=max_depth,
         )
-        freshness = self.evidence_freshness_map(
-            task,
-            changed_paths,
-            options=FreshnessMapOptions(
-                limit=limit,
-                per_role=per_role,
-                impact_limit_per_surface=impact_limit_per_surface,
-                max_depth=max_depth,
-            ),
-        )
-        payload: dict[str, object] = {
-            "schema": REPOSITORY_SNAPSHOT_SCHEMA,
-            "observer": repository_observer_packet(),
-            "repository": deepcopy(brief["repository"]),
-            "task_identity": brief["task_identity"],
-            "paths": self._snapshot_paths(changed_paths),
-            "affected": deepcopy(brief.get("affected") or {}),
-            "ownership": deepcopy(brief.get("ownership")),
-            "verification": self._snapshot_verification(brief),
-            "freshness": self._snapshot_freshness(freshness),
-            "bounds": deepcopy(brief.get("bounds") or {}),
-            "completeness": {
-                "state": "complete",
-                "scope": "bounded-explicit-change-set",
-                "dynamic_runtime_relationships": "unknown",
-            },
-            "storage": "derived-not-persisted",
-            "authority": "repository-intelligence-only",
-            "execution_effect": "none",
-        }
-        if "project_impact" in brief:
-            payload["project_impact"] = deepcopy(brief["project_impact"])
-        payload["snapshot_identity"] = "sha256:" + packet_digest(
-            REPOSITORY_SNAPSHOT_SCHEMA, payload
-        )
-        if snapshot_key is not None:
-            self._snapshot_reuse.entries[snapshot_key] = deepcopy(payload)
-        return payload
+        with self.reads.session(expected_generation=self._repository_generation(brief)):
+            freshness = self.freshness_map(
+                task,
+                changed_paths,
+                options=FreshnessMapOptions(
+                    limit=limit,
+                    per_role=per_role,
+                    impact_limit_per_surface=impact_limit_per_surface,
+                    max_depth=max_depth,
+                ),
+            )
+            payload: dict[str, object] = {
+                "schema": REPOSITORY_SNAPSHOT_SCHEMA,
+                "observer": repository_observer_packet(),
+                "repository": deepcopy(brief["repository"]),
+                "task_identity": brief["task_identity"],
+                "paths": self._snapshot_paths(changed_paths),
+                "affected": deepcopy(brief.get("affected") or {}),
+                "ownership": deepcopy(brief.get("ownership")),
+                "verification": self._snapshot_verification(brief),
+                "freshness": self._snapshot_freshness(freshness),
+                "bounds": deepcopy(brief.get("bounds") or {}),
+                "completeness": {
+                    "state": "complete",
+                    "scope": "bounded-explicit-change-set",
+                    "dynamic_runtime_relationships": "unknown",
+                },
+                "storage": "derived-not-persisted",
+                "authority": "repository-intelligence-only",
+                "execution_effect": "none",
+            }
+            if "project_impact" in brief:
+                payload["project_impact"] = deepcopy(brief["project_impact"])
+            payload["snapshot_identity"] = "sha256:" + packet_digest(
+                REPOSITORY_SNAPSHOT_SCHEMA, payload
+            )
+            if snapshot_key is not None:
+                self._snapshot_reuse.entries[snapshot_key] = deepcopy(payload)
+            return payload
 
     def _validate_previous_snapshot(
         self,
@@ -396,7 +357,7 @@ class RepositoryDeltaMixin(ReadScopeOwner):
         previous_snapshot: Mapping[str, object],
     ) -> tuple[Mapping[str, object], str]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryChanges", self)
         if previous_snapshot.get("schema") != REPOSITORY_SNAPSHOT_SCHEMA:
             raise ValueError(
                 "previous_snapshot must be a hashmarks.repository-intelligence-snapshot.v1 packet"
@@ -573,7 +534,7 @@ class RepositoryDeltaMixin(ReadScopeOwner):
         return result
 
     @diagnostic_producer
-    def repository_intelligence_delta(
+    def delta(
         self,
         task: str,
         changed_paths: Sequence[str | Path],
@@ -586,11 +547,9 @@ class RepositoryDeltaMixin(ReadScopeOwner):
         options = options or REPOSITORY_DELTA_DEFAULT_OPTIONS
         """Return changed repository-intelligence facts between admitted states."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        previous_repository, repository_identity = self._validate_previous_snapshot(
-            task, previous_snapshot
-        )
-        current = self.repository_intelligence_snapshot(
+            self = cast("RepositoryChanges", self)
+        self._validate_previous_snapshot(task, previous_snapshot)
+        current = self.snapshot(
             task,
             changed_paths,
             limit=limit,
@@ -598,6 +557,19 @@ class RepositoryDeltaMixin(ReadScopeOwner):
             impact_limit_per_surface=options.impact_limit_per_surface,
             max_depth=options.max_depth,
         )
+        return self._compare_snapshots(task, previous_snapshot, current)
+
+    def _compare_snapshots(
+        self,
+        task: str,
+        previous_snapshot: Mapping[str, object],
+        current: Mapping[str, object],
+    ) -> dict[str, object]:
+        """Compare explicit qualified values without observing a second endpoint."""
+        previous_repository, repository_identity = self._validate_previous_snapshot(
+            task, previous_snapshot
+        )
+        self._validate_previous_snapshot(task, current)
         current_repository = self._delta_mapping(
             current.get("repository"), field="current.repository"
         )
@@ -605,9 +577,9 @@ class RepositoryDeltaMixin(ReadScopeOwner):
         changes = [row for row in changes if row.get("path") != ["snapshot_identity"]]
         changed_sections = sorted(
             {
-                str(row["path"][0])
+                str(path[0])
                 for row in changes
-                if isinstance(row.get("path"), list) and row["path"]
+                if isinstance(path := row.get("path"), list) and path
             }
         )
         previous_observer = self._delta_mapping(

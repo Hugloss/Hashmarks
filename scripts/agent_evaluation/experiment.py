@@ -145,7 +145,8 @@ def coverage_ledger(
             if isinstance(bundle.get("lane"), dict)
             else None
         )
-        trace = bundle.get("trace") if isinstance(bundle.get("trace"), dict) else {}
+        raw_trace = bundle.get("trace")
+        trace = raw_trace if isinstance(raw_trace, dict) else {}
         task = trace.get("task_id")
         key = (str(lane), str(task))
         if key not in expected:

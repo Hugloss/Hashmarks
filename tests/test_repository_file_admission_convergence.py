@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
+
+from contract_assertions import assert_array, assert_records, assert_text
 
 from hashmarks import CodeMap
 from hashmarks.codemap.project_graph import (
@@ -17,7 +20,7 @@ class _NativeProjectProvider(ProjectGraphProvider):
 
     def __init__(
         self,
-        manifest_finder: object,
+        manifest_finder: Callable[[str], tuple[Path, ...]],
         *,
         include_denied_freshness: bool = False,
     ) -> None:
@@ -108,10 +111,13 @@ def test_denied_nested_npm_manifest_is_not_parsed_or_projected(tmp_path: Path) -
         codemap.index.sync()
         enriched = codemap.native.enrich_projects(("npm-package-graph",))
 
-    ids = {row["project_id"] for row in enriched["projects"]}
+    ids = {row["project_id"] for row in assert_records(enriched["projects"])}
     assert ids == {"npm:root", "npm:@hm/public"}
     assert enriched["edges"] == []
-    assert all("packages/private" not in warning for warning in enriched["warnings"])
+    assert all(
+        "packages/private" not in assert_text(warning)
+        for warning in assert_array(enriched["warnings"])
+    )
 
 
 def test_native_project_nodes_and_edges_are_filtered_by_repository_admission(
@@ -138,12 +144,14 @@ def test_native_project_nodes_and_edges_are_filtered_by_repository_admission(
             if row["producer"] == "fixture-native-projects"
         }
 
-    assert {row["project_id"] for row in enriched["projects"]} == {"fixture:public"}
+    assert {row["project_id"] for row in assert_records(enriched["projects"])} == {
+        "fixture:public"
+    }
     assert enriched["edges"] == []
     assert stored_ids == {"fixture:public"}
     assert any(
-        "filtered project evidence outside repository admission" in warning
-        for warning in enriched["warnings"]
+        "filtered project evidence outside repository admission" in assert_text(warning)
+        for warning in assert_array(enriched["warnings"])
     )
 
 
@@ -209,7 +217,7 @@ def test_project_graph_allow_to_deny_converges_without_denied_residue(
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.index.sync()
         before = codemap.native.enrich_projects(("npm-package-graph",))
-        assert {row["project_id"] for row in before["projects"]} == {
+        assert {row["project_id"] for row in assert_records(before["projects"])} == {
             "npm:root",
             "npm:@hm/a",
             "npm:@hm/b",
@@ -226,13 +234,13 @@ def test_project_graph_allow_to_deny_converges_without_denied_residue(
 
         after = codemap.native.enrich_projects(("npm-package-graph",))
 
-    assert {row["project_id"] for row in after["projects"]} == {
+    assert {row["project_id"] for row in assert_records(after["projects"])} == {
         "npm:root",
         "npm:@hm/a",
     }
     assert all(
         edge["target"] != "npm:@hm/b" and edge["source"] != "npm:@hm/b"
-        for edge in after["edges"]
+        for edge in assert_records(after["edges"])
     )
 
 
@@ -255,8 +263,8 @@ def test_denied_declared_project_links_do_not_activate_or_parse(
     assert enriched["projects"] == []
     assert enriched["edges"] == []
     assert all(
-        ".hashmarks-project-links.toml" not in warning
-        for warning in enriched["warnings"]
+        ".hashmarks-project-links.toml" not in assert_text(warning)
+        for warning in assert_array(enriched["warnings"])
     )
 
 

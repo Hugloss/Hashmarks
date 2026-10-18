@@ -357,8 +357,12 @@ The catalog stays small: explainability and endpoint comparison are modes on exi
 
 `repository_declarations` accepts `result_mode="observation" | "explain" | "discovery"`.
 Observation remains the default; explain returns `hashmarks.repository-declaration-explain.v1`.
-Discovery takes `groups=[]` and optional explicit `python_backend_paths`, with
-`include_class_fields=True` enabling ordinary class annotations. It returns
+Discovery takes `groups=[]` and an optional `source_selection` object.
+`source_selection={"python_backend_paths":["service.py"],"include_class_fields":true}`
+selects backend declarations and ordinary class annotations.
+`source_selection={"python_interface":{"paths":["routes.py"],"route_objects":["api"]}}`
+selects interface syntax through the same declaration owner. Source selection
+is valid only in discovery mode; unknown selection fields fail closed. It returns
 `hashmarks.repository-declaration-discovery.v1`, retaining tracked source inputs
 and nested declarations. `previous_observation` compares a prior packet of the
 same observation/discovery kind. Source selection cannot be mixed with raw

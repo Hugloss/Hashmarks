@@ -2,14 +2,19 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from contract_assertions import assert_present
+
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.model import SearchHit
 from hashmarks.codemap.task_retrieval import _TaskRetrievalResult
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
     from pathlib import Path
 
     import pytest
+
+    from hashmarks.codemap.task_action_types import _TaskActionExactIdentifierEvidence
 
 _INDEX_LIMIT = 1024
 
@@ -55,7 +60,7 @@ def _install_bounded_exact_index(
     probe = ([first] if visible else []) + stale + [hidden]
     assert len(probe) == _INDEX_LIMIT + 1
 
-    def exact_symbols(names: list[str], *, limit: int) -> list[object]:
+    def exact_symbols(names: list[str], *, limit: int) -> list[dict[str, object]]:
         normalized = {str(name).lower() for name in names}
         if "collision_owner" in normalized and limit == _INDEX_LIMIT + 1:
             return probe[:limit]
@@ -170,7 +175,7 @@ def test_complete_exact_symbol_search_can_still_resolve_unique_owner(
             per_role=1,
         )
 
-    assert action["edit"]["path"] == "src/a.py"
+    assert assert_present(action["edit"])["path"] == "src/a.py"
     assert action["owner_basis"] in {"exact-symbol", "unique-exact-symbol"}
     assert action["ambiguity"]["ambiguous"] is False
     assert action["ownership_authority"]["owner_resolved"] is True
@@ -199,7 +204,7 @@ def test_literal_path_remains_independent_authority_when_symbol_index_is_bounded
             per_role=1,
         )
 
-    assert action["edit"]["path"] == "src/a.py"
+    assert assert_present(action["edit"])["path"] == "src/a.py"
     assert action["owner_basis"] == "literal-path"
     assert action["ambiguity"]["ambiguous"] is False
     assert action["ownership_authority"]["owner_resolved"] is True
@@ -225,9 +230,11 @@ def test_skipped_exact_identifier_search_cannot_claim_negative_or_unique_evidenc
         calls = []
         original = codemap.ownership._task_action_exact_identifier_edit_candidates
 
-        def tracked(*_args: object, **_kwargs: object) -> object:
+        def tracked(
+            task: str, rows: Sequence[dict[str, object]], failed: set[str]
+        ) -> _TaskActionExactIdentifierEvidence:
             calls.append(True)
-            return original(*_args, **_kwargs)
+            return original(task, rows, failed)
 
         monkeypatch.setattr(
             codemap.ownership, "_task_action_exact_identifier_edit_candidates", tracked

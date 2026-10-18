@@ -6,8 +6,10 @@ from a partial list or turn a producer claim into canonical repository proof.
 """
 
 import pytest
+from contract_assertions import assert_array, assert_object
 
 from hashmarks import validate_repository_intelligence_evidence
+from hashmarks.codemap.diagnostic_observation import external_diagnostic_observation
 from hashmarks.codemap.repository_delta import (
     RepositoryDeltaMixin,
     RepositoryGenerationBinding,
@@ -15,7 +17,7 @@ from hashmarks.codemap.repository_delta import (
 
 
 def _observed_verification() -> dict[str, object]:
-    return RepositoryDeltaMixin.external_diagnostic_observation(
+    return external_diagnostic_observation(
         producer="pyright",
         binding=RepositoryGenerationBinding("sha256:before", 4),
         diagnostics=[],
@@ -118,7 +120,7 @@ def test_change_set_completeness_requires_a_real_boolean(bad: object) -> None:
             current_repository_identity="sha256:after",
             current_generation=5,
             changed_paths=["docs/guide.md"],
-            change_set_complete=bad,  # type: ignore[arg-type]
+            change_set_complete=bad,
         )
 
 
@@ -142,10 +144,13 @@ def test_public_validation_preserves_external_freshness_qualification(
     assert checked["valid"] is True
     assert checked["reasons"] == []
     normalized = checked["normalized"]
-    assert normalized["freshness_state"] == state
-    assert normalized["stale"] is stale
-    assert normalized["change_set_completeness"] == packet["change_set_completeness"]
-    assert normalized["freshness_reason"] == packet["reason"]
+    assert assert_object(normalized)["freshness_state"] == state
+    assert assert_object(normalized)["stale"] is stale
+    assert (
+        assert_object(normalized)["change_set_completeness"]
+        == packet["change_set_completeness"]
+    )
+    assert assert_object(normalized)["freshness_reason"] == packet["reason"]
 
     required = validate_repository_intelligence_evidence(packet, require_fresh=True)
     assert required["valid"] is (state == "current")
@@ -174,15 +179,15 @@ def test_normalized_freshness_distinguishes_unchanged_and_conditional_current(
 
     assert checked_unchanged["valid"] is True
     assert checked_conditional["valid"] is True
-    assert checked_unchanged["normalized"]["freshness_reason"] == (
+    assert assert_object(checked_unchanged["normalized"])["freshness_reason"] == (
         "repository-and-generation-unchanged"
     )
-    assert checked_conditional["normalized"]["freshness_reason"] == (
+    assert assert_object(checked_conditional["normalized"])["freshness_reason"] == (
         "declared-complete-change-set-outside-observation-scope"
     )
-    assert checked_conditional["normalized"]["change_set_completeness"] == (
-        "caller-claimed-complete"
-    )
+    assert assert_object(checked_conditional["normalized"])[
+        "change_set_completeness"
+    ] == ("caller-claimed-complete")
 
 
 @pytest.mark.parametrize("bad", [None, True, "complete", [], {}, 0])
@@ -195,5 +200,5 @@ def test_public_validation_rejects_invalid_change_set_qualification(
     checked = validate_repository_intelligence_evidence(packet)
 
     assert checked["valid"] is False
-    assert "invalid-change-set-completeness" in checked["reasons"]
+    assert "invalid-change-set-completeness" in assert_array(checked["reasons"])
     assert checked["normalized"] is None

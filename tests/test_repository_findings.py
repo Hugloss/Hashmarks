@@ -6,6 +6,12 @@ import time
 from typing import TYPE_CHECKING
 
 import pytest
+from contract_assertions import (
+    assert_integer,
+    assert_object,
+    assert_records,
+    assert_text,
+)
 
 from hashmarks.cli import main
 from hashmarks.codemap import CodeMap, CodeMapService, CodeMapServiceClient
@@ -58,19 +64,28 @@ def test_repository_findings_projects_existing_analyzers_without_low_signal_cach
             "import-identity": 1,
         },
     }
-    by_code = {finding["code"]: finding for finding in result["findings"]}
+    by_code = {
+        finding["code"]: finding for finding in assert_records(result["findings"])
+    }
     assert by_code["python-duplicate-module-identity"]["path"] == "scripts/loader.py"
     assert by_code["python-cache-owner-import-identity-risk"]["path"] == "pkg/state.py"
     assert (
         by_code["python-read-modify-write-without-visible-guard"]["path"]
         == "pkg/state.py"
     )
-    assert result["analyzers"]["cache_ownership"]["owners"] >= 1
-    assert all(
-        finding["source_schema"].startswith("hashmarks.")
-        for finding in result["findings"]
+    assert (
+        assert_integer(
+            assert_object(assert_object(result["analyzers"])["cache_ownership"])[
+                "owners"
+            ]
+        )
+        >= 1
     )
-    assert "execution" in result["boundary"]
+    assert all(
+        assert_text(finding["source_schema"]).startswith("hashmarks.")
+        for finding in assert_records(result["findings"])
+    )
+    assert "execution" in assert_text(result["boundary"])
 
 
 def test_repository_findings_path_scope_preserves_repository_import_risk_linkage(
@@ -81,12 +96,19 @@ def test_repository_findings_path_scope_preserves_repository_import_risk_linkage
         codemap.index.sync()
         result = codemap.ownership.findings(["pkg/state.py"])
 
-    assert {finding["path"] for finding in result["findings"]} == {"pkg/state.py"}
-    assert {finding["code"] for finding in result["findings"]} == {
+    assert {finding["path"] for finding in assert_records(result["findings"])} == {
+        "pkg/state.py"
+    }
+    assert {finding["code"] for finding in assert_records(result["findings"])} == {
         "python-cache-owner-import-identity-risk",
         "python-read-modify-write-without-visible-guard",
     }
-    assert result["analyzers"]["import_ownership"]["findings"] == 0
+    assert (
+        assert_object(assert_object(result["analyzers"])["import_ownership"])[
+            "findings"
+        ]
+        == 0
+    )
 
 
 def test_cli_map_findings_is_one_step_repository_analysis_surface(
@@ -138,10 +160,13 @@ def test_repository_findings_retain_observation_and_expose_adjudication(
         result = codemap.ownership.findings()
 
     assert result["findings"]
-    for finding in result["findings"]:
+    for finding in assert_records(result["findings"]):
         assert finding["observation"] == "retained"
-        assert finding["interpretation"]["authority"] == "repository-evidence-only"
-        assert finding["interpretation"]["actionability"] in {
+        assert (
+            assert_object(finding["interpretation"])["authority"]
+            == "repository-evidence-only"
+        )
+        assert assert_object(finding["interpretation"])["actionability"] in {
             "actionable",
             "not-actionable",
         }

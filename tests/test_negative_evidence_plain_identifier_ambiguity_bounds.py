@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
+from contract_assertions import assert_object
 
 from hashmarks.codemap import CodeMap
 
@@ -173,7 +174,7 @@ def test_explicit_identifier_authority_is_independent_of_plain_scan_bound(
         task = "Refactor explicit_owner_name and resolve behavior"
         action = codemap.tasks.action_map(task, limit=1, per_role=1)
 
-    assert action["edit"]["path"] == "src/owner.py"
+    assert assert_object(action["edit"])["path"] == "src/owner.py"
     assert action["owner_basis"] in {"exact-symbol", "unique-exact-symbol"}
     assert action["ownership_authority"]["owner_resolved"] is True
     assert action["exact_identifier_search"]["completeness"] == "complete"

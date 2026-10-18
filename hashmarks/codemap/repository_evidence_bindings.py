@@ -129,17 +129,6 @@ class RepositoryBindings(
             raise ValueError("evidence scope must be 'lines' or 'member'")
         return cls._binding_span(raw)
 
-    @staticmethod
-    def _physical_lines(raw: bytes) -> list[bytes]:
-        """Split physical repository lines only on LF while preserving exact bytes."""
-        if not raw:
-            return []
-        parts = raw.split(b"\n")
-        lines = [part + b"\n" for part in parts[:-1]]
-        if parts[-1]:
-            lines.append(parts[-1])
-        return lines
-
     def _observe_span(self, span: EvidenceSpan) -> dict[str, object]:
         member, raw = self.source.member(span.path, include_bytes=True)
         base: dict[str, object] = {
@@ -174,7 +163,7 @@ class RepositoryBindings(
                 "reason": "member-not-utf8-text",
             }
 
-        lines = self._physical_lines(raw)
+        lines = self.source._physical_lines(raw)
         if span.end_line > len(lines):
             return {
                 **base,

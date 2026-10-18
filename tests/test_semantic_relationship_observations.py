@@ -207,7 +207,7 @@ def test_task_lsp_projection_preserves_owner_verifier_and_request_locality(
         captured: Any = cm.tasks.evidence(
             task, supplied_observations=[_capture(tmp_path)]
         )
-        delta: Any = cm.task_post_change_delta(
+        delta: Any = cm.changes.task_delta(
             task, ["contract.py"], previous_evidence=captured
         )
         after: Any = cm.tasks.evidence(task)

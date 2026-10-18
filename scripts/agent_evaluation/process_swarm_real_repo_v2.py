@@ -148,9 +148,10 @@ def _codemap_candidates(
             },
         )
     entry_points = codemap.tasks.entry_points(query, limit=limit)
-    recommended = [
-        row for row in entry_points.get("recommended", []) if isinstance(row, dict)
-    ]
+    raw_recommended = entry_points.get("recommended", [])
+    if not isinstance(raw_recommended, list):
+        raise ValueError("recommended entries must be a list")
+    recommended = [row for row in raw_recommended if isinstance(row, dict)]
     candidates = [str(row.get("path") or "") for row in recommended]
     ambiguity = entry_points.get("ambiguity")
     ambiguity = ambiguity if isinstance(ambiguity, dict) else {}

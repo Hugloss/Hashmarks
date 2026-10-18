@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, TypeVar
 
+from .codemap.decision_session import RepeatedSourceChangeError
 from .file_store import UnstableFileError
 
 if TYPE_CHECKING:
@@ -25,7 +26,7 @@ _T = TypeVar("_T")
 def is_transient_repository_race(exc: BaseException) -> bool:
     """Return whether *exc* is a known recomputable repository race."""
 
-    if isinstance(exc, UnstableFileError):
+    if isinstance(exc, (UnstableFileError, RepeatedSourceChangeError)):
         return True
     if not isinstance(exc, RuntimeError):
         return False

@@ -37,7 +37,10 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
     from pathlib import Path
 
-    from mcp.types import CallToolResult
+    from mcp.server import MCPServer
+    from mcp.server.mcpserver.exceptions import ToolError
+    from mcp.types import CallToolResult, ToolAnnotations
+
 
 _INSTALL_HINT = (
     'Hashmarks MCP support requires the optional extra: pip install "hashmarks[mcp]"'
@@ -77,11 +80,12 @@ else:
     _TaskEvidenceResultMode = Literal[*tuple(operation_modes("task_evidence"))]
 
 
-def _sdk() -> tuple[type[Any], type[Any], type[Any]]:
+def _sdk() -> tuple[type[MCPServer], type[ToolAnnotations], type[ToolError]]:
     try:
         from mcp.server import MCPServer
         from mcp.server.mcpserver.exceptions import ToolError
         from mcp.types import ToolAnnotations
+
     except ImportError as exc:  # pragma: no cover - exercised through CLI boundary
         raise OptionalFeatureError(_INSTALL_HINT) from exc
     return MCPServer, ToolAnnotations, ToolError
@@ -127,9 +131,9 @@ def _task_evidence_tool_result(
 
 
 def _register_json_mirror_tool(
-    server: object,
+    server: MCPServer,
     contract: McpToolContract,
-    annotations: object,
+    annotations: ToolAnnotations,
     handler: Callable[..., object],
 ) -> None:
     from mcp.types import CallToolResult
@@ -185,9 +189,9 @@ def _call_surface(
 
 
 def _register_repository_declarations_tool(
-    server: object,
+    server: MCPServer,
     surface: HashmarksMcpSurface,
-    annotations: object,
+    annotations: ToolAnnotations,
     tool_error: type[Exception],
 ) -> None:
     contract = tool_contract("repository_declarations")
@@ -202,8 +206,7 @@ def _register_repository_declarations_tool(
         previous_observation: dict[str, Any] | None = None,
         result_mode: _RepositoryDeclarationsResultMode = contract.default_response_mode,
         presentation: _Presentation = "none",
-        python_backend_paths: list[str] | None = None,
-        include_class_fields: bool = False,
+        source_selection: dict[str, Any] | None = None,
     ) -> dict[str, object]:
         return _call_surface(
             contract,
@@ -215,25 +218,30 @@ def _register_repository_declarations_tool(
             response_mode=result_mode,
             presentation=presentation,
             **(
-                {
-                    "python_backend_paths": python_backend_paths,
-                    "include_class_fields": include_class_fields,
-                }
-                if python_backend_paths is not None or include_class_fields
+                {"source_selection": source_selection}
+                if source_selection is not None
                 else {}
             ),
         )
 
 
+def _set_query_surface_annotation(
+    handler: Callable[..., object], surfaces: tuple[str, ...] | list[str]
+) -> None:
+    if not TYPE_CHECKING:
+        handler.__annotations__["surface_name"] = Literal.__getitem__(tuple(surfaces))
+
+
 def _register_agent_evidence_tools(
-    server: object,
+    server: MCPServer,
     surface: HashmarksMcpSurface,
-    annotations: object,
+    annotations: ToolAnnotations,
     tool_error: type[Exception],
     query_surfaces: tuple[str, ...] | list[str] | None = None,
 ) -> None:
     """Expose existing producers while keeping MCP registration bounded."""
     intelligence_contract = tool_contract("repository_intelligence_query")
+    selected_surfaces = QUERY_SURFACES if query_surfaces is None else query_surfaces
 
     query_description = intelligence_contract.description
     if query_surfaces is not None and query_surfaces != tuple(QUERY_SURFACES):
@@ -252,7 +260,7 @@ def _register_agent_evidence_tools(
         member_path: str | None = None,
         previous_snapshot: dict[str, Any] | None = None,
     ) -> dict[str, object]:
-        if surface_name not in query_surfaces:
+        if surface_name not in selected_surfaces:
             error = McpSurfaceError(
                 "repository_intelligence_query surface is unavailable in this "
                 "server projection: " + str(surface_name)
@@ -274,9 +282,7 @@ def _register_agent_evidence_tools(
     # MCP derives the public input schema from this annotation. A projected
     # server must advertise the same allowlist enforced by the handler rather
     # than the complete canonical Literal used by an unprojected server.
-    repository_intelligence_query.__annotations__["surface_name"] = Literal.__getitem__(
-        query_surfaces
-    )
+    _set_query_surface_annotation(repository_intelligence_query, selected_surfaces)
     server.tool(
         name=intelligence_contract.name,
         description=query_description,
@@ -380,9 +386,9 @@ def _register_agent_evidence_tools(
 
 
 def _register_evidence_comparison_tool(
-    server: object,
+    server: MCPServer,
     surface: HashmarksMcpSurface,
-    annotations: object,
+    annotations: ToolAnnotations,
     tool_error: type[Exception],
 ) -> None:
     """Expose native two-endpoint comparisons with no history or execution state."""
@@ -421,7 +427,7 @@ def _register_evidence_comparison_tool(
         )
 
 
-def _apply_tool_projection(server: object, selected_tools: tuple[str, ...]) -> None:
+def _apply_tool_projection(server: MCPServer, selected_tools: tuple[str, ...]) -> None:
     selected = set(selected_tools)
     for name in MCP_TOOL_NAMES:
         if name not in selected:
@@ -451,8 +457,10 @@ def build_server(
     state_dir: str | Path | None = None,
     tool_names: tuple[str, ...] | list[str] | None = None,
     query_surfaces: tuple[str, ...] | list[str] | None = None,
-) -> object:
-    MCPServer, ToolAnnotations, ToolError = _sdk()
+) -> MCPServer:
+    _server_type, ToolAnnotations, ToolError = _sdk()
+    from .mcp_sdk_server import McpServerBinding, create_sdk_server
+
     selected_tools, selected_query_surfaces = _server_projection_selection(
         tool_names,
         query_surfaces,
@@ -460,7 +468,7 @@ def build_server(
     surface = HashmarksMcpSurface(
         str(workspace), state_dir=None if state_dir is None else str(state_dir)
     )
-    server = MCPServer(
+    server = create_sdk_server(
         MCP_SERVER_NAME,
         description=MCP_SERVER_DESCRIPTION,
         instructions=mcp_projection_instructions(
@@ -468,6 +476,9 @@ def build_server(
             query_surfaces=query_surfaces,
         ),
         version=__version__,
+        binding=McpServerBinding(
+            surface, selected_tools, selected_query_surfaces, query_surfaces is not None
+        ),
     )
     annotations = ToolAnnotations(
         read_only_hint=MCP_READ_ONLY_ANNOTATIONS["readOnlyHint"],
@@ -664,10 +675,6 @@ def build_server(
 
     _apply_tool_projection(server, selected_tools)
 
-    server._hashmarks_surface = surface
-    server._hashmarks_projection_tools = selected_tools
-    server._hashmarks_projection_query_surfaces = selected_query_surfaces
-    server._hashmarks_query_surface_projection_explicit = query_surfaces is not None
     return server
 
 

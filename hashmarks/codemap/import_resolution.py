@@ -19,9 +19,6 @@ from .python_exports import (
 )
 
 if TYPE_CHECKING:
-    from .decision_session import DecisionScope
-    from .repository_file_discovery import RepositoryFiles
-    from .repository_index_store import WorkspaceMapStore
     from .repository_source import RepositorySource
 
 
@@ -183,16 +180,13 @@ class RepositoryImports:
 
     def __init__(
         self,
-        files: RepositoryFiles,
         source: RepositorySource,
-        reads: DecisionScope,
-        store: WorkspaceMapStore,
     ) -> None:
-        self.files = files
+        self.files = source.files
         self.source = source
-        self.reads = reads
-        self.store = store
-        self.workspace = files.workspace
+        self.reads = source.reads
+        self.store = source.store
+        self.workspace = source.workspace
 
     """Own repository import/re-export identity resolution for CodeMap evidence."""
 
@@ -281,6 +275,7 @@ class RepositoryImports:
         decision = self.files.decide(path)
         if not decision.index or decision.evidence_visibility.value != "source":
             return False
+        self.source.ensure_current(path)
         try:
             tree = read_python_ast(self.workspace / path).tree
         except (OSError, UnicodeError, SyntaxError, ValueError):
@@ -338,6 +333,7 @@ class RepositoryImports:
         """
         if not facade_path.endswith(".py") or not exported_name:
             return "unknown", []
+        self.source.ensure_current(facade_path)
         try:
             tree = read_python_ast(self.workspace / facade_path).tree
         except (OSError, UnicodeError, SyntaxError, ValueError):

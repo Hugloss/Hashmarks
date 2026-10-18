@@ -18,8 +18,6 @@ if TYPE_CHECKING:
     from .decision_session import DecisionScope
     from .import_resolution import RepositoryImports
     from .native_evidence import RepositoryNativeEvidence
-    from .repository_index_store import WorkspaceMapStore
-    from .repository_source import RepositorySource
 
 
 class RepositoryRelationships(ReadScopeOwner):
@@ -27,18 +25,19 @@ class RepositoryRelationships(ReadScopeOwner):
 
     def __init__(
         self,
-        source: RepositorySource,
-        reads: DecisionScope,
-        store: WorkspaceMapStore,
         imports: RepositoryImports,
         native: RepositoryNativeEvidence,
     ) -> None:
-        self.source = source
-        self._reads = reads
-        self.store = store
+        if imports.reads is not native.reads:
+            raise ValueError(
+                "Import and native evidence must share one repository read scope"
+            )
+        self.source = imports.source
+        self._reads = imports.reads
+        self.store = self.source.store
         self.imports = imports
         self.native = native
-        self.workspace = source.workspace
+        self.workspace = self.source.workspace
         self._reverse_file_graph_cache: (
             tuple[int, bytes, dict[str, set[str]]] | None
         ) = None

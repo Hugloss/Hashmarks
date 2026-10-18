@@ -5,8 +5,17 @@ from __future__ import annotations
 import json
 import shutil
 from collections import Counter
+from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
+
+from contract_assertions import (
+    assert_array,
+    assert_integer,
+    assert_object,
+    assert_records,
+    assert_text,
+)
 
 from hashmarks.adapters import (
     maven_dependency_observation,
@@ -25,24 +34,29 @@ LSP_CORPUS = Path(__file__).parent / "fixtures" / "native_lsp"
 TASK = "Change normalize_widget in src/engine.py to lowercase the trimmed value and verify its semantics."
 
 
-def assert_literal_returned_counts(packet: dict[str, object]) -> None:
+def assert_literal_returned_counts(packet: Mapping[str, object]) -> None:
     """Every advertised returned count accounts for the emitted rows only."""
-    rows = packet["occurrences"]
+    rows = assert_records(packet["occurrences"])
     members = [
         row
-        for row in packet["member_observations"]
+        for row in assert_records(packet["member_observations"])
         if row["availability"] == "observed"
     ]
-    by_path = Counter(row["path"] for row in rows)
-    by_literal = Counter(row["literal"] for row in rows)
-    assert sum(row["returned_occurrence_count"] for row in members) == len(rows)
+    by_path = Counter(assert_text(row["path"]) for row in rows)
+    by_literal = Counter(assert_text(row["literal"]) for row in rows)
     assert sum(
-        row["returned_occurrence_count"] for row in packet["literal_observations"]
+        assert_integer(row["returned_occurrence_count"]) for row in members
+    ) == len(rows)
+    assert sum(
+        assert_integer(row["returned_occurrence_count"])
+        for row in assert_records(packet["literal_observations"])
     ) == len(rows)
     for row in members:
-        assert row["returned_occurrence_count"] == by_path[row["path"]]
-    for row in packet["literal_observations"]:
-        assert row["returned_occurrence_count"] == by_literal[row["literal"]]
+        assert row["returned_occurrence_count"] == by_path[assert_text(row["path"])]
+    for row in assert_records(packet["literal_observations"]):
+        assert (
+            row["returned_occurrence_count"] == by_literal[assert_text(row["literal"])]
+        )
 
 
 def _replace_inputs(root: Path, source: Path, paths: list[str]) -> list[str]:
@@ -101,7 +115,7 @@ def lsp_capture(root: Path, source: Path, name: str) -> dict[str, object]:
         for row in json.loads((source / "captures.json").read_text())
         if row["name"] == name
     )
-    return rebase(row["capture"])
+    return assert_object(rebase(row["capture"]))
 
 
 def _lsp_document_event(
@@ -228,71 +242,89 @@ def assert_projection(native: object, operation: str, mode: str = "default") -> 
             assert response == native
             continue
         assert response["result"] == native
-        projected = response["presentation"]
+        projected = assert_object(response["presentation"])
         assert projected["coverage"] == "projection-only"
-        for group in projected["groups"]:
-            assert (
-                group["count_observed_in_packet"]
-                == len(group["findings"]) + group["omitted_from_presentation"]
-            )
-            for row in group["findings"]:
-                assert len(row["source_refs"]) == 1
-                value = native
-                for part in row["source_refs"][0].split("/")[1:]:
+        for group in assert_records(projected["groups"]):
+            assert group["count_observed_in_packet"] == len(
+                assert_array(group["findings"])
+            ) + assert_integer(group["omitted_from_presentation"])
+            for row in assert_records(group["findings"]):
+                references = assert_array(row["source_refs"])
+                assert len(references) == 1
+                value: object = native
+                for part in assert_text(references[0]).split("/")[1:]:
                     key = part.replace("~1", "/").replace("~0", "~")
-                    value = value[int(key)] if isinstance(value, list) else value[key]
+                    value = (
+                        value[int(key)]
+                        if isinstance(value, list)
+                        else assert_object(value)[key]
+                    )
                 assert row["details"] == value
 
 
 def assert_hover_capture(
-    packet: dict[str, object], capture: dict[str, object]
+    packet: Mapping[str, object], capture: Mapping[str, object]
 ) -> dict[str, object]:
     """A genuine hover's exact text remains an attributed, non-relational claim."""
     row = next(
-        row for row in packet["observations"] if row["producer"] == capture["producer"]
+        row
+        for row in assert_records(packet["observations"])
+        if row["producer"] == capture["producer"]
     )
-    result = capture["response"]["result"]
-    assert row["capability"]["hover_observation"] == {
+    result = assert_object(capture["response"])["result"]
+    hover = None if result is None else assert_object(result)
+    capability = assert_object(row["capability"])
+    assert capability["hover_observation"] == {
         "state": "no-hover-returned" if result is None else "hover-returned",
-        "contents": None if result is None else result["contents"],
-        "range": None if result is None else result.get("range"),
+        "contents": None if hover is None else hover["contents"],
+        "range": None if hover is None else hover.get("range"),
         "authority": "caller-supplied-producer-claim",
         "semantic_correspondence": "not-established",
         "negative_evidence_admissible": False,
     }
-    assert row["capability"]["observed_operation"] == "textDocument/hover"
-    assert row["capability"]["authority"] == "producer-claimed"
+    assert capability["observed_operation"] == "textDocument/hover"
+    assert capability["authority"] == "producer-claimed"
     assert row["claims"] == []
-    assert row["accounting"]["received"] == row["accounting"]["retained"] == 0
+    assert (
+        assert_object(row["accounting"])["received"]
+        == assert_object(row["accounting"])["retained"]
+        == 0
+    )
     assert row["negative_evidence_admissible"] is False
     assert packet["negative_evidence_admissible"] is False
     return row
 
 
 def assert_hover_presentation(
-    packet: dict[str, object],
-    presentation: dict[str, object],
-    capture: dict[str, object],
+    packet: Mapping[str, object],
+    presentation: Mapping[str, object],
+    capture: Mapping[str, object],
 ) -> None:
     """Check the transported context, including its independent qualifications."""
     row = assert_hover_capture(packet, capture)
     assert validate_evidence_presentation(packet, presentation)["valid"] is True
+    details = [
+        assert_object(context["details"])
+        for context in assert_records(presentation["source_context"])
+    ]
     (context,) = [
-        context["details"]["relationship_observation"]
-        for context in presentation["source_context"]
-        if context["details"].get("relationship_observation", {}).get("producer")
+        assert_object(item["relationship_observation"])
+        for item in details
+        if assert_object(item.get("relationship_observation", {})).get("producer")
         == capture["producer"]
     ]
     for field in ("capability", "freshness", "scope", "capture_identity"):
         assert context[field] == row[field]
     if presentation["format"] == "text":
         contents = json.dumps(
-            row["capability"]["hover_observation"]["contents"],
+            assert_object(assert_object(row["capability"])["hover_observation"])[
+                "contents"
+            ],
             ensure_ascii=False,
             sort_keys=True,
             separators=(",", ":"),
         )
-        assert contents in presentation["text"]
+        assert contents in assert_text(presentation["text"])
 
 
 def semantic_dependency_fields(observation: dict[str, object]) -> dict[str, object]:

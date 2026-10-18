@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
+from contract_assertions import assert_records, assert_text
+
 from hashmarks.cli import main
 from hashmarks.codemap import CodeMap
 
@@ -14,7 +19,7 @@ def test_cache_ownership_maps_module_cache_and_unproven_invalidation(
         codemap.index.sync()
         result = codemap.ownership.cache_findings()
     assert result["schema"] == "hashmarks.cache-ownership.v1"
-    owner = next(x for x in result["owners"] if x["owner"] == "CACHE")
+    owner = next(x for x in assert_records(result["owners"]) if x["owner"] == "CACHE")
     assert owner["scope"] == "module"
     assert owner["mutable"] is True
     assert owner["invalidation"] == "not-proven"
@@ -28,7 +33,7 @@ def test_cache_ownership_maps_lru_cache_as_decorator_managed(tmp_path: Path) -> 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         result = codemap.ownership.cache_findings()
-    owner = next(x for x in result["owners"] if x["owner"] == "value")
+    owner = next(x for x in assert_records(result["owners"]) if x["owner"] == "value")
     assert owner["kind"] == "decorator:lru_cache"
     assert owner["invalidation"] == "decorator-managed"
     assert owner["confidence"] == "high"
@@ -51,11 +56,11 @@ def test_cache_ownership_composes_with_import_identity_risk(tmp_path: Path) -> N
         result = codemap.ownership.cache_findings()
     owner = next(
         x
-        for x in result["owners"]
+        for x in assert_records(result["owners"])
         if x["path"] == "pkg/helper.py" and x["owner"] == "CACHE"
     )
     assert owner["import_identity_risk"] is True
-    assert "duplicate module identity" in owner["reason"]
+    assert "duplicate module identity" in assert_text(owner["reason"])
 
 
 def test_cache_ownership_does_not_invent_ordinary_module_state(tmp_path: Path) -> None:
@@ -63,10 +68,12 @@ def test_cache_ownership_does_not_invent_ordinary_module_state(tmp_path: Path) -
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         result = codemap.ownership.cache_findings()
-    assert result["owners"] == []
+    assert assert_records(result["owners"]) == []
 
 
-def test_cli_cache_ownership(tmp_path: Path, capsys: pytest.Capsys) -> None:
+def test_cli_cache_ownership(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     (tmp_path / "state.py").write_text("CACHE = {}\n", encoding="utf-8")
     assert main(["map", "sync", "--workspace", str(tmp_path)]) == 0
     capsys.readouterr()

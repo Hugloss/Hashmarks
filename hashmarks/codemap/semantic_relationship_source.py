@@ -34,23 +34,6 @@ def uri_member(uri: object, workspace: Path) -> str | None:
     return normalize_relative_path(relative.as_posix(), allow_root=False)
 
 
-def validated_position(value: object) -> dict[str, int]:
-    if not isinstance(value, Mapping) or set(value) != {"line", "character"}:
-        raise ValueError("relationship position requires line and character")
-    if any(type(value[key]) is not int or not 0 <= value[key] < 2**31 for key in value):
-        raise ValueError("relationship positions must be nonnegative LSP integers")
-    return dict(value)
-
-
-def validated_range(value: object) -> dict[str, Any]:
-    if not isinstance(value, Mapping) or set(value) != {"start", "end"}:
-        raise ValueError("relationship range requires start and end")
-    start, end = validated_position(value["start"]), validated_position(value["end"])
-    if (start["line"], start["character"]) > (end["line"], end["character"]):
-        raise ValueError("relationship range is reversed")
-    return {"start": start, "end": end}
-
-
 def character_offset(text: str, units: int, encoding: str) -> int | None:
     total = 0
     for index, character in enumerate(text):

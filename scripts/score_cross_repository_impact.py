@@ -174,7 +174,7 @@ def _freeze_task(base: Path, task: dict) -> tuple[dict, float]:
                 encoding="utf-8",
             )
         started = time.perf_counter()
-        packet = codemap.task_change_impact(str(task["query"]), [changed])
+        packet = codemap.changes.task_impact(str(task["query"]), [changed])
         impact_ms = (time.perf_counter() - started) * 1000.0
     return {
         "id": task["id"],

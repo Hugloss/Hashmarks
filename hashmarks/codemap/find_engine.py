@@ -21,7 +21,6 @@ if TYPE_CHECKING:
 
     from .decision_session import DecisionScope
     from .native_evidence import RepositoryNativeEvidence
-    from .repository_source import RepositorySource
 
 
 @dataclass(frozen=True, slots=True)
@@ -154,9 +153,8 @@ def _find_claim_fields(
 class RepositorySearch(TaskRetrievalMixin, RetrievalDiagnosticsMixin):
     """Own candidate retrieval, deterministic ranking and retrieval reuse."""
 
-    def __init__(
-        self, source: RepositorySource, native: RepositoryNativeEvidence
-    ) -> None:
+    def __init__(self, native: RepositoryNativeEvidence) -> None:
+        source = native.source
         self.source = source
         self.native = native
         self.files = source.files

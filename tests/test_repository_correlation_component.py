@@ -40,7 +40,7 @@ def test_correlation_rejects_old_member_equivalence_after_edit(
     member.write_text("VALUE = 1\n")
     index.sync()
     source = _source(index)
-    correlation = RepositoryCorrelation(source, RepositoryBindings(source))
+    correlation = RepositoryCorrelation(RepositoryBindings(source))
     observation, _ = source.member("owner.py")
     original_revision = observation["member_revision"]
     claim = _bundle(
@@ -68,7 +68,7 @@ def test_correlation_preserves_same_named_symbol_ambiguity(
         (index.workspace / f"{name}.py").write_text("def duplicate(): pass\n")
     index.sync()
     source = _source(index)
-    correlation = RepositoryCorrelation(source, RepositoryBindings(source))
+    correlation = RepositoryCorrelation(RepositoryBindings(source))
     packet = correlation.observe(
         _bundle({"anchor_id": "symbol", "symbol": "duplicate"}),
         include_relationships=False,

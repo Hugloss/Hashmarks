@@ -31,7 +31,7 @@ def packet_all(
     source: Path, repo: Path, tasks: list[dict]
 ) -> tuple[dict[str, dict], float]:
     task_json = json.dumps(tasks, separators=(",", ":"))
-    code = """import json,sys,time\nfrom pathlib import Path\nfrom hashmarks.codemap import CodeMap\nr=Path(sys.argv[1]); tasks=json.loads(sys.argv[2]); out={}\nt=time.perf_counter()\nwith CodeMap(r) as c:\n c.sync()\n for row in tasks: out[row['id']]=c.task_decision_packet(row['query'],token_budget=512)\nprint(json.dumps({'wall_ms':(time.perf_counter()-t)*1000,'packets':out},sort_keys=True))\n"""
+    code = """import json,sys,time\nfrom pathlib import Path\nfrom hashmarks.codemap import CodeMap\nr=Path(sys.argv[1]); tasks=json.loads(sys.argv[2]); out={}\nt=time.perf_counter()\nwith CodeMap(r) as c:\n c.index.sync()\n for row in tasks: out[row['id']]=c.tasks.decision_packet(row['query'],token_budget=512)\nprint(json.dumps({'wall_ms':(time.perf_counter()-t)*1000,'packets':out},sort_keys=True))\n"""
     env = dict(os.environ)
     env["PYTHONPATH"] = str(source)
     p = subprocess.run(

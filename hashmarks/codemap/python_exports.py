@@ -171,6 +171,21 @@ def python_class_node(tree: ast.Module, qualname: str) -> ast.ClassDef | None:
     return selected
 
 
+def python_class_member_binding(
+    node: ast.ClassDef, name: str
+) -> tuple[str, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef | None]:
+    """Expose the same ordered binding rule inside one declared class scope."""
+    binding = _export_binding(ast.Module(body=node.body, type_ignores=[]), name)
+    return binding.kind, binding.declaration
+
+
+def python_function_body_binds(
+    node: ast.FunctionDef | ast.AsyncFunctionDef, name: str
+) -> bool:
+    """Observe writes in the body separately from formal argument bindings."""
+    return any(_writes_name(statement, name) for statement in node.body)
+
+
 def python_import_target(node: ast.ImportFrom, name: str) -> str:
     """One spelling for indexed and qualified relative import evidence."""
     prefix = "." * node.level + (node.module or "")

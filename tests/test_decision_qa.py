@@ -1,3 +1,5 @@
+from contract_assertions import assert_array, assert_object
+
 from scripts.agent_evaluation.decision_qa import (
     evaluate_decision_packet,
     packet_consistency,
@@ -51,7 +53,9 @@ def test_consistency_accepts_shared_multi_role_evidence() -> None:
 
 def test_consistency_detects_false_role_safety_claim() -> None:
     packet = _packet(safe=True)
-    packet["work_context"]["items"] = packet["work_context"]["items"][:2]
+    assert_object(packet["work_context"])["items"] = assert_array(
+        assert_object(packet["work_context"])["items"]
+    )[:2]
     result = packet_consistency(packet)
     assert result["consistent"] is False
     assert "context-safety-role-coverage-mismatch" in result["issues"]

@@ -163,7 +163,7 @@ def test_post_change_reports_semantic_freshness_without_comparing_claim_sets(
         codemap.index.sync()
         codemap.native.import_scip(_index(tmp_path))
         previous = codemap.tasks.evidence(_TASK)
-        noop: Any = codemap.task_post_change_delta(
+        noop: Any = codemap.changes.task_delta(
             _TASK, ["src/engine.py"], previous_evidence=previous
         )
         assert noop["semantic_relationships"]["changed"] is False
@@ -172,7 +172,7 @@ def test_post_change_reports_semantic_freshness_without_comparing_claim_sets(
             "def normalize_widget(value: str) -> str:\n    return value.strip().lower()\n",
             encoding="utf-8",
         )
-        delta: Any = codemap.task_post_change_delta(
+        delta: Any = codemap.changes.task_delta(
             _TASK, ["src/engine.py"], previous_evidence=previous
         )
     evidence: Any = delta["semantic_relationships"]
@@ -210,7 +210,7 @@ def test_post_change_zero_scip_observation_becomes_unavailable_not_absent(
             "def normalize_widget(value: str) -> str:\n    return value.strip().lower()\n",
             encoding="utf-8",
         )
-        delta = codemap.task_post_change_delta(
+        delta = codemap.changes.task_delta(
             _TASK, ["src/engine.py"], previous_evidence=previous
         )
     assert "semantic_relationships" in delta

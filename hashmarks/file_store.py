@@ -11,6 +11,7 @@ from .file_metadata_codec import (
     MetadataCodecError,
     decode_overflow_metadata,
     encode_metadata_fields,
+    validate_metadata_fields,
 )
 from .paths import canonical_host_path, sqlite_identity_exclusions
 from .sqlite_boundary import configure_sqlite_connection, sqlite_transaction
@@ -120,15 +121,19 @@ class FileDigestStore:
         if len(row) != 8:
             raise MetadataCodecError("invalid persisted file-digest row shape")
         device, inode, size, mtime_ns, ctime_ns, executable, overflow, digest = row
-        if overflow is None:
-            return (device, inode, size, mtime_ns, ctime_ns, executable, digest)  # type: ignore[return-value]
-        metadata = decode_overflow_metadata(overflow)
+        if not isinstance(executable, int) or not isinstance(digest, str):
+            raise MetadataCodecError("invalid persisted executable/digest fields")
+        metadata = (
+            validate_metadata_fields((device, inode, size, mtime_ns, ctime_ns))
+            if overflow is None
+            else decode_overflow_metadata(overflow)
+        )
         device, inode, size, mtime_ns, ctime_ns = metadata
-        if device < 0 or inode < 0 or size < 0:
+        if overflow is not None and (device < 0 or inode < 0 or size < 0):
             raise MetadataCodecError(
                 "persisted device, inode, and size must be non-negative"
             )
-        return (device, inode, size, mtime_ns, ctime_ns, executable, digest)  # type: ignore[return-value]
+        return device, inode, size, mtime_ns, ctime_ns, executable, digest
 
     def _discard_corrupt_row(self, workspace: str, relpath: str) -> None:
         self._db.execute(

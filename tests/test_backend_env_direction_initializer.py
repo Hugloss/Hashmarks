@@ -18,7 +18,7 @@ def _observe(repo: Path, *, source: str) -> dict:
     (repo / PATH).write_text(source, encoding="utf-8")
     with CodeMap(repo) as cm:
         cm.index.sync()
-        return cm.discover_repository_declarations(
+        return cm.declarations.discover(
             [StaticPythonBackendDeclarations(paths=(PATH,))]
         )
 
@@ -177,16 +177,14 @@ def test_source_mutation_changes_direct_initializer_correspondence(
     provider = StaticPythonBackendDeclarations(paths=(PATH,))
     with CodeMap(tmp_path) as cm:
         cm.index.sync()
-        before = cm.discover_repository_declarations([provider])
+        before = cm.declarations.discover([provider])
         source.write_text(
             "import os\nclass Settings(BaseSettings):\n"
             "    key: str = os.getenv('TWO')\n",
             encoding="utf-8",
         )
         cm.index.sync([PATH])
-        after = cm.discover_repository_declarations(
-            [provider], previous_observation=before
-        )
+        after = cm.declarations.discover([provider], previous_observation=before)
     first = _value(_groups(before, "python-model-class-syntax")[0])["fields"][0]
     second = _value(_groups(after, "python-model-class-syntax")[0])["fields"][0]
     assert (
@@ -206,14 +204,14 @@ def test_explicit_opt_in_observation_modes_still_independent(tmp_path: Path) -> 
     )
     with CodeMap(tmp_path) as cm:
         cm.index.sync()
-        model = cm.discover_repository_declarations(
+        model = cm.declarations.discover(
             [
                 StaticPythonBackendDeclarations(
                     paths=(PATH,), include_environment_reads=False
                 )
             ]
         )
-        env = cm.discover_repository_declarations(
+        env = cm.declarations.discover(
             [StaticPythonBackendDeclarations(paths=(PATH,), include_model_fields=False)]
         )
     assert len(_groups(model, "python-model-class-syntax")) == 1

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
-from typing import Any, cast
 
 import pytest
+from contract_assertions import assert_object, assert_records
 
 from hashmarks.codemap import ChangeImpactOptions, CodeMap
 from hashmarks.python_ast_cache import read_python_ast
@@ -16,7 +16,7 @@ from scripts.repository_evaluation.backend_transport import capture_cli
 def _observe(root: Path, *, start: int = 2, end: int = 2) -> dict[str, object]:
     with CodeMap(root) as codemap:
         codemap.index.sync()
-        packet = codemap.task_change_impact(
+        packet = codemap.changes.task_impact(
             "Inspect reported changes in service.py",
             ["service.py"],
             options=ChangeImpactOptions(
@@ -25,7 +25,9 @@ def _observe(root: Path, *, start: int = 2, end: int = 2) -> dict[str, object]:
                 ]
             ),
         )
-    return cast("dict[str, Any]", packet)["changed_line_evidence"]["observations"][0]
+    return assert_records(
+        assert_object(packet["changed_line_evidence"])["observations"]
+    )[0]
 
 
 def test_async_context_calls_and_exception_syntax_are_source_facts(
@@ -43,18 +45,18 @@ def test_async_context_calls_and_exception_syntax_are_source_facts(
         "            session.rollback()\n"
     )
     row = _observe(tmp_path, start=5, end=5)
-    boundary = row["function_boundary_syntax"]
+    boundary = assert_object(row["function_boundary_syntax"])
     assert boundary["authority"] == "direct-static-syntax-only"
     assert boundary["runtime_boundary_kind"] == "not-established"
     assert boundary["task_ownership"] == "not-established"
     assert boundary["callee_resolution"] == "not-established"
     assert boundary["execution_order"] == "not-established"
     assert boundary["negative_evidence_admissible"] is False
-    function = boundary["observations"][0]
+    function = assert_records(boundary["observations"])[0]
     assert function["subject"] == "service.py::process"
     assert function["state"] == "source-index-bound"
     assert function["declaration_syntax"] == "async"
-    sites = function["sites"]
+    sites = assert_records(function["sites"])
     assert [
         (site["line"], site["callee_identifier_syntax"])
         for site in sites
@@ -89,13 +91,16 @@ def test_context_identifier_and_async_iterator_remain_literal_syntax(
         "        async for message in self.connection.notifies():\n"
         "            self.queue.put_nowait(message)\n"
     )
-    boundary = _observe(tmp_path)["function_boundary_syntax"]
-    sites = boundary["observations"][0]["sites"]
+    boundary = assert_object(_observe(tmp_path)["function_boundary_syntax"])
+    sites = assert_records(assert_records(boundary["observations"])[0]["sites"])
     context = next(site for site in sites if site["syntax_kind"] == "async-with")
-    assert context["context_expressions"][0]["context_identifier_syntax"] == (
-        "self.listener_lock"
+    assert assert_records(context["context_expressions"])[0][
+        "context_identifier_syntax"
+    ] == ("self.listener_lock")
+    assert (
+        assert_records(context["context_expressions"])[0]["callee_identifier_syntax"]
+        is None
     )
-    assert context["context_expressions"][0]["callee_identifier_syntax"] is None
     iterator = next(site for site in sites if site["syntax_kind"] == "async-for")
     assert iterator["callee_identifier_syntax"] == "self.connection.notifies"
     assert iterator["target_identifier_syntax"] == "message"
@@ -111,15 +116,19 @@ def test_nested_changed_function_owns_its_sites_independently(tmp_path: Path) ->
         "    async with create_task_group() as group:\n"
         "        group.start_soon(stop_subscriber)\n"
     )
-    boundary = _observe(tmp_path, start=3, end=3)["function_boundary_syntax"]
-    observed = {row["subject"]: row for row in boundary["observations"]}
+    boundary = assert_object(
+        _observe(tmp_path, start=3, end=3)["function_boundary_syntax"]
+    )
+    observed = {row["subject"]: row for row in assert_records(boundary["observations"])}
     assert any(
         site.get("callee_identifier_syntax") == "sub.stop"
-        for site in observed["service.py::stop.stop_subscriber"]["sites"]
+        for site in assert_records(
+            observed["service.py::stop.stop_subscriber"]["sites"]
+        )
     )
     assert all(
         site.get("callee_identifier_syntax") != "sub.stop"
-        for site in observed["service.py::stop"]["sites"]
+        for site in assert_records(observed["service.py::stop"]["sites"])
     )
 
 
@@ -134,10 +143,10 @@ def test_nested_scopes_and_complex_receivers_do_not_gain_resolution(
         "    acquire().commit()\n"
     )
     row = _observe(tmp_path, start=5, end=5)
-    boundary = row["function_boundary_syntax"]
-    function = boundary["observations"][0]
+    boundary = assert_object(row["function_boundary_syntax"])
+    function = assert_records(boundary["observations"])[0]
     assert function["declaration_syntax"] == "sync"
-    sites = function["sites"]
+    sites = assert_records(function["sites"])
     assert all(site["line"] == 5 for site in sites)
     commit = next(
         site for site in sites if site.get("callee_member_syntax") == "commit"
@@ -179,13 +188,13 @@ def test_reported_multiline_call_and_cli_formats_retain_qualified_syntax(
         boundary = packet["changed_line_evidence"]["observations"][0][
             "function_boundary_syntax"
         ]
-        observed = boundary["observations"][0]
+        observed = assert_records(boundary["observations"])[0]
         assert observed["truncation"] == "truncated"
         assert boundary["runtime_boundary_kind"] == "not-established"
         assert boundary["negative_evidence_admissible"] is False
         assert {
             site["syntax_kind"]
-            for site in observed["sites"]
+            for site in assert_records(observed["sites"])
             if site.get("callee_identifier_syntax") == "changed"
         } == {"await", "call"}
 
@@ -197,16 +206,17 @@ def test_bounded_sites_keep_reported_line_without_claiming_completeness(
         "def process():\n"
         + "".join(f"    calls.site_{index}()\n" for index in range(50))
     )
-    function = _observe(tmp_path, start=51, end=51)["function_boundary_syntax"][
-        "observations"
-    ][0]
+    boundary = assert_object(
+        _observe(tmp_path, start=51, end=51)["function_boundary_syntax"]
+    )
+    function = assert_records(boundary["observations"])[0]
     assert function["observed_site_count"] == 50
-    assert len(function["sites"]) == 32
+    assert len(assert_records(function["sites"])) == 32
     assert function["omitted_site_count"] == 18
     assert function["truncation"] == "truncated"
     assert any(
         site["callee_identifier_syntax"] == "calls.site_49"
-        for site in function["sites"]
+        for site in assert_records(function["sites"])
     )
 
 
@@ -225,25 +235,28 @@ def test_file_backed_body_and_decorator_share_cached_tree(
             raise AssertionError("file-backed observation reparsed cached source")
 
         monkeypatch.setattr(ast, "parse", forbidden_parse)
-        packet = cast(
-            "dict[str, object]",
-            codemap.task_change_impact(
-                "Inspect service.py",
-                ["service.py"],
-                options=ChangeImpactOptions(
-                    changed_line_spans=[
-                        {"path": "service.py", "start_line": 1, "end_line": 3}
-                    ]
-                ),
+        packet = codemap.changes.task_impact(
+            "Inspect service.py",
+            ["service.py"],
+            options=ChangeImpactOptions(
+                changed_line_spans=[
+                    {"path": "service.py", "start_line": 1, "end_line": 3}
+                ]
             ),
         )
-    row = packet["changed_line_evidence"]["observations"][0]
+    row = assert_records(
+        assert_object(packet["changed_line_evidence"])["observations"]
+    )[0]
     assert (
-        row["function_boundary_syntax"]["observations"][0]["declaration_syntax"]
+        assert_records(assert_object(row["function_boundary_syntax"])["observations"])[
+            0
+        ]["declaration_syntax"]
         == "async"
     )
     assert (
-        row["decorator_associations"]["associations"][0]["subject"]
+        assert_records(assert_object(row["decorator_associations"])["associations"])[0][
+            "subject"
+        ]
         == "service.py::process"
     )
 

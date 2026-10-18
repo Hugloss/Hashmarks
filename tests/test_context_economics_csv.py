@@ -3,9 +3,9 @@ from __future__ import annotations
 import csv
 import json
 from pathlib import Path
-from typing import Any
 
 import pytest
+from contract_assertions import assert_array, assert_object, assert_records
 
 from scripts.agent_evaluation.context_economics_csv import INPUT_SCHEMA, main
 
@@ -122,8 +122,9 @@ def test_context_economics_csv_rejects_duplicate_condition_rows(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     report = _report()
-    duplicate = dict(report["repositories"][0]["lanes"]["native"]["tasks"][0])
-    report["repositories"][0]["lanes"]["native"]["tasks"].append(duplicate)
+    lanes = assert_object(assert_records(report["repositories"])[0]["lanes"])
+    tasks = assert_array(assert_object(lanes["native"])["tasks"])
+    tasks.append(dict(assert_object(tasks[0])))
     with pytest.raises(ValueError, match="duplicate economics row"):
         _run(tmp_path, monkeypatch, report)
 
@@ -132,7 +133,19 @@ def test_context_economics_csv_rejects_duplicate_raw_run_identity(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     report = _report()
-    duplicate = dict(report["repositories"][0]["lanes"]["native"]["raw_runs"][0])
-    report["repositories"][0]["lanes"]["native"]["raw_runs"].append(duplicate)
+    lanes = assert_object(assert_records(report["repositories"])[0]["lanes"])
+    runs = assert_array(assert_object(lanes["native"])["raw_runs"])
+    runs.append(dict(assert_object(runs[0])))
     with pytest.raises(ValueError, match="duplicate raw run task_id"):
         _run(tmp_path, monkeypatch, report)
+
+
+@pytest.mark.parametrize("counter", ["input_tokens", "total_tokens"])
+def test_context_economics_csv_rejects_boolean_measurement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, counter: str
+) -> None:
+    lane = _lane(1000, 100)
+    task = assert_records(lane["tasks"])[0]
+    assert_object(task["usage"])[counter] = True
+    with pytest.raises(ValueError, match="measurements must be numeric"):
+        _run(tmp_path, monkeypatch, _report(native=lane))

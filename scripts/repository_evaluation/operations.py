@@ -31,20 +31,20 @@ def _declarations(codemap: CodeMap, inputs: dict[str, Any]) -> dict[str, object]
     if provider_name not in providers:
         raise ValueError("evaluation declaration provider must be backend or interface")
     provider = providers[provider_name](**settings)
-    return codemap.discover_repository_declarations([provider])
+    return codemap.declarations.discover([provider])
 
 
 def _change_impact(codemap: CodeMap, inputs: dict[str, Any]) -> dict[str, object]:
     settings = dict(inputs)
     options = ChangeImpactOptions(**settings.pop("options", {}))
-    return codemap.task_change_impact(**settings, options=options)
+    return codemap.changes.task_impact(**settings, options=options)
 
 
 def _intelligence_query(codemap: CodeMap, inputs: dict[str, Any]) -> dict[str, object]:
     settings = dict(inputs)
     surface, task = settings.pop("surface_name"), settings.pop("task")
     paths = settings.pop("changed_paths", None) or ()
-    return codemap.repository_intelligence_query(
+    return codemap.views.query(
         surface, task, paths, options=RepositoryIntelligenceQueryOptions(**settings)
     )
 
@@ -79,12 +79,15 @@ def observe_case(codemap: CodeMap, case: Mapping[str, object]) -> dict[str, obje
         "correlate_evidence": lambda: codemap.correlation.observe(**inputs),
         "repository_declarations": lambda: _declarations(codemap, inputs),
         "change_impact": lambda: _change_impact(codemap, inputs),
-        "post_change": lambda: codemap.task_post_change_delta(**inputs),
-        "dependency_codemap": lambda: codemap.dependency_codemap(**inputs),
+        "post_change": lambda: codemap.changes.task_delta(**inputs),
+        "dependency_codemap": lambda: codemap.dependencies.codemap(**inputs),
         "repository_intelligence_query": lambda: _intelligence_query(codemap, inputs),
     }
     if operation not in operations:
         raise ValueError(f"unsupported repository evaluation operation: {operation}")
     if not isinstance(case.get("inputs"), dict):
         raise ValueError("observer evaluation case requires an inputs object")
-    return operations[operation]()
+    result = operations[operation]()
+    if not isinstance(result, dict):
+        raise ValueError("observer evaluation operation must return an object")
+    return dict(result)

@@ -9,7 +9,9 @@ import subprocess
 import sys
 import time
 import tomllib
+from collections.abc import Callable
 from pathlib import Path
+from typing import TypeVar
 
 from hashmarks._command_output import log_command_output
 from hashmarks.codemap import CodeMap
@@ -17,6 +19,7 @@ from hashmarks.codemap import CodeMap
 logger = logging.getLogger(__name__)
 
 SCHEMA = "fastidentity.metrics.v1"
+_T = TypeVar("_T")
 
 
 def _run_json(argv: list[str], *, cwd: Path) -> dict:
@@ -40,7 +43,7 @@ def _run_json(argv: list[str], *, cwd: Path) -> dict:
         ) from exc
 
 
-def _timed(fn: Callable[[], object]) -> Callable[[], object]:
+def _timed(fn: Callable[[], _T]) -> tuple[_T, float]:
     started = time.perf_counter()
     value = fn()
     return value, time.perf_counter() - started
@@ -61,7 +64,7 @@ def _codemap_probe(root: Path) -> dict:
                 "Identity impact", token_budget=1200, limit=10
             )
         )
-        stats = codemap.status()
+        stats = codemap.views.status()
     return {
         "seconds": {
             "sync": first_s,

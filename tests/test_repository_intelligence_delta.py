@@ -9,6 +9,10 @@ import pytest
 from contract_assertions import assert_array, assert_object, assert_records, assert_text
 
 from hashmarks import CodeMap
+from hashmarks.codemap.diagnostic_observation import (
+    diagnostic_observation_delta,
+    external_diagnostic_observation,
+)
 from hashmarks.codemap.repository_delta import (
     RepositoryDeltaMixin,
     RepositoryGenerationBinding,
@@ -57,7 +61,7 @@ def test_snapshot_contains_path_symbols_dependencies_and_repository_evidence(
     _source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        snapshot = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
+        snapshot = codemap.changes.snapshot(task, ["src/owner.py"])
     assert snapshot["schema"] == "hashmarks.repository-intelligence-snapshot.v1"
     paths = assert_object(snapshot["paths"])
     owner = assert_object(paths["src/owner.py"])
@@ -75,13 +79,13 @@ def test_repository_delta_is_smaller_and_exactly_reconstructs_current_snapshot(
     source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        previous = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
+        previous = codemap.changes.snapshot(task, ["src/owner.py"])
         source.write_text("def widget(): return 'new'\n", encoding="utf-8")
         codemap.index.sync(["src/owner.py"])
-        delta = codemap.repository_intelligence_delta(
+        delta = codemap.changes.delta(
             task, ["src/owner.py"], previous_snapshot=previous
         )
-        current = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
+        current = codemap.changes.snapshot(task, ["src/owner.py"])
 
     assert delta["schema"] == "hashmarks.repository-intelligence-delta.v1"
     assert delta["storage"] == "derived-not-persisted"
@@ -117,15 +121,15 @@ def test_repository_delta_reports_dependency_change(tmp_path: Path) -> None:
     task = "change route widget behavior and verify route test"
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        previous = codemap.repository_intelligence_snapshot(task, ["src/route.py"])
+        previous = codemap.changes.snapshot(task, ["src/route.py"])
         route.write_text(
             "from src.b import widget\ndef route(): return widget()\n", encoding="utf-8"
         )
         codemap.index.sync(["src/route.py"])
-        delta = codemap.repository_intelligence_delta(
+        delta = codemap.changes.delta(
             task, ["src/route.py"], previous_snapshot=previous
         )
-        current = codemap.repository_intelligence_snapshot(task, ["src/route.py"])
+        current = codemap.changes.snapshot(task, ["src/route.py"])
     assert _apply(previous, delta) == current
     assert any(
         row.get("target") == "src.b.widget"
@@ -157,15 +161,13 @@ def test_repository_delta_does_not_promote_name_similarity_to_move_identity(
     task = "change widget and verify widget test"
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        previous = codemap.repository_intelligence_snapshot(
-            task, ["src/left.py", "src/right.py"]
-        )
+        previous = codemap.changes.snapshot(task, ["src/left.py", "src/right.py"])
         left.write_text("", encoding="utf-8")
         right.write_text(
             "def helper(): return 2\ndef widget(): return 1\n", encoding="utf-8"
         )
         codemap.index.sync(["src/left.py", "src/right.py"])
-        delta = codemap.repository_intelligence_delta(
+        delta = codemap.changes.delta(
             task, ["src/left.py", "src/right.py"], previous_snapshot=previous
         )
     assert any(
@@ -199,21 +201,19 @@ def test_repository_delta_rejects_foreign_repository_other_task_and_wrong_schema
     _source_b, _ = _repo(b)
     with CodeMap(a) as ca:
         ca.index.sync()
-        previous = ca.repository_intelligence_snapshot(task, ["src/owner.py"])
+        previous = ca.changes.snapshot(task, ["src/owner.py"])
     with CodeMap(b) as cb:
         cb.index.sync()
         with pytest.raises(ValueError, match="repository-mismatch"):
-            cb.repository_intelligence_delta(
-                task, ["src/owner.py"], previous_snapshot=previous
-            )
+            cb.changes.delta(task, ["src/owner.py"], previous_snapshot=previous)
     with CodeMap(a) as ca:
         ca.index.sync()
         with pytest.raises(ValueError, match="task-mismatch"):
-            ca.repository_intelligence_delta(
+            ca.changes.delta(
                 "different task", ["src/owner.py"], previous_snapshot=previous
             )
         with pytest.raises(ValueError, match="repository-intelligence-snapshot"):
-            ca.repository_intelligence_delta(
+            ca.changes.delta(
                 task, ["src/owner.py"], previous_snapshot={"schema": "wrong"}
             )
 
@@ -222,13 +222,13 @@ def test_repository_delta_rejects_tampered_retained_snapshot(tmp_path: Path) -> 
     _source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        previous = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
+        previous = codemap.changes.snapshot(task, ["src/owner.py"])
         assert_object(assert_object(previous["paths"])["src/owner.py"])[
             "member_state"
         ] = "known-absent"
 
         with pytest.raises(ValueError, match="snapshot identity mismatch"):
-            codemap.repository_intelligence_delta(
+            codemap.changes.delta(
                 task,
                 ["src/owner.py"],
                 previous_snapshot=previous,
@@ -279,7 +279,7 @@ def test_repository_snapshot_exposes_observer_and_explicit_completeness(
     _source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        snapshot = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
+        snapshot = codemap.changes.snapshot(task, ["src/owner.py"])
 
     assert assert_text(assert_object(snapshot["observer"])["identity"]).startswith(
         "sha256:"
@@ -298,7 +298,7 @@ def test_repository_delta_keeps_observer_change_separate_from_repository_change(
     _source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        previous = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
+        previous = codemap.changes.snapshot(task, ["src/owner.py"])
         previous["observer"] = {
             **assert_object(previous["observer"]),
             "identity": "sha256:older-observer",
@@ -311,7 +311,7 @@ def test_repository_delta_keeps_observer_change_separate_from_repository_change(
                 if key != "snapshot_identity"
             },
         )
-        delta = codemap.repository_intelligence_delta(
+        delta = codemap.changes.delta(
             task, ["src/owner.py"], previous_snapshot=previous
         )
 
@@ -326,8 +326,8 @@ def test_snapshot_relationship_rows_have_stable_identity_and_provenance(
     _source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        first = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
-        second = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
+        first = codemap.changes.snapshot(task, ["src/owner.py"])
+        second = codemap.changes.snapshot(task, ["src/owner.py"])
 
     first_owner = assert_object(assert_object(first["paths"])["src/owner.py"])
     second_owner = assert_object(assert_object(second["paths"])["src/owner.py"])
@@ -351,7 +351,7 @@ def test_relationship_identity_does_not_turn_provenance_into_semantic_delta(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        previous = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
+        previous = codemap.changes.snapshot(task, ["src/owner.py"])
         dependencies = assert_records(
             assert_object(assert_object(previous["paths"])["src/owner.py"])[
                 "dependencies"
@@ -370,7 +370,7 @@ def test_relationship_identity_does_not_turn_provenance_into_semantic_delta(
                 if key != "snapshot_identity"
             },
         )
-        delta = codemap.repository_intelligence_delta(
+        delta = codemap.changes.delta(
             task, ["src/owner.py"], previous_snapshot=previous
         )
 
@@ -379,7 +379,7 @@ def test_relationship_identity_does_not_turn_provenance_into_semantic_delta(
 
 
 def test_diagnostic_delta_uses_identity_not_aggregate_count() -> None:
-    before = RepositoryDeltaMixin.external_diagnostic_observation(
+    before = external_diagnostic_observation(
         producer="pyright",
         binding=RepositoryGenerationBinding("sha256:repo-a", 41),
         outcome="fail",
@@ -388,7 +388,7 @@ def test_diagnostic_delta_uses_identity_not_aggregate_count() -> None:
             {"tool": "pyright", "rule": "b", "path": "src/b.py", "message": "stable"},
         ],
     )
-    after = RepositoryDeltaMixin.external_diagnostic_observation(
+    after = external_diagnostic_observation(
         producer="pyright",
         binding=RepositoryGenerationBinding("sha256:repo-b", 42),
         outcome="fail",
@@ -398,9 +398,7 @@ def test_diagnostic_delta_uses_identity_not_aggregate_count() -> None:
         ],
     )
 
-    delta = RepositoryDeltaMixin.diagnostic_observation_delta(
-        before, after, changed_paths=["src/a.py"]
-    )
+    delta = diagnostic_observation_delta(before, after, changed_paths=["src/a.py"])
 
     diagnostics = assert_object(delta["diagnostics"])
     assert diagnostics["before_count"] == 2
@@ -412,7 +410,7 @@ def test_diagnostic_delta_uses_identity_not_aggregate_count() -> None:
 
 
 def test_blocked_environment_is_observation_not_repository_failure() -> None:
-    observation = RepositoryDeltaMixin.external_diagnostic_observation(
+    observation = external_diagnostic_observation(
         producer="pytest",
         binding=RepositoryGenerationBinding("sha256:repo", 42),
         outcome="blocked-permission",
@@ -428,7 +426,7 @@ def test_blocked_environment_is_observation_not_repository_failure() -> None:
 def test_external_diagnostic_observation_normalizes_scope_and_rejects_unknown_outcome() -> (
     None
 ):
-    observation = RepositoryDeltaMixin.external_diagnostic_observation(
+    observation = external_diagnostic_observation(
         producer="ruff",
         binding=RepositoryGenerationBinding("sha256:repo", 3),
         outcome="pass",
@@ -437,7 +435,7 @@ def test_external_diagnostic_observation_normalizes_scope_and_rejects_unknown_ou
     )
     assert observation["scope_paths"] == ["a.py", "b.py"]
     with pytest.raises(ValueError, match="unsupported external observation outcome"):
-        RepositoryDeltaMixin.external_diagnostic_observation(
+        external_diagnostic_observation(
             producer="ruff",
             binding=RepositoryGenerationBinding("sha256:repo", 3),
             outcome="retry",
@@ -450,13 +448,13 @@ def test_external_diagnostic_identity_is_order_stable() -> None:
         {"tool": "ruff", "rule": "A", "path": "a.py", "message": "a"},
         {"tool": "ruff", "rule": "B", "path": "b.py", "message": "b"},
     ]
-    first = RepositoryDeltaMixin.external_diagnostic_observation(
+    first = external_diagnostic_observation(
         producer="ruff",
         binding=RepositoryGenerationBinding("sha256:repo", 1),
         outcome="fail",
         diagnostics=rows,
     )
-    second = RepositoryDeltaMixin.external_diagnostic_observation(
+    second = external_diagnostic_observation(
         producer="ruff",
         binding=RepositoryGenerationBinding("sha256:repo", 1),
         outcome="fail",
@@ -467,7 +465,7 @@ def test_external_diagnostic_identity_is_order_stable() -> None:
 
 
 def test_external_observation_stales_on_relevant_edit() -> None:
-    observation = RepositoryDeltaMixin.external_diagnostic_observation(
+    observation = external_diagnostic_observation(
         producer="pytest",
         binding=RepositoryGenerationBinding("sha256:repo-a", 41),
         outcome="pass",
@@ -488,7 +486,7 @@ def test_external_observation_stales_on_relevant_edit() -> None:
 
 
 def test_unrelated_edit_does_not_destroy_scoped_observation_freshness() -> None:
-    observation = RepositoryDeltaMixin.external_diagnostic_observation(
+    observation = external_diagnostic_observation(
         producer="pytest",
         binding=RepositoryGenerationBinding("sha256:repo-a", 41),
         outcome="pass",
@@ -513,7 +511,7 @@ def test_unrelated_edit_does_not_destroy_scoped_observation_freshness() -> None:
 
 
 def test_unscoped_external_observation_fails_closed_after_repository_change() -> None:
-    observation = RepositoryDeltaMixin.external_diagnostic_observation(
+    observation = external_diagnostic_observation(
         producer="ruff",
         binding=RepositoryGenerationBinding("sha256:repo-a", 41),
         outcome="pass",
@@ -534,7 +532,7 @@ def test_unscoped_external_observation_fails_closed_after_repository_change() ->
 
 
 def test_dependency_scope_invalidates_observation_without_direct_path_overlap() -> None:
-    observation = RepositoryDeltaMixin.external_diagnostic_observation(
+    observation = external_diagnostic_observation(
         producer="pytest",
         binding=RepositoryGenerationBinding("sha256:repo-a", 41),
         outcome="pass",
@@ -560,7 +558,7 @@ def test_verification_relationship_has_provider_identity_without_sufficiency_cla
     _source, _task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        relationship = codemap.verification_relationship_evidence(
+        relationship = codemap.verification.relationship_evidence(
             relation_kind="behavioral-verification",
             source="src/owner.py",
             target="tests/test_owner.py",
@@ -582,14 +580,14 @@ def test_verification_relationship_identity_is_deterministic_and_policy_free(
     _source, _task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        first = codemap.verification_relationship_evidence(
+        first = codemap.verification.relationship_evidence(
             source="src/owner.py",
             target="tests/test_owner.py",
             classification="direct",
             relation_kind="behavioral-verification",
             provenance="static-reference",
         )
-        second = codemap.verification_relationship_evidence(
+        second = codemap.verification.relationship_evidence(
             source="src/owner.py",
             target="tests/test_owner.py",
             classification="direct",
@@ -607,7 +605,7 @@ def test_verification_relationship_rejects_blank_relation_kind(tmp_path: Path) -
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         with pytest.raises(ValueError, match="relationship kind must be nonblank"):
-            codemap.verification_relationship_evidence(
+            codemap.verification.relationship_evidence(
                 source="src/owner.py",
                 target="tests/test_owner.py",
                 classification="direct",
@@ -623,7 +621,7 @@ def test_verification_relationship_rejects_policy_classifications(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         with pytest.raises(ValueError, match="unsupported verification relationship"):
-            codemap.verification_relationship_evidence(
+            codemap.verification.relationship_evidence(
                 relation_kind="behavioral-verification",
                 source="src/owner.py",
                 target="tests/test_owner.py",

@@ -3,21 +3,36 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 import pytest
+from contract_assertions import (
+    assert_array,
+    assert_integer,
+    assert_object,
+    assert_records,
+    assert_text,
+)
 
 from hashmarks.codemap import CodeMap
 from hashmarks.evidence_context import describe_evidence_binding_reacquisition
 
 
 def requery(cm: CodeMap, reference: dict[str, object]) -> dict[str, object]:
-    query = reference["requery"]
+    query = assert_object(reference["requery"])
+    binding_id = assert_text(query["binding_id"])
+    include_relationships = query["include_relationships"]
+    assert isinstance(include_relationships, bool)
     return cm.bindings.observe(
-        [{"binding_id": query["binding_id"], "evidence": query["evidence"]}],
-        dependency_paths={query["binding_id"]: query["dependency_paths"]},
-        include_relationships=query["include_relationships"],
-        relationship_limit_per_path=query["relationship_limit_per_path"],
+        [{"binding_id": binding_id, "evidence": assert_records(query["evidence"])}],
+        dependency_paths={
+            binding_id: [
+                assert_text(path) for path in assert_array(query["dependency_paths"])
+            ]
+        },
+        include_relationships=include_relationships,
+        relationship_limit_per_path=assert_integer(
+            query["relationship_limit_per_path"]
+        ),
     )
 
 
@@ -51,7 +66,7 @@ def test_reacquisition_preserves_definition_but_observes_current_change(
     (root / "other.py").write_text("def other():\n    return 2\n")
     with CodeMap(root, state_dir=state) as cm:
         cm.index.sync()
-        before: Any = cm.bindings.observe(
+        before = cm.bindings.observe(
             [
                 {
                     "binding_id": "consumer:source",
@@ -78,35 +93,47 @@ def test_reacquisition_preserves_definition_but_observes_current_change(
     with CodeMap(root, state_dir=state) as cm:
         cm.index.sync()
         after = requery(cm, reference)
-        delta: Any = cm.bindings.delta(before, after)
-    old, new = before["bindings"][0], after["bindings"][0]
+        delta = cm.bindings.delta(before, after)
+    old, new = (
+        assert_records(before["bindings"])[0],
+        assert_records(after["bindings"])[0],
+    )
     assert old["binding_definition_identity"] == new["binding_definition_identity"]
     assert old["binding_observation_identity"] != new["binding_observation_identity"]
     assert after["bindings_identity"] != before["bindings_identity"]
-    assert new["relationships"]["bounds"]["limit_per_path"] == 1
-    assert new["relationships"]["completeness"] == "bounded-not-claimed"
-    assert [row["path"] for row in new["dependencies"]] == ["dependency.py"]
-    (changed,) = delta["bindings"]["changed"]
+    assert (
+        assert_object(assert_object(new["relationships"])["bounds"])["limit_per_path"]
+        == 1
+    )
+    assert assert_object(new["relationships"])["completeness"] == "bounded-not-claimed"
+    assert [row["path"] for row in assert_records(new["dependencies"])] == [
+        "dependency.py"
+    ]
+    (changed,) = assert_records(assert_object(delta["bindings"])["changed"])
     if change == "dependency":
         assert old["evidence"] == new["evidence"]
-        assert changed["direct_evidence"]["state"] == "preserved"
-        assert changed["declared_dependencies"]["state"] == "affected"
+        assert assert_object(changed["direct_evidence"])["state"] == "preserved"
+        assert assert_object(changed["declared_dependencies"])["state"] == "affected"
     elif change == "member":
         assert (
-            old["evidence"][0]["span_identity"] == new["evidence"][0]["span_identity"]
+            assert_records(old["evidence"])[0]["span_identity"]
+            == assert_records(new["evidence"])[0]["span_identity"]
         )
-        assert changed["direct_evidence"]["state"] == "changed"
+        assert assert_object(changed["direct_evidence"])["state"] == "changed"
     elif change == "span":
         assert (
-            old["evidence"][0]["span_identity"] != new["evidence"][0]["span_identity"]
+            assert_records(old["evidence"])[0]["span_identity"]
+            != assert_records(new["evidence"])[0]["span_identity"]
         )
     elif change == "relationship":
         assert (
-            old["relationships"]["relationships"]
-            != new["relationships"]["relationships"]
+            assert_object(old["relationships"])["relationships"]
+            != assert_object(new["relationships"])["relationships"]
         )
     elif change == "delete":
-        assert all(row["state"] == "known-absent" for row in new["evidence"])
+        assert all(
+            row["state"] == "known-absent" for row in assert_records(new["evidence"])
+        )
     with CodeMap(root, state_dir=tmp_path / "fresh") as cm:
         cm.index.sync()
         rebuilt = requery(cm, reference)

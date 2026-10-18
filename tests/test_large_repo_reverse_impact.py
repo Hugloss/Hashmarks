@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from contract_assertions import assert_array, assert_object, assert_records
+
 from hashmarks.codemap import CodeMap
 
 if TYPE_CHECKING:
@@ -25,8 +27,8 @@ def test_python_reverse_fast_path_preserves_longest_module_resolution(
         codemap.index.sync()
         package = codemap.relationships.affected("src/pkg/__init__.py", max_depth=2)
         module = codemap.relationships.affected("src/pkg/sub.py", max_depth=2)
-    assert "src/consumer.py" not in package["affected_files"]
-    assert "src/consumer.py" in module["affected_files"]
+    assert "src/consumer.py" not in assert_array(package["affected_files"])
+    assert "src/consumer.py" in assert_array(module["affected_files"])
 
 
 def test_exact_path_change_impact_does_not_reinterpret_path_as_free_text(
@@ -47,10 +49,10 @@ def test_exact_path_change_impact_does_not_reinterpret_path_as_free_text(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        impact = codemap.change_impact(
+        impact = codemap.changes.impact(
             "src/m050000.py", max_depth=2, limit_per_surface=6
         )
-    rows = impact["surfaces"]["implementation"]
+    rows = assert_records(assert_object(impact["surfaces"])["implementation"])
     reverse = {row["path"] for row in rows if row["provenance"] == "reverse-file-graph"}
     adjacency = {
         row["path"] for row in rows if row["provenance"] == "task-graph-adjacency"

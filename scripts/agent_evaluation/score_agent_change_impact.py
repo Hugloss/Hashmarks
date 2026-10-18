@@ -6,6 +6,7 @@ import json
 import logging
 import time
 from collections import Counter, defaultdict
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -64,7 +65,7 @@ def _append_probe(path: Path, task_id: str) -> None:
     path.write_text(original.rstrip("\n") + "\n" + marker + "\n", encoding="utf-8")
 
 
-def _task_candidate_path(packet: dict[str, object]) -> str:
+def _task_candidate_path(packet: Mapping[str, object]) -> str:
     ownership = packet.get("ownership")
     if not isinstance(ownership, dict):
         return ""
@@ -105,7 +106,7 @@ def _freeze_public_evidence(
                 raise ValueError(f"PUBLIC task {task_id} has no repository candidate")
             _append_probe(repo / edit_path, task_id)
             impact_started = time.perf_counter()
-            impact = codemap.task_change_impact(query, [edit_path])
+            impact = codemap.changes.task_impact(query, [edit_path])
             impact_ms = (time.perf_counter() - impact_started) * 1000.0
             frozen.append(
                 {

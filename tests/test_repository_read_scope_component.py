@@ -14,7 +14,7 @@ from hashmarks.codemap.indexing_lifecycle import RepositoryIndex
 def _reads(index: RepositoryIndex) -> DecisionScope:
     (index.workspace / "owner.py").write_text("def owner(): pass\n")
     index.sync()
-    return DecisionScope(index, index.store, index._observation_source)
+    return DecisionScope(index)
 
 
 def test_nested_scopes_share_the_same_read_binding(index: RepositoryIndex) -> None:

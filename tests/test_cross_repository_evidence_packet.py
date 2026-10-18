@@ -5,12 +5,10 @@ import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+
+from contract_assertions import assert_object, assert_records
 
 from hashmarks.codemap import CodeMap, CodeMapService, CodeMapServiceClient
-
-if TYPE_CHECKING:
-    pass
 
 
 def _repo(
@@ -54,31 +52,31 @@ def test_cross_repository_packet_preserves_provenance_and_freshness(
     backend, web, mobile = _repo(tmp_path, fake_maven_wrapper)
     with CodeMap(tmp_path) as codemap:
         _prepare(codemap)
-        packet = codemap.cross_repository_evidence_packet(
+        packet = codemap.cross_repository.packet(
             "Update backend API implementation",
             ["backend/src/Api.java"],
         )
-        repeated = codemap.cross_repository_evidence_packet(
+        repeated = codemap.cross_repository.packet(
             "Update backend API implementation",
             ["backend/src/Api.java"],
         )
 
     assert packet == repeated
     assert packet["schema"] == "hashmarks.cross-repository-evidence-packet.v1"
-    assert packet["source"]["project_identities"] == [backend]
+    assert assert_object(packet["source"])["project_identities"] == [backend]
     assert packet["dependents"] == [
         {"project_identity": web, "depth": 1},
         {"project_identity": mobile, "depth": 2},
     ]
-    assert {row["producer"] for row in packet["relationships"]} == {
+    assert {row["producer"] for row in assert_records(packet["relationships"])} == {
         "declared-project-links"
     }
-    assert packet["freshness"]["state"] == "dependent"
-    assert packet["freshness"]["dependency_state"] == "current"
-    assert packet["freshness"]["dependencies"] == [
+    assert assert_object(packet["freshness"])["state"] == "dependent"
+    assert assert_object(packet["freshness"])["dependency_state"] == "current"
+    assert assert_object(packet["freshness"])["dependencies"] == [
         {"producer": "declared-project-links", "state": "current"}
     ]
-    unresolved_scopes = {row["scope"] for row in packet["unresolved"]}
+    unresolved_scopes = {row["scope"] for row in assert_records(packet["unresolved"])}
     assert unresolved_scopes == {"ownership", "verification"}
     assert packet["storage"] == "derived-not-persisted"
     assert packet["execution_effect"] == "none"
@@ -90,14 +88,17 @@ def test_shared_input_packet_reports_all_affected_projects(
     backend, web, mobile = _repo(tmp_path, fake_maven_wrapper)
     with CodeMap(tmp_path) as codemap:
         _prepare(codemap)
-        packet = codemap.cross_repository_evidence_packet(
+        packet = codemap.cross_repository.packet(
             "Update shared API contract",
             ["contracts/api.yaml"],
         )
 
-    projects = {row["project_identity"]: row["depth"] for row in packet["dependents"]}
+    projects = {
+        row["project_identity"]: row["depth"]
+        for row in assert_records(packet["dependents"])
+    }
     assert projects == {backend: 1, web: 1, mobile: 2}
-    assert packet["freshness"]["dependency_state"] == "current"
+    assert assert_object(packet["freshness"])["dependency_state"] == "current"
 
 
 def test_no_cross_repository_evidence_is_explicitly_unresolved(tmp_path: Path) -> None:
@@ -105,15 +106,13 @@ def test_no_cross_repository_evidence_is_explicitly_unresolved(tmp_path: Path) -
     (tmp_path / "src" / "owner.py").write_text("VALUE = 1\n")
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        packet = codemap.cross_repository_evidence_packet(
-            "Update owner value", ["src/owner.py"]
-        )
+        packet = codemap.cross_repository.packet("Update owner value", ["src/owner.py"])
 
-    reasons = {row["reason"] for row in packet["unresolved"]}
+    reasons = {row["reason"] for row in assert_records(packet["unresolved"])}
     assert "no-cross-repository-impact-supported" in reasons
-    assert packet["source"]["project_identities"] == []
+    assert assert_object(packet["source"])["project_identities"] == []
     assert packet["dependents"] == []
-    assert packet["freshness"]["state"] == "unknown"
+    assert assert_object(packet["freshness"])["state"] == "unknown"
 
 
 def test_cross_repository_packet_service_roundtrip(

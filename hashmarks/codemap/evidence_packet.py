@@ -16,7 +16,7 @@ from hashmarks.operation_contract import (
 )
 
 from .configuration_evidence import ConfigurationEvidenceMixin
-from .decision_session import ReadScopeOwner, decision_scoped
+from .decision_session import ReadScopeOwner, decision_scoped, reconcile_decision
 from .evidence_decision_packet import (
     TASK_DECISION_DEFAULT_OPTIONS,
     DecisionPacketMixin,
@@ -1146,6 +1146,7 @@ class TaskEvidencePacketMixin(
     @overload
     def evidence(
         self,
+        /,
         task: str,
         *,
         limit: int = TASK_EVIDENCE_DEFAULT_OPTIONS.limit,
@@ -1158,6 +1159,7 @@ class TaskEvidencePacketMixin(
     @overload
     def evidence(
         self,
+        /,
         task: str,
         *,
         limit: int = TASK_EVIDENCE_DEFAULT_OPTIONS.limit,
@@ -1170,6 +1172,7 @@ class TaskEvidencePacketMixin(
     @overload
     def evidence(
         self,
+        /,
         task: str,
         *,
         limit: int = TASK_EVIDENCE_DEFAULT_OPTIONS.limit,
@@ -1179,8 +1182,10 @@ class TaskEvidencePacketMixin(
         result_mode: str,
     ) -> TaskEvidencePacket | InitialTaskEvidenceEnvelope: ...
 
+    @reconcile_decision
     def evidence(
         self,
+        /,
         task: str,
         *,
         limit: int = TASK_EVIDENCE_DEFAULT_OPTIONS.limit,

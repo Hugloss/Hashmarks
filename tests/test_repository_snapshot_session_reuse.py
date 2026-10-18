@@ -50,23 +50,21 @@ def test_identical_snapshot_requests_reuse_one_generation_bound_composition(
         codemap.index.sync()
         calls = {"brief": 0, "freshness": 0}
         monkeypatch.setattr(
-            codemap,
-            "change_intelligence_brief",
-            _counted(calls, "brief", codemap.change_intelligence_brief),
+            codemap.changes,
+            "brief",
+            _counted(calls, "brief", codemap.changes.brief),
         )
         monkeypatch.setattr(
-            codemap,
-            "evidence_freshness_map",
-            _counted(calls, "freshness", codemap.evidence_freshness_map),
+            codemap.changes,
+            "freshness_map",
+            _counted(calls, "freshness", codemap.changes.freshness_map),
         )
 
         with codemap.reads.session():
-            first = codemap.repository_intelligence_snapshot(task, paths)
-            profile = codemap.repository_intelligence_profile(
-                task, paths, profile="compact"
-            )
-            economics = codemap.intelligence_economics_receipt(task, paths)
-            repeated = codemap.repository_intelligence_snapshot(task, paths)
+            first = codemap.changes.snapshot(task, paths)
+            profile = codemap.views.profile(task, paths, profile="compact")
+            economics = codemap.economics.receipt(task, paths)
+            repeated = codemap.changes.snapshot(task, paths)
             stats = codemap.reads.stats()
 
         assert repeated == first
@@ -85,23 +83,19 @@ def test_snapshot_reuse_key_includes_task_paths_and_all_bounds(
         codemap.index.sync()
         calls = {"brief": 0}
         monkeypatch.setattr(
-            codemap,
-            "change_intelligence_brief",
-            _counted(calls, "brief", codemap.change_intelligence_brief),
+            codemap.changes,
+            "brief",
+            _counted(calls, "brief", codemap.changes.brief),
         )
         with codemap.reads.session():
-            codemap.repository_intelligence_snapshot(task, paths)
-            codemap.repository_intelligence_snapshot(task + " safely", paths)
-            codemap.repository_intelligence_snapshot(
-                task, [*paths, "tests/test_owner.py"]
-            )
-            codemap.repository_intelligence_snapshot(task, paths, limit=21)
-            codemap.repository_intelligence_snapshot(task, paths, per_role=4)
-            codemap.repository_intelligence_snapshot(
-                task, paths, impact_limit_per_surface=5
-            )
-            codemap.repository_intelligence_snapshot(task, paths, max_depth=4)
-            codemap.repository_intelligence_snapshot(task, paths)
+            codemap.changes.snapshot(task, paths)
+            codemap.changes.snapshot(task + " safely", paths)
+            codemap.changes.snapshot(task, [*paths, "tests/test_owner.py"])
+            codemap.changes.snapshot(task, paths, limit=21)
+            codemap.changes.snapshot(task, paths, per_role=4)
+            codemap.changes.snapshot(task, paths, impact_limit_per_surface=5)
+            codemap.changes.snapshot(task, paths, max_depth=4)
+            codemap.changes.snapshot(task, paths)
             stats = codemap.reads.stats()
 
         assert calls["brief"] == 7
@@ -114,11 +108,11 @@ def test_cached_snapshot_isolated_from_caller_mutation(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         with codemap.reads.session():
-            first = codemap.repository_intelligence_snapshot(task, paths)
+            first = codemap.changes.snapshot(task, paths)
             identity = first["snapshot_identity"]
             first["repository"] = {"mutated": True}
             assert_object(first["paths"]).clear()
-            second = codemap.repository_intelligence_snapshot(task, paths)
+            second = codemap.changes.snapshot(task, paths)
 
         assert second["snapshot_identity"] == identity
         assert second["repository"] != {"mutated": True}
@@ -133,14 +127,14 @@ def test_snapshot_cache_is_not_reused_across_decision_sessions(
         codemap.index.sync()
         calls = {"brief": 0}
         monkeypatch.setattr(
-            codemap,
-            "change_intelligence_brief",
-            _counted(calls, "brief", codemap.change_intelligence_brief),
+            codemap.changes,
+            "brief",
+            _counted(calls, "brief", codemap.changes.brief),
         )
         with codemap.reads.session():
-            codemap.repository_intelligence_snapshot(task, paths)
-            codemap.repository_intelligence_snapshot(task, paths)
+            codemap.changes.snapshot(task, paths)
+            codemap.changes.snapshot(task, paths)
         with codemap.reads.session():
-            codemap.repository_intelligence_snapshot(task, paths)
+            codemap.changes.snapshot(task, paths)
 
         assert calls["brief"] == 2

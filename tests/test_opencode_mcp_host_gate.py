@@ -8,6 +8,7 @@ from argparse import Namespace
 from pathlib import Path
 
 import pytest
+from contract_assertions import assert_object, assert_records
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "host_qualification" / "opencode_mcp_host_gate.py"
@@ -292,7 +293,13 @@ def test_selection_scenarios_are_neutral_and_keep_negative_controls(
     try:
         matches = surface.find("apply_discount")["results"]
         assert (
-            len({row["path"] for row in matches if row["name"] == "apply_discount"})
+            len(
+                {
+                    row["path"]
+                    for row in assert_records(matches)
+                    if row["name"] == "apply_discount"
+                }
+            )
             >= 5
         )
         expected = (
@@ -342,7 +349,7 @@ def test_selection_result_keeps_native_calls_and_validates_hashmarks() -> None:
             [_tool_event("hashmarks_task_evidence", {"unexpected": True})], scenario
         )
     failed = _tool_event("hashmarks_task_evidence", {})
-    failed["part"]["state"]["status"] = "error"
+    assert_object(assert_object(failed["part"])["state"])["status"] = "error"
     with pytest.raises(host_gate.HostGateError, match="did not complete"):
         host_gate._selection_result([failed], scenario)
 

@@ -99,6 +99,30 @@ def test_candidate_disclosure_never_promotes_stale_test_revision(
             assert row.get("test_revision") == hash_file(path, domain=FILE_DOMAIN).hash
 
 
+def test_method_subject_and_parent_references_keep_separate_source_bases(
+    tmp_path: Path,
+) -> None:
+    _repository(tmp_path)
+    with CodeMap(tmp_path) as repository:
+        repository.index.sync()
+        packet = repository.tasks.evidence("Inspect update_metadata behavior")
+    original = assert_object(
+        next(
+            row
+            for row in packet["verification"]["relevance"]["candidates"]
+            if row["path"] == "tests/test_original.py"
+        )
+    )
+    bases = assert_records(original.get("source_candidate_basis"))
+    assert {"Worker", "Worker.update_metadata"} <= {
+        basis["symbol"] for basis in bases if basis["path"] == "alpha.py"
+    }
+    assert all(basis["ownership_authority"] is False for basis in bases)
+    assert original["verification_selection_authority"] is False
+    assert original["edit_relationship"] == "unestablished"
+    assert packet["ownership"]["owner"] is None
+
+
 def test_source_identifier_scout_keeps_late_test_body_without_claiming_reference(
     tmp_path: Path,
 ) -> None:

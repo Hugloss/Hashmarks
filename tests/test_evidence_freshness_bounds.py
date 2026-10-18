@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from contract_assertions import assert_array
 
 from hashmarks.codemap import CodeMap
 
@@ -79,7 +80,7 @@ def test_project_provenance_traversal_is_bounded_and_ordered(
         {"project": "D", "depth": 1},
         {"project": "C", "depth": 2},
     ]
-    assert full["edges"][0] == {
+    assert assert_array(full["edges"])[0] == {
         "from": "A",
         "to": "B",
         "kind": "import",

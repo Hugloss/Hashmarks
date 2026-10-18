@@ -9,6 +9,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import TypedDict
 
 from hashmarks._command_output import log_command_output
 from hashmarks.codemap import (
@@ -16,6 +17,7 @@ from hashmarks.codemap import (
 )
 
 from .metrics_agent_economics import (
+    FileCost,
     _file_cost,
 )
 from .metrics_blind_worker_ab import (
@@ -35,6 +37,33 @@ _R = _S.parent.parent
 SCHEMA = "hashmarks.selective-scout-economics.v1"
 FAMILY = "hashmarks-selective-scout-a"
 PACKET = "hashmarks.selective-scout-input.v1"
+
+
+class ScoutInput(TypedDict):
+    id: object
+    query: object
+    first_path: str
+    ambiguous: bool
+    alternatives: list[dict[str, object]]
+
+
+class ScoutSelection(ScoutInput):
+    spawn: bool
+
+
+class ScoutPolicyTask(TypedDict):
+    id: object
+    spawned: bool
+    ambiguous: bool
+    initial_target: str
+    final_target: str
+    correct_final: bool
+    scout_evidence: FileCost
+
+
+class ScoutPolicyReport(TypedDict):
+    summary: dict[str, int | float]
+    tasks: list[ScoutPolicyTask]
 
 
 def run_scout(packet: Path, output: Path) -> None:
@@ -69,21 +98,29 @@ def run_scout(packet: Path, output: Path) -> None:
     )
 
 
-def _base_rows(workspace: Path, public: list[dict], limit: int) -> list[dict]:
-    rows = []
+def _base_rows(workspace: Path, public: list[dict], limit: int) -> list[ScoutInput]:
+    rows: list[ScoutInput] = []
     with CodeMap(workspace) as codemap:
         codemap.index.sync()
         for task in public:
             entry = codemap.tasks.entry_points(task["query"], limit=limit)
-            recommended = [
-                row for row in entry.get("recommended", []) if isinstance(row, dict)
-            ]
+            raw_recommended = entry.get("recommended", [])
+            if not isinstance(raw_recommended, list):
+                raise ValueError("task entry recommendations must be an array")
+            recommended = [row for row in raw_recommended if isinstance(row, dict)]
             ambiguity = entry.get("ambiguity", {})
             ambiguous = (
                 bool(ambiguity.get("ambiguous"))
                 if isinstance(ambiguity, dict)
                 else False
             )
+            alternatives = (
+                ambiguity.get("alternatives", [])
+                if ambiguous and isinstance(ambiguity, dict)
+                else []
+            )
+            if not isinstance(alternatives, list):
+                raise ValueError("scout alternatives must be an array")
             rows.append(
                 {
                     "id": task["id"],
@@ -92,16 +129,14 @@ def _base_rows(workspace: Path, public: list[dict], limit: int) -> list[dict]:
                     if recommended
                     else "",
                     "ambiguous": ambiguous,
-                    "alternatives": list(ambiguity.get("alternatives", []))
-                    if ambiguous and isinstance(ambiguity, dict)
-                    else [],
+                    "alternatives": alternatives,
                 }
             )
     return rows
 
 
 def _run_scout_process(
-    root: Path, name: str, policy: str, rows: list[dict]
+    root: Path, name: str, policy: str, rows: list[dict[str, object]]
 ) -> tuple[dict, float]:
     if not rows:
         return {}, 0.0
@@ -141,11 +176,11 @@ def _policy_report(
     root: Path,
     name: str,
     workspace: Path,
-    base: list[dict],
+    base: list[ScoutInput],
     expected: dict[str, set],
     policy: str,
-) -> dict:
-    selected = [
+) -> ScoutPolicyReport:
+    selected: list[ScoutSelection] = [
         {
             **row,
             "spawn": policy == "always-scout"
@@ -162,7 +197,7 @@ def _policy_report(
         if row["spawn"]
     ]
     scout_output, elapsed = _run_scout_process(root, name, policy, scout_rows)
-    rows = []
+    rows: list[ScoutPolicyTask] = []
     for row in selected:
         target = str(
             scout_output.get(str(row["id"]), {}).get("target") or row["first_path"]

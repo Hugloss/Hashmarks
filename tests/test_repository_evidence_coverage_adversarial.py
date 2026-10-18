@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
+from contract_assertions import assert_object
+
 from hashmarks.client import RepositoryObservation
 from hashmarks.codemap.engine import CodeMap
 from hashmarks.codemap.repository_evidence_bindings import RepositoryBindings
@@ -67,8 +69,8 @@ def _assert_binding_local_precision(coverage: dict[str, object]) -> None:
         "bound_range": "known",
         "reason": "binding-delta-supplied",
     }
-    assert coverage["coverage"]["state"] == "incomplete"
-    assert coverage["coverage"]["outside_classification"] == "unknown"
+    assert assert_object(coverage["coverage"])["state"] == "incomplete"
+    assert assert_object(coverage["coverage"])["outside_classification"] == "unknown"
     assert coverage["binding_impacts"] == [
         {
             "binding_id": "shared:first",
@@ -103,7 +105,7 @@ def test_incomplete_change_set_keeps_exact_precision_binding_local(
         )
 
     _assert_binding_local_precision(coverage)
-    assert coverage["coverage"]["source"] == "caller-asserted"
+    assert assert_object(coverage["coverage"])["source"] == "caller-asserted"
 
 
 def test_incomplete_repository_observation_keeps_same_precision_split(
@@ -131,7 +133,7 @@ def test_incomplete_repository_observation_keeps_same_precision_split(
         )
 
     _assert_binding_local_precision(coverage)
-    assert coverage["coverage"]["source"] == "repository-observer"
+    assert assert_object(coverage["coverage"])["source"] == "repository-observer"
     assert coverage["change_set"] == {
         "source": "repository-observer",
         "state": "dirty",
@@ -167,11 +169,11 @@ def test_coverage_prepares_each_binding_scope_once(tmp_path: Path) -> None:
 
     assert rows.call_count == 1
     assert paths.call_count == len(_bindings())
-    assert coverage["precision"]["bound_range"] == "unknown"
-    assert coverage["classification"]["outside_declared_bindings"] == []
-    assert coverage["classification"]["outside_declared_bindings_candidates"] == [
-        "outside.py"
-    ]
+    assert assert_object(coverage["precision"])["bound_range"] == "unknown"
+    assert assert_object(coverage["classification"])["outside_declared_bindings"] == []
+    assert assert_object(coverage["classification"])[
+        "outside_declared_bindings_candidates"
+    ] == ["outside.py"]
     assert coverage["binding_impacts"] == [
         {"binding_id": "shared:first", "reasons": ["bound-member-precision-unknown"]},
         {"binding_id": "shared:second", "reasons": ["bound-member-precision-unknown"]},

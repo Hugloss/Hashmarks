@@ -38,9 +38,12 @@ def _save(p: Path, o: object) -> None:
 
 
 def _event(state: dict[str, object], kind: str, **kw: object) -> None:
-    state["events"].append(
+    events = state["events"]
+    if not isinstance(events, list):
+        raise ValueError("ledger events must be a list")
+    events.append(
         {
-            "seq": len(state["events"]) + 1,
+            "seq": len(events) + 1,
             "kind": kind,
             "monotonic_ns": time.monotonic_ns(),
             **kw,
@@ -81,13 +84,13 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _record_packet(a: argparse.Namespace, state: dict, repo: Path) -> None:
-    method = "task_decision_packet" if a.cmd == "packet" else "task_decision_brief"
+    method = "decision_packet" if a.cmd == "packet" else "decision_brief"
     code = """import json,sys,time
 from pathlib import Path
 from hashmarks.codemap import CodeMap
 r=Path(sys.argv[1]); q=sys.argv[2]; b=int(sys.argv[3]); t=time.perf_counter()
 with CodeMap(r) as c:
- c.sync(); p=getattr(c,sys.argv[4])(q,token_budget=b)
+ c.index.sync(); p=getattr(c.tasks,sys.argv[4])(q,token_budget=b)
 print(json.dumps({'wall_ms':(time.perf_counter()-t)*1000,'packet':p},sort_keys=True))
 """
     env = dict(os.environ)
@@ -334,7 +337,10 @@ def main() -> None:
         _event(st, "task_received")
         _save(a.state, st)
         return
-    repo = Path(st["repo"])
+    repository = st["repo"]
+    if not isinstance(repository, str):
+        raise ValueError("ledger repo must be a string")
+    repo = Path(repository)
     if a.cmd in {"packet", "brief"}:
         _record_packet(a, st, repo)
         return

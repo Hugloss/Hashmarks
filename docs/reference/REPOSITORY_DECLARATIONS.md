@@ -31,7 +31,11 @@ and validation remain explicitly unestablished or unknown.
 
 Selected backend-source discovery is available through the existing public
 operation with `result_mode="discovery"`. MCP callers supply `groups=[]` and
-`python_backend_paths=["service.py"]`, optionally `include_class_fields=True`.
+`source_selection={"python_backend_paths":["service.py"]}`, optionally including
+`"include_class_fields":true` in that object. Interface selection uses
+`source_selection={"python_interface":{"paths":["routes.py"],"route_objects":["api"]}}`.
+Both surfaces use the same explicit producer-selection translator; source
+selection does not move syntax interpretation or evidence authority into adapters.
 The CLI equivalent is:
 
 ```sh
@@ -379,7 +383,7 @@ These axes are intentionally independent. A source move, source disappearance, p
 
 ## Derivation authority and explanation
 
-`CodeMap.repository_declaration_derivation_authority(observation)` is a pure
+`CodeMap.declarations.derivation_authority(observation)` is a pure
 read-only projection over one already-qualified declaration packet. It returns
 schema `hashmarks.repository-declaration-derivation.v1` and reuses, rather than
 redefines:
@@ -397,7 +401,7 @@ or span evidence that supported it. Its deterministic `derivation_identity`
 binds that existing authority graph; it does not create a new repository
 generation, declaration identity family, evidence store, or provenance graph.
 
-`CodeMap.repository_declaration_explain(observation)` returns schema
+`CodeMap.declarations.explain(observation)` returns schema
 `hashmarks.repository-declaration-explain.v1`. It provides a compact semantic
 summary of group comparison/absence outcomes and declaration counts together
 with the full declaration derivation projection.
@@ -494,7 +498,7 @@ groups = [
 
 with CodeMap(".") as codemap:
     codemap.index.sync()
-    packet = codemap.repository_declarations(groups)
+    packet = codemap.declarations.observe(groups)
 ~~~
 
 The same request-scoped primitive is exposed by the read-only MCP \`repository_declarations\` tool.
@@ -534,7 +538,7 @@ class MyProvider:
 
 with CodeMap(".") as codemap:
     codemap.index.sync()
-    packet = codemap.discover_repository_declarations([MyProvider()])
+    packet = codemap.declarations.discover([MyProvider()])
 ~~~
 
 Discovery is deliberately **explicit composition**, not ambient plugin loading.

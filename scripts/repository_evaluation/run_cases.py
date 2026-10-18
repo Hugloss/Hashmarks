@@ -36,6 +36,14 @@ def _repository_identity(codemap: CodeMap) -> str:
     )
 
 
+def _case_bound(value: object, default: int) -> int:
+    if not value:
+        return default
+    if not isinstance(value, (int, float, str)):
+        raise ValueError("case bounds must be numeric")
+    return int(value)
+
+
 def _case_result(codemap: CodeMap, case: Mapping[str, object]) -> dict[str, Any]:
     operation = str(case.get("operation") or "")
     if operation != "task_action_map":
@@ -46,14 +54,14 @@ def _case_result(codemap: CodeMap, case: Mapping[str, object]) -> dict[str, Any]
             "elapsed_ns": time.perf_counter_ns() - started,
         }
     task = str(case.get("task") or "")
-    limit = int(case.get("limit") or 20)
+    limit = _case_bound(case.get("limit"), 20)
     started = time.perf_counter_ns()
     with codemap.reads.session(diagnostics=True):
         hits = codemap.search.find_task(task, limit=limit)
         action = codemap.tasks.action_map(
             task,
             limit=limit,
-            per_role=int(case.get("per_role") or 3),
+            per_role=_case_bound(case.get("per_role"), 3),
         )
         diagnostics = codemap.reads.diagnostics()
     return {

@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from hashmarks.operation_contract import operation_schema
 from scripts.agent_evaluation import grade_internal_agent_runs as grader
 from scripts.agent_evaluation import internal_agent_ledger as ledger
 
@@ -12,6 +13,48 @@ from scripts.agent_evaluation import internal_agent_ledger as ledger
 def _invoke(monkeypatch: pytest.MonkeyPatch, state: Path, *args: str) -> None:
     monkeypatch.setattr(sys, "argv", ["ledger", "--state", str(state), *args])
     ledger.main()
+
+
+@pytest.mark.parametrize("mode", ["packet", "brief"])
+def test_ledger_observes_real_canonical_components(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "owner.py").write_text("def owner():\n    return 1\n", encoding="utf-8")
+    state = tmp_path / "state.json"
+    _invoke(
+        monkeypatch,
+        state,
+        "init",
+        "--task-id",
+        "one",
+        "--lane",
+        "hashmarks",
+        "--repo",
+        str(repo),
+        "--query",
+        "change owner.py",
+    )
+
+    _invoke(
+        monkeypatch,
+        state,
+        mode,
+        "--source",
+        str(Path(__file__).resolve().parents[1]),
+    )
+
+    packet = json.loads(
+        state.with_suffix("." + mode + ".json").read_text(encoding="utf-8")
+    )
+    assert packet["schema"] == operation_schema("task_decision_" + mode)
+    assert packet["edit"]["path"] == "owner.py"
+    events = json.loads(state.read_text(encoding="utf-8"))["events"]
+    assert [event["kind"] for event in events] == [
+        "task_received",
+        "hashmarks_packet" if mode == "packet" else "hashmarks_brief",
+    ]
 
 
 def test_ledger_native_lifecycle_records_metrics(

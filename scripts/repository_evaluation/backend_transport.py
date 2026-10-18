@@ -77,23 +77,35 @@ def _source_cli_arguments(inputs: dict[str, Any]) -> list[str]:
     return args
 
 
-def _declaration_cli_arguments(inputs: dict[str, Any]) -> list[str]:
+def _declaration_cli_arguments(
+    inputs: dict[str, Any], interface_path: Path | None = None
+) -> list[str]:
     if (
         set(inputs)
-        - {"groups", "result_mode", "python_backend_paths", "include_class_fields"}
+        - {
+            "groups",
+            "result_mode",
+            "python_backend_paths",
+            "include_class_fields",
+            "python_interface",
+        }
         or inputs.get("groups") != []
         or inputs.get("result_mode") != "discovery"
-        or not inputs.get("python_backend_paths")
+        or not (inputs.get("python_backend_paths") or inputs.get("python_interface"))
         or type(inputs.get("include_class_fields", False)) is not bool
     ):
         raise ValueError(
             "backend CLI declaration capture requires selected source discovery"
         )
     args = ["repository-declarations"]
-    for path in inputs["python_backend_paths"]:
+    for path in inputs.get("python_backend_paths") or []:
         args.extend(("--python-backend-path", path))
     if inputs.get("include_class_fields"):
         args.append("--include-class-fields")
+    if inputs.get("python_interface") is not None:
+        if interface_path is None:
+            raise ValueError("interface CLI capture requires its explicit JSON input")
+        args.extend(("--python-interface-json", str(interface_path)))
     return args
 
 
@@ -135,11 +147,20 @@ def _cli_arguments(operation: str, inputs: dict[str, Any]) -> list[str]:
 def capture_cli(
     workspace: Path, state: Path, case: dict[str, Any]
 ) -> list[dict[str, Any]]:
-    if case["operation"] not in _JSON_CLI_OPERATIONS:
+    interface = (
+        case["operation"] == "repository_declarations"
+        and case["inputs"].get("python_interface") is not None
+    )
+    if case["operation"] not in _JSON_CLI_OPERATIONS and not interface:
         return _cli_captures(workspace, state, case)
     with tempfile.TemporaryDirectory(prefix="hashmarks-observation-request-") as raw:
         request = Path(raw) / "input.json"
-        request.write_text(json.dumps(case["inputs"]), encoding="utf-8")
+        request.write_text(
+            json.dumps(
+                case["inputs"]["python_interface"] if interface else case["inputs"]
+            ),
+            encoding="utf-8",
+        )
         return _cli_captures(workspace, state, case, request)
 
 
@@ -150,7 +171,9 @@ def _cli_captures(
     request_path: Path | None = None,
 ) -> list[dict[str, Any]]:
     args = (
-        _cli_arguments(case["operation"], case["inputs"])
+        _declaration_cli_arguments(case["inputs"], request_path)
+        if case["operation"] == "repository_declarations"
+        else _cli_arguments(case["operation"], case["inputs"])
         if request_path is None
         else [
             _JSON_CLI_OPERATIONS[case["operation"]],
@@ -191,6 +214,21 @@ def _cli_captures(
     return captures
 
 
+def _mcp_inputs(case: dict[str, Any]) -> dict[str, Any]:
+    """Translate frozen workflow inputs into the current public request shape."""
+    inputs = dict(case["inputs"])
+    if case["operation"] == "repository_declarations":
+        source_keys = {
+            "python_backend_paths",
+            "include_class_fields",
+            "python_interface",
+        }
+        selection = {key: inputs.pop(key) for key in source_keys if key in inputs}
+        if selection:
+            inputs["source_selection"] = selection
+    return inputs
+
+
 async def _mcp_captures(
     workspace: Path, state: Path, case: dict[str, Any]
 ) -> list[dict[str, Any]]:
@@ -206,13 +244,14 @@ async def _mcp_captures(
         env={**os.environ, "HASHMARKS_NO_UPDATE_CHECK": "1"},
     )
     captures = []
+    inputs = _mcp_inputs(case)
     async with stdio_client(parameters) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
             for presentation in FORMATS:
                 reply = await session.call_tool(
                     tool_contract(case["operation"]).name,
-                    {**case["inputs"], "presentation": presentation},
+                    {**inputs, "presentation": presentation},
                 )
                 if reply.is_error:
                     raise ValueError(f"backend MCP returned an error: {reply.content}")

@@ -5,6 +5,10 @@ import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from hashmarks.codemap import CodeMap
 
 _CAMEL = re.compile(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
 _WORD = re.compile(r"[A-Za-z0-9]+")
@@ -73,7 +77,7 @@ class FieldedBM25Index:
             self._dfs[field] = dict(df)
 
     @classmethod
-    def build(cls, codemap: object) -> FieldedBM25Index:
+    def build(cls, codemap: CodeMap) -> FieldedBM25Index:
         workspace = Path(codemap.workspace)
         paths = sorted(codemap.store.paths())
         symbols = codemap.store.symbols_for_paths(

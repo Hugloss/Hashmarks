@@ -8,8 +8,16 @@ from typing import TYPE_CHECKING, Any, cast
 import pytest
 from contract_assertions import assert_object
 
-from hashmarks import CodeMap, validate_repository_intelligence_evidence
-from hashmarks.codemap.diagnostic_observation import DIAGNOSTIC_ENDPOINT_MAX_BYTES
+from hashmarks import validate_repository_intelligence_evidence
+from hashmarks.codemap.diagnostic_observation import (
+    DIAGNOSTIC_ENDPOINT_MAX_BYTES,
+    diagnostic_observation_delta,
+    external_diagnostic_observation,
+)
+from hashmarks.codemap.diagnostic_source_revision import (
+    diagnostic_source_revision_evidence,
+)
+from hashmarks.codemap.repository_changes import RepositoryChanges
 from hashmarks.codemap.repository_delta import RepositoryGenerationBinding
 from hashmarks.evidence_presentation import present_repository_evidence
 from hashmarks.mcp_surface import HashmarksMcpSurface, McpSurfaceError
@@ -20,7 +28,7 @@ if TYPE_CHECKING:
 
 
 def _observe(rows: object = None) -> dict[str, object]:
-    return CodeMap.external_diagnostic_observation(
+    return external_diagnostic_observation(
         producer="example-test",
         binding=RepositoryGenerationBinding("repo:fixture", 1),
         diagnostics=[{"path": "src.py", "line": 1, "message": "claim"}]
@@ -55,9 +63,9 @@ def test_header_mutations_fail_core_projection_and_public_validation(
     original = _observe()
     malformed = {**original, field: value}
     with pytest.raises(ValueError):
-        CodeMap.diagnostic_observation_delta(original, malformed)
+        diagnostic_observation_delta(original, malformed)
     with pytest.raises(ValueError):
-        CodeMap.diagnostic_source_revision_evidence(malformed, [])
+        diagnostic_source_revision_evidence(malformed, [])
     assert validate_repository_intelligence_evidence(malformed)["valid"] is False
 
 
@@ -88,7 +96,7 @@ def test_exact_duplicates_preserve_occurrences_and_conflicting_metadata_rejects(
 ):
     row = {"path": "src.py", "line": 1, "message": "claim"}
     packet = _observe([row, row])
-    delta = CodeMap.diagnostic_observation_delta(packet, packet)
+    delta = diagnostic_observation_delta(packet, packet)
     facts = assert_object(delta["diagnostics"])
     assert packet["diagnostic_count"] == 2
     assert facts["before_count"] == facts["unchanged_count"] == 1
@@ -108,13 +116,13 @@ def test_input_rows_are_detached_and_unlocated_claims_are_preserved() -> None:
     packet: Any = _observe([row])
     row["metadata"]["sample"].append(2)
     assert packet["diagnostics"][0]["metadata"] == {"sample": [1]}
-    delta: Any = CodeMap.diagnostic_observation_delta(_observe([]), packet)
+    delta: Any = diagnostic_observation_delta(_observe([]), packet)
     assert delta["diagnostics"]["path_locality"]["rows"][0]["locality"] == "unknown"
 
 
 def test_legacy_delta_without_occurrence_counts_remains_readable() -> None:
     packet = _observe()
-    delta: Any = CodeMap.diagnostic_observation_delta(packet, packet)
+    delta: Any = diagnostic_observation_delta(packet, packet)
     del delta["diagnostics"]["occurrence_counts"]
     assert validate_repository_intelligence_evidence(delta)["valid"] is True
 
@@ -122,7 +130,7 @@ def test_legacy_delta_without_occurrence_counts_remains_readable() -> None:
 @pytest.mark.parametrize("count", [False, -1, 0, 257])
 def test_serialized_occurrence_counts_cannot_erase_unique_facts(count: object) -> None:
     packet = _observe()
-    delta: Any = CodeMap.diagnostic_observation_delta(packet, packet)
+    delta: Any = diagnostic_observation_delta(packet, packet)
     delta["diagnostics"]["occurrence_counts"]["after"] = count
     assert validate_repository_intelligence_evidence(delta)["valid"] is False
 
@@ -149,7 +157,7 @@ def test_mcp_cannot_bypass_endpoint_authority_or_row_limits(tmp_path: Path) -> N
 
 def test_current_repository_freshness_never_attests_producer_freshness() -> None:
     packet = _observe()
-    current = CodeMap.external_observation_freshness(
+    current = RepositoryChanges.external_observation_freshness(
         packet, current_repository_identity="repo:fixture", current_generation=1
     )
     assert current["state"] == "current"
@@ -168,7 +176,7 @@ def test_changed_producer_metadata_is_preserved_without_fabricating_code_changes
         [{"path": "src.py", "message": "claim", "producer_time": "earlier"}]
     )
     after = _observe([{"path": "src.py", "message": "claim", "producer_time": "later"}])
-    delta: Any = CodeMap.diagnostic_observation_delta(before, after)
+    delta: Any = diagnostic_observation_delta(before, after)
     facts = delta["diagnostics"]
     assert facts["unchanged_count"] == 1
     assert facts["added"] == facts["removed"] == []
@@ -203,7 +211,7 @@ def test_type_distinct_metadata_is_a_change_and_conflicting_duplicates_reject(
     for rows in ([old, new], [new, old]):
         with pytest.raises(ValueError, match="conflicting diagnostic"):
             _observe(rows)
-    delta: Any = CodeMap.diagnostic_observation_delta(_observe([old]), _observe([new]))
+    delta: Any = diagnostic_observation_delta(_observe([old]), _observe([new]))
     assert len(delta["diagnostics"]["changed_claims"]) == 1
     assert validate_repository_intelligence_evidence(delta)["valid"] is True
 
@@ -213,7 +221,7 @@ def test_json_roundtrip_does_not_invent_a_metadata_change() -> None:
 
     before = _observe([{"path": "src.py", "metadata": {"items": (True, 1, 1.0)}}])
     after = json.loads(json.dumps(before))
-    delta: Any = CodeMap.diagnostic_observation_delta(before, after)
+    delta: Any = diagnostic_observation_delta(before, after)
     assert before == after
     assert delta["diagnostics"]["changed_claims"] == []
 
@@ -231,7 +239,7 @@ def test_retained_delta_endpoint_headers_use_original_admission(
     field: str, value: object
 ) -> None:
     packet = _observe()
-    delta: Any = CodeMap.diagnostic_observation_delta(packet, packet)
+    delta: Any = diagnostic_observation_delta(packet, packet)
     axis = {
         "producer": "producer_context",
         "environment_identity": "producer_context",
@@ -251,7 +259,7 @@ def test_serialized_type_conflict_cannot_bypass_constructor_admission() -> None:
     packet["diagnostic_count"] = 2
     assert validate_repository_intelligence_evidence(packet)["valid"] is False
     with pytest.raises(ValueError, match="conflicting diagnostic"):
-        CodeMap.diagnostic_observation_delta(packet, packet)
+        diagnostic_observation_delta(packet, packet)
 
 
 def test_mcp_retains_type_distinct_metadata_changes_and_rejects_conflicting_rows(
@@ -264,7 +272,7 @@ def test_mcp_retains_type_distinct_metadata_changes_and_rejects_conflicting_rows
         actual: Any = surface.evidence_comparison(
             before, after, result_mode="diagnostics"
         )
-        assert actual == CodeMap.diagnostic_observation_delta(before, after)
+        assert actual == diagnostic_observation_delta(before, after)
         assert len(actual["diagnostics"]["changed_claims"]) == 1
         malformed: Any = deepcopy(before)
         malformed["diagnostics"].extend(after["diagnostics"])

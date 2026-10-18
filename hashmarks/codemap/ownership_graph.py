@@ -78,6 +78,10 @@ class RepositoryOwnership(
         structure: RepositoryStructure,
         search: RepositorySearch,
     ) -> None:
+        if any(
+            owner.reads is not source.reads for owner in (imports, structure, search)
+        ):
+            raise ValueError("Ownership inputs must share one repository read scope")
         self.search = search
         self.source = source
         self.imports = imports

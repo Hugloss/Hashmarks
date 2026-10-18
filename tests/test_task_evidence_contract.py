@@ -60,7 +60,7 @@ def samples(tmp_path_factory: pytest.TempPathFactory) -> _Samples:
             action=codemap.tasks.action_map(_TASK),
             packet=packet,
             initial=codemap.tasks.evidence(_TASK, result_mode="initial"),
-            delta=codemap.task_post_change_delta(
+            delta=codemap.changes.task_delta(
                 _TASK, ["owner.py"], previous_evidence=packet
             ),
         )
@@ -303,9 +303,9 @@ def test_dictionary_input_contract_rejects_read_only_mapping_before_sync(
         generation = codemap.store.generation()
         # Exercise a malformed runtime caller; static consumers use the exact API.
         with pytest.raises(ValueError, match="hashmarks.task-evidence.v5 packet"):
-            _call_with_previous(codemap.task_post_change_delta, proxy)
+            _call_with_previous(codemap.changes.task_delta, proxy)
         assert codemap.store.generation() == generation
-        result = codemap.task_post_change_delta(
+        result = codemap.changes.task_delta(
             _TASK, ["owner.py"], previous_evidence=dict(proxy)
         )
         assert result["change"] == "changed"

@@ -2,6 +2,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from contract_assertions import assert_text
 
 from hashmarks.codemap import CodeMap
 
@@ -97,7 +98,7 @@ def test_explicit_query_scope_pruning_is_segment_aware(tmp_path: Path) -> None:
         assert outline["path"] == rel
         source = codemap.source.read(f"{rel}::adapter")
         assert source["path"] == rel
-        assert "return 4" in source["content"]
+        assert "return 4" in assert_text(source["content"])
 
 
 def test_explicit_query_retires_historical_pruned_dependency_row(

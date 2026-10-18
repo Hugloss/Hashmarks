@@ -12,8 +12,11 @@ from contract_assertions import (
 )
 
 from hashmarks import CodeMap
+from hashmarks.codemap.diagnostic_observation import (
+    diagnostic_observation_delta,
+    external_diagnostic_observation,
+)
 from hashmarks.codemap.repository_delta import (
-    RepositoryDeltaMixin,
     RepositoryGenerationBinding,
 )
 from hashmarks.codemap.repository_source import RepositorySource
@@ -180,7 +183,7 @@ def test_source_observation_rejects_invalid_bounds(
 def _observation(
     rows: list[dict[str, object]], *, collection: str = "fresh-complete"
 ) -> dict[str, object]:
-    return RepositoryDeltaMixin.external_diagnostic_observation(
+    return external_diagnostic_observation(
         producer="pyright",
         binding=RepositoryGenerationBinding(
             repository_identity="repo:fixture", codemap_generation=5
@@ -207,9 +210,7 @@ def _diagnostic(line: int, message: str = "undefined") -> dict[str, object]:
 def test_diagnostic_shift_is_candidate_not_proven_identity() -> None:
     before = _observation([_diagnostic(4)])
     after = _observation([_diagnostic(14)], collection="fresh-partial")
-    delta = RepositoryDeltaMixin.diagnostic_observation_delta(
-        before, after, changed_paths=["example.py"]
-    )
+    delta = diagnostic_observation_delta(before, after, changed_paths=["example.py"])
     relocations = assert_array(
         assert_object(delta["diagnostics"])["possible_relocations"]
     )
@@ -233,7 +234,7 @@ def test_diagnostic_shift_is_candidate_not_proven_identity() -> None:
 def test_diagnostic_ambiguous_shift_is_not_correlated() -> None:
     before = _observation([_diagnostic(4), _diagnostic(5)])
     after = _observation([_diagnostic(14)])
-    delta = RepositoryDeltaMixin.diagnostic_observation_delta(before, after)
+    delta = diagnostic_observation_delta(before, after)
     assert assert_object(delta["diagnostics"])["possible_relocations"] == []
 
 
@@ -408,7 +409,7 @@ def _qualified_observation(
     environment: str | None = "pyright:fixture",
     repository: str = "repo:fixture",
 ) -> dict[str, object]:
-    return RepositoryDeltaMixin.external_diagnostic_observation(
+    return external_diagnostic_observation(
         producer="pyright",
         binding=RepositoryGenerationBinding(repository, 5),
         diagnostics=rows,
@@ -422,7 +423,7 @@ def _qualified_observation(
 def test_diagnostic_qualified_removal_requires_complete_after_collection() -> None:
     before = _qualified_observation([_diagnostic(4)])
     after = _qualified_observation([], outcome="pass")
-    delta = RepositoryDeltaMixin.diagnostic_observation_delta(before, after)
+    delta = diagnostic_observation_delta(before, after)
     proof = assert_object(assert_object(delta["diagnostics"])["qualification"])
     diagnostic_identity = assert_object(assert_array(before["diagnostics"])[0])[
         "identity"
@@ -443,7 +444,7 @@ def test_incomplete_diagnostic_collection_does_not_prove_absence(
 ) -> None:
     before = _qualified_observation([_diagnostic(4)])
     after = _qualified_observation([], collection=collection, outcome="fail")
-    delta = RepositoryDeltaMixin.diagnostic_observation_delta(before, after)
+    delta = diagnostic_observation_delta(before, after)
     proof = assert_object(assert_object(delta["diagnostics"])["qualification"])
     assert len(assert_array(assert_object(delta["diagnostics"])["removed"])) == 1
     assert proof["qualified_removed_identities"] == []
@@ -456,7 +457,7 @@ def test_incomplete_diagnostic_collection_does_not_prove_absence(
 def test_partial_after_collection_can_qualify_newly_seen_diagnostics() -> None:
     before = _qualified_observation([])
     after = _qualified_observation([_diagnostic(4)], collection="fresh-partial")
-    delta = RepositoryDeltaMixin.diagnostic_observation_delta(before, after)
+    delta = diagnostic_observation_delta(before, after)
     proof = assert_object(assert_object(delta["diagnostics"])["qualification"])
     assert proof["qualified_added_identities"] == [
         assert_object(assert_array(after["diagnostics"])[0])["identity"]
@@ -467,7 +468,7 @@ def test_partial_after_collection_can_qualify_newly_seen_diagnostics() -> None:
 def test_partial_before_collection_cannot_prove_new_diagnostic() -> None:
     before = _qualified_observation([], collection="fresh-partial")
     after = _qualified_observation([_diagnostic(4)])
-    delta = RepositoryDeltaMixin.diagnostic_observation_delta(before, after)
+    delta = diagnostic_observation_delta(before, after)
     proof = assert_object(assert_object(delta["diagnostics"])["qualification"])
     assert proof["qualified_added_identities"] == []
     assert proof["unqualified_added_identities"] == [
@@ -490,7 +491,7 @@ def test_changed_producer_context_never_upgrades_diagnostic_absence(
 ) -> None:
     before = _qualified_observation([_diagnostic(4)])
     after = _qualified_observation([], **different_after)
-    delta = RepositoryDeltaMixin.diagnostic_observation_delta(before, after)
+    delta = diagnostic_observation_delta(before, after)
     proof = assert_object(assert_object(delta["diagnostics"])["qualification"])
     assert proof["qualified_removed_identities"] == []
     assert proof["unqualified_removed_identities"] == [
@@ -502,11 +503,9 @@ def test_missing_explicit_producer_scope_cannot_prove_absence() -> None:
     before = _qualified_observation([_diagnostic(4)], scope=())
     after = _qualified_observation([], scope=())
     proof = assert_object(
-        assert_object(
-            RepositoryDeltaMixin.diagnostic_observation_delta(before, after)[
-                "diagnostics"
-            ]
-        )["qualification"]
+        assert_object(diagnostic_observation_delta(before, after)["diagnostics"])[
+            "qualification"
+        ]
     )
     assert proof["qualified_removed_identities"] == []
     assert len(assert_array(proof["unqualified_removed_identities"])) == 1

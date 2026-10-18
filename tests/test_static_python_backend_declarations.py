@@ -27,7 +27,7 @@ def _write(root: Path, source: str, *, path: str = PATH) -> None:
 def _observe(root: Path, provider: StaticPythonBackendDeclarations) -> dict:
     with CodeMap(root) as cm:
         cm.index.sync()
-        return cm.discover_repository_declarations([provider])
+        return cm.declarations.discover([provider])
 
 
 def _groups(packet: dict) -> dict[str, list[dict]]:
@@ -147,14 +147,12 @@ def test_selected_source_revision_edit_changes_identity_without_reinterpreting(
     provider = StaticPythonBackendDeclarations(paths=(PATH,))
     with CodeMap(tmp_path) as cm:
         cm.index.sync()
-        before = cm.discover_repository_declarations([provider])
-        same = cm.discover_repository_declarations([provider])
+        before = cm.declarations.discover([provider])
+        same = cm.declarations.discover([provider])
         assert same["observation_identity"] == before["observation_identity"]
         _write(tmp_path, "import os\nvalue = os.getenv('SECOND')\n")
         cm.index.sync([PATH])
-        after = cm.discover_repository_declarations(
-            [provider], previous_observation=before
-        )
+        after = cm.declarations.discover([provider], previous_observation=before)
     assert before["observation_identity"] != after["observation_identity"]
     assert _value(_groups(after)["python-env-access-syntax"][0])["key"]["value"] == (
         "SECOND"
@@ -197,13 +195,13 @@ def test_invalid_ast_and_bound_excess_fail_closed(tmp_path: Path) -> None:
         with pytest.raises(
             (ValueError, SyntaxError, RepositoryDeclarationProviderError)
         ):
-            cm.discover_repository_declarations([provider])
+            cm.declarations.discover([provider])
     fields = "\n".join(f"    field_{n}: int" for n in range(MAX_MODEL_FIELDS + 1))
     _write(tmp_path, f"class Payload(BaseModel):\n{fields}\n")
     with CodeMap(tmp_path) as cm:
         cm.index.sync()
         with pytest.raises((ValueError, RepositoryDeclarationProviderError)):
-            cm.discover_repository_declarations([provider])
+            cm.declarations.discover([provider])
 
 
 def test_restricted_visibility_cannot_publish_source_syntax(tmp_path: Path) -> None:
@@ -216,7 +214,7 @@ def test_restricted_visibility_cannot_publish_source_syntax(tmp_path: Path) -> N
     with CodeMap(tmp_path) as cm:
         cm.index.sync()
         with pytest.raises(RepositoryDeclarationProviderError):
-            cm.discover_repository_declarations([provider])
+            cm.declarations.discover([provider])
 
 
 def test_provider_has_no_ambient_discovery_without_explicit_selection(
@@ -225,7 +223,7 @@ def test_provider_has_no_ambient_discovery_without_explicit_selection(
     _write(tmp_path, "import os\nsecret = os.getenv('ONLY_IF_SELECTED')\n")
     with CodeMap(tmp_path) as cm:
         cm.index.sync()
-        packet = cast("dict", cm.discover_repository_declarations([]))
+        packet = cast("dict", cm.declarations.discover([]))
     assert packet["declarations"]["groups"] == []
 
 
@@ -367,22 +365,20 @@ def test_generic_class_reopen_rejects_stale_source_and_does_not_replay(
     )
     with CodeMap(tmp_path, state_dir=state) as cm:
         cm.index.sync()
-        before = cm.discover_repository_declarations([provider])
+        before = cm.declarations.discover([provider])
     _write(tmp_path, "class Payload(Parent):\n    current: str\n")
     with CodeMap(tmp_path, state_dir=state) as cm:
         with pytest.raises(RepositoryDeclarationProviderError, match="input changed"):
-            cm.discover_repository_declarations([provider], previous_observation=before)
+            cm.declarations.discover([provider], previous_observation=before)
         cm.index.sync([PATH])
         after = cast(
             "dict",
-            cm.discover_repository_declarations(
-                [provider], previous_observation=before
-            ),
+            cm.declarations.discover([provider], previous_observation=before),
         )
         omitted = cast(
-            "dict", cm.discover_repository_declarations([], previous_observation=before)
+            "dict", cm.declarations.discover([], previous_observation=before)
         )
-        current = cast("dict", cm.discover_repository_declarations([provider]))
+        current = cast("dict", cm.declarations.discover([provider]))
     assert before["observation_identity"] != after["observation_identity"]
     assert after["observation_identity"] == current["observation_identity"]
     assert omitted["declarations"]["groups"] == []

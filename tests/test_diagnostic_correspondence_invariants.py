@@ -9,6 +9,10 @@ import pytest
 from benchmarks.diagnostic_correspondence import materialize_fixture
 from hashmarks import CodeMap
 from hashmarks.codemap import diagnostic_observation
+from hashmarks.codemap.diagnostic_observation import (
+    diagnostic_observation_delta,
+    external_diagnostic_observation,
+)
 from hashmarks.file_store import UnstableFileError
 
 if TYPE_CHECKING:
@@ -63,8 +67,9 @@ def test_distinct_consumer_bindings_share_one_snapshot_but_no_mutable_output(
     source = repository.workspace / "app/service.py"
     source.write_bytes(b"\n" + source.read_bytes())
     repository.index.sync()
+    reads_after_ingestion = reads
     after: Any = repository.bindings.observe(_bindings(), include_relationships=False)
-    assert reads == 2
+    assert reads - reads_after_ingestion == 1
     assert after["bindings"][1]["evidence"] != first["bindings"][1]["evidence"]
 
 
@@ -109,11 +114,11 @@ def test_alias_spelling_never_overrides_shadowing_ambiguity_or_missing_import(
 
 def test_public_diagnostic_operations_bind_the_canonical_producers() -> None:
     assert (
-        CodeMap.external_diagnostic_observation
+        external_diagnostic_observation
         is diagnostic_observation.external_diagnostic_observation
     )
     assert (
-        CodeMap.diagnostic_observation_delta
+        diagnostic_observation_delta
         is diagnostic_observation.diagnostic_observation_delta
     )
 

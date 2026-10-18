@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from contract_assertions import assert_object
 
 from hashmarks.client import RepositoryObservation
 from hashmarks.codemap import CodeMap
@@ -143,11 +144,13 @@ def test_interrupted_sync_rolls_back_candidate_generation(
         monkeypatch.setattr(codemap.index, "_parse_or_reuse", explode)
         with pytest.raises(RuntimeError, match="synthetic interruption"):
             codemap.index.sync()
-        assert codemap.status()["build"]["state"] == "NEVER_SYNCED"
+        assert assert_object(codemap.views.status()["build"])["state"] == "NEVER_SYNCED"
         assert codemap.store.generation() == 0
         assert codemap.store.paths() == set()
 
     with CodeMap(tmp_path, artifact_db=artifact_db) as reopened:
-        assert reopened.status()["build"]["state"] == "NEVER_SYNCED"
+        assert (
+            assert_object(reopened.views.status()["build"])["state"] == "NEVER_SYNCED"
+        )
         assert reopened.search.find("run")[0].path == "src/app.py"
-        assert reopened.status()["build"]["complete"] is True
+        assert assert_object(reopened.views.status()["build"])["complete"] is True

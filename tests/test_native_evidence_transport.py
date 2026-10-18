@@ -318,7 +318,7 @@ def test_native_dependency_mcp_comparison_formats_keep_version_change(
     paths = materialize_dependency(root, source)
     with CodeMap(root, state_dir=state) as cm:
         cm.index.sync()
-        before = cm.dependency_resolution_evidence(
+        before = cm.dependencies.observe(
             dependency_capture("uv", source, input_revisions(root, paths))
         )
     source = native_dependency_corpus / "uv" / "v2"
@@ -644,7 +644,7 @@ def test_native_mcp_stdio_lsp_and_dependency_comparison_keep_semantic_facts(
     inputs = _copy_dependency_inputs(root, source)
     with CodeMap(root, state_dir=state) as cm:
         cm.index.sync()
-        before = cm.dependency_resolution_evidence(
+        before = cm.dependencies.observe(
             dependency_capture("uv", source, input_revisions(root, inputs))
         )
     source = native_dependency_corpus / "uv" / "v2"
@@ -969,10 +969,10 @@ def test_real_mcp_unicode_delta_text_content_matches_frozen_format_trials(
     task = "Change räkna in räknare.py to return efter😀."
     with CodeMap(root, state_dir=state) as cm:
         cm.index.sync()
-        before = cm.repository_intelligence_snapshot(task, ["räknare.py"])
+        before = cm.changes.snapshot(task, ["räknare.py"])
         source.write_text('def räkna():\n    return "efter😀"\n', encoding="utf-8")
         cm.index.sync(["räknare.py"])
-        packet = cm.repository_intelligence_query(
+        packet = cm.views.query(
             "delta",
             task,
             ["räknare.py"],

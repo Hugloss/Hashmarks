@@ -24,11 +24,13 @@ Observation tracks whether previously derived evidence can still be trusted agai
 
 The important distinction is between:
 
-- **proven** — continuity/currentness has been positively established for the required authority surface;
+- **current** — currentness is established for the required authority surface;
 - **stale** — a relevant change is known to invalidate the evidence;
 - **unknown** — currentness cannot be proven and stronger authority must fail closed.
 
 Unknown must never be silently promoted to fresh.
+Proof strength such as `proven` is a separate dimension from the serialized
+freshness states `current`, `stale` and `unknown`.
 
 ### 3. Derived CodeMap
 
@@ -45,6 +47,26 @@ CodeMap indexes repository structure and relationships such as:
 - verification relevance.
 
 CodeMap is reconstructible derived state. It may be cached and incrementally maintained, but its semantic result may not exceed a fresh reconciled view of the same repository.
+
+`CodeMap` is the construction root. It exposes typed, read-only component
+references and inherits no domain implementation. Components borrow exact lower
+owners rather than retaining the root or sharing its `self`. The normative
+[owner map](STATE_AND_SEMANTIC_OWNERS.md) assigns source observation, import/native
+qualification, relationships, retrieval, ownership, verification, task evidence,
+bindings, declarations, dependencies, changes and aggregate projections.
+
+The root owns resource lifetime through `ExitStack`: failed construction closes
+already-open resources, close attempts every owned resource after an error, and
+repeated close does not repeat cleanup. Read scopes retain the existing published
+generation; task, search, context and change caches retain their distinct owners.
+Composed change packets reject publication drift after their qualified input.
+Profile projections and explicit endpoint comparisons consume supplied values
+without collecting another current observation.
+
+An overlay borrows base Index, Search and DecisionScope capabilities and may own
+its local construction root. Its base generation/fingerprint binding survives
+only while both facts remain unchanged. No borrowed base CodeMap, worktree
+creation, Git mutation or execution authority is part of that contract.
 
 ### Repository analysis scope
 

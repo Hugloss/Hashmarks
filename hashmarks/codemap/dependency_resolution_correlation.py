@@ -10,7 +10,7 @@ from .dependency_resolution_contract import object_rows as _objects
 from .repository_observation import packet_digest
 
 if TYPE_CHECKING:
-    from .engine import CodeMap
+    from .repository_dependencies import RepositoryDependencies
 
 
 def _ownership_summary(
@@ -96,7 +96,7 @@ class DependencyResolutionCorrelationMixin:
                     break
         return selected
 
-    def dependency_import_correspondence(
+    def import_correspondence(
         self,
         observation: Mapping[str, object],
         *,
@@ -105,9 +105,9 @@ class DependencyResolutionCorrelationMixin:
         context: str | None = None,
     ) -> dict[str, object]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryDependencies", self)
         self._require_current_dependency_observation_v3(observation)
-        candidates = self._imports._python_import_module_candidates(
+        candidates = self.imports._python_import_module_candidates(
             source_path, import_target
         )
         ownership = cast(
@@ -121,7 +121,7 @@ class DependencyResolutionCorrelationMixin:
             "import_target": import_target,
             **({"context": context} if context is not None else {}),
             "import_claim_authority": "caller-claimed",
-            "repository_paths": self._imports._resolve_import_paths(
+            "repository_paths": self.imports._resolve_import_paths(
                 source_path, import_target
             ),
             "matched_modules": [
@@ -148,7 +148,7 @@ class DependencyResolutionCorrelationMixin:
         raw: Mapping[str, object],
     ) -> tuple[dict[str, object], list[Mapping[str, object]]]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryDependencies", self)
         _contract.reject_unknown_fields(raw, label="correlation row")
         module = _text(raw.get("module"), label="correlation module", required=True)
         context = _text(raw.get("context"), label="correlation context")
@@ -157,7 +157,7 @@ class DependencyResolutionCorrelationMixin:
         )
         normalized_anchors: list[dict[str, object]] = []
         for anchor in anchors:
-            claims = self.correlation._anchor_claims(anchor)
+            claims = self._repository_correlation._anchor_claims(anchor)
             normalized_anchors.append(
                 {"anchor_id": claims.anchor_id, "claims": claims.as_dict()}
             )
@@ -218,7 +218,7 @@ class DependencyResolutionCorrelationMixin:
         occurrences: dict[str, int],
     ) -> tuple[dict[str, object], dict[str, object], list[str]]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryDependencies", self)
         definition, anchors = self._dependency_correlation_row_definition(raw)
         digest = packet_digest("hashmarks.dependency-correlation-bundle.v2", definition)
         ordinal = occurrences.get(digest, 0)
@@ -244,14 +244,14 @@ class DependencyResolutionCorrelationMixin:
         )
         return bundle, link, source_ids
 
-    def dependency_evidence_correlation(
+    def correlation(
         self,
         observation: Mapping[str, object],
         request: Mapping[str, object],
     ) -> dict[str, object]:
         """Correlate dependency owners with current repository evidence."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryDependencies", self)
         self._require_current_dependency_observation_v3(observation)
         _contract.reject_unknown_fields(request, label="correlation request")
         correlations = _objects(
@@ -271,7 +271,7 @@ class DependencyResolutionCorrelationMixin:
             used_sources.update(source_ids)
             dependency_links.append(link)
             bundles.append(bundle)
-        packet = self.correlation.observe(
+        packet = self._repository_correlation.observe(
             bundles,
             path_mappings=cast(
                 "Sequence[Mapping[str, object]] | None",

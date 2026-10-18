@@ -2,17 +2,25 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import logging
+from collections.abc import Mapping
+from pathlib import Path
+from typing import NotRequired, TypedDict, TypeGuard
 
 from hashmarks._command_output import log_command_output
-
-try:
-    from scripts._module_loader import import_sibling
-except ModuleNotFoundError:  # direct script execution
-    from _module_loader import import_sibling
-import json
-from pathlib import Path
-from typing import Any
+from scripts.agent_evaluation.metrics_agent_trace import (
+    TraceComparison,
+    load_trace,
+    load_usage,
+    load_verdict,
+)
+from scripts.agent_evaluation.metrics_agent_trace import (
+    compare as compare_traces,
+)
+from scripts.agent_evaluation.metrics_agent_trace import (
+    gate as trace_gate,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +29,48 @@ REPORT_SCHEMA = "hashmarks.agent-experiment-report.v1"
 MODES = {"baseline", "hashmarks"}
 
 
-def _load_trace_module() -> object:
-    return import_sibling("metrics_agent_trace", __package__)
+class ExperimentRun(TypedDict):
+    task_id: str
+    task_revision: str
+    repository_identity: str
+    mode: str
+    run_id: str
+    trace: str
+    verdict: str
+    usage: str
+    subject: str
+    grader_evidence: NotRequired[object]
+    provider_evidence: NotRequired[object]
+
+
+class ExperimentManifest(TypedDict):
+    schema: str
+    experiment_id: str
+    model_identity: str
+    model_config_identity: str
+    runner_identity: str
+    runs: list[ExperimentRun]
+    runner_version: NotRequired[object]
+    grader_identity: NotRequired[object]
+    provider_identity: NotRequired[object]
+    task_policy_identity: NotRequired[object]
+    benchmark_protocol_identity: NotRequired[object]
+
+
+class ExperimentReport(TypedDict):
+    schema: str
+    experiment_id: str
+    manifest_sha256: str
+    runner_identity: str
+    runner_version: object
+    model_identity: str
+    model_config_identity: str
+    task_policy_identity: object
+    benchmark_protocol_identity: object
+    repositories: int
+    tasks: int
+    raw_evidence_required: bool
+    comparison: TraceComparison
 
 
 def _nonempty(value: object, field: str, path: Path) -> str:
@@ -65,7 +113,7 @@ def _validate_manifest_run(
     path: Path,
     seen_run_ids: set[str],
     seen_task_modes: set[tuple[str, str]],
-) -> None:
+) -> TypeGuard[ExperimentRun]:
     if not isinstance(run, dict):
         raise ValueError(f"manifest run {index} must be an object: {path}")
     for field in (
@@ -93,10 +141,10 @@ def _validate_manifest_run(
             f"duplicate manifest task/mode: {run['task_id']}:{run['mode']}"
         )
     seen_task_modes.add(task_mode)
+    return True
 
 
-def load_manifest(path: Path) -> dict[str, object]:
-    value = json.loads(path.read_text(encoding="utf-8"))
+def _validate_manifest(value: object, path: Path) -> TypeGuard[ExperimentManifest]:
     if not isinstance(value, dict) or value.get("schema") != MANIFEST_SCHEMA:
         raise ValueError(f"unsupported agent experiment manifest schema: {path}")
     for field in (
@@ -111,19 +159,29 @@ def load_manifest(path: Path) -> dict[str, object]:
         raise ValueError(f"manifest runs must be a non-empty list: {path}")
     seen_run_ids: set[str] = set()
     seen_task_modes: set[tuple[str, str]] = set()
-    for index, run in enumerate(runs):
+    if not all(
         _validate_manifest_run(run, index, path, seen_run_ids, seen_task_modes)
+        for index, run in enumerate(runs)
+    ):
+        raise ValueError(f"invalid experiment run: {path}")
     by_task: dict[str, set[str]] = {}
     for run in runs:
         by_task.setdefault(run["task_id"], set()).add(run["mode"])
     incomplete = sorted(task for task, modes in by_task.items() if modes != MODES)
     if incomplete:
         raise ValueError("manifest has unpaired tasks: " + ", ".join(incomplete))
+    return True
+
+
+def load_manifest(path: Path) -> ExperimentManifest:
+    value: object = json.loads(path.read_text(encoding="utf-8"))
+    if not _validate_manifest(value, path):
+        raise ValueError(f"invalid experiment manifest: {path}")
     return value
 
 
 def _validate_digest_binding(
-    record: dict[str, Any], evidence_path: Path, kind: str
+    record: Mapping[str, object], evidence_path: Path, kind: str
 ) -> None:
     expected = record.get("evidence_digest")
     actual = _sha256(evidence_path)
@@ -134,7 +192,7 @@ def _validate_digest_binding(
 
 
 def _expected_run_identity(
-    manifest: dict[str, object], run: dict[str, object]
+    manifest: Mapping[str, object], run: Mapping[str, object]
 ) -> dict[str, object]:
     return {
         "task_id": run["task_id"],
@@ -149,11 +207,11 @@ def _expected_run_identity(
 
 
 def _validate_run_records(
-    run: dict[str, object],
-    expected: dict[str, object],
-    trace: dict[str, object],
-    verdict: dict[str, object],
-    usage: dict[str, object],
+    run: Mapping[str, object],
+    expected: Mapping[str, object],
+    trace: Mapping[str, object],
+    verdict: Mapping[str, object],
+    usage: Mapping[str, object],
 ) -> None:
     for field, expected_value in expected.items():
         if trace.get(field) != expected_value:
@@ -171,10 +229,10 @@ def _validate_run_records(
 
 
 def _validate_optional_identities(
-    manifest: dict[str, object],
-    run: dict[str, object],
-    verdict: dict[str, object],
-    usage: dict[str, object],
+    manifest: Mapping[str, object],
+    run: Mapping[str, object],
+    verdict: Mapping[str, object],
+    usage: Mapping[str, object],
 ) -> None:
     grader_identity = manifest.get("grader_identity")
     if (
@@ -193,9 +251,9 @@ def _validate_optional_identities(
 def _validate_raw_evidence(
     root: Path,
     manifest_path: Path,
-    run: dict[str, object],
-    verdict: dict[str, object],
-    usage: dict[str, object],
+    run: Mapping[str, object],
+    verdict: Mapping[str, object],
+    usage: Mapping[str, object],
     strict_raw_evidence: bool,
 ) -> None:
     for field, record, kind in (
@@ -215,18 +273,17 @@ def _validate_raw_evidence(
 def _validate_experiment_run(
     root: Path,
     manifest_path: Path,
-    manifest: dict[str, object],
-    run: dict[str, object],
-    trace_module: object,
+    manifest: Mapping[str, object],
+    run: Mapping[str, object],
     strict_raw_evidence: bool,
 ) -> tuple[Path, Path, Path]:
     trace_path = _relative_file(root, run["trace"], "trace", manifest_path)
     verdict_path = _relative_file(root, run["verdict"], "verdict", manifest_path)
     usage_path = _relative_file(root, run["usage"], "usage", manifest_path)
     subject_path = _relative_file(root, run["subject"], "subject", manifest_path)
-    trace = trace_module.load_trace(trace_path)
-    verdict = trace_module.load_verdict(verdict_path)
-    usage = trace_module.load_usage(usage_path)
+    trace = load_trace(trace_path)
+    verdict = load_verdict(verdict_path)
+    usage = load_usage(usage_path)
     expected = _expected_run_identity(manifest, run)
     _validate_run_records(run, expected, trace, verdict, usage)
     subject_digest = _sha256(subject_path)
@@ -244,8 +301,7 @@ def _validate_experiment_run(
 
 def run_experiment(
     manifest_path: Path, *, strict_raw_evidence: bool = False
-) -> dict[str, object]:
-    trace_module = _load_trace_module()
+) -> ExperimentReport:
     manifest = load_manifest(manifest_path)
     root = manifest_path.parent
     trace_paths: list[Path] = []
@@ -259,7 +315,6 @@ def run_experiment(
             manifest_path,
             manifest,
             run,
-            trace_module,
             strict_raw_evidence,
         )
         trace_paths.append(trace_path)
@@ -267,7 +322,7 @@ def run_experiment(
         usage_paths.append(usage_path)
         repositories.add(run["repository_identity"])
 
-    comparison = trace_module.compare(
+    comparison = compare_traces(
         trace_paths,
         verdict_paths=verdict_paths,
         usage_paths=usage_paths,
@@ -275,7 +330,7 @@ def run_experiment(
         require_external_verdict=True,
         require_external_usage=True,
     )
-    failures = trace_module.gate(comparison, min_pairs=len(manifest["runs"]) // 2)
+    failures = trace_gate(comparison, min_pairs=len(manifest["runs"]) // 2)
     if failures:
         raise ValueError("experiment evidence gate failed: " + "; ".join(failures))
 

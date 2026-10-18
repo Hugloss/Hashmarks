@@ -20,7 +20,12 @@ from hashmarks.python_ast_cache import read_python_ast
 from .decision_session import ReadScopeOwner, decision_scoped
 from .model import EvidenceVisibility
 from .ownership.filesystem_lifecycle import locality_lifecycle
-from .python_exports import python_class_node, python_function_scope_binds
+from .python_exports import (
+    python_class_member_binding,
+    python_class_node,
+    python_function_body_binds,
+    python_function_scope_binds,
+)
 from .repository_domains import is_test_path
 from .structural_locality_model import (
     LOCALITY_SCHEMA,
@@ -168,6 +173,11 @@ class RepositoryStructure(ReadScopeOwner):
         *,
         search_provider: AstGrepSearchProvider | None = None,
     ) -> None:
+        if any(
+            owner.reads is not source.reads
+            for owner in (imports, native, relationships)
+        ):
+            raise ValueError("Structural inputs must share one repository read scope")
         self.source = source
         self.imports = imports
         self.native = native
@@ -233,6 +243,17 @@ class RepositoryStructure(ReadScopeOwner):
             complete=len(probe) <= _LOCALITY_SYMBOL_CANDIDATE_LIMIT,
         )
 
+    def _qualified_path_symbols(self, path: str) -> list[dict[str, object]]:
+        """Observe the complete admitted file scope before binding a declaration."""
+        decision = self.source.files.decide(path)
+        if (
+            not decision.index
+            or decision.evidence_visibility is not EvidenceVisibility.SOURCE
+        ):
+            return []
+        self.source.ensure_current(path)
+        return self.reads.symbols_for_path(path)
+
     def _python_function_locally_binds(self, path: str, source: str, name: str) -> bool:
         if not path.endswith(".py") or not source or not name:
             return False
@@ -250,12 +271,15 @@ class RepositoryStructure(ReadScopeOwner):
         source_path: str,
         source_qualname: str,
         short: str,
-        candidates: list[dict[str, object]],
+        evidence: _NamedSymbolCandidateEvidence,
     ) -> tuple[dict[str, object] | None, list[str], bool]:
+        candidates = evidence.rows
         candidate_ids = sorted(_symbol_id(row) for row in candidates)
         if self._python_function_locally_binds(source_path, source_qualname, short):
             return None, candidate_ids, False
         kind, targets = self.imports._python_export_binding(source_path, short)
+        if kind in {"ambiguous", "star"} or (kind == "local" and not evidence.complete):
+            return None, candidate_ids, True
         if kind == "local":
             declared = self.imports._python_export_is_declaration(source_path, short)
             local = [
@@ -274,13 +298,11 @@ class RepositoryStructure(ReadScopeOwner):
                 return None, candidate_ids, True
             owned = [
                 row
-                for row in candidates
-                if (str(row.get("path") or ""), str(row.get("qualname") or ""))
-                in symbols
+                for path, qualname in symbols
+                for row in self._qualified_path_symbols(path)
+                if str(row.get("qualname") or "") == qualname
             ]
             return _binding_result(owned, candidates, unresolved=bool(symbols))
-        if kind in {"ambiguous", "star"}:
-            return None, candidate_ids, True
         return None, candidate_ids, False
 
     def _python_class_node(self, path: str, qualname: str) -> ast.ClassDef | None:
@@ -334,15 +356,16 @@ class RepositoryStructure(ReadScopeOwner):
         path: str,
         class_qualname: str,
         method: str,
-        candidates: list[dict[str, object]],
         seen: frozenset[tuple[str, str]] = frozenset(),
     ) -> tuple[dict[str, object] | None, bool]:
         key = (path, class_qualname)
         if key in seen:
             return None, True
-        direct = self._python_direct_method_owners(
-            path, class_qualname, method, candidates
+        direct, unresolved = self._python_direct_method_owners(
+            path, class_qualname, method, self._qualified_path_symbols(path)
         )
+        if unresolved:
+            return None, True
         if direct:
             return (direct[0], False) if len(direct) == 1 else (None, True)
 
@@ -356,7 +379,6 @@ class RepositoryStructure(ReadScopeOwner):
                 path=base_path,
                 class_qualname=base_qualname,
                 method=method,
-                candidates=candidates,
                 seen=seen | {key},
             )
             ambiguous = ambiguous or base_ambiguous
@@ -367,19 +389,29 @@ class RepositoryStructure(ReadScopeOwner):
         owner = next(iter(owners.values())) if owners else None
         return owner, False
 
-    @staticmethod
     def _python_direct_method_owners(
+        self,
         path: str,
         class_qualname: str,
         method: str,
         candidates: Sequence[dict[str, object]],
-    ) -> list[dict[str, object]]:
-        return [
+    ) -> tuple[list[dict[str, object]], bool]:
+        class_node = self._python_class_node(path, class_qualname)
+        if class_node is None:
+            return [], True
+        kind, declaration = python_class_member_binding(class_node, method)
+        if declaration is None:
+            return [], kind != "unknown"
+        owners = [
             row
             for row in candidates
             if str(row.get("path") or "") == path
             and str(row.get("qualname") or "") == f"{class_qualname}.{method}"
+            and locality_coordinate(row["start_line"])
+            <= declaration.lineno
+            <= locality_coordinate(row["end_line"])
         ]
+        return owners, not owners
 
     @staticmethod
     def _python_self_cls_target(
@@ -401,9 +433,9 @@ class RepositoryStructure(ReadScopeOwner):
         )
 
     @staticmethod
-    def _python_receiver_matches_method(
+    def _python_receiver_method(
         class_node: ast.ClassDef, target: _SelfClsCallTarget
-    ) -> bool:
+    ) -> ast.FunctionDef | ast.AsyncFunctionDef | None:
         methods = [
             node
             for node in class_node.body
@@ -411,11 +443,11 @@ class RepositoryStructure(ReadScopeOwner):
             and node.name == target.source_method
         ]
         if len(methods) != 1:
-            return False
+            return None
         source_node = methods[0]
         positional = [*source_node.args.posonlyargs, *source_node.args.args]
         if not positional or positional[0].arg != target.receiver:
-            return False
+            return None
         decorators = {
             (
                 decorator.id
@@ -427,8 +459,8 @@ class RepositoryStructure(ReadScopeOwner):
             for decorator in source_node.decorator_list
         }
         if target.receiver == "cls":
-            return "classmethod" in decorators
-        return not {"classmethod", "staticmethod"} & decorators
+            return source_node if "classmethod" in decorators else None
+        return source_node if not {"classmethod", "staticmethod"} & decorators else None
 
     def _python_self_cls_call_binding(
         self,
@@ -442,18 +474,22 @@ class RepositoryStructure(ReadScopeOwner):
         if call_target is None:
             return None
         class_node = self._python_class_node(source_path, call_target.class_qualname)
-        if class_node is None or not self._python_receiver_matches_method(
-            class_node, call_target
-        ):
+        source_node = (
+            self._python_receiver_method(class_node, call_target)
+            if class_node
+            else None
+        )
+        if source_node is None:
             return None
+        candidate_ids = sorted(_symbol_id(row) for row in candidates)
+        if python_function_body_binds(source_node, call_target.receiver):
+            return None, candidate_ids, True
 
         owner, unresolved = self._python_method_owner(
             path=source_path,
             class_qualname=call_target.class_qualname,
             method=call_target.method,
-            candidates=candidates,
         )
-        candidate_ids = sorted(_symbol_id(row) for row in candidates)
         if owner is None:
             return None, candidate_ids, unresolved
         return owner, [_symbol_id(owner)], False
@@ -489,24 +525,17 @@ class RepositoryStructure(ReadScopeOwner):
         root: str,
         candidates: list[dict[str, object]],
     ) -> tuple[dict[str, object] | None, list[str], bool, bool]:
-        qualified = [
-            row
-            for row in candidates
-            if str(row.get("path") or "") == source_path
-            and str(row.get("qualname") or "") == target
-        ]
+        candidate_ids = sorted(_symbol_id(row) for row in candidates)
+        if self._python_class_node(source_path, root) is None:
+            return None, candidate_ids, True, True
+        class_name, method = target.rsplit(".", 1)
+        qualified, _unresolved = self._python_direct_method_owners(
+            source_path, class_name, method, self._qualified_path_symbols(source_path)
+        )
         if len(qualified) == 1:
             return qualified[0], [_symbol_id(qualified[0])], False, True
-        evidence = self._visible_named_symbol_candidates(root)
-        root_present = any(
-            str(row.get("path") or "") == source_path
-            and str(row.get("qualname") or "") == root
-            for row in evidence.rows
-        )
-        if not evidence.complete:
-            return None, sorted(_symbol_id(row) for row in candidates), True, False
         resolved, ids, unresolved = _binding_result(
-            qualified, candidates, unresolved=root_present
+            qualified, candidates, unresolved=True
         )
         return resolved, ids, unresolved, True
 
@@ -518,36 +547,39 @@ class RepositoryStructure(ReadScopeOwner):
         candidates: list[dict[str, object]],
     ) -> tuple[dict[str, object] | None, list[str], bool, bool]:
         candidate_ids = sorted(_symbol_id(row) for row in candidates)
-        owners, unresolved = self.imports._resolve_import_owner_evidence(
+        symbols, unresolved = self.imports._resolve_import_symbol_evidence(
             source_path, import_target
         )
-        if unresolved:
+        if unresolved or len(symbols) != 1:
+            data_binding = self._python_imported_data_binding(
+                source_path, import_target
+            )
+            return None, candidate_ids, not data_binding, data_binding
+        path, class_name = symbols[0]
+        if self._python_class_node(path, class_name) is None:
             return None, candidate_ids, True, True
-        owner_paths = set(owners)
-        imported_name = import_target.rsplit(".", 1)[-1]
-        evidence = self._visible_named_symbol_candidates(imported_name)
-        if not evidence.complete:
-            return None, candidate_ids, True, False
-        class_present = any(
-            str(row.get("path") or "") in owner_paths
-            and str(row.get("qualname") or "") == imported_name
-            and str(row.get("kind") or "") == "class"
-            for row in evidence.rows
-        )
-        if not class_present:
-            return None, candidate_ids, False, True
         member = target.split(".", 1)[1]
-        qualified_name = f"{imported_name}.{member}"
-        qualified = [
-            row
-            for row in candidates
-            if str(row.get("path") or "") in owner_paths
-            and str(row.get("qualname") or "") == qualified_name
-        ]
+        qualified_name = f"{class_name}.{member}"
+        class_qualname, method = qualified_name.rsplit(".", 1)
+        qualified, _unresolved = self._python_direct_method_owners(
+            path, class_qualname, method, self._qualified_path_symbols(path)
+        )
         resolved, ids, unresolved = _binding_result(
             qualified, candidates, unresolved=True
         )
         return resolved, ids, unresolved, True
+
+    def _python_imported_data_binding(self, path: str, target: str) -> bool:
+        """Keep admitted imported data in the existing external/unindexed category."""
+        owners, unresolved = self.imports._resolve_import_owner_evidence(path, target)
+        if unresolved:
+            return False
+        name = target.rsplit(".", 1)[-1]
+        return any(
+            self.imports._python_export_binding(owner, name)[0] == "local"
+            and not self.imports._python_export_is_declaration(owner, name)
+            for owner in owners
+        )
 
     def _python_repository_qualified_call_binding(
         self,
@@ -592,27 +624,35 @@ class RepositoryStructure(ReadScopeOwner):
         evidence = self._visible_named_symbol_candidates(name)
         candidates = evidence.rows
         candidate_ids = sorted(_symbol_id(row) for row in candidates)
-        if not evidence.complete:
-            return None, candidate_ids, True, False
         source_qualname = str(edge.get("source") or "")
         source_row = self.store.file_row(source_path)
         language = "" if source_row is None else str(source_row["language"] or "")
         if language == "python" and target != short:
-            return self._python_qualified_call_binding(
+            binding = self._python_qualified_call_binding(
                 source_path=source_path,
                 source_qualname=source_qualname,
                 target=target,
                 candidates=candidates,
             )
+            if binding[0] is not None or evidence.complete:
+                return binding
+            return None, binding[1], True, False
         if language == "python":
             resolved, ids, unresolved = self._python_plain_call_binding(
                 source_path=source_path,
                 source_qualname=source_qualname,
                 short=short,
-                candidates=candidates,
+                evidence=evidence,
             )
-            return resolved, ids, unresolved, True
-        return None, candidate_ids, bool(candidate_ids), True
+            if resolved is not None:
+                return resolved, ids, False, True
+            return None, ids, unresolved or not evidence.complete, evidence.complete
+        return (
+            None,
+            candidate_ids,
+            bool(candidate_ids) or not evidence.complete,
+            evidence.complete,
+        )
 
     def _locality_callers(
         self, row: Mapping[str, object], *, ref_limit: int

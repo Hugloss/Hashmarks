@@ -40,15 +40,9 @@ if TYPE_CHECKING:
     from .repository_intelligence_query import (
         RepositoryIntelligenceQueryOptions as RepositoryIntelligenceQueryOptions,
     )
-    from .semantic_relationship_delta import (
-        semantic_relationship_delta as semantic_relationship_delta,
-    )
     from .service import CodeMapService as CodeMapService
     from .service import CodeMapServiceClient as CodeMapServiceClient
     from .service import default_codemap_socket as default_codemap_socket
-    from .structural_locality_delta import (
-        structural_locality_delta as structural_locality_delta,
-    )
     from .worktree_overlay import WorktreeOverlay as WorktreeOverlay
     from .worktree_overlay import (
         WorktreeOverlayBaseChangedError as WorktreeOverlayBaseChangedError,
@@ -77,14 +71,38 @@ _EXPORTS: dict[str, str] = {
     "SyncResult": "model",
     "WorktreeOverlay": "worktree_overlay",
     "WorktreeOverlayBaseChangedError": "worktree_overlay",
-    "structural_locality_delta": "structural_locality_delta",
-    "semantic_relationship_delta": "semantic_relationship_delta",
     "COMPACT_PROJECT_IMPACT_SCHEMA": "project_impact_codec",
     "compact_project_impact": "project_impact_codec",
     "expand_project_impact": "project_impact_codec",
 }
 
-__all__ = list(_EXPORTS)
+__all__ = [
+    "CodeMap",
+    "evidence_component_fits",
+    "evidence_request_budget_fits",
+    "validate_evidence_locator_claim",
+    "ChangeImpactOptions",
+    "PostChangeOptions",
+    "RepositoryIntelligenceQueryOptions",
+    "RepositoryDeclarationProvider",
+    "RepositoryDeclarationProviderContext",
+    "RepositoryDeclarationProviderError",
+    "RepositoryDeclarationProviderResult",
+    "CodeMapService",
+    "CodeMapServiceClient",
+    "default_codemap_socket",
+    "EvidenceVisibility",
+    "ContextDisclosure",
+    "ContextPack",
+    "ContextPolicy",
+    "SearchHit",
+    "SyncResult",
+    "WorktreeOverlay",
+    "WorktreeOverlayBaseChangedError",
+    "COMPACT_PROJECT_IMPACT_SCHEMA",
+    "compact_project_impact",
+    "expand_project_impact",
+]
 
 
 def __getattr__(name: str) -> object:

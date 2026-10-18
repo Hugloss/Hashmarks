@@ -7,7 +7,7 @@ from collections.abc import Iterable, Mapping
 from hashmarks.evidence_presentation_conformance import validate_evidence_presentation
 
 
-def combine_required(values: Iterable[bool | None]) -> bool | None:
+def combine_required(values: Iterable[object]) -> bool | None:
     """Known failure dominates missing proof; an empty set is not proof."""
     observed = list(values)
     if any(value is not None and type(value) is not bool for value in observed):

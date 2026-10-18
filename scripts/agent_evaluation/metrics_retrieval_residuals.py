@@ -5,6 +5,7 @@ import hashlib
 import json
 import logging
 from pathlib import Path
+from typing import TypedDict
 
 from hashmarks._command_output import log_command_output
 from hashmarks.codemap import (
@@ -23,14 +24,44 @@ SCHEMA = "hashmarks.retrieval-residual-classification.v1"
 FAMILY = "hashmarks-residual-classification-a"
 
 
+class ResidualTaskReport(TypedDict):
+    id: object
+    query: str
+    expected_files: list[str]
+    first_edit_target: str | None
+    top1_correct: bool
+    expected_any_top5: bool
+    all_expected_top20: bool
+    ambiguous: bool
+    residual_class: str
+
+
+class ResidualRepositoryReport(TypedDict):
+    name: str
+    public_task_sha256: str
+    hidden_corpus_sha256: str
+    tasks: list[ResidualTaskReport]
+
+
 def _task_report(
-    cm: object, task: dict[str, object], secret: dict[str, object], *, limit: int
-) -> dict[str, object]:
-    hits = cm.search.find_task(task["query"], limit=limit)
+    cm: CodeMap, task: dict[str, object], secret: dict[str, object], *, limit: int
+) -> ResidualTaskReport:
+    query = task["query"]
+    if not isinstance(query, str):
+        raise ValueError("benchmark query must be a string")
+    hits = cm.search.find_task(query, limit=limit)
     paths = [hit.path for hit in hits]
-    expected = set(secret.get("expected_files") or ())
-    entry = cm.tasks.entry_points(task["query"], limit=limit)
-    recommended = [row for row in entry.get("recommended", []) if isinstance(row, dict)]
+    expected_files = secret.get("expected_files") or ()
+    if not isinstance(expected_files, (list, tuple, set)) or not all(
+        isinstance(path, str) for path in expected_files
+    ):
+        raise ValueError("expected benchmark paths must be a collection of strings")
+    expected = {str(path) for path in expected_files}
+    entry = cm.tasks.entry_points(query, limit=limit)
+    raw_recommended = entry.get("recommended", [])
+    if not isinstance(raw_recommended, list):
+        raise ValueError("task entry recommendations must be an array")
+    recommended = [row for row in raw_recommended if isinstance(row, dict)]
     first = str(recommended[0].get("path") or "") if recommended else None
     top1 = first in expected
     top5 = bool(expected.intersection(paths[:5]))
@@ -51,7 +82,7 @@ def _task_report(
         residual = "none"
     return {
         "id": task["id"],
-        "query": task["query"],
+        "query": query,
         "expected_files": sorted(expected),
         "first_edit_target": first,
         "top1_correct": top1,
@@ -63,7 +94,7 @@ def _task_report(
 
 
 def collect(root: Path, limit: int = 20) -> dict[str, object]:
-    reports = []
+    reports: list[ResidualRepositoryReport] = []
     for name, ws, corpus, pub in materialize_challenge(root / "challenge"):
         public = json.loads(pub.read_text())["tasks"]
         hidden = _load_corpus(corpus)

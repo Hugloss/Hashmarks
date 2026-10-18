@@ -12,19 +12,28 @@ from .repository_observation import packet_digest
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from .engine import CodeMap
+    from .decision_session import DecisionScope
+    from .repository_changes import RepositoryChanges
 
 
 CROSS_REPOSITORY_SCHEMA = "hashmarks.cross-repository-evidence-packet.v1"
 
 
-class CrossRepositoryEvidenceMixin(ReadScopeOwner):
+class RepositoryCrossRepository(ReadScopeOwner):
     """Bounded cross-repository projection over existing Hashmarks authorities.
 
     This surface does not discover, clone, execute, schedule, or persist external
     repositories.  It composes already-admitted project-impact, ownership,
     verification, and freshness evidence into one consumer packet.
     """
+
+    def __init__(self, changes: RepositoryChanges) -> None:
+        self.changes = changes
+        self.tasks = changes.tasks
+
+    @property
+    def reads(self) -> DecisionScope:
+        return self.changes.reads
 
     @staticmethod
     def _cross_project_impact(
@@ -156,8 +165,6 @@ class CrossRepositoryEvidenceMixin(ReadScopeOwner):
     def _cross_verification_evidence(
         self, task: str, action: Mapping[str, object], limit: int
     ) -> tuple[dict[str, object], Mapping[str, object]]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         verify = action.get("verify")
         verify_row = verify if isinstance(verify, Mapping) else {}
         member = str(verify_row.get("path") or "")
@@ -182,7 +189,7 @@ class CrossRepositoryEvidenceMixin(ReadScopeOwner):
     )
 
     @diagnostic_producer
-    def cross_repository_evidence_packet(
+    def packet(
         self,
         task: str,
         changed_paths: Sequence[str | Path],
@@ -192,14 +199,12 @@ class CrossRepositoryEvidenceMixin(ReadScopeOwner):
         options: ChangeImpactOptions | None = None,
     ) -> dict[str, object]:
         options = options or self.CROSS_REPOSITORY_EVIDENCE_DEFAULT_OPTIONS
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         if options.project_impact_limit is None or options.project_impact_limit < 1:
             raise ValueError("project_impact_limit must be >= 1")
 
         impact = cast(
             Mapping[str, object],
-            self.task_change_impact(
+            self.changes.task_impact(
                 task,
                 changed_paths,
                 limit=limit,
@@ -212,68 +217,71 @@ class CrossRepositoryEvidenceMixin(ReadScopeOwner):
                 ),
             ),
         )
-        action = cast(
-            Mapping[str, object],
-            self.tasks.action_map(task, limit=limit, per_role=per_role),
-        )
-        freshness = cast(
-            Mapping[str, object],
-            self.evidence_freshness_map(
-                task,
-                changed_paths,
-                options=FreshnessMapOptions(
-                    limit=limit,
-                    per_role=per_role,
-                    impact_limit_per_surface=options.impact_limit_per_surface,
-                    max_depth=options.max_depth,
+        with self.reads.session(
+            expected_generation=self.changes._impact_generation(impact)
+        ):
+            action = cast(
+                Mapping[str, object],
+                self.tasks.action_map(task, limit=limit, per_role=per_role),
+            )
+            freshness = cast(
+                Mapping[str, object],
+                self.changes.freshness_map(
+                    task,
+                    changed_paths,
+                    options=FreshnessMapOptions(
+                        limit=limit,
+                        per_role=per_role,
+                        impact_limit_per_surface=options.impact_limit_per_surface,
+                        max_depth=options.max_depth,
+                    ),
                 ),
-            ),
-        )
+            )
 
-        expanded, roots, dependents, relationships = self._cross_project_impact(
-            impact.get("project_impact")
-        )
+            expanded, roots, dependents, relationships = self._cross_project_impact(
+                impact.get("project_impact")
+            )
 
-        verification_projection, verification = self._cross_verification_evidence(
-            task, action, limit
-        )
+            verification_projection, verification = self._cross_verification_evidence(
+                task, action, limit
+            )
 
-        unresolved = self._cross_unresolved_evidence(
-            impact.get("project_impact"),
-            expanded,
-            self._cross_ownership_projection(action),
-            verification,
-        )
+            unresolved = self._cross_unresolved_evidence(
+                impact.get("project_impact"),
+                expanded,
+                self._cross_ownership_projection(action),
+                verification,
+            )
 
-        surfaces = impact.get("surfaces", {})
-        assert isinstance(surfaces, Mapping)
-        assert all(isinstance(rows, list) for rows in surfaces.values())
-        payload: dict[str, object] = {
-            "schema": CROSS_REPOSITORY_SCHEMA,
-            "source": self._cross_source_projection(freshness, impact, roots),
-            "task_identity": freshness.get("task_identity"),
-            "dependents": dependents,
-            "relationships": relationships,
-            "affected_ownership_surface": {
-                "ownership": self._cross_ownership_projection(action),
-                "surfaces": {
-                    key: list(value) for key, value in surfaces.items() if value
+            surfaces = impact.get("surfaces", {})
+            assert isinstance(surfaces, Mapping)
+            assert all(isinstance(rows, list) for rows in surfaces.values())
+            payload: dict[str, object] = {
+                "schema": CROSS_REPOSITORY_SCHEMA,
+                "source": self._cross_source_projection(freshness, impact, roots),
+                "task_identity": freshness.get("task_identity"),
+                "dependents": dependents,
+                "relationships": relationships,
+                "affected_ownership_surface": {
+                    "ownership": self._cross_ownership_projection(action),
+                    "surfaces": {
+                        key: list(value) for key, value in surfaces.items() if value
+                    },
                 },
-            },
-            "verification": verification_projection,
-            "freshness": self._cross_freshness_projection(freshness),
-            "unresolved": unresolved,
-            "bounds": {
-                "depth": options.max_depth,
-                "per_surface": options.impact_limit_per_surface,
-                "project_impact": options.project_impact_limit,
-            },
-            "authority": "repository-intelligence-only",
-            "storage": "derived-not-persisted",
-            "execution_effect": "none",
-        }
-        payload["packet_identity"] = "sha256:" + packet_digest(
-            CROSS_REPOSITORY_SCHEMA,
-            payload,
-        )
-        return payload
+                "verification": verification_projection,
+                "freshness": self._cross_freshness_projection(freshness),
+                "unresolved": unresolved,
+                "bounds": {
+                    "depth": options.max_depth,
+                    "per_surface": options.impact_limit_per_surface,
+                    "project_impact": options.project_impact_limit,
+                },
+                "authority": "repository-intelligence-only",
+                "storage": "derived-not-persisted",
+                "execution_effect": "none",
+            }
+            payload["packet_identity"] = "sha256:" + packet_digest(
+                CROSS_REPOSITORY_SCHEMA,
+                payload,
+            )
+            return payload

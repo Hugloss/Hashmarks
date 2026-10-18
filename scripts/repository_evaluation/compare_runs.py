@@ -19,7 +19,10 @@ from scripts.repository_evaluation.common import (
 
 def _by_id(run: Mapping[str, object]) -> dict[str, Mapping[str, object]]:
     rows: dict[str, Mapping[str, object]] = {}
-    for row in run.get("cases", []):
+    cases = run.get("cases", [])
+    if not isinstance(cases, list):
+        raise ValueError("comparison cases must be a list")
+    for row in cases:
         if not isinstance(row, Mapping):
             continue
         case_id = str(row.get("id") or "")
@@ -33,11 +36,12 @@ def _semantic_projection(row: Mapping[str, object]) -> dict[str, object]:
     action = result.get("action") if isinstance(result, Mapping) else None
     if not isinstance(action, Mapping):
         return {}
-    edit = action.get("edit") if isinstance(action.get("edit"), Mapping) else {}
-    verify = action.get("verify") if isinstance(action.get("verify"), Mapping) else {}
-    ambiguity = (
-        action.get("ambiguity") if isinstance(action.get("ambiguity"), Mapping) else {}
-    )
+    raw_edit = action.get("edit")
+    edit = raw_edit if isinstance(raw_edit, Mapping) else {}
+    raw_verify = action.get("verify")
+    verify = raw_verify if isinstance(raw_verify, Mapping) else {}
+    raw_ambiguity = action.get("ambiguity")
+    ambiguity = raw_ambiguity if isinstance(raw_ambiguity, Mapping) else {}
     authority = action.get("ownership_authority")
     authority = authority if isinstance(authority, Mapping) else {}
     return {

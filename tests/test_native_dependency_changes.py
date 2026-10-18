@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
+from contract_assertions import assert_records
 from native_evidence_support import (
     assert_projection,
     dependency_capture,
@@ -37,7 +38,7 @@ def test_native_dependency_sequence_binds_real_inputs_and_reopens(
         raw = dependency_capture(producer, source, input_revisions(root, paths))
         with CodeMap(root, state_dir=state) as cm:
             cm.index.sync()
-            current: Any = cm.dependency_resolution_evidence(raw)
+            current: Any = cm.dependencies.observe(raw)
             assert all(
                 row["source_equivalence"] == "proven"
                 for row in current["repository_inputs"]
@@ -49,16 +50,16 @@ def test_native_dependency_sequence_binds_real_inputs_and_reopens(
             ]
             assert selected == ([] if expected is None else [expected])
             if previous is not None:
-                delta: Any = cm.dependency_resolution_delta(previous, current)
+                delta: Any = cm.dependencies.delta(previous, current)
                 assert delta["comparability"] == "comparable"
                 assert delta["change_axes"]["repository_inputs"] == "changed"
                 assert delta["change_axes"]["semantic_resolution"] == "changed"
                 assert_projection(delta, "dependency_codemap", "compare")
         with CodeMap(root, state_dir=state) as reopened:
-            restored: Any = reopened.dependency_resolution_evidence(raw)
+            restored: Any = reopened.dependencies.observe(raw)
         with CodeMap(root, state_dir=tmp_path / f"fresh-{name}-{expected}") as fresh:
             fresh.index.sync()
-            rebuilt: Any = fresh.dependency_resolution_evidence(raw)
+            rebuilt: Any = fresh.dependencies.observe(raw)
         assert semantic_dependency_fields(restored) == semantic_dependency_fields(
             current
         )
@@ -78,12 +79,12 @@ def test_old_native_capture_keeps_input_mismatch_visible(
     raw = dependency_capture(producer, before_source, input_revisions(root, paths))
     with CodeMap(root, state_dir=tmp_path / "state") as cm:
         cm.index.sync()
-        before: Any = cm.dependency_resolution_evidence(raw)
+        before: Any = cm.dependencies.observe(raw)
         materialize_dependency(root, native_dependency_corpus / producer / "v2")
         cm.index.sync()
-        reused: Any = cm.dependency_resolution_evidence(raw)
-        delta: Any = cm.dependency_resolution_delta(before, reused)
-        response = cm.dependency_codemap(raw)
+        reused: Any = cm.dependencies.observe(raw)
+        delta: Any = cm.dependencies.delta(before, reused)
+        response = cm.dependencies.codemap(raw)
     assert any(
         row["source_equivalence"] == "mismatch" for row in reused["repository_inputs"]
     )
@@ -103,7 +104,7 @@ def test_native_dependency_formatting_change_is_not_resolution_change(
     raw = dependency_capture(producer, source, input_revisions(root, paths))
     with CodeMap(root, state_dir=tmp_path / "state") as cm:
         cm.index.sync()
-        before: Any = cm.dependency_resolution_evidence(raw)
+        before: Any = cm.dependencies.observe(raw)
         path = root / ("uv.lock" if producer == "uv" else "pom.xml")
         prefix = (
             "# format-only observation\n"
@@ -124,8 +125,8 @@ def test_native_dependency_formatting_change_is_not_resolution_change(
             after_raw = uv_lock_dependency_observation(
                 lock=path.read_bytes(), repository_inputs=input_revisions(root, paths)
             )
-        after: Any = cm.dependency_resolution_evidence(after_raw)
-        delta: Any = cm.dependency_resolution_delta(before, after)
+        after: Any = cm.dependencies.observe(after_raw)
+        delta: Any = cm.dependencies.delta(before, after)
     assert delta["change_axes"]["repository_inputs"] == "changed"
     assert delta["change_axes"]["semantic_resolution"] == "unchanged"
     assert delta["change_axes"]["physical_evidence_content"] == (
@@ -153,11 +154,11 @@ def test_native_maven_file_changes_preserve_expected_delta_and_projection(
             paths = materialize_dependency(root, source)
             cm.index.sync()
             observations.append(
-                cm.dependency_resolution_evidence(
+                cm.dependencies.observe(
                     dependency_capture("maven", source, input_revisions(root, paths))
                 )
             )
-        delta: Any = cm.dependency_resolution_delta(*observations)
+        delta: Any = cm.dependencies.delta(*observations)
     assert delta["comparability"] == "comparable"
     assert len(delta["component_selection_transitions"]) == transitions
     assert len(delta["components_removed"]) == removed
@@ -191,7 +192,7 @@ def test_native_uv_grouped_bounds_and_incomplete_inventory_cannot_prove_absence(
     raw = dependency_capture("uv", source, input_revisions(root, paths))
     with CodeMap(root, state_dir=tmp_path / "state") as cm:
         cm.index.sync()
-        observation: Any = cm.dependency_resolution_evidence(raw)
+        observation: Any = cm.dependencies.observe(raw)
         request = {
             "operation": "dependencies",
             "node_id": observation["roots"][0]["node_id"],
@@ -200,20 +201,20 @@ def test_native_uv_grouped_bounds_and_incomplete_inventory_cannot_prove_absence(
         results = [
             cast(
                 Any,
-                cm.dependency_resolution_queries(
+                cm.dependencies.queries(
                     observation, [{**request, "max_results": limit}]
                 ),
             )["results"][0]
             for limit in (1, 16)
         ]
         incomplete = deepcopy(raw)
-        for row in incomplete["coverage"]:
+        for row in assert_records(incomplete["coverage"]):
             row["completeness"] = "incomplete"
-        partial: Any = cm.dependency_resolution_evidence(incomplete)
-        response = cm.dependency_codemap(incomplete)
+        partial: Any = cm.dependencies.observe(incomplete)
+        response = cm.dependencies.codemap(incomplete)
         missing = cast(
             Any,
-            cm.dependency_resolution_queries(
+            cm.dependencies.queries(
                 partial,
                 [
                     {
@@ -239,7 +240,7 @@ def test_native_maven_bounded_search_does_not_turn_unvisited_into_absent(
     paths = materialize_dependency(root, source)
     with CodeMap(root, state_dir=tmp_path / "state") as cm:
         cm.index.sync()
-        observation: Any = cm.dependency_resolution_evidence(
+        observation: Any = cm.dependencies.observe(
             dependency_capture("maven", source, input_revisions(root, paths))
         )
         target = next(
@@ -255,11 +256,9 @@ def test_native_maven_bounded_search_does_not_turn_unvisited_into_absent(
         }
         bounded = cast(
             Any,
-            cm.dependency_resolution_queries(
-                observation, [{**request, "max_visits": 1}]
-            ),
+            cm.dependencies.queries(observation, [{**request, "max_visits": 1}]),
         )["results"][0]
-        complete = cast(Any, cm.dependency_resolution_queries(observation, [request]))[
+        complete = cast(Any, cm.dependencies.queries(observation, [request]))[
             "results"
         ][0]
     assert bounded["result"] == []
@@ -292,7 +291,7 @@ def test_native_maven_profiles_do_not_promote_context_absence_to_global_absence(
     )
     with CodeMap(root, state_dir=tmp_path / "state") as cm:
         cm.index.sync()
-        observation: Any = cm.dependency_resolution_evidence(raw)
+        observation: Any = cm.dependencies.observe(raw)
         selection = next(
             row
             for row in observation["selections"]
@@ -302,17 +301,13 @@ def test_native_maven_profiles_do_not_promote_context_absence_to_global_absence(
         request = {"operation": "inventory", "node_id": selection["node_id"]}
         default = cast(
             Any,
-            cm.dependency_resolution_queries(
-                observation, [{**request, "context": "default"}]
-            ),
+            cm.dependencies.queries(observation, [{**request, "context": "default"}]),
         )["results"][0]
         extra = cast(
             Any,
-            cm.dependency_resolution_queries(
-                observation, [{**request, "context": "extra"}]
-            ),
+            cm.dependencies.queries(observation, [{**request, "context": "extra"}]),
         )["results"][0]
-        response = cm.dependency_codemap(raw)
+        response = cm.dependencies.codemap(raw)
     assert default["result"] == []
     assert default["negative_evidence"] == "admissible-within-declared-scope"
     assert extra["result"] and extra["negative_evidence"] == "not-applicable"

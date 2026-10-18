@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import ExitStack
 from dataclasses import dataclass
 from pathlib import Path
 from types import TracebackType
@@ -11,39 +12,28 @@ from hashmarks.client import (
 from hashmarks.file_store import FileDigestStore
 from hashmarks.paths import canonical_host_path
 
-from .change_impact import _ImpactOwnerReuse
-from .change_intelligence import ChangeIntelligenceMixin
 from .context_cache import ContextCache
-from .cross_repository_evidence import CrossRepositoryEvidenceMixin
+from .cross_repository_evidence import RepositoryCrossRepository
 from .decision_session import (
     DecisionScope,
-    ReadScopeOwner,
 )
-from .dependency_resolution_delta import DependencyResolutionDeltaMixin
-from .dependency_resolution_derivation import DependencyResolutionDerivationMixin
-from .dependency_resolution_evidence import DependencyResolutionEvidenceMixin
 from .evidence_correlation import RepositoryCorrelation
 from .evidence_graph import RepositoryRelationships
-from .evidence_profiles import EvidenceProfilesMixin
 from .evidence_verification import RepositoryVerification
 from .find_engine import RepositorySearch
-from .freshness_map import EvidenceFreshnessMapMixin
 from .import_resolution import RepositoryImports
 from .indexing_lifecycle import (
     _MAX_INDEX_BYTES,
     RepositoryIndex,
 )
-from .intelligence_economics import IntelligenceEconomicsMixin
+from .intelligence_economics import RepositoryEconomics
 from .native_evidence import RepositoryNativeEvidence
 from .ownership_graph import RepositoryOwnership
-from .post_change import PostChangeMixin
 from .providers import SourceRangeProvider, TreeSitterRangeProvider
-from .query_surface import QuerySurfaceMixin
+from .repository_changes import RepositoryChanges
 from .repository_context import RepositoryContext
-from .repository_declaration_derivation import RepositoryDeclarationDerivationMixin
-from .repository_declaration_discovery import RepositoryDeclarationDiscoveryMixin
-from .repository_declarations import RepositoryDeclarationsMixin
-from .repository_delta import RepositoryDeltaMixin, _SnapshotReuse
+from .repository_declarations import RepositoryDeclarations
+from .repository_dependencies import RepositoryDependencies
 from .repository_evidence_bindings import RepositoryBindings
 from .repository_file_discovery import RepositoryFiles
 from .repository_index_store import (
@@ -51,7 +41,7 @@ from .repository_index_store import (
     WorkspaceMapStore,
     default_artifact_db,
 )
-from .repository_intelligence_query import RepositoryIntelligenceQueryMixin
+from .repository_intelligence_query import RepositoryViews
 from .repository_observation import RepositoryObservationSource
 from .repository_source import RepositorySource
 from .repository_tasks import RepositoryTasks
@@ -105,24 +95,7 @@ class _CodeMapPaths:
         return cls(root, state, artifacts, policy, internal)
 
 
-class CodeMap(
-    DependencyResolutionDeltaMixin,
-    DependencyResolutionDerivationMixin,
-    DependencyResolutionEvidenceMixin,
-    ChangeIntelligenceMixin,
-    EvidenceFreshnessMapMixin,
-    RepositoryDeltaMixin,
-    EvidenceProfilesMixin,
-    CrossRepositoryEvidenceMixin,
-    RepositoryIntelligenceQueryMixin,
-    RepositoryDeclarationDerivationMixin,
-    RepositoryDeclarationDiscoveryMixin,
-    RepositoryDeclarationsMixin,
-    IntelligenceEconomicsMixin,
-    PostChangeMixin,
-    QuerySurfaceMixin,
-    ReadScopeOwner,
-):
+class CodeMap:
     """Derived repository-intelligence map.
 
     This subsystem is intentionally outside the Identity import graph. It may
@@ -141,15 +114,22 @@ class CodeMap(
         range_provider: SourceRangeProvider | None = None,
     ) -> None:
         paths = _CodeMapPaths.prepare(workspace, state_dir, artifact_db, policy_path)
+        with ExitStack() as resources:
+            self._open_resources(paths, resources)
+            self._compose_components(range_provider, max_index_bytes)
+            self._resources = resources.pop_all()
+
+    def _open_resources(self, paths: _CodeMapPaths, resources: ExitStack) -> None:
         self.workspace = paths.workspace
         self.state_dir = paths.state_dir
-        store = WorkspaceMapStore(self.state_dir / "codemap.sqlite3")
-        store.bind_workspace(
+        self.store = WorkspaceMapStore(self.state_dir / "codemap.sqlite3")
+        resources.callback(self.store.close)
+        self.store.bind_workspace(
             self.workspace,
             allow_unbound_existing=paths.internal_state_path is not None,
         )
-        self.store = store
         self.file_store = FileDigestStore(self.state_dir / "identity.sqlite3")
+        resources.callback(self.file_store.close)
         # Protocol v3 is the compatibility fence. Reuse one stateless IPC client
         # so repository observations validate daemon compatibility once rather
         # than spending an extra status round-trip on every freshness sample.
@@ -157,12 +137,18 @@ class CodeMap(
             IdentityClient(self.workspace, state_dir=self.state_dir, timeout=0.1)
         )
         self.artifacts = ArtifactStore(paths.artifact_db)
+        resources.callback(self.artifacts.close)
         self._files = RepositoryFiles(
             self.workspace,
             internal_state_path=paths.internal_state_path,
             policy_path=paths.policy_path,
         )
         self._context_cache = ContextCache(self.state_dir)
+        resources.callback(self._context_cache.close)
+
+    def _compose_components(
+        self, range_provider: SourceRangeProvider | None, max_index_bytes: int
+    ) -> None:
         # Optional structural precision lives entirely in the CodeMap lane.
         # Missing tree-sitter support is expected and never affects Identity.
         range_producer = (
@@ -177,30 +163,22 @@ class CodeMap(
             observation_source=self._observation_source,
             max_index_bytes=max_index_bytes,
         )
-        self._reads = DecisionScope(self.index, self.store, self._observation_source)
-        self._source = RepositorySource(
-            self.files, self.index, self.reads, self.store, self.file_store
-        )
-        self._imports = RepositoryImports(
-            self.files, self.source, self.reads, self.store
-        )
-        self._native = RepositoryNativeEvidence(
-            self.files, self.source, self.reads, self.store
-        )
-        self._relationships = RepositoryRelationships(
-            self.source, self.reads, self.store, self._imports, self.native
-        )
+        self._reads = DecisionScope(self.index)
+        self._source = RepositorySource(self.index, self.reads)
+        self._imports = RepositoryImports(self.source)
+        self._native = RepositoryNativeEvidence(self.source)
+        self._relationships = RepositoryRelationships(self._imports, self.native)
         self._structure = RepositoryStructure(
             self.source, self._imports, self.native, self.relationships
         )
-        self._search = RepositorySearch(self.source, self.native)
+        self._search = RepositorySearch(self.native)
         self._context = RepositoryContext(
             self.source, self.search, self.relationships, self._context_cache
         )
         self._ownership = RepositoryOwnership(
             self.source, self._imports, self.structure, self.search
         )
-        self._verification = RepositoryVerification(self.source, self._imports)
+        self._verification = RepositoryVerification(self._imports)
         self._tasks = RepositoryTasks(
             self.search,
             self.ownership,
@@ -209,9 +187,17 @@ class CodeMap(
             self.context,
         )
         self._bindings = RepositoryBindings(self.source)
-        self._correlation = RepositoryCorrelation(self.source, self.bindings)
-        self._snapshot_reuse = _SnapshotReuse()
-        self._impact_owner_reuse = _ImpactOwnerReuse()
+        self._correlation = RepositoryCorrelation(self.bindings)
+        self._declarations = RepositoryDeclarations(self.bindings)
+        self._dependencies = RepositoryDependencies(
+            self.source, self._imports, self.correlation
+        )
+        self._changes = RepositoryChanges(self.tasks, self.relationships)
+        self._cross_repository = RepositoryCrossRepository(self.changes)
+        self._economics = RepositoryEconomics(self.changes)
+        self._views = RepositoryViews(
+            self.changes, self.cross_repository, self.economics, self.structure
+        )
 
     @property
     def files(self) -> RepositoryFiles:
@@ -269,6 +255,30 @@ class CodeMap(
     def correlation(self) -> RepositoryCorrelation:
         return self._correlation
 
+    @property
+    def declarations(self) -> RepositoryDeclarations:
+        return self._declarations
+
+    @property
+    def dependencies(self) -> RepositoryDependencies:
+        return self._dependencies
+
+    @property
+    def changes(self) -> RepositoryChanges:
+        return self._changes
+
+    @property
+    def cross_repository(self) -> RepositoryCrossRepository:
+        return self._cross_repository
+
+    @property
+    def economics(self) -> RepositoryEconomics:
+        return self._economics
+
+    @property
+    def views(self) -> RepositoryViews:
+        return self._views
+
     def __enter__(self) -> CodeMap:
         return self
 
@@ -281,7 +291,4 @@ class CodeMap(
         self.close()
 
     def close(self) -> None:
-        self._context_cache.close()
-        self.store.close()
-        self.artifacts.close()
-        self.file_store.close()
+        self._resources.close()

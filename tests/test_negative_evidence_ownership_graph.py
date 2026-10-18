@@ -72,7 +72,7 @@ def test_edge_bound_cannot_become_structural_owner_absence(
         "def start():\n    return 1\n",
         encoding="utf-8",
     )
-    probed_edges = [{"kind": "other"} for _ in range(101)]
+    probed_edges: list[dict[str, object]] = [{"kind": "other"} for _ in range(101)]
 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
@@ -115,7 +115,7 @@ def test_symbol_candidate_bound_is_observed_before_ownership_filtering(
             }
         ]
     }
-    symbols = [
+    symbols: list[dict[str, object]] = [
         {
             "path": f"src/candidate_{index}.py",
             "name": "target",

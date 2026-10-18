@@ -315,7 +315,7 @@ def test_repository_derived_file_evidence_uses_canonical_admission_owner() -> No
 
     assert '.rglob("pyproject.toml")' not in indexing
     assert 'self.files.visible_manifests("pyproject.toml")' in indexing
-    assert "default_project_graph_providers(files.visible_manifests)" in native
+    assert "default_project_graph_providers(self.files.visible_manifests)" in native
     assert "def _manifest_admitted(" in freshness
     assert "self.files.is_admitted(relpath)" in freshness
     assert "self.files.decide(relpath)" in freshness

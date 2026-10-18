@@ -79,7 +79,7 @@ def test_standalone_structure_preserves_competing_import_ambiguity(
 def test_structure_and_comparison_imports_have_no_facade_or_task_dependency() -> None:
     for statement in (
         "from hashmarks.codemap.structural_locality import RepositoryStructure",
-        "from hashmarks.codemap import structural_locality_delta; assert 'hashmarks.codemap.structural_locality' not in sys.modules",
+        "from hashmarks.codemap.structural_locality_delta import structural_locality_delta; assert 'hashmarks.codemap.structural_locality' not in sys.modules",
     ):
         result = subprocess.run(
             [

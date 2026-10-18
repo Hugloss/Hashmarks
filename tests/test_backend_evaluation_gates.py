@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Any
 
 import pytest
+from contract_assertions import assert_object
 
 from scripts.repository_evaluation.backend_gates import combine_required
 from scripts.repository_evaluation.backend_workflows import _authority_safe, _gates
@@ -24,7 +24,7 @@ from scripts.repository_evaluation.backend_workflows import _authority_safe, _ga
     ],
 )
 def test_required_proof_is_non_vacuous_and_failure_preserving(
-    observations: list[object], expected: object
+    observations: list[bool | None], expected: bool | None
 ) -> None:
     assert combine_required(observations) is expected
 
@@ -61,7 +61,9 @@ def _stage() -> dict[str, object]:
     }
 
 
-def _evaluate(before: dict[str, object], after: dict[str, object]) -> dict[str, object]:
+def _evaluate(
+    before: dict[str, object], after: dict[str, object]
+) -> dict[str, bool | None]:
     return _gates(
         before,
         after,
@@ -80,7 +82,7 @@ def _evaluate(before: dict[str, object], after: dict[str, object]) -> dict[str, 
 
 def test_after_initial_oversize_is_a_hard_gate_independent_of_recall() -> None:
     before, after = _stage(), _stage()
-    after["initial"]["mcp"]["initial_size"] = False
+    assert_object(assert_object(after["initial"])["mcp"])["initial_size"] = False
     gates = _evaluate(before, after)
     assert gates["initial_size"] is False
     assert gates["initial_evidence"] is True
@@ -113,8 +115,8 @@ def test_empty_authority_checks_are_not_a_successful_observation() -> None:
 
 def test_known_after_transport_failure_dominates_missing_before_proof() -> None:
     before, after = _stage(), _stage()
-    before["mcp"]["parity"] = None
-    after["mcp"]["parity"] = False
+    assert_object(before["mcp"])["parity"] = None
+    assert_object(after["mcp"])["parity"] = False
     gates = _evaluate(before, after)
     assert gates["mcp"] is False
     assert gates["presentation"] is False
@@ -122,19 +124,19 @@ def test_known_after_transport_failure_dominates_missing_before_proof() -> None:
 
 def test_initial_profile_failure_cannot_be_hidden_by_full_profile() -> None:
     before, after = _stage(), _stage()
-    after["initial"]["cli"]["authority"] = False
+    assert_object(assert_object(after["initial"])["cli"])["authority"] = False
     assert _evaluate(before, after)["authority"] is False
 
 
 def test_missing_initial_proof_cannot_be_certified_by_full_profile() -> None:
     before, after = _stage(), _stage()
-    after["initial"]["mcp"]["initial_size"] = None
+    assert_object(assert_object(after["initial"])["mcp"])["initial_size"] = None
     assert _evaluate(before, after)["initial_size"] is None
 
 
 def test_owner_recall_requires_the_after_stage() -> None:
     before, after = _stage(), _stage()
-    after["packet"]["retrieval"]["results"] = []
+    assert_object(assert_object(after["packet"])["retrieval"])["results"] = []
     assert _evaluate(before, after)["owner_top_three"] is False
 
 

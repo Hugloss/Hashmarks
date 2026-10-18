@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from contract_assertions import assert_object, assert_present
+
 from hashmarks.codemap import CodeMap
 
 
@@ -68,8 +70,8 @@ def test_omitted_lowercase_alnum_identifier_recovers_task_local_action(
         target["token"] not in views[key].split()
         for key in ("base", "governance", "evidence")
     )
-    assert action["edit"]["path"] == target["edit"]
-    assert action["verify"]["path"] == target["verify"]
+    assert assert_present(action["edit"])["path"] == target["edit"]
+    assert assert_present(action["verify"])["path"] == target["verify"]
 
 
 def test_omitted_identifier_probe_survives_leading_version_protocol_tokens(
@@ -83,8 +85,8 @@ def test_omitted_identifier_probe_survives_leading_version_protocol_tokens(
         codemap.index.sync()
         action = codemap.tasks.action_map(query, limit=20, per_role=3)
 
-    assert action["edit"]["path"] == target["edit"]
-    assert action["verify"]["path"] == target["verify"]
+    assert assert_present(action["edit"])["path"] == target["edit"]
+    assert assert_present(action["verify"])["path"] == target["verify"]
 
 
 def test_omitted_identifiers_preserve_existing_multi_owner_ambiguity(
@@ -121,5 +123,5 @@ def test_omitted_identifiers_preserve_existing_multi_owner_ambiguity(
 
     assert action["ambiguity"]["ambiguous"] is True
     assert action["ambiguity"]["reason"] == "multiple-task-local-structural-owners"
-    assert packet["discrimination"]["needed"] is True
-    assert packet["discrimination"]["reason"] == "competing-action-roles"
+    assert assert_object(packet["discrimination"])["needed"] is True
+    assert assert_object(packet["discrimination"])["reason"] == "competing-action-roles"

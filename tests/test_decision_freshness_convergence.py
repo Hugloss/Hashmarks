@@ -1,7 +1,7 @@
 from pathlib import Path
-from typing import Any
 
 import pytest
+from contract_assertions import assert_object
 
 from hashmarks.codemap import CodeMap
 
@@ -41,15 +41,15 @@ def test_unknown_freshness_converges_across_decision_surfaces(
         decision = codemap.tasks.decision_brief(task, token_budget=256)
         action = codemap.tasks.action_brief(task, token_budget=256)
 
-    assert packet["identity"]["stale"] is True
-    assert packet["identity"]["codemap_complete"] is True
-    assert packet["evidence_receipt"]["stale"] is None
+    assert assert_object(packet["identity"])["stale"] is True
+    assert assert_object(packet["identity"])["codemap_complete"] is True
+    assert assert_object(packet["evidence_receipt"])["stale"] is None
 
     assert decision["stale"] is True
-    assert decision["evidence_receipt"]["stale"] is None
+    assert assert_object(decision["evidence_receipt"])["stale"] is None
 
     assert action["status"] == "safe-unknown"
-    assert action["evidence_receipt"]["stale"] is None
+    assert assert_object(action["evidence_receipt"])["stale"] is None
 
 
 def test_codemap_completeness_does_not_redefine_freshness(
@@ -75,9 +75,9 @@ def test_codemap_completeness_does_not_redefine_freshness(
 
         packet = codemap.tasks.decision_packet(task, token_budget=256)
 
-    assert packet["identity"]["stale"] is False
-    assert packet["identity"]["codemap_complete"] is False
-    assert packet["identity"]["codemap_build_state"] == "BUILDING"
+    assert assert_object(packet["identity"])["stale"] is False
+    assert assert_object(packet["identity"])["codemap_complete"] is False
+    assert assert_object(packet["identity"])["codemap_build_state"] == "BUILDING"
 
 
 def test_action_brief_status_consumes_receipt_freshness_once(
@@ -112,4 +112,4 @@ def test_action_brief_status_consumes_receipt_freshness_once(
 
     assert reads == 1
     assert brief["status"] == "safe-fresh"
-    assert brief["evidence_receipt"]["stale"] is False
+    assert assert_object(brief["evidence_receipt"])["stale"] is False

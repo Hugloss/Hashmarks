@@ -5,7 +5,9 @@ import threading
 import time
 from typing import TYPE_CHECKING
 
-from hashmarks.codemap import CodeMap, CodeMapService, CodeMapServiceClient
+from contract_assertions import assert_object, assert_records
+
+from hashmarks.codemap import CodeMapService, CodeMapServiceClient
 from hashmarks.codemap.evidence_packet import (
     TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS,
 )
@@ -154,7 +156,9 @@ def test_budget_sweep_defaults_have_one_core_owner(tmp_path: Path) -> None:
         thread.join(timeout=5)
 
     expected = list(TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS)
-    assert [row["budget"] for row in raw["rows"]] == expected
+    assert [
+        row["budget"] for row in assert_records(assert_object(raw)["rows"])
+    ] == expected
     assert [row["budget"] for row in typed["rows"]] == expected
 
 

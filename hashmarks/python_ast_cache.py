@@ -25,6 +25,11 @@ class PythonAstSnapshot:
     tree: ast.Module
     identity: _FileIdentity
 
+    @property
+    def size_bytes(self) -> int:
+        """Describe physical size at the stable read, never content identity."""
+        return self.identity[2]
+
     @cached_property
     def function_definitions_by_name(
         self,

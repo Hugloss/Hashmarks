@@ -1,14 +1,21 @@
 import shutil
 from pathlib import Path
-from typing import Any
 
 import pytest
 
 from hashmarks.codemap import (
     CodeMap,
+    SearchHit,
     WorktreeOverlay,
     WorktreeOverlayBaseChangedError,
 )
+from hashmarks.codemap.indexing_lifecycle import RepositoryIndex
+
+
+def _publish_generation_only(index: RepositoryIndex) -> None:
+    """Test-owned producer publishes through the canonical transaction."""
+    with index.store.publication_transaction():
+        index.store.bump_generation()
 
 
 def _repo(root: Path, value: int = 1) -> None:
@@ -29,13 +36,20 @@ def test_overlay_indexes_only_changed_paths_and_reuses_base_artifacts(
     (worktree / "src" / "engine.py").write_text("def target():\n    return 99\n")
     with CodeMap(base_dir) as base:
         base.index.sync()
-        with WorktreeOverlay(base, worktree, worker_id="agent-a") as overlay:
+        with WorktreeOverlay(
+            base.index,
+            base.search,
+            base.reads,
+            worktree,
+            worker_id="agent-a",
+            artifact_db=base.index.artifact_db_path,
+        ) as overlay:
             stats = overlay.sync(["src/engine.py"])
             hits = overlay.find_task("target engine", limit=10)
-            assert stats.base_generation == base.store.generation()
-            assert stats.base_workspace_fingerprint == base.store.meta(
-                "workspace_fingerprint"
-            )
+            assert (
+                stats.base_generation,
+                stats.base_workspace_fingerprint,
+            ) == base.index.publication_binding()
     assert stats.changed_paths == ("src/engine.py",)
     assert stats.as_dict()["schema"] == "hashmarks.worktree-overlay-stats.v2"
     assert stats.parsed_artifacts <= 1
@@ -55,8 +69,22 @@ def test_overlays_are_worker_isolated(tmp_path: Path) -> None:
     with CodeMap(base_dir) as base:
         base.index.sync()
         with (
-            WorktreeOverlay(base, a, worker_id="agent-a") as oa,
-            WorktreeOverlay(base, b, worker_id="agent-b") as ob,
+            WorktreeOverlay(
+                base.index,
+                base.search,
+                base.reads,
+                a,
+                worker_id="agent-a",
+                artifact_db=base.index.artifact_db_path,
+            ) as oa,
+            WorktreeOverlay(
+                base.index,
+                base.search,
+                base.reads,
+                b,
+                worker_id="agent-b",
+                artifact_db=base.index.artifact_db_path,
+            ) as ob,
         ):
             oa.sync(["src/engine.py"])
             ob.sync(["src/engine.py"])
@@ -75,7 +103,14 @@ def test_overlay_rejects_base_workspace_and_parent_escape(tmp_path: Path) -> Non
     with CodeMap(tmp_path) as base:
         base.index.sync()
         try:
-            WorktreeOverlay(base, tmp_path, worker_id="same")
+            WorktreeOverlay(
+                base.index,
+                base.search,
+                base.reads,
+                tmp_path,
+                worker_id="same",
+                artifact_db=base.index.artifact_db_path,
+            )
         except ValueError:
             pass
         else:
@@ -93,7 +128,14 @@ def test_overlay_rejects_later_base_generation_until_explicit_resync(
 
     with CodeMap(base_dir) as base:
         base.index.sync()
-        with WorktreeOverlay(base, worktree, worker_id="agent-a") as overlay:
+        with WorktreeOverlay(
+            base.index,
+            base.search,
+            base.reads,
+            worktree,
+            worker_id="agent-a",
+            artifact_db=base.index.artifact_db_path,
+        ) as overlay:
             initial = overlay.sync(["src/engine.py"])
 
             (base_dir / "src" / "helper.py").write_text(
@@ -124,14 +166,20 @@ def test_overlay_rejects_generation_only_base_advance(tmp_path: Path) -> None:
 
     with CodeMap(base_dir) as base:
         base.index.sync()
-        with WorktreeOverlay(base, worktree, worker_id="agent-a") as overlay:
+        with WorktreeOverlay(
+            base.index,
+            base.search,
+            base.reads,
+            worktree,
+            worker_id="agent-a",
+            artifact_db=base.index.artifact_db_path,
+        ) as overlay:
             stats = overlay.sync(["src/engine.py"])
             fingerprint = stats.base_workspace_fingerprint
 
-            with base.store.publication_transaction():
-                base.store.bump_generation()
+            _publish_generation_only(base.index)
 
-            assert base.store.meta("workspace_fingerprint") == fingerprint
+            assert base.index.publication_binding()[1] == fingerprint
             with pytest.raises(
                 WorktreeOverlayBaseChangedError,
                 match="canonical base advanced after overlay sync",
@@ -151,16 +199,22 @@ def test_overlay_rejects_base_generation_change_during_fused_read(
 
     with CodeMap(base_dir) as base:
         base.index.sync()
-        with WorktreeOverlay(base, worktree, worker_id="agent-a") as overlay:
+        with WorktreeOverlay(
+            base.index,
+            base.search,
+            base.reads,
+            worktree,
+            worker_id="agent-a",
+            artifact_db=base.index.artifact_db_path,
+        ) as overlay:
             overlay.sync(["src/engine.py"])
             original_find = overlay.overlay.search.find_task
 
             def advance_base_during_overlay_read(
                 task: str, *, limit: int = 20
-            ) -> object:
+            ) -> tuple[SearchHit, ...]:
                 hits = original_find(task, limit=limit)
-                with base.store.publication_transaction():
-                    base.store.bump_generation()
+                _publish_generation_only(base.index)
                 return hits
 
             monkeypatch.setattr(

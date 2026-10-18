@@ -8,6 +8,7 @@ import subprocess
 import tomllib
 from collections import Counter
 from pathlib import Path
+from typing import TypedDict
 
 from hashmarks._command_output import log_command_output
 
@@ -40,7 +41,32 @@ def _quality_config() -> tuple[dict[str, int], int]:
 LIMITS, MAX_PYTHON_FILE_LINES = _quality_config()
 
 
-def inventory() -> list[dict[str, object]]:
+class DebtFinding(TypedDict):
+    path: str
+    line: int
+    violations: dict[str, int]
+
+
+class FileDebt(TypedDict):
+    functions: int
+    rule_findings: int
+    excess: int
+
+
+class DebtSummary(TypedDict):
+    schema: str
+    limits: dict[str, int]
+    max_python_file_lines: int
+    oversized_files: dict[str, int]
+    functions: int
+    rule_findings: int
+    excess: int
+    by_root: dict[str, int]
+    files: dict[str, FileDebt]
+    findings: list[DebtFinding]
+
+
+def inventory() -> list[DebtFinding]:
     command = [
         "ruff",
         "check",
@@ -56,7 +82,7 @@ def inventory() -> list[dict[str, object]]:
     result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
     if result.returncode not in (0, 1):
         raise RuntimeError(f"Ruff inventory failed: {result.stderr.strip()}")
-    grouped: dict[tuple[str, int], dict[str, object]] = {}
+    grouped: dict[tuple[str, int], DebtFinding] = {}
     for diagnostic in json.loads(result.stdout):
         rule = diagnostic["code"]
         path = Path(diagnostic["filename"]).relative_to(ROOT).as_posix()
@@ -84,13 +110,13 @@ def _oversized_production_files() -> dict[str, int]:
     return oversized
 
 
-def _summary(findings: list[dict[str, object]]) -> dict[str, object]:
-    files: dict[str, dict[str, int]] = {}
+def _summary(findings: list[DebtFinding]) -> DebtSummary:
+    files: dict[str, FileDebt] = {}
     for finding in findings:
         path = str(finding["path"])
         row = files.setdefault(path, {"functions": 0, "rule_findings": 0, "excess": 0})
         row["functions"] += 1
-        violations = dict(finding["violations"])
+        violations = finding["violations"]
         row["rule_findings"] += len(violations)
         row["excess"] += sum(
             int(value) - LIMITS[rule] for rule, value in violations.items()
@@ -104,11 +130,11 @@ def _summary(findings: list[dict[str, object]]) -> dict[str, object]:
         "max_python_file_lines": MAX_PYTHON_FILE_LINES,
         "oversized_files": _oversized_production_files(),
         "functions": len(findings),
-        "rule_findings": sum(len(dict(item["violations"])) for item in findings),
+        "rule_findings": sum(len(item["violations"]) for item in findings),
         "excess": sum(
             int(value) - LIMITS[rule]
             for item in findings
-            for rule, value in dict(item["violations"]).items()
+            for rule, value in item["violations"].items()
         ),
         "by_root": dict(sorted(roots.items())),
         "files": dict(sorted(files.items())),
@@ -126,9 +152,9 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _report_inventory(
-    findings: list[dict[str, object]], summary: dict[str, object], as_json: bool
+    findings: list[DebtFinding], summary: DebtSummary, as_json: bool
 ) -> int:
-    oversized = dict(summary["oversized_files"])
+    oversized = summary["oversized_files"]
     if as_json:
         log_command_output(logger, json.dumps(summary, sort_keys=True))
         return 1 if findings or oversized else 0

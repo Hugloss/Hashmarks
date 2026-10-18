@@ -82,7 +82,7 @@ def _snapshot(
 
 
 def _qualify(codemap: CodeMap, snapshot: dict[str, object]) -> dict[str, object]:
-    return codemap.dependency_resolution_evidence(snapshot)
+    return codemap.dependencies.observe(snapshot)
 
 
 def test_dependency_delta_compares_explicit_endpoints_across_generations(
@@ -96,7 +96,7 @@ def test_dependency_delta_compares_explicit_endpoints_across_generations(
         codemap.index.sync(["later.py"])
         after = _qualify(codemap, _snapshot())
 
-        delta = codemap.dependency_resolution_delta(before, after)
+        delta = codemap.dependencies.delta(before, after)
 
     assert (
         assert_object(before["repository_binding"])["codemap_generation"]
@@ -129,7 +129,7 @@ def test_dependency_delta_projects_component_selection_transition(
         codemap.index.sync()
         before = _qualify(codemap, before_raw)
         after = _qualify(codemap, after_raw)
-        delta = codemap.dependency_resolution_delta(before, after)
+        delta = codemap.dependencies.delta(before, after)
 
     assert delta["component_selection_transitions"] == [
         {
@@ -169,7 +169,7 @@ def test_dependency_delta_projects_same_node_semantic_change(
         codemap.index.sync()
         before = _qualify(codemap, before_raw)
         after = _qualify(codemap, after_raw)
-        delta = codemap.dependency_resolution_delta(before, after)
+        delta = codemap.dependencies.delta(before, after)
 
     assert delta["selections_added"] == []
     assert delta["selections_removed"] == []
@@ -209,7 +209,7 @@ def test_dependency_delta_separates_adapter_semantics_from_repository_meaning(
         codemap.index.sync()
         before = _qualify(codemap, before_raw)
         after = _qualify(codemap, after_raw)
-        delta = codemap.dependency_resolution_delta(before, after)
+        delta = codemap.dependencies.delta(before, after)
 
     assert before["resolution_identity"] == after["resolution_identity"]
     assert before["observation_identity"] != after["observation_identity"]
@@ -233,7 +233,7 @@ def test_dependency_delta_uses_canonical_json_for_producer_provenance(
         codemap.index.sync()
         before = _qualify(codemap, before_raw)
         after = _qualify(codemap, after_raw)
-        delta = codemap.dependency_resolution_delta(before, after)
+        delta = codemap.dependencies.delta(before, after)
 
     assert before["observation_identity"] != after["observation_identity"]
     assert assert_object(delta["change_axes"])["producer_provenance"] == "changed"
@@ -250,7 +250,7 @@ def test_dependency_delta_separates_evidence_topology_from_equal_bytes(
         codemap.index.sync()
         before = _qualify(codemap, before_raw)
         after = _qualify(codemap, after_raw)
-        delta = codemap.dependency_resolution_delta(before, after)
+        delta = codemap.dependencies.delta(before, after)
 
     assert before["resolution_identity"] == after["resolution_identity"]
     assert assert_object(delta["change_axes"])["semantic_resolution"] == "unchanged"
@@ -273,7 +273,7 @@ def test_dependency_delta_reports_source_content_change_without_semantic_change(
         codemap.index.sync()
         before = _qualify(codemap, before_raw)
         after = _qualify(codemap, after_raw)
-        delta = codemap.dependency_resolution_delta(before, after)
+        delta = codemap.dependencies.delta(before, after)
 
     assert before["resolution_identity"] == after["resolution_identity"]
     assert assert_object(delta["change_axes"])["semantic_resolution"] == "unchanged"
@@ -295,7 +295,7 @@ def test_dependency_delta_reports_unknown_adapter_semantics_without_rejecting(
         codemap.index.sync()
         before = _qualify(codemap, before_raw)
         after = _qualify(codemap, after_raw)
-        delta = codemap.dependency_resolution_delta(before, after)
+        delta = codemap.dependencies.delta(before, after)
 
     assert delta["comparability"] == "comparable"
     assert delta["before_adapter_semantics"] is None
@@ -315,7 +315,7 @@ def test_dependency_delta_reports_unknown_physical_content_without_digest(
         codemap.index.sync()
         before = _qualify(codemap, before_raw)
         after = _qualify(codemap, after_raw)
-        delta = codemap.dependency_resolution_delta(before, after)
+        delta = codemap.dependencies.delta(before, after)
 
     assert delta["comparability"] == "comparable"
     assert assert_object(delta["change_axes"])["physical_evidence_content"] == "unknown"
@@ -334,7 +334,7 @@ def test_dependency_delta_keeps_coverage_change_separate_from_resolution(
         codemap.index.sync()
         before = _qualify(codemap, before_raw)
         after = _qualify(codemap, after_raw)
-        delta = codemap.dependency_resolution_delta(before, after)
+        delta = codemap.dependencies.delta(before, after)
 
     assert before["resolution_identity"] == after["resolution_identity"]
     assert assert_object(delta["change_axes"])["semantic_resolution"] == "unchanged"
@@ -353,7 +353,7 @@ def test_dependency_delta_marks_definition_change_non_comparable(
         codemap.index.sync()
         before = _qualify(codemap, before_raw)
         after = _qualify(codemap, after_raw)
-        delta = codemap.dependency_resolution_delta(before, after)
+        delta = codemap.dependencies.delta(before, after)
 
     assert delta["comparability"] == "not-comparable"
     assert delta["reason"] == "definition-changed"
@@ -380,7 +380,7 @@ def test_dependency_delta_reports_repository_identity_as_independent_axis(
     with CodeMap(right) as right_map:
         right_map.index.sync()
         after = _qualify(right_map, _snapshot())
-        delta = right_map.dependency_resolution_delta(before, after)
+        delta = right_map.dependencies.delta(before, after)
 
     assert (
         assert_object(before["repository_binding"])["repository_identity"]

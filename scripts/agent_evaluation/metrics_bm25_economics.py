@@ -6,6 +6,7 @@ import json
 import logging
 import time
 from pathlib import Path
+from typing import NotRequired, TypedDict
 
 from hashmarks._command_output import log_command_output
 from hashmarks.codemap import (
@@ -16,6 +17,7 @@ from scripts.experimental_fielded_bm25 import (
 )
 
 from .metrics_agent_economics import (
+    FileCost,
     _file_cost,
     _verification_target,
 )
@@ -31,20 +33,61 @@ SCHEMA = "hashmarks.bm25-economics.v1"
 FAMILY = "hashmarks-fielded-bm25-a"
 
 
+class BM25TaskReport(TypedDict):
+    id: object
+    query: str
+    hashmarks_first: str | None
+    bm25_first: str | None
+    fused_first: str | None
+    bm25_matched_fields: list[str]
+    bm25_override: bool
+    correct_hashmarks: bool
+    correct_bm25: bool
+    correct_fused: bool
+    verification_target: str | None
+    evidence_read: FileCost
+    verification_candidates_examined: int
+
+
+class BM25RepositoryReport(TypedDict):
+    name: str
+    public_task_sha256: str
+    hidden_corpus_sha256: str
+    tasks: list[BM25TaskReport]
+
+
+class BM25Summary(TypedDict):
+    repositories: int
+    tasks: int
+    bm25_build_ms: float
+    current_hashmarks_correct_first: int
+    bm25_correct_first: int
+    candidate_fused_correct_first: int
+    candidate_fused_wrong_first: int
+    candidate_bm25_overrides: int
+    candidate_fused_evidence_approx_tokens: int
+    correct_verifications: int
+    promotion_decision: NotRequired[str]
+    canonical_after_experiment_correct_first: NotRequired[int]
+
+
 def _task_report(
     workspace: Path,
-    cm: object,
-    idx: int,
+    cm: CodeMap,
+    idx: FieldedBM25Index,
     task: dict[str, object],
     secret: dict[str, object],
     *,
     limit: int,
-) -> dict[str, object]:
+) -> BM25TaskReport:
     query = task["query"]
+    if not isinstance(query, str):
+        raise ValueError("benchmark query must be a string")
     canonical = cm.tasks.entry_points(query, limit=limit)
-    recommended = [
-        row for row in canonical.get("recommended", []) if isinstance(row, dict)
-    ]
+    raw_recommended = canonical.get("recommended", [])
+    if not isinstance(raw_recommended, list):
+        raise ValueError("task entry recommendations must be an array")
+    recommended = [row for row in raw_recommended if isinstance(row, dict)]
     hashmarks_first = str(recommended[0].get("path") or "") if recommended else None
     hits = idx.search(query, limit=limit)
     bm25_first = hits[0].path if hits else None
@@ -58,7 +101,10 @@ def _task_report(
     verification, candidates_examined = _verification_target(
         workspace, query, limit=limit, codemap=cm
     )
-    expected = {str(value) for value in secret.get("expected_files") or ()}
+    expected_files = secret.get("expected_files") or ()
+    if not isinstance(expected_files, (list, tuple)):
+        raise ValueError("expected benchmark files must be an array")
+    expected = {str(value) for value in expected_files}
     return {
         "id": task["id"],
         "query": query,
@@ -77,7 +123,7 @@ def _task_report(
 
 
 def collect(root: Path, limit: int = 20) -> dict[str, object]:
-    reports = []
+    reports: list[BM25RepositoryReport] = []
     build_ms = 0.0
     for name, workspace, corpus, public_path in materialize_challenge(
         root / "challenge"
@@ -103,7 +149,7 @@ def collect(root: Path, limit: int = 20) -> dict[str, object]:
     rows = [x for r in reports for x in r["tasks"]]
     n = len(rows)
     tokens = sum(int(r["evidence_read"]["approx_tokens"]) for r in rows)
-    summary = {
+    summary: BM25Summary = {
         "repositories": len(reports),
         "tasks": n,
         "bm25_build_ms": build_ms,

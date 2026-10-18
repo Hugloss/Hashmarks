@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from contract_assertions import assert_array
 
 import hashmarks.codemap.find_engine as find_engine_module
 import hashmarks.evidence_context as evidence_context_module
@@ -43,4 +44,4 @@ def test_find_claim_admission_consumes_canonical_freshness(
 
     assert result["freshness"] == "stale"
     assert result["negative_evidence"] == "not-admissible"
-    assert "repository-freshness-stale" in result["admissibility_reasons"]
+    assert "repository-freshness-stale" in assert_array(result["admissibility_reasons"])

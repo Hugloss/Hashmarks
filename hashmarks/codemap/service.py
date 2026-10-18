@@ -570,7 +570,7 @@ class CodeMapService:
         )
         if encoding not in {"verbose", "compact"}:
             raise ValueError("project_impact_encoding must be verbose or compact")
-        result = self._map().task_change_impact(
+        result = self._map().changes.task_impact(
             task,
             changed,
             limit=limit,
@@ -610,7 +610,7 @@ class CodeMapService:
             not isinstance(member_path, str) or not member_path.strip()
         ):
             raise ValueError("member_path must be a non-empty string or null")
-        result = self._map().repository_intelligence_query(
+        result = self._map().views.query(
             surface,
             task,
             changed,
@@ -660,7 +660,7 @@ class CodeMapService:
         token_budget = self._bounded_int(
             request, "token_budget", defaults.token_budget, 1, 100_000
         )
-        result = self._map().task_post_change_delta(
+        result = self._map().changes.task_delta(
             task,
             changed,
             previous_evidence=previous_evidence,
@@ -673,7 +673,7 @@ class CodeMapService:
     def _refresh_delta_response(self, request: dict[str, Any]) -> dict[str, Any]:
         task, changed, limit, per_role, budget = self._refresh_context(request)
         defaults = POST_CHANGE_DEFAULT_OPTIONS
-        result = self._map().refresh_after_change_delta(
+        result = self._map().changes.refresh_delta(
             task,
             changed,
             options=PostChangeOptions(
@@ -692,7 +692,7 @@ class CodeMapService:
 
     def _refresh_brief_response(self, request: dict[str, Any]) -> dict[str, Any]:
         task, changed, limit, per_role, budget = self._refresh_context(request)
-        result = self._map().refresh_after_change_brief(
+        result = self._map().changes.refresh_brief(
             task,
             changed,
             limit=limit,
@@ -703,7 +703,7 @@ class CodeMapService:
 
     def _refresh_response(self, request: dict[str, Any]) -> dict[str, Any]:
         task, changed, limit, per_role, budget = self._refresh_context(request)
-        result = self._map().refresh_after_change(
+        result = self._map().changes.refresh(
             task,
             changed,
             limit=limit,

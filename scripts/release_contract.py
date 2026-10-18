@@ -16,7 +16,7 @@ from typing import Protocol
 
 
 class SubParsers(Protocol):
-    def add_parser(self, name: str, **kwargs: object) -> argparse.ArgumentParser: ...
+    def add_parser(self, name: str) -> argparse.ArgumentParser: ...
 
 
 def _log_command_output(*values: object) -> None:
@@ -464,7 +464,9 @@ def _validate_standalone_bundle_members(
         )
 
 
-def _load_standalone_bundle(root: Path, bundle: Path) -> dict[str, object]:
+def _load_standalone_bundle(
+    root: Path, bundle: Path
+) -> tuple[dict[str, object], dict[str, object], object]:
     root = root.resolve()
     bundle = bundle.resolve()
     value = _read_standalone_qualification(bundle)
@@ -485,7 +487,7 @@ def _load_standalone_bundle(root: Path, bundle: Path) -> dict[str, object]:
     )
     if standalone != observed_standalone or checksum != observed_checksum:
         raise ValueError("standalone qualification does not match current bundle bytes")
-    return value
+    return standalone, checksum, value["qualification_identity"]
 
 
 def _qualified_standalones(
@@ -496,14 +498,13 @@ def _qualified_standalones(
     standalones: list[dict[str, object]] = []
     checksums: list[dict[str, object]] = []
     observed: set[tuple[str, str]] = set()
-    for qualification in qualifications:
-        standalone = dict(qualification["standalone"])
-        checksum = dict(qualification["installer_checksum"])
+    for qualified_standalone, qualified_checksum, identity in qualifications:
+        standalone = dict(qualified_standalone)
+        checksum = dict(qualified_checksum)
         key = (str(standalone["platform"]), str(standalone["architecture"]))
         if key in observed:
             raise ValueError(f"duplicate standalone qualification: {key[0]}/{key[1]}")
         observed.add(key)
-        identity = qualification["qualification_identity"]
         standalone["qualification_identity"] = identity
         checksum["qualification_identity"] = identity
         standalones.append(standalone)
@@ -521,7 +522,7 @@ def _qualified_standalones(
 
 
 def _bootstrap_installer_rows(root: Path) -> list[dict[str, object]]:
-    rows = []
+    rows: list[dict[str, object]] = []
     for platform, filename in BOOTSTRAP_INSTALLERS.items():
         path = root.resolve() / filename
         if not path.is_file():
@@ -586,6 +587,18 @@ def _validate_publication_identity(manifest: dict[str, object]) -> None:
         raise ValueError("publication manifest identity mismatch")
 
 
+def _artifact_rows(manifest: dict[str, object], key: str) -> list[dict[str, object]]:
+    rows = manifest.get(key)
+    if not isinstance(rows, list):
+        raise ValueError(f"publication manifest {key} must be a list")
+    result: list[dict[str, object]] = []
+    for row in rows:
+        if not isinstance(row, dict) or not isinstance(row.get("filename"), str):
+            raise ValueError(f"publication manifest {key} contains an invalid row")
+        result.append(row)
+    return result
+
+
 def publication_asset_names(manifest: dict[str, object]) -> list[str]:
     if manifest.get("schema") != PUBLICATION_SCHEMA:
         raise ValueError("publication asset list requires a publication manifest")
@@ -598,12 +611,7 @@ def publication_asset_names(manifest: dict[str, object]) -> list[str]:
         "installer_checksums",
         "bootstrap_installers",
     ):
-        rows = manifest.get(key)
-        if not isinstance(rows, list):
-            raise ValueError(f"publication manifest {key} must be a list")
-        for row in rows:
-            if not isinstance(row, dict) or not isinstance(row.get("filename"), str):
-                raise ValueError(f"publication manifest {key} contains an invalid row")
+        for row in _artifact_rows(manifest, key):
             names.append(str(row["filename"]))
 
     if len(names) != len(set(names)):
@@ -645,20 +653,17 @@ def _publication_source_map(
         "release-manifest.json": manifest_path.resolve(),
         "SHA256SUMS.txt": sha256sums_path.resolve(),
     }
-    for row in manifest["distributions"]:
-        assert isinstance(row, dict)
+    for row in _artifact_rows(manifest, "distributions"):
         filename = str(row["filename"])
         sources[filename] = dist.resolve() / filename
     for key in ("standalones", "installer_checksums"):
-        for row in manifest[key]:
-            assert isinstance(row, dict)
+        for row in _artifact_rows(manifest, key):
             filename = str(row["filename"])
             sources[filename] = _standalone_publication_source(
                 filename,
                 standalone_bundles,
             )
-    for row in manifest["bootstrap_installers"]:
-        assert isinstance(row, dict)
+    for row in _artifact_rows(manifest, "bootstrap_installers"):
         filename = str(row["filename"])
         sources[filename] = root.resolve() / filename
     return sources
@@ -675,8 +680,7 @@ def _publication_rows_by_name(
             "installer_checksums",
             "bootstrap_installers",
         )
-        for row in manifest[key]
-        if isinstance(row, dict)
+        for row in _artifact_rows(manifest, key)
     }
 
 
@@ -710,14 +714,13 @@ def _copy_publication_sources(
 
 
 def _sha256sums_text(manifest: dict[str, object]) -> str:
-    checksum_rows = list(manifest["distributions"])
-    checksum_rows.extend(manifest.get("standalones", []))
-    checksum_rows.extend(manifest.get("installer_checksums", []))
-    checksum_rows.extend(manifest.get("bootstrap_installers", []))
+    checksum_rows = _artifact_rows(manifest, "distributions")
+    for key in ("standalones", "installer_checksums", "bootstrap_installers"):
+        if key in manifest:
+            checksum_rows.extend(_artifact_rows(manifest, key))
 
     lines = []
     for row in checksum_rows:
-        assert isinstance(row, dict)
         digest = str(row["sha256"]).removeprefix("sha256:")
         lines.append(f"{digest}  {row['filename']}")
     return "\n".join(lines) + "\n"

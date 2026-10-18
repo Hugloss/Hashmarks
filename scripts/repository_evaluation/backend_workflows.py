@@ -365,7 +365,7 @@ def execute_workflow(
         with CodeMap(workspace, state_dir=state) as codemap:
             stale = _freshness(codemap, paths, before_revisions)
             write_json(output / "stale.json", stale)
-            delta = codemap.task_post_change_delta(
+            delta = codemap.changes.task_delta(
                 workflow["task"],
                 paths,
                 previous_evidence=before["packet"],

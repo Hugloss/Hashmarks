@@ -3,22 +3,18 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import sys
 import time
 from pathlib import Path
 
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
 from hashmarks._command_output import log_command_output
 from hashmarks.codemap import CodeMap
+from scripts.agent_evaluation.sanitized_agent_swarm import _guard, _load_public
 
 logger = logging.getLogger(__name__)
-
-try:
-    from scripts._module_loader import import_sibling
-except ModuleNotFoundError:  # direct script execution
-    from _module_loader import import_sibling
-
-_sanitized = import_sibling("sanitized_agent_swarm", __package__)
-_guard = _sanitized._guard
-_load_public = _sanitized._load_public
 
 TRACE_SCHEMA = "hashmarks.agent-work-trace.v1"
 
@@ -48,7 +44,8 @@ def emit(
                 }
             )
             sequence = 2
-            edit = packet.get("edit") if isinstance(packet.get("edit"), dict) else None
+            raw_edit = packet.get("edit")
+            edit = raw_edit if isinstance(raw_edit, dict) else None
             if edit is not None:
                 now = time.perf_counter_ns()
                 events.append(
@@ -61,7 +58,10 @@ def emit(
                     }
                 )
                 sequence += 1
-            if bool((packet.get("discrimination") or {}).get("needed")):
+            discrimination = packet.get("discrimination")
+            if not isinstance(discrimination, dict):
+                discrimination = {}
+            if bool(discrimination.get("needed")):
                 now = time.perf_counter_ns()
                 events.append(
                     {
@@ -72,9 +72,8 @@ def emit(
                     }
                 )
                 sequence += 1
-            verify = (
-                packet.get("verify") if isinstance(packet.get("verify"), dict) else None
-            )
+            raw_verify = packet.get("verify")
+            verify = raw_verify if isinstance(raw_verify, dict) else None
             if verify is not None:
                 now = time.perf_counter_ns()
                 events.append(

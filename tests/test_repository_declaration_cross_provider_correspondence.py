@@ -297,18 +297,16 @@ def _cross_provider_packets(
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        baseline = codemap.discover_repository_declarations(
-            [provider_a, provider_b, correlation]
-        )
+        baseline = codemap.declarations.discover([provider_a, provider_b, correlation])
 
         (repo / "owner-b.txt").write_text("owner: team-b\n", encoding="utf-8")
         codemap.index.sync(["owner-b.txt"])
-        differing = codemap.discover_repository_declarations(
+        differing = codemap.declarations.discover(
             [provider_a, provider_b, correlation],
             previous_observation=baseline,
         )
 
-        ambiguous = codemap.discover_repository_declarations(
+        ambiguous = codemap.declarations.discover(
             [
                 provider_a,
                 provider_b,
@@ -317,7 +315,7 @@ def _cross_provider_packets(
             previous_observation=differing,
         )
 
-        removed = codemap.discover_repository_declarations(
+        removed = codemap.declarations.discover(
             [provider_a, provider_b],
             previous_observation=ambiguous,
         )
@@ -560,18 +558,18 @@ def _nontransitive_correspondence_packets(
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        chain = codemap.discover_repository_declarations(
+        chain = codemap.declarations.discover(
             [provider_a, provider_b, provider_c, ab, bc]
         )
 
         (repo / "owner-b.txt").write_text("owner: team-b\n", encoding="utf-8")
         codemap.index.sync(["owner-b.txt"])
-        middle_changed = codemap.discover_repository_declarations(
+        middle_changed = codemap.declarations.discover(
             [provider_a, provider_b, provider_c, ab, bc],
             previous_observation=chain,
         )
 
-        explicit_ac = codemap.discover_repository_declarations(
+        explicit_ac = codemap.declarations.discover(
             [provider_a, provider_b, provider_c, ab, bc, ac],
             previous_observation=middle_changed,
         )
@@ -736,21 +734,19 @@ def _referential_isolation_packets(
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        baseline = codemap.discover_repository_declarations(
-            [provider_a, provider_b, correlation]
-        )
+        baseline = codemap.declarations.discover([provider_a, provider_b, correlation])
 
-        source_removed = codemap.discover_repository_declarations(
+        source_removed = codemap.declarations.discover(
             [provider_a, correlation],
             previous_observation=baseline,
         )
 
-        unknown_basis = codemap.discover_repository_declarations(
+        unknown_basis = codemap.declarations.discover(
             [provider_a, correlation_unknown],
             previous_observation=source_removed,
         )
 
-        source_restored = codemap.discover_repository_declarations(
+        source_restored = codemap.declarations.discover(
             [provider_a, provider_b, correlation_unknown],
             previous_observation=unknown_basis,
         )
@@ -958,10 +954,8 @@ def _direction_reversal_packets(
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
-        before = codemap.discover_repository_declarations(
-            [provider_a, provider_b, forward]
-        )
-        after = codemap.discover_repository_declarations(
+        before = codemap.declarations.discover([provider_a, provider_b, forward])
+        after = codemap.declarations.discover(
             [provider_a, provider_b, reversed_pair],
             previous_observation=before,
         )

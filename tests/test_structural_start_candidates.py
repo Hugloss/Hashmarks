@@ -8,6 +8,7 @@ from pytest import MonkeyPatch
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.model import SearchHit
 from hashmarks.codemap.ownership_relation_types import OwnershipRelationGraph
+from hashmarks.codemap.task_retrieval import _TaskRetrievalResult
 
 
 def _write(path: Path, content: str) -> None:
@@ -99,7 +100,11 @@ def test_ninth_source_start_changes_observed_structural_ambiguity(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         monkeypatch.setattr(
-            codemap.search, "find_task", lambda _task, *, limit=20: hits[:limit]
+            codemap.search,
+            "observe_task",
+            lambda _task, *, limit=20: _TaskRetrievalResult(
+                hits[:limit], ("fixture-observation-scope-unknown",)
+            ),
         )
         monkeypatch.setattr(
             codemap.ownership,
@@ -133,7 +138,11 @@ def test_unselected_graph_bound_and_stale_competitor_remain_visible(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         monkeypatch.setattr(
-            codemap.search, "find_task", lambda _task, *, limit=20: hits[:limit]
+            codemap.search,
+            "observe_task",
+            lambda _task, *, limit=20: _TaskRetrievalResult(
+                hits[:limit], ("fixture-observation-scope-unknown",)
+            ),
         )
         monkeypatch.setattr(
             codemap.ownership,

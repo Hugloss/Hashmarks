@@ -46,3 +46,17 @@ def test_oversized_source_audit_thresholds_are_review_nominations() -> None:
         payload["policy"]["critical_file_lines"] > payload["policy"]["high_file_lines"]
     )
     assert "nominate review" in payload["policy"]["note"]
+
+
+def test_source_size_audit_counts_exact_utf8_bytes_with_crlf(tmp_path: Path) -> None:
+    package = tmp_path / "hashmarks"
+    package.mkdir()
+    source = package / "sample.py"
+    content = "class Caf\u00e9:\r\n    pass\r\n".encode("utf-8")
+    source.write_bytes(content)
+
+    result = audit(tmp_path)
+
+    assert result["python_file_count"] == 1
+    assert result["top_files"][0]["bytes"] == len(content)
+    assert result["top_files"][0]["lines"] == 2

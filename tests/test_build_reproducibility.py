@@ -4,6 +4,8 @@ import hashlib
 import os
 from typing import TYPE_CHECKING
 
+import pytest
+
 import hashmarks_build
 
 if TYPE_CHECKING:

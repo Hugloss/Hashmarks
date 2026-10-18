@@ -12,6 +12,7 @@ from hashmarks import CodeMap
 from hashmarks.codemap.repository_intelligence_query import (
     REPOSITORY_INTELLIGENCE_QUERY_DEFAULT_OPTIONS,
     RepositoryIntelligenceQueryOptions,
+    RepositoryViews,
     repository_query_response,
 )
 from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
@@ -40,25 +41,17 @@ def test_query_facade_delegates_without_changing_producer_semantics(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         expected = {
-            "change-intelligence": codemap.change_intelligence_brief(
-                task, ["src/owner.py"]
-            ),
-            "freshness": codemap.evidence_freshness_map(task, ["src/owner.py"]),
-            "snapshot": codemap.repository_intelligence_snapshot(
-                task, ["src/owner.py"]
-            ),
-            "profile": codemap.repository_intelligence_profile(
-                task, ["src/owner.py"], profile="compact"
-            ),
-            "cross-repository": codemap.cross_repository_evidence_packet(
-                task, ["src/owner.py"]
-            ),
+            "change-intelligence": codemap.changes.brief(task, ["src/owner.py"]),
+            "freshness": codemap.changes.freshness_map(task, ["src/owner.py"]),
+            "snapshot": codemap.changes.snapshot(task, ["src/owner.py"]),
+            "profile": codemap.views.profile(task, ["src/owner.py"], profile="compact"),
+            "cross-repository": codemap.cross_repository.packet(task, ["src/owner.py"]),
             "verification-explanation": codemap.tasks.explain_verification_selection(
                 task, "tests/test_owner.py"
             ),
         }
         actual = {
-            surface: codemap.repository_intelligence_query(
+            surface: codemap.views.query(
                 surface,
                 task,
                 ["src/owner.py"] if surface != "verification-explanation" else (),
@@ -86,15 +79,15 @@ def test_query_facade_delta_matches_direct_delta(tmp_path: Path) -> None:
     source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        previous = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
+        previous = codemap.changes.snapshot(task, ["src/owner.py"])
         source.write_text("def widget(): return 'new'\n", encoding="utf-8")
         codemap.index.sync(["src/owner.py"])
-        direct = codemap.repository_intelligence_delta(
+        direct = codemap.changes.delta(
             task,
             ["src/owner.py"],
             previous_snapshot=previous,
         )
-        query = codemap.repository_intelligence_query(
+        query = codemap.views.query(
             "delta",
             task,
             ["src/owner.py"],
@@ -112,26 +105,22 @@ def test_query_facade_is_deterministic_and_fails_closed(tmp_path: Path) -> None:
     _source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        first = codemap.repository_intelligence_query("profile", task, ["src/owner.py"])
-        second = codemap.repository_intelligence_query(
-            "profile", task, ["src/owner.py"]
-        )
+        first = codemap.views.query("profile", task, ["src/owner.py"])
+        second = codemap.views.query("profile", task, ["src/owner.py"])
         assert first == second
         with pytest.raises(ValueError, match="surface must be one of"):
-            codemap.repository_intelligence_query("magic", task, ["src/owner.py"])
+            codemap.views.query("magic", task, ["src/owner.py"])
         with pytest.raises(ValueError, match="changed_paths must not be empty"):
-            codemap.repository_intelligence_query("snapshot", task)
+            codemap.views.query("snapshot", task)
         with pytest.raises(ValueError, match="previous_snapshot is required"):
-            codemap.repository_intelligence_query("delta", task, ["src/owner.py"])
+            codemap.views.query("delta", task, ["src/owner.py"])
 
 
 def test_repository_intelligence_defaults_have_one_core_owner(
     tmp_path: Path,
 ) -> None:
     assert (
-        inspect.signature(CodeMap.repository_intelligence_query)
-        .parameters["options"]
-        .default
+        inspect.signature(RepositoryViews.query).parameters["options"].default
         is REPOSITORY_INTELLIGENCE_QUERY_DEFAULT_OPTIONS
     )
     assert (
@@ -190,8 +179,8 @@ def test_raw_query_omission_preserves_canonical_negative_members_default(
 ) -> None:
     captured: dict[str, object] = {}
 
-    class _Map:
-        def repository_intelligence_query(
+    class _Views:
+        def query(
             self,
             surface: str,
             task: str,
@@ -201,6 +190,9 @@ def test_raw_query_omission_preserves_canonical_negative_members_default(
         ) -> dict[str, object]:
             captured["options"] = options
             return {"schema": "hashmarks.repository-intelligence-query.v1"}
+
+    class _Map:
+        views = _Views()
 
     service = CodeMapService(tmp_path, socket_path=tmp_path / "service.sock")
     monkeypatch.setattr(service, "_map", lambda: _Map())

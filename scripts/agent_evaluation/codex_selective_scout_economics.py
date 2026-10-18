@@ -9,13 +9,18 @@ import os
 import shutil
 import subprocess
 import time
+from collections.abc import Mapping
 from pathlib import Path
+from typing import TypedDict
 
 from hashmarks._command_output import log_command_output
 
 from .codex_agent_economics import (
     CodexRunConfig,
+    CodexRunResult,
     CollectionConfig,
+    ModelRunResult,
+    _process_output_text,
     _run_one,
     _usage_from_jsonl,
 )
@@ -35,6 +40,40 @@ _S = Path(__file__).resolve().parent
 SCHEMA = "hashmarks.codex-selective-scout-economics.v1"
 PROTOCOL = "hashmarks.codex-selective-scout-economics-protocol.v1"
 FAMILY = "hashmarks-real-selective-scout-a"
+
+
+class TaggedScoutResult(ModelRunResult):
+    task_id: str
+
+
+class ScoutTaskScore(TypedDict):
+    id: object
+    scout_spawned: bool
+    correct_first_edit: bool
+    correct_verification: bool
+    main_usage: dict[str, int | None]
+    scout_usage: dict[str, int | None] | None
+    main_elapsed_ms: float
+    scout_elapsed_ms: float
+
+
+class ScoutRepositoryReport(TypedDict):
+    name: str
+    public_task_sha256: str
+    hidden_corpus_sha256: str
+    summary: dict[str, int | float]
+    tasks: list[ScoutTaskScore]
+    scout_runs: list[TaggedScoutResult]
+
+
+def _scout_alternatives(packet: Mapping[str, object]) -> list[dict[str, object]]:
+    ambiguity = packet.get("ambiguity")
+    if not isinstance(ambiguity, dict):
+        return []
+    alternatives = ambiguity.get("alternatives", [])
+    if not isinstance(alternatives, list):
+        raise ValueError("scout alternatives must be an array")
+    return [row for row in alternatives if isinstance(row, dict)]
 
 
 def _id(v: object) -> str:
@@ -67,19 +106,14 @@ def _scout_schema(path: Path) -> None:
 
 
 def _scout_prompt(task: dict[str, str], workspace: Path, pkt: dict[str, object]) -> str:
-    alts = (
-        [
-            {
-                "role": r.get("role"),
-                "path": r.get("path"),
-                "canonical_rank": r.get("canonical_rank"),
-            }
-            for r in pkt.get("ambiguity", {}).get("alternatives", [])
-            if isinstance(r, dict)
-        ]
-        if isinstance(pkt.get("ambiguity"), dict)
-        else []
-    )
+    alts = [
+        {
+            "role": r.get("role"),
+            "path": r.get("path"),
+            "canonical_rank": r.get("canonical_rank"),
+        }
+        for r in _scout_alternatives(pkt)
+    ]
     return f"""You are an isolated READ-ONLY repository scout in a controlled agent-economics benchmark.\nTask id: {task["id"]}\nTask: {task["query"]}\nRepository root: {workspace}\nThe primary Hashmarks worker found competing role evidence. Candidate evidence (worker-visible, no hidden answers):\n{json.dumps(alts, sort_keys=True)}\nInspect only these candidate files if needed. Choose the single candidate path best justified as the first edit/authority target for the task. Do not modify files. Return only the structured output schema. Never choose a path not listed above.\n"""
 
 
@@ -89,7 +123,7 @@ def _run_scout(
     workspace: Path,
     pkt: dict[str, object],
     run_dir: Path,
-) -> dict[str, object]:
+) -> ModelRunResult:
     run_dir.mkdir(parents=True, exist_ok=True)
     schema = run_dir / "output.schema.json"
     final = run_dir / "final.json"
@@ -123,6 +157,8 @@ def _run_scout(
             cmd,
             input=prompt,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             capture_output=True,
             timeout=config.timeout_s,
             env=dict(os.environ),
@@ -132,24 +168,16 @@ def _run_scout(
         err = cp.stderr
     except subprocess.TimeoutExpired as e:
         rc = 124
-        out = e.stdout or ""
-        err = (e.stderr or "") + "\nTIMEOUT"
+        out = _process_output_text(e.stdout)
+        err = _process_output_text(e.stderr) + "\nTIMEOUT"
     elapsed = (time.perf_counter() - t) * 1000
-    events.write_text(out)
-    stderr.write_text(err)
+    events.write_bytes(out.encode("utf-8"))
+    stderr.write_bytes(err.encode("utf-8"))
     parsed = None
     if final.is_file():
         with contextlib.suppress(Exception):
             parsed = json.loads(final.read_text())
-    allowed = (
-        {
-            str(r.get("path") or "")
-            for r in pkt.get("ambiguity", {}).get("alternatives", [])
-            if isinstance(r, dict)
-        }
-        if isinstance(pkt.get("ambiguity"), dict)
-        else set()
-    )
+    allowed = {str(r.get("path") or "") for r in _scout_alternatives(pkt)}
     if isinstance(parsed, dict) and parsed.get("recommended_path") not in allowed:
         parsed = {
             "task_id": task["id"],
@@ -172,13 +200,14 @@ def _main_with_scout(
     task: dict[str, str],
     workspace: Path,
     run_dir: Path,
-    scout: dict[str, object] | None,
-) -> dict[str, object]:
+    scout: ModelRunResult | None,
+) -> CodexRunResult:
     # Use the shared real-Codex runner but add frozen scout guidance to the public task text; the grader remains unopened.
     enriched = dict(task)
-    if scout and isinstance(scout.get("final"), dict):
-        rec = scout["final"].get("recommended_path")
-        reason = scout["final"].get("reason")
+    final = scout["final"] if scout else None
+    if isinstance(final, dict):
+        rec = final.get("recommended_path")
+        reason = final.get("reason")
         enriched["query"] = (
             task["query"]
             + f"\nA separate read-only ambiguity scout recommended candidate path `{rec}` with reason: {reason}. Verify this recommendation against repository evidence before finalizing."
@@ -195,18 +224,19 @@ def _main_with_scout(
 def _scored_rows(
     public: list[dict],
     hidden: list[dict],
-    runs: list[dict[str, object]],
-    scouts: list[dict[str, object]],
+    runs: list[CodexRunResult],
+    scouts: list[TaggedScoutResult],
     expected_verification: str,
-) -> list[dict[str, object]]:
+) -> list[ScoutTaskScore]:
     hidden_by_id = {str(task["id"]): task for task in hidden}
     scout_by_id = {str(scout["task_id"]): scout for scout in scouts}
-    rows = []
+    rows: list[ScoutTaskScore] = []
     for task, main in zip(public, runs, strict=False):
         expected = {
             str(path) for path in hidden_by_id[task["id"]].get("expected_files", [])
         }
-        final = main.get("final") if isinstance(main.get("final"), dict) else {}
+        raw_final = main["final"]
+        final = raw_final if isinstance(raw_final, dict) else {}
         edit = str(final.get("first_edit_target") or "")
         verify = str(final.get("verification_target") or "")
         scout = scout_by_id.get(str(task["id"]))
@@ -225,7 +255,7 @@ def _scored_rows(
     return rows
 
 
-def _token_total(rows: list[dict[str, object]], field: str) -> int:
+def _token_total(rows: list[ScoutTaskScore], field: str) -> int:
     return sum(
         int((row["main_usage"] or {}).get(field) or 0)
         + int((row["scout_usage"] or {}).get(field) or 0)
@@ -238,22 +268,19 @@ def _repository_report(
     source: tuple[str, Path, Path, Path],
     config: CollectionConfig,
     run_config: CodexRunConfig,
-) -> dict[str, object]:
+) -> ScoutRepositoryReport:
     name, workspace, corpus, public_path = source
     public = json.loads(public_path.read_text())["tasks"]
     hidden = _load_corpus(corpus)
     if config.max_tasks is not None:
         public = public[: config.max_tasks]
         hidden = hidden[: config.max_tasks]
-    runs = []
-    scouts = []
+    runs: list[CodexRunResult] = []
+    scouts: list[TaggedScoutResult] = []
     for task in public:
         packet = context_packet(workspace, task["query"], mode="current")
-        ambiguity = (
-            packet.get("ambiguity", {})
-            if isinstance(packet.get("ambiguity"), dict)
-            else {}
-        )
+        raw_ambiguity = packet.get("ambiguity")
+        ambiguity = raw_ambiguity if isinstance(raw_ambiguity, dict) else {}
         scout = None
         if ambiguity.get("ambiguous"):
             scout = _run_scout(

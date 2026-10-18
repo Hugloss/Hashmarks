@@ -126,3 +126,61 @@ def test_scoped_references_filter_paths_before_row_bound(tmp_path: Path) -> None
         assert codemap.store.refs_many_for_paths(["Thing"], [], limit_per_target=2) == {
             "Thing": []
         }
+
+
+def test_reference_priority_preserves_capacity_and_independent_cached_orders(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "a_source.py").write_text("from owner import Thing\n" + "Thing()\n" * 8)
+    (tmp_path / "tests").mkdir()
+    preferred = "tests/test_thing.py"
+    (tmp_path / preferred).write_text("from owner import Thing\nThing()\n")
+    with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as repository:
+        repository.index.sync()
+        with repository.reads.session():
+            original = repository.reads.refs_many(["Thing"], limit_per_target=4)
+            prioritized = repository.reads.refs_many(
+                ["Thing"], limit_per_target=4, preferred_paths=[preferred]
+            )
+            narrow = repository.reads.refs_many(
+                ["other.Thing"],
+                limit_per_target=1,
+                preferred_paths=[preferred, preferred],
+            )
+            assert len(prioritized["Thing"]) == 4
+            assert [row["path"] for row in prioritized["Thing"]] == [
+                preferred,
+                preferred,
+                "a_source.py",
+                "a_source.py",
+            ]
+            assert narrow["other.Thing"] == prioritized["Thing"][:1]
+            narrow["other.Thing"][0]["path"] = "mutated.py"
+            repeated = repository.reads.refs_many(
+                ["Thing"], limit_per_target=1, preferred_paths=[preferred]
+            )
+            assert repeated["Thing"] == prioritized["Thing"][:1]
+            assert repository.reads.refs_many(["Thing"], limit_per_target=4) == original
+            assert all(row["path"] == "a_source.py" for row in original["Thing"])
+
+
+def test_preferred_reference_window_keeps_its_truncation_lookahead(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "a_source.py").write_text("from owner import Thing\nThing()\n")
+    (tmp_path / "tests").mkdir()
+    preferred = "tests/test_thing.py"
+    (tmp_path / preferred).write_text("from owner import Thing\n" + "Thing()\n" * 1030)
+    with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as repository:
+        repository.index.sync()
+        with repository.reads.session():
+            prefix = repository.reads.refs_many(
+                ["Thing"], limit_per_target=1024, preferred_paths=[preferred]
+            )["Thing"]
+            lookahead = repository.reads.refs_many(
+                ["Thing"], limit_per_target=1025, preferred_paths=[preferred]
+            )["Thing"]
+    assert len(prefix) == 1024
+    assert len(lookahead) == 1025
+    assert prefix == lookahead[:1024]
+    assert all(row["path"] == preferred for row in lookahead)

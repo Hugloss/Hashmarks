@@ -6,7 +6,7 @@ It is deliberately **not** another product contract. Normative behavior remains 
 
 ## Why the code can feel hard to enter
 
-`CodeMap` is composed from many responsibility-specific mixins. That keeps ownership boundaries explicit, but reading `engine.py` top-to-bottom does not reveal a request flow. A new maintainer therefore needs two maps before reading implementation bodies:
+`CodeMap` constructs named, independently usable components and owns their shared resources. Domain behavior lives in those components, including their cohesive internal traits; it is not inherited by the root. A new maintainer needs two maps before reading implementation bodies:
 
 1. **Which module owns which fact or decision?**
 2. **What path does a common request take through those owners?**
@@ -39,11 +39,11 @@ Canonical content identity is separate from CodeMap. CodeMap state is derived an
 
 ## Responsibility map
 
-### Construction and shared state
+### Construction and scoped state
 
-- `engine.py` — assembles `CodeMap` and initializes long-lived dependencies. Domain owners retain cache meaning and invalidation; shared fields do not transfer that authority to construction.
+- `engine.py` — constructs resources and named components and closes owned resources. It inherits no domain implementation. Domain owners retain cache meaning and invalidation.
 - `repository_index_store.py` — persistent derived CodeMap storage and bulk query primitives.
-- `decision_session.py` — read-only, generation-bound reuse of immutable evidence inside one decision scope, including exact repository-intelligence snapshots when task, changed paths, and all bounds match.
+- `decision_session.py` — read-only generation-bound primitive reuse and the immutable read-scope value. `repository_changes.py` owns exact snapshot and impact reuse; Tasks and Search own their distinct reuse state.
 
 ### Indexing and repository ingestion
 
@@ -53,13 +53,13 @@ Canonical content identity is separate from CodeMap. CodeMap state is derived an
 - `parsers.py` — source parsing dispatch and parse-artifact keys.
 - `index_surfaces.py` — classifies indexed paths into source/test/docs/config-like surfaces.
 - `policy.py` — repository context/index visibility policy.
-- `file_store.py` (in `hashmarks/`) — stable bytes/content digests; repository admission remains with discovery and qualified member observation remains with `repository_delta.py`.
+- `file_store.py` (in `hashmarks/`) — stable bytes/content digests; admission remains with Files and qualified member observation with `repository_source.py`.
 
 ### Retrieval and context
 
 - `find_engine.py` — independent `RepositorySearch`, indexed search and retrieval-owned state.
 - `task_retrieval.py`, `retrieval_diagnostics.py` — internal Search retrieval/ranking, bounded reuse and diagnostics over the same owner/cache.
-- `query_router.py`, `query_primitives.py`, `query_surface.py` — query intent/formulation and public query projections.
+- `query_router.py`, `query_primitives.py` — query intent/formulation. `repository_intelligence_query.py::RepositoryViews` owns aggregate query/status/profile composition; the obsolete `query_surface.py` root mixin is removed.
 - `repository_context.py`, `work_context.py`, `context_cache.py` — independent `RepositoryContext`, stateless supplied-action projection and borrowed context persistence.
 
 ### Repository relationships
@@ -79,7 +79,7 @@ Canonical content identity is separate from CodeMap. CodeMap state is derived an
 
 ### Change impact and verification
 
-- `change_impact.py`, `post_change.py` — impact evidence around repository changes.
+- `repository_changes.py` — independent `RepositoryChanges`, exposed by `CodeMap.changes`; owns snapshot/impact reuse and the existing change/refresh/delta/freshness implementations. Input-generation guards reject mixed-publication compositions. `change_impact.py`, `post_change.py`, `change_intelligence.py`, `freshness_map.py` and `repository_delta.py` belong to this owner.
 - `evidence_verification.py` — independent `RepositoryVerification`, with owner-bound scoped requests and no task-service dependency. `verification_relevance_model.py` holds explicit request/value bindings.
 - `verification_plan.py` — bounded runner/argv projection for an already-known verification surface; it does not execute verification or choose repository work.
 - `verification_explanation.py` — explanation projection over verification selection.
@@ -91,6 +91,8 @@ Canonical content identity is separate from CodeMap. CodeMap state is derived an
 - `change_intelligence.py`, `repository_delta.py`, `evidence_profiles.py`, `cross_repository_evidence.py`, `intelligence_economics.py` — derived repository-intelligence projections. `repository_delta.py` owns snapshot composition and repository/observer delta vocabulary; inside one explicit decision session, an exact snapshot request may be reused by profile/economics/delta consumers without creating a second truth source.
 - `repository_evidence_bindings.py` — independent `RepositoryBindings`, exposed by `CodeMap.bindings`, observes opaque consumer bindings through Source. `repository_evidence_binding_delta.py` and `repository_evidence_coverage.py` belong to that component; `repository_evidence_binding_validation.py` supplies pure retained-packet integrity checks. They do not create a second repository change/freshness model.
 - `evidence_correlation.py` — independent `RepositoryCorrelation`, exposed by `CodeMap.correlation`, borrows Source and Bindings. `evidence_correlation_delta.py` compares explicit endpoints; `evidence_correlation_model.py` and `evidence_correlation_replay.py` own pure values and retained-packet integrity shared with diagnostics. Correlation owns only claim/correspondence/source-equivalence projection semantics; interpretation, causation, persistence, execution, and recovery remain external.
+- `repository_dependencies.py` — independent `RepositoryDependencies`, exposed by `CodeMap.dependencies`, borrows Source, Imports and repository Correlation. The existing `dependency_resolution_*` observation, correlation, derivation and delta implementations belong to this owner; they no longer share CodeMap state.
+- `repository_declarations.py` — independent `RepositoryDeclarations`, exposed by `CodeMap.declarations`, composes observation, discovery, derivation and explanation over one supplied Bindings owner and its Source/Files/read scope. Providers and previous-packet comparisons are call-local.
 - `dependency_resolution_contract.py` — owns the v3 schema identity, semantic-authority vocabulary, and fail-closed dependency field allowlists, including the adjacent dependency-correlation request vocabulary; it contains no qualification or query behavior.
 - `dependency_resolution_evidence.py` — owns typed producer-neutral external dependency-resolution observations. V3 separates logical components from concrete selections, resolved inventory from graph reachability, physical source format from semantic evidence authority, and resolution identity from the full qualified observation. One physical source may support several semantic authorities; core qualification must never infer authority from a Maven/uv/other producer kind or require a package-manager-specific source shape. It preserves multi-context relationships, contextual module/distribution ownership, compact producer-evidence references, scoped completeness/truncation, repository-generation binding, factual delta, and bounded traversal with explicit omissions. Distribution names never prove import ownership; ownership must be supplied independently and ambiguity is preserved. Package-manager syntax and parsing terminate in `hashmarks/adapters/*`; see `docs/reference/DEPENDENCY_EVIDENCE.md`. It does not run package managers, inspect dependency implementations, own repository-declared dependency intent, or duplicate `project_graph.py`, `import_resolution.py`, repository freshness/delta, or `evidence_correlation.py`.
 - `dependency_resolution_derivation.py` — read-only derivation and explain projections from an already-qualified dependency observation. It reuses dependency qualification, identity, repository binding, and source authority; it owns only compact provenance/explanation shape and deterministic derivation identity. It can explain a caller-retained old endpoint without requiring current repository state. It does not create a history store, repository generation, provenance graph, or producer execution/redetection path.
@@ -248,9 +250,14 @@ Use these questions in order:
 5. **Is a new cache necessary?** First look for operation-local or generation-bound reuse in `decision_session.py` and existing store bulk APIs.
 6. **Is a new serialized state word or delta concept necessary?** Read `docs/reference/STATE_AND_SEMANTIC_OWNERS.md` and reuse the existing state family/owner first.
 
-Every direct `CodeMap` mixin is a responsibility boundary and must be named in this responsibility map. CI enforces that rule so adding a mixin cannot silently add an undocumented semantic owner.
+Every independent component and state writer must have a named owner in this map.
+CodeMap inherits no domain implementation; an internal trait belongs to its
+actual component rather than acquiring access to root state.
 
-Before adding any evidence owner or public evidence schema, also complete the admission/persistence template in `docs/reference/STATE_AND_SEMANTIC_OWNERS.md`. The review must name existing owners first, state the missing fact, classify persistence, and justify any public Python or MCP promotion. A useful agent workflow is not sufficient admission evidence.
+For new production responsibility, apply the observer ownership note in
+`docs/reference/PRODUCT_BOUNDARY.md` and name existing authorities first. Defect
+repairs and refactors need no admission ceremony. A useful agent workflow does
+not transfer consumer or execution responsibility into Hashmarks.
 
 ## Reading strategy for a new maintainer
 
@@ -296,7 +303,7 @@ When structural ownership is eligible, `CodeMap.tasks.action_map()` freezes the 
 
 ### Decision-session task-action reuse
 
-`CodeMap.tasks.action_map()` is a derived projection over canonical task evidence. Within one explicit `CodeMap.reads.session()`, the decision-session projection cache may reuse an exact projection keyed by repository generation, task, `limit`, and `per_role`. This is disposable performance state, not evidence authority: the first computation still performs normal authority-path freshness bookkeeping, callers receive deep copies, and a new session or generation recomputes.
+`CodeMap.tasks.action_map()` is a derived projection over canonical task evidence. Within one explicit `CodeMap.reads.session()`, Tasks may reuse its exact scoped task observation for the same task and bounds. This is disposable performance state, not evidence authority: the first computation still performs normal authority-path freshness bookkeeping, callers receive deep copies, and a new session or generation recomputes.
 
 ### Decision-session change-impact owner-chain reuse
 
@@ -304,7 +311,7 @@ Repeated repository-intelligence surfaces can call `task_change_impact()` severa
 
 ### Decision-session composition diagnostics
 
-Use `with codemap.decision_session(diagnostics=True): ...` when measuring repository-intelligence composition. After the session, `codemap.decision_session_diagnostics()` returns `hashmarks.decision-session-diagnostics.v1` with a bounded producer span tree, inclusive and exclusive nanoseconds, unique semantic request counts, duplicate calls, cache hit/miss counters, and authoritative store-read counters already exposed by the session.
+Use `with codemap.reads.session(diagnostics=True): ...` when measuring repository-intelligence composition. After the session, `codemap.reads.diagnostics()` returns `hashmarks.decision-session-diagnostics.v1` with a bounded producer span tree, inclusive and exclusive nanoseconds, unique semantic request counts, duplicate calls, cache hit/miss counters, and authoritative store-read counters already exposed by the session.
 
 The receipt is runtime diagnostics only (`authority=runtime-diagnostics-only`, `storage=derived-not-persisted`, `execution_effect=none`). It must not become repository evidence, persistent telemetry, scheduling input, or an exporter platform. Normal decision sessions do not collect spans.
 

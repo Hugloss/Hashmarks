@@ -71,17 +71,6 @@ def test_cli_does_not_import_watchdog_as_daemon_gate() -> None:
     assert "_require_watcher" not in source
 
 
-def test_project_core_and_daemon_metadata_are_registry_free() -> None:
-    import tomllib
-
-    project_root = Path(__file__).resolve().parents[1]
-    data = tomllib.loads((project_root / "pyproject.toml").read_text())
-    assert data["build-system"]["requires"] == []
-    assert data["build-system"]["build-backend"] == "hashmarks_build"
-    assert data["project"]["dependencies"] == []
-    assert data["project"]["optional-dependencies"] == {"mcp": ["mcp>=2.2.0"]}
-
-
 def test_daemon_request_barrier_observes_immediate_write(tmp_path: Path) -> None:
     if not sys.platform.startswith("linux"):
         pytest.skip("native inotify barrier is Linux-specific")

@@ -7,6 +7,7 @@ import logging
 import os
 import subprocess
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -227,6 +228,22 @@ def run_worker(
     )
 
 
+def _integer_counter(value: object) -> int:
+    if not isinstance(value, (str, int, float)):
+        raise ValueError("worker counters must be numeric")
+    return int(value)
+
+
+def _reported_counter(report: Mapping[str, object], policy: str, key: str) -> int:
+    observation = report[policy]
+    if not isinstance(observation, Mapping):
+        raise ValueError("worker report must be an object")
+    summary = observation["summary"]
+    if not isinstance(summary, Mapping):
+        raise ValueError("worker summary must be an object")
+    return _integer_counter(summary[key])
+
+
 def _score(
     hidden_tasks: list[dict[str, Any]], output: dict[str, Any]
 ) -> dict[str, object]:
@@ -261,7 +278,7 @@ def _score(
             }
         )
     n = len(rows)
-    summary = {
+    summary: dict[str, int | float] = {
         "tasks": n,
         "correct_recoveries": sum(bool(row["correct_recovery"]) for row in rows),
         "repeated_failed_edits": sum(bool(row["repeated_failed_edit"]) for row in rows),
@@ -269,7 +286,7 @@ def _score(
             bool(row["changed_to_different_wrong_edit"]) for row in rows
         ),
         "recovery_candidates_examined": sum(
-            int(row["recovery_candidates_examined"] or 0) for row in rows
+            _integer_counter(row["recovery_candidates_examined"] or 0) for row in rows
         ),
     }
     summary["correct_recovery_rate"] = summary["correct_recoveries"] / n if n else 0.0
@@ -332,7 +349,7 @@ def collect(root: Path, *, limit: int = 20) -> dict[str, object]:
         reports.append(report)
 
     def total(policy: str, key: str) -> int:
-        return sum(int(repo[policy]["summary"][key]) for repo in reports)  # type: ignore[index]
+        return sum(_reported_counter(repo, policy, key) for repo in reports)
 
     protocol = {
         "schema": PROTOCOL_SCHEMA,

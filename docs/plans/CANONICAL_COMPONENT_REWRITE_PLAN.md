@@ -11,6 +11,30 @@ acceptance requirements remain unchanged.
 
 ## Implementation checkpoint — 2026-10-17
 
+Current position, updated 2026-10-18: all **23 canonical component owners**
+are implemented. `CodeMap` composes them and owns resource lifetime; domain
+operations and caches belong to named components. Current full configured Ty
+and Pyright checks pass. The latest independently extracted source-selection
+ring passes 217 tests; its genuine interface workflow passes 18 API/CLI/official
+MCP stage/format checks over seven exact source claims. Earlier diagnostic and
+interface syntax proofs retain their original identities. Architecture
+acceptance remains open for complete operation/direct-
+test/baseline correspondence and locality qualification (CR-11), followed by
+current full membership, comparable economics and final artifacts (CR-12).
+The twenty-capability backend 5/5 result is not established. Earlier checkpoint
+numbers below are historical evidence, not the current typing status.
+
+Remaining completion work:
+
+| Work | What still needs proof |
+| --- | --- |
+| CR-11 architecture acceptance | Remaining direct owning test/internal-stage and baseline correspondence, complete qualified locality/caller scopes, and comparable measurements. Canonical components exist; these proofs are still open. |
+| Q-01 corpus breadth | Qualify the twelve-problem handler intake; build producer/consumer, DI/config, dependency/build, cross-service, additional native and economics populations; add eight debug problems over two more repositories. Source counts alone are not qualification. |
+| Q-02 independent oracles/witnesses | Review causal owners, symbols/ranges/revisions, relevant existing tests, eligibility, unknowns and semantic adversaries; close every required artifact-bound witness. |
+| Q-03 observer defects/workflows | Repair retained owner/symbol/verifier failures; acquire the complete eligible before/after API/CLI/official MCP/native population with edit, stale, rebuild, reopen and wrong-source/tampering controls. |
+| CR-12 / Q-04 final candidate | Complete current deterministic test membership, dependency/semantic replay and fresh capture rings, cold/warm/incremental/rename/delete/recovery economics with noise control, heldouts, independent source rebuild and wheel/sdist proof. Recheck current green typing on that final artifact. |
+| Q-05 overall acceptance | All twenty capability rows must meet their reviewed populations and required gates on the same candidate. Any required FAIL or INCOMPLETE keeps the overall result unfinished. |
+
 - CR-00: exact starting dirty-tree ZIP and static operation/state/caller
   inventory are retained in `.hashmarks/canonical-component-rewrite/cr00/`.
   The baseline passed 87 tests. Its full inventories were 2,071 Ty diagnostics
@@ -220,15 +244,1659 @@ root packet methods and implementation paths are removed without aliases.
   and one warning**, recorded in `cr06-full-ty-checkpoint.log` and
   `cr06-full-pyright-checkpoint.log`.
 
-Continue with CR-07 Bindings/Correlation, CR-08 Declarations/Dependencies and the
-remaining owner families. Complete structural-locality/read-binding/lifecycle
-qualification and full project typing still remain mandatory before the final
+CR-07's production boundaries are implemented and qualified on the retained
+candidate:
+
+- `RepositoryBindings` owns observation, endpoint comparison and coverage over
+  Source; `RepositoryCorrelation` borrows Source and Bindings. Neither constructs
+  Tasks or calls CodeMap. Flat root methods are removed and current consumers,
+  transports and public documentation use the named components.
+- Pure retained-binding validation lives in
+  `repository_evidence_binding_validation.py`; pure correlation values and packet
+  integrity live in `evidence_correlation_model.py` and
+  `evidence_correlation_replay.py`. Diagnostics reuse those checks without
+  inheriting a live observing service. No repository or external-claim authority
+  changed.
+- The focused binding/correlation/adversarial/operation ring passed **306 tests**.
+  The unchanged integration membership plus independent component tests passed
+  **726 tests**. Independent source extraction passed **258 tests**, including
+  CLI/MCP, tampering, generation, coverage, topology and multiplicity cases.
+  New direct-component cases prove unindexed revision sharing, unchanged span
+  identity across another-line edits, stale source-equivalence rejection,
+  same-name ambiguity and import independence from Tasks/CodeMap.
+- Source compileall, preflight and scoped F401/F821 pass. Changed owner and new
+  component-test scoped Ty/Pyright checks pass. Full project checkpoints remain
+  red: **1,968 Ty diagnostics / 1,925 Pyright errors and one warning**.
+- Candidate `cr07-qualified/source.zip`, SHA-256
+  `f3a37b7c0bd2cc704b07de675e6d9899f66f81d239e2c8a72534db24bb866735`,
+  binds observer
+  `sha256:d42f07f04fa55fbc9fb65c85c56a9f7f57d48ea9cf23a62fa51a74404ab3643e`.
+  `cr07-public-workflows/summary.json` and
+  `cr07-native-workflows/summary.json` bind that same observer. Metadata/sender
+  pass all ten gates each in each ring, including unchanged initial-size and
+  evidence gates; native captures were regenerated in this invocation. Aggregate
+  qualification remains INCOMPLETE because these are two selected workflows.
+
+CR-08's production boundaries are implemented and qualified:
+
+- `RepositoryDeclarations` borrows Bindings and derives its Source, Files and
+  read scope from the same owner. Existing discovery/derivation implementations
+  belong to it. `RepositoryDependencies` composes the existing internal
+  observation/correlation/derivation/comparison implementations over explicit
+  Source, Imports and repository Correlation. It lives in
+  `repository_dependencies.py` to keep their existing import dependencies
+  acyclic. Neither component calls CodeMap or Tasks. Flat root methods are
+  removed; production, transport, qualification and documented callers migrated.
+- **370 existing contract tests**, **8 direct-component tests**, **734 integration
+  tests**, **15 genuine uv/Maven replay tests**, and the **96-test semantic
+  evidence dogfood ring** pass. Existing provider-removal, same-state reopen,
+  correspondence cycles and cross-producer endpoint tests retain their meaning.
+  Direct cases additionally prove source-revision sharing, comparison-only
+  previous input, format-neutral semantic identity and import independence.
+- `cr08-qualified/source.zip`, SHA-256
+  `41591fdd311d1dccbbede2793b4f4dc8bb07565875670ad2fb52ee4d5f23bad4`,
+  passed **545 tests** from independent extraction. The one Git-index-only node
+  was excluded only there after passing in the real-worktree integration ring.
+  The initial Gitless run remains retained as a failed environmental probe.
+  Source compileall, preflight, scoped F401/F821 and owner/new-test Ty/Pyright
+  checks pass. Full typing remains red: **1,966 Ty diagnostics / 1,923 Pyright
+  errors and one warning**.
+- Public workflows and fresh native acquisition ran from that independent
+  extraction, binding observer
+  `sha256:b67c45ea16120b3caf321a6d85204154d53558f267319e13db54253b3ea03319`.
+  Metadata/sender pass all ten gates each in each ring, including the unchanged
+  initial-size/evidence checks. Reports are
+  `cr08-public-workflows/summary.json` and `cr08-native-workflows/summary.json`;
+  aggregate status is INCOMPLETE for the selected two-workflow scope.
+
+CR-09's production boundaries are implemented and qualified:
+
+- `RepositoryChanges` owns the existing change, refresh, snapshot, delta and
+  freshness implementations, including scope-bound snapshot/impact reuse.
+  `RepositoryCrossRepository`, `RepositoryEconomics` and `RepositoryViews`
+  borrow explicit lower owners. The shared `EvidenceProfileProjection` consumes
+  supplied values without live repository services. `CodeMap` now inherits no
+  domain implementation; the obsolete `query_surface.py` is removed.
+- Index owns `derived_graph`, index-only `status`, publication binding and the
+  immutable artifact database location. Views composes full status through those
+  lower facts and the existing native/watch qualifiers. `WorktreeOverlay` takes
+  base Index/Search/DecisionScope plus explicit artifact-location configuration;
+  it stores no borrowed base CodeMap and rejects sync/read generation or
+  fingerprint drift. Existing generation adversaries remain, with test-owned
+  publication and new independent-base/fingerprint adversaries.
+- Five new deterministic reproductions exposed mixed-generation composition in
+  brief, freshness, snapshot, cross-repository and comparison-economics packets.
+  They failed before repair and now pass: composition binds the first qualified
+  input generation. Cached snapshot return rechecks that binding. A separate
+  failing measurement showed two current snapshot captures in one economics
+  comparison; endpoint comparison now consumes the already-observed value, with
+  one capture proven after repair. Invalid prior economics input is checked
+  before current observation. No retry, executor or alternative generation owner
+  was introduced.
+- Pure diagnostic class aliases were removed; callers import defining functions.
+  The planned verification name exposed two distinct contracts: elementary
+  `verification.relationship_evidence` and graph composition
+  `verification.ownership_relationships`. Both remain under Verification; no
+  graph result replaced the elementary signature.
+- **752 integration tests** and **423 focused change/diagnostic/aggregate/overlay
+  tests** pass. Independent extraction passed **1,148 tests**, including genuine
+  dependency and semantic replay. One Git-index-only node was deselected only
+  in the Gitless extraction after passing in the real-worktree ring. Scoped
+  owner/new-test Ty and Pyright, F401/F821, source compileall and preflight pass.
+  Full typing remains red: **1,966 Ty diagnostics / 1,922 Pyright errors and one
+  warning**.
+- `cr09-qualified/source.zip`, SHA-256
+  `1fa744e12af65b319374694b2b07a7a9e799aa15bf0fd13b16864842037f84a8`,
+  binds observer
+  `sha256:1a0df149f3a9df3b29507299b2048e7ecd38173bc84a0bc3cbc92d3baa322963`.
+  Public and freshly regenerated native metadata/sender workflows ran from this
+  extraction and pass all ten gates each in each ring, with unchanged initial
+  evidence/size targets. Reports `cr09-public-workflows/summary.json` and
+  `cr09-native-workflows/summary.json` remain INCOMPLETE for selected scope.
+
+CR-10 progress — 2026-10-18:
+
+- Four additional lifecycle reproductions failed before repair: leaked open
+  resources after component-constructor failure or workspace-binding rejection,
+  repeated cleanup on repeated close, and cleanup stopping when one resource
+  raised. The construction root now registers resources immediately in an
+  `ExitStack` and transfers it only after successful component composition.
+  All four cases pass, including cleanup after a close error. Component wiring
+  and resource acquisition are separate private construction stages; no domain
+  method or root back-pointer was added.
+- Root/state/concurrent-publication/service/native/diagnostic qualification
+  passed **126 tests** in the worktree and **126 tests** from independent source
+  extraction. Scoped Root/lifecycle-test Ty and Pyright and preflight pass.
+  Candidate `cr10-resource-qualified/source.zip`, SHA-256
+  `e01ca151b48fad727770ee2dc546a99b8520af1e4958ee79dfc749ce36a27e09`,
+  binds observer
+  `sha256:a610339536e70fdfdfb22179b7d933944738bc7f551792d4ba631bc19fcb7b40`.
+  CR-09's genuine reports remain evidence for their earlier exact observer;
+  they are not reattributed to this subsequent lifecycle candidate.
+- A read-only audit covering the **98** original public operations/class values
+  reports zero retired root callers for its constructor/type-derived receiver
+  scope. One class-level diagnostic freshness caller found by the full typing
+  inventory was migrated to Changes. The audit is not proof that arbitrary
+  dynamic or unindexed receivers are resolved. Effective guard positive controls,
+  full caller/adapter closure, mixed-input qualification and locality still need
+  CR-11 work. Current architecture/navigation/API docs describe the named owners.
+
+CR-11 progress — 2026-10-18:
+
+- A closed, test-only inventory now checks **23 component constructor graphs**,
+  resolved component import directions, reserved cache writers, root properties
+  and root construction callbacks. Positive controls use the same checks to
+  reject an aliased/type-only root back-reference, direct/container foreign cache
+  writes, a dependency cycle, whole-root/bound/lambda callbacks and retired root
+  aliases. These checks are scoped architectural evidence, not an arbitrary
+  Python security proof. No production registry or governance state was added.
+- Eleven previously accepted mixed-owner constructions failed the new expected
+  rejection tests. Redundant Index/store/Source arguments were removed from
+  DecisionScope, Source, Imports, Native, Search, Verification, Correlation and
+  Relationships. Remaining multi-owner compositions reject different read scopes.
+  Store binding still belongs to the existing store owner. Two different
+  workspaces with identical relative filenames remain distinct; independent
+  readers of the same durable store still work. The binding/architecture ring
+  passes **28 tests**.
+- All **147 production Ty diagnostics** from the prior checkpoint were repaired.
+  Both `ty check hashmarks` and `pyright hashmarks` now report **zero errors and
+  warnings**. Repairs narrow checked codec/adapter values, type existing domain
+  validation results, preserve completed nullable cache values, describe native
+  SDK metadata without unchecked casts, and pass exact lower owners into import
+  identity/diagnostic helpers. Optional SDK construction remains lazy. The stale
+  watcher test copying the entire dependency extras declaration was removed under
+  the explicit AGENTS.md prohibition on duplicate configuration/version-policy
+  assertions; executable watcher/SDK behavior tests remain.
+- Production clean typing is **not full-project clean typing**. Current full
+  commands remain red: **1,795 Ty diagnostics / 1,731 Pyright errors, zero
+  warnings**, in `cr11-full-ty-current.log` and
+  `cr11-full-pyright-current.log`. Test/evaluation-script debt must be repaired
+  without blanket Any, ignores, exclusions or severity changes.
+- **786 integration tests**, **275 native/protocol tests**, **138 selection and
+  conformance tests**, and **155 identity/metadata/relationship/watcher tests**
+  pass in their bounded rings. The exact candidate passed **1,177 tests** from
+  independent extraction; the one Git-index-only node was excluded only in the
+  Gitless artifact after real-worktree proof. Preflight, source compileall and
+  committed-lock convergence pass.
+- Candidate `cr11-typed-production/source.zip`, SHA-256
+  `034eb85811ffd1dda2607cde68dd713c76393f9fec34a7b254fc47379e8b7a9f`,
+  binds observer
+  `sha256:8377db1c3c0951d13f45b8535740bc8caa08ce2cd89846a2d202c4b66cfc6d66`.
+  Public and freshly acquired native metadata/sender workflows ran from that
+  extraction and pass all ten gates each in each ring. Reports
+  `cr11-public-workflows/summary.json` and `cr11-native-workflows/summary.json`
+  remain INCOMPLETE for selected scope. The broader twenty-capability corpus,
+  independent oracle review, witnesses, heldouts and final qualification remain.
+
+CR-11 test/evaluation typing follow-up — 2026-10-18:
+
+- Corpus timing retains the callable's actual result type. Corpus task metrics
+  and suite/protocol results now describe their existing fields with precise
+  TypedDicts; numeric summaries retain numeric value types. The suite imports its
+  sibling through the canonical `scripts` module path rather than an unresolved
+  direct-execution fallback. No benchmark scores, task membership, expected
+  owners or acceptance thresholds changed.
+- Diagnostic member-evidence assertions now check open JSON object/array/scalar
+  shapes before access or intentional tampering. The fixture exposes typed
+  source options and keeps deliberately malformed booleans at the JSON ingress.
+  Original provenance, stale/foreign evidence, completeness and tampering
+  assertions remain. No unchecked casts or checker suppressions were added.
+- The two evaluation owners and diagnostic member-evidence test pass both
+  scoped typecheckers. **117 behavioral tests** pass across the metrics suite,
+  member-evidence and source-revision tests. Production bytes are unchanged from
+  observer `8377db1c...`; that candidate's earlier production and genuine-workflow
+  proof is not a claim about the full later test/evaluation tree.
+- Full commands remain red at **1,698 Ty diagnostics / 1,645 Pyright errors,
+  zero warnings**, recorded in `cr11-full-ty-owner-checkpoint.log` and
+  `cr11-full-pyright-owner-checkpoint.log`. Continue owner-sized repairs; the
+  larger test/script and final qualification scopes are still incomplete.
+
+CR-11 checked assertions and embedded caller repair — 2026-10-18:
+
+- Fifteen test owners now retain checked JSON object, array and scalar shapes
+  through assertions and deliberate tampering. The concurrent-publication
+  fixtures forward the actual Index/store parameter and result types rather
+  than erasing them to `object`. Existing source, ambiguity, negative-evidence,
+  declaration-identity, dependency-coverage and projection assertions remain.
+  The MCP tests share one fake SDK module installation while retaining their
+  tool catalog, error translation, lazy construction and native SDK checks.
+- Interchange validators now accept `object` at their public untrusted-input
+  boundary and immediately use the existing checked mapping admission. This
+  corrects the annotations to match their already tested fail-closed behavior;
+  it does not relax a schema, field check, authority rule or failure condition.
+  No unchecked casts, Any blankets, checker suppressions or tool-policy changes
+  were added. The production observer is now
+  `sha256:6b4e99d22cb962e91f5494a92bf10e0ef5596d095a8c4289604d407887aae965`;
+  earlier observer `8377db1c...` workflow proof remains bound to that earlier code.
+- Real subprocess runs reproduced two missed migration callers in
+  `full_edit_verify_benchmark.py` and `internal_agent_ledger.py`: both raised
+  `AttributeError` at the removed `CodeMap.sync`. They now use `index.sync` and
+  `tasks.decision_packet`/`tasks.decision_brief`. Three new real subprocess
+  smoke cases cover those paths; the existing controlled execution remains
+  evaluation-only. Ten tests pass across these two callers.
+- The caller audit now also inspects literal Python payloads. Its current
+  five parsed payloads contain no retired root calls. All 24 non-Python strings
+  were inspected as docstrings, and all 14 interpolated candidates are diagnostic
+  messages, not executable code. This extends the declared audit scope; it is
+  not proof of arbitrary dynamic execution or a replacement for transport tests.
+- Current worktree proof: 79 diagnostic/comparison tests, 33 MCP tests,
+  108 adapter/changed-line/qualification/malformed-root tests, 19 authority and
+  concurrent-publication tests, 33 ordinary metric tests and six metric tests
+  each run in its own process pass. The validator/conformance ring also passes
+  103 tests, with overlap in the preceding rings. Each repaired owner passes
+  both scoped checkers; full production typing remains clean. Source compile,
+  preflight, lock convergence and diff hygiene pass.
+- Full configured project gates are still red: **1,275 Ty diagnostics /
+  1,244 Pyright errors, zero warnings**, in `cr11-full-ty-followup.log` and
+  `cr11-full-pyright-followup.log`. These improve the preceding 1,698/1,645
+  inventories but do not establish a clean project or 5/5. Complete locality,
+  current full deterministic membership, broader corpora, independent oracle
+  reviews, witnesses and final qualification remain required.
+- The frozen source checkpoint is `cr11-typing-followup/source.zip`, SHA-256
+  `3acf00f8f2fc18887d2f87585a91f5e5a893fcc1ce02243689b03abfe45d0734`,
+  source identity
+  `sha256:25cfab90e00de433bf6ef62d7f738ca7438f5252cd8b8075602d3ddb8d4ad86e`.
+  Independent extraction `/tmp/hashmarks-cr11-typing-followup-uafdf7jb` verifies
+  its import origin and current `6b4e99d2...` observer. **316 tests pass** from
+  that extraction; six marked metric cases are excluded from the combined
+  process and have separate passing worktree process reports. The source
+  archive predates this artifact-result prose only.
+- Public and freshly regenerated native metadata/sender workflows ran from
+  that extraction. All ten gates pass for each selected workflow in each ring,
+  bound to the same `6b4e99d2...` observer. Reports
+  `cr11-followup-public/summary.json` and `cr11-followup-native/summary.json`
+  remain **INCOMPLETE** for their deliberately selected population. These
+  current results do not establish broader corpus, review, witness or 5/5 closure.
+
+CR-11 typed evaluation follow-up — 2026-10-18:
+
+- Trace, retrieval-regret and regret-suite owners now expose the validated input
+  and report shapes with typed dictionaries. Existing raising validators also
+  narrow their accepted values; no unchecked cast or checker suppression is
+  needed. Unknown metadata remains opaque, missing discovery costs remain
+  `None`, and incomplete required evidence still prevents comparison. Imports
+  use the canonical module path. Suite helpers receive report values rather
+  than an untyped module dependency.
+- All six modified script/test owners pass both scoped type checkers. Their
+  **22 behavioral tests** pass in the worktree and independent extraction.
+  The actual three module CLI commands also pass and match their API results.
+  On controlled complete/incomplete inputs, independently imported pre/post
+  artifacts produce byte-identical loaded evidence, traces, comparisons and
+  suite reports, including unknown metadata. Retained proof is
+  `cr11-evaluation-preservation/comparison.json`; this is preservation evidence,
+  not genuine-corpus breadth or independent oracle review.
+- Exact checkpoint `cr11-typed-evaluation/source.zip` has SHA-256
+  `79e65ace900b457693bab9e839e0d9768d0c15aaf36abacfc24d9b97f879fc7f`,
+  source identity
+  `sha256:97289937550eab1ecba55b64bec75bf0158937aaaff957cd6c3441819e66e961`,
+  extraction `/tmp/hashmarks-cr11-typed-evaluation-tl5woh7p`. The archive
+  predates this result prose only. Production and the backend evaluator remain
+  unchanged from the preceding `6b4e99d2...` observer qualification.
+- Current full gates remain red at **1,196 Ty diagnostics / 1,192 Pyright
+  errors, zero warnings**, recorded in `cr11-full-ty-evaluation.log` and
+  `cr11-full-pyright-evaluation.log`. Continue the remaining script/test owners,
+  locality closure and full deterministic qualification. No whole-project or
+  twenty-capability 5/5 claim is established by this checkpoint.
+
+CR-11 component diagnostics and owner typing follow-up — 2026-10-18:
+
+- Experiment manifests/reports and experiment-set aggregation now retain their
+  validated types through direct imports of the existing defining functions.
+  Extra metadata stays opaque, and the existing digest, subject, pairing,
+  repeated-run and breadth checks remain. A malformed replication-policy root
+  now fails explicitly, and a report missing its claimed eligible reduction
+  cannot increment the aggregate. Six new malformed/unknown cases pass.
+- Ownership, cache, provenance, configuration, native presentation, SCIP,
+  persistence and acceptance tests now retain known producer types or check open
+  JSON fields before access. Existing ambiguity, stale-evidence, source denial,
+  missing-edge, capture-identity and previous-packet non-replay assertions remain.
+  Native capture replay passed 96 tests before the later diagnostic owner fix;
+  current-candidate native qualification is still required below.
+- A reproduced fixture defect affected five worktree-cache setups: annotations
+  in place of `setenv` calls meant they did not isolate their shared cache.
+  Real calls now bind both supported platform cache variables. The snapshot
+  test proves the persisted artifact lies inside the declared test cache. The
+  empty parser fixture implements the actual structural producer protocol.
+- A reproduced observer defect merged Source and Bindings `observe` diagnostics
+  into one producer. ReadScope now qualifies operation labels with the concrete
+  component's module/class identity. Same-owner repeated requests still count
+  as duplicates. A separate reproduced defect marked an exactly full span
+  buffer truncated; the flag now compares actual observed and retained counts.
+  Boundary controls cover below, at and above the advertised limit.
+  These changes concern runtime diagnostics only and add no repository,
+  execution, certification or telemetry-retention authority.
+- The affected diagnostics/read-scope/input-binding/worktree ring passes
+  **37 tests**. Whole production typing and all nineteen affected owners pass
+  scoped Ty/Pyright. Full project validation remains red at
+  **901 Ty diagnostics / 902 Pyright errors, zero warnings**, recorded in
+  `cr11-full-ty-owner-diagnostics.log` and
+  `cr11-full-pyright-owner-diagnostics.log`. The previous `6b4e99d2...` observer
+  qualification is historical after this diagnostic production change.
+- Frozen checkpoint `cr11-owner-diagnostics/source.zip` has SHA-256
+  `4c43e2913392b55f1516ac87d630ca981dd31d382e353821b7541b40ffaa5d68`,
+  source identity
+  `sha256:13b555170bbb63061a6461412416b7c5641df90904c417df14ed2eef7d2d6716`.
+  Independent extraction `/tmp/hashmarks-cr11-owner-diagnostics-lw_fvp0n`
+  verifies its import origin and observer
+  `sha256:dd1291363cccf5e034e8619f685c5c2c5c839912ab7227ee94e7b160c80da342`.
+  **314 tests pass** from this extraction, including the affected owners,
+  architecture/lifecycle controls and the complete native capture replay ring.
+- The independently imported previous/current artifacts produce byte-identical
+  experiment and aggregate reports on the retained ordinary/replicated valid
+  inputs, including strict raw-evidence binding and opaque metadata. Proof is
+  `cr11-experiment-preservation/comparison.json`. This establishes controlled
+  preservation, not independent real-world oracle review or corpus breadth.
+- Public and freshly regenerated native metadata/sender workflows ran from
+  that exact extraction. All ten gates pass for each selected workflow in each
+  ring. Reports `cr11-owner-diagnostics-public/summary.json` and
+  `cr11-owner-diagnostics-native/summary.json` remain **INCOMPLETE** for selected
+  scope. The archive predates this artifact-result prose only. Full-project
+  typing, complete locality, deterministic membership and Q-00–Q-05
+  corpus/oracle/witness work remain. This is not architecture or 5/5 completion.
+
+CR-11 output collectors and checked boundary assertions — 2026-10-18:
+
+- Twenty affected owners now pass scoped Ty/Pyright without unchecked casts,
+  new ignores, Any blankets or relaxed tooling. Source-boundary tests check
+  actual returned objects/arrays. MCP tests check native result/text variants
+  and use the existing SDK resource owner to close servers. Known producer
+  defaults, read-only annotations, response parity and negative controls remain.
+- Existing evaluator runners had a reproduced timeout defect: partial stdout
+  and stderr could be bytes and then fail during concatenation or persistence.
+  Both existing runner paths now translate partial output to UTF-8 text and
+  persist exactly the bytes covered by their reported identities. Six cases
+  cover byte, text and missing output. Boolean/malformed usage counters remain
+  unknown; valid zero and known counters remain distinct from unavailable totals.
+  Seven counter cases pass. These repairs stay in evaluation infrastructure and
+  add no execution responsibility to the Hashmarks product.
+- File-cost, observation and collector results now retain their numeric and
+  structured fields. The existing benchmark selection, fusion, role resolution,
+  score calculations and corpus/oracle inputs remain. Four dependency/derived
+  evidence owners retain their adversarial identity and generation assertions.
+  The affected worktree rings pass: 31 boundary/MCP tests, 47 ordinary runner and
+  metrics tests, 34 ownership/concurrency/diagnostic tests and 17 dependency tests.
+  Overlapping metric rings are not additional independent population breadth.
+- Exact checkpoint `cr11-output-collectors/source.zip` has SHA-256
+  `ae6494df27729971b7c8de4c3ad300e48c3f2dfab4dea24f0007d014c91844f5`,
+  source identity
+  `sha256:d2befed88ad67c5dd7f508f6a90e1f243b3122563cb06eefb86ce65f1736bdb9`,
+  extraction `/tmp/hashmarks-cr11-output-collectors-mi0wke7r`. Actual import
+  origins and the unchanged `dd129136...` observer are verified. **129 tests
+  pass** from that extraction, with six marked metric cases excluded from the
+  combined process. The affected selective-scout metric case also passes in its
+  own extracted process. Five other excluded cases are not credited to this run.
+- Controlled valid inputs produce byte-identical file-cost, main/scout scoring,
+  public-prompt and usage reports across independently imported previous/current
+  artifacts; proof is `cr11-output-preservation/comparison.json`. Timeout and
+  invalid-counter behavior is separately qualified by its regressions. This is
+  controlled preservation evidence, not new genuine-source or oracle breadth.
+- Source compile, preflight, scoped import/name checks and diff hygiene pass.
+  Production and the backend evaluator are unchanged from the preceding frozen
+  observer qualification. Current full gates remain red: **654 Ty diagnostics /
+  686 Pyright errors, zero warnings**, in `cr11-full-ty-output-collectors.log`
+  and `cr11-full-pyright-output-collectors.log`. The archive predates this result
+  prose only. Remaining typing, complete locality, deterministic membership,
+  broader corpora, independent oracles, witnesses and final qualification still
+  prevent an architecture-complete or twenty-capability 5/5 claim.
+
+CR-11 bounded evidence and identity assertions — 2026-10-18:
+
+- Exact-owner, cache, change-brief, cross-repository, freshness, bounded-symbol,
+  backend ablation and gate assertions now retain known types or check open
+  JSON shapes. Qualified-identity and same-version drift controls still reject
+  ambiguous, stale, wrong-symbol and mismatched implementation evidence.
+  `combine_required` accepts untrusted iterable values at its type boundary;
+  its existing strict bool/None validation and failure-preserving body are
+  unchanged. No acceptance threshold, oracle, case membership or review flag
+  changed.
+- Generic timing retains the callable's actual result. The source-size audit
+  uses `read_python_ast` and typed definition/file/threshold results. A new CRLF
+  control reproduced an undercount of physical bytes. `PythonAstSnapshot`
+  exposes its captured stable-read byte length for this diagnostic; the audit
+  reports that length without a second file observation. Cache metadata remains
+  process-local acceleration and never becomes content identity, freshness or
+  execution authority. The thresholds remain review nominations only.
+- Worktree proof: 38 owner/cache/brief/service tests, 46 hard-gate/ablation/
+  negative-evidence/freshness tests and 17 qualified/same-version identity tests
+  pass. The AST-cache/audit/metrics/diagnostics ring passes 23 tests, with overlap
+  accounted for by its selected membership. All fifteen affected owners and
+  whole production typing pass both scoped checkers. Full configured checks
+  remain red: **539 Ty diagnostics / 562 Pyright errors, zero warnings**, in
+  `cr11-full-ty-bounds-identity.log` and
+  `cr11-full-pyright-bounds-identity.log`.
+- Exact checkpoint `cr11-bounds-identity/source.zip` has SHA-256
+  `95219ee78ab15e15a0a3f9330503700b0fb90b9b0cd89e3df62cc7603299033b`,
+  source identity
+  `sha256:01841c88025e7039699143b9f64e177e5557da9839c0907dffad8f4b56012d67`,
+  extraction `/tmp/hashmarks-cr11-bounds-identity-a5exoky_`. Import origin and
+  observer `66b138197c64b768f4e2f0112dfee2489dea3aa9735a81b6bc5a464a86ca8574`
+  are verified. **156 tests pass** from the independent extraction, including
+  affected contracts and constructor/lifecycle controls. The archive predates
+  this result prose only. Previous `dd129136...` qualification remains historical.
+- Public and fresh native metadata/sender acquisition on this extraction pass
+  all ten gates for each selected workflow in each ring, bound to observer
+  `66b13819...` and evaluator `ba14c7c5...`. Reports
+  `cr11-bounds-identity-public/summary.json` and
+  `cr11-bounds-identity-native/summary.json` remain **INCOMPLETE** for selected
+  population. Remaining full
+  typing, complete locality, deterministic membership, broader corpora,
+  independent oracles, witnesses and final qualification still prevent 5/5.
+
+CR-11 canonical tooling and component-family inventory — 2026-10-18:
+
+- The journal now imports its canonical trace normalizer directly. Release
+  tooling retains validated standalone rows instead of erasing them back into
+  an untyped receipt; manifest row admission is shared by asset naming,
+  checksum generation and materialization. The argparse protocol exposes the
+  actual operation used by its callers. Source/tag/checksum/bundle-membership
+  checks remain enforced, and no release or repository mutation was performed.
+- Profile/shard measurements check JSON shapes at ingress. Worker measurement
+  owners retain typed decision, verification, read-cost and score values;
+  their existing task selection, cue scoring, summaries and isolation behavior
+  are preserved. Host qualification uses the canonical common-module import
+  and `sys.stderr`. Repository tests use actual pytest fixture types, a narrow
+  watcher-process protocol and checked JSON shapes. Adversarial mutations still
+  reach the original evidence objects rather than detached array copies.
+- `external_observation_freshness` accepts untrusted completeness input and
+  retains its existing strict boolean admission. `require_nonblank_string`
+  exposes its existing non-optional return contract through an overload. These
+  are type-boundary repairs; neither changes an authority or freshness rule.
+  No new ignore, unchecked cast, Any blanket, exclusion, severity relaxation,
+  acceptance threshold, oracle flag or corpus membership was introduced.
+- Worktree rings pass 31 release, 30 comparison/membership, 59 freshness/
+  admission/watcher/handoff, 89 measurement, 84 authority/projection/recovery
+  and 62 tooling/evidence tests. The subsequently changed inspection and
+  multistep benchmark nodes each pass in a separate process. These rings
+  overlap and are not distinct corpus breadth. Full configured inventories
+  are now **269 Ty diagnostics / 288 Pyright errors, zero warnings**, recorded
+  in `cr11-full-ty-owner-typing.log`,
+  `cr11-full-pyright-owner-typing.log` and
+  `cr11-owner-typing-remaining.json`. Whole production passes both checkers.
+- Exact checkpoint `cr11-owner-typing/source.zip` has SHA-256
+  `fce17ae6baf9341a0eb5e8686cc363d3de5dd24a41fe9c58e63eb6510d11e79a`,
+  source identity
+  `sha256:8b4292c7a4f5a99c972f0227028ab6bbf92cb285db4194c6e336b1c4829a8d3f`,
+  extraction `/tmp/hashmarks-cr11-owner-typing-tu_3iyiw`. Exact import origin
+  and observer `2b4edd3822feed69f5ff6c56375b4cfe76533bcffeb979575a0b5934f2520be3`
+  are verified. **270 tests pass** from this extraction, plus the two modified
+  benchmark nodes in separate extracted processes. Preflight, compileall,
+  lock convergence, scoped undefined-name checks and diff hygiene pass.
+- Public and freshly regenerated native metadata/sender runs from this
+  extraction pass every selected gate under evaluator
+  `306de9746756ecd4649a34027c7be44fb707628a2346b9f8910c269ea1d07c3e`.
+  Reports are `cr11-owner-typing-public/summary.json` and
+  `cr11-owner-typing-native-02/summary.json`; both remain **INCOMPLETE** for
+  their selected population. The first native launch failed because its PATH
+  omitted Node; that environment failure is retained separately and is not
+  counted as qualification.
+- Expanded locality acquisition covers **1,087 nominated definitions across
+  the 23 components and composition root**, including family implementations.
+  Its exact inputs and per-definition observations are retained in
+  `cr11-owner-typing-locality/`. This does not establish complete locality:
+  inherited `self` calls and other repository calls remain unresolved, and
+  external-or-unindexed calls still require classification. Before/after
+  semantic target correspondence and direct owning-test correspondence also
+  remain open. Do not waive these findings or reduce the measurement depth.
+  Acquisition completed for all 1,087 definitions with zero observation errors.
+  `review-index.json` deduplicates **67 unresolved call sites** and **8,160
+  external-or-unindexed sites**. Overlapping neighborhoods contain 41 nodes
+  with incomplete caller bounds and 227 truncated candidate-search records;
+  these occurrence counts are not independent problems or a success score.
+  Call/reference bounds are already 1,024, the currently supported maximum.
+  The next locality repair should reproduce `_resolve_call_target` allowing a
+  truncated global short-name lookup to prevent qualification of a locally or
+  import-bound target. Keep real ambiguity, shadowing and unavailable evidence
+  unresolved; do not manufacture exact inheritance/runtime relationships.
+- Acquisition exposed two nonexistent family-module nominations,
+  `retrieval_stability` and `explain_retrieval`. Their operations are methods
+  of existing owners, not standalone modules. A new catalog check reproduced
+  both stale nominations; they are removed and a nonexistent-module control
+  attacks that same check. The architecture/input/lifecycle ring passes
+  **34 tests**, and the changed guard passes both scoped type checks. This
+  test-only repair and this result prose postdate the source ZIP above;
+  observer/evaluator implementation bytes remain unchanged.
+- Final catalog checkpoint `cr11-family-catalog/source.zip` has SHA-256
+  `dbe9f85c4ed62c4a9188ba7052dd4dc8b13dfb4db34c902336eea8b23361d2e5`,
+  source identity
+  `sha256:344de3120365eeaf93257b12e82452c9ca0b66550f702ae70638ef972350e4c7`,
+  extraction `/tmp/hashmarks-cr11-family-catalog-jcuicr9o`. All 34 architecture,
+  input-binding and lifecycle tests pass from that extraction. Its imports and
+  observer/evaluator identities are verified. `measurement-reuse.json` proves
+  that only the catalog test and plan differ from the 270-test checkpoint;
+  production, evaluator, source manifests and oracles are byte-identical.
+  This final receipt prose postdates that archive. Overall status remains
+  **INCOMPLETE**, with CR-11, CR-12 and Q-00–Q-05 still open.
+
+CR-11 source-bound call qualification — 2026-10-18:
+
+- **Classification: REFACTOR INTERNALLY / OBSERVER defect repair.** Structure
+  remains the direct-call semantic owner; Imports owns import identity and
+  Source owns current admitted file observations. No new public API, graph,
+  cache, policy or execution responsibility was added. Shared Python syntax
+  helpers expose the existing ordered class-member binding rule and distinguish
+  body writes from formal receiver arguments.
+- The global sixty-four-name pool previously vetoed exact local/imported class
+  members, receiver methods and imported function aliases when unrelated
+  declarations crowded that pool. Positive qualification now uses complete
+  admitted file observations, exact import leaves and the selected AST
+  declaration range. Unqualified fallbacks retain their bounds. Conditional
+  members, shadowed/rebound receivers, unproven imports and inapplicable indexed
+  source ranges cannot become exact targets. Imported data retains its existing
+  external-or-unindexed category; runtime dispatch remains unestablished.
+- Import/export binding reads now reject source drift inside an active read
+  scope. A reproduced re-export edit had allowed current AST facts to be
+  combined with the old indexed repository binding. The repaired workflow
+  requires refresh, preserves the old generation until sync, and then exposes
+  the current defining source.
+- Twenty identical behavioral controls were run against the unchanged prior
+  observer `2b4edd38...`: **10 failed / 10 passed**. Failures include four
+  incorrect exact associations, the stale re-export binding and the crowded
+  positive bindings. The repaired controls all pass. Their exact common source
+  and probe identity are retained in `cr11-locality-before-probe.json` and
+  `cr11-locality-before-source-controls.xml`.
+- An additional range control checks that a symbol name with coordinates for
+  another declaration stays unresolved. Its first version assumed the index
+  retained the last duplicate declaration; inspection showed that assumption
+  was unsupported. The retained failed probe is not qualification. The final
+  control explicitly supplies an inapplicable indexed range and asserts no
+  exact target, without introducing a second symbol/index owner.
+- The existing qualified-root negative control now includes a genuinely
+  conditional source binding. Its unknown/truncation/negative-authority
+  assertions remain intact. Independent positive controls separately prove
+  that a complete direct binding survives unrelated global name bounds. No
+  corpus oracle, review flag, threshold or global candidate limit changed.
+- Worktree qualification: 53 locality/import-scope/bound tests pass, the final
+  direct control file passes 21 tests, the broader source/import/component/
+  freshness ring passes 198, genuine LSP/SCIP change and CLI/MCP replay passes
+  53, and export/exact-bound controls pass seven. Rings overlap and are not
+  independent corpus breadth. Scoped checks and whole production pass both
+  type checkers. Full configured checks remain **269 Ty diagnostics / 288
+  Pyright errors, zero warnings** (`cr11-locality-full-ty.log` and
+  `cr11-locality-full-pyright.log`). Preflight, source compileall, lock
+  convergence, scoped undefined-name checks and diff hygiene pass.
+- Current-source locality and a controlled re-observation of the prior exact
+  1,087-target source remain required before claiming a measured improvement.
+  Inherited receiver context, unresolved/external classification, truncation,
+  direct owning tests and baseline correspondence still need closure. CR-11,
+  CR-12 and the full twenty-capability campaign remain open.
+
+CR-11 qualification accounting and canonical measurement hook — 2026-10-18:
+
+- The controlled remeasurement retained all **10,114 observed call sites** on
+  the unchanged prior source and bounds. It also exposed an important limit:
+  268 prior exact resolutions became uncertain, mostly around receiver writes
+  in typing-cast blocks. A falling unresolved count was partly a movement into
+  the external/unindexed category, not a qualified improvement. The final
+  resolver keeps known formal-receiver candidates in unresolved repository
+  evidence. No typing-library exception or runtime branch evaluation was added.
+  Receiver-write/native qualification remains an open proof obligation.
+- The 1,087 prior definition requests represent **1,084 distinct qualified
+  targets**: four overload declarations share `TaskEvidencePacketMixin.evidence`.
+  Repeated requests returned the same artifact identity and add no distinct
+  coverage. Current frozen-source acquisition includes the new source/syntax
+  helpers (1,091 requests / 1,088 distinct targets). Physical overload
+  declaration coverage versus operation membership still needs qualification.
+- A broader economics test exposed a remaining retired root attribute in the
+  benchmark's observation counter. The counter now patches canonical
+  `Source.member`; a positive control intentionally observes a member and
+  verifies that the benchmark rejects it. The original AttributeError remains
+  in `cr11-locality-qa-typing.log`. The repaired measurement/reacquisition/
+  dependency-scope/exception ring passes **28 tests**, including genuine uv/Maven
+  capture-derived economics. AST scans in exception-boundary tests use the
+  process-local Python AST cache. No benchmark acceptance target changed.
+- These four additional test owners pass both scoped checkers. The configured
+  project inventory is now **244 Ty diagnostics / 263 Pyright errors, zero
+  warnings** (`cr11-locality-qa-remaining.json` and
+  `cr11-locality-qa-full-pyright.log`). Production remains clean under both
+  checkers. Full project typing is still red.
+- Final frozen source `cr11-locality-qualified/source.zip` has SHA-256
+  `357b5442eaa1b4812d9080df0c0deb0b6c7657d4437d3bcd475e45196a2ba96b`,
+  source identity
+  `sha256:1adb682104dfdcad2ddb742af1010fa24ad25ab2c3191df3e64e059508295831`,
+  extraction `/tmp/hashmarks-cr11-locality-qualified-4ne6s5lm`, observer
+  `8649b349cc1c4afc8b9b24e392e70ce556f73ff73d708ad36c8cba4ea55cecae`.
+  Import origin and unchanged evaluator `306de974...` are verified. The
+  extraction passes **287 tests**; the latest locality ring passes 54, and
+  the direct-consumer/native replay ring passes 121. Its JUnit export emitted
+  a property-format warning; the affected native node passes cleanly with a
+  property-compatible xunit1 export, preserving its witness metadata. These
+  counts overlap and do not qualify new corpus breadth.
+- The earlier `cr11-locality-scope` candidate (`3e46b284...`) and its comparison
+  are intermediate evidence only. The final same-source/current-source
+  observations and selected public workflow reports are retained under
+  `cr11-locality-qualified-*`. Their completed results must be inspected before
+  updating the measured qualification claim. This result prose postdates the
+  final source ZIP; production, evaluator, tests and benchmark bytes are frozen.
+
+Final source-bound qualification results — 2026-10-18:
+
+- `cr11-locality-qualified-comparison.json` verifies identical repository,
+  target-source and measurement-configuration identities for the controlled
+  same-source comparison. All **10,114 call sites remain**, with no new or
+  retargeted site. **268 former exact resolutions are now unknown**, and no
+  previously unknown site gained a resolution in this real-source population.
+  The synthetic source contracts prove supported positive binding behavior;
+  they do not establish a real-repository recall improvement.
+- The final same-source result contains **407 unresolved sites**, 8,088
+  external-or-unindexed sites, **11 distinct symbols with incomplete caller
+  bounds**, and 231 truncated candidate records across distinct target
+  neighborhoods. The current frozen source has 1,091 requests / 1,088 distinct
+  targets, no missing module nominations, 407 unresolved sites and the same
+  outstanding bound counts. Both acquisitions completed with zero observation
+  errors. Counts must not be presented as architecture success.
+- Next locality work must independently qualify receiver-write contexts,
+  especially type-only cast blocks, and retain the original declaration facts
+  and uncertainty. Prefer existing source/native claim machinery; do not add
+  library-name suppressions, infer runtime branch values, weaken source/range
+  checks, waive unknowns or shrink the measured scope. Overload declaration
+  accounting, direct owning-test correspondence and the remaining bound scopes
+  remain required before CR-11 closes.
+- The final observer's public metadata/sender report
+  `cr11-locality-qualified-public/summary.json` passes all ten selected gates
+  per workflow under observer `8649b349...` and evaluator `306de974...`.
+  Aggregate status remains **INCOMPLETE**. The 287-test independent extraction,
+  121-test direct-consumer/native replay ring, final production/scoped type
+  checks, preflight, compileall, lock convergence and diff hygiene pass with
+  their recorded scopes. Fresh native acquisition for this observer and the
+  complete campaign still remain part of final qualification.
+
+CR-11 genuine native receiver witness and lexical context — 2026-10-18:
+
+- **OBSERVER:** extend existing native call-site source correspondence with an
+  independent indexed lexical context. This observes repository ranges and
+  revision agreement; it neither repairs a producer's claim nor infers runtime
+  dispatch. Source/Reads retain repository authority, the relationship model
+  owns pure position/range validation, and the existing LSP adapter transports
+  the same producer evidence. No new graph, global resolver or executor exists.
+- A finite capture from the installed Pyright language server on the frozen
+  Hashmarks owner-chain method returned 15 outgoing claims, including the
+  three selected demoted owner-chain methods. The raw caller item covers only
+  its name token, so the old `outside-caller-item` result remains visible.
+  `declaration_context` separately checks current index/member revision,
+  unique declaration identity, source coordinates and lexical containment.
+  None of these facts certifies a runtime edge or full execution path.
+- `cr11-receiver-native-probe/` retains exact source-archive identity, actual
+  requests/responses/transcript, raw normalized capture and before/after
+  qualification. All 15 claim identities, captured locations and original
+  range states remain unchanged. The new lexical context matches all 15 ranges;
+  five targets map to repository declarations, including the three selected
+  owner-chain methods. This is one genuine native witness, not closure of all
+  268 demotions or extra independent corpus breadth. No external dependency
+  implementation was inspected by the agent.
+- The pure model rejects stronger authority, negative evidence, mismatched
+  member identities, invalid coordinates and contradictory containment even
+  after packet digests are recomputed. Existing stale, out-of-bounds and
+  outside-caller controls remain. Position/range codecs moved from the live
+  resolver to the pure relationship model; all defining imports migrated and
+  no old aliases remain. Source, producer scope and lexical context stay
+  separate axes. The source-integrity file passes 18 tests; the broader
+  source/native/hover/SCIP/transport ring passes 164.
+- Ruff diagnostics now retain typed finding/file/summary values while reading
+  unchanged limits from `pyproject.toml`. The trace emitter imports its actual
+  canonical guard/public-input owner and retains direct CLI execution from an
+  unrelated directory. CSV economics checks numeric measurements rather than
+  coercing booleans into numeric evidence. Nine metric/trace tests pass,
+  including direct CLI and boolean adversaries; missing usage remains missing.
+- Full configured typing is now **221 Ty diagnostics / 235 Pyright errors,
+  zero warnings**, in `cr11-native-context-remaining.json` and
+  `cr11-native-context-full-pyright.log`. Production and all changed owners pass
+  both scoped checkers. Preflight, compileall, lock convergence and diff hygiene
+  pass. Native evidence and qualification remain incomplete until the full
+  declared source/claim population, transports and witnesses are qualified.
+- Exact source `cr11-native-context/source.zip` has SHA-256
+  `130e07845e9a2bd29ba180bb08d3ea43f74d215789bc2b49b86ef7ee81fe6d9b`,
+  source identity
+  `sha256:b751aa41c300c1fabb43fbbbc25737651d7eb7f735a6ecd37773d61e4a8afe2d`,
+  extraction `/tmp/hashmarks-cr11-native-context-hme37gb9`, observer
+  `8e3fc400fc694b93c93940d28ad7c0b38b4dd297765792f434c8e73fd9585035`.
+  Import origin and unchanged evaluator `306de974...` are verified.
+  **207 tests pass** from the extraction; the genuine native probe also
+  re-qualifies through that extracted observer with all original claim
+  identities/warnings retained. The selected public metadata/sender report
+  `cr11-native-context-public/summary.json` passes every selected gate and
+  remains **INCOMPLETE** for campaign scope. This final result prose postdates
+  the archive; source and test bytes remain frozen. No full 5/5 claim is made.
+
+CR-11 configured full typing closure and profile integrity — 2026-10-18:
+
+- **Both unchanged configured type gates now pass across the full project.**
+  `cr11-full-ty-configured.log` records zero Ty diagnostics and
+  `cr11-full-pyright-final-attempt.log` records zero Pyright errors/warnings.
+  No exclusion, severity, baseline or tool-requirement changes were made.
+  Ruff/preflight also passes after the repaired owner types and actual imports.
+- The remaining test owners now check nullable/JSON/typed-union evidence at
+  their actual boundaries. Digest, snapshot, import-resolution tuple and
+  source-row counter mocks preserve the real producer types. Tamper controls
+  still mutate original evidence objects; dataclass configuration replacement
+  exercises invalid runtime admission without type ignores. A stale
+  `ContextPlanningMixin` import now inspects canonical `RepositoryContext.build`.
+- Script collectors retain typed results and exact counters instead of object
+  erasure. Canonical package imports replace duplicate bare-module/dynamic-loader
+  paths. Optional Windows PTY loading remains inside its existing Windows QA
+  operation, with a narrow native-factory/process port; no new dependency,
+  installation path or product execution responsibility was introduced. Valid
+  selection/scoring behavior and missing-value handling remain unchanged.
+- Profile-comparison controls reproduced seven failures: duplicate IDs in any
+  input, missing/extra/empty repeat membership, and absent noise controls being
+  treated as known zero noise. The repair preserves exact membership, rejects
+  malformed/empty/semantically ungrounded/nonpositive or nonfinite measurements,
+  and returns `UNCALIBRATED` with unknown noise when no repeat was supplied.
+  Valid paired thresholds and per-case noise logic are unchanged. The profile/
+  repository-evaluation/measurement ring passes 45 tests. No backend grader
+  target, corpus oracle or review flag changed; evaluator implementation identity
+  changes because its package contains the repaired measurement code.
+- Focused evidence includes 49 ownership/negative/MCP guards, 59 concurrency/
+  snapshot/authority/calibration tests, 54 CSV evidence tests, and isolated
+  collector/reproducibility nodes. These overlap and do not establish complete
+  deterministic membership. The full deterministic ring has started: batch 0
+  (shards 0–3) passes in `cr11-dev-batch-00-02.log`. Its first launch rejected a
+  duplicate `--no-sync` flag before tests; no work from that launch is credited.
+  Remaining batches must complete before declaring full project tests clean.
+- Full typing closure does not close CR-11 locality/native-witness obligations,
+  CR-12 exact-artifact/integrated qualification, or Q-00–Q-05 genuine corpora,
+  independent oracles, witnesses, heldouts, economics and final twenty rows.
+
+CR-11 integrated qualification and source-drift boundary — 2026-10-18:
+
+- The typing-clean checkpoint is `cr11-typing-clean/source.zip`, SHA-256
+  `23f5d6997d91591db36e31761129c9363993b014a0414a75dd645d3f327cfb84`,
+  source identity
+  `sha256:0af11c556e315aa051eaab5a9352f5516526923c67a6542652d467308dbe5833`.
+  Its independent extraction passes 199 focused tests. Observer identity remains
+  `sha256:8e3fc400fc694b93c93940d28ad7c0b38b4dd297765792f434c8e73fd9585035`;
+  evaluator identity is
+  `sha256:770456057c6ea2fb0fc043855228e50589256c7e10859eef30eb073d62732041`.
+- Integrated batches 0–11 passed after correcting a test's read-counter scope:
+  index ingestion now reads bytes to bind content/digest, while binding
+  observation still performs one shared read for its sixteen consumer bindings.
+  The test now measures that observation phase separately; the thirteen-test
+  regression ring and complete batch 2 pass. Exact prior membership conservation
+  is retained in `cr11-test-selection-repair-comparison.json`.
+- Batch 12 reproduced a genuine concurrent source-drift defect. A bounded
+  twelve-round discovery run retained an escaping `DecisionRefreshRequired`
+  (`cr11-multiprocess-discovery.json`). Deterministic controls then reproduced
+  both task-evidence and change-impact failures without sleeps or scheduler luck.
+- The canonical read owner now exposes its existing reconciliation boundary as
+  `reconcile_decision`. Both staged operations restart their complete observation
+  after the read scope closes and the changed member is reconciled. Ordinary
+  scoped operations use the same implementation. Nested reads preserve the
+  existing outer owner; repeated drift of the same member fails closed. No new
+  retry window, executor, freshness authority or stale-result fallback was added.
+- The focused generation/freshness/impact/MCP ring passes 60 tests, and fresh
+  twelve-round mutation dogfood passes all 768 calls with zero errors, BUILDING
+  leaks or generation regressions. Scoped Ty/Pyright and preflight pass.
+  Shared read behavior changed, so the old integrated results are historical;
+  `cr11-refreshed-dev-all.log` contains the new full-membership run. Its complete
+  outcome and current source identity must be recorded before claiming success.
+
+CR-11 native population, independent packaging and import-order repair — 2026-10-18:
+
+- The read-boundary candidate is `cr11-refresh-boundary/source.zip`, SHA-256
+  `84536104c34779390632a33a41700a4069ef1863846d140281969d3854a65158`,
+  source identity
+  `sha256:8c6e600472c36444327e83f2ae44d6d1cd503172db511c769c807cc3c940c3b4`,
+  observer
+  `sha256:0d7e1b8716a30d067f9a42495f49e9483f8d65c9d1cc2f2907070454ec3dd60d`.
+  Its independent extraction passes 91 focused tests; both full configured type
+  gates pass. These results precede the import-order repair below.
+- Fresh installed Pyright acquisition covers all 110 callers / 26 source files
+  behind the retained 268 exact-to-unknown call-site demotions. All 268 sites have
+  exact native endpoint correspondence and current lexical call-site containment,
+  checked against unchanged call syntax and occurrence membership across the
+  shifted source lines. `cr11-receiver-native-population/site-correspondence.json`
+  retains the per-site source hashes, raw claim identities and comparison basis.
+  This closes that specific witness gap without promoting static unknowns or
+  lexical containment into runtime dispatch/reachability.
+- The 1,569 raw claims remain intact: 636 unique repository endpoints and 933
+  outside-repository endpoints, with zero omitted locations. All retain the
+  producer's `outside-caller-item` qualification. Independent lexical context
+  is within-declaration for 1,558 claims and outside for eleven; none of those
+  eleven is promoted. Broader locality still remains INCOMPLETE: all 1,092
+  declaration requests / 1,089 targets were observed, with 407 unresolved sites,
+  8,096 external-or-unindexed sites, eleven incomplete caller scopes and 231
+  candidate-truncation occurrences (`cr11-refreshed-locality-accounting.json`).
+- Genuine replay passes 96 semantic and fifteen dependency tests. Actual fresh
+  SCIP/native qualification passes all twelve core workflows / 24 revisions,
+  including CLI/MCP/stale/reopen checks, in `cr11-refreshed-live-native/summary.json`.
+  This is explicit-target native proof; it does not substitute for answer-blind
+  retrieval, independent capability review or the full campaign matrix.
+- Independent source ZIP, wheel and sdist rebuilds are byte-identical; the wheel
+  rebuilt from the sdist is identical too. Both isolated installations pass the
+  actual CLI smoke, and the wheel passes official installed MCP transport.
+  `cr11-refreshed-packaging/build-comparison.json` binds these artifacts to the
+  read-boundary candidate. Declared optional extras were installed in its isolated
+  environment after the offline cache lacked them. No project dependency intent
+  or committed lock changed. Cold/warm/incremental parent/current/same-version
+  observations preserve exact evidence and read/query/parse counts; these are
+  deterministic counters, not the required full timing/churn campaign.
+- The refreshed deterministic run passes batches 0–11, then batch 12 finds an
+  import-order defect in a different test: package-level lazy delta exports can
+  become module objects when the corresponding submodule was imported first.
+  Fresh-process controls reproduce both import orders. The repair removes the
+  ambiguous callable aliases and migrates the CLI/tests to the defining pure
+  delta modules. No compatibility shim or module interception is retained.
+  The import/presentation/structure ring passes 38 tests, and both full type
+  gates still pass. Current observer after that repair is
+  `sha256:6524cfd92113cd8e3dc918586d6cd157c050c4ea0059cdc0f6b1af1ff9532ac6`;
+  the preceding candidate's reports retain their original identities.
+- Broader core public acquisition preserves new failures rather than claiming
+  twelve retrieval successes. Stable-offset misses its changed method, and two
+  completed FastStream workflows also miss required disclosure facts. A parent
+  API run reproduces stable-offset before the read-boundary repair. Removing the
+  diagnostic-word restriction from bounded lexical lookup fixes stable-offset
+  but regresses metadata; a same-line-term restriction still regresses metadata.
+  Both experiments remain disposable source copies and are **not implemented**.
+  Their retained failures and independently isolated neutral fixture identify the
+  next evidence-ordering investigation; existing tasks/oracles remain unchanged.
+
+CR-11 composed post-change reads and preserved before authority — 2026-10-18:
+
+- The import repair was frozen as `cr11-import-surface/source.zip`, SHA-256
+  `a2c9208196e81fd827353931dd69ace9ee86a5bc8e27a1e632716a04446c9b42`.
+  Its independent extraction passes 140 focused tests and its native replay
+  passes. The subsequent full test run was deliberately stopped during batch 5
+  when genuine workflows proved another source defect; completed batches 0–4
+  remain recorded, and the interrupted batch is INCOMPLETE, not a test failure.
+  `cr11-import-surface-controller-interruption.json` records the exact scope.
+- Genuine partial-pull and failed-BEGIN workflows both reached an escaping
+  `DecisionRefreshRequired` while `task_delta` observed a changed imported file
+  outside the caller's reported path list. Four deterministic regressions
+  reproduced the same defect across delta, refresh, brief and compact refresh.
+  A further controlled competing publisher proved a mixed before-revision
+  snapshot could be accepted. Both failures retain their pre-repair evidence.
+- `DecisionScope.observe` now owns read-stage recomputation, while Changes retains
+  the original before values and sync result. Index member reconciliation checks
+  its expected generation inside the existing publication transaction and
+  returns that exact generation. Another publisher fails closed; nested readers
+  propagate to their outer owner. The before snapshot and previous index binding
+  are captured together in a qualified read scope. No prior packet is hydrated
+  into durable state and no new generation/cache/execution authority is added.
+- Reported-path normalization is shared by the five Changes operations that
+  previously repeated it. The type-checked current task packet supplies its
+  freshness directly. The focused read/index/post-change/authority ring passes
+  67 tests, and unchanged full Ty/Pyright plus preflight pass at this checkpoint.
+- Re-running the two genuine problems through API before/after and post-change
+  acquisition now completes both delta checks with PASS under observer
+  `sha256:38a37cc161c95daa5679198c4f412cafd92072eaea8bb263eb709a7eb5b46793`.
+  SQLAlchemy's task facts pass; FastStream retains a separate disclosure failure.
+  Empty transport selections remain INCOMPLETE and do not establish CLI/MCP proof.
+- Fresh multi-process stress then captured actual repeated source changes. A
+  typed `RepeatedSourceChangeError` now preserves the direct read's one-refresh
+  bound while the existing CLI/MCP bounded recomputation recognizes that signal.
+  A matching untyped message remains unrelated; no deadline or retry budget was
+  increased. The final focused ring passes 104 tests; fresh twelve-round stress
+  passes all 768 calls with zero errors, BUILDING leaks or generation regressions.
+  Both unchanged full type gates pass again in
+  `cr11-composed-read-full-typing-final.log`. Deterministic membership and exact
+  artifacts must now be requalified for these repaired source bytes.
+- The campaign census was recomputed without observer execution. Frozen suite/
+  grader identities and all 89 entries / 59 problems / eight suites still agree.
+  The seven missing catalogs and debugging shortage remain. Executable grader
+  capability proofs are absent throughout the retained population; workflow
+  declaration metadata alone does not fill them. The twenty-row unacquired
+  matrix remains INCOMPLETE in `cr11-current-campaign-census.json`.
+
+CR-11 complete deterministic membership checkpoint — 2026-10-18:
+
+- **All selected deterministic product-test membership now passes.**
+  `cr11-deterministic-membership-closure.json` reconciles all 3,445 selected
+  test-node selectors across sixteen complete batches / 64 shards, yielding
+  **4,748 passing pytest cases, zero skips, zero missing or duplicate members**.
+  Parameterized selectors explain the difference between the two counts. Failed
+  and partial earlier batches are retained and excluded from this proof.
+- The final two fixture repairs preserve their original assertions: the
+  conformance spy targets Index, and structural-start fixtures supply Search's
+  bounded observation instead of replacing its convenience hit projection.
+  Nine conformance and both structural fixture tests pass. No production,
+  evaluator, tool configuration, corpus or oracle changed for these repairs.
+- Test-source weights changed grouping while exact membership stayed
+  `sha256:2103b0bb29f66ed500539cb62432b49d4dd86c68d3b54eb46cca5f3432b5451f`.
+  Unchanged singleton batches 0–1, complete reweighted batches 2–14, and the final
+  batch's saved immutable membership provide exact closure. The external agent
+  executed that final complete batch through pytest; no runner, progress store,
+  execution policy or certification machinery was added to Hashmarks.
+- Current observer is
+  `sha256:f0c80ad1fb4f0fb818a2e0efba44dad1af63a2a329350bc0115fa07cc04ec19a`;
+  evaluator remains
+  `sha256:770456057c6ea2fb0fc043855228e50589256c7e10859eef30eb073d62732041`.
+  Both current metadata/sender workflows pass all ten public gates. Actual fresh
+  native qualification passes all twelve core workflows / 24 revisions. Native
+  replay passes 96 semantic and fifteen dependency tests; independent extraction
+  passes 178 focused tests, plus nine after the conformance-spy correction.
+- Fresh current Pyright capture observes all 110 retained callers and all 268
+  expected targets. Strict unchanged-call comparison passes 266 sites; two
+  intentional changes from sync/decision generation to `scope.generation` remain
+  explicitly different. `changed-site-witnesses.json` separately proves their
+  current callee ranges and native endpoints, without claiming historical
+  argument equivalence or runtime dispatch. Broader locality/direct-test
+  correspondence still needs its declared closure.
+- Seven further profile-comparability failures are reproduced in
+  `cr11-profile-provenance-reproductions.json`: mismatched repeat producer,
+  repository, cases, evaluator, sample protocol, semantic fingerprint or semantic
+  stability can still produce WIN. They are controlled QA reproductions, not
+  genuine corpus additions, and remain **unrepaired**. The earlier duplicate/
+  membership/readiness repair does not close this provenance gap.
+- Full architecture, final exact-artifact qualification and Q-00–Q-05 remain
+  open. Clean deterministic tests and typing do not establish twenty-capability
+  5/5; the missing catalogs, independent executable oracles, witnesses, heldouts,
+  source-disclosure failures and complete economics campaign still apply.
+
+Profile comparison provenance closure — 2026-10-18:
+
+- The seven false-WIN controls above are now repaired and revalidated in
+  `cr11-profile-provenance-revalidated.json`. Comparisons require matching source,
+  case-set, evaluator and measurement protocol. A noise repeat also requires the
+  same observer and stable matching semantic fingerprints. A candidate observer
+  may differ. Missing provenance, invalid integer/shard bounds and an omitted
+  shard identity cannot masquerade as a comparable or completely merged profile.
+- Existing positive numeric/semantic expectations and per-case thresholds remain
+  unchanged. No-repeat observations remain UNCALIBRATED with unknown noise.
+  Comparable complete merged profiles still work. The focused comparator and
+  repository-evaluation ring passes 62 tests; the original seven reproductions
+  all reject rather than yield WIN. No corpus, oracle, review flag, performance
+  threshold or product execution responsibility changed.
+- Production observer remains `f0c80ad…`. The evaluator changes to
+  `sha256:ae8085bcdab106f0bd6b75406b69d230b049ffc429d32e920ed86a5f908593b9`.
+  Earlier backend reports retain evaluator `770456…`; they are not relabeled as
+  fresh results from the new evaluator. The full 4,748-case deterministic proof
+  belongs to the preceding clean source checkpoint; this QA-only follow-up adds
+  its focused proof and requires current source/evaluator qualification.
+
+Qualification/Ruff responsibility consolidation — 2026-10-18:
+
+- **Classification: DECOMPOSE MULTIPLE RESPONSIBILITIES; observer decision SPLIT.**
+  The old promotion module combined repository handoff binding with hardcoded
+  Ruff versions/rules and execution-result receipt validation. Repository
+  content/membership/provenance binding is OBSERVER; environment compatibility,
+  tool-result receipts and release/certification policy are OUTSIDE. The explicit
+  AGENTS.md single-configuration-owner rule and product constitution require
+  removing that policy rather than adding another pyproject parser or matrix.
+- The repository-binding check now belongs to the existing `qualification_units`
+  owner. `validate_native_qualification_repository_binding` first validates the
+  retained handoff, then compares its current content, membership, classification,
+  plan, handoff and producer identities. Invalid input returns before repository
+  measurement. No new registry, state, cache, producer/schema or execution owner
+  was added. Dependency direction is the existing handoff CLI to its canonical
+  qualification owner; the promotion wrapper is removed.
+- `hashmarks/promotion_receipt.py` and `scripts/promotion_gate.py` are deleted.
+  The existing `scripts.qualification_handoff` gains `--validate FILE`, exposing
+  only the existing validation result. Removed APIs have no compatibility shim.
+  Ruff version/rule constants and environment receipt semantics are gone from
+  production. Historical exact-symbol corpus cases/grader bytes are untouched;
+  they remain observations of their original source revisions.
+- The parent receipt/CLI/fuzz ring passed 33 tests before removal. Current direct
+  binding, native handoff, qualification and malformed-root tests pass 43 tests.
+  Neutral controls preserve current binding, actual source drift with unchanged
+  membership, rehashed foreign/self-consistent identity drift, input immutability
+  and hostile execution fields. CLI checks retain stale rejection and ensure
+  no result/promotion fields or obsolete tool receipt option. Fuzz coverage now
+  targets the supported repository-binding validator. Removed compatibility and
+  execution-receipt tests are not counted as current product obligations.
+- This intentionally changes public API and observer implementation identity.
+  Both current full type gates and preflight now pass with zero diagnostics/debt.
+  Observer is
+  `sha256:945d23159de8e22f4ecf2acc604a61c4cc6e009a1c5258d62be25a5a942cc3c1`;
+  evaluator remains `ae8085b…`. Independent candidate checks must complete;
+  earlier `f0c80ad…` observer reports retain their original identities. Canonical
+  architecture/locality closure and the full twenty-capability campaign remain
+  open. This removal does not promote any capability to 5/5.
+
+  Independent extraction now passes 105 focused qualification/profile/fuzz
+  tests. Actual subprocess handoff rendering/current validation returns 0;
+  source drift returns 3 with validation-only authority. Before/after locality
+  uses the same observer, depth two and 1,024 call/reference bounds. The preserved
+  repository-binding path has zero unresolved repository calls and zero candidate
+  truncation on both sides, with three files before and two after. External or
+  unindexed calls remain explicit. The CLI `main` neighborhoods retain candidate
+  truncation, so the broader locality report stays INCOMPLETE; no bound/depth was
+  lowered to produce a pass. Evidence: `cr11-qualification-binding-locality/`.
+
+Genuine disclosure diagnosis after boundary consolidation — 2026-10-18:
+
+- Unchanged FastStream shutdown and queue-lifetime tasks were observed using the
+  existing public packet and bounded source readers. The broker method's file
+  is ranked 43 within the existing 64-file pool; repeated singular/plural query
+  families and signature-only context matches crowd declaration disclosure.
+  The concurrent queue constructor is outside that pool and matches only one
+  declared context term, so it is a distinct unresolved case. Expected source
+  labels were used for comparison only, never injected into the task query.
+- A disposable ordered-qualified-name/unique-family experiment recovers the
+  broker method without regressing metadata/sender source facts. A neutral
+  40-constructor fixture exposes an additional duplicate-hint defect: removing
+  the repeated locator also erased its context qualification and promotion.
+  Preserving qualification on the existing locator passes that fixture and 23
+  existing declaration/context/lexical tests. These changes remain **unshipped**;
+  clean implementation, typing and public transport/size checks are still needed.
+- The refined experiment still misses the existing before-revision broker test.
+  The source-only review confirms `tests/brokers/base/connection.py` contains
+  `test_stop_before_start` and `test_connect`, both awaiting a broker stop. Its
+  `Any` receiver does not prove exact runtime wiring. Expanding mechanical task
+  variants and qualifying the test namespace before the lexical bound still
+  did not surface it. Those experiments are also unshipped; candidate ordering
+  before the eight-row projection remains to be inspected. Edit ownership stays
+  ambiguous and the selected verifier is unchanged.
+- The first diagnostic context pool omitted production's test-path filter; its
+  raw 32-row absence is not used as a production completeness claim. The corrected
+  filter probe and all rejected/partial experiments are retained under
+  `cr11-disclosure-source-probe/`, `cr11-qualified-name-*` and
+  `cr11-verification-subject-experiment.*`. No bound, oracle, review flag or corpus
+  membership was changed to improve the result. Neither source-fact improvement
+  nor this research closes a capability at 5/5.
+
+Declaration ordering and independent verification subjects — 2026-10-18:
+
+- **OBSERVER defect repairs; REFACTOR INTERNALLY in the existing Tasks/Search
+  evidence owners.** The neutral 40-constructor regression fails on the frozen
+  parent. Repeated normalized task families no longer manufacture additional
+  declaration matches. Context preselection retains callable-name matches before
+  signature-only matches; qualified-name order and name coverage distinguish an
+  operation from parameter-heavy constructors. A duplicate locator retains its
+  existing facts and context qualification. No edit-owner or verifier selection
+  policy, source oracle, corpus input or bound was changed for this repair.
+- The declaration/context/lexical/initial ring passes 44 tests. Current public
+  metadata/sender workflows pass all ten gates, including initial size and format
+  parity. The first broker shutdown public run now exposes its exact method but
+  still fails verifier disclosure; that failure remains retained in
+  `cr11-declaration-order-public/` rather than being reclassified as success.
+- Read-only candidate traces identify a distinct identity regression: verification
+  replaced an observed method with its parent class, dropping the method anchor.
+  On the genuine shutdown source the relevant existing test ranked 166 in that
+  broad class pool. Keeping the exact method, normalized lexical forms and test
+  namespace improves its rank; coherent qualified declaration overlap must also
+  precede filename-only similarity. These are advisory disclosure observations,
+  with exact references and namespace evidence retaining earlier precedence.
+- Parent-class references remain independent context observations instead of
+  being erased or relabeled as method references. The same three source locators
+  may therefore produce at most two distinct subjects each; metadata reports
+  `source_locator_bound: 3` and `subject_bound: 6`. The returned verification
+  bound stays eight, and the existing lexical/source windows are unchanged.
+  Each subject keeps its own source basis and reference qualification. Selected
+  edit/test authority is untouched; no runtime call, sufficiency or execution
+  claim follows from class or lexical similarity.
+- A new direct regression requires separate method and class bases. All 30
+  unchanged verification prototype regressions pass, and the current focused
+  ring passes 34 tests. The extended reference, ambiguity, stale identity and
+  presentation ring passes 109 tests. Both full type gates and preflight pass.
+  The combined genuine CLI/MCP run is now terminal: broker shutdown, metadata
+  and sender each pass all ten gates, including before/after source/test facts,
+  initial evidence/size, freshness, authority and presentation parity. Aggregate
+  status remains INCOMPLETE for this three-workflow scope. Independent extraction
+  passes 153 tests. Reports: `cr11-verifier-subject-public/summary.json` and
+  `cr11-source-verification-subjects-extracted.xml`. No overall 5/5 claim is
+  established; the separate queue constructor and stable-offset cases remain.
+
+Additional genuine qualification — 2026-10-18:
+
+- Observer `44af3024…` and evaluator `ae8085bc…` have three further
+  complete public acquisitions: FastAPI dictionary defaults, Litestar
+  NotRequired field schema, and SQLModel field discriminators. Each passes the
+  eight available common gates across both revisions, CLI and official MCP,
+  including the unchanged initial-size ceiling and presentation parity. These
+  tasks explicitly nominate source paths; owner recall and initial sufficiency
+  remain unqualified. Reports are `cr12-model-public-<workflow>/summary.json`.
+- The existing model source oracle has been independently checked against six
+  pinned repository identities and eight class/field source units. The retained
+  review is `benchmarks/repository_evaluation/manifests/backend-model-v1/`
+  `source-oracles.review.json`. It records source-span hashes and references the
+  unchanged oracle; `capability_reviewed` remains false. This is source review,
+  not capability or witness closure.
+- The expanded source-only review now covers all twelve admitted model problems
+  across three repositories: 24 exact repository identities, 39 model-stage
+  units, direct field annotations/default syntax, declared base expressions,
+  nested class identities and exact source spans. See
+  `source-oracles-expanded.review.json` beside the original review. All three
+  input oracle files remain unchanged. Capability review, required semantic
+  adversaries and complete witness membership remain open.
+- The remaining eight model API acquisitions pass their independently expected
+  source/test and declaration facts before and after the genuine changes
+  (`cr12-model-remaining-api/summary.json`). Missing transports in these API-only
+  observations retain INCOMPLETE status. Subsequent full public acquisition
+  completes all twelve model problems: eleven pass the available fact/transport/
+  size checks, while Iterable still misses its test and exceeds the initial
+  ceiling. One datetime authority check remains unqualified. Fresh native
+  production passes all twelve workflows (`cr12-model-native-public-02/`).
+  Pure aggregation admits all seven model report parts without constructing
+  CodeMap or launching a process (`cr12-model-campaign-regrade/`). Its model row
+  remains FAIL: native binding cannot compensate for failed retrieval/size,
+  missing authority or unreviewed capability witnesses.
+- The four-repository heldout evaluation completed all 24 cases against the
+  exact required source identities. Nineteen pass, including both expected
+  ambiguities. Five historical Hashmarks cases fail: paths-under, stale-path
+  removal and directory pruning select the wrong ambiguous candidate; MCP task
+  evidence and repository-content identity remain over-ambiguous. No false-safe
+  or false-unique result was observed. The unchanged failing results are retained
+  at `cr12-heldout-current/summary.json`; this gate is not closed.
+- An isolated queue declaration-component experiment is not admitted to product
+  code. It reveals the genuine constructor but still misses its existing test,
+  and a neutral crowded-class control fails on both parent and experiment.
+  Retained results include `cr12-component-hint-api/` and
+  `cr12-class-component-experiment.log`. Increasing source visibility in one
+  repository is not sufficient evidence for the proposed generic repair.
+- The model API-only baseline additionally fails to disclose the existing
+  Iterable response-options test on both revisions. Its absent CLI/MCP outcomes
+  remain INCOMPLETE, not passes (`cr12-model-baseline-api-selected/`).
+
+Lossless initial-wire repair — observer `b91988e9…`, 2026-10-18:
+
+- **REFACTOR INTERNALLY** in the existing initial codec. Choose between the
+  existing JSON/zlib/Base64 payload and JSON/LZMA/Base85, preserving every
+  decoded value, semantic identity and presentation fact. Encoder history is
+  bounded by payload size; decoding retains the unchanged 1 MiB output limit
+  and adds a 16 MiB LZMA dictionary-memory limit. No retrieval bound, source
+  oracle, qualification threshold, review flag or test-selection policy changes.
+- The neutral varied-source regression fails on the frozen parent and passes
+  after repair. New decoder controls cover corrupt/truncated/concatenated
+  streams, size lies, dictionary-memory inflation, duplicate keys, header
+  shadowing, false/null/zero/Unicode and future fields. The focused ring passes
+  **184 tests**. A broader run also reproduces an outdated provenance-label
+  expectation on the frozen parent: the fixture's `prefix` parameter now yields
+  the already-admitted declaration-context route. Its expected route labels
+  are updated, while canonical order, source facts, authority, omission counts
+  and unchanged edit/verification assertions remain; exact symbol/ranges are
+  additionally asserted.
+- Fresh genuine Iterable CLI/MCP acquisition passes initial size at both
+  revisions, with a maximum compact/text response of **3,972 tokens** instead
+  of 4,207. The independent existing-verifier expectation still fails; overall
+  workflow status remains FAIL (`cr12-lossless-initial-public-iterable/`).
+- Fresh native metadata/sender/subscriber workflows pass every selected gate
+  (`cr12-lossless-initial-native/`). Their aggregate remains INCOMPLETE for the
+  selected three-workflow scope. The corresponding public acquisition passes
+  all ten selected gates for each of the same three workflows, including the
+  original source/test facts, size and format parity
+  (`cr12-lossless-initial-public-core/`); its aggregate also remains INCOMPLETE.
+- Full configured Ty and Pyright pass with zero diagnostics/errors/warnings
+  (`cr12-lossless-initial-full-typing-02.log`); preflight passes without policy
+  relaxation. Public-encoder measurements use the identical genuine packet,
+  two warmups and nine samples, plus an independently extracted parent repeat.
+  Wire bytes fall from 9,673 to 8,720; median encoder time rises from about
+  5.8 ms to 14.1 ms, with traced peak memory rising from about 0.51 MB to
+  2.27 MB. This measured space/CPU tradeoff is not a repository-wide speedup
+  or completion of the required economics campaign (`cr12-initial-encoder-*`).
+- The preceding exact extraction has fresh complete acquisition membership for
+  1,099 locality requests / 1,096 distinct targets, with zero observation errors.
+  It still has 400 unresolved repository call sites, 8,061 external/unindexed
+  sites and eleven incomplete caller counts. A fresh Pyright capture covers
+  all 160 unresolved callers. Exact source-expression/range checks corroborate
+  374 of 400 sites as explicit producer claims; 26 remain unknown. Static
+  authority is not strengthened and runtime dispatch remains unestablished.
+  These observations bind the preceding `44af3024…` extraction, not the later
+  codec candidate (`cr12-extracted-component-locality/` and
+  `cr12-locality-native-current/site-correspondence.json`).
+- Source archive and independent-extraction evidence for this codec checkpoint
+  use the `cr12-lossless-initial-source` names. Independent extraction passes
+  **373 tests**, including direct components, input binding/lifecycle, codec,
+  backend grading, native LSP and official transport, with actual import origin
+  and observer identity asserted. The four changed/new codec operations have
+  zero unresolved repository calls and no incomplete caller counts at the same
+  depth-two / 1,024-call/reference bounds; external/unindexed calls remain
+  explicitly unclassified. This paragraph records results after the ZIP was
+  frozen; production, tests and source-review bytes are unchanged. Complete
+  deterministic membership,
+  architecture/locality closure, missing catalogs, semantic adversaries,
+  independent capability review and final twenty-row qualification remain open.
+
+Reference-window repair — observer `65352b1a…`, 2026-10-18:
+
+- A neutral direct-component fixture reproduces production-reference fanout
+  hiding a test's qualified import through a package re-export. The repair stays
+  with the existing owners: Store orders a caller-nominated preference inside
+  the same bounded global read; DecisionScope binds that preference into its
+  generation/short-target memo key; Verification nominates canonically classified
+  test paths. Owner/import qualification and edit authority remain separate.
+- The returned evidence window remains 1,024 rows, with one physical lookahead
+  row. Preferred references are followed by unpreferred references within the
+  same capacity. Saturation remains incomplete and cannot establish absence or
+  uniqueness. Controls cover shadowed aliases, detached cached rows, different
+  preference orders, unpreferred fallback and the 1,025th-row sentinel. Three
+  existing fake query ports accept the added keyword while retaining all original
+  assertions; no corpus oracle, threshold or authority assertion is weakened.
+- The focused read/verification/economics ring passes **43 tests** and the wider
+  ownership/import/freshness/disclosure ring passes **223 tests**. Full Ty,
+  Pyright and scoped Ruff pass. The adopted production, evaluator and tool-config
+  bytes match the isolated candidate across 356 files. Its real public
+  metadata/sender/subscriber workflows pass all ten gates each, including source/
+  test facts and initial size. Reports use `cr13-refpriority-public-core/`.
+- The genuine Iterable workflow still misses its independently nominated test;
+  its compact/text maximum remains under the ceiling at **3,961 tokens**
+  (`cr13-refpriority-public-iterable/`). The partial-pull before verifier also
+  remains missing (`cr13-refpriority-partial-batch/`). These are unresolved
+  retrieval defects, not passes or claims that the candidate search is complete.
+- The complete twelve-workflow API-only baseline at the preceding `b91988e9…`
+  observer is retained in `cr13-core-api-baseline/`. Eight workflows pass their
+  before/after expected facts. Stable-offset symbol disclosure, SQLAlchemy pickle
+  source/symbol disclosure, the concurrent queue owner/symbol/test, and the
+  partial-pull before verifier fail. Missing transports stay INCOMPLETE.
+  Current broader corpus qualification, complete structural locality, exact
+  direct-test/baseline correspondence and the final twenty-capability result
+  remain open.
+
+Canonical Source helper cleanup — observer `5383cbdb…`, 2026-10-18:
+
+- Alternate-path review found one private `RepositorySource._source_shape`
+  static-method alias forwarding to the already canonical pure
+  `source_line_correspondence.source_shape` owner. Its sole caller now invokes
+  the defining helper directly; the alias is deleted. No other consumer or
+  override was found. Classification: REFACTOR INTERNALLY. This removes a
+  concrete ownership/localization obstacle without adding resolver heuristics,
+  compatibility wrappers, caches or semantic authority.
+- Unchanged Source/direct/official-transport tests pass before and after:
+  **74 PASS** on each side (`cr13-source-shape-parent.xml` and
+  `cr13-source-shape-after.xml`). Paired locality for the exact
+  `_source_observation_from_bytes` target, using the same observer,
+  configuration and depth-two / 1,024-call/reference bounds, changes unresolved
+  repository calls from **1 to 0** and exposes the canonical helper. Three files
+  remain observed; symbol count increases from 9 to 10 and context from 287 to
+  304 lines because the helper is now followed. External/unindexed calls increase
+  from 58 to 70. This is one-target correctness evidence, not a speedup or
+  complete component-locality claim. See `cr13-source-shape-locality/summary.json`.
+- A fresh Pyright language-server capture against the independent extraction
+  also binds that exact call-expression range to the unique repository
+  `source_line_correspondence.py::source_shape` endpoint. One nominated caller
+  is captured and qualified without errors; the pure range/source match passes
+  for its one nominated call site. See
+  `cr13-source-shape-native/site-correspondence-normalized.json`. This is an
+  explicit producer/source correspondence witness; runtime dispatch and global
+  call completeness remain unestablished.
+- Full configured Ty and Pyright pass, as does source compileall. The exact
+  source ZIP is `cr13-canonical-source-shape/source.zip`, SHA-256
+  `9b76c1ffff1074e0c19cccae34f47896828583c9b9558cfa3e6ce400ddd51fd0`.
+  Its source identity is
+  `sha256:c1aa612c6d4f18804c79d645f3dcd064d32134f2baa9d49a760605116db309e3`.
+  The independent extraction passes **478 tests**, including component,
+  lifecycle, binding, verification, native and public-transport coverage, with
+  actual import origin and observer identity asserted
+  (`cr13-source-shape-extracted.xml`).
+- Fresh native metadata, sender and subscriber-stop workflows pass all ten
+  gates each at this observer, including before/after CLI/MCP, source binding,
+  source token correspondence and stale reopen. The report is
+  `cr13-canonical-source-native/summary.json`. Its aggregate status remains
+  INCOMPLETE because nine other suite workflows were not selected. This native
+  source/transport scope cannot establish the full backend capability result.
+- The same three genuine public workflows pass all ten gates each at the
+  current observer, including independently expected source/test facts,
+  before/after CLI/MCP parity, authority and initial evidence/size. Maximum
+  initial compact/text sizes are **3,548 tokens** for sender, **3,436** for
+  metadata and **3,107** for subscriber-stop. See
+  `cr13-canonical-source-public-core/summary.json`. This selected three-workflow
+  report remains INCOMPLETE for full-suite/capability qualification.
+- The current public Iterable run still fails the independently expected
+  `tests/test_skip_defaults.py` verification retrieval on both revisions
+  (`cr13-canonical-source-public-iterable/summary.json`). Initial compact/text
+  size passes with a maximum of **3,961 tokens**, and freshness, revision and
+  authority gates pass. Failed facts/CLI/MCP/presentation gates remain failed;
+  source-only/native passes do not compensate for missing verification evidence.
+- These proof paragraphs follow the frozen ZIP. Production, evaluator,
+  tool configuration and source-review bytes remain identical to that snapshot;
+  the later two-test Changes addition is separately bound below. All 23
+  component owners are implemented; CR-11's complete
+  operation/direct-test/baseline correspondence and locality disposition,
+  CR-12's current complete membership/economics/artifacts, and Q-00 through Q-05
+  remain open. Architecture implementation is not architecture acceptance or
+  twenty-capability 5/5 qualification.
+
+Public-operation correspondence at the same observer is retained in
+`cr13-operation-correspondence/summary.json`: all **95** public operations in
+the frozen CR-00 baseline map to callable current component operations, and
+**zero** retired root callables remain. The authored migration table supplies
+the mapping; actual runtime definitions identify the owner and defining module.
+This closes the public-name migration inventory only. Static test-call leads
+are explicitly unreviewed: Context's `work`/`budget_sweep` are exercised through
+`WorkContextProjection`, external freshness has class-level direct calls, and
+the operation-contract suite covers dynamically dispatched surfaces. Those
+facts must be reviewed against assertions and receiver identity; they are not
+automatic direct-test coverage. Introduced/internal stages, behavioral baseline
+correspondence and full locality remain INCOMPLETE.
+
+The public-operation review identified a missing direct behavioral test for
+`Changes.refresh_brief`: existing operation-contract coverage checked its schema
+boundary but did not prove changed-path isolation or generation consistency.
+Two new tests independently construct Changes and prove that an unreported
+changed file is not refreshed, the task brief reflects the current published
+observation, and publication during task composition rejects the packet and
+releases the read scope. The unchanged production implementation passes both.
+The Changes/refresh/delta/diagnostic/projection/architecture ring passes
+**100 tests** (`cr13-refresh-brief-ring-02.xml`); both new tests also pass from
+an independent copy of the frozen production extraction with an explicitly
+hashed test-only overlay (`cr13-refresh-brief-test-overlay.json`). Full Ty,
+Pyright and agent preflight pass. Initial probe failures from using an unsupported
+brief field/index-counter comparison and from a sandbox-denied service socket
+are retained; the successful ring uses the actual decision-identity contract and
+an environment permitting local sockets. No production or oracle change was
+needed. The frozen source ZIP and its 478-test proof predate these two tests;
+the overlay is iteration evidence, not a replacement exact-artifact claim.
+
+The final two-test replay strengthens the brief check with the public evidence
+receipt's exact `codemap_generation`, independently of its hashed decision
+identity (`cr13-refresh-brief-direct-final.xml` and
+`cr13-refresh-brief-extracted-final.xml`). Four existing external-freshness
+controls also pass (`cr13-external-freshness-direct.xml`). The operation report
+now records **39** manually reviewed public-operation test correspondences and
+leaves **56** unreviewed. Each reviewed row names the concrete independent
+receiver, assertions, test bytes and execution evidence; its scope is only those
+listed behaviors, not complete operation/internal-stage coverage. Static names
+do not prove coverage.
+
+The root lifetime review specifically proves partial-construction cleanup,
+workspace-binding failure cleanup, idempotent close, and attempting every close
+when one fails. All listed reviewed tests have matching executed test nodes in
+the retained XML receipts; no static call lead is counted as execution proof.
+
+A supplemental current-source locality scope covers 25 operations: both retained
+Python binding helpers, all top-level initial codec operations, canonical
+`source_shape`, and the two changed reference-query methods. All 25 observe
+without error or incomplete caller counts. The first 23 have zero unresolved
+repository calls. Three unresolved query-mixin call sites are corroborated by
+fresh Pyright claims and exact source-expression/range matching, including the
+two `_count_read` calls and `refs_many_for_paths`. Reports are
+`cr13-extracted-component-locality-supplement/summary.json` and
+`cr13-reference-query-native/site-correspondence-normalized.json`. External/
+unindexed calls remain undisposed; this explicit source/native correspondence
+does not establish runtime dispatch or complete architecture locality.
+
+The complete current census and supplement now contain **1,122 requests /
+1,119 distinct targets**, with zero observation errors, zero missing nominated
+modules and zero missing targets from the preceding census. This adds 23 explicit
+codec/source/query targets to the previous scope; its totals must not be compared
+as a same-scope performance or regression score. Pure artifact accounting retains
+**404 unresolved repository call sites**, **8,298 external/unindexed sites**, and
+**35 incomplete caller observations over 11 distinct symbols**. The report names
+each affected symbol; none gains completeness from the census.
+The report remains INCOMPLETE:
+`cr13-current-locality-accounting/summary.json`. The explicit native witnesses
+above corroborate their nominated sites only; the full unresolved population
+still needs current source/native correspondence and qualified disposition.
+
+Fresh native capture now covers all **162** callers in that current unresolved
+population, with **162 qualified / zero errors**. Pure exact call-expression,
+source-binding and range matching corroborates **379 of 404 sites** as unique
+repository endpoints; **25 remain unknown**. The latter include `super` exception
+initialization and external regex/dictionary/metadata calls. No SDK or dependency
+implementation was inspected and no unknown was promoted to a repository
+negative or runtime fact. See `cr13-locality-native-current/summary.json` and
+`site-correspondence-normalized.json`. These are current observer-bound producer
+claims; caller bounds, external/unindexed disposition, internal stages and
+behavior/economics baseline correspondence still prevent CR-11 closure.
+
+Local-source review accounts for all 25 remaining uncorroborated sites without
+examining external implementations: 20 receivers are assigned imported
+`re.compile` results, two are calls through imported `importlib.metadata`, one
+uses a repository dictionary alias, and two invoke `super().__init__` from
+classes explicitly inheriting `RuntimeError`. Exact local declaration/call spans
+are retained in `cr13-locality-native-current/unknown-site-disposition.json`.
+Every row remains **unknown** for runtime dispatch with negative evidence
+inadmissible; this source-syntax disposition does not clear the whole external/
+unindexed population or the remaining architecture gates.
+
+The same canonical caller search was also replayed for all 11 distinct symbols
+with incomplete caller bounds, using observational instrumentation against the
+frozen extraction (`cr13-caller-bound-review/summary.json`). Exact reasons are
+retained per symbol: reference-window saturation and/or incomplete reverse-import
+alias qualification. The search and its limits were not rewritten. Returned
+callers remain candidates under those incomplete scopes; neither a wider display
+nor the forward native witnesses proves a complete reverse-caller universe.
+
+Handler-corpus intake has started from three inspected genuine changes over
+FastAPI, Litestar and FastStream, with six exact local Git archives and recomputed
+repository-content identities (`cr13-handler-source-intake/intake.json`). Cached
+AST/source review prepared 35 decorated handler units over twelve selected
+owner/test-file observations before any observer output
+(`source-oracles.json`). The FastAPI wrapping regression test is created only
+after its change, so it is explicitly absent before and cannot serve as a
+before-existing verifier. FastStream's actual fix adds a curried
+`docs_router.post(...)(handler)` registration; decorator-only observation cannot
+claim that registration is absent. This is INCOMPLETE intake, not a new admitted
+campaign suite or a replacement for twelve genuine problems, independent
+capability review, semantic adversaries and public/native witnesses.
+
+Retrieval diagnostic freshness repair — 2026-10-18:
+
+- Direct Search review reproduced missing preparation and missing shared read
+  scope in `retrieval_stability` and `explain_retrieval`. A cached unsignaled
+  source edit was not reconciled, and publication between replay/selected/lane
+  stages could produce a mixed-publication diagnostic. Four neutral controls
+  fail against the independently extracted `5383cbdb…` parent with asserted
+  import origin (`cr14-retrieval-diagnostic-frozen-parent.xml`).
+- Classification: REFACTOR INTERNALLY. Search remains the sole retrieval/cache
+  owner. Both public diagnostics now prepare contributing paths through the
+  existing Search owner, then compose inside the existing generation-bound
+  DecisionScope. Two named observation stages retain the existing replay/cache
+  restoration, route/fusion algorithms, bounds and wire schemas. The existing
+  static `ReadScopeOwner` port types that dependency; no state manager, graph,
+  dispatcher or extra cache is introduced.
+- Direct controls prove reconciled generation, rejection of interleaved
+  publication, released scope and canonical-result preservation after a replay
+  failure. The focused retrieval/task/freshness/architecture/codec ring passes
+  144 tests before the final static port declaration; final extracted/ring and
+  full typing evidence must follow below. All prior observer-bound public/native
+  and locality reports remain historical after this production repair and must
+  not be relabeled as current proof. The full CR-11/CR-12 and twenty-capability
+  requirements remain open.
+
+- The final typed candidate passes full Ty/Pyright and agent preflight, source
+  compileall, and **152 tests** from its independent extraction with import
+  origin and observer asserted (`cr14-diagnostics-extracted.xml`). It binds
+  observer
+  `sha256:3f7e72e6a755abbc50d8ef5cd63b7d617ed200acdd5ea3f9b93c044bf81ea194`.
+  Exact archive: `cr14-retrieval-diagnostics/source.zip`, SHA-256
+  `f41bfaaa54a7fbcac9e3706e29b8eb19097fd89fc4376c270a70353e2ec2814e`;
+  source identity
+  `sha256:218ac80a80ee4a9f9925b5d50b8f11dba380daeb8ba9fd255228b900452ca741`.
+- A bounded parent/current/parent-repeat economics observation uses the same
+  pinned genuine metadata source, task and limits, two warmups and nine timed
+  samples per diagnostic (`cr14-diagnostic-economics/summary.json`). Warm packet
+  bytes and hashes are identical on all three sides (573 stability / 2,661
+  explanation bytes). Stability medians are 59.1 / 43.2 / 56.6 ms; explanation
+  medians are 15.0 / 15.9 / 13.4 ms. Current explanation performs eight contributor
+  file-row reads and one document-frequency read for explicit freshness
+  preparation; the same-generation cache previously avoided that qualification.
+  This scoped evidence neither proves a general speedup nor replaces the full
+  cold/incremental/rename/delete/recovery economics requirement. These result
+  paragraphs postdate the exact ZIP; production/test/evaluator bytes remain
+  unchanged.
+
+- `cr14-diagnostic-preservation.json` confirms the only changed production file
+  since the frozen parent is `retrieval_diagnostics.py`; the preserved query/
+  task/freshness/architecture/codec ring bytes are identical. Both prior direct
+  Search tests and new controls have parent/current execution evidence. Current
+  operation review is `cr14-operation-correspondence/summary.json`: **46** listed
+  public-operation behaviors reviewed / **49** still unreviewed. Inherited review
+  bytes are compared explicitly and historical execution is not rebound to the
+  new observer. Paired public-target and new-stage locality is retained in
+  `cr14-diagnostic-locality/summary.json`; unresolved cast/mixin call targets
+  have current native/source qualification: all four callers captured and
+  qualified without errors, and **12/12** nominated repository call sites match
+  exact source ranges and unique producer-claimed endpoints
+  (`cr14-diagnostic-native/site-correspondence-normalized.json`). Caller bounds
+  are complete in this scope. External/unindexed calls remain explicit and
+  runtime dispatch is not inferred; the full architecture census is separate.
+
+Handler intake now pins **12 distinct genuine changes / three repositories /
+24 exact source trees** (`cr14-handler-source-intake/intake.json`), without
+changing campaign membership or capability review flags. Independent cached
+AST/source intake retains **268** HTTP/websocket/subscriber-like decorated
+units over 48 selected file observations, including unsupported syntax rather
+than calling it absent (`source-oracles-expanded.json`). Exact diff/source
+correspondence additionally retains 40 changed production definition spans and
+449 test declarations (`change-source-review.json`). These counts describe
+acquired source, not reviewed semantic breadth. Three nominated test files exist
+only after their change, and before-existing verifiers still need independent
+selection. Actual causal owners, input/return branches, supported registrations,
+semantic adversaries, independent review and public/native witnesses remain
+INCOMPLETE; reaching the source-count minimum does not close the handler catalog.
+Three creation-only before-test gaps now have independently inspected existing
+surfaces in `existing-before-tests.review.json`: included-router response tests,
+existing streaming response tests, and the existing AsyncAPI response test.
+Each record binds its exact pinned file/span and explains its limited relevance;
+none is claimed to cover the new defect or provide sufficient regression proof.
+The other test/oracle/capability requirements remain open.
+
+Curried route-call source primitive — 2026-10-18:
+
+- The genuine selected-provider baseline independently freezes three curried
+  route-call expressions before and four after the AsyncAPI try-route change,
+  while the previous provider returns zero groups on both sides. No route
+  absence or runtime-registration claim is admissible from that result. See
+  `cr14-handler-registration-baseline/independent-source-oracle.json` and its
+  before/after API artifacts.
+- The existing selected `StaticPythonInterfaceDeclarations` provider now also
+  reports explicit expression statements of the form
+  `receiver.method(route)(handler)`. The claim binds the exact call span, method,
+  literal/dynamic route syntax, simple handler-argument spelling and argument
+  expansion. Handler resolution and runtime registration remain unestablished;
+  no declaration linkage, framework identity, reachability or new graph exists.
+  Existing provider path/source/group bounds apply. Classification: REFACTOR
+  INTERNALLY; the observer ownership note is in `STATIC_INTERFACE_EVIDENCE.md`.
+- Neutral parent probes fail for the missing syntax. Controls cover conditional/
+  nested statements, dynamic routes/handlers, absent/rebound names, foreign
+  receivers, argument expansion, decorator-position exclusion and 129-group
+  failure before publication. An initial intermediate control found decorator
+  expressions were being counted; limiting this claim to expression statements
+  fixes that overreach. The first provider/source/architecture ring passes
+  **122 tests**; final frozen proof follows separately.
+- `cr14-handler-registration-after/` retains a useful intermediate 3/4-fact
+  observation but is explicitly disqualified for implementation binding: source
+  changed while that Python process was alive. Its recorded final file hash
+  cannot attest the already imported module. Rerun from an immutable extraction
+  with start/end observer checks; never relabel this run as a current pass.
+
+- The stable candidate binds observer
+  `sha256:912eda24c7238bdbc6432373a239f06f3d4a42fe5f93ffa093f9f08dc715b966`.
+  `cr14-curried-route-source/source.zip` has SHA-256
+  `9e6cf5c43e863feddef1c5f8932e6e4eccd82a3ddf345270cc3eb1e531422244`
+  and source identity
+  `sha256:b976e1d9a179602111379654205bd9789ebb097db27dd5acdff5b4a79faedcf4`.
+  Its independent extraction passes **136 tests**, including provider syntax,
+  source/authority adversaries, correspondence persistence, architecture and
+  initial presentation (`cr14-curried-route-extracted.xml`). Full Ty/Pyright,
+  compileall and preflight pass for the frozen source. Nine later curried syntax/
+  presentation controls pass in the worktree; their separately hashed test-only
+  overlay does not alter the frozen production artifact claim.
+- The identical genuine before/after source problem was rerun from that immutable
+  extraction with start/end observer checks. Its independent oracle and source
+  fact grader pass all **seven** exact call expressions (three before / four
+  after), including method, handler spelling, source line and retained runtime/
+  handler/absence/coverage unknowns (`cr14-handler-registration-frozen/summary.json`).
+  The aggregate remains INCOMPLETE for public transport, broader representative
+  semantic cases and capability qualification.
+- The preceding diagnostic observer's public core report passes all ten gates
+  each for metadata/sender/subscriber-stop; maxima are 3,434 / 3,549 / 3,107
+  initial tokens (`cr14-diagnostics-public-core/`). Its genuine Iterable workflow
+  still fails expected verification retrieval on both revisions, with initial
+  maximum 3,958 tokens (`cr14-diagnostics-public-iterable/`). These retain their
+  `3f7e72e6…` observer binding and are historical after the provider extension.
+- Paired locality for the source composer and both new pure stages uses the same
+  depth-two / 1,024-call/reference configuration on exact parent/current source.
+  All four observations have zero unresolved repository calls and complete
+  caller bounds (`cr14-curried-route-locality/summary.json`). External/unindexed
+  calls remain explicit. The nine final syntax/presentation controls also pass
+  from their independent hashed test overlay
+  (`cr14-curried-presentation-extracted.xml`); these are additional tests after
+  the frozen 136-test candidate, not a rebuilt exact artifact.
+- A tracked source-only catalog now preserves the twelve handler problems and
+  24 exact trees at
+  `benchmarks/repository_evaluation/manifests/backend-handler-v1/source-catalog.json`.
+  Candidate owners/tests, selected-file hashes, source identities, creation-only
+  before-test gaps and pending proof are explicit. Every semantic/capability
+  review flag remains false; the active campaign is unchanged. Source identity
+  validation is separate from semantic/oracle/witness qualification.
+- All 24 tracked source identities and selected present/absent file hashes pass
+  against the exact admitted trees (`cr14-handler-catalog-validation.log`). The
+  catalog SHA-256 is
+  `370d66f3708ebe4532ea50364e1b36ca65e5b02b28054e58d4f8603cd4722b78`.
+  Projection-only grading over the seven genuine call claims passes all eight
+  stage/format combinations (`cr14-genuine-route-presentation.json`), retaining
+  each complete declaration and uncertainty. This is retained-result formatting
+  proof, not newly acquired CLI/official MCP source-provider transport.
+- A final source-edit control proves that changed curried call syntax is rejected
+  before refresh, updates after explicit index refresh, and cannot be restored by
+  a previous packet after reopen with no selected provider. The final hashed
+  test overlay replays **ten** curried syntax/presentation/freshness cases from
+  independent production bytes (`cr14-curried-freshness-extracted-final.xml`).
+  A checked object read fixes the new test's typing diagnostic without changing
+  its assertions; final full typing and preflight must remain clean.
+- Final full Ty/Pyright and preflight pass
+  (`cr14-final-freshness-full-typing-02.log`,
+  `cr14-final-freshness-preflight.log`). The bounded provider economics comparison
+  uses the identical genuine source/path/receiver with two warmups, nine timed
+  samples and parent repeat. Medians are 5.60 / 10.47 / 5.75 ms; packet bytes
+  are 3,394 / 18,293 / 3,394, with 0 / 4 / 0 source claims returned. This is the
+  measured cost of four newly exposed facts and their bindings, not a speedup
+  or equivalent-evidence comparison (`cr14-curried-route-economics/summary.json`).
+  Full economics and bounded initial-response qualification remain open.
+
+Public interface selection — 2026-10-18:
+
+- The existing selected interface provider is now reachable through the same
+  public declaration operation as backend syntax. Classification: EXTRACT
+  RESPONSIBILITY for the former MCP-only provider factory and duplicated CLI
+  construction. `repository_declaration_selection.source_declaration_providers`
+  is the single pure request-to-provider translator; existing producers still
+  own all syntax/bounds, and Declarations/Bindings/Source retain authority.
+  No provider registry, new cache, source interpreter or discovery state exists.
+- MCP uses one `source_selection` object containing `python_backend_paths`,
+  `include_class_fields` and/or `python_interface`; the former flat source
+  arguments are removed. The CLI retains backend-path flags and adds
+  `--python-interface-json FILE`. Interface paths, receiver names and the existing
+  body/input-syntax booleans are explicit; unknown selection fields fail before
+  discovery. Wire response schemas and all observer semantics are unchanged.
+- Five request probes failed before implementation because the prior API cannot accept the
+  selection; the new boundary accepts valid selections and rejects malformed
+  paths/names/booleans/unknown fields. The current CLI/official MCP/evaluator
+  ring passes **145 tests** (`cr15-interface-ring.xml`); final source artifact,
+  broader ownership/source rings and genuine seven-expression transport proof
+  follow separately. Existing task inputs/oracles/gates remain unchanged;
+  the QA capture adapter translates their source-selection shape explicitly.
+- Controls additionally cover discovery-only use, no mixing supplied groups,
+  no previous-packet hydration, source drift rejection before refresh, changed
+  facts after explicit refresh, and combined backend/interface provider values
+  equal to their direct Python observation. The owner map and public docs name
+  the new construction boundary; no syntax semantics move into CLI/MCP.
+- The final selected-source request passes full configured Ty/Pyright, compileall
+  and preflight. The additional actual transport/architecture ring passes
+  **49 tests**, including the combined-provider control
+  (`cr15-interface-architecture.xml`). The frozen candidate is
+  `cr15-interface-transport-source/source.zip`, SHA-256
+  `0dc1d11cd03a83fb4d4d88ae833814183a6728c1b55716d6580a7811c56d75a4`,
+  source identity
+  `sha256:aae97a4b2e0438d953f998b133cd1c1302ce61e6a205ee9a853ee96e9408b0ec`,
+  observer
+  `sha256:3d02ecd4884a94012755c86460c81c6c31babff77cc67194816602bc98159181`.
+  Final extracted and genuine workflow reports follow this exact binding; prior
+  public/native reports retain their original observer identity.
+- The independent extracted candidate passes **217 tests**, including actual
+  interface/backend CLI/MCP, authority, source freshness, provider selection,
+  architecture, evaluator and initial presentation
+  (`cr15-interface-extracted.xml`). Import origin and observer identity are
+  asserted in the extracted process. The genuine fixed before/after oracle
+  passes all **18** API/CLI/official MCP stage/format checks for its exact seven
+  call expressions (`cr15-genuine-interface-transport/summary.json`), including
+  unchanged source identities/revisions, native equality and uncertainty/
+  presentation parity. This is one selected-provider source workflow; broader
+  handler semantics, genuine lifecycle/adversarial witnesses and final capability
+  qualification remain open. These result paragraphs follow the frozen ZIP;
+  executable/evaluator/test/source-catalog bytes must remain unchanged.
+- Comparable locality retains the same CLI/MCP adapter targets before/after and
+  the four new pure selection stages (`cr15-selection-locality/summary.json`).
+  All new stages and the CLI adapter have zero unresolved repository calls and
+  complete caller bounds. The MCP composition retains one pre-existing
+  unresolved retry-predicate call on both sides; it remains explicit. External/
+  unindexed calls and whole-architecture locality are not waived.
+
+The next handler proof uses actual CLI/official MCP over the same frozen
+seven-expression oracle, all formats and exact source binding. The new controls
+cover stale-before-refresh and reopen/unselected behavior; broaden those genuine
+workflow witnesses without adding a provider registry or executing handlers.
+
+Continue CR-11 locality/caller/direct-test closure, then CR-12.
+Complete structural-locality/read-binding/lifecycle
+qualification and current full-project typing remain mandatory before the final
 twenty-capability corpus/oracle/witness campaign can claim 5/5.
 Use `.hashmarks/canonical-component-rewrite/` for the retained evidence. Earlier
 `cr02-index-v2` extraction failures remain historical; three test call sites and
 one repository-Git-only proof requirement were corrected in later qualification.
-Full architecture, configured project typing, structural-locality and the
-independent twenty-capability 5/5 campaign are not complete.
+Full configured typing also passes for the current codec candidate. Full
+architecture, structural-locality and the independent
+twenty-capability 5/5 campaign are not complete.
 
 ## 1. Decision, scope and intended result
 
@@ -1362,11 +3030,19 @@ the evaluator still detects wrong, missing, stale and truncated evidence.
 
 ### Q-01 — Complete genuine corpus membership
 
-Seven whole catalogs remain: **8 handlers, 9 producer/consumer data, 11 DI/config,
+Seven catalogs still lack qualified populations: **8 handlers, 9 producer/consumer data, 11 DI/config,
 15 dependency/build, 16 cross-service, 18 additional native evidence, and
 20 economics**. Debugging has four problems from one repository and still needs
 eight genuine problems across two additional repositories. Existing catalogs
 also need their remaining qualification, not just source intake.
+
+Handler source intake now contains twelve pinned problems over three repositories
+in `backend-handler-v1/source-catalog.json`, outside active campaign membership.
+Its semantic/capability review flags remain false. One genuine seven-expression
+interface case has bounded source/transport proof; it does not qualify the full
+handler population. The other six catalog populations remain to be built and
+qualified. Current configured full typing is green; Q-04 still requires those
+same gates on the eventual final candidate.
 
 Use the admitted repository pools in the research plan. Pin actual before/after
 revisions and archives, preserve problem identity and write answer-blind tasks.

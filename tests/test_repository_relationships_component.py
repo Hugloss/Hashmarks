@@ -15,10 +15,8 @@ from hashmarks.codemap.indexing_lifecycle import RepositoryIndex
 
 def _relationships(index: RepositoryIndex) -> RepositoryRelationships:
     native = _native(index)
-    imports = RepositoryImports(index.files, native.source, native.reads, index.store)
-    return RepositoryRelationships(
-        native.source, native.reads, index.store, imports, native
-    )
+    imports = RepositoryImports(native.source)
+    return RepositoryRelationships(imports, native)
 
 
 def test_relationships_expose_import_reference_and_test_evidence_without_tasks(

@@ -306,7 +306,7 @@ def _freeze_task_packet(
             )
         meter = EvidenceEconomics()
         started = time.perf_counter_ns()
-        packet = codemap.task_change_impact(
+        packet = codemap.changes.task_impact(
             task["query"],
             [task["changed"]],
             options=ChangeImpactOptions(
@@ -356,9 +356,12 @@ def _score_frozen_packet(item: dict, expected: dict) -> dict:
         if isinstance(packet.get("project_impact"), dict)
         else {}
     )
+    rows = fragment.get("affected", [])
+    if not isinstance(rows, list):
+        raise ValueError("project impact affected rows must be a list")
     affected = {
         str(row.get("project")): int(row.get("depth", -1))
-        for row in fragment.get("affected", [])
+        for row in rows
         if isinstance(row, dict)
     }
     expected_depths = {
@@ -373,9 +376,12 @@ def _score_frozen_packet(item: dict, expected: dict) -> dict:
         project_precision = intersection / len(projects)
     else:
         project_precision = 1.0 if not expected_projects else 0.0
+    rows = fragment.get("edges", [])
+    if not isinstance(rows, list):
+        raise ValueError("project impact edges must be a list")
     producer_complete = all(
         isinstance(edge, dict) and edge.get("producer") == "declared-project-links"
-        for edge in fragment.get("edges", [])
+        for edge in rows
     )
     refresh_ok = True
     if task["kind"] == "shared-input":

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Any
+
+from contract_assertions import assert_array, assert_object, assert_records, assert_text
 
 from hashmarks.consumer_conformance import validate_native_repository_evidence_bundle
 from hashmarks.evidence_context import evidence_context_identity
@@ -76,7 +77,7 @@ def test_rejects_cross_producer_context_pairing() -> None:
         expected_producer_implementation_identity=PRODUCER_A,
     )
     assert state["valid"] is False
-    assert "context:context-identity-mismatch" in state["reasons"]
+    assert "context:context-identity-mismatch" in assert_array(state["reasons"])
 
 
 def test_rejects_cross_repository_pairing_even_when_each_side_is_self_consistent() -> (
@@ -91,7 +92,9 @@ def test_rejects_cross_repository_pairing_even_when_each_side_is_self_consistent
         provenance,
         expected_producer_implementation_identity=PRODUCER_A,
     )
-    assert "cross-contract-repository-identity-mismatch" in state["reasons"]
+    assert "cross-contract-repository-identity-mismatch" in assert_array(
+        state["reasons"]
+    )
 
 
 def test_rejects_cross_generation_pairing_even_when_each_side_is_self_consistent() -> (
@@ -106,13 +109,17 @@ def test_rejects_cross_generation_pairing_even_when_each_side_is_self_consistent
         provenance,
         expected_producer_implementation_identity=PRODUCER_A,
     )
-    assert "cross-contract-codemap-generation-mismatch" in state["reasons"]
+    assert "cross-contract-codemap-generation-mismatch" in assert_array(
+        state["reasons"]
+    )
 
 
 def test_rejects_tampered_verification_membership_with_valid_context() -> None:
     envelope, contract, receipt, provenance = _bundle()
     tampered = deepcopy(envelope)
-    tampered["selection"]["members"][0]["member_id"] = "sha256:" + "f" * 64
+    assert_records(assert_object(tampered["selection"])["members"])[0]["member_id"] = (
+        "sha256:" + "f" * 64
+    )
     state = validate_native_repository_evidence_bundle(
         tampered,
         contract,
@@ -121,4 +128,7 @@ def test_rejects_tampered_verification_membership_with_valid_context() -> None:
         expected_producer_implementation_identity=PRODUCER_A,
     )
     assert state["valid"] is False
-    assert any(reason.startswith("selection:") for reason in state["reasons"])
+    assert any(
+        assert_text(reason).startswith("selection:")
+        for reason in assert_array(state["reasons"])
+    )

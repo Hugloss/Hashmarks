@@ -22,18 +22,32 @@ from .repository_declaration_contract import (
     normalize_request,
 )
 from .repository_declaration_delta import declaration_delta
+from .repository_declaration_derivation import RepositoryDeclarationDerivationMixin
+from .repository_declaration_discovery import RepositoryDeclarationDiscoveryMixin
 from .repository_evidence_binding_validation import validate_bindings_packet
 from .repository_observation import packet_digest
 
 if TYPE_CHECKING:
-    from .engine import CodeMap
+    from .decision_session import DecisionScope
     from .repository_declaration_provider import RepositoryDeclarationProvider
+    from .repository_evidence_bindings import RepositoryBindings
 
 _SCHEMA = operation_schema("repository_declarations")
 
 
-class RepositoryDeclarationsMixin:
+class RepositoryDeclarations(
+    RepositoryDeclarationDiscoveryMixin, RepositoryDeclarationDerivationMixin
+):
     """Project cross-artifact declarations without choosing a winning value."""
+
+    def __init__(self, bindings: RepositoryBindings) -> None:
+        self.bindings = bindings
+        self.source = bindings.source
+        self.files = self.source.files
+
+    @property
+    def reads(self) -> DecisionScope:
+        return self.source.reads
 
     def _semantic_subject_identity(
         self,
@@ -43,8 +57,6 @@ class RepositoryDeclarationsMixin:
         scope: Mapping[str, object],
     ) -> str:
         """Identify the provider-declared semantic subject independently of location."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         return "sha256:" + packet_digest(
             "hashmarks.repository-declaration-semantic-subject.v1",
             {
@@ -61,8 +73,6 @@ class RepositoryDeclarationsMixin:
         semantic_role: Mapping[str, object],
     ) -> str:
         """Identify one provider-declared semantic role inside a subject."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         return "sha256:" + packet_digest(
             "hashmarks.repository-declaration-semantic-role.v1",
             {
@@ -134,8 +144,6 @@ class RepositoryDeclarationsMixin:
         semantic_subject_identity: str,
         binding_rows: Mapping[str, Mapping[str, object]],
     ) -> dict[str, object]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         binding = binding_rows[str(normalized["binding_id"])]
         semantic_role = normalized.get("semantic_role")
         semantic_declaration_identity = (
@@ -214,8 +222,6 @@ class RepositoryDeclarationsMixin:
         group: Mapping[str, object],
         binding_rows: Mapping[str, Mapping[str, object]],
     ) -> dict[str, object]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         group_id = str(group["group_id"])
         semantic_namespace = str(group["semantic_namespace"])
         concept = cast("Mapping[str, object]", group["concept"])
@@ -270,8 +276,6 @@ class RepositoryDeclarationsMixin:
         }
 
     def _declaration_packet_identity(self, packet: Mapping[str, object]) -> str:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         payload = {
             key: value
             for key, value in packet.items()
@@ -325,7 +329,6 @@ class RepositoryDeclarationsMixin:
         *,
         name: str,
     ) -> Mapping[str, object]:
-        self = cast("CodeMap", self)
         repository = packet.get("repository")
         if not isinstance(repository, Mapping):
             raise ValueError(f"{name} repository must be an object")
@@ -420,8 +423,6 @@ class RepositoryDeclarationsMixin:
         binding_rows: Mapping[str, Mapping[str, object]],
         name: str,
     ) -> str:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         declaration_id = str(declaration.get("declaration_id") or "")
         if not declaration_id:
             raise ValueError(f"{name} declaration_id must not be empty")
@@ -527,8 +528,6 @@ class RepositoryDeclarationsMixin:
         *,
         name: str,
     ) -> None:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         (
             group_id,
             semantic_namespace,
@@ -656,8 +655,6 @@ class RepositoryDeclarationsMixin:
             raise ValueError(f"{name} repository evidence binding set mismatch")
 
     def _validate_previous_declarations(self, previous: Mapping[str, object]) -> None:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         self._validate_declaration_observation(
             previous,
             name="previous declaration observation",
@@ -666,7 +663,7 @@ class RepositoryDeclarationsMixin:
         if repository.get("repository_identity") != self.reads.repository_identity():
             raise ValueError("previous declaration observation repository-mismatch")
 
-    def repository_declarations(
+    def observe(
         self,
         groups: Sequence[Mapping[str, object]],
         *,
@@ -680,8 +677,6 @@ class RepositoryDeclarationsMixin:
         explicitly scoped group, and admits absence only under complete,
         untruncated declared coverage.
         """
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         normalized_groups, bindings = normalize_request(groups)
         evidence_packet = self.bindings.observe(bindings, include_relationships=False)
         binding_rows = {
@@ -754,7 +749,7 @@ class RepositoryDeclarationsMixin:
                 )
         return packet
 
-    def repository_declarations_operation(
+    def operation(
         self,
         groups: Sequence[Mapping[str, object]],
         *,
@@ -763,13 +758,11 @@ class RepositoryDeclarationsMixin:
         providers: Sequence[RepositoryDeclarationProvider] | None = None,
     ) -> dict[str, object]:
         """Execute one canonical declaration operation independent of transport."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         mode = require_operation_mode("repository_declarations", result_mode)
         if mode == "discovery":
             if groups:
                 raise ValueError("discovery requires empty caller-supplied groups")
-            discovered = self.discover_repository_declarations(
+            discovered = self.discover(
                 providers if providers is not None else (),
                 previous_observation=previous_observation,
             )
@@ -780,13 +773,11 @@ class RepositoryDeclarationsMixin:
             raise ValueError("providers require result_mode=discovery")
         if mode == "explain" and previous_observation is not None:
             raise ValueError("previous_observation requires result_mode=observation")
-        packet = self.repository_declarations(
+        packet = self.observe(
             groups,
             previous_observation=previous_observation,
         )
-        result = (
-            self.repository_declaration_explain(packet) if mode == "explain" else packet
-        )
+        result = self.explain(packet) if mode == "explain" else packet
         return validate_operation_response(
             "repository_declarations",
             result,

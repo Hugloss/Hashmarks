@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import importlib.util
 import json
-import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+from scripts import mcp_host_status as status
 
 if TYPE_CHECKING:
     import subprocess
@@ -13,11 +13,6 @@ if TYPE_CHECKING:
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "mcp_host_status.py"
-SPEC = importlib.util.spec_from_file_location("mcp_host_status", SCRIPT)
-assert SPEC and SPEC.loader
-status = importlib.util.module_from_spec(SPEC)
-sys.modules[SPEC.name] = status
-SPEC.loader.exec_module(status)
 
 
 def test_checked_in_project_configs_are_hashmarks_owned() -> None:

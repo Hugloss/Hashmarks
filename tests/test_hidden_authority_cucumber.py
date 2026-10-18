@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from contract_assertions import assert_object, assert_present
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.project_graph import (
@@ -62,7 +63,7 @@ def test_directory_spelling_does_not_decide_owner_authority(
             )
         assert vague["ambiguity"]["ambiguous"] is True
         assert vague["ownership_authority"]["owner_resolved"] is False
-        assert explicit["edit"]["path"] == f"{name}/owner.py"
+        assert assert_present(explicit["edit"])["path"] == f"{name}/owner.py"
         assert explicit["ambiguity"]["ambiguous"] is False
         assert graph["selected"] == f"{name}/owner.py"
         observations.append(
@@ -130,7 +131,7 @@ def test_qualified_reexport_outweighs_unrelated_duplicate(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         action = codemap.tasks.action_map("Fix src.case.handle_orbit", limit=20)
-    assert action["edit"]["path"] == "src/case/engine.py"
+    assert assert_present(action["edit"])["path"] == "src/case/engine.py"
     assert action["owner_basis"] == "exact-import-owner"
     assert action["ambiguity"]["ambiguous"] is False
 
@@ -276,7 +277,7 @@ def test_declared_project_capabilities_survive_provider_rename(
         codemap.native.enrich_projects(("npm-package-graph", provider_name))
 
         _write(tmp_path, "contract.json", '{"v":2}\n')
-        shared = codemap.task_change_impact("contract changed", ["contract.json"])
+        shared = codemap.changes.task_impact("contract changed", ["contract.json"])
 
         _write(
             tmp_path,
@@ -286,11 +287,11 @@ def test_declared_project_capabilities_survive_provider_rename(
             "target='npm:backend'\n"
             "kind='consumer'\n",
         )
-        topology = codemap.task_change_impact(
+        topology = codemap.changes.task_impact(
             "declared topology changed", [".hashmarks-project-links.toml"]
         )
 
-    assert shared["project_refresh"]["producer"] == provider_name
-    assert shared["project_refresh"]["mode"] == "freshness-rebind"
-    assert topology["project_refresh"]["producer"] == provider_name
-    assert topology["project_refresh"]["mode"] == "topology-recollect"
+    assert assert_object(shared["project_refresh"])["producer"] == provider_name
+    assert assert_object(shared["project_refresh"])["mode"] == "freshness-rebind"
+    assert assert_object(topology["project_refresh"])["producer"] == provider_name
+    assert assert_object(topology["project_refresh"])["mode"] == "topology-recollect"

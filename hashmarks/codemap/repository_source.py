@@ -30,11 +30,7 @@ from .source_line_correspondence import (
 )
 
 if TYPE_CHECKING:
-    from hashmarks.file_store import FileDigestStore
-
     from .indexing_lifecycle import RepositoryIndex
-    from .repository_file_discovery import RepositoryFiles
-    from .repository_index_store import WorkspaceMapStore
 
 
 def _instruction_scope(authority: str) -> str:
@@ -134,24 +130,34 @@ class RepositorySource(ScopedSourceLiteralsMixin, ReadScopeOwner):
 
     def __init__(
         self,
-        files: RepositoryFiles,
         index: RepositoryIndex,
         reads: DecisionScope,
-        store: WorkspaceMapStore,
-        file_store: FileDigestStore,
     ) -> None:
-        self.files = files
+        if reads.index is not index:
+            raise ValueError(
+                "Source Index and read scope must share one repository authority"
+            )
+        self.files = index.files
         self.index = index
         self._reads = reads
-        self.store = store
-        self.file_store = file_store
-        self.workspace = files.workspace
+        self.store = index.store
+        self.file_store = index.file_store
+        self.workspace = index.workspace
 
     @property
     def reads(self) -> DecisionScope:
         return self._reads
 
-    _source_shape = staticmethod(source_shape)
+    @staticmethod
+    def _physical_lines(raw: bytes) -> list[bytes]:
+        """Split physical repository lines only on LF while preserving exact bytes."""
+        if not raw:
+            return []
+        parts = raw.split(b"\n")
+        lines = [part + b"\n" for part in parts[:-1]]
+        if parts[-1]:
+            lines.append(parts[-1])
+        return lines
 
     def _repository_member_source(
         self, relpath: str
@@ -572,7 +578,7 @@ class RepositorySource(ScopedSourceLiteralsMixin, ReadScopeOwner):
         limit = cast("dict[str, int]", packet["limits"])["results"]
         member = cast("dict[str, object]", packet["member"])
         literal = cast("str | None", packet["literal_query"])
-        packet["source_shape"] = self._source_shape(
+        packet["source_shape"] = source_shape(
             raw,
             long_line_threshold=cast("int", packet["long_line_threshold"]),
         )

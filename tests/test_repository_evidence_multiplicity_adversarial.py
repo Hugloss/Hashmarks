@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from contract_assertions import assert_object, assert_records
+
 from hashmarks.codemap.engine import CodeMap
 
 
@@ -43,15 +45,15 @@ def _assert_definition_only_transition(
     delta: dict[str, object],
     coverage: dict[str, object],
 ) -> None:
-    changed = delta["bindings"]["changed"]
+    changed = assert_records(assert_object(delta["bindings"])["changed"])
     assert len(changed) == 1
     row = changed[0]
     assert row["binding_id"] == "consumer"
-    assert row["definition"]["state"] == "changed"
-    assert row["direct_evidence"]["state"] == "preserved"
-    assert row["locator_evidence"]["state"] == "preserved"
-    assert row["member_evidence"]["state"] == "preserved"
-    assert row["declared_dependencies"]["state"] == "unaffected"
+    assert assert_object(row["definition"])["state"] == "changed"
+    assert assert_object(row["direct_evidence"])["state"] == "preserved"
+    assert assert_object(row["locator_evidence"])["state"] == "preserved"
+    assert assert_object(row["member_evidence"])["state"] == "preserved"
+    assert assert_object(row["declared_dependencies"])["state"] == "unaffected"
     assert coverage["binding_impacts"] == [
         {
             "binding_id": "consumer",
@@ -86,14 +88,14 @@ def test_duplicate_locator_multiplicity_is_definition_topology_not_content_chang
             single,
         )
 
-    single_row = single["bindings"][0]
-    duplicated_row = duplicated["bindings"][0]
-    assert len(single_row["evidence"]) == 1
-    assert len(duplicated_row["evidence"]) == 2
+    single_row = assert_records(single["bindings"])[0]
+    duplicated_row = assert_records(duplicated["bindings"])[0]
+    assert len(assert_records(single_row["evidence"])) == 1
+    assert len(assert_records(duplicated_row["evidence"])) == 2
     assert (
-        duplicated_row["evidence"][0]["span_identity"]
-        == duplicated_row["evidence"][1]["span_identity"]
-        == single_row["evidence"][0]["span_identity"]
+        assert_records(duplicated_row["evidence"])[0]["span_identity"]
+        == assert_records(duplicated_row["evidence"])[1]["span_identity"]
+        == assert_records(single_row["evidence"])[0]["span_identity"]
     )
     assert (
         single_row["binding_definition_identity"]
@@ -134,10 +136,10 @@ def test_lines_to_member_scope_switch_is_definition_not_repository_content_chang
             lines,
         )
 
-    lines_row = lines["bindings"][0]
-    member_row = member["bindings"][0]
-    lines_evidence = lines_row["evidence"][0]
-    member_evidence = member_row["evidence"][0]
+    lines_row = assert_records(lines["bindings"])[0]
+    member_row = assert_records(member["bindings"])[0]
+    lines_evidence = assert_records(lines_row["evidence"])[0]
+    member_evidence = assert_records(member_row["evidence"])[0]
 
     assert lines_evidence["scope"] == "lines"
     assert member_evidence["scope"] == "member"

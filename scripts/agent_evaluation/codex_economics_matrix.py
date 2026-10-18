@@ -5,7 +5,7 @@ import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 from hashmarks._command_output import log_command_output
 
@@ -29,6 +29,21 @@ class Variant:
     model: str
     effort: str
     strategy: str
+
+
+class VariantMetric(TypedDict):
+    name: str
+    model: str
+    reasoning_effort: str
+    strategy: str
+    tasks: int
+    verified_solutions: int
+    verified_rate: float
+    total_tokens: int
+    token_metrics_available: bool
+    tokens_per_verified_solution: float | None
+    wall_ms: float
+    wall_ms_per_verified_solution: float | None
 
 
 def parse_variant(s: str) -> Variant:
@@ -74,7 +89,7 @@ def _joint(result: dict[str, Any], strategy: str) -> tuple[int, int, float, int]
 
 def _metric(
     name: str, result: dict[str, Any], strategy: str, model: str, effort: str
-) -> dict[str, object]:
+) -> VariantMetric:
     tasks, verified, elapsed, tokens = _joint(result, strategy)
     return {
         "name": name,
@@ -94,7 +109,7 @@ def _metric(
     }
 
 
-def _dominance(rows: list[dict[str, object]]) -> list[dict[str, str]]:
+def _dominance(rows: list[VariantMetric]) -> list[dict[str, str]]:
     out = []
     for a in rows:
         for b in rows:

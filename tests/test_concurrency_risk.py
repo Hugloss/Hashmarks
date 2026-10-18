@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from contract_assertions import assert_object, assert_records
+
 from hashmarks.codemap import CodeMap
 
 
@@ -11,10 +13,10 @@ def test_rmw_risk_nominates_same_owner_read_then_write(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as c:
         c.index.sync()
         result = c.ownership.concurrency_findings(["store.py"])
-    f = result["findings"][0]
+    f = assert_records(result["findings"])[0]
     assert f["code"] == "python-read-modify-write-without-visible-guard"
     assert f["read_call"] == "store.get" and f["write_call"] == "store.set"
-    assert result["summary"]["unguarded"] == 1
+    assert assert_object(result["summary"])["unguarded"] == 1
 
 
 def test_rmw_risk_recognizes_visible_transaction_guard(tmp_path: Path) -> None:
@@ -25,8 +27,8 @@ def test_rmw_risk_recognizes_visible_transaction_guard(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as c:
         c.index.sync()
         result = c.ownership.concurrency_findings(["store.py"])
-    assert result["findings"][0]["guarded"] is True
-    assert result["summary"]["unguarded"] == 0
+    assert assert_records(result["findings"])[0]["guarded"] is True
+    assert assert_object(result["summary"])["unguarded"] == 0
 
 
 def test_os_read_write_different_file_descriptors_are_not_one_rmw_owner(
@@ -39,7 +41,7 @@ def test_os_read_write_different_file_descriptors_are_not_one_rmw_owner(
     with CodeMap(tmp_path) as c:
         c.index.sync()
         result = c.ownership.concurrency_findings(["copy.py"])
-    assert result["findings"] == []
+    assert assert_records(result["findings"]) == []
 
 
 def test_os_read_write_same_file_descriptor_remains_rmw_nomination(
@@ -52,7 +54,7 @@ def test_os_read_write_same_file_descriptor_remains_rmw_nomination(
     with CodeMap(tmp_path) as c:
         c.index.sync()
         result = c.ownership.concurrency_findings(["state.py"])
-    finding = result["findings"][0]
+    finding = assert_records(result["findings"])[0]
     assert finding["read_call"] == "os.read"
     assert finding["write_call"] == "os.write"
 
@@ -65,7 +67,7 @@ def test_aliased_os_read_write_bind_file_descriptor_owner(tmp_path: Path) -> Non
     with CodeMap(tmp_path) as c:
         c.index.sync()
         result = c.ownership.concurrency_findings(["copy.py"])
-    assert result["findings"] == []
+    assert assert_records(result["findings"]) == []
 
 
 def test_rmw_risk_ignores_function_local_fresh_mapping(tmp_path: Path) -> None:
@@ -79,7 +81,7 @@ def test_rmw_risk_ignores_function_local_fresh_mapping(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as c:
         c.index.sync()
         result = c.ownership.concurrency_findings(["local.py"])
-    assert result["findings"] == []
+    assert assert_records(result["findings"]) == []
 
 
 def test_rmw_risk_ignores_fresh_os_environ_copy(tmp_path: Path) -> None:
@@ -94,7 +96,7 @@ def test_rmw_risk_ignores_fresh_os_environ_copy(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as c:
         c.index.sync()
         result = c.ownership.concurrency_findings(["local_env.py"])
-    assert result["findings"] == []
+    assert assert_records(result["findings"]) == []
 
 
 def test_rmw_risk_keeps_direct_os_environ_alias(tmp_path: Path) -> None:
@@ -109,9 +111,9 @@ def test_rmw_risk_keeps_direct_os_environ_alias(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as c:
         c.index.sync()
         result = c.ownership.concurrency_findings(["shared_env.py"])
-    assert len(result["findings"]) == 1
-    assert result["findings"][0]["read_call"] == "env.get"
-    assert result["findings"][0]["write_call"] == "env.update"
+    assert len(assert_records(result["findings"])) == 1
+    assert assert_records(result["findings"])[0]["read_call"] == "env.get"
+    assert assert_records(result["findings"])[0]["write_call"] == "env.update"
 
 
 def test_rmw_risk_keeps_parameter_owned_mapping(tmp_path: Path) -> None:
@@ -124,9 +126,9 @@ def test_rmw_risk_keeps_parameter_owned_mapping(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as c:
         c.index.sync()
         result = c.ownership.concurrency_findings(["shared.py"])
-    assert len(result["findings"]) == 1
-    assert result["findings"][0]["read_call"] == "store.get"
-    assert result["findings"][0]["write_call"] == "store.update"
+    assert len(assert_records(result["findings"])) == 1
+    assert assert_records(result["findings"])[0]["read_call"] == "store.get"
+    assert assert_records(result["findings"])[0]["write_call"] == "store.update"
 
 
 def test_rmw_risk_ignores_contextvar_owner(tmp_path: Path) -> None:
@@ -142,7 +144,7 @@ def test_rmw_risk_ignores_contextvar_owner(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as c:
         c.index.sync()
         result = c.ownership.concurrency_findings(["context_state.py"])
-    assert result["findings"] == []
+    assert assert_records(result["findings"]) == []
 
 
 def test_rmw_risk_ignores_runvar_owner(tmp_path: Path) -> None:
@@ -159,7 +161,7 @@ def test_rmw_risk_ignores_runvar_owner(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as c:
         c.index.sync()
         result = c.ownership.concurrency_findings(["run_state.py"])
-    assert result["findings"] == []
+    assert assert_records(result["findings"]) == []
 
 
 def test_rmw_risk_does_not_suppress_reassigned_local_alias(tmp_path: Path) -> None:
@@ -174,4 +176,4 @@ def test_rmw_risk_does_not_suppress_reassigned_local_alias(tmp_path: Path) -> No
     with CodeMap(tmp_path) as c:
         c.index.sync()
         result = c.ownership.concurrency_findings(["alias.py"])
-    assert len(result["findings"]) == 1
+    assert len(assert_records(result["findings"])) == 1

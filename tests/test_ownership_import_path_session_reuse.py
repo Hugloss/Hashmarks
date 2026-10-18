@@ -31,7 +31,7 @@ def test_exact_ownership_import_paths_reuses_exact_request_in_one_session(
         calls = 0
         original = codemap._imports._resolve_import_owner_evidence
 
-        def counted(source_path: str, target: str) -> list[str]:
+        def counted(source_path: str, target: str) -> tuple[list[str], bool]:
             nonlocal calls
             calls += 1
             return original(source_path, target)
@@ -61,7 +61,7 @@ def test_ownership_import_path_cache_key_includes_source_and_target(
         calls = 0
         original = codemap._imports._resolve_import_owner_evidence
 
-        def counted(source_path: str, target: str) -> list[str]:
+        def counted(source_path: str, target: str) -> tuple[list[str], bool]:
             nonlocal calls
             calls += 1
             return original(source_path, target)
@@ -130,7 +130,7 @@ def test_ownership_import_path_cache_is_not_reused_across_sessions(
         calls = 0
         original = codemap._imports._resolve_import_owner_evidence
 
-        def counted(source_path: str, target: str) -> list[str]:
+        def counted(source_path: str, target: str) -> tuple[list[str], bool]:
             nonlocal calls
             calls += 1
             return original(source_path, target)

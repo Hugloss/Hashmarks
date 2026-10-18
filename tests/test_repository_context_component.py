@@ -19,7 +19,7 @@ from hashmarks.codemap.repository_context import RepositoryContext
 @pytest.fixture
 def context(index: RepositoryIndex) -> Iterator[RepositoryContext]:
     relationships = _relationships(index)
-    search = RepositorySearch(relationships.source, relationships.native)
+    search = RepositorySearch(relationships.native)
     cache = ContextCache(index.workspace.parent / "context-cache")
     try:
         yield RepositoryContext(relationships.source, search, relationships, cache)

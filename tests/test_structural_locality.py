@@ -4,7 +4,8 @@ from pathlib import Path
 
 from contract_assertions import assert_array, assert_object, assert_records
 
-from hashmarks.codemap import CodeMap, structural_locality_delta
+from hashmarks.codemap import CodeMap
+from hashmarks.codemap.structural_locality_delta import structural_locality_delta
 
 
 def _write(root: Path, rel: str, content: str) -> None:

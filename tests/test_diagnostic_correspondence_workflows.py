@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import tomllib
 from copy import deepcopy
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from contract_assertions import assert_object, assert_records
 
 from benchmarks.diagnostic_correspondence import (
     claim_bundle,
@@ -18,6 +16,13 @@ from benchmarks.diagnostic_correspondence import (
 )
 from hashmarks import CodeMap
 from hashmarks.adapters import uv_lock_dependency_observation
+from hashmarks.codemap.diagnostic_observation import (
+    diagnostic_observation_delta,
+    external_diagnostic_observation,
+)
+from hashmarks.codemap.diagnostic_source_revision import (
+    diagnostic_source_revision_evidence,
+)
 from hashmarks.codemap.repository_delta import RepositoryGenerationBinding
 from hashmarks.codemap.repository_intelligence_query import (
     RepositoryIntelligenceQueryOptions,
@@ -45,7 +50,7 @@ def repository(tmp_path: Path) -> Iterator[CodeMap]:
 
 
 def _diagnostic(source: dict[str, Any], line: int) -> dict[str, Any]:
-    return CodeMap.external_diagnostic_observation(
+    return external_diagnostic_observation(
         producer="example-test",
         binding=RepositoryGenerationBinding("repo:local-fixture", source["generation"]),
         environment_identity="fixture-session",
@@ -87,7 +92,7 @@ def test_line_move_comparison_has_identical_core_and_mcp_evidence(
     repository.index.sync()
     after_source: Any = repository.source.observe("app/service.py", lines=[5])
     after = _diagnostic(after_source, 5)
-    expected: Any = repository.diagnostic_observation_delta(
+    expected: Any = diagnostic_observation_delta(
         before, after, before_source=before_source, after_source=after_source
     )
     surface = HashmarksMcpSurface(
@@ -155,9 +160,7 @@ def test_old_locations_do_not_become_exact_current_source_after_changes(
     anchor = packet["bundles"][0]["anchors"][0]
     assert anchor["source_equivalence"]["state"] != "proven"
     current: Any = repository.source.observe("app/service.py")
-    result: Any = repository.diagnostic_source_revision_evidence(
-        _diagnostic(before, 4), [current]
-    )
+    result: Any = diagnostic_source_revision_evidence(_diagnostic(before, 4), [current])
     assert result["rows"][0]["state"] in {"unknown", "different"}
     assert not result["matching_count"]
 
@@ -214,7 +217,7 @@ def test_observer_visibility_changes_are_not_repository_edits(
     after["diagnostic_count"] = 0
     after["collection"] = {"state": "unavailable", "authority": "producer-claimed"}
     after["outcome"] = "blocked-permission"
-    delta: Any = repository.diagnostic_observation_delta(before, after)
+    delta: Any = diagnostic_observation_delta(before, after)
     assert delta["generation"]["before"] == delta["generation"]["after"]
     assert delta["source_revisions"]["changed"] is False
     assert delta["diagnostics"]["qualification"]["qualified_removed_identities"] == []
@@ -225,7 +228,7 @@ def test_local_lock_observations_preserve_versions_and_repository_binding(
     repository: CodeMap,
 ) -> None:
     lock = repository.workspace / "uv.lock"
-    before: Any = repository.dependency_resolution_evidence(
+    before: Any = repository.dependencies.observe(
         uv_lock_dependency_observation(
             lock=lock.read_bytes(),
             repository_inputs=[
@@ -240,7 +243,7 @@ def test_local_lock_observations_preserve_versions_and_repository_binding(
         lock.read_bytes().replace(b"version = '1.0.0'", b"version = '2.0.0'")
     )
     repository.index.sync()
-    after: Any = repository.dependency_resolution_evidence(
+    after: Any = repository.dependencies.observe(
         uv_lock_dependency_observation(
             lock=lock.read_bytes(),
             repository_inputs=[
@@ -251,7 +254,7 @@ def test_local_lock_observations_preserve_versions_and_repository_binding(
             ],
         )
     )
-    delta: Any = repository.dependency_resolution_delta(before, after)
+    delta: Any = repository.dependencies.delta(before, after)
     assert {
         row["version"]
         for row in before["selections"]
@@ -337,7 +340,7 @@ def test_current_claim_cannot_repair_a_stale_index(repository: CodeMap) -> None:
         path, domain=FILE_DOMAIN
     ).hash
     current = repository.source.observe("app/service.py", lines=[4])
-    result: Any = repository.diagnostic_source_revision_evidence(
+    result: Any = diagnostic_source_revision_evidence(
         _diagnostic(producer_claim, 4), [current]
     )
     assert result["rows"][0]["state"] == "unknown"
@@ -383,7 +386,7 @@ def test_declared_and_locked_versions_have_evidence_without_a_winner(
                 ],
             }
         )
-    packet: Any = repository.repository_declarations(
+    packet: Any = repository.declarations.observe(
         [
             {
                 "group_id": "dependency-version",
@@ -423,7 +426,7 @@ def test_registered_mcp_tool_transports_paired_source_observations(
 
     source: Any = repository.source.observe("app/service.py", lines=[4])
     diagnostic = _diagnostic(source, 4)
-    expected = repository.diagnostic_observation_delta(
+    expected = diagnostic_observation_delta(
         diagnostic, diagnostic, before_source=source, after_source=source
     )
     server: Any = build_server(
@@ -522,10 +525,14 @@ def test_existing_delivery_routes_preserve_complete_local_packets(
             "bundles": claim_bundle({"anchor_id": "same", "path": "app/service.py"})
         },
     }[operation]
-    if operation == "repository_evidence":
-        expected = repository.bindings.observe(bindings)
-    else:
-        expected = getattr(repository, operation)(**inputs)
+    local_observations = {
+        "task_evidence": lambda: repository.tasks.evidence(**inputs),
+        "structural_locality": lambda: repository.structure.locality(**inputs),
+        "dependency_codemap": lambda: repository.dependencies.codemap(**inputs),
+        "repository_evidence": lambda: repository.bindings.observe(bindings),
+        "correlate_evidence": lambda: repository.correlation.observe(**inputs),
+    }
+    expected = local_observations[operation]()
     surface = HashmarksMcpSurface(
         str(repository.workspace), state_dir=str(repository.state_dir)
     )
@@ -569,7 +576,7 @@ def test_query_delivery_uses_matching_presentation_and_exact_core_identity(
     try:
         for capture in captures:
             presentation = capture["format"]
-            expected = repository.repository_intelligence_query(
+            expected = repository.views.query(
                 "freshness",
                 task,
                 paths,

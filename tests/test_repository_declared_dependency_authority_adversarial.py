@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from contract_assertions import assert_object, assert_records, assert_text
+
 from hashmarks.codemap.engine import CodeMap
 
 
@@ -19,7 +21,10 @@ def _binding(binding_id: str, evidence_path: str) -> dict[str, object]:
 
 
 def _changed_by_id(delta: dict[str, object]) -> dict[str, dict[str, object]]:
-    return {row["binding_id"]: row for row in delta["bindings"]["changed"]}
+    return {
+        assert_text(row["binding_id"]): row
+        for row in assert_records(assert_object(delta["bindings"])["changed"])
+    }
 
 
 def test_equal_dependency_bytes_at_new_path_are_definition_change_not_observation_change(
@@ -51,10 +56,10 @@ def test_equal_dependency_bytes_at_new_path_are_definition_change_not_observatio
             binding_delta_before=before,
         )
 
-    before_binding = before["bindings"][0]
-    after_binding = after["bindings"][0]
-    before_dependency = before_binding["dependencies"][0]
-    after_dependency = after_binding["dependencies"][0]
+    before_binding = assert_records(before["bindings"])[0]
+    after_binding = assert_records(after["bindings"])[0]
+    before_dependency = assert_records(before_binding["dependencies"])[0]
+    after_dependency = assert_records(after_binding["dependencies"])[0]
 
     assert before_dependency["path"] == "dep-a.lock"
     assert after_dependency["path"] == "dep-b.lock"
@@ -64,8 +69,8 @@ def test_equal_dependency_bytes_at_new_path_are_definition_change_not_observatio
         != after_binding["binding_definition_identity"]
     )
 
-    changed = delta["bindings"]["changed"][0]
-    declared = changed["declared_dependencies"]
+    changed = assert_records(assert_object(delta["bindings"])["changed"])[0]
+    declared = assert_object(changed["declared_dependencies"])
     assert declared["state"] == "definition-changed"
     assert declared["definition"] == {
         "state": "changed",
@@ -76,8 +81,8 @@ def test_equal_dependency_bytes_at_new_path_are_definition_change_not_observatio
         "state": "unchanged",
         "changes": [],
     }
-    assert changed["direct_evidence"]["state"] == "preserved"
-    assert changed["member_evidence"]["state"] == "preserved"
+    assert assert_object(changed["direct_evidence"])["state"] == "preserved"
+    assert assert_object(changed["member_evidence"])["state"] == "preserved"
     assert coverage["binding_impacts"] == [
         {
             "binding_id": "consumer",
@@ -133,17 +138,17 @@ def test_shared_declared_dependency_affects_only_bindings_that_declared_it(
 
     changed = _changed_by_id(delta)
     assert set(changed) == {"consumer:a", "consumer:b"}
-    assert delta["bindings"]["preserved"] == ["consumer:c"]
+    assert assert_object(delta["bindings"])["preserved"] == ["consumer:c"]
 
     for binding_id in ("consumer:a", "consumer:b"):
         row = changed[binding_id]
-        assert row["direct_evidence"]["state"] == "preserved"
-        assert row["member_evidence"]["state"] == "preserved"
-        declared = row["declared_dependencies"]
+        assert assert_object(row["direct_evidence"])["state"] == "preserved"
+        assert assert_object(row["member_evidence"])["state"] == "preserved"
+        declared = assert_object(row["declared_dependencies"])
         assert declared["state"] == "affected"
-        assert declared["definition"]["state"] == "preserved"
-        assert declared["observations"]["state"] == "changed"
-        assert declared["observations"]["changes"] == [
+        assert assert_object(declared["definition"])["state"] == "preserved"
+        assert assert_object(declared["observations"])["state"] == "changed"
+        assert assert_object(declared["observations"])["changes"] == [
             {
                 "path": "shared.lock",
                 "state": "changed",
@@ -152,9 +157,9 @@ def test_shared_declared_dependency_affects_only_bindings_that_declared_it(
             }
         ]
 
-    assert coverage["classification"]["declared_dependencies_changed"] == [
-        "shared.lock"
-    ]
+    assert assert_object(coverage["classification"])[
+        "declared_dependencies_changed"
+    ] == ["shared.lock"]
     assert coverage["binding_impacts"] == [
         {
             "binding_id": "consumer:a",

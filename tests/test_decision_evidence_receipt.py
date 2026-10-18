@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from pathlib import Path
 
 from hashmarks.codemap import CodeMap
@@ -16,7 +17,7 @@ def _repo(root: Path) -> None:
     )
 
 
-def _identity(packet: dict[str, object]) -> str:
+def _identity(packet: Mapping[str, object]) -> str:
     receipt = packet["evidence_receipt"]
     assert isinstance(receipt, dict)
     assert receipt["schema"] == "hashmarks.decision-evidence-receipt.v1"

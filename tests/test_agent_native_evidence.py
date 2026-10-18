@@ -1,13 +1,19 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
 from pathlib import Path
 
 import pytest
+from contract_assertions import assert_object, assert_records, assert_text
 
 from hashmarks.codemap import CodeMap
 from hashmarks.evidence_presentation import FAMILIES, present_repository_evidence
 from hashmarks.mcp_surface import HashmarksMcpSurface, McpSurfaceError
+
+
+def _groups(packet: Mapping[str, object]) -> dict[str, dict[str, object]]:
+    return {assert_text(row["family"]): row for row in assert_records(packet["groups"])}
 
 
 def _repo(tmp_path: Path) -> Path:
@@ -35,7 +41,7 @@ def test_findings_separate_observation_move_candidate_and_capability_change() ->
         "completeness": {"changed": True},
     }
     result = present_repository_evidence(delta, format="structured")
-    groups = {g["family"]: g for g in result["groups"]}
+    groups = _groups(result)
     assert tuple(FAMILIES) == (
         "source",
         "relationship",
@@ -49,21 +55,26 @@ def test_findings_separate_observation_move_candidate_and_capability_change() ->
         "ownership_evidence",
         "evidence_measurement",
     )
-    assert groups["source"]["findings"][0]["assertion"] == "observed_change"
     assert (
-        groups["correspondence"]["findings"][0]["assertion"]
+        assert_records(groups["source"]["findings"])[0]["assertion"]
+        == "observed_change"
+    )
+    assert (
+        assert_records(groups["correspondence"]["findings"])[0]["assertion"]
         == "candidate_correspondence"
     )
-    assert groups["relationship"]["findings"][0]["kind"] == "dependency_edge_removed"
+    assert (
+        assert_records(groups["relationship"]["findings"])[0]["kind"]
+        == "dependency_edge_removed"
+    )
     assert groups["qualification"]["count_observed_in_packet"] == 3
     assert result["source_evidence_identity"] == "test-identity"
     assert present_repository_evidence(delta, format="compact")["format"] == "compact"
-    assert (
-        "correspondence:" in present_repository_evidence(delta, format="text")["text"]
+    assert "correspondence:" in assert_text(
+        present_repository_evidence(delta, format="text")["text"]
     )
-    assert (
-        "candidate_correspondence"
-        in present_repository_evidence(delta, format="text")["text"]
+    assert "candidate_correspondence" in assert_text(
+        present_repository_evidence(delta, format="text")["text"]
     )
 
 
@@ -75,12 +86,19 @@ def test_diagnostic_disappearance_remains_only_a_producer_claim() -> None:
             "possible_relocations": [{"from": "old", "to": "new"}],
         },
     }
-    groups = present_repository_evidence(packet, format="structured")["groups"]
+    groups = assert_records(
+        present_repository_evidence(packet, format="structured")["groups"]
+    )
     assert groups[0]["family"] == "diagnostic"
-    assert groups[0]["findings"][0]["kind"] == "diagnostic_missing_after"
-    assert groups[0]["findings"][0]["assertion"] == "producer_claim"
+    assert (
+        assert_records(groups[0]["findings"])[0]["kind"] == "diagnostic_missing_after"
+    )
+    assert assert_records(groups[0]["findings"])[0]["assertion"] == "producer_claim"
     assert groups[1]["family"] == "correspondence"
-    assert groups[1]["findings"][0]["assertion"] == "candidate_correspondence"
+    assert (
+        assert_records(groups[1]["findings"])[0]["assertion"]
+        == "candidate_correspondence"
+    )
 
 
 def test_presentation_rejects_unknown_modes_and_preserves_unknown_schema() -> None:
@@ -109,9 +127,10 @@ def test_mcp_exposes_existing_authoritative_source_and_query_evidence(
             "profile", "Explain target", ["src/alpha.py"]
         )
         assert profile["schema"] == "hashmarks.repository-intelligence-query.v1"
-        assert profile["presentation"]["supported"]
+        assert assert_object(profile["presentation"])["supported"]
         assert (
-            profile["presentation"]["source_schema"] == "hashmarks.evidence-profile.v1"
+            assert_object(profile["presentation"])["source_schema"]
+            == "hashmarks.evidence-profile.v1"
         )
         with pytest.raises(McpSurfaceError, match="requires exactly one"):
             surface.source_observation(
@@ -138,9 +157,7 @@ def test_core_presentation_does_not_replace_snapshot_or_mutate_producer(
     repo = _repo(tmp_path)
     with CodeMap(repo) as codemap:
         codemap.index.sync()
-        snapshot = codemap.repository_intelligence_snapshot(
-            "Explain target", ["src/alpha.py"]
-        )
+        snapshot = codemap.changes.snapshot("Explain target", ["src/alpha.py"])
         rendered = present_repository_evidence(snapshot, format="structured")
         assert snapshot["schema"] == "hashmarks.repository-intelligence-snapshot.v1"
         assert rendered["source_evidence_identity"] == snapshot["snapshot_identity"]
@@ -175,7 +192,7 @@ def test_mcp_evidence_binding_and_coverage_reuse_core_qualification(
             result_mode="coverage",
         )
         assert coverage["schema"] == "hashmarks.repository-evidence-coverage.v1"
-        assert coverage["coverage"]["state"] == "incomplete"
+        assert assert_object(coverage["coverage"])["state"] == "incomplete"
         assert surface.repository_findings(["src/alpha.py"])["schema"] == (
             "hashmarks.repository-findings.v1"
         )
@@ -221,19 +238,27 @@ def test_task_evidence_projection_exposes_source_owner_and_verifier_separately()
     }
     before = deepcopy(native)
     projection = present_repository_evidence(native, format="compact")
-    groups = {group["family"]: group for group in projection["groups"]}
-    source = groups["source"]["findings"][0]
+    groups = _groups(projection)
+    source = assert_records(groups["source"]["findings"])[0]
     assert source["kind"] == "owner_source_evidence"
     assert source["source_refs"] == ["/ownership/source_evidence"]
-    assert source["source_context"]["task_ownership"]["owner_path"] == "src/archive.py"
-    assert source["details"]["content"] == "ZipInfo(filename)"
-    ownership = groups["ownership_evidence"]["findings"]
+    assert (
+        assert_object(assert_object(source["source_context"])["task_ownership"])[
+            "owner_path"
+        ]
+        == "src/archive.py"
+    )
+    assert assert_object(source["details"])["content"] == "ZipInfo(filename)"
+    ownership = assert_records(groups["ownership_evidence"]["findings"])
     assert ownership[0]["kind"] == "qualified_owner"
     assert (
-        ownership[0]["source_context"]["task_ownership"]["freshness_state"] == "current"
+        assert_object(assert_object(ownership[0]["source_context"])["task_ownership"])[
+            "freshness_state"
+        ]
+        == "current"
     )
     assert ownership[0]["source_refs"] == ["/ownership/owner"]
-    verifiers = groups["verification"]["findings"]
+    verifiers = assert_records(groups["verification"]["findings"])
     assert [row["kind"] for row in verifiers[:2]] == [
         "selected_verifier",
         "verification_plan",
@@ -243,9 +268,8 @@ def test_task_evidence_projection_exposes_source_owner_and_verifier_separately()
     assert all(row["assertion"] == "producer_claim" for row in verifiers[:2])
     assert projection["authority"] == "descriptive-only"
     assert native == before
-    assert (
-        "owner_source_evidence"
-        in present_repository_evidence(native, format="text")["text"]
+    assert "owner_source_evidence" in assert_text(
+        present_repository_evidence(native, format="text")["text"]
     )
 
 
@@ -269,17 +293,22 @@ def test_task_evidence_ambiguous_next_read_remains_non_authoritative() -> None:
         "verification": {"selected": None, "plan": {}, "authority": ""},
         "evidence_receipt": {},
     }
-    groups = {
-        group["family"]: group
-        for group in present_repository_evidence(native, format="structured")["groups"]
-    }
-    rows = groups["ownership_evidence"]["findings"]
+    groups = _groups(present_repository_evidence(native, format="structured"))
+    rows = assert_records(groups["ownership_evidence"]["findings"])
     assert "qualified_owner" not in {row["kind"] for row in rows}
     assert rows[0]["kind"] == "owner_candidate"
     next_read = next(row for row in rows if row["kind"] == "discrimination_read")
     assert next_read["assertion"] == "producer_claim"
-    assert next_read["source_context"]["task_ownership"]["status"] == "ambiguous"
-    assert next_read["details"]["authority"] == "non-authoritative-discrimination"
+    assert (
+        assert_object(assert_object(next_read["source_context"])["task_ownership"])[
+            "status"
+        ]
+        == "ambiguous"
+    )
+    assert (
+        assert_object(next_read["details"])["authority"]
+        == "non-authoritative-discrimination"
+    )
 
 
 def test_compact_source_hits_precede_member_inventory() -> None:
@@ -304,17 +333,19 @@ def test_compact_source_hits_precede_member_inventory() -> None:
     }
     projection = present_repository_evidence(native, format="compact")
     sources = next(
-        group for group in projection["groups"] if group["family"] == "source"
+        group
+        for group in assert_records(projection["groups"])
+        if group["family"] == "source"
     )
     assert sources["count_observed_in_packet"] == 9
     assert sources["omitted_from_presentation"] == 4
-    assert sources["findings"][0]["kind"] == "occurrences"
-    assert sources["findings"][0]["source_refs"] == ["/occurrences/0"]
-    assert sources["findings"][0]["path"] == "src/member_7.py"
+    assert assert_records(sources["findings"])[0]["kind"] == "occurrences"
+    assert assert_records(sources["findings"])[0]["source_refs"] == ["/occurrences/0"]
+    assert assert_records(sources["findings"])[0]["path"] == "src/member_7.py"
     assert projection["coverage"] == "projection-only"
-    assert projection["source_context"][0]["details"]["negative_evidence"] == (
-        "not-admissible"
-    )
+    assert assert_object(assert_records(projection["source_context"])[0]["details"])[
+        "negative_evidence"
+    ] == ("not-admissible")
 
 
 def test_literal_set_mcp_surface_preserves_modes_and_presentation(
@@ -336,13 +367,13 @@ def test_literal_set_mcp_surface_preserves_modes_and_presentation(
         assert response["observed_match_count"] == 2
         assert response["exact_match_count"] == 2
         presentation = present_repository_evidence(response, format="compact")
-        groups = {group["family"]: group for group in presentation["groups"]}
-        hits = groups["source"]["findings"]
-        assert [row["details"]["literal"] for row in hits[:2]] == [
+        groups = _groups(presentation)
+        hits = assert_records(groups["source"]["findings"])
+        assert [assert_object(row["details"])["literal"] for row in hits[:2]] == [
             "ZIP_DEFLATED",
             "ZipInfo",
         ]
-        qualifications = groups["qualification"]["findings"]
+        qualifications = assert_records(groups["qualification"]["findings"])
         assert len(qualifications) == 3
         assert all(
             row["source_refs"] == [f"/literal_observations/{index}"]

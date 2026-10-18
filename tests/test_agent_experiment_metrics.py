@@ -3,21 +3,14 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Callable
-from types import ModuleType
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING
 
 import pytest
 
+from scripts.agent_evaluation import metrics_agent_experiment as experiment_metrics
+
 if TYPE_CHECKING:
     from pathlib import Path
-
-_MODULE = __import__(
-    "scripts.agent_evaluation.metrics_agent_experiment", fromlist=["*"]
-)
-
-
-def _load() -> ModuleType:
-    return _MODULE
 
 
 def _digest(path: Path) -> str:
@@ -126,8 +119,9 @@ def _experiment(
 def test_manifest_validates_complete_experiment_and_raw_evidence(
     tmp_path: Path,
 ) -> None:
-    module = _load()
-    report = module.run_experiment(_experiment(tmp_path), strict_raw_evidence=True)
+    report = experiment_metrics.run_experiment(
+        _experiment(tmp_path), strict_raw_evidence=True
+    )
     assert report["schema"] == "hashmarks.agent-experiment-report.v1"
     assert report["tasks"] == 1
     assert report["repositories"] == 1
@@ -136,55 +130,49 @@ def test_manifest_validates_complete_experiment_and_raw_evidence(
 
 
 def test_manifest_rejects_trace_identity_drift(tmp_path: Path) -> None:
-    module = _load()
     with pytest.raises(ValueError, match="trace repository_identity mismatch"):
-        module.run_experiment(
+        experiment_metrics.run_experiment(
             _experiment(tmp_path, mismatch=("hashmarks", "sha256:wrong"))
         )
 
 
 def test_manifest_rejects_raw_evidence_digest_mismatch(tmp_path: Path) -> None:
-    module = _load()
     manifest = _experiment(tmp_path)
     (tmp_path / "baseline.provider.raw").write_bytes(b"tampered")
     with pytest.raises(ValueError, match="provider raw evidence digest mismatch"):
-        module.run_experiment(manifest, strict_raw_evidence=True)
+        experiment_metrics.run_experiment(manifest, strict_raw_evidence=True)
 
 
 def test_strict_raw_evidence_requires_retained_raw_files(tmp_path: Path) -> None:
-    module = _load()
     with pytest.raises(ValueError, match="requires grader_evidence"):
-        module.run_experiment(
+        experiment_metrics.run_experiment(
             _experiment(tmp_path, omit_raw=True), strict_raw_evidence=True
         )
 
 
 def test_manifest_rejects_unpaired_expected_task(tmp_path: Path) -> None:
-    module = _load()
     manifest = _experiment(tmp_path)
     payload = json.loads(manifest.read_text())
     payload["runs"] = payload["runs"][:1]
     manifest.write_text(json.dumps(payload))
     with pytest.raises(ValueError, match="unpaired tasks: t1"):
-        module.load_manifest(manifest)
+        experiment_metrics.load_manifest(manifest)
 
 
 def test_manifest_paths_cannot_escape_experiment_directory(tmp_path: Path) -> None:
-    module = _load()
     manifest = _experiment(tmp_path)
     payload = json.loads(manifest.read_text())
     payload["runs"][0]["trace"] = "../escape.json"
     manifest.write_text(json.dumps(payload))
     with pytest.raises(ValueError, match="escapes experiment directory"):
-        module.run_experiment(manifest)
+        experiment_metrics.run_experiment(manifest)
 
 
 def test_verdict_is_bound_to_exact_subject_bytes(tmp_path: Path) -> None:
-    module = _load()
     manifest = _experiment(tmp_path)
     (tmp_path / "hashmarks.patch").write_bytes(b"different patch")
     with pytest.raises(ValueError, match="verdict subject_digest mismatch"):
-        module.run_experiment(manifest, strict_raw_evidence=True)
+        experiment_metrics.run_experiment(manifest, strict_raw_evidence=True)
 
 
 @pytest.mark.parametrize(
@@ -214,14 +202,13 @@ def test_verdict_is_bound_to_exact_subject_bytes(tmp_path: Path) -> None:
 def test_manifest_rejects_invalid_structure(
     tmp_path: Path, mutation: Callable[[dict[str, object]], None], message: str
 ) -> None:
-    module = _load()
     manifest = _experiment(tmp_path)
     payload = json.loads(manifest.read_text())
     mutation(payload)
     manifest.write_text(json.dumps(payload))
 
     with pytest.raises(ValueError, match=message):
-        module.load_manifest(manifest)
+        experiment_metrics.load_manifest(manifest)
 
 
 @pytest.mark.parametrize(
@@ -245,7 +232,6 @@ def test_manifest_rejects_invalid_structure(
 def test_experiment_rejects_record_identity_drift(
     tmp_path: Path, filename: str, field: str, value: str, message: str
 ) -> None:
-    module = _load()
     manifest = _experiment(tmp_path)
     record_path = tmp_path / filename
     record = json.loads(record_path.read_text())
@@ -253,19 +239,18 @@ def test_experiment_rejects_record_identity_drift(
     record_path.write_text(json.dumps(record))
 
     with pytest.raises(ValueError, match=message):
-        module.run_experiment(manifest)
+        experiment_metrics.run_experiment(manifest)
 
 
 def test_manifest_rejects_absolute_and_missing_evidence_paths(tmp_path: Path) -> None:
-    module = _load()
     manifest = _experiment(tmp_path)
     payload = json.loads(manifest.read_text())
     payload["runs"][0]["trace"] = str((tmp_path / "baseline.trace.json").resolve())
     manifest.write_text(json.dumps(payload))
     with pytest.raises(ValueError, match="must be relative"):
-        module.run_experiment(manifest)
+        experiment_metrics.run_experiment(manifest)
 
     payload["runs"][0]["trace"] = "missing.json"
     manifest.write_text(json.dumps(payload))
     with pytest.raises(ValueError, match="file does not exist"):
-        module.run_experiment(manifest)
+        experiment_metrics.run_experiment(manifest)

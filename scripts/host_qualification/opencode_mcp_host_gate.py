@@ -25,11 +25,11 @@ from hashmarks.mcp_contract import (
 )
 from hashmarks.mcp_launch import installed_mcp_command
 
-SCRIPTS_DIR = Path(__file__).resolve().parent.parent
-if str(SCRIPTS_DIR) not in sys.path:
-    sys.path.insert(0, str(SCRIPTS_DIR))
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+if str(REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPOSITORY_ROOT))
 
-from mcp_host_gate_common import (  # noqa: E402 - import follows standalone script path setup
+from scripts.mcp_host_gate_common import (  # noqa: E402 - import follows standalone script path setup
     basic_qualification_proof,
 )
 
@@ -458,8 +458,9 @@ def _selection_result(
     calls = []
     for part in parts:
         tool = str(part.get("tool") or "")
-        state = part.get("state")
-        status = state.get("status") if isinstance(state, dict) else None
+        raw_state = part.get("state")
+        state = raw_state if isinstance(raw_state, dict) else {}
+        status = state.get("status")
         payload_schema = None
         if tool.startswith("hashmarks_") and status != "completed":
             raise HostGateError(f"Hashmarks tool did not complete: {tool}: {status}")
@@ -502,7 +503,7 @@ def _selection_result(
         "prompt": scenario.prompt,
         "tool_calls": calls,
         "hashmarks_invoked": any(
-            call["tool"].startswith("hashmarks_") for call in calls
+            str(call["tool"]).startswith("hashmarks_") for call in calls
         ),
         "task_evidence_invoked": any(
             call["tool"] == "hashmarks_task_evidence" for call in calls
@@ -563,7 +564,7 @@ def _opencode_model_catalog(
                 b'{"error":{"message":"catalog captured","type":"invalid_request_error"}}'
             )
 
-        def log_message(self, *_args: object) -> None:
+        def log_message(self, format: str, *args: object) -> None:
             pass
 
     server = HTTPServer(("127.0.0.1", 0), CaptureHandler)
@@ -1245,7 +1246,7 @@ def main(argv: list[str] | None = None) -> int:
         log_command_output(
             logger,
             f"{label}: ENVIRONMENT_BLOCKED\n{exc}",
-            file=os.sys.stderr,
+            file=sys.stderr,
         )
         return 2
     except (HostGateError, OSError, subprocess.TimeoutExpired) as exc:
@@ -1263,7 +1264,7 @@ def main(argv: list[str] | None = None) -> int:
             + "\n",
             encoding="utf-8",
         )
-        log_command_output(logger, f"{label}: FAIL\n{exc}", file=os.sys.stderr)
+        log_command_output(logger, f"{label}: FAIL\n{exc}", file=sys.stderr)
         return 1
 
     receipt_path.write_text(
@@ -1273,14 +1274,14 @@ def main(argv: list[str] | None = None) -> int:
         log_command_output(
             logger,
             f"{label}: ENVIRONMENT_BLOCKED\nreceipt: {receipt_path}",
-            file=os.sys.stderr,
+            file=sys.stderr,
         )
         return 2
     if receipt.get("status") in {"FAIL", "INCOMPLETE"}:
         log_command_output(
             logger,
             f"{label}: {receipt['status']}\nreceipt: {receipt_path}",
-            file=os.sys.stderr,
+            file=sys.stderr,
         )
         return 1
     log_command_output(

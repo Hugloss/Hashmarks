@@ -17,7 +17,7 @@ BIG = 2**63
 def _oversized_metadata(*, field: int) -> tuple[int, int, int, int, int, int]:
     values = [1, 2, 5, 4, 5, 0]
     values[field] = BIG
-    return tuple(values)  # type: ignore[return-value]
+    return values[0], values[1], values[2], values[3], values[4], values[5]
 
 
 @pytest.mark.parametrize("field", range(5))

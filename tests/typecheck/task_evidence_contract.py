@@ -61,7 +61,7 @@ def check_task_evidence_types(codemap: CodeMap, mode: str) -> None:
         DiscriminationRead | None,
     )
     assert_type(
-        codemap.task_post_change_delta(
+        codemap.changes.task_delta(
             "change owner", ["owner.py"], previous_evidence=packet
         ),
         TaskPostChangeDelta,

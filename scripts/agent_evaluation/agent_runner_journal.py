@@ -1,21 +1,17 @@
 from __future__ import annotations
 
 import argparse
-import logging
-
-from hashmarks._command_output import log_command_output
-
-try:
-    from scripts._module_loader import import_sibling
-except ModuleNotFoundError:  # direct script execution
-    from _module_loader import import_sibling
 import contextlib
 import json
+import logging
 import os
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from hashmarks._command_output import log_command_output
+from scripts.agent_evaluation import normalize_agent_trace as normalizer
 
 logger = logging.getLogger(__name__)
 
@@ -33,10 +29,6 @@ class JournalIdentity:
     run_id: str
     model_identity: str
     model_config_identity: str
-
-
-def _load_normalizer() -> object:
-    return import_sibling("normalize_agent_trace", __package__)
 
 
 def _read_json(path: Path) -> object:
@@ -73,7 +65,6 @@ def init_journal(
     identity: JournalIdentity,
     tool_map: dict[str, Any],
 ) -> dict[str, Any]:
-    normalizer = _load_normalizer()
     if journal.exists() and any(journal.iterdir()):
         raise ValueError(f"journal already exists and is not empty: {journal}")
     if identity.mode not in {"baseline", "hashmarks"}:
@@ -113,7 +104,6 @@ def init_journal(
 
 
 def record_event(journal: Path, event: dict[str, Any]) -> Path:
-    normalizer = _load_normalizer()
     header_path = journal / "header.json"
     if not header_path.is_file():
         raise ValueError(f"journal header is missing: {journal}")
@@ -166,9 +156,7 @@ def _journal_events(journal: Path) -> list[dict[str, Any]]:
     return events
 
 
-def _write_validated_raw(
-    output: Path, raw: dict[str, object], normalizer: object
-) -> None:
+def _write_validated_raw(output: Path, raw: dict[str, object]) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_name = tempfile.mkstemp(
         prefix=".runner-log-", suffix=".tmp", dir=output.parent
@@ -189,7 +177,6 @@ def _write_validated_raw(
 def finalize_journal(
     journal: Path, output: Path, *, normalized_output: Path | None = None
 ) -> dict[str, Any]:
-    normalizer = _load_normalizer()
     header_path = journal / "header.json"
     header = _read_json(header_path)
     if not isinstance(header, dict) or header.get("schema") != JOURNAL_SCHEMA:
@@ -197,7 +184,7 @@ def finalize_journal(
     raw = {key: value for key, value in header.items() if key != "schema"}
     raw["schema"] = RAW_SCHEMA
     raw["events"] = _journal_events(journal)
-    _write_validated_raw(output, raw, normalizer)
+    _write_validated_raw(output, raw)
     if normalized_output is not None:
         normalized = normalizer.normalize(output)
         normalized_output.parent.mkdir(parents=True, exist_ok=True)

@@ -9,7 +9,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, TypedDict
 
 from hashmarks._command_output import log_command_output
 from hashmarks.codemap import (
@@ -30,6 +30,36 @@ _REPO_ROOT = _SCRIPTS_DIR.parent.parent
 SCHEMA = "hashmarks.worker-inspection-ab.v1"
 PROTOCOL_SCHEMA = "hashmarks.worker-inspection-ab-protocol.v1"
 FAMILY = "hashmarks-worker-inspection-a"
+
+
+class _InspectionResolution(TypedDict):
+    resolved: bool
+    target: str | None
+    reason: str
+
+
+class _EntryState(TypedDict):
+    first_path: str | None
+    first_role: object
+    ambiguous: bool
+    ambiguity_reason: object
+    ambiguity_roles: list[object]
+    alternatives: list[dict[str, object]]
+
+
+class _Score(TypedDict):
+    summary: dict[str, int | float]
+    tasks: list[dict[str, object]]
+
+
+class _RepositoryScore(TypedDict):
+    name: str
+    workspace: str
+    public_task_sha256: str
+    hidden_corpus_sha256: str
+    defer_only: _Score
+    inspect_then_resolve: _Score
+
 
 ROLE_CUES: dict[str, tuple[str, ...]] = {
     "authority": ("agents", "agent instructions", "authority", "policy", "rules"),
@@ -61,16 +91,17 @@ def _identity(value: object) -> str:
     return "sha256:" + hashlib.sha256(payload).hexdigest()
 
 
-def _entry_state(
-    source: Path | CodeMap, query: str, *, limit: int
-) -> dict[str, object]:
+def _entry_state(source: Path | CodeMap, query: str, *, limit: int) -> _EntryState:
     if isinstance(source, CodeMap):
         value = source.tasks.entry_points(query, limit=limit)
     else:
         with CodeMap(source) as codemap:
             codemap.index.sync()
             value = codemap.tasks.entry_points(query, limit=limit)
-    recommended = [row for row in value.get("recommended", []) if isinstance(row, dict)]
+    raw_recommended = value.get("recommended", [])
+    if not isinstance(raw_recommended, list):
+        raise ValueError("entry recommendations must be a list")
+    recommended = [row for row in raw_recommended if isinstance(row, dict)]
     ambiguity = value.get("ambiguity", {})
     if not isinstance(ambiguity, dict):
         ambiguity = {}
@@ -112,7 +143,7 @@ def _cue_score(query: str, role: str, path: str) -> tuple[int, int, int]:
 
 def _resolve_after_inspection(
     query: str, alternatives: list[dict[str, object]]
-) -> dict[str, object]:
+) -> _InspectionResolution:
     candidates = [row for row in alternatives if row.get("path")]
     unique_paths = {str(row.get("path")) for row in candidates}
     if len(unique_paths) == 1 and unique_paths:
@@ -123,7 +154,10 @@ def _resolve_after_inspection(
         role = str(row.get("role") or "")
         path = str(row.get("path") or "")
         score = _cue_score(query, role, path)
-        rank = int(row.get("canonical_rank") or 10**9)
+        raw_rank = row.get("canonical_rank") or 10**9
+        if not isinstance(raw_rank, (int, float, str)):
+            raise ValueError("inspection candidate canonical_rank must be numeric")
+        rank = int(raw_rank)
         scored.append((score, -rank, path, role))
     if not scored:
         return {"resolved": False, "target": None, "reason": "no-competing-evidence"}
@@ -136,9 +170,7 @@ def _resolve_after_inspection(
     return {"resolved": True, "target": best[2], "reason": "public-task-role-cue"}
 
 
-def _worker_action(
-    policy: str, query: str, state: dict[str, object]
-) -> dict[str, object]:
+def _worker_action(policy: str, query: str, state: _EntryState) -> dict[str, object]:
     if policy not in {"defer-only", "inspect-then-resolve"}:
         raise ValueError(f"unsupported policy: {policy}")
     if not state["ambiguous"]:
@@ -214,13 +246,13 @@ def run_worker(
     )
 
 
-def _score(tasks: list[dict[str, Any]], output: dict[str, Any]) -> dict[str, object]:
+def _score(tasks: list[dict[str, Any]], output: dict[str, Any]) -> _Score:
     by_id = {
         str(row.get("id") or ""): row
         for row in output.get("tasks", [])
         if isinstance(row, dict)
     }
-    rows = []
+    rows: list[dict[str, object]] = []
     for task in tasks:
         task_id = str(task.get("id") or task.get("query") or "")
         expected = {str(value) for value in task.get("expected_files") or ()}
@@ -261,7 +293,7 @@ def _score(tasks: list[dict[str, Any]], output: dict[str, Any]) -> dict[str, obj
             }
         )
     n = len(rows)
-    summary = {
+    summary: dict[str, int | float] = {
         "tasks": n,
         "correct_final_edits": sum(bool(r["correct_final_edit"]) for r in rows),
         "unsafe_wrong_final_edits": sum(
@@ -285,7 +317,7 @@ def _score(tasks: list[dict[str, Any]], output: dict[str, Any]) -> dict[str, obj
 
 def collect(root: Path, *, limit: int = 20) -> dict[str, object]:
     repos = materialize_challenge(root / "challenge")
-    reports = []
+    reports: list[_RepositoryScore] = []
     for name, workspace, corpus, public_path in repos:
         outputs: dict[str, Path] = {}
         for policy in ("defer-only", "inspect-then-resolve"):
@@ -337,8 +369,8 @@ def collect(root: Path, *, limit: int = 20) -> dict[str, object]:
             }
         )
 
-    def total(policy: str, key: str) -> int:
-        return sum(int(repo[policy]["summary"][key]) for repo in reports)  # type: ignore[index]
+    def total(policy: Literal["defer_only", "inspect_then_resolve"], key: str) -> int:
+        return sum(int(repo[policy]["summary"][key]) for repo in reports)
 
     tasks = total("defer_only", "tasks")
     inspected = total("inspect_then_resolve", "inspections")

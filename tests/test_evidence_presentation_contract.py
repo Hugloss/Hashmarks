@@ -7,20 +7,24 @@ import json
 from collections.abc import Callable, Mapping
 from itertools import product
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Never
+from typing import TYPE_CHECKING, Never
 
 import pytest
 from contract_assertions import assert_array, assert_object, assert_records, assert_text
 
-from hashmarks.codemap import CodeMap, semantic_relationship_delta
+from hashmarks.codemap import CodeMap
+from hashmarks.codemap.diagnostic_observation import (
+    diagnostic_observation_delta,
+    external_diagnostic_observation,
+)
 from hashmarks.codemap.repository_delta import (
-    RepositoryDeltaMixin,
     RepositoryGenerationBinding,
 )
 from hashmarks.codemap.repository_intelligence_query import (
     QUERY_SURFACES,
     RepositoryIntelligenceQueryOptions,
 )
+from hashmarks.codemap.semantic_relationship_delta import semantic_relationship_delta
 from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
 from hashmarks.codemap.static_python_backend_declarations import (
     StaticPythonBackendDeclarations,
@@ -85,7 +89,7 @@ def _findings(projection: dict[str, object]) -> list[dict[str, object]]:
 
 def _fixture_diagnostic_delta(paths: list[str]) -> dict[str, object]:
     """Use one exact externally claimed endpoint without another analyzer."""
-    external = RepositoryDeltaMixin.external_diagnostic_observation(
+    external = external_diagnostic_observation(
         producer="test-diagnostics",
         binding=RepositoryGenerationBinding("fixture-repository", 1),
         diagnostics=[
@@ -102,7 +106,7 @@ def _fixture_diagnostic_delta(paths: list[str]) -> dict[str, object]:
         scope_paths=paths,
         collection_state="fresh-complete",
     )
-    return RepositoryDeltaMixin.diagnostic_observation_delta(external, external)
+    return diagnostic_observation_delta(external, external)
 
 
 @pytest.fixture(scope="module")
@@ -178,7 +182,7 @@ def native_packets(
     }
     with CodeMap(root, state_dir=root / "state") as codemap:
         codemap.index.sync()
-        snapshot = codemap.repository_intelligence_snapshot(task, paths)
+        snapshot = codemap.changes.snapshot(task, paths)
         previous = codemap.tasks.evidence(task)
         binding = codemap.bindings.observe(
             [
@@ -188,8 +192,8 @@ def native_packets(
                 }
             ]
         )
-        observation = codemap.dependency_resolution_evidence(dependency)
-        declarations = codemap.repository_declarations([group])
+        observation = codemap.dependencies.observe(dependency)
+        declarations = codemap.declarations.observe([group])
         locality = codemap.structure.locality("src/owner.py::widget")
         packets: list[tuple[str, str, Mapping[str, object]]] = [
             ("repository_context", "default", codemap.context.orient()),
@@ -200,28 +204,28 @@ def native_packets(
                 "initial",
                 codemap.tasks.evidence(task, result_mode="initial"),
             ),
-            ("change_impact", "default", codemap.task_change_impact(task, paths)),
+            ("change_impact", "default", codemap.changes.task_impact(task, paths)),
             ("correlate_evidence", "default", codemap.correlation.observe([bundle])),
             (
                 "dependency_codemap",
                 "observation",
-                codemap.dependency_codemap(dependency),
+                codemap.dependencies.codemap(dependency),
             ),
             (
                 "dependency_codemap",
                 "explain",
-                codemap.dependency_resolution_explain(observation),
+                codemap.dependencies.explain(observation),
             ),
             (
                 "dependency_codemap",
                 "compare",
-                codemap.dependency_resolution_delta(observation, observation),
+                codemap.dependencies.delta(observation, observation),
             ),
             ("repository_declarations", "observation", declarations),
             (
                 "repository_declarations",
                 "discovery",
-                codemap.repository_declarations_operation(
+                codemap.declarations.operation(
                     [],
                     result_mode="discovery",
                     providers=(StaticPythonBackendDeclarations(paths=(paths[0],)),),
@@ -230,7 +234,7 @@ def native_packets(
             (
                 "repository_declarations",
                 "explain",
-                codemap.repository_declaration_explain(declarations),
+                codemap.declarations.explain(declarations),
             ),
             (
                 "source_observation",
@@ -298,7 +302,7 @@ def native_packets(
             (
                 "post_change",
                 "default",
-                codemap.task_post_change_delta(task, paths, previous_evidence=previous),
+                codemap.changes.task_delta(task, paths, previous_evidence=previous),
             )
         )
         packets.append(
@@ -321,7 +325,7 @@ def native_packets(
                     (
                         "repository_intelligence_query",
                         "default",
-                        codemap.repository_intelligence_query(
+                        codemap.views.query(
                             surface,
                             task,
                             paths,
@@ -580,8 +584,8 @@ def test_service_transports_presentation_and_rejects_older_service(
 ) -> None:
     captured = {}
 
-    class Map:
-        def repository_intelligence_query(
+    class Views:
+        def query(
             self,
             _surface: str,
             _task: str,
@@ -594,6 +598,9 @@ def test_service_transports_presentation_and_rejects_older_service(
                 "schema": operation_schema("repository_intelligence_query"),
                 "presentation": {"format": options.presentation},
             }
+
+    class Map:
+        views = Views()
 
     service = CodeMapService(tmp_path, socket_path=tmp_path / "unused.sock")
     monkeypatch.setattr(service, "_map", Map)

@@ -25,7 +25,7 @@ def _observe(root: Path) -> dict[str, object]:
     with CodeMap(root, state_dir=root / "state") as codemap:
         codemap.index.sync()
         return dict(
-            codemap.task_change_impact(
+            codemap.changes.task_impact(
                 "Inspect source arguments",
                 ["service.py"],
                 options=ChangeImpactOptions(

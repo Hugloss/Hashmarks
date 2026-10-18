@@ -43,6 +43,11 @@ def assert_number(value: object) -> int | float:
     return value
 
 
+def assert_integer(value: object) -> int:
+    assert isinstance(value, int) and not isinstance(value, bool)
+    return value
+
+
 def is_available_plan(
     plan: TaskVerificationPlan,
 ) -> TypeGuard[AvailableVerificationPlan]:

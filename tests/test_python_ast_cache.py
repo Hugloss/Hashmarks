@@ -113,9 +113,11 @@ def test_python_ast_cache_retries_when_source_changes_during_read(
     original_read_text = Path.read_text
     calls = 0
 
-    def mutating_read_text(path: Path, *_args: object, **_kwargs: object) -> str:
+    def mutating_read_text(
+        path: Path, encoding: str | None = None, errors: str | None = None
+    ) -> str:
         nonlocal calls
-        text = original_read_text(path, *_args, **_kwargs)
+        text = original_read_text(path, encoding=encoding, errors=errors)
         if path == source and calls == 0:
             calls += 1
             source.write_text("def bravo():\n    return 2\n", encoding="utf-8")

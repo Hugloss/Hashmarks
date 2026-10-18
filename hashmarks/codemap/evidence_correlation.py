@@ -29,7 +29,6 @@ from .repository_observation import packet_digest
 if TYPE_CHECKING:
     from .decision_session import DecisionScope
     from .repository_evidence_bindings import RepositoryBindings
-    from .repository_source import RepositorySource
 
 _MAX_BUNDLES = 64
 _MAX_ANCHORS_PER_BUNDLE = 256
@@ -368,10 +367,10 @@ class RepositoryCorrelation(
     execution authority.
     """
 
-    def __init__(self, source: RepositorySource, bindings: RepositoryBindings) -> None:
-        self.source = source
+    def __init__(self, bindings: RepositoryBindings) -> None:
+        self.source = bindings.source
         self.bindings = bindings
-        self.store = source.store
+        self.store = self.source.store
 
     @property
     def reads(self) -> DecisionScope:

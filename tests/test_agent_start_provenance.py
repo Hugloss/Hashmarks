@@ -1,8 +1,17 @@
 from pathlib import Path
-from typing import Any
+
+import pytest
+from contract_assertions import assert_present
 
 from hashmarks.codemap import CodeMap
-from hashmarks.codemap.task_evidence_types import SourceReadPending, TaskSourceEvidence
+from hashmarks.codemap.task_evidence_types import (
+    SourceReadPending,
+    TaskEvidencePacket,
+    TaskFreshness,
+    TaskOwnership,
+    TaskSourceEvidence,
+    TaskVerification,
+)
 
 
 def _repo(root: Path) -> None:
@@ -22,19 +31,19 @@ def _task() -> str:
     return "Change cobalt_value from old to new and verify cobalt_value"
 
 
-def _ownership(start: dict[str, object]) -> dict[str, object]:
+def _ownership(start: TaskEvidencePacket) -> TaskOwnership:
     value = start.get("ownership")
     assert isinstance(value, dict)
     return value
 
 
-def _verification(start: dict[str, object]) -> dict[str, object]:
+def _verification(start: TaskEvidencePacket) -> TaskVerification:
     value = start.get("verification")
     assert isinstance(value, dict)
     return value
 
 
-def _freshness(start: dict[str, object]) -> dict[str, object]:
+def _freshness(start: TaskEvidencePacket) -> TaskFreshness:
     value = start.get("freshness")
     assert isinstance(value, dict)
     return value
@@ -64,7 +73,7 @@ def test_task_evidence_exposes_compact_selection_source_revision_and_unknown_fre
 
 
 def test_task_evidence_maps_generation_bound_continuity_to_current(
-    tmp_path: Path, monkeypatch: object
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
@@ -83,7 +92,7 @@ def test_task_evidence_maps_generation_bound_continuity_to_current(
 
 
 def test_task_evidence_reports_stale_when_continuity_reports_change(
-    tmp_path: Path, monkeypatch: object
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
@@ -101,7 +110,7 @@ def test_task_evidence_reports_stale_when_continuity_reports_change(
 
 
 def test_task_evidence_marks_action_stale_if_selected_source_refresh_changes_generation(
-    tmp_path: Path, monkeypatch: object
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
@@ -151,8 +160,13 @@ def test_config_projection_provenance_stays_post_selection(tmp_path: Path) -> No
         codemap.index.sync()
         start = codemap.tasks.evidence(f"{task['query']} in {policy}", token_budget=512)
 
-    assert _ownership(start)["candidate"]["path"].endswith("policy.toml")
-    assert _ownership(start)["source_evidence"]["representation"] == "config-key-range"
+    assert assert_present(_ownership(start)["candidate"])["path"].endswith(
+        "policy.toml"
+    )
+    assert (
+        assert_present(_ownership(start)["source_evidence"])["representation"]
+        == "config-key-range"
+    )
     assert start["provenance"]["why"] == "contract-authority"
     assert "revision" in start["provenance"]
     assert len(start["provenance"]["revision"]) == 64
@@ -181,7 +195,7 @@ def test_task_evidence_context_identity_is_budget_independent_and_revision_bound
 
 
 def test_task_evidence_context_identity_changes_with_freshness_authority(
-    tmp_path: Path, monkeypatch: object
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
@@ -211,7 +225,10 @@ def test_task_evidence_marks_stale_when_selected_verification_contents_change_af
         )
         start = codemap.tasks.evidence(_task(), token_budget=512)
     assert _freshness(start)["state"] == "stale"
-    assert _verification(start)["selected"]["path"] == "tests/test_engine.py"
+    assert (
+        assert_present(_verification(start)["selected"])["path"]
+        == "tests/test_engine.py"
+    )
     assert start["provenance"]["freshness"] == "stale"
     assert "freshness_reason" in start["provenance"]
     assert (
@@ -255,7 +272,7 @@ def test_task_evidence_marks_stale_when_selected_verification_is_renamed_after_s
 
 
 def test_task_evidence_closing_fence_catches_verification_mutation_during_packet_projection(
-    tmp_path: Path, monkeypatch: object
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:

@@ -6,7 +6,7 @@ ownership of a process graph, a framework runtime or agent tool selection.
 
 It does **not** alter the 14-tool MCP catalog or run automatically. It is an
 explicitly selected trusted provider for Hashmarks' existing
-`CodeMap.discover_repository_declarations` operation.
+`CodeMap.declarations.discover` operation.
 
 ```python
 from hashmarks import CodeMap
@@ -21,8 +21,23 @@ provider = StaticPythonInterfaceDeclarations(
 )
 with CodeMap(".") as codemap:
     codemap.index.sync()
-    observation = codemap.discover_repository_declarations([provider])
+    observation = codemap.declarations.discover([provider])
 ```
+
+The same provider can be selected through `repository_declarations` on official
+MCP with `groups=[]`, `result_mode="discovery"`, and
+`source_selection={"python_interface":{"paths":["src/api.py"],"route_objects":["app","router"],"tool_objects":["mcp"]}}`.
+Optional `include_literal_shape_syntax` and `include_input_contract_syntax`
+booleans belong inside `python_interface`. Unknown fields or invalid paths,
+receiver names and options reject before source discovery.
+
+For CLI, save that inner interface object as `interfaces.json` and run
+`hashmarks repository-declarations --python-interface-json interfaces.json`.
+The existing `--presentation` and `--previous-observation` options apply.
+CLI and MCP use `repository_declaration_selection.source_declaration_providers`
+to construct the existing producers; parsing, freshness and claims remain with
+Declarations, its selected providers, Bindings and Source. MCP source options
+are grouped in `source_selection`; old flat source arguments are removed.
 
 ## Exactly what is observed
 
@@ -65,6 +80,33 @@ The core does not need to understand API routing or MCP tools; `concept` and
 `scope` remain provider namespaced and opaque. This provider must not become
 an ambiently loaded plugin, a second parser/index generation, or an MCP
 execution surface.
+
+## Explicit curried route-call syntax
+
+The same selected-file provider also observes expression statements such as
+`router.post("/items")(handler)`, including statements inside functions or
+conditional branches. The caller must nominate the simple receiver name in
+`route_objects`. The claim describes the call expression only:
+
+- `concept.kind=http-route-call` records the method spelling, literal route
+  argument or explicit dynamic/unsupported state, and a simple handler-argument
+  name when present.
+- Its evidence is the exact call-expression line span under the existing member
+  revision binding. It shares the existing provider source and group bounds.
+- `handler_resolution=unresolved` and
+  `runtime_registration=not-established` always remain explicit. Missing,
+  rebound, imported, dynamic or branch-dependent handler arguments are never
+  joined to declarations. Receiver identity and framework execution are not
+  inferred. Curried expressions in decorator position are outside this claim.
+
+Observed repository fact/evidence: explicit HTTP-like curried-call syntax in
+caller-selected source. Authority source: the admitted file AST and exact bound
+call span. Completeness/freshness behavior: existing source revision binding,
+incomplete semantic coverage, unknown absence and shared group bounds. Existing
+Hashmarks owner extended: `StaticPythonInterfaceDeclarations` under repository
+Declarations/Bindings/Source. Consumer/execution responsibility explicitly not
+acquired: resolving framework/runtime handler identity, route registration,
+reachability, execution or certification. Decision: **OBSERVER**.
 
 ## Opt-in backend handler inputs (B15–B19)
 
@@ -113,7 +155,7 @@ type graph, dependency-injection engine, new MCP tool or durable state.
 
 `StaticPythonBackendDeclarations(paths=("src/models.py", "src/settings.py"))`
 is a separate **explicitly selected** provider for the existing
-`CodeMap.discover_repository_declarations([provider])` authority. It does
+`CodeMap.declarations.discover([provider])` authority. It does
 not run automatically or add an MCP tool, framework integration, state
 store, config interpreter, or global schema index.
 
@@ -159,7 +201,7 @@ from hashmarks.codemap.static_python_backend_declarations import (
 
 with CodeMap(".") as codemap:
     codemap.index.sync()
-    observation = codemap.discover_repository_declarations(
+    observation = codemap.declarations.discover(
         [StaticPythonBackendDeclarations(paths=("src/models.py", "src/settings.py"))]
     )
 ```

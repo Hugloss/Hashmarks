@@ -85,7 +85,7 @@ def observe_declarations(
     with CodeMap(workspace, state_dir=state) as codemap:
         packet = cast(
             "dict[str, Any]",
-            codemap.repository_declarations_operation(
+            codemap.declarations.operation(
                 inputs["groups"],
                 result_mode=inputs["result_mode"],
                 providers=(

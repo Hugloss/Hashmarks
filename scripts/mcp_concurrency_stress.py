@@ -9,6 +9,7 @@ import tempfile
 import time
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
+from multiprocessing.synchronize import Event
 from pathlib import Path
 from typing import Any
 
@@ -77,7 +78,7 @@ def _worker(
     repo_text: str,
     state_text: str,
     calls: int,
-    start: mp.synchronize.Event,
+    start: Event,
     out: mp.Queue,
 ) -> None:
     repo = Path(repo_text)
@@ -116,7 +117,7 @@ def _worker(
         )
 
 
-def _writer(repo_text: str, writes: int, start: mp.synchronize.Event) -> None:
+def _writer(repo_text: str, writes: int, start: Event) -> None:
     repo = Path(repo_text)
     source = repo / "src" / "feature.py"
     start.wait(timeout=30)

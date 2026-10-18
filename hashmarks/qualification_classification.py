@@ -95,10 +95,10 @@ def classify_nodeids(root: Path, nodeids: Sequence[str]) -> dict[str, object]:
 
     root = root.resolve()
     policy = load_classification_policy(root)
+    node_overrides = policy["node_overrides"]
+    assert isinstance(node_overrides, list)
     overrides = {
-        str(row["nodeid"]): row
-        for row in policy["node_overrides"]
-        if isinstance(row, Mapping)
+        str(row["nodeid"]): row for row in node_overrides if isinstance(row, Mapping)
     }
     rules = policy["path_rules"]
     assert isinstance(rules, list)
@@ -136,8 +136,10 @@ def classification_map(
     root: Path, nodeids: Sequence[str]
 ) -> dict[str, dict[str, object]]:
     artifact = classify_nodeids(root, nodeids)
+    classifications = artifact["classifications"]
+    assert isinstance(classifications, list)
     return {
         str(row["nodeid"]): dict(row)
-        for row in artifact["classifications"]
+        for row in classifications
         if isinstance(row, Mapping)
     }

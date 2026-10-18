@@ -43,6 +43,11 @@ class RepositoryTasks(
         relationships: RepositoryRelationships,
         context: RepositoryContext,
     ) -> None:
+        if any(
+            owner.reads is not search.reads
+            for owner in (ownership, verification, relationships, context)
+        ):
+            raise ValueError("Task inputs must share one repository read scope")
         self.source = source = search.source
         self.context = context
         self.structure = ownership.structure

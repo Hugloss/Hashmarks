@@ -6,7 +6,7 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, NotRequired, TypedDict
 
 from hashmarks._command_output import log_command_output
 from hashmarks.codemap import (
@@ -28,6 +28,67 @@ PROTOCOL_SCHEMA = "hashmarks.agent-economics-protocol.v1"
 FAMILY = "hashmarks-agent-economics-a"
 
 
+class FileCostRow(TypedDict):
+    path: str
+    bytes: int
+
+
+class FileCost(TypedDict):
+    files: int
+    bytes: int
+    approx_tokens: int
+    rows: list[FileCostRow]
+
+
+class WorkerTaskObservation(TypedDict):
+    id: str
+    query: str
+    first_edit_target: str | None
+    verification_target: str | None
+    search_ms: float
+    repository_scan_files: int
+    repository_scan_bytes: int
+    evidence_read: FileCost
+    verification_candidates_examined: int
+    search_calls: NotRequired[int]
+    hashmarks_calls: NotRequired[int]
+    ambiguous: NotRequired[bool]
+
+
+class WorkerObservation(TypedDict):
+    strategy: str
+    cold_setup_ms: float
+    tasks: list[WorkerTaskObservation]
+    elapsed_ms: float
+
+
+class TaskEconomicsScore(TypedDict):
+    id: str
+    correct_first_edit: bool
+    correct_verification: bool
+    first_edit_target: str
+    verification_target: str
+    evidence_read: FileCost
+    search_ms: float
+    repository_scan_files: int
+    repository_scan_bytes: int
+    verification_candidates_examined: int
+
+
+class EconomicsScore(TypedDict):
+    summary: dict[str, int | float]
+    tasks: list[TaskEconomicsScore]
+    cold_setup_ms: NotRequired[float]
+    elapsed_ms: NotRequired[float]
+
+
+class EconomicsRepositoryReport(TypedDict):
+    name: str
+    public_task_sha256: str
+    hidden_corpus_sha256: str
+    strategies: dict[str, EconomicsScore]
+
+
 def _identity(value: object) -> str:
     payload = json.dumps(
         value, sort_keys=True, separators=(",", ":"), ensure_ascii=True
@@ -39,9 +100,9 @@ def _approx_tokens(num_bytes: int) -> int:
     return max(1, (num_bytes + 3) // 4) if num_bytes else 0
 
 
-def _file_cost(workspace: Path, paths: list[str]) -> dict[str, object]:
+def _file_cost(workspace: Path, paths: list[str]) -> FileCost:
     seen: set[str] = set()
-    rows = []
+    rows: list[FileCostRow] = []
     total = 0
     for rel in paths:
         if not rel or rel in seen:
@@ -87,10 +148,10 @@ def _verification_target(
 
 def _native_worker(
     workspace: Path, tasks: list[dict[str, str]], *, limit: int
-) -> dict[str, object]:
+) -> WorkerObservation:
     repo_files = _repository_files(workspace)
     scan_bytes = sum(p.stat().st_size for p in repo_files)
-    rows = []
+    rows: list[WorkerTaskObservation] = []
     started = time.perf_counter()
     for task in tasks:
         q = task["query"]
@@ -124,19 +185,23 @@ def _native_worker(
 
 def _hashmarks_worker(
     workspace: Path, tasks: list[dict[str, str]], *, limit: int
-) -> dict[str, object]:
-    rows = []
+) -> WorkerObservation:
+    rows: list[WorkerTaskObservation] = []
     started = time.perf_counter()
     with CodeMap(workspace) as cm:
         t0 = time.perf_counter()
-        sync = cm.index.sync()
+        cm.index.sync()
         cold_ms = (time.perf_counter() - t0) * 1000
         for task in tasks:
             q = task["query"]
             t1 = time.perf_counter()
             entry = cm.tasks.entry_points(q, limit=limit)
             query_ms = (time.perf_counter() - t1) * 1000
-            rec = [r for r in entry.get("recommended", []) if isinstance(r, dict)]
+            rec = entry.get("recommended", [])
+            if not isinstance(rec, list):
+                raise ValueError("task entry recommendations must be an array")
+            rec = [row for row in rec if isinstance(row, dict)]
+            ambiguity = entry.get("ambiguity")
             first = str(rec[0].get("path") or "") if rec else None
             verify, vpos = _verification_target(workspace, q, limit=limit, codemap=cm)
             selected = [str(r.get("path") or "") for r in rec[:3]]
@@ -153,8 +218,8 @@ def _hashmarks_worker(
                     "repository_scan_bytes": 0,
                     "evidence_read": read,
                     "verification_candidates_examined": vpos,
-                    "ambiguous": bool(entry.get("ambiguity", {}).get("ambiguous"))
-                    if isinstance(entry.get("ambiguity"), dict)
+                    "ambiguous": bool(ambiguity.get("ambiguous"))
+                    if isinstance(ambiguity, dict)
                     else False,
                 }
             )
@@ -167,15 +232,15 @@ def _hashmarks_worker(
 
 
 def _score(
-    repo_name: str, hidden: list[dict[str, Any]], result: dict[str, object]
-) -> dict[str, object]:
+    repo_name: str, hidden: list[dict[str, Any]], result: WorkerObservation
+) -> EconomicsScore:
     expected_verification = {
         "python-orders": "tests/test_orders.py",
         "typescript-dashboard": "tests/MetricsPanel.test.tsx",
         "release-contracts": "tests/test_release_contract.py",
     }[repo_name]
-    by_id = {str(r.get("id") or ""): r for r in result["tasks"] if isinstance(r, dict)}  # type: ignore[index]
-    rows = []
+    by_id = {str(r.get("id") or ""): r for r in result["tasks"]}
+    rows: list[TaskEconomicsScore] = []
     for task in hidden:
         tid = str(task.get("id") or "")
         expected = {str(x) for x in task.get("expected_files") or ()}
@@ -189,8 +254,8 @@ def _score(
                 "correct_verification": verification == expected_verification,
                 "first_edit_target": first,
                 "verification_target": verification,
-                "evidence_read": obs.get("evidence_read"),
-                "search_ms": obs.get("search_ms"),
+                "evidence_read": obs["evidence_read"],
+                "search_ms": obs["search_ms"],
                 "repository_scan_files": obs.get("repository_scan_files", 0),
                 "repository_scan_bytes": obs.get("repository_scan_bytes", 0),
                 "verification_candidates_examined": obs.get(
@@ -199,7 +264,7 @@ def _score(
             }
         )
     n = len(rows)
-    evidence_bytes = sum(int(r["evidence_read"]["bytes"]) for r in rows)  # type: ignore[index]
+    evidence_bytes = sum(int(r["evidence_read"]["bytes"]) for r in rows)
     return {
         "summary": {
             "tasks": n,
@@ -229,7 +294,7 @@ def collect(
     ):
         public = json.loads(public_path.read_text())["tasks"]
         hidden = _load_corpus(corpus)
-        repo = {
+        repo: EconomicsRepositoryReport = {
             "name": name,
             "public_task_sha256": _sha256_bytes(public_path.read_bytes()),
             "hidden_corpus_sha256": _sha256_bytes(corpus.read_bytes()),
@@ -248,12 +313,12 @@ def collect(
         reports.append(repo)
 
     def aggregate(strategy: str, key: str) -> float:
-        return sum(float(r["strategies"][strategy]["summary"][key]) for r in reports)  # type: ignore[index]
+        return sum(float(r["strategies"][strategy]["summary"][key]) for r in reports)
 
     tasks = sum(
         int(r["strategies"][strategies[0]]["summary"]["tasks"]) for r in reports
-    )  # type: ignore[index]
-    summary = {"repositories": len(reports), "tasks": tasks}
+    )
+    summary: dict[str, int | float] = {"repositories": len(reports), "tasks": tasks}
     for strategy in strategies:
         prefix = "native" if strategy == "native" else "hashmarks"
         for key in (
@@ -270,7 +335,7 @@ def collect(
             summary[f"{prefix}_{key}"] = aggregate(strategy, key)
         summary[f"{prefix}_cold_setup_ms"] = sum(
             float(r["strategies"][strategy]["cold_setup_ms"]) for r in reports
-        )  # type: ignore[index]
+        )
         summary[f"{prefix}_search_ms"] = aggregate(strategy, "search_ms")
     protocol = {
         "schema": PROTOCOL_SCHEMA,

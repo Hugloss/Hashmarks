@@ -2,18 +2,21 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import logging
+from collections.abc import Mapping
 from dataclasses import dataclass, field
+from pathlib import Path
+from typing import NotRequired, TypedDict, TypeGuard
 
 from hashmarks._command_output import log_command_output
-
-try:
-    from scripts._module_loader import import_sibling
-except ModuleNotFoundError:  # direct script execution
-    from _module_loader import import_sibling
-import json
-from pathlib import Path
-from typing import Any
+from scripts.agent_evaluation.metrics_agent_experiment import (
+    ExperimentManifest,
+    ExperimentReport,
+    ExperimentRun,
+    load_manifest,
+    run_experiment,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +27,91 @@ PUBLIC_MIN_REPOSITORIES = 3
 PUBLIC_MIN_UNIQUE_TASKS = 30
 
 
+class ExperimentSetEntry(TypedDict):
+    manifest: str
+    manifest_sha256: str
+    replication_group: NotRequired[object]
+
+
+class ExperimentSetManifest(TypedDict):
+    schema: str
+    experiment_set_id: str
+    model_identity: str
+    model_config_identity: str
+    task_policy_identity: str
+    experiments: list[ExperimentSetEntry]
+    runner_identity: NotRequired[object]
+    grader_identity: NotRequired[object]
+    provider_identity: NotRequired[object]
+    benchmark_protocol_identity: NotRequired[object]
+    replication_policy: NotRequired[object]
+
+
+class ExperimentMeasurement(TypedDict):
+    experiment_id: str
+    manifest_sha256: str
+    repositories: int
+    tasks: int
+    baseline_model_input_tokens: int
+    hashmarks_model_input_tokens: int
+    model_input_token_reduction: float
+
+
+class BootstrapInterval(TypedDict):
+    method: str
+    confidence: float
+    samples: int
+    lower: float
+    upper: float
+    scope: str
+
+
+class ReplicationGroup(TypedDict):
+    replication_group: str
+    repeat_count: int
+    replication_eligible: bool
+    mean_model_input_token_reduction: float
+    min_model_input_token_reduction: float
+    max_model_input_token_reduction: float
+
+
+class ReplicationReport(TypedDict):
+    group_count: int
+    eligible_group_count: int
+    min_repeats_per_group: int
+    groups: list[ReplicationGroup]
+    descriptive_confidence_interval: BootstrapInterval | None
+    statistical_claim_eligible: bool
+    warning: str
+
+
+class ExperimentSetSummary(TypedDict):
+    experiment_count: int
+    repository_count: int
+    unique_task_count: int
+    run_count: int
+    baseline_model_input_tokens: int
+    hashmarks_model_input_tokens: int
+    aggregate_model_input_token_reduction: float
+    internal_controlled_claim_eligible: bool
+    public_broad_claim_eligible: bool
+    public_broad_claim_blockers: list[str]
+    replication: ReplicationReport
+    public_minimums: dict[str, int]
+
+
+class ExperimentSetReport(TypedDict):
+    schema: str
+    experiment_set_id: str
+    manifest_sha256: str
+    model_identity: str
+    model_config_identity: str
+    task_policy_identity: str
+    benchmark_protocol_identity: object
+    experiments: list[ExperimentMeasurement]
+    summary: ExperimentSetSummary
+
+
 @dataclass
 class _SetAggregation:
     experiment_ids: set[str] = field(default_factory=set)
@@ -31,7 +119,7 @@ class _SetAggregation:
     run_ids: set[str] = field(default_factory=set)
     task_keys: set[tuple[str, str, str]] = field(default_factory=set)
     repositories: set[str] = field(default_factory=set)
-    experiment_reports: list[dict[str, object]] = field(default_factory=list)
+    experiment_reports: list[ExperimentMeasurement] = field(default_factory=list)
     total_baseline_tokens: int = 0
     total_hashmarks_tokens: int = 0
 
@@ -43,7 +131,7 @@ class _SetAggregation:
             raise ValueError(f"duplicate experiment_id: {experiment_id}")
         self.experiment_ids.add(experiment_id)
 
-    def admit_runs(self, experiment: dict[str, object]) -> None:
+    def admit_runs(self, experiment: ExperimentManifest) -> None:
         for run in experiment["runs"]:
             run_id = run["run_id"]
             if run_id in self.run_ids:
@@ -53,7 +141,7 @@ class _SetAggregation:
             if run["mode"] == "baseline":
                 self._admit_task(run)
 
-    def _admit_task(self, run: dict[str, object]) -> None:
+    def _admit_task(self, run: ExperimentRun) -> None:
         key = (run["repository_identity"], run["task_id"], run["task_revision"])
         if key in self.task_keys:
             raise ValueError(
@@ -62,7 +150,7 @@ class _SetAggregation:
         self.task_keys.add(key)
 
     def admit_report(
-        self, experiment_id: str, digest: str, report: dict[str, object]
+        self, experiment_id: str, digest: str, report: ExperimentReport
     ) -> None:
         summary = report["comparison"]["summary"]
         if not summary.get("token_reduction_claim_eligible"):
@@ -77,6 +165,11 @@ class _SetAggregation:
             raise ValueError(
                 f"experiment {experiment_id} lacks exact aggregate model-input tokens"
             )
+        reduction = summary["average_model_input_token_reduction"]
+        if reduction is None:
+            raise ValueError(
+                f"experiment {experiment_id} lacks aggregate model-input token reduction"
+            )
         self.total_baseline_tokens += baseline
         self.total_hashmarks_tokens += hashmarks
         self.experiment_reports.append(
@@ -87,15 +180,9 @@ class _SetAggregation:
                 "tasks": report["tasks"],
                 "baseline_model_input_tokens": baseline,
                 "hashmarks_model_input_tokens": hashmarks,
-                "model_input_token_reduction": summary[
-                    "average_model_input_token_reduction"
-                ],
+                "model_input_token_reduction": reduction,
             }
         )
-
-
-def _load_experiment_module() -> object:
-    return import_sibling("metrics_agent_experiment", __package__)
 
 
 def _nonempty(value: object, field: str, path: Path) -> str:
@@ -134,7 +221,7 @@ def _sha256(path: Path) -> str:
 
 def _validate_set_entry(
     entry: object, index: int, path: Path, seen_paths: set[str]
-) -> None:
+) -> TypeGuard[ExperimentSetEntry]:
     if not isinstance(entry, dict):
         raise ValueError(f"experiment-set entry {index} must be an object: {path}")
     rel = _nonempty(
@@ -158,10 +245,12 @@ def _validate_set_entry(
     if rel in seen_paths:
         raise ValueError(f"duplicate experiment manifest entry: {rel}")
     seen_paths.add(rel)
+    return True
 
 
-def load_set_manifest(path: Path) -> dict[str, object]:
-    value = json.loads(path.read_text(encoding="utf-8"))
+def _validate_set_manifest(
+    value: object, path: Path
+) -> TypeGuard[ExperimentSetManifest]:
     if not isinstance(value, dict) or value.get("schema") != SET_SCHEMA:
         raise ValueError(f"unsupported agent experiment-set manifest schema: {path}")
     for field in (
@@ -175,13 +264,25 @@ def load_set_manifest(path: Path) -> dict[str, object]:
     if not isinstance(experiments, list) or not experiments:
         raise ValueError(f"experiment-set experiments must be a non-empty list: {path}")
     seen_paths: set[str] = set()
-    for index, entry in enumerate(experiments):
+    if not all(
         _validate_set_entry(entry, index, path, seen_paths)
+        for index, entry in enumerate(experiments)
+    ):
+        raise ValueError(f"invalid experiment-set entry: {path}")
+    return True
+
+
+def load_set_manifest(path: Path) -> ExperimentSetManifest:
+    value: object = json.loads(path.read_text(encoding="utf-8"))
+    if not _validate_set_manifest(value, path):
+        raise ValueError(f"invalid experiment-set manifest: {path}")
     return value
 
 
-def _replication_policy(manifest: dict[str, object]) -> tuple[int, float, int]:
+def _replication_policy(manifest: Mapping[str, object]) -> tuple[int, float, int]:
     policy = manifest.get("replication_policy", {})
+    if not isinstance(policy, Mapping):
+        raise ValueError("replication_policy must be an object")
     min_repeats = policy.get("min_repeats_per_group", 3)
     confidence = policy.get("confidence", 0.95)
     bootstrap_samples = policy.get("bootstrap_samples", 10000)
@@ -200,10 +301,10 @@ def _replication_policy(manifest: dict[str, object]) -> tuple[int, float, int]:
 
 def _bootstrap_interval(
     manifest_path: Path,
-    experiment_reports: list[dict[str, object]],
+    experiment_reports: list[ExperimentMeasurement],
     confidence: float,
     bootstrap_samples: int,
-) -> dict[str, object] | None:
+) -> BootstrapInterval | None:
     import math
     import random
 
@@ -235,12 +336,12 @@ def _bootstrap_interval(
 
 
 def _replication_report(
-    manifest: dict[str, object],
+    manifest: ExperimentSetManifest,
     manifest_path: Path,
-    experiment_reports: list[dict[str, object]],
-) -> dict[str, object]:
+    experiment_reports: list[ExperimentMeasurement],
+) -> ReplicationReport:
     # Repetitions describe variation and never add repository/task breadth.
-    groups: dict[str, list[dict[str, Any]]] = {}
+    groups: dict[str, list[ExperimentMeasurement]] = {}
     for index, entry in enumerate(manifest["experiments"]):
         group = _nonempty(
             entry.get("replication_group"),
@@ -250,7 +351,7 @@ def _replication_report(
         groups.setdefault(group, []).append(experiment_reports[index])
     min_repeats, confidence, bootstrap_samples = _replication_policy(manifest)
 
-    group_reports = []
+    group_reports: list[ReplicationGroup] = []
     eligible_groups = 0
     for group_id in sorted(groups):
         rows = groups[group_id]
@@ -285,7 +386,7 @@ def _replication_report(
     }
 
 
-def _set_consistency_fields(manifest: dict[str, object]) -> dict[str, object]:
+def _set_consistency_fields(manifest: Mapping[str, object]) -> dict[str, object]:
     fields = {
         "model_identity": manifest["model_identity"],
         "model_config_identity": manifest["model_config_identity"],
@@ -309,10 +410,9 @@ def _set_consistency_fields(manifest: dict[str, object]) -> dict[str, object]:
 def _load_bound_experiment(
     root: Path,
     manifest_path: Path,
-    entry: dict[str, object],
+    entry: ExperimentSetEntry,
     index: int,
-    experiment_module: object,
-) -> tuple[Path, str, dict[str, object]]:
+) -> tuple[Path, str, ExperimentManifest]:
     experiment_path = _relative_file(
         root, entry["manifest"], f"experiment {index} manifest", manifest_path
     )
@@ -322,11 +422,11 @@ def _load_bound_experiment(
             "experiment manifest digest mismatch: "
             f"expected {entry['manifest_sha256']}, got {digest}"
         )
-    return experiment_path, digest, experiment_module.load_manifest(experiment_path)
+    return experiment_path, digest, load_manifest(experiment_path)
 
 
 def _validate_experiment_consistency(
-    experiment: dict[str, object], expected_fields: dict[str, object]
+    experiment: ExperimentManifest, expected_fields: dict[str, object]
 ) -> None:
     experiment_id = experiment["experiment_id"]
     for field_name, expected in expected_fields.items():
@@ -357,8 +457,7 @@ def _public_claim_blockers(state: _SetAggregation) -> list[str]:
 
 def run_experiment_set(
     manifest_path: Path, *, strict_raw_evidence: bool = True
-) -> dict[str, object]:
-    experiment_module = _load_experiment_module()
+) -> ExperimentSetReport:
     manifest = load_set_manifest(manifest_path)
     root = manifest_path.parent
     state = _SetAggregation()
@@ -366,12 +465,12 @@ def run_experiment_set(
 
     for index, entry in enumerate(manifest["experiments"]):
         experiment_path, digest, experiment = _load_bound_experiment(
-            root, manifest_path, entry, index, experiment_module
+            root, manifest_path, entry, index
         )
         experiment_id = experiment["experiment_id"]
         state.admit_manifest(experiment_path, digest, experiment_id)
         _validate_experiment_consistency(experiment, expected_fields)
-        report = experiment_module.run_experiment(
+        report = run_experiment(
             experiment_path, strict_raw_evidence=strict_raw_evidence
         )
         state.admit_runs(experiment)
@@ -415,7 +514,7 @@ def run_experiment_set(
 
 
 def gate(
-    report: dict[str, object], *, require_public_broad_claim: bool = False
+    report: ExperimentSetReport, *, require_public_broad_claim: bool = False
 ) -> list[str]:
     summary = report["summary"]
     failures: list[str] = []

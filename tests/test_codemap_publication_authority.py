@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import threading
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
 
 import pytest
+from contract_assertions import assert_object
 
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.indexing_lifecycle import _DiscoveredFile, _SyncIdentity
+from hashmarks.codemap.model import EvidenceVisibility, ParsedArtifact, SyncResult
 
 
 def _write_repository(root: Path, *, symbol: str) -> Path:
@@ -39,7 +42,7 @@ class _PublicationHarness:
         self.b_started = threading.Event()
         self.staged = threading.Event()
         self.finished = threading.Event()
-        self.results: list[object] = []
+        self.results: list[SyncResult] = []
         self.errors: list[BaseException] = []
 
     def install_writer_serialization_hooks(
@@ -48,16 +51,38 @@ class _PublicationHarness:
         original_a_begin = self.writer_a.index._sync_begin_build
         original_b_begin = self.writer_b.index._sync_begin_build
 
-        def block_a(*args: object, **kwargs: object) -> object:
-            value = original_a_begin(*args, **kwargs)
+        def block_a(
+            *,
+            discovered: Sequence[_DiscoveredFile],
+            full: bool,
+            requested_paths: Sequence[str],
+            preflight: dict[str, object],
+        ) -> str:
+            value = original_a_begin(
+                discovered=discovered,
+                full=full,
+                requested_paths=requested_paths,
+                preflight=preflight,
+            )
             self.a_entered.set()
             if not self.a_release.wait(timeout=5):
                 raise TimeoutError("test did not release first CodeMap writer")
             return value
 
-        def observe_b(*args: object, **kwargs: object) -> object:
+        def observe_b(
+            *,
+            discovered: Sequence[_DiscoveredFile],
+            full: bool,
+            requested_paths: Sequence[str],
+            preflight: dict[str, object],
+        ) -> str:
             self.b_entered.set()
-            return original_b_begin(*args, **kwargs)
+            return original_b_begin(
+                discovered=discovered,
+                full=full,
+                requested_paths=requested_paths,
+                preflight=preflight,
+            )
 
         monkeypatch.setattr(self.writer_a.index, "_sync_begin_build", block_a)
         monkeypatch.setattr(self.writer_b.index, "_sync_begin_build", observe_b)
@@ -65,11 +90,20 @@ class _PublicationHarness:
     def install_staged_finalize_hook(self, monkeypatch: pytest.MonkeyPatch) -> None:
         original_finalize = self.writer_a.index._sync_finalize_identity
 
-        def block_before_publication(*args: object, **kwargs: object) -> object:
+        def block_before_publication(
+            *,
+            changed: bool,
+            identity_generation_before: int | None,
+            warnings: list[str],
+        ) -> _SyncIdentity:
             self.staged.set()
             if not self.a_release.wait(timeout=5):
                 raise TimeoutError("test did not release staged CodeMap publication")
-            return original_finalize(*args, **kwargs)
+            return original_finalize(
+                changed=changed,
+                identity_generation_before=identity_generation_before,
+                warnings=warnings,
+            )
 
         monkeypatch.setattr(
             self.writer_a.index, "_sync_finalize_identity", block_before_publication
@@ -111,9 +145,9 @@ def test_concurrent_sync_writers_serialize_one_publication_authority(
         thread_a.start()
         assert harness.a_entered.wait(timeout=5)
 
-        status = harness.reader.status()
+        status = harness.reader.views.status()
         assert status["generation"] == harness.initial.generation
-        assert status["build"]["complete"] is True
+        assert assert_object(status["build"])["complete"] is True
         assert harness.reader.store.symbol("before_owner")
         assert harness.reader.store.symbol("after_owner") == []
 
@@ -135,7 +169,7 @@ def test_concurrent_sync_writers_serialize_one_publication_authority(
 
         assert harness.reader.store.symbol("before_owner") == []
         assert harness.reader.store.symbol("after_owner")
-        assert harness.reader.status()["build"]["complete"] is True
+        assert assert_object(harness.reader.views.status()["build"])["complete"] is True
         assert harness.reader.store.generation() == harness.initial.generation + 1
     finally:
         harness.a_release.set()
@@ -245,8 +279,21 @@ class _LazyRefreshHarness:
     def install_staged_row_hook(self, monkeypatch: pytest.MonkeyPatch) -> None:
         original_set_file = self.reader.store.set_file
 
-        def block_after_staged_row(*args: object, **kwargs: object) -> object:
-            value = original_set_file(*args, **kwargs)
+        def block_after_staged_row(
+            path: str,
+            artifact: ParsedArtifact,
+            *,
+            module_name: str | None,
+            visibility: EvidenceVisibility,
+            index_surface: str = "other",
+        ) -> dict[str, tuple[str, ...]]:
+            value = original_set_file(
+                path,
+                artifact,
+                module_name=module_name,
+                visibility=visibility,
+                index_surface=index_surface,
+            )
             self.staged.set()
             if not self.release.wait(timeout=5):
                 raise TimeoutError("test did not release staged path refresh")

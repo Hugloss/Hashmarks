@@ -5,6 +5,7 @@ import json
 import logging
 import statistics
 import time
+from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -44,7 +45,7 @@ def _append_probe(path: Path) -> None:
     )
 
 
-def _task_candidate_path(packet: dict[str, object]) -> str:
+def _task_candidate_path(packet: Mapping[str, object]) -> str:
     ownership = packet.get("ownership")
     if not isinstance(ownership, dict):
         return ""
@@ -87,7 +88,7 @@ def _freeze_scenario(
             if edit_path:
                 _append_probe(repo / edit_path)
                 impact_started = time.perf_counter()
-                impact = codemap.task_change_impact(query, [edit_path])
+                impact = codemap.changes.task_impact(query, [edit_path])
                 impact_ms = (time.perf_counter() - impact_started) * 1000.0
             else:
                 impact = {}

@@ -6,6 +6,10 @@ from typing import Any
 SAFETY_CLASSES = ("correct-safe", "false-safe", "correct-unsafe", "false-unsafe")
 
 
+def _mapping(value: object) -> Mapping[str, object]:
+    return value if isinstance(value, Mapping) else {}
+
+
 def _path(value: object) -> str | None:
     if not isinstance(value, Mapping):
         return None
@@ -32,18 +36,17 @@ def _covered_roles(packet: Mapping[str, Any]) -> set[str]:
     return roles
 
 
+def _missing_roles(context: Mapping[str, object]) -> Sequence[object]:
+    roles = context.get("missing_roles") or []
+    if not isinstance(roles, Sequence) or isinstance(roles, (str, bytes)):
+        raise ValueError("missing roles must be a sequence")
+    return roles
+
+
 def packet_consistency(packet: Mapping[str, Any]) -> dict[str, Any]:
     """Check worker-visible packet semantics without using grading truth."""
-    context = (
-        packet.get("work_context")
-        if isinstance(packet.get("work_context"), Mapping)
-        else {}
-    )
-    budget = (
-        packet.get("context_budget")
-        if isinstance(packet.get("context_budget"), Mapping)
-        else {}
-    )
+    context = _mapping(packet.get("work_context"))
+    budget = _mapping(packet.get("context_budget"))
     covered = _covered_roles(packet)
     required = {
         role
@@ -51,9 +54,7 @@ def packet_consistency(packet: Mapping[str, Any]) -> dict[str, Any]:
         if isinstance(packet.get(role), Mapping) and packet[role].get("path")
     }
     missing_from_items = sorted(required - covered)
-    declared_missing = sorted(
-        str(role) for role in (context.get("missing_roles") or [])
-    )
+    declared_missing = sorted(str(role) for role in _missing_roles(context))
     context_safe = bool(context.get("safe"))
     budget_safe = bool(budget.get("safe"))
     expected_safe_from_items = not missing_from_items
@@ -90,11 +91,7 @@ def evaluate_decision_packet(
     """
     actual_edit = _path(packet.get("edit"))
     actual_verify = _path(packet.get("verify"))
-    context = (
-        packet.get("work_context")
-        if isinstance(packet.get("work_context"), Mapping)
-        else {}
-    )
+    context = _mapping(packet.get("work_context"))
     actual_safe = bool(context.get("safe"))
     if actual_safe and expected_safe:
         safety_class = "correct-safe"
@@ -109,19 +106,13 @@ def evaluate_decision_packet(
     consistency = packet_consistency(packet)
     return {
         "schema": "hashmarks.agent-decision-qa.v1",
-        "task_identity": (
-            packet.get("identity", {}).get("task_identity")
-            if isinstance(packet.get("identity"), Mapping)
-            else None
-        ),
+        "task_identity": (_mapping(packet.get("identity")).get("task_identity")),
         "edit_correct": edit_correct,
         "verify_correct": verify_correct,
         "safety_class": safety_class,
         "safe_correct": safety_class in {"correct-safe", "correct-unsafe"},
         "discrimination_needed": bool(
-            packet.get("discrimination", {}).get("needed")
-            if isinstance(packet.get("discrimination"), Mapping)
-            else False
+            _mapping(packet.get("discrimination")).get("needed", False)
         ),
         "packet_consistent": bool(consistency["consistent"]),
         "packet_issues": consistency["issues"],

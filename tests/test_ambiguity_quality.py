@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from contract_assertions import assert_object
+
 from hashmarks.codemap import CodeMap
 
 
@@ -39,12 +41,15 @@ def test_decision_packet_carries_ambiguity_only_when_scout_needs_it(
         codemap.index.sync()
         packet = codemap.tasks.decision_packet("widget implementation test", limit=20)
     if (
-        packet["discrimination"]["needed"]
-        and packet["discrimination"]["reason"] == "competing-action-roles"
+        assert_object(packet["discrimination"])["needed"]
+        and assert_object(packet["discrimination"])["reason"]
+        == "competing-action-roles"
     ):
         assert (
-            packet["discrimination"]["ambiguity"]["schema"]
+            assert_object(assert_object(packet["discrimination"])["ambiguity"])[
+                "schema"
+            ]
             == "hashmarks.action-ambiguity.v2"
         )
     else:
-        assert packet["discrimination"]["ambiguity"] is None
+        assert assert_object(packet["discrimination"])["ambiguity"] is None
