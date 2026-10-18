@@ -77,6 +77,7 @@ COMPONENTS: dict[str, tuple[str, frozenset[str]]] = {
                 "RepositoryVerification",
                 "RepositoryRelationships",
                 "RepositoryContext",
+                "RepositoryDeclarations",
             }
         ),
     ),
@@ -198,6 +199,7 @@ FAMILY_MODULES = {
             "evidence_decision_packet",
             "task_evidence_retrieval",
             "task_evidence_scoped_method",
+            "task_evidence_fields",
             "configuration_evidence",
         )
     },

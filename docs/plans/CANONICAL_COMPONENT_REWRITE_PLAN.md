@@ -2905,6 +2905,12 @@ CR-35 configuration guard/wiring source review — 2026-10-18:
   Nominated test paths remain unqualified until their actual source relations
   are reviewed; three named test files do not exist before their changes.
   A complete same-candidate twelve-workflow acquisition follows.
+- An independent source-shape pass binds every one of the 66 selected lines to
+  its actual statement AST and containing declarations
+  (`backend-configuration-v1/source-ast-review.json`). Four are module-level
+  imports/alias/export facts and remain unscoped to a function. This checks
+  source context without inferring control-flow execution, runtime provider
+  identity or capability readiness from textual coincidence.
 - Test-source review records 17 exact test declarations across the twelve
   problems, with file/range hashes, imports, calls and assertion syntax
   (`backend-configuration-v1/test-source-review.json`). It distinguishes direct
@@ -2933,6 +2939,154 @@ CR-35 configuration guard/wiring source review — 2026-10-18:
   reuse canonical export/declaration binding proof for local data, preserve
   conditional/ambiguous bindings and avoid claiming runtime dispatch. No product
   change is mixed into the in-flight twelve-workflow qualification candidate.
+- Metadata-only holdout review checks each reserved commit against every admitted
+  same-repository revision without extracting or inspecting reserved source
+  (`backend-configuration-v1/holdout-metadata-review.json`). None is an ancestor
+  of this catalog's source revisions. Non-ancestry does not establish semantic
+  or task/oracle independence; all reservations remain unqualified. No hidden
+  holdout is inspected or promoted during product tuning.
+- Real captured source packets are independently attacked with wrong-before
+  revision, missing anchor, truncation, unknown line coverage, forged member/
+  line digest and wrong member path (`cr35-genuine-source-adversaries.json`).
+  Controls require the actual current packet to pass first; originals remain
+  untouched and every mutation must fail revision binding. This proves source
+  provenance/completeness rejection only, not runtime configuration semantics.
+  Missing workflow artifacts remain explicitly unobserved until acquisition
+  finishes; no partial adversarial population is counted complete.
+- Initial task-evidence audit exposes a separate product gap
+  (`cr35-task-sufficiency-audit.json`): actual default-provider task packets omit
+  the provider initializer/reference spelling, and the cached-yield task packet
+  omits the generator/cache guard. Caller-nominated extra source reads expose
+  these facts but do not prove their initial retrieval/composition. Do not turn
+  source-line acquisition success into 5/5 or flip initial-evidence eligibility.
+  A later generic observer repair must compose existing source/declaration facts
+  around admitted literal source locators, with exact provenance and bounded
+  omissions, preserving ownership/verification selection and the 4,000-token
+  bound. Prove the gap with a neutral public regression before implementing it.
+- The neutral public reduction now reproduces that gap with ordinary
+  `settings.py` / `providers.py` / `declarations.py`, without framework or oracle
+  filenames (`cr35-neutral-sufficiency/`). The literal source path is visible
+  and ownership is resolved, but the declared `default_factory` spelling is
+  absent from both full and decoded-initial task packets. The next production
+  repair can turn this exact reduction into an owning regression and compose
+  the existing backend-declaration observation around literal source locators.
+  Keep runtime binding unknown and keep selection authority with its existing
+  owner. The complete current-candidate workflow run remains unmodified.
+- Inspected composition explains the omission: Tasks' class-declaration stage
+  skips file-only locators and emits direct methods only. Generic annotated
+  class/default syntax already belongs to StaticPythonBackendDeclarations and
+  RepositoryDeclarations. Engine currently constructs Tasks before Declarations;
+  any composition change must preserve the documented one-way dependency map
+  and Source revision binding rather than instantiate a second analyzer/cache
+  or independently reinterpret the default initializer.
+
+CR-36 preserve caller-selected source anchors — 2026-10-18:
+
+- The complete source review finds a genuine hard failure: constructor metadata
+  requests six exact source anchors, but ordinary compact/text source-family
+  caps expose only five. Native and structured observations retain line 75;
+  compact/text CLI/MCP omit it. Four required source-presentation witnesses fail
+  (`cr35-source-witness-accounting.json`). The failed candidate and unchanged
+  source oracle remain retained; no required fact or check is removed.
+- Twelve neutral public regressions fail on the parent at requested-anchor
+  retention for 6/8/32 lines, both formats and competing literal matches
+  (`cr36-anchor-parent.xml`). Classification: REFACTOR INTERNALLY in the existing
+  evidence-presentation owner. Explicit source-member line requests use its
+  existing 48-row bound and retain requested anchors before separately bounded
+  literal matches. Source's own supported request bounds stay unchanged; all
+  supported 32 anchors fit. Non-explicit source ordering/caps and native source
+  facts, identities, freshness and uncertainty remain unchanged.
+- The first focused source/context ring passes 49 cases. This is a projection
+  repair, not a new source analyzer, general limit increase, repository-negative
+  claim or semantic-runtime interpretation. Fresh exact-artifact, type,
+  frozen-original test, transport and genuine-oracle requalification follow.
+- Exact projection candidate `cr36-source-anchor-projection/source.zip`, SHA-256
+  `67557fe8c2697cadb3e551a30c1126c46a7404bec09a414d59083bb50a30fe37`,
+  source identity
+  `sha256:48071785d7361338f4155e895fde3c01ea87874b09e1d778abc132df7dd74c7e`,
+  observer
+  `sha256:60afc9f52d69a54c6268ca7fa2a56123a362cd8be495b06771be535c520d0f18`,
+  passes 116 independent extracted source/presentation/initial/workflow tests
+  with zero skips (`cr36-anchor-extracted.xml`), plus current full Ty/Pyright.
+  The complete twelve-workflow CR-35 run is terminal FAIL: 1,698/1,698 required
+  source units observed, 1,694 PASS and four constructor line-75 compact/text
+  presentation witnesses FAIL. All twelve genuine source-binding adversary
+  sets reject their 84 mutations (`cr35-genuine-source-adversaries.json`).
+  The same unchanged reviewed corpus is reacquired on CR-36; old evidence is not
+  rebound and no failed check is removed.
+- All 104 exact frozen original source/presentation/initial tests pass over the
+  complete changed production tree, zero skips
+  (`cr36-original-source-tests-receipt.json`). Pure reprojection of the exact
+  retained CR-35 native packets passes all 210 required source display checks
+  across 72 stage/format observations (`cr36-retained-projection-recheck.json`),
+  preserving the original native packet identities. This is not substituted for
+  fresh transport acquisition; the same-candidate full corpus is running, with
+  a focused rerun of the previously failing constructor case also retained.
+- The fresh focused constructor rerun passes every admitted common and source
+  family gate on both revisions through API/CLI/official MCP
+  (`cr36-constructor-focused/summary.json`): all 159 required source witnesses
+  PASS, including the previously omitted line 75 in compact/text. Maximum
+  required task initial cost is 2,662 tokens. Aggregate remains INCOMPLETE for
+  the other eleven workflows and independent capability review. The complete
+  CR-36 twelve-workflow population continues separately; its observed receipts
+  are evidence only for completed units, never proof for the unfinished set.
+- The full twelve-workflow run is now terminal: every admitted common gate
+  passes, and all 1,698/1,698 required source witnesses PASS with zero missing
+  members (`cr36-source-witness-accounting.json`). Observer-free pure regrading
+  reproduces every outcome (`cr36-full-pure-regrade.json`). Aggregate remains
+  INCOMPLETE because independent semantic/capability reviews and initial-evidence
+  eligibility are still unresolved. These results remain bound to CR-36.
+
+CR-37 initial declared-field disclosure — 2026-10-18:
+
+- The retained genuine configuration audit and a neutral selected-file reduction
+  reproduce a missing initial source fact: a file-only locator is visible while
+  its annotated field's `default_factory`/provider reference is absent. Seven
+  public cases fail on the parent; denied/outline controls pass
+  (`cr37-field-parent-corrected.xml`). The parent source/test bytes are retained
+  in `cr37-field-parent/source.zip`; no corpus oracle or review flag is changed.
+- Classification: EXTRACT RESPONSIBILITY for task-local field disclosure,
+  composed from the existing declaration owner rather than another parser or
+  semantic graph. Tasks receives the canonical RepositoryDeclarations component
+  through an explicit same-read-scope constructor dependency. Its bounded
+  projection retains the existing static producer's values, exact field lines,
+  source revision, provider/repository qualification and unknown runtime
+  semantics. It changes no owner or selected verifier. Source-order class bounds
+  count omissions; unavailable or empty observations cannot establish absence.
+- A first affected run exposes a text projection omission; the native and
+  compact/structured packets contain the field facts but initial text does not.
+  The text owner now projects the same qualified context with its absolute
+  native pointer. Focused parity, privacy, reopen, provider bounds, exact-artifact
+  and genuine before/after qualification follow. This checkpoint does not claim
+  architecture acceptance, initial sufficiency or any capability at 5/5.
+- The frozen CR-37 artifact passes 192 independently extracted affected cases
+  and 142 exact unchanged predecessor tests, zero skips, with full configured
+  Ty/Pyright clean. Its genuine provider workflow is nevertheless FAIL:
+  source facts, authority, revisions and transports pass, but newly exposed
+  fields make required initial compact/text replies exceed 4,000 tokens
+  (`cr37-provider-genuine/summary.json`). This failure is retained. Architecture
+  locality observations also preserve unresolved orchestration/mixin call sites;
+  no locality completeness waiver is claimed.
+
+CR-38 bound initial field disclosure and preserve metadata — 2026-10-18:
+
+- Full packets keep all admitted declaration values. Tasks supplies a bounded
+  lexical field-name selection for the initial profile (three matching fields,
+  or source order when there is no match). The pure initial projector consumes
+  those indexes and records every excluded field plus original source indexes;
+  it changes no owner, verifier or source coverage. Empty observations add no
+  field supplement and do not establish absence.
+- Compact/text scopes retain the selected exact field records and readable
+  unknown/non-authority qualifiers. Explicit native metadata references preserve
+  the rest of each supplied mapping, including future fields, false, zero and
+  null. Independent consumer reconstruction and real CLI/MCP tests cover this
+  contract; no opaque presentation codec or repository-specific rank rule is
+  introduced. Source packet facts and qualification flags are not weakened.
+- The first focused run finds an unchanged-test regression: adding empty field
+  metadata unnecessarily changed an admitted owner row. Empty supplements are
+  now omitted, and unchanged initial rows are preserved when no field is
+  excluded. Current exact-artifact, full typing and genuine size qualification
+  follow; no initial-sufficiency or 5/5 claim is made at this checkpoint.
 
 Next work after this checkpoint:
 

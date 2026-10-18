@@ -146,3 +146,51 @@ def declaration_scopes_text(rows: Sequence[Mapping[str, Any]]) -> list[str]:
     for ref, context in contexts:
         lines.extend(declaration_scope_text(context, ref, shared=common))
     return lines
+
+
+def field_declaration_scope(context: Mapping[str, Any], ref: str) -> dict[str, Any]:
+    """Keep field records readable; reference their exact native metadata.
+
+    Each metadata_ref names the complete original mapping. Overlay the other
+    displayed keys to recover the supplied record; references never re-observe
+    source or qualify a claim. Unknown and future metadata remain recoverable.
+    """
+    groups = []
+    for index, group in enumerate(context.get("groups", [])):
+        group_ref = f"/groups/{index}"
+        value = group["value"]
+        groups.append(
+            {
+                "metadata_ref": group_ref,
+                "scope": group["scope"],
+                "semantic_value_authority": group["semantic_value_authority"],
+                "evidence_state": group["evidence_state"],
+                "value": {
+                    "metadata_ref": group_ref + "/value",
+                    "fields": value["fields"],
+                    "runtime_binding": value["runtime_binding"],
+                    "coverage": value["coverage"],
+                    "negative_evidence_admissible": value[
+                        "negative_evidence_admissible"
+                    ],
+                },
+            }
+        )
+    return {
+        "metadata_ref_base": ref,
+        "metadata_ref": "",
+        **{
+            key: context[key]
+            for key in (
+                "state",
+                "reason",
+                "coverage",
+                "source_revision",
+                "ownership_authority",
+                "negative_evidence_admissible",
+                "initial_field_projection",
+            )
+            if key in context
+        },
+        **({"groups": groups} if "groups" in context else {}),
+    }

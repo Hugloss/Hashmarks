@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from .find_engine import RepositorySearch
     from .ownership_graph import RepositoryOwnership
     from .repository_context import RepositoryContext
+    from .repository_declarations import RepositoryDeclarations
 
 
 class RepositoryTasks(
@@ -42,14 +43,17 @@ class RepositoryTasks(
         verification: RepositoryVerification,
         relationships: RepositoryRelationships,
         context: RepositoryContext,
+        *,
+        declarations: RepositoryDeclarations,
     ) -> None:
         if any(
             owner.reads is not search.reads
-            for owner in (ownership, verification, relationships, context)
+            for owner in (ownership, verification, relationships, context, declarations)
         ):
             raise ValueError("Task inputs must share one repository read scope")
         self.source = source = search.source
         self.context = context
+        self.declarations = declarations
         self.structure = ownership.structure
         self.search = search
         self.ownership = ownership

@@ -457,6 +457,48 @@ def _project_verification(
         }
 
 
+def _project_field_declarations(
+    rows: list[dict[str, Any]], omissions: dict[str, Any]
+) -> None:
+    for index, row in enumerate(rows):
+        context = row.get("field_declarations")
+        if not isinstance(context, dict) or "initial_field_selection" not in context:
+            continue
+        selected = context["initial_field_selection"]["fields"]
+        observed_fields = sum(
+            len(group["value"]["fields"]) for group in context["groups"]
+        )
+        if len(selected) == observed_fields:
+            continue
+        retained = []
+        for group_index, group in enumerate(context["groups"]):
+            fields = group["value"]["fields"]
+            chosen = [
+                field
+                for field_index, field in enumerate(fields)
+                if [group_index, field_index] in selected
+            ]
+            ref = f"/retrieval/results/{index}/field_declarations/groups/{group_index}/value/fields"
+            omissions["collections"][ref] = {
+                "observed_in_source_packet": len(fields),
+                "returned": len(chosen),
+                "omitted": len(fields) - len(chosen),
+            }
+            if chosen:
+                group["value"]["fields"] = chosen
+                retained.append(group)
+        context["groups"] = retained
+        context["initial_field_projection"] = {
+            "coverage": "projection-only",
+            "returned_groups": len(retained),
+            "returned_fields": len(selected),
+            "observed_fields": observed_fields,
+            "omitted_fields": observed_fields - len(selected),
+            "source_group_indexes": sorted({group for group, _ in selected}),
+            "source_field_indexes": selected,
+        }
+
+
 def initial_task_evidence(packet: Mapping[str, Any]) -> InitialTaskEvidenceProjection:
     """Project existing facts, retaining qualifiers and accounting for detail loss."""
     validate_operation_response("task_evidence", packet)
@@ -500,6 +542,7 @@ def initial_task_evidence(packet: Mapping[str, Any]) -> InitialTaskEvidenceProje
             retained.append(owner_row)
     retrieval["results"] = retained
     _encode_class_declarations(retained)
+    _project_field_declarations(retained, omissions)
     omissions["collections"]["/retrieval/results"] = {
         "observed_in_source_packet": len(rows),
         "returned": len(retained),

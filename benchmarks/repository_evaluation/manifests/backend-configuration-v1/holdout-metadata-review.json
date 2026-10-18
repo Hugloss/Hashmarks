@@ -1,0 +1,35 @@
+{
+  "qualification_effect": "none; no holdout promoted to unseen",
+  "results": [
+    {
+      "ancestor_of_admitted_sources": [],
+      "independence": "not-established",
+      "reason": "non-ancestry alone does not prove semantic/task independence",
+      "repository": "fastapi",
+      "reserved_commit": "7bcb78d10d818b05791a34b41d6e84f0e8871013",
+      "reserved_tree_extracted": false,
+      "source_content_inspected": false
+    },
+    {
+      "ancestor_of_admitted_sources": [],
+      "independence": "not-established",
+      "reason": "non-ancestry alone does not prove semantic/task independence",
+      "repository": "litestar",
+      "reserved_commit": "dadb6d168f442fdce0e866f12dfe62cf2baaec68",
+      "reserved_tree_extracted": false,
+      "source_content_inspected": false
+    },
+    {
+      "ancestor_of_admitted_sources": [],
+      "independence": "not-established",
+      "reason": "non-ancestry alone does not prove semantic/task independence",
+      "repository": "faststream",
+      "reserved_commit": "590a4cde76a02d08bb0eef32345ddffdb8632f27",
+      "reserved_tree_extracted": false,
+      "source_content_inspected": false
+    }
+  ],
+  "schema": "hashmarks.configuration-holdout-metadata-audit.v1",
+  "scope": "commit-ancestry metadata only; no reserved source/change inspection, extraction or execution",
+  "status": "INCOMPLETE"
+}

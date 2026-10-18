@@ -29,6 +29,7 @@ from .task_evidence_discrimination import (
     STRUCTURAL_SELECTION_BASIS,
     select_task_evidence_discrimination_candidate,
 )
+from .task_evidence_fields import TaskEvidenceFieldsMixin
 from .task_evidence_retrieval import TaskEvidenceRetrievalMixin
 from .task_evidence_scoped_method import TaskEvidenceScopedMethodMixin
 from .task_evidence_types import SourceReadPending
@@ -106,6 +107,7 @@ class _TaskEvidenceRange:
 class TaskEvidencePacketMixin(
     TaskEvidenceRetrievalMixin,
     TaskEvidenceScopedMethodMixin,
+    TaskEvidenceFieldsMixin,
     ConfigurationEvidenceMixin,
     DecisionPacketMixin,
     ReadScopeOwner,

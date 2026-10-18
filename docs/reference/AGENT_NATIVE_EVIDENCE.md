@@ -84,6 +84,11 @@ Unsupported schemas return explicit unsupported coverage. Malformed required
 collections fail clearly. Empty text says “No displayed findings in this
 projection”; it never claims repository absence.
 
+Explicit source-member line requests use the existing 48-row presentation
+bound in every format. Their producer-bounded anchors precede literal matches,
+so all supported requested lines remain visible even when literal matches fill
+the display. This changes no source qualification or negative-evidence rule.
+
 Initial compact verification groups can share repeated qualifier combinations
 through `qualifier_columns` and `qualifier_sets`. A finding's `details.qualifiers`
 is an index into that group's sets; zip its selected set with the declared
@@ -146,6 +151,37 @@ containing owner path. An ambiguous candidate/next-read is a
 remains a producer claim. The complete native ownership/verification records
 remain visible in the original result. All projections preserve source
 pointers, current freshness and their producer-owned qualifications.
+
+For a task that explicitly names a current source-visible Python file, its
+retrieval row also carries `field_declarations`. Tasks borrows the canonical
+RepositoryDeclarations owner and its built-in static Python producer; it does
+not parse fields independently. The first three classes with annotated fields
+appear in source order, with observed/returned/omitted class counts. Each value
+retains the producer's supported annotations, initializer references, source
+lines, unknown runtime binding, incomplete semantic coverage and unresolved
+correspondence. The source revision, repository qualification, provider
+provenance and originating discovery identity remain attached. Empty syntax
+does not establish absence; provider failure yields unavailable disclosure with
+incomplete coverage. Outline/denied files disclose no field values.
+
+The initial profile retains at most three fields from those source groups.
+Tasks supplies a lexical field-name selection: matching task terms first, or
+source order when no field name matches. This is disclosure relevance only.
+Full packets retain all admitted fields; initial omissions count excluded
+fields and retain their original group/field indexes. Coverage stays incomplete
+and exclusions never establish absent declarations. Existing owner and verifier
+facts are preserved independently of this bound.
+
+Initial compact/text field scopes keep the selected field records readable.
+`metadata_ref_base` names their scope in the decoded native packet; a
+`metadata_ref` is a JSON pointer relative to that base. Recover each complete
+mapping from that exact reference and overlay its displayed keys, recursively
+for groups and values. Repository/provider qualifications and future metadata
+remain in the native packet; source revision, incomplete coverage and the
+non-authoritative/runtime-unknown qualifiers remain readable. This representation
+performs no source read and changes no supplied fact. This
+supplement changes no owner or verification selection and acquires no runtime
+configuration or execution authority.
 
 ### Qualified owner labels must match producer proof
 

@@ -263,6 +263,21 @@ def compact_initial_groups(groups: list[dict[str, Any]]) -> None:
                 finding.pop("source_context", None)
 
 
+def _compact_initial_field_declarations(groups: list[dict[str, Any]]) -> None:
+    from hashmarks.evidence_declaration_text import field_declaration_scope
+
+    for group in groups:
+        if group["family"] != "retrieval_evidence":
+            continue
+        for finding in group["findings"]:
+            details = finding.get("details", {})
+            fields = details.get("field_declarations")
+            if isinstance(fields, dict):
+                details["field_declarations"] = field_declaration_scope(
+                    fields, finding["source_refs"][0] + "/field_declarations"
+                )
+
+
 def compact_initial_declarations(groups: list[dict[str, Any]]) -> None:
     """Render lexical scopes once; the native packet retains the exact records."""
     from hashmarks.evidence_declaration_text import (
@@ -270,6 +285,7 @@ def compact_initial_declarations(groups: list[dict[str, Any]]) -> None:
         declaration_scope_table,
     )
 
+    _compact_initial_field_declarations(groups)
     for group in groups:
         if group["family"] != "retrieval_evidence":
             continue
@@ -453,6 +469,7 @@ def project_initial_task(
                 "same_name_declarations",
                 "direct_call_declarations",
                 "supplement",
+                "field_declarations",
             )
             if key in row
         }
@@ -489,6 +506,26 @@ def project_initial_task(
                 {},
                 assertion="producer_claim",
             )
+
+
+def _initial_field_declarations_text(rows: list[dict[str, Any]]) -> list[str]:
+    from hashmarks.evidence_declaration_text import field_declaration_scope
+
+    return [
+        "Declared field syntax @ /retrieval/results/"
+        + str(index)
+        + "/field_declarations: "
+        + json.dumps(
+            field_declaration_scope(
+                row["field_declarations"],
+                f"/retrieval/results/{index}/field_declarations",
+            ),
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        for index, row in enumerate(rows)
+        if isinstance(row.get("field_declarations"), Mapping)
+    ]
 
 
 def initial_evidence_text(packet: Mapping[str, object]) -> str:
@@ -528,6 +565,7 @@ def initial_evidence_text(packet: Mapping[str, object]) -> str:
             f"Source candidate: {row['path']}::{row.get('symbol', row.get('qualname', ''))} ({row.get('start_line', 'unknown')}:{row.get('end_line', 'unknown')}; basis: {row.get('supplement', 'canonical-retrieval')}; @ /retrieval/results/{index})."
         )
     lines.extend(declaration_scopes_text(retrieval.get("results", [])))
+    lines.extend(_initial_field_declarations_text(retrieval.get("results", [])))
     lines.extend(initial_semantic_relationship_text(packet))
     relevance = verification.get("relevance")
     if isinstance(relevance, Mapping):

@@ -253,6 +253,7 @@ class RetrievalLocator(TypedDict):
     class_declarations: NotRequired[Mapping[str, object]]
     same_name_declarations: NotRequired[Mapping[str, object]]
     direct_call_declarations: NotRequired[Mapping[str, object]]
+    field_declarations: NotRequired[Mapping[str, object]]
 
 
 class TaskRetrievalDraftBounds(TaskActionBounds):

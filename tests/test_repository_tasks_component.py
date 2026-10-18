@@ -12,6 +12,8 @@ from hashmarks.codemap.context_cache import ContextCache
 from hashmarks.codemap.evidence_verification import RepositoryVerification
 from hashmarks.codemap.indexing_lifecycle import RepositoryIndex
 from hashmarks.codemap.repository_context import RepositoryContext
+from hashmarks.codemap.repository_declarations import RepositoryDeclarations
+from hashmarks.codemap.repository_evidence_bindings import RepositoryBindings
 from hashmarks.codemap.repository_tasks import RepositoryTasks
 from hashmarks.codemap.task_action_types import (
     _TaskActionMapContext,
@@ -35,6 +37,7 @@ def tasks(index: RepositoryIndex) -> Iterator[RepositoryTasks]:
             verification,
             ownership.structure.relationships,
             context,
+            declarations=RepositoryDeclarations(RepositoryBindings(ownership.source)),
         )
     finally:
         cache.close()

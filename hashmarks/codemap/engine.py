@@ -179,16 +179,17 @@ class CodeMap:
             self.source, self._imports, self.structure, self.search
         )
         self._verification = RepositoryVerification(self._imports)
+        self._bindings = RepositoryBindings(self.source)
+        self._declarations = RepositoryDeclarations(self.bindings)
         self._tasks = RepositoryTasks(
             self.search,
             self.ownership,
             self.verification,
             self.relationships,
             self.context,
+            declarations=self.declarations,
         )
-        self._bindings = RepositoryBindings(self.source)
         self._correlation = RepositoryCorrelation(self.bindings)
-        self._declarations = RepositoryDeclarations(self.bindings)
         self._dependencies = RepositoryDependencies(
             self.source, self._imports, self.correlation
         )

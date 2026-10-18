@@ -57,6 +57,9 @@ metadata fields. Primary upstream commit subjects and distinct triggering
 conditions are recorded. Every prior task, source, assertion and review flag
 is preserved. This source-level review does not establish causal test relevance,
 runtime behavior, holdout independence or complete capability qualification.
+`source-ast-review.json` additionally binds all 66 lines to their containing
+declarations and statement ASTs. Module-level imports and the marker alias
+remain module-level facts; enclosing source scope is not runtime reachability.
 
 `test-source-review.json` records exact declarations, imports, calls and
 assertions for nominated or source-related tests on each revision. It keeps
@@ -84,3 +87,7 @@ extracted by this intake, and source exposure has not been audited. They do not
 establish unseen holdout independence. Perform contamination and independent
 oracle review before admitting them as final holdouts; replacements may be
 required.
+`holdout-metadata-review.json` checks commit ancestry without reading reserved
+source. None of the three nominated commits is an ancestor of this catalog's
+admitted source revisions. That does not prove semantic or task/oracle
+independence; all three remain unqualified holdout nominations.

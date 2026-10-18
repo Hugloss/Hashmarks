@@ -710,6 +710,9 @@ def _source(
     ref: tuple[object, ...],
     ctx: Mapping[str, object],
 ) -> None:
+    if packet.get("requested_lines"):
+        # Explicit line targets precede separately bounded literal matches.
+        p.field(packet, "line_anchors", "source", ref, ctx)
     _fields(
         p,
         packet,
@@ -718,7 +721,16 @@ def _source(
         (
             ("occurrences", "source", "records"),
             ("literal_observations", "qualification", "records"),
-            ("line_anchors", "source", "records"),
+        ),
+    )
+    if not packet.get("requested_lines"):
+        p.field(packet, "line_anchors", "source", ref, ctx)
+    _fields(
+        p,
+        packet,
+        ref,
+        ctx,
+        (
             ("member", "source", "record"),
             ("member_observations", "source", "records"),
             ("source_shape", "evidence_measurement", "record"),
@@ -1472,7 +1484,14 @@ def present_repository_evidence(
         packet = decode_initial_packet(dict(packet))
     # Initial collections are already bounded by their producer. A second cap
     # must not hide the relevant verifier or an admitted owner alternative.
-    limit = _MAX_PRESENTED_ROWS if initial or format == "structured" else 5
+    explicit_source_lines = packet.get("schema") == operation_schema(
+        "source_observation", "member"
+    ) and bool(packet.get("requested_lines"))
+    limit = (
+        _MAX_PRESENTED_ROWS
+        if initial or explicit_source_lines or format == "structured"
+        else 5
+    )
     projection = _Projection(limit)
     supported = projection.project(packet)
     groups = [

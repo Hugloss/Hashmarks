@@ -1,0 +1,1018 @@
+{
+  "facts": [
+    {
+      "enclosing_declarations": [],
+      "file_sha256": "055a6a9f976e96c31820cc53b9543df738e68043333ebdd03807295a9e36aa1c",
+      "id": "faststream-default-dependency-provider",
+      "line": 6,
+      "path": "faststream/_internal/di/config.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:304dca377bccb9f0049721f3827c5e778ea8825fcd7f51a16141f9a582adb997:1805",
+      "source_line_sha256": "88aa05bc3b232a6df6d67a5f27a8cb324c3c6e099402bec974d7c55e9b1c24af",
+      "stage": "after",
+      "statement_ast": "ImportFrom(module='fast_depends', names=[alias(name='Provider'), alias(name='dependency_provider')], level=0)",
+      "statement_kind": "ImportFrom"
+    },
+    {
+      "enclosing_declarations": [
+        "FastDependsConfig"
+      ],
+      "file_sha256": "055a6a9f976e96c31820cc53b9543df738e68043333ebdd03807295a9e36aa1c",
+      "id": "faststream-default-dependency-provider",
+      "line": 33,
+      "path": "faststream/_internal/di/config.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:304dca377bccb9f0049721f3827c5e778ea8825fcd7f51a16141f9a582adb997:1805",
+      "source_line_sha256": "f83de071ee9e739e8bfaedaf73293f3488d89a7527f370d297e1c128fff2ab2d",
+      "stage": "after",
+      "statement_ast": "AnnAssign(target=Name(id='provider', ctx=Store()), annotation=Constant(value='Provider'), value=Call(func=Name(id='field', ctx=Load()), args=[], keywords=[keyword(arg='default', value=Name(id='dependency_provider', ctx=Load()))]), simple=1)",
+      "statement_kind": "AnnAssign"
+    },
+    {
+      "enclosing_declarations": [],
+      "file_sha256": "0a0cc38fc7d1b94f49a489f8593af4e2b08613857601ac3bed6f13f78d16cb6e",
+      "id": "faststream-default-dependency-provider",
+      "line": 6,
+      "path": "faststream/_internal/di/config.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:c4cb762edd886f95f8c113da3c3a28a6c2f3b0dbcde5160d87b69e1a6d95d315:1805",
+      "source_line_sha256": "ad00a0b1cff385789c742120baad69a40868d52340d38b79f6de3d6d16a691d2",
+      "stage": "before",
+      "statement_ast": "ImportFrom(module='fast_depends', names=[alias(name='Provider')], level=0)",
+      "statement_kind": "ImportFrom"
+    },
+    {
+      "enclosing_declarations": [
+        "FastDependsConfig"
+      ],
+      "file_sha256": "0a0cc38fc7d1b94f49a489f8593af4e2b08613857601ac3bed6f13f78d16cb6e",
+      "id": "faststream-default-dependency-provider",
+      "line": 33,
+      "path": "faststream/_internal/di/config.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:c4cb762edd886f95f8c113da3c3a28a6c2f3b0dbcde5160d87b69e1a6d95d315:1805",
+      "source_line_sha256": "6af08d10f2c77bef329b5aa6dc8cb86fc32ec7f6564668bc0616a00f4b0116e7",
+      "stage": "before",
+      "statement_ast": "AnnAssign(target=Name(id='provider', ctx=Store()), annotation=Constant(value='Provider'), value=Call(func=Name(id='field', ctx=Load()), args=[], keywords=[keyword(arg='default_factory', value=Name(id='Provider', ctx=Load()))]), simple=1)",
+      "statement_kind": "AnnAssign"
+    },
+    {
+      "enclosing_declarations": [
+        "get_flat_params"
+      ],
+      "file_sha256": "95ad496b3661dd77c94d610034710857aa8b69660fd8caa79541764871081624",
+      "id": "fastapi-request-parameter-dependency-flattening",
+      "line": 252,
+      "path": "fastapi/dependencies/utils.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:47b72c06253a9f104581110f7106eb8d2ee332d1d4daee640dd58938c2a1b5ec:3131",
+      "source_line_sha256": "9688abb1853a0e94707d35c56bca4c27c25ccf39d4f3f695b1d6ff9a6b112ee8",
+      "stage": "after",
+      "statement_ast": "While(test=Name(id='dependants', ctx=Load()), body=[Assign(targets=[Name(id='current_dependant', ctx=Store())], value=Call(func=Attribute(value=Name(id='dependants', ctx=Load()), attr='pop', ctx=Load()), args=[], keywords=[])), Assign(targets=[Name(id='cache_key', ctx=Store())], value=Call(func=Name(id='_get_cache_key', ctx=Load()), args=[], keywords=[keyword(arg='dependant', value=Name(id='current_dependant', ctx=Load())), keyword(arg='uses_scopes_cache', value=Name(id='uses_scopes_cache', ctx=Load()))])), If(test=Compare(left=Name(id='cache_key', ctx=Load()), ops=[In()], comparators=[Name(id='visited', ctx=Load())]), body=[Continue()], orelse=[]), Expr(value=Call(func=Attribute(value=Name(id='visited', ctx=Load()), attr='append', ctx=Load()), args=[Name(id='cache_key', ctx=Load())], keywords=[])), Expr(value=Call(func=Attribute(value=Name(id='path_params', ctx=Load()), attr='extend', ctx=Load()), args=[Attribute(value=Name(id='current_dependant', ctx=Load()), attr='path_params', ctx=Load())], keywords=[])), Expr(value=Call(func=Attribute(value=Name(id='query_params', ctx=Load()), attr='extend', ctx=Load()), args=[Attribute(value=Name(id='current_dependant', ctx=Load()), attr='query_params', ctx=Load())], keywords=[])), Expr(value=Call(func=Attribute(value=Name(id='header_params', ctx=Load()), attr='extend', ctx=Load()), args=[Attribute(value=Name(id='current_dependant', ctx=Load()), attr='header_params', ctx=Load())], keywords=[])), Expr(value=Call(func=Attribute(value=Name(id='cookie_params', ctx=Load()), attr='extend', ctx=Load()), args=[Attribute(value=Name(id='current_dependant', ctx=Load()), attr='cookie_params', ctx=Load())], keywords=[])), Expr(value=Call(func=Attribute(value=Name(id='dependants', ctx=Load()), attr='extend', ctx=Load()), args=[Call(func=Name(id='reversed', ctx=Load()), args=[Attribute(value=Name(id='current_dependant', ctx=Load()), attr='dependencies', ctx=Load())], keywords=[])], keywords=[]))], orelse=[])",
+      "statement_kind": "While"
+    },
+    {
+      "enclosing_declarations": [
+        "get_flat_params"
+      ],
+      "file_sha256": "95ad496b3661dd77c94d610034710857aa8b69660fd8caa79541764871081624",
+      "id": "fastapi-request-parameter-dependency-flattening",
+      "line": 258,
+      "path": "fastapi/dependencies/utils.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:47b72c06253a9f104581110f7106eb8d2ee332d1d4daee640dd58938c2a1b5ec:3131",
+      "source_line_sha256": "db5586e20dabe1d2395d46ff8810dfcc122f4618851b9a14937753275151db3e",
+      "stage": "after",
+      "statement_ast": "If(test=Compare(left=Name(id='cache_key', ctx=Load()), ops=[In()], comparators=[Name(id='visited', ctx=Load())]), body=[Continue()], orelse=[])",
+      "statement_kind": "If"
+    },
+    {
+      "enclosing_declarations": [
+        "get_flat_params"
+      ],
+      "file_sha256": "95ad496b3661dd77c94d610034710857aa8b69660fd8caa79541764871081624",
+      "id": "fastapi-request-parameter-dependency-flattening",
+      "line": 261,
+      "path": "fastapi/dependencies/utils.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:47b72c06253a9f104581110f7106eb8d2ee332d1d4daee640dd58938c2a1b5ec:3131",
+      "source_line_sha256": "a24ca85ad74aa67bb9411c524cce4b2e9cf0cf67bb77f00b966d9c392a1102b0",
+      "stage": "after",
+      "statement_ast": "Expr(value=Call(func=Attribute(value=Name(id='path_params', ctx=Load()), attr='extend', ctx=Load()), args=[Attribute(value=Name(id='current_dependant', ctx=Load()), attr='path_params', ctx=Load())], keywords=[]))",
+      "statement_kind": "Expr"
+    },
+    {
+      "enclosing_declarations": [
+        "get_flat_params"
+      ],
+      "file_sha256": "95ad496b3661dd77c94d610034710857aa8b69660fd8caa79541764871081624",
+      "id": "fastapi-request-parameter-dependency-flattening",
+      "line": 265,
+      "path": "fastapi/dependencies/utils.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:47b72c06253a9f104581110f7106eb8d2ee332d1d4daee640dd58938c2a1b5ec:3131",
+      "source_line_sha256": "e084ec25b9151f62824c23be8f108d79f0dd080c59e00615e5991edbc96dff24",
+      "stage": "after",
+      "statement_ast": "Expr(value=Call(func=Attribute(value=Name(id='dependants', ctx=Load()), attr='extend', ctx=Load()), args=[Call(func=Name(id='reversed', ctx=Load()), args=[Attribute(value=Name(id='current_dependant', ctx=Load()), attr='dependencies', ctx=Load())], keywords=[])], keywords=[]))",
+      "statement_kind": "Expr"
+    },
+    {
+      "enclosing_declarations": [
+        "get_flat_params"
+      ],
+      "file_sha256": "95ad496b3661dd77c94d610034710857aa8b69660fd8caa79541764871081624",
+      "id": "fastapi-request-parameter-dependency-flattening",
+      "line": 270,
+      "path": "fastapi/dependencies/utils.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:47b72c06253a9f104581110f7106eb8d2ee332d1d4daee640dd58938c2a1b5ec:3131",
+      "source_line_sha256": "9810879cc7bfb7432f68a899861af976467ae55c264883295b0040fd718c7634",
+      "stage": "after",
+      "statement_ast": "Return(value=BinOp(left=BinOp(left=BinOp(left=Name(id='path_params', ctx=Load()), op=Add(), right=Name(id='query_params', ctx=Load())), op=Add(), right=Name(id='header_params', ctx=Load())), op=Add(), right=Name(id='cookie_params', ctx=Load())))",
+      "statement_kind": "Return"
+    },
+    {
+      "enclosing_declarations": [
+        "get_flat_params"
+      ],
+      "file_sha256": "f226d7d5062e705d687795eeabb0f920d5376ac7c30bd8f974f6f788d40b9de6",
+      "id": "fastapi-request-parameter-dependency-flattening",
+      "line": 245,
+      "path": "fastapi/dependencies/utils.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:052a027a13065cadc21fb0538fb8ff106ba03e0c2e61adc5c18262354c59ff42:3131",
+      "source_line_sha256": "959785ac915fbd19eee44dd6ad93f5339b27fb345403132566f1afc9eab95d0e",
+      "stage": "before",
+      "statement_ast": "Assign(targets=[Name(id='flat_dependant', ctx=Store())], value=Call(func=Name(id='get_flat_dependant', ctx=Load()), args=[Name(id='dependant', ctx=Load())], keywords=[keyword(arg='skip_repeats', value=Constant(value=True))]))",
+      "statement_kind": "Assign"
+    },
+    {
+      "enclosing_declarations": [
+        "get_flat_params"
+      ],
+      "file_sha256": "f226d7d5062e705d687795eeabb0f920d5376ac7c30bd8f974f6f788d40b9de6",
+      "id": "fastapi-request-parameter-dependency-flattening",
+      "line": 250,
+      "path": "fastapi/dependencies/utils.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:052a027a13065cadc21fb0538fb8ff106ba03e0c2e61adc5c18262354c59ff42:3131",
+      "source_line_sha256": "9810879cc7bfb7432f68a899861af976467ae55c264883295b0040fd718c7634",
+      "stage": "before",
+      "statement_ast": "Return(value=BinOp(left=BinOp(left=BinOp(left=Name(id='path_params', ctx=Load()), op=Add(), right=Name(id='query_params', ctx=Load())), op=Add(), right=Name(id='header_params', ctx=Load())), op=Add(), right=Name(id='cookie_params', ctx=Load())))",
+      "statement_kind": "Return"
+    },
+    {
+      "enclosing_declarations": [
+        "Provide",
+        "Provide.__init__"
+      ],
+      "file_sha256": "b785ed3aef69bbc0bcb9257e956adb90a2bfe592ac6b2527f989330e4a2545ff",
+      "id": "litestar-bound-method-providers",
+      "line": 62,
+      "path": "litestar/di.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:edd889b011e42bd9e52a75c8ec9882f12ef3793a500e83580f1ad502d2d21974:1403",
+      "source_line_sha256": "d90f6c0058f1d89a434245df69edd5a0ddf8d346ec0a10318afd9a17ad1bbdc4",
+      "stage": "after",
+      "statement_ast": "Assign(targets=[Name(id='is_method', ctx=Store())], value=Call(func=Name(id='ismethod', ctx=Load()), args=[Name(id='dependency', ctx=Load())], keywords=[]))",
+      "statement_kind": "Assign"
+    },
+    {
+      "enclosing_declarations": [
+        "Provide",
+        "Provide.__init__"
+      ],
+      "file_sha256": "b785ed3aef69bbc0bcb9257e956adb90a2bfe592ac6b2527f989330e4a2545ff",
+      "id": "litestar-bound-method-providers",
+      "line": 63,
+      "path": "litestar/di.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:edd889b011e42bd9e52a75c8ec9882f12ef3793a500e83580f1ad502d2d21974:1403",
+      "source_line_sha256": "531be0c26f4494822cd5a5503242768e358eefed1f1d458fe6f7a0a7cb91c287",
+      "stage": "after",
+      "statement_ast": "Assign(targets=[Name(id='is_callable_instance', ctx=Store())], value=BoolOp(op=And(), values=[UnaryOp(op=Not(), operand=Name(id='is_class_dependency', ctx=Load())), UnaryOp(op=Not(), operand=Name(id='is_function', ctx=Load())), UnaryOp(op=Not(), operand=Name(id='is_method', ctx=Load()))]))",
+      "statement_kind": "Assign"
+    },
+    {
+      "enclosing_declarations": [
+        "Provide",
+        "Provide.__init__"
+      ],
+      "file_sha256": "b785ed3aef69bbc0bcb9257e956adb90a2bfe592ac6b2527f989330e4a2545ff",
+      "id": "litestar-bound-method-providers",
+      "line": 65,
+      "path": "litestar/di.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:edd889b011e42bd9e52a75c8ec9882f12ef3793a500e83580f1ad502d2d21974:1403",
+      "source_line_sha256": "43702e10318132ae4cea60ccfac8f91942e8cd476113c45ac24324fdca06a422",
+      "stage": "after",
+      "statement_ast": "Assign(targets=[Name(id='check_target', ctx=Store())], value=Attribute(value=Name(id='dependency', ctx=Load()), attr='__call__', ctx=Load()))",
+      "statement_kind": "Assign"
+    },
+    {
+      "enclosing_declarations": [
+        "Provide",
+        "Provide.__init__"
+      ],
+      "file_sha256": "5319d47c1cefe8c55d82a0c83ff94d612c5daf262ea6f3d5a77602bba8b76c77",
+      "id": "litestar-bound-method-providers",
+      "line": 62,
+      "path": "litestar/di.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:66c7bca48ddeecdaf7986b96f5196023a1415aa81e3b7a298bde5d5df96a1d2c:1403",
+      "source_line_sha256": "a19528a0cf47985af6dd254911cec31525c9553a09cd4255bf2e872195d31113",
+      "stage": "before",
+      "statement_ast": "Assign(targets=[Name(id='is_callable_instance', ctx=Store())], value=BoolOp(op=And(), values=[UnaryOp(op=Not(), operand=Name(id='is_class_dependency', ctx=Load())), UnaryOp(op=Not(), operand=Name(id='is_function', ctx=Load()))]))",
+      "statement_kind": "Assign"
+    },
+    {
+      "enclosing_declarations": [
+        "Provide",
+        "Provide.__init__"
+      ],
+      "file_sha256": "5319d47c1cefe8c55d82a0c83ff94d612c5daf262ea6f3d5a77602bba8b76c77",
+      "id": "litestar-bound-method-providers",
+      "line": 64,
+      "path": "litestar/di.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:66c7bca48ddeecdaf7986b96f5196023a1415aa81e3b7a298bde5d5df96a1d2c:1403",
+      "source_line_sha256": "43702e10318132ae4cea60ccfac8f91942e8cd476113c45ac24324fdca06a422",
+      "stage": "before",
+      "statement_ast": "Assign(targets=[Name(id='check_target', ctx=Store())], value=Attribute(value=Name(id='dependency', ctx=Load()), attr='__call__', ctx=Load()))",
+      "statement_kind": "Assign"
+    },
+    {
+      "enclosing_declarations": [
+        "Provide",
+        "Provide.__init__"
+      ],
+      "file_sha256": "5319d47c1cefe8c55d82a0c83ff94d612c5daf262ea6f3d5a77602bba8b76c77",
+      "id": "litestar-stateful-callable-cleanup",
+      "line": 62,
+      "path": "litestar/di.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:28abe2f79328bb9b935d56a0c72f3fe973fc87918dd2c2d6a654c9d1825f5fa6:1400",
+      "source_line_sha256": "a19528a0cf47985af6dd254911cec31525c9553a09cd4255bf2e872195d31113",
+      "stage": "after",
+      "statement_ast": "Assign(targets=[Name(id='is_callable_instance', ctx=Store())], value=BoolOp(op=And(), values=[UnaryOp(op=Not(), operand=Name(id='is_class_dependency', ctx=Load())), UnaryOp(op=Not(), operand=Name(id='is_function', ctx=Load()))]))",
+      "statement_kind": "Assign"
+    },
+    {
+      "enclosing_declarations": [
+        "Provide",
+        "Provide.__init__"
+      ],
+      "file_sha256": "5319d47c1cefe8c55d82a0c83ff94d612c5daf262ea6f3d5a77602bba8b76c77",
+      "id": "litestar-stateful-callable-cleanup",
+      "line": 63,
+      "path": "litestar/di.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:28abe2f79328bb9b935d56a0c72f3fe973fc87918dd2c2d6a654c9d1825f5fa6:1400",
+      "source_line_sha256": "4d2208acae518136555c298b8ec6fd43feba2d69bb0918c9c67592ca0ab7ff93",
+      "stage": "after",
+      "statement_ast": "If(test=BoolOp(op=Or(), values=[Name(id='is_class_dependency', ctx=Load()), Name(id='is_callable_instance', ctx=Load())]), body=[Assign(targets=[Name(id='check_target', ctx=Store())], value=Attribute(value=Name(id='dependency', ctx=Load()), attr='__call__', ctx=Load()))], orelse=[Assign(targets=[Name(id='check_target', ctx=Store())], value=Name(id='dependency', ctx=Load()))])",
+      "statement_kind": "If"
+    },
+    {
+      "enclosing_declarations": [
+        "Provide",
+        "Provide.__init__"
+      ],
+      "file_sha256": "5319d47c1cefe8c55d82a0c83ff94d612c5daf262ea6f3d5a77602bba8b76c77",
+      "id": "litestar-stateful-callable-cleanup",
+      "line": 64,
+      "path": "litestar/di.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:28abe2f79328bb9b935d56a0c72f3fe973fc87918dd2c2d6a654c9d1825f5fa6:1400",
+      "source_line_sha256": "43702e10318132ae4cea60ccfac8f91942e8cd476113c45ac24324fdca06a422",
+      "stage": "after",
+      "statement_ast": "Assign(targets=[Name(id='check_target', ctx=Store())], value=Attribute(value=Name(id='dependency', ctx=Load()), attr='__call__', ctx=Load()))",
+      "statement_kind": "Assign"
+    },
+    {
+      "enclosing_declarations": [
+        "Provide",
+        "Provide.__init__"
+      ],
+      "file_sha256": "5319d47c1cefe8c55d82a0c83ff94d612c5daf262ea6f3d5a77602bba8b76c77",
+      "id": "litestar-stateful-callable-cleanup",
+      "line": 66,
+      "path": "litestar/di.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:28abe2f79328bb9b935d56a0c72f3fe973fc87918dd2c2d6a654c9d1825f5fa6:1400",
+      "source_line_sha256": "9f35467ecaf893100a2319fedf001eac8b177043e87fd7fc72785b94d6e452bd",
+      "stage": "after",
+      "statement_ast": "Assign(targets=[Name(id='check_target', ctx=Store())], value=Name(id='dependency', ctx=Load()))",
+      "statement_kind": "Assign"
+    },
+    {
+      "enclosing_declarations": [
+        "Provide",
+        "Provide.__init__"
+      ],
+      "file_sha256": "bdba46b06a37723b80968d39f079c9e85c59679f599ea1df1a07aa26e7c50a20",
+      "id": "litestar-stateful-callable-cleanup",
+      "line": 62,
+      "path": "litestar/di.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:b039ebe88f1910eaf21579358c16903163cc4e1b0d09adbf566429e2619cdbac:1400",
+      "source_line_sha256": "51b6fd92c468cae8d0074e888fc7c67bb38a3e327b77dd541fa139e740fc54a2",
+      "stage": "before",
+      "statement_ast": "Assign(targets=[Attribute(value=Name(id='self', ctx=Load()), attr='has_sync_generator_dependency', ctx=Store())], value=Call(func=Name(id='isgeneratorfunction', ctx=Load()), args=[IfExp(test=UnaryOp(op=Not(), operand=Name(id='is_class_dependency', ctx=Load())), body=Name(id='dependency', ctx=Load()), orelse=Attribute(value=Name(id='dependency', ctx=Load()), attr='__call__', ctx=Load()))], keywords=[]))",
+      "statement_kind": "Assign"
+    },
+    {
+      "enclosing_declarations": [
+        "Provide",
+        "Provide.__init__"
+      ],
+      "file_sha256": "bdba46b06a37723b80968d39f079c9e85c59679f599ea1df1a07aa26e7c50a20",
+      "id": "litestar-stateful-callable-cleanup",
+      "line": 65,
+      "path": "litestar/di.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:b039ebe88f1910eaf21579358c16903163cc4e1b0d09adbf566429e2619cdbac:1400",
+      "source_line_sha256": "51b6fd92c468cae8d0074e888fc7c67bb38a3e327b77dd541fa139e740fc54a2",
+      "stage": "before",
+      "statement_ast": "Assign(targets=[Attribute(value=Name(id='self', ctx=Load()), attr='has_async_generator_dependency', ctx=Store())], value=Call(func=Name(id='isasyncgenfunction', ctx=Load()), args=[IfExp(test=UnaryOp(op=Not(), operand=Name(id='is_class_dependency', ctx=Load())), body=Name(id='dependency', ctx=Load()), orelse=Attribute(value=Name(id='dependency', ctx=Load()), attr='__call__', ctx=Load()))], keywords=[]))",
+      "statement_kind": "Assign"
+    },
+    {
+      "enclosing_declarations": [
+        "_get_flat_body_params"
+      ],
+      "file_sha256": "f226d7d5062e705d687795eeabb0f920d5376ac7c30bd8f974f6f788d40b9de6",
+      "id": "fastapi-body-dependency-flattening",
+      "line": 227,
+      "path": "fastapi/dependencies/utils.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:81a185020a65044497f5d5ba9560543d11b1bbeebcad623d73c4fbb905f2a3aa:3131",
+      "source_line_sha256": "f4299bcae846ae2b263f937099bc67a604e93490c2306ac7a4e4a679fc1d336e",
+      "stage": "after",
+      "statement_ast": "Expr(value=Call(func=Attribute(value=Name(id='body_params', ctx=Load()), attr='extend', ctx=Load()), args=[Attribute(value=Name(id='current_dependant', ctx=Load()), attr='body_params', ctx=Load())], keywords=[]))",
+      "statement_kind": "Expr"
+    },
+    {
+      "enclosing_declarations": [
+        "_get_body_field"
+      ],
+      "file_sha256": "f226d7d5062e705d687795eeabb0f920d5376ac7c30bd8f974f6f788d40b9de6",
+      "id": "fastapi-body-dependency-flattening",
+      "line": 1075,
+      "path": "fastapi/dependencies/utils.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:81a185020a65044497f5d5ba9560543d11b1bbeebcad623d73c4fbb905f2a3aa:3131",
+      "source_line_sha256": "d64bae0ea3837033c4c41dab8eaa28097776670eb39d4bf85afb70d75a7cb605",
+      "stage": "after",
+      "statement_ast": "Assign(targets=[Name(id='BodyModel', ctx=Store())], value=Call(func=Name(id='create_body_model', ctx=Load()), args=[], keywords=[keyword(arg='fields', value=Name(id='body_params', ctx=Load())), keyword(arg='model_name', value=Name(id='model_name', ctx=Load()))]))",
+      "statement_kind": "Assign"
+    },
+    {
+      "enclosing_declarations": [
+        "get_body_field"
+      ],
+      "file_sha256": "596bc4b09501b46f42805283bda2aa74e2b57e758b8929aa0176e972154bbdcd",
+      "id": "fastapi-body-dependency-flattening",
+      "line": 1066,
+      "path": "fastapi/dependencies/utils.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:6ec3c2f38a3d25c2f9e1b57be537e40c60f11a100931e8dd9077080001a7518e:3131",
+      "source_line_sha256": "d999ed750e24aa5dfbba13cbcb3ab8694f045bd7e6ddf5dd45e5f6cd52a640dc",
+      "stage": "before",
+      "statement_ast": "Assign(targets=[Name(id='BodyModel', ctx=Store())], value=Call(func=Name(id='create_body_model', ctx=Load()), args=[], keywords=[keyword(arg='fields', value=Attribute(value=Name(id='flat_dependant', ctx=Load()), attr='body_params', ctx=Load())), keyword(arg='model_name', value=Name(id='model_name', ctx=Load()))]))",
+      "statement_kind": "Assign"
+    },
+    {
+      "enclosing_declarations": [
+        "get_flat_dependant"
+      ],
+      "file_sha256": "596bc4b09501b46f42805283bda2aa74e2b57e758b8929aa0176e972154bbdcd",
+      "id": "fastapi-repeat-dependency-bookkeeping",
+      "line": 156,
+      "path": "fastapi/dependencies/utils.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:42017585e18ba0cd7e3aa8c4b587b1ba3bcca4d7c1c636992138c39943b86f01:3131",
+      "source_line_sha256": "4b98cf414b1ab13432e8013edde375d5186e0f32246aa3393f5a48b4ad6bb77c",
+      "stage": "after",
+      "statement_ast": "Assign(targets=[Name(id='track_visited', ctx=Store())], value=BoolOp(op=Or(), values=[Name(id='skip_repeats', ctx=Load()), Compare(left=Name(id='visited', ctx=Load()), ops=[IsNot()], comparators=[Constant(value=None)]), Compare(left=Name(id='_uses_scopes_cache', ctx=Load()), ops=[IsNot()], comparators=[Constant(value=None)])]))",
+      "statement_kind": "Assign"
+    },
+    {
+      "enclosing_declarations": [
+        "get_flat_dependant"
+      ],
+      "file_sha256": "596bc4b09501b46f42805283bda2aa74e2b57e758b8929aa0176e972154bbdcd",
+      "id": "fastapi-repeat-dependency-bookkeeping",
+      "line": 158,
+      "path": "fastapi/dependencies/utils.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:42017585e18ba0cd7e3aa8c4b587b1ba3bcca4d7c1c636992138c39943b86f01:3131",
+      "source_line_sha256": "209b31add7f5e521c332db9444f0b8999ce48ed3585baa78e852f1c946208baa",
+      "stage": "after",
+      "statement_ast": "If(test=Name(id='track_visited', ctx=Load()), body=[If(test=Compare(left=Name(id='visited', ctx=Load()), ops=[Is()], comparators=[Constant(value=None)]), body=[Assign(targets=[Name(id='visited', ctx=Store())], value=List(elts=[], ctx=Load()))], orelse=[]), If(test=Compare(left=Name(id='_uses_scopes_cache', ctx=Load()), ops=[Is()], comparators=[Constant(value=None)]), body=[Assign(targets=[Name(id='_uses_scopes_cache', ctx=Store())], value=Dict(keys=[], values=[]))], orelse=[]), Expr(value=Call(func=Attribute(value=Name(id='visited', ctx=Load()), attr='append', ctx=Load()), args=[Call(func=Name(id='_get_cache_key', ctx=Load()), args=[], keywords=[keyword(arg='dependant', value=Name(id='dependant', ctx=Load())), keyword(arg='uses_scopes_cache', value=Name(id='_uses_scopes_cache', ctx=Load()))])], keywords=[]))], orelse=[])",
+      "statement_kind": "If"
+    },
+    {
+      "enclosing_declarations": [
+        "get_flat_dependant"
+      ],
+      "file_sha256": "596bc4b09501b46f42805283bda2aa74e2b57e758b8929aa0176e972154bbdcd",
+      "id": "fastapi-repeat-dependency-bookkeeping",
+      "line": 163,
+      "path": "fastapi/dependencies/utils.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:42017585e18ba0cd7e3aa8c4b587b1ba3bcca4d7c1c636992138c39943b86f01:3131",
+      "source_line_sha256": "c1e85bc3bd9e36cfee3718223843c0171fccbc90f5342892b8edc711db624ca8",
+      "stage": "after",
+      "statement_ast": "Expr(value=Call(func=Attribute(value=Name(id='visited', ctx=Load()), attr='append', ctx=Load()), args=[Call(func=Name(id='_get_cache_key', ctx=Load()), args=[], keywords=[keyword(arg='dependant', value=Name(id='dependant', ctx=Load())), keyword(arg='uses_scopes_cache', value=Name(id='_uses_scopes_cache', ctx=Load()))])], keywords=[]))",
+      "statement_kind": "Expr"
+    },
+    {
+      "enclosing_declarations": [
+        "get_flat_dependant"
+      ],
+      "file_sha256": "596bc4b09501b46f42805283bda2aa74e2b57e758b8929aa0176e972154bbdcd",
+      "id": "fastapi-repeat-dependency-bookkeeping",
+      "line": 194,
+      "path": "fastapi/dependencies/utils.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:42017585e18ba0cd7e3aa8c4b587b1ba3bcca4d7c1c636992138c39943b86f01:3131",
+      "source_line_sha256": "4c4bf58160d20cf5947bbafe7279cfd22ddcf0a48951bc4de7d786294562a496",
+      "stage": "after",
+      "statement_ast": "If(test=Name(id='skip_repeats', ctx=Load()), body=[Assert(test=Compare(left=Name(id='visited', ctx=Load()), ops=[IsNot()], comparators=[Constant(value=None)])), If(test=Compare(left=Call(func=Name(id='_get_cache_key', ctx=Load()), args=[], keywords=[keyword(arg='dependant', value=Name(id='sub_dependant', ctx=Load())), keyword(arg='uses_scopes_cache', value=Name(id='_uses_scopes_cache', ctx=Load()))]), ops=[In()], comparators=[Name(id='visited', ctx=Load())]), body=[Continue()], orelse=[])], orelse=[])",
+      "statement_kind": "If"
+    },
+    {
+      "enclosing_declarations": [
+        "get_flat_dependant"
+      ],
+      "file_sha256": "fe1d9ae1bbd3da03e6bc5bd5496ab541beafcd81af0a0c7cedb4153665fa0fb0",
+      "id": "fastapi-repeat-dependency-bookkeeping",
+      "line": 155,
+      "path": "fastapi/dependencies/utils.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:308ee093da2a56b36cf3566a28e829c66d8696aa1789d54caff470fb5c94cbc3:3131",
+      "source_line_sha256": "c7f08c9873457355afa235691bca1f644050c21b3fd9a60ce630be1f9feadcc2",
+      "stage": "before",
+      "statement_ast": "If(test=Compare(left=Name(id='visited', ctx=Load()), ops=[Is()], comparators=[Constant(value=None)]), body=[Assign(targets=[Name(id='visited', ctx=Store())], value=List(elts=[], ctx=Load()))], orelse=[])",
+      "statement_kind": "If"
+    },
+    {
+      "enclosing_declarations": [
+        "get_flat_dependant"
+      ],
+      "file_sha256": "fe1d9ae1bbd3da03e6bc5bd5496ab541beafcd81af0a0c7cedb4153665fa0fb0",
+      "id": "fastapi-repeat-dependency-bookkeeping",
+      "line": 159,
+      "path": "fastapi/dependencies/utils.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:308ee093da2a56b36cf3566a28e829c66d8696aa1789d54caff470fb5c94cbc3:3131",
+      "source_line_sha256": "414c8ef427f1acfbb075acc3b60727dc91a0b80a8bcbae50f3315a204b9bdc67",
+      "stage": "before",
+      "statement_ast": "Expr(value=Call(func=Attribute(value=Name(id='visited', ctx=Load()), attr='append', ctx=Load()), args=[Call(func=Name(id='_get_cache_key', ctx=Load()), args=[], keywords=[keyword(arg='dependant', value=Name(id='dependant', ctx=Load())), keyword(arg='uses_scopes_cache', value=Name(id='_uses_scopes_cache', ctx=Load()))])], keywords=[]))",
+      "statement_kind": "Expr"
+    },
+    {
+      "enclosing_declarations": [
+        "Dependant"
+      ],
+      "file_sha256": "cf67c1c8ca5a2f1d99947aeed1e4759ad95402cc59f5d96758a1955ce06e0182",
+      "id": "fastapi-dependency-model-memory",
+      "line": 31,
+      "path": "fastapi/dependencies/models.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:4ecb7b1b292928e20ef99d7aeb071a0b3e3b6703c086b633458da6140094ff1e:3130",
+      "source_line_sha256": "9863a7608c35fdba1fab1853005b1e70d0b4ebc4c16b72251ee638031d38056e",
+      "stage": "after",
+      "statement_ast": null,
+      "statement_kind": null
+    },
+    {
+      "enclosing_declarations": [
+        "_is_coroutine_callable_cached"
+      ],
+      "file_sha256": "cf67c1c8ca5a2f1d99947aeed1e4759ad95402cc59f5d96758a1955ce06e0182",
+      "id": "fastapi-dependency-model-memory",
+      "line": 200,
+      "path": "fastapi/dependencies/models.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:4ecb7b1b292928e20ef99d7aeb071a0b3e3b6703c086b633458da6140094ff1e:3130",
+      "source_line_sha256": "796ba8c320756b0c18a6def51ed2034a6bbd6203dd2dc12a3a7b616519b01e4f",
+      "stage": "after",
+      "statement_ast": null,
+      "statement_kind": null
+    },
+    {
+      "enclosing_declarations": [
+        "_is_coroutine_callable"
+      ],
+      "file_sha256": "cf67c1c8ca5a2f1d99947aeed1e4759ad95402cc59f5d96758a1955ce06e0182",
+      "id": "fastapi-dependency-model-memory",
+      "line": 229,
+      "path": "fastapi/dependencies/models.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:4ecb7b1b292928e20ef99d7aeb071a0b3e3b6703c086b633458da6140094ff1e:3130",
+      "source_line_sha256": "5b0ae06fee529da45bc7b9a59fff4841bf91adebf15f1bfccdcb5a427a2e0c5c",
+      "stage": "after",
+      "statement_ast": "Return(value=Call(func=Name(id='_is_coroutine_callable_cached', ctx=Load()), args=[Call(func=Name(id='_CallIdentity', ctx=Load()), args=[Name(id='call', ctx=Load())], keywords=[])], keywords=[]))",
+      "statement_kind": "Return"
+    },
+    {
+      "enclosing_declarations": [
+        "Dependant"
+      ],
+      "file_sha256": "5cf22411aba41da4da173f4ba1e23d7ff4fede8b4e015928382d75dd3a456d62",
+      "id": "fastapi-dependency-model-memory",
+      "line": 31,
+      "path": "fastapi/dependencies/models.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:50077ceea9aa3854771e882a97951618da4612b644e4037842f18695b7e04fb5:3129",
+      "source_line_sha256": "5275c0d3a9ef2a309efcda05f41ffd3d2916de500a5917ce6785f741a55d5fe2",
+      "stage": "before",
+      "statement_ast": null,
+      "statement_kind": null
+    },
+    {
+      "enclosing_declarations": [
+        "Dependant",
+        "Dependant.is_coroutine_callable"
+      ],
+      "file_sha256": "5cf22411aba41da4da173f4ba1e23d7ff4fede8b4e015928382d75dd3a456d62",
+      "id": "fastapi-dependency-model-memory",
+      "line": 157,
+      "path": "fastapi/dependencies/models.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:50077ceea9aa3854771e882a97951618da4612b644e4037842f18695b7e04fb5:3129",
+      "source_line_sha256": "243031d67a5e1a3bb33f3fd121d4fa50bcd4defd26cd1f7144b877fbd5213ccf",
+      "stage": "before",
+      "statement_ast": "ClassDef(name='Dependant', bases=[], keywords=[], body=[AnnAssign(target=Name(id='path_params', ctx=Store()), annotation=Subscript(value=Name(id='list', ctx=Load()), slice=Name(id='ModelField', ctx=Load()), ctx=Load()), value=Call(func=Name(id='field', ctx=Load()), args=[], keywords=[keyword(arg='default_factory', value=Name(id='list', ctx=Load()))]), simple=1), AnnAssign(target=Name(id='query_params', ctx=Store()), annotation=Subscript(value=Name(id='list', ctx=Load()), slice=Name(id='ModelField', ctx=Load()), ctx=Load()), value=Call(func=Name(id='field', ctx=Load()), args=[], keywords=[keyword(arg='default_factory', value=Name(id='list', ctx=Load()))]), simple=1), AnnAssign(target=Name(id='header_params', ctx=Store()), annotation=Subscript(value=Name(id='list', ctx=Load()), slice=Name(id='ModelField', ctx=Load()), ctx=Load()), value=Call(func=Name(id='field', ctx=Load()), args=[], keywords=[keyword(arg='default_factory', value=Name(id='list', ctx=Load()))]), simple=1), AnnAssign(target=Name(id='cookie_params', ctx=Store()), annotation=Subscript(value=Name(id='list', ctx=Load()), slice=Name(id='ModelField', ctx=Load()), ctx=Load()), value=Call(func=Name(id='field', ctx=Load()), args=[], keywords=[keyword(arg='default_factory', value=Name(id='list', ctx=Load()))]), simple=1), AnnAssign(target=Name(id='body_params', ctx=Store()), annotation=Subscript(value=Name(id='list', ctx=Load()), slice=Name(id='ModelField', ctx=Load()), ctx=Load()), value=Call(func=Name(id='field', ctx=Load()), args=[], keywords=[keyword(arg='default_factory', value=Name(id='list', ctx=Load()))]), simple=1), AnnAssign(target=Name(id='dependencies', ctx=Store()), annotation=Subscript(value=Name(id='list', ctx=Load()), slice=Constant(value='Dependant'), ctx=Load()), value=Call(func=Name(id='field', ctx=Load()), args=[], keywords=[keyword(arg='default_factory', value=Name(id='list', ctx=Load()))]), simple=1), AnnAssign(target=Name(id='name', ctx=Store()), annotation=BinOp(left=Name(id='str', ctx=Load()), op=BitOr(), right=Constant(value=None)), value=Constant(value=None), simple=1), AnnAssign(target=Name(id='call', ctx=Store()), annotation=BinOp(left=Subscript(value=Name(id='Callable', ctx=Load()), slice=Tuple(elts=[Constant(value=Ellipsis), Name(id='Any', ctx=Load())], ctx=Load()), ctx=Load()), op=BitOr(), right=Constant(value=None)), value=Constant(value=None), simple=1), AnnAssign(target=Name(id='request_param_name', ctx=Store()), annotation=BinOp(left=Name(id='str', ctx=Load()), op=BitOr(), right=Constant(value=None)), value=Constant(value=None), simple=1), AnnAssign(target=Name(id='websocket_param_name', ctx=Store()), annotation=BinOp(left=Name(id='str', ctx=Load()), op=BitOr(), right=Constant(value=None)), value=Constant(value=None), simple=1), AnnAssign(target=Name(id='http_connection_param_name', ctx=Store()), annotation=BinOp(left=Name(id='str', ctx=Load()), op=BitOr(), right=Constant(value=None)), value=Constant(value=None), simple=1), AnnAssign(target=Name(id='response_param_name', ctx=Store()), annotation=BinOp(left=Name(id='str', ctx=Load()), op=BitOr(), right=Constant(value=None)), value=Constant(value=None), simple=1), AnnAssign(target=Name(id='background_tasks_param_name', ctx=Store()), annotation=BinOp(left=Name(id='str', ctx=Load()), op=BitOr(), right=Constant(value=None)), value=Constant(value=None), simple=1), AnnAssign(target=Name(id='security_scopes_param_name', ctx=Store()), annotation=BinOp(left=Name(id='str', ctx=Load()), op=BitOr(), right=Constant(value=None)), value=Constant(value=None), simple=1), AnnAssign(target=Name(id='own_oauth_scopes', ctx=Store()), annotation=BinOp(left=Subscript(value=Name(id='list', ctx=Load()), slice=Name(id='str', ctx=Load()), ctx=Load()), op=BitOr(), right=Constant(value=None)), value=Constant(value=None), simple=1), AnnAssign(target=Name(id='parent_oauth_scopes', ctx=Store()), annotation=BinOp(left=Subscript(value=Name(id='list', ctx=Load()), slice=Name(id='str', ctx=Load()), ctx=Load()), op=BitOr(), right=Constant(value=None)), value=Constant(value=None), simple=1), AnnAssign(target=Name(id='use_cache', ctx=Store()), annotation=Name(id='bool', ctx=Load()), value=Constant(value=True), simple=1), AnnAssign(target=Name(id='path', ctx=Store()), annotation=BinOp(left=Name(id='str', ctx=Load()), op=BitOr(), right=Constant(value=None)), value=Constant(value=None), simple=1), AnnAssign(target=Name(id='scope', ctx=Store()), annotation=BinOp(left=Subscript(value=Name(id='Literal', ctx=Load()), slice=Tuple(elts=[Constant(value='function'), Constant(value='request')], ctx=Load()), ctx=Load()), op=BitOr(), right=Constant(value=None)), value=Constant(value=None), simple=1), FunctionDef(name='oauth_scopes', args=arguments(posonlyargs=[], args=[arg(arg='self')], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[Assign(targets=[Name(id='scopes', ctx=Store())], value=IfExp(test=Attribute(value=Name(id='self', ctx=Load()), attr='parent_oauth_scopes', ctx=Load()), body=Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='parent_oauth_scopes', ctx=Load()), attr='copy', ctx=Load()), args=[], keywords=[]), orelse=List(elts=[], ctx=Load()))), For(target=Name(id='scope', ctx=Store()), iter=BoolOp(op=Or(), values=[Attribute(value=Name(id='self', ctx=Load()), attr='own_oauth_scopes', ctx=Load()), List(elts=[], ctx=Load())]), body=[If(test=Compare(left=Name(id='scope', ctx=Load()), ops=[NotIn()], comparators=[Name(id='scopes', ctx=Load())]), body=[Expr(value=Call(func=Attribute(value=Name(id='scopes', ctx=Load()), attr='append', ctx=Load()), args=[Name(id='scope', ctx=Load())], keywords=[]))], orelse=[])], orelse=[]), Return(value=Name(id='scopes', ctx=Load()))], decorator_list=[Name(id='cached_property', ctx=Load())], returns=Subscript(value=Name(id='list', ctx=Load()), slice=Name(id='str', ctx=Load()), ctx=Load())), FunctionDef(name='cache_key', args=arguments(posonlyargs=[], args=[arg(arg='self')], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[Assign(targets=[Name(id='scopes_for_cache', ctx=Store())], value=IfExp(test=Attribute(value=Name(id='self', ctx=Load()), attr='_uses_scopes', ctx=Load()), body=Call(func=Name(id='tuple', ctx=Load()), args=[Call(func=Name(id='sorted', ctx=Load()), args=[Call(func=Name(id='set', ctx=Load()), args=[BoolOp(op=Or(), values=[Attribute(value=Name(id='self', ctx=Load()), attr='oauth_scopes', ctx=Load()), List(elts=[], ctx=Load())])], keywords=[])], keywords=[])], keywords=[]), orelse=Tuple(elts=[], ctx=Load()))), Return(value=Tuple(elts=[Attribute(value=Name(id='self', ctx=Load()), attr='call', ctx=Load()), Name(id='scopes_for_cache', ctx=Load()), BoolOp(op=Or(), values=[Attribute(value=Name(id='self', ctx=Load()), attr='computed_scope', ctx=Load()), Constant(value='')])], ctx=Load()))], decorator_list=[Name(id='cached_property', ctx=Load())], returns=Name(id='DependencyCacheKey', ctx=Load())), FunctionDef(name='_uses_scopes', args=arguments(posonlyargs=[], args=[arg(arg='self')], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[If(test=Attribute(value=Name(id='self', ctx=Load()), attr='own_oauth_scopes', ctx=Load()), body=[Return(value=Constant(value=True))], orelse=[]), If(test=Compare(left=Attribute(value=Name(id='self', ctx=Load()), attr='security_scopes_param_name', ctx=Load()), ops=[IsNot()], comparators=[Constant(value=None)]), body=[Return(value=Constant(value=True))], orelse=[]), If(test=Attribute(value=Name(id='self', ctx=Load()), attr='_is_security_scheme', ctx=Load()), body=[Return(value=Constant(value=True))], orelse=[]), For(target=Name(id='sub_dep', ctx=Store()), iter=Attribute(value=Name(id='self', ctx=Load()), attr='dependencies', ctx=Load()), body=[If(test=Attribute(value=Name(id='sub_dep', ctx=Load()), attr='_uses_scopes', ctx=Load()), body=[Return(value=Constant(value=True))], orelse=[])], orelse=[]), Return(value=Constant(value=False))], decorator_list=[Name(id='cached_property', ctx=Load())], returns=Name(id='bool', ctx=Load())), FunctionDef(name='_is_security_scheme', args=arguments(posonlyargs=[], args=[arg(arg='self')], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[If(test=Compare(left=Attribute(value=Name(id='self', ctx=Load()), attr='call', ctx=Load()), ops=[Is()], comparators=[Constant(value=None)]), body=[Return(value=Constant(value=False))], orelse=[]), Assign(targets=[Name(id='unwrapped', ctx=Store())], value=Call(func=Name(id='_unwrapped_call', ctx=Load()), args=[Attribute(value=Name(id='self', ctx=Load()), attr='call', ctx=Load())], keywords=[])), Return(value=Call(func=Name(id='isinstance', ctx=Load()), args=[Name(id='unwrapped', ctx=Load()), Name(id='SecurityBase', ctx=Load())], keywords=[]))], decorator_list=[Name(id='cached_property', ctx=Load())], returns=Name(id='bool', ctx=Load())), FunctionDef(name='_security_scheme', args=arguments(posonlyargs=[], args=[arg(arg='self')], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[Assign(targets=[Name(id='unwrapped', ctx=Store())], value=Call(func=Name(id='_unwrapped_call', ctx=Load()), args=[Attribute(value=Name(id='self', ctx=Load()), attr='call', ctx=Load())], keywords=[])), Assert(test=Call(func=Name(id='isinstance', ctx=Load()), args=[Name(id='unwrapped', ctx=Load()), Name(id='SecurityBase', ctx=Load())], keywords=[])), Return(value=Name(id='unwrapped', ctx=Load()))], decorator_list=[Name(id='cached_property', ctx=Load())], returns=Name(id='SecurityBase', ctx=Load())), FunctionDef(name='_security_dependencies', args=arguments(posonlyargs=[], args=[arg(arg='self')], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[Assign(targets=[Name(id='security_deps', ctx=Store())], value=ListComp(elt=Name(id='dep', ctx=Load()), generators=[comprehension(target=Name(id='dep', ctx=Store()), iter=Attribute(value=Name(id='self', ctx=Load()), attr='dependencies', ctx=Load()), ifs=[Attribute(value=Name(id='dep', ctx=Load()), attr='_is_security_scheme', ctx=Load())], is_async=0)])), Return(value=Name(id='security_deps', ctx=Load()))], decorator_list=[Name(id='cached_property', ctx=Load())], returns=Subscript(value=Name(id='list', ctx=Load()), slice=Constant(value='Dependant'), ctx=Load())), FunctionDef(name='is_gen_callable', args=arguments(posonlyargs=[], args=[arg(arg='self')], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[If(test=Compare(left=Attribute(value=Name(id='self', ctx=Load()), attr='call', ctx=Load()), ops=[Is()], comparators=[Constant(value=None)]), body=[Return(value=Constant(value=False))], orelse=[]), If(test=BoolOp(op=Or(), values=[Call(func=Attribute(value=Name(id='inspect', ctx=Load()), attr='isgeneratorfunction', ctx=Load()), args=[Call(func=Name(id='_impartial', ctx=Load()), args=[Attribute(value=Name(id='self', ctx=Load()), attr='call', ctx=Load())], keywords=[])], keywords=[]), Call(func=Attribute(value=Name(id='inspect', ctx=Load()), attr='isgeneratorfunction', ctx=Load()), args=[Call(func=Name(id='_unwrapped_call', ctx=Load()), args=[Attribute(value=Name(id='self', ctx=Load()), attr='call', ctx=Load())], keywords=[])], keywords=[])]), body=[Return(value=Constant(value=True))], orelse=[]), If(test=Call(func=Attribute(value=Name(id='inspect', ctx=Load()), attr='isclass', ctx=Load()), args=[Call(func=Name(id='_unwrapped_call', ctx=Load()), args=[Attribute(value=Name(id='self', ctx=Load()), attr='call', ctx=Load())], keywords=[])], keywords=[]), body=[Return(value=Constant(value=False))], orelse=[]), Assign(targets=[Name(id='dunder_call', ctx=Store())], value=Call(func=Name(id='getattr', ctx=Load()), args=[Call(func=Name(id='_impartial', ctx=Load()), args=[Attribute(value=Name(id='self', ctx=Load()), attr='call', ctx=Load())], keywords=[]), Constant(value='__call__'), Constant(value=None)], keywords=[])), If(test=Compare(left=Name(id='dunder_call', ctx=Load()), ops=[Is()], comparators=[Constant(value=None)]), body=[Return(value=Constant(value=False))], orelse=[]), If(test=BoolOp(op=Or(), values=[Call(func=Attribute(value=Name(id='inspect', ctx=Load()), attr='isgeneratorfunction', ctx=Load()), args=[Call(func=Name(id='_impartial', ctx=Load()), args=[Name(id='dunder_call', ctx=Load())], keywords=[])], keywords=[]), Call(func=Attribute(value=Name(id='inspect', ctx=Load()), attr='isgeneratorfunction', ctx=Load()), args=[Call(func=Name(id='_unwrapped_call', ctx=Load()), args=[Name(id='dunder_call', ctx=Load())], keywords=[])], keywords=[])]), body=[Return(value=Constant(value=True))], orelse=[]), Assign(targets=[Name(id='dunder_unwrapped_call', ctx=Store())], value=Call(func=Name(id='getattr', ctx=Load()), args=[Call(func=Name(id='_unwrapped_call', ctx=Load()), args=[Attribute(value=Name(id='self', ctx=Load()), attr='call', ctx=Load())], keywords=[]), Constant(value='__call__'), Constant(value=None)], keywords=[])), If(test=Compare(left=Name(id='dunder_unwrapped_call', ctx=Load()), ops=[Is()], comparators=[Constant(value=None)]), body=[Return(value=Constant(value=False))], orelse=[]), If(test=BoolOp(op=Or(), values=[Call(func=Attribute(value=Name(id='inspect', ctx=Load()), attr='isgeneratorfunction', ctx=Load()), args=[Call(func=Name(id='_impartial', ctx=Load()), args=[Name(id='dunder_unwrapped_call', ctx=Load())], keywords=[])], keywords=[]), Call(func=Attribute(value=Name(id='inspect', ctx=Load()), attr='isgeneratorfunction', ctx=Load()), args=[Call(func=Name(id='_unwrapped_call', ctx=Load()), args=[Name(id='dunder_unwrapped_call', ctx=Load())], keywords=[])], keywords=[])]), body=[Return(value=Constant(value=True))], orelse=[]), Return(value=Constant(value=False))], decorator_list=[Name(id='cached_property', ctx=Load())], returns=Name(id='bool', ctx=Load())), FunctionDef(name='is_async_gen_callable', args=arguments(posonlyargs=[], args=[arg(arg='self')], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[If(test=Compare(left=Attribute(value=Name(id='self', ctx=Load()), attr='call', ctx=Load()), ops=[Is()], comparators=[Constant(value=None)]), body=[Return(value=Constant(value=False))], orelse=[]), If(test=BoolOp(op=Or(), values=[Call(func=Attribute(value=Name(id='inspect', ctx=Load()), attr='isasyncgenfunction', ctx=Load()), args=[Call(func=Name(id='_impartial', ctx=Load()), args=[Attribute(value=Name(id='self', ctx=Load()), attr='call', ctx=Load())], keywords=[])], keywords=[]), Call(func=Attribute(value=Name(id='inspect', ctx=Load()), attr='isasyncgenfunction', ctx=Load()), args=[Call(func=Name(id='_unwrapped_call', ctx=Load()), args=[Attribute(value=Name(id='self', ctx=Load()), attr='call', ctx=Load())], keywords=[])], keywords=[])]), body=[Return(value=Constant(value=True))], orelse=[]), If(test=Call(func=Attribute(value=Name(id='inspect', ctx=Load()), attr='isclass', ctx=Load()), args=[Call(func=Name(id='_unwrapped_call', ctx=Load()), args=[Attribute(value=Name(id='self', ctx=Load()), attr='call', ctx=Load())], keywords=[])], keywords=[]), body=[Return(value=Constant(value=False))], orelse=[]), Assign(targets=[Name(id='dunder_call', ctx=Store())], value=Call(func=Name(id='getattr', ctx=Load()), args=[Call(func=Name(id='_impartial', ctx=Load()), args=[Attribute(value=Name(id='self', ctx=Load()), attr='call', ctx=Load())], keywords=[]), Constant(value='__call__'), Constant(value=None)], keywords=[])), If(test=Compare(left=Name(id='dunder_call', ctx=Load()), ops=[Is()], comparators=[Constant(value=None)]), body=[Return(value=Constant(value=False))], orelse=[]), If(test=BoolOp(op=Or(), values=[Call(func=Attribute(value=Name(id='inspect', ctx=Load()), attr='isasyncgenfunction', ctx=Load()), args=[Call(func=Name(id='_impartial', ctx=Load()), args=[Name(id='dunder_call', ctx=Load())], keywords=[])], keywords=[]), Call(func=Attribute(value=Name(id='inspect', ctx=Load()), attr='isasyncgenfunction', ctx=Load()), args=[Call(func=Name(id='_unwrapped_call', ctx=Load()), args=[Name(id='dunder_call', ctx=Load())], keywords=[])], keywords=[])]), body=[Return(value=Constant(value=True))], orelse=[]), Assign(targets=[Name(id='dunder_unwrapped_call', ctx=Store())], value=Call(func=Name(id='getattr', ctx=Load()), args=[Call(func=Name(id='_unwrapped_call', ctx=Load()), args=[Attribute(value=Name(id='self', ctx=Load()), attr='call', ctx=Load())], keywords=[]), Constant(value='__call__'), Constant(value=None)], keywords=[])), If(test=Compare(left=Name(id='dunder_unwrapped_call', ctx=Load()), ops=[Is()], comparators=[Constant(value=None)]), body=[Return(value=Constant(value=False))], orelse=[]), If(test=BoolOp(op=Or(), values=[Call(func=Attribute(value=Name(id='inspect', ctx=Load()), attr='isasyncgenfunction', ctx=Load()), args=[Call(func=Name(id='_impartial', ctx=Load()), args=[Name(id='dunder_unwrapped_call', ctx=Load())], keywords=[])], keywords=[]), Call(func=Attribute(value=Name(id='inspect', ctx=Load()), attr='isasyncgenfunction', ctx=Load()), args=[Call(func=Name(id='_unwrapped_call', ctx=Load()), args=[Name(id='dunder_unwrapped_call', ctx=Load())], keywords=[])], keywords=[])]), body=[Return(value=Constant(value=True))], orelse=[]), Return(value=Constant(value=False))], decorator_list=[Name(id='cached_property', ctx=Load())], returns=Name(id='bool', ctx=Load())), FunctionDef(name='is_coroutine_callable', args=arguments(posonlyargs=[], args=[arg(arg='self')], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[If(test=Compare(left=Attribute(value=Name(id='self', ctx=Load()), attr='call', ctx=Load()), ops=[Is()], comparators=[Constant(value=None)]), body=[Return(value=Constant(value=False))], orelse=[]), If(test=BoolOp(op=And(), values=[Call(func=Attribute(value=Name(id='inspect', ctx=Load()), attr='isroutine', ctx=Load()), args=[Call(func=Name(id='_impartial', ctx=Load()), args=[Attribute(value=Name(id='self', ctx=Load()), attr='call', ctx=Load())], keywords=[])], keywords=[]), Call(func=Name(id='iscoroutinefunction', ctx=Load()), args=[Call(func=Name(id='_impartial', ctx=Load()), args=[Attribute(value=Name(id='self', ctx=Load()), attr='call', ctx=Load())], keywords=[])], keywords=[])]), body=[Return(value=Constant(value=True))], orelse=[]), If(test=BoolOp(op=And(), values=[Call(func=Attribute(value=Name(id='inspect', ctx=Load()), attr='isroutine', ctx=Load()), args=[Call(func=Name(id='_unwrapped_call', ctx=Load()), args=[Attribute(value=Name(id='self', ctx=Load()), attr='call', ctx=Load())], keywords=[])], keywords=[]), Call(func=Name(id='iscoroutinefunction', ctx=Load()), args=[Call(func=Name(id='_unwrapped_call', ctx=Load()), args=[Attribute(value=Name(id='self', ctx=Load()), attr='call', ctx=Load())], keywords=[])], keywords=[])]), body=[Return(value=Constant(value=True))], orelse=[]), If(test=Call(func=Attribute(value=Name(id='inspect', ctx=Load()), attr='isclass', ctx=Load()), args=[Call(func=Name(id='_unwrapped_call', ctx=Load()), args=[Attribute(value=Name(id='self', ctx=Load()), attr='call', ctx=Load())], keywords=[])], keywords=[]), body=[Return(value=Constant(value=False))], orelse=[]), Assign(targets=[Name(id='dunder_call', ctx=Store())], value=Call(func=Name(id='getattr', ctx=Load()), args=[Call(func=Name(id='_impartial', ctx=Load()), args=[Attribute(value=Name(id='self', ctx=Load()), attr='call', ctx=Load())], keywords=[]), Constant(value='__call__'), Constant(value=None)], keywords=[])), If(test=Compare(left=Name(id='dunder_call', ctx=Load()), ops=[Is()], comparators=[Constant(value=None)]), body=[Return(value=Constant(value=False))], orelse=[]), If(test=BoolOp(op=Or(), values=[Call(func=Name(id='iscoroutinefunction', ctx=Load()), args=[Call(func=Name(id='_impartial', ctx=Load()), args=[Name(id='dunder_call', ctx=Load())], keywords=[])], keywords=[]), Call(func=Name(id='iscoroutinefunction', ctx=Load()), args=[Call(func=Name(id='_unwrapped_call', ctx=Load()), args=[Name(id='dunder_call', ctx=Load())], keywords=[])], keywords=[])]), body=[Return(value=Constant(value=True))], orelse=[]), Assign(targets=[Name(id='dunder_unwrapped_call', ctx=Store())], value=Call(func=Name(id='getattr', ctx=Load()), args=[Call(func=Name(id='_unwrapped_call', ctx=Load()), args=[Attribute(value=Name(id='self', ctx=Load()), attr='call', ctx=Load())], keywords=[]), Constant(value='__call__'), Constant(value=None)], keywords=[])), If(test=Compare(left=Name(id='dunder_unwrapped_call', ctx=Load()), ops=[Is()], comparators=[Constant(value=None)]), body=[Return(value=Constant(value=False))], orelse=[]), If(test=BoolOp(op=Or(), values=[Call(func=Name(id='iscoroutinefunction', ctx=Load()), args=[Call(func=Name(id='_impartial', ctx=Load()), args=[Name(id='dunder_unwrapped_call', ctx=Load())], keywords=[])], keywords=[]), Call(func=Name(id='iscoroutinefunction', ctx=Load()), args=[Call(func=Name(id='_unwrapped_call', ctx=Load()), args=[Name(id='dunder_unwrapped_call', ctx=Load())], keywords=[])], keywords=[])]), body=[Return(value=Constant(value=True))], orelse=[]), Return(value=Constant(value=False))], decorator_list=[Name(id='cached_property', ctx=Load())], returns=Name(id='bool', ctx=Load())), FunctionDef(name='computed_scope', args=arguments(posonlyargs=[], args=[arg(arg='self')], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[If(test=Attribute(value=Name(id='self', ctx=Load()), attr='scope', ctx=Load()), body=[Return(value=Attribute(value=Name(id='self', ctx=Load()), attr='scope', ctx=Load()))], orelse=[]), If(test=BoolOp(op=Or(), values=[Attribute(value=Name(id='self', ctx=Load()), attr='is_gen_callable', ctx=Load()), Attribute(value=Name(id='self', ctx=Load()), attr='is_async_gen_callable', ctx=Load())]), body=[Return(value=Constant(value='request'))], orelse=[]), Return(value=Constant(value=None))], decorator_list=[Name(id='cached_property', ctx=Load())], returns=BinOp(left=Name(id='str', ctx=Load()), op=BitOr(), right=Constant(value=None)))], decorator_list=[Name(id='dataclass', ctx=Load())])",
+      "statement_kind": "ClassDef"
+    },
+    {
+      "enclosing_declarations": [
+        "Dependant",
+        "Dependant.is_coroutine_callable"
+      ],
+      "file_sha256": "5cf22411aba41da4da173f4ba1e23d7ff4fede8b4e015928382d75dd3a456d62",
+      "id": "fastapi-dependency-model-memory",
+      "line": 158,
+      "path": "fastapi/dependencies/models.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:50077ceea9aa3854771e882a97951618da4612b644e4037842f18695b7e04fb5:3129",
+      "source_line_sha256": "4625d2a7f359a8d1a4703a4ec58f47521bf5bbe37ea56390c42d85b3bfe1660f",
+      "stage": "before",
+      "statement_ast": "FunctionDef(name='is_coroutine_callable', args=arguments(posonlyargs=[], args=[arg(arg='self')], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[If(test=Compare(left=Attribute(value=Name(id='self', ctx=Load()), attr='call', ctx=Load()), ops=[Is()], comparators=[Constant(value=None)]), body=[Return(value=Constant(value=False))], orelse=[]), If(test=BoolOp(op=And(), values=[Call(func=Attribute(value=Name(id='inspect', ctx=Load()), attr='isroutine', ctx=Load()), args=[Call(func=Name(id='_impartial', ctx=Load()), args=[Attribute(value=Name(id='self', ctx=Load()), attr='call', ctx=Load())], keywords=[])], keywords=[]), Call(func=Name(id='iscoroutinefunction', ctx=Load()), args=[Call(func=Name(id='_impartial', ctx=Load()), args=[Attribute(value=Name(id='self', ctx=Load()), attr='call', ctx=Load())], keywords=[])], keywords=[])]), body=[Return(value=Constant(value=True))], orelse=[]), If(test=BoolOp(op=And(), values=[Call(func=Attribute(value=Name(id='inspect', ctx=Load()), attr='isroutine', ctx=Load()), args=[Call(func=Name(id='_unwrapped_call', ctx=Load()), args=[Attribute(value=Name(id='self', ctx=Load()), attr='call', ctx=Load())], keywords=[])], keywords=[]), Call(func=Name(id='iscoroutinefunction', ctx=Load()), args=[Call(func=Name(id='_unwrapped_call', ctx=Load()), args=[Attribute(value=Name(id='self', ctx=Load()), attr='call', ctx=Load())], keywords=[])], keywords=[])]), body=[Return(value=Constant(value=True))], orelse=[]), If(test=Call(func=Attribute(value=Name(id='inspect', ctx=Load()), attr='isclass', ctx=Load()), args=[Call(func=Name(id='_unwrapped_call', ctx=Load()), args=[Attribute(value=Name(id='self', ctx=Load()), attr='call', ctx=Load())], keywords=[])], keywords=[]), body=[Return(value=Constant(value=False))], orelse=[]), Assign(targets=[Name(id='dunder_call', ctx=Store())], value=Call(func=Name(id='getattr', ctx=Load()), args=[Call(func=Name(id='_impartial', ctx=Load()), args=[Attribute(value=Name(id='self', ctx=Load()), attr='call', ctx=Load())], keywords=[]), Constant(value='__call__'), Constant(value=None)], keywords=[])), If(test=Compare(left=Name(id='dunder_call', ctx=Load()), ops=[Is()], comparators=[Constant(value=None)]), body=[Return(value=Constant(value=False))], orelse=[]), If(test=BoolOp(op=Or(), values=[Call(func=Name(id='iscoroutinefunction', ctx=Load()), args=[Call(func=Name(id='_impartial', ctx=Load()), args=[Name(id='dunder_call', ctx=Load())], keywords=[])], keywords=[]), Call(func=Name(id='iscoroutinefunction', ctx=Load()), args=[Call(func=Name(id='_unwrapped_call', ctx=Load()), args=[Name(id='dunder_call', ctx=Load())], keywords=[])], keywords=[])]), body=[Return(value=Constant(value=True))], orelse=[]), Assign(targets=[Name(id='dunder_unwrapped_call', ctx=Store())], value=Call(func=Name(id='getattr', ctx=Load()), args=[Call(func=Name(id='_unwrapped_call', ctx=Load()), args=[Attribute(value=Name(id='self', ctx=Load()), attr='call', ctx=Load())], keywords=[]), Constant(value='__call__'), Constant(value=None)], keywords=[])), If(test=Compare(left=Name(id='dunder_unwrapped_call', ctx=Load()), ops=[Is()], comparators=[Constant(value=None)]), body=[Return(value=Constant(value=False))], orelse=[]), If(test=BoolOp(op=Or(), values=[Call(func=Name(id='iscoroutinefunction', ctx=Load()), args=[Call(func=Name(id='_impartial', ctx=Load()), args=[Name(id='dunder_unwrapped_call', ctx=Load())], keywords=[])], keywords=[]), Call(func=Name(id='iscoroutinefunction', ctx=Load()), args=[Call(func=Name(id='_unwrapped_call', ctx=Load()), args=[Name(id='dunder_unwrapped_call', ctx=Load())], keywords=[])], keywords=[])]), body=[Return(value=Constant(value=True))], orelse=[]), Return(value=Constant(value=False))], decorator_list=[Name(id='cached_property', ctx=Load())], returns=Name(id='bool', ctx=Load()))",
+      "statement_kind": "FunctionDef"
+    },
+    {
+      "enclosing_declarations": [
+        "Provide",
+        "Provide.__init__"
+      ],
+      "file_sha256": "f3201763ec85d57ee7097ea4ff00af6595953aeef40bd07a916cb6a636ef4406",
+      "id": "litestar-cached-yield-provider",
+      "line": 63,
+      "path": "litestar/di.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:238218771c77647e5aac17437009817d637c1f0c45d3b8a67c6aaf8bb9fcb654:1228",
+      "source_line_sha256": "17412bed301244ec9ab437e07fb50d73d3d02f23f23a07b01c0ed861da665feb",
+      "stage": "after",
+      "statement_ast": "Assign(targets=[Name(id='has_generator_dependency', ctx=Store())], value=BoolOp(op=Or(), values=[Attribute(value=Name(id='self', ctx=Load()), attr='has_sync_generator_dependency', ctx=Load()), Attribute(value=Name(id='self', ctx=Load()), attr='has_async_generator_dependency', ctx=Load())]))",
+      "statement_kind": "Assign"
+    },
+    {
+      "enclosing_declarations": [
+        "Provide",
+        "Provide.__init__"
+      ],
+      "file_sha256": "f3201763ec85d57ee7097ea4ff00af6595953aeef40bd07a916cb6a636ef4406",
+      "id": "litestar-cached-yield-provider",
+      "line": 65,
+      "path": "litestar/di.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:238218771c77647e5aac17437009817d637c1f0c45d3b8a67c6aaf8bb9fcb654:1228",
+      "source_line_sha256": "35bdd0c34953a994be1e16a603f552b8ead16fe621589bfa8165daf80d4627ff",
+      "stage": "after",
+      "statement_ast": "If(test=BoolOp(op=And(), values=[Name(id='has_generator_dependency', ctx=Load()), Name(id='use_cache', ctx=Load())]), body=[Raise(exc=Call(func=Name(id='ImproperlyConfiguredException', ctx=Load()), args=[Constant(value='Cannot cache generator dependency, consider using Lifespan Context instead.')], keywords=[]))], orelse=[])",
+      "statement_kind": "If"
+    },
+    {
+      "enclosing_declarations": [
+        "Provide",
+        "Provide.__init__"
+      ],
+      "file_sha256": "f3201763ec85d57ee7097ea4ff00af6595953aeef40bd07a916cb6a636ef4406",
+      "id": "litestar-cached-yield-provider",
+      "line": 66,
+      "path": "litestar/di.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:238218771c77647e5aac17437009817d637c1f0c45d3b8a67c6aaf8bb9fcb654:1228",
+      "source_line_sha256": "55008e714c7332fadd84120654896cb325b8ac3b38e085bc0178cfa20b13d8c2",
+      "stage": "after",
+      "statement_ast": "Raise(exc=Call(func=Name(id='ImproperlyConfiguredException', ctx=Load()), args=[Constant(value='Cannot cache generator dependency, consider using Lifespan Context instead.')], keywords=[]))",
+      "statement_kind": "Raise"
+    },
+    {
+      "enclosing_declarations": [
+        "Provide",
+        "Provide.__init__"
+      ],
+      "file_sha256": "f3201763ec85d57ee7097ea4ff00af6595953aeef40bd07a916cb6a636ef4406",
+      "id": "litestar-cached-yield-provider",
+      "line": 67,
+      "path": "litestar/di.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:238218771c77647e5aac17437009817d637c1f0c45d3b8a67c6aaf8bb9fcb654:1228",
+      "source_line_sha256": "8237707243dd339b6e4e26220bab6a50fafbdaf59878eea35fa5bd5e80e1f7fd",
+      "stage": "after",
+      "statement_ast": "Raise(exc=Call(func=Name(id='ImproperlyConfiguredException', ctx=Load()), args=[Constant(value='Cannot cache generator dependency, consider using Lifespan Context instead.')], keywords=[]))",
+      "statement_kind": "Raise"
+    },
+    {
+      "enclosing_declarations": [
+        "Provide",
+        "Provide.__init__"
+      ],
+      "file_sha256": "f3201763ec85d57ee7097ea4ff00af6595953aeef40bd07a916cb6a636ef4406",
+      "id": "litestar-cached-yield-provider",
+      "line": 88,
+      "path": "litestar/di.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:238218771c77647e5aac17437009817d637c1f0c45d3b8a67c6aaf8bb9fcb654:1228",
+      "source_line_sha256": "5928f4381c4a37bfe2172230331c82f4a0270725dd028c5731ad01959a7710d8",
+      "stage": "after",
+      "statement_ast": "Assign(targets=[Attribute(value=Name(id='self', ctx=Load()), attr='use_cache', ctx=Store())], value=Name(id='use_cache', ctx=Load()))",
+      "statement_kind": "Assign"
+    },
+    {
+      "enclosing_declarations": [
+        "Provide",
+        "Provide.__init__"
+      ],
+      "file_sha256": "fc5e601d509efd282437a48d58b40edc592eb57cbd747f01d1f02ce91cafcc8d",
+      "id": "litestar-cached-yield-provider",
+      "line": 59,
+      "path": "litestar/di.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:4cfa8c3260c34cebb0f9e772998f1946609f81a06888bfc1d674d251191f3be6:1228",
+      "source_line_sha256": "62c420b67dc707f9cd4359c4b8fcb07ad85b3599e5196a66a9ced6c32d7b1efa",
+      "stage": "before",
+      "statement_ast": "If(test=Call(func=Name(id='is_sync_or_async_generator', ctx=Load()), args=[Name(id='dependency', ctx=Load())], keywords=[]), body=[Expr(value=Call(func=Name(id='warn_sync_to_thread_with_generator', ctx=Load()), args=[Name(id='dependency', ctx=Load())], keywords=[keyword(arg='stacklevel', value=Constant(value=3))]))], orelse=[If(test=UnaryOp(op=Not(), operand=Name(id='has_sync_callable', ctx=Load())), body=[Expr(value=Call(func=Name(id='warn_sync_to_thread_with_async_callable', ctx=Load()), args=[Name(id='dependency', ctx=Load())], keywords=[keyword(arg='stacklevel', value=Constant(value=3))]))], orelse=[])])",
+      "statement_kind": "If"
+    },
+    {
+      "enclosing_declarations": [
+        "Provide",
+        "Provide.__init__"
+      ],
+      "file_sha256": "fc5e601d509efd282437a48d58b40edc592eb57cbd747f01d1f02ce91cafcc8d",
+      "id": "litestar-cached-yield-provider",
+      "line": 74,
+      "path": "litestar/di.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:4cfa8c3260c34cebb0f9e772998f1946609f81a06888bfc1d674d251191f3be6:1228",
+      "source_line_sha256": "5928f4381c4a37bfe2172230331c82f4a0270725dd028c5731ad01959a7710d8",
+      "stage": "before",
+      "statement_ast": "Assign(targets=[Attribute(value=Name(id='self', ctx=Load()), attr='use_cache', ctx=Store())], value=Name(id='use_cache', ctx=Load()))",
+      "statement_kind": "Assign"
+    },
+    {
+      "enclosing_declarations": [
+        "ContextRepoComposition",
+        "ContextRepoComposition.__init__"
+      ],
+      "file_sha256": "d1ca2b32c0098898cc73a0c68b56cd057638aa8d2470e433308aa3a591929fc4",
+      "id": "faststream-composed-context-provider",
+      "line": 24,
+      "path": "faststream/_internal/context/composition.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:446a39cbd40ea8133a5ce36d2477d4ff47125a293788359eafc9fadb544c5f33:2131",
+      "source_line_sha256": "b68a807bad0aa90aa94ec4135a0697d91cce2cfa018ba81c2e7dd6a33fbf3c14",
+      "stage": "after",
+      "statement_ast": "Assign(targets=[Attribute(value=Name(id='self', ctx=Load()), attr='_contexts', ctx=Store())], value=Tuple(elts=[Attribute(value=Name(id='self', ctx=Load()), attr='_inner_context', ctx=Load()), Starred(value=Name(id='contexts', ctx=Load()), ctx=Load())], ctx=Load()))",
+      "statement_kind": "Assign"
+    },
+    {
+      "enclosing_declarations": [
+        "ContextRepoComposition",
+        "ContextRepoComposition.get"
+      ],
+      "file_sha256": "d1ca2b32c0098898cc73a0c68b56cd057638aa8d2470e433308aa3a591929fc4",
+      "id": "faststream-composed-context-provider",
+      "line": 67,
+      "path": "faststream/_internal/context/composition.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:446a39cbd40ea8133a5ce36d2477d4ff47125a293788359eafc9fadb544c5f33:2131",
+      "source_line_sha256": "d8606a287a68400437289aa6a9ac77badfe66ce18212a301767a81e8ee1df458",
+      "stage": "after",
+      "statement_ast": "For(target=Name(id='context', ctx=Store()), iter=Attribute(value=Name(id='self', ctx=Load()), attr='_contexts', ctx=Load()), body=[Assign(targets=[Name(id='variable', ctx=Store())], value=Call(func=Attribute(value=Name(id='context', ctx=Load()), attr='get', ctx=Load()), args=[Name(id='key', ctx=Load()), Name(id='EMPTY', ctx=Load())], keywords=[])), If(test=Compare(left=Name(id='variable', ctx=Load()), ops=[NotEq()], comparators=[Name(id='EMPTY', ctx=Load())]), body=[Return(value=Name(id='variable', ctx=Load()))], orelse=[])], orelse=[])",
+      "statement_kind": "For"
+    },
+    {
+      "enclosing_declarations": [
+        "ContextRepoComposition",
+        "ContextRepoComposition.get"
+      ],
+      "file_sha256": "d1ca2b32c0098898cc73a0c68b56cd057638aa8d2470e433308aa3a591929fc4",
+      "id": "faststream-composed-context-provider",
+      "line": 68,
+      "path": "faststream/_internal/context/composition.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:446a39cbd40ea8133a5ce36d2477d4ff47125a293788359eafc9fadb544c5f33:2131",
+      "source_line_sha256": "3618fca6a024e3d9b2751f9de182c7362f15a79415c5fcd95349b13d2efd3c0f",
+      "stage": "after",
+      "statement_ast": "Assign(targets=[Name(id='variable', ctx=Store())], value=Call(func=Attribute(value=Name(id='context', ctx=Load()), attr='get', ctx=Load()), args=[Name(id='key', ctx=Load()), Name(id='EMPTY', ctx=Load())], keywords=[]))",
+      "statement_kind": "Assign"
+    },
+    {
+      "enclosing_declarations": [
+        "ContextRepoComposition",
+        "ContextRepoComposition.get"
+      ],
+      "file_sha256": "d1ca2b32c0098898cc73a0c68b56cd057638aa8d2470e433308aa3a591929fc4",
+      "id": "faststream-composed-context-provider",
+      "line": 69,
+      "path": "faststream/_internal/context/composition.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:446a39cbd40ea8133a5ce36d2477d4ff47125a293788359eafc9fadb544c5f33:2131",
+      "source_line_sha256": "951d074db926ec8f7b82068ad8019865de8f0e45382a50f54fdcde02a6e60706",
+      "stage": "after",
+      "statement_ast": "If(test=Compare(left=Name(id='variable', ctx=Load()), ops=[NotEq()], comparators=[Name(id='EMPTY', ctx=Load())]), body=[Return(value=Name(id='variable', ctx=Load()))], orelse=[])",
+      "statement_kind": "If"
+    },
+    {
+      "enclosing_declarations": [
+        "ContextRepoComposition",
+        "ContextRepoComposition.get"
+      ],
+      "file_sha256": "d1ca2b32c0098898cc73a0c68b56cd057638aa8d2470e433308aa3a591929fc4",
+      "id": "faststream-composed-context-provider",
+      "line": 70,
+      "path": "faststream/_internal/context/composition.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:446a39cbd40ea8133a5ce36d2477d4ff47125a293788359eafc9fadb544c5f33:2131",
+      "source_line_sha256": "1ec9bab9aba7a7dd0efdfde3dd4403ae9df102e36eaf629066d03ccdd617ad14",
+      "stage": "after",
+      "statement_ast": "Return(value=Name(id='variable', ctx=Load()))",
+      "statement_kind": "Return"
+    },
+    {
+      "enclosing_declarations": [
+        "ContextRepo",
+        "ContextRepo.get"
+      ],
+      "file_sha256": "ea26514440dc4071e1e48fc389668d5f6bd1ec064695962f748837b737265dc9",
+      "id": "faststream-composed-context-provider",
+      "line": 129,
+      "path": "faststream/_internal/context/repository.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:f2b28f7cfa2052f60e0a2f502fc6eb5d058a1948fb514890bc99aafd4a14b8aa:2129",
+      "source_line_sha256": "1ff8ce42bb4bffaa4ca200af193c48aacce12071d2b6e04fc13157e515fdb00c",
+      "stage": "before",
+      "statement_ast": "If(test=Compare(left=NamedExpr(target=Name(id='glob', ctx=Store()), value=Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='_global_context', ctx=Load()), attr='get', ctx=Load()), args=[Name(id='key', ctx=Load()), Name(id='EMPTY', ctx=Load())], keywords=[])), ops=[Is()], comparators=[Name(id='EMPTY', ctx=Load())]), body=[Return(value=Call(func=Attribute(value=Name(id='self', ctx=Load()), attr='get_local', ctx=Load()), args=[Name(id='key', ctx=Load()), Name(id='default', ctx=Load())], keywords=[]))], orelse=[])",
+      "statement_kind": "If"
+    },
+    {
+      "enclosing_declarations": [
+        "ContextRepo",
+        "ContextRepo.get"
+      ],
+      "file_sha256": "ea26514440dc4071e1e48fc389668d5f6bd1ec064695962f748837b737265dc9",
+      "id": "faststream-composed-context-provider",
+      "line": 130,
+      "path": "faststream/_internal/context/repository.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:f2b28f7cfa2052f60e0a2f502fc6eb5d058a1948fb514890bc99aafd4a14b8aa:2129",
+      "source_line_sha256": "0c6be3a2073632b3487fc69ded726f3d118891f203b99c47d97a665894d75885",
+      "stage": "before",
+      "statement_ast": "Return(value=Call(func=Attribute(value=Name(id='self', ctx=Load()), attr='get_local', ctx=Load()), args=[Name(id='key', ctx=Load()), Name(id='default', ctx=Load())], keywords=[]))",
+      "statement_kind": "Return"
+    },
+    {
+      "enclosing_declarations": [
+        "_FastStreamDependant"
+      ],
+      "file_sha256": "bc41691d0880458259d35f77b045dcbde315d1ada0d28f366c8e74c1620cbe2c",
+      "id": "faststream-dependant-constructor-metadata",
+      "line": 22,
+      "path": "faststream/_internal/fastapi/get_dependant.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:22b54379dfbb33818bf606b46313ec9b50f7d1ace66a57d5e16d5b905a0e27f3:2110",
+      "source_line_sha256": "1351fde0aa587f5db914248a360d110930942bd943bbb2ecb138d21fb2a305ce",
+      "stage": "after",
+      "statement_ast": "ClassDef(name='_FastStreamDependant', bases=[Name(id='Dependant', ctx=Load())], keywords=[], body=[Expr(value=Constant(value='FastAPI dependant extended with fields required by FastStream.')), AnnAssign(target=Name(id='model', ctx=Store()), annotation=Subscript(value=Name(id='type', ctx=Load()), slice=Name(id='Any', ctx=Load()), ctx=Load()), simple=1), AnnAssign(target=Name(id='custom_fields', ctx=Store()), annotation=Subscript(value=Name(id='dict', ctx=Load()), slice=Tuple(elts=[Name(id='str', ctx=Load()), Name(id='Any', ctx=Load())], ctx=Load()), ctx=Load()), simple=1), AnnAssign(target=Name(id='flat_params', ctx=Store()), annotation=Subscript(value=Name(id='list', ctx=Load()), slice=Name(id='OptionItem', ctx=Load()), ctx=Load()), simple=1)], decorator_list=[])",
+      "statement_kind": "ClassDef"
+    },
+    {
+      "enclosing_declarations": [
+        "_FastStreamDependant"
+      ],
+      "file_sha256": "bc41691d0880458259d35f77b045dcbde315d1ada0d28f366c8e74c1620cbe2c",
+      "id": "faststream-dependant-constructor-metadata",
+      "line": 25,
+      "path": "faststream/_internal/fastapi/get_dependant.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:22b54379dfbb33818bf606b46313ec9b50f7d1ace66a57d5e16d5b905a0e27f3:2110",
+      "source_line_sha256": "40188a27756d2d29b7b05f28438de45f53ac92b30a206fa81bba613256d19e04",
+      "stage": "after",
+      "statement_ast": "AnnAssign(target=Name(id='model', ctx=Store()), annotation=Subscript(value=Name(id='type', ctx=Load()), slice=Name(id='Any', ctx=Load()), ctx=Load()), simple=1)",
+      "statement_kind": "AnnAssign"
+    },
+    {
+      "enclosing_declarations": [
+        "_FastStreamDependant"
+      ],
+      "file_sha256": "bc41691d0880458259d35f77b045dcbde315d1ada0d28f366c8e74c1620cbe2c",
+      "id": "faststream-dependant-constructor-metadata",
+      "line": 26,
+      "path": "faststream/_internal/fastapi/get_dependant.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:22b54379dfbb33818bf606b46313ec9b50f7d1ace66a57d5e16d5b905a0e27f3:2110",
+      "source_line_sha256": "fea5ae32784bc09eecbb84d2c1a46cb278594455ecc6f6134adaaca2917b1c09",
+      "stage": "after",
+      "statement_ast": "AnnAssign(target=Name(id='custom_fields', ctx=Store()), annotation=Subscript(value=Name(id='dict', ctx=Load()), slice=Tuple(elts=[Name(id='str', ctx=Load()), Name(id='Any', ctx=Load())], ctx=Load()), ctx=Load()), simple=1)",
+      "statement_kind": "AnnAssign"
+    },
+    {
+      "enclosing_declarations": [
+        "_FastStreamDependant"
+      ],
+      "file_sha256": "bc41691d0880458259d35f77b045dcbde315d1ada0d28f366c8e74c1620cbe2c",
+      "id": "faststream-dependant-constructor-metadata",
+      "line": 27,
+      "path": "faststream/_internal/fastapi/get_dependant.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:22b54379dfbb33818bf606b46313ec9b50f7d1ace66a57d5e16d5b905a0e27f3:2110",
+      "source_line_sha256": "7ad9106a78d0878ca6300830cf09f9e861eb85f11b51a70f2f8966ed43f6ccd5",
+      "stage": "after",
+      "statement_ast": "AnnAssign(target=Name(id='flat_params', ctx=Store()), annotation=Subscript(value=Name(id='list', ctx=Load()), slice=Name(id='OptionItem', ctx=Load()), ctx=Load()), simple=1)",
+      "statement_kind": "AnnAssign"
+    },
+    {
+      "enclosing_declarations": [
+        "_extend_fastapi_dependant"
+      ],
+      "file_sha256": "bc41691d0880458259d35f77b045dcbde315d1ada0d28f366c8e74c1620cbe2c",
+      "id": "faststream-dependant-constructor-metadata",
+      "line": 33,
+      "path": "faststream/_internal/fastapi/get_dependant.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:22b54379dfbb33818bf606b46313ec9b50f7d1ace66a57d5e16d5b905a0e27f3:2110",
+      "source_line_sha256": "41ce076e91aa0c3556518435cab6a770d4554444d4f63e10293965bd5c899244",
+      "stage": "after",
+      "statement_ast": "Return(value=Call(func=Name(id='_FastStreamDependant', ctx=Load()), args=[], keywords=[keyword(value=DictComp(key=Attribute(value=Name(id='field', ctx=Load()), attr='name', ctx=Load()), value=Call(func=Name(id='getattr', ctx=Load()), args=[Name(id='dependant', ctx=Load()), Attribute(value=Name(id='field', ctx=Load()), attr='name', ctx=Load())], keywords=[]), generators=[comprehension(target=Name(id='field', ctx=Store()), iter=Call(func=Name(id='fields', ctx=Load()), args=[Name(id='dependant', ctx=Load())], keywords=[]), ifs=[], is_async=0)]))]))",
+      "statement_kind": "Return"
+    },
+    {
+      "enclosing_declarations": [
+        "_patch_fastapi_dependent"
+      ],
+      "file_sha256": "bc41691d0880458259d35f77b045dcbde315d1ada0d28f366c8e74c1620cbe2c",
+      "id": "faststream-dependant-constructor-metadata",
+      "line": 75,
+      "path": "faststream/_internal/fastapi/get_dependant.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:22b54379dfbb33818bf606b46313ec9b50f7d1ace66a57d5e16d5b905a0e27f3:2110",
+      "source_line_sha256": "18181dd52b71696949d6e5a3d88a4a906fe7f4a405025ce281df3c6c2eef40fe",
+      "stage": "after",
+      "statement_ast": "Assign(targets=[Name(id='dependant', ctx=Store())], value=Call(func=Name(id='_extend_fastapi_dependant', ctx=Load()), args=[Name(id='dependant', ctx=Load())], keywords=[]))",
+      "statement_kind": "Assign"
+    },
+    {
+      "enclosing_declarations": [
+        "_patch_fastapi_dependent"
+      ],
+      "file_sha256": "93a5de7b58fe74987b988dede40129529e85d2f5f26d04e7c27ab62e359acff6",
+      "id": "faststream-dependant-constructor-metadata",
+      "line": 131,
+      "path": "faststream/_internal/fastapi/get_dependant.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:9219915facfe9e62a28c0960c09a3c7b20a37e349117b215e463a193ea2a2eb8:2108",
+      "source_line_sha256": "8d344cf6e5ca2089b10484b85c2624ddb76aa13c3ed06c60138dacc7c226cd80",
+      "stage": "before",
+      "statement_ast": "Assign(targets=[Attribute(value=Name(id='dependant', ctx=Load()), attr='model', ctx=Store())], value=Call(func=Name(id='create_model', ctx=Load()), args=[Call(func=Name(id='getattr', ctx=Load()), args=[Name(id='call', ctx=Load()), Constant(value='__name__'), Attribute(value=Call(func=Name(id='type', ctx=Load()), args=[Name(id='call', ctx=Load())], keywords=[]), attr='__name__', ctx=Load())], keywords=[])], keywords=[]))",
+      "statement_kind": "Assign"
+    },
+    {
+      "enclosing_declarations": [
+        "Dependency"
+      ],
+      "file_sha256": "8458ce16267ed2e63a49713b7c576e29caa4d5859666c664a6fe096e650a4d0c",
+      "id": "litestar-named-dependency-markers",
+      "line": 35,
+      "path": "litestar/di.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:8f57e9100ea2a9540363ff1afd5f94ab6455577ec1f9a010f3fb638ccb8d5a52:1387",
+      "source_line_sha256": "b79ccd838c0a90833ecf42ee7c26a307ad73382122645f2d98cb720292ac7f4a",
+      "stage": "after",
+      "statement_ast": "ClassDef(name='Dependency', bases=[], keywords=[], body=[FunctionDef(name='__init__', args=arguments(posonlyargs=[], args=[arg(arg='self'), arg(arg='kind', annotation=Subscript(value=Name(id='Literal', ctx=Load()), slice=Constant(value='named'), ctx=Load()))], kwonlyargs=[], kw_defaults=[], defaults=[Constant(value='named')]), body=[Assign(targets=[Attribute(value=Name(id='self', ctx=Load()), attr='kind', ctx=Store())], value=Name(id='kind', ctx=Load()))], decorator_list=[], returns=Constant(value=None))], decorator_list=[])",
+      "statement_kind": "ClassDef"
+    },
+    {
+      "enclosing_declarations": [
+        "Dependency",
+        "Dependency.__init__"
+      ],
+      "file_sha256": "8458ce16267ed2e63a49713b7c576e29caa4d5859666c664a6fe096e650a4d0c",
+      "id": "litestar-named-dependency-markers",
+      "line": 36,
+      "path": "litestar/di.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:8f57e9100ea2a9540363ff1afd5f94ab6455577ec1f9a010f3fb638ccb8d5a52:1387",
+      "source_line_sha256": "de099fc6044328fdeff6e50d36670227c18c6c060557d4b518050caf5e1f989c",
+      "stage": "after",
+      "statement_ast": "FunctionDef(name='__init__', args=arguments(posonlyargs=[], args=[arg(arg='self'), arg(arg='kind', annotation=Subscript(value=Name(id='Literal', ctx=Load()), slice=Constant(value='named'), ctx=Load()))], kwonlyargs=[], kw_defaults=[], defaults=[Constant(value='named')]), body=[Assign(targets=[Attribute(value=Name(id='self', ctx=Load()), attr='kind', ctx=Store())], value=Name(id='kind', ctx=Load()))], decorator_list=[], returns=Constant(value=None))",
+      "statement_kind": "FunctionDef"
+    },
+    {
+      "enclosing_declarations": [],
+      "file_sha256": "8458ce16267ed2e63a49713b7c576e29caa4d5859666c664a6fe096e650a4d0c",
+      "id": "litestar-named-dependency-markers",
+      "line": 42,
+      "path": "litestar/di.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:8f57e9100ea2a9540363ff1afd5f94ab6455577ec1f9a010f3fb638ccb8d5a52:1387",
+      "source_line_sha256": "40aff66bc751a16948666da6cba87ffa1c1128e5223850069260d6b8e274d6f2",
+      "stage": "after",
+      "statement_ast": "Assign(targets=[Name(id='NamedDependency', ctx=Store())], value=Subscript(value=Name(id='Annotated', ctx=Load()), slice=Tuple(elts=[Name(id='T', ctx=Load()), Call(func=Name(id='Dependency', ctx=Load()), args=[], keywords=[keyword(arg='kind', value=Constant(value='named'))])], ctx=Load()), ctx=Load()))",
+      "statement_kind": "Assign"
+    },
+    {
+      "enclosing_declarations": [],
+      "file_sha256": "608c274bea8da26a963045cbb3dfd8d651d60ec665ce9fe06e7d6e5cb80852c6",
+      "id": "litestar-named-dependency-markers",
+      "line": 26,
+      "path": "litestar/di.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:675f5936274fdf7313e73a80951aed10dc624de59c236cc2825173163a1fcdfb:1387",
+      "source_line_sha256": "2b4a69affd27b3d92befb542d24c354dbb13a6468725eda6cd562da71d2c273a",
+      "stage": "before",
+      "statement_ast": "Assign(targets=[Name(id='__all__', ctx=Store())], value=Tuple(elts=[Constant(value='Provide')], ctx=Load()))",
+      "statement_kind": "Assign"
+    },
+    {
+      "enclosing_declarations": [
+        "_extend_fastapi_dependant"
+      ],
+      "file_sha256": "19607814dec2c0046f3db0462c5d7997a34ca9508d90c6bea4bc449129fc71c2",
+      "id": "faststream-non-init-dependant-fields",
+      "line": 33,
+      "path": "faststream/_internal/fastapi/get_dependant.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:bbc1b057d83d7ec05b8b347d9febd79eaa53351d10963bc3ab156fcef446d12d:2122",
+      "source_line_sha256": "feb8e4647331b9b1c956f637ee27bec226344afb30150dcbc0cce5d275d85d0c",
+      "stage": "after",
+      "statement_ast": "Return(value=Call(func=Name(id='_FastStreamDependant', ctx=Load()), args=[], keywords=[keyword(value=DictComp(key=Attribute(value=Name(id='field', ctx=Load()), attr='name', ctx=Load()), value=Call(func=Name(id='getattr', ctx=Load()), args=[Name(id='dependant', ctx=Load()), Attribute(value=Name(id='field', ctx=Load()), attr='name', ctx=Load())], keywords=[]), generators=[comprehension(target=Name(id='field', ctx=Store()), iter=Call(func=Name(id='fields', ctx=Load()), args=[Name(id='dependant', ctx=Load())], keywords=[]), ifs=[Attribute(value=Name(id='field', ctx=Load()), attr='init', ctx=Load())], is_async=0)]))]))",
+      "statement_kind": "Return"
+    },
+    {
+      "enclosing_declarations": [
+        "_extend_fastapi_dependant"
+      ],
+      "file_sha256": "19607814dec2c0046f3db0462c5d7997a34ca9508d90c6bea4bc449129fc71c2",
+      "id": "faststream-non-init-dependant-fields",
+      "line": 34,
+      "path": "faststream/_internal/fastapi/get_dependant.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:bbc1b057d83d7ec05b8b347d9febd79eaa53351d10963bc3ab156fcef446d12d:2122",
+      "source_line_sha256": "884bf8a22d2d7d8c4d98b84e8cb833554efcdb74682e39c3d528f7717b4908d4",
+      "stage": "after",
+      "statement_ast": "Return(value=Call(func=Name(id='_FastStreamDependant', ctx=Load()), args=[], keywords=[keyword(value=DictComp(key=Attribute(value=Name(id='field', ctx=Load()), attr='name', ctx=Load()), value=Call(func=Name(id='getattr', ctx=Load()), args=[Name(id='dependant', ctx=Load()), Attribute(value=Name(id='field', ctx=Load()), attr='name', ctx=Load())], keywords=[]), generators=[comprehension(target=Name(id='field', ctx=Store()), iter=Call(func=Name(id='fields', ctx=Load()), args=[Name(id='dependant', ctx=Load())], keywords=[]), ifs=[Attribute(value=Name(id='field', ctx=Load()), attr='init', ctx=Load())], is_async=0)]))]))",
+      "statement_kind": "Return"
+    },
+    {
+      "enclosing_declarations": [
+        "_extend_fastapi_dependant"
+      ],
+      "file_sha256": "19607814dec2c0046f3db0462c5d7997a34ca9508d90c6bea4bc449129fc71c2",
+      "id": "faststream-non-init-dependant-fields",
+      "line": 35,
+      "path": "faststream/_internal/fastapi/get_dependant.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:bbc1b057d83d7ec05b8b347d9febd79eaa53351d10963bc3ab156fcef446d12d:2122",
+      "source_line_sha256": "be8620733e19f413c4cc8ce8dc6e0fb27a9c7b95ad4e1e9567dae8fbc3082162",
+      "stage": "after",
+      "statement_ast": "Return(value=Call(func=Name(id='_FastStreamDependant', ctx=Load()), args=[], keywords=[keyword(value=DictComp(key=Attribute(value=Name(id='field', ctx=Load()), attr='name', ctx=Load()), value=Call(func=Name(id='getattr', ctx=Load()), args=[Name(id='dependant', ctx=Load()), Attribute(value=Name(id='field', ctx=Load()), attr='name', ctx=Load())], keywords=[]), generators=[comprehension(target=Name(id='field', ctx=Store()), iter=Call(func=Name(id='fields', ctx=Load()), args=[Name(id='dependant', ctx=Load())], keywords=[]), ifs=[Attribute(value=Name(id='field', ctx=Load()), attr='init', ctx=Load())], is_async=0)]))]))",
+      "statement_kind": "Return"
+    },
+    {
+      "enclosing_declarations": [
+        "_extend_fastapi_dependant"
+      ],
+      "file_sha256": "bc41691d0880458259d35f77b045dcbde315d1ada0d28f366c8e74c1620cbe2c",
+      "id": "faststream-non-init-dependant-fields",
+      "line": 33,
+      "path": "faststream/_internal/fastapi/get_dependant.py",
+      "runtime_interpretation": "not-established",
+      "source_identity": "sha256:6c2ba2f0837458b224f75095046d7cb713cbd9759d813140c623fcbaa1c85cf0:2113",
+      "source_line_sha256": "41ce076e91aa0c3556518435cab6a770d4554444d4f63e10293965bd5c899244",
+      "stage": "before",
+      "statement_ast": "Return(value=Call(func=Name(id='_FastStreamDependant', ctx=Load()), args=[], keywords=[keyword(value=DictComp(key=Attribute(value=Name(id='field', ctx=Load()), attr='name', ctx=Load()), value=Call(func=Name(id='getattr', ctx=Load()), args=[Name(id='dependant', ctx=Load()), Attribute(value=Name(id='field', ctx=Load()), attr='name', ctx=Load())], keywords=[]), generators=[comprehension(target=Name(id='field', ctx=Store()), iter=Call(func=Name(id='fields', ctx=Load()), args=[Name(id='dependant', ctx=Load())], keywords=[]), ifs=[], is_async=0)]))]))",
+      "statement_kind": "Return"
+    }
+  ],
+  "schema": "hashmarks.configuration-source-ast-review.v1",
+  "scope": "all 66 independently selected source lines bound to exact lexical declarations and statement ASTs; no product outcomes, runtime execution or capability admission used",
+  "source_line_count": 66,
+  "status": "INCOMPLETE"
+}

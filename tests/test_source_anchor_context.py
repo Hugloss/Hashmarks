@@ -19,6 +19,46 @@ from hashmarks.evidence_presentation import present_repository_evidence
 from hashmarks.mcp_surface import HashmarksMcpSurface, McpSurfaceError
 
 
+@pytest.mark.parametrize("count", [6, 8, 32])
+@pytest.mark.parametrize("format", ["compact", "text"])
+@pytest.mark.parametrize("literal", [None, "common"])
+def test_requested_anchors_survive_display_bounds_and_literal_matches(
+    tmp_path: Path, count: int, format: str, literal: str | None
+) -> None:
+    (tmp_path / "example.py").write_text(
+        "".join(f'VALUE_{i} = "common"\n' for i in range(64))
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        packet = codemap.source.observe(
+            "example.py",
+            literal=literal,
+            lines=tuple(range(1, count + 1)),
+            anchor_context_lines=1 if count <= 8 else 0,
+            limit=64,
+        )
+    original = deepcopy(packet)
+    projection = present_repository_evidence(packet, format=format)
+    findings = [
+        row
+        for group in assert_records(projection["groups"])
+        for row in assert_records(group["findings"])
+        if row["kind"] == "line_anchors"
+    ]
+    assert len(findings) == count
+    assert [assert_object(row["details"])["line"] for row in findings] == list(
+        range(1, count + 1)
+    )
+    assert [row["source_refs"] for row in findings] == [
+        [f"/line_anchors/{i}"] for i in range(count)
+    ]
+    assert packet == original
+    for finding, native in zip(
+        findings, assert_records(packet["line_anchors"]), strict=True
+    ):
+        assert finding["details"] == native
+
+
 def test_opt_in_line_context_preserves_legacy_anchors_and_identity(
     tmp_path: Path,
 ) -> None:

@@ -157,8 +157,10 @@ line/start-column and explicit left/right truncation. Its center
 neighbors have `role: "context"`. CRLF trailing carriage returns are
 omitted from displayed text, not from the original byte-line digest.
 
-Agent-native source presentation places explicit `line_anchors` after
-literal `occurrences`, before member inventories. All details and exact
+Agent-native source presentation places explicitly requested `line_anchors`
+before literal `occurrences` and member inventories, using the existing 48-row
+bound in every format so the supported requested anchors remain visible.
+Without explicit line requests, the normal display caps and order apply. All details and exact
 `/line_anchors/N` pointers survive compact rendering; omitted row counts
 remain projection-only. The native packet remains the sole source authority,
 and line excerpt display does not imply that the diagnostic producer observed
