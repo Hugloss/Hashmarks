@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from enum import Enum
+from types import TracebackType
 from typing import TYPE_CHECKING
 
 from .client import DaemonCompatibilityError, DaemonUnavailableError, IdentityClient
 from .digest import Digest
 from .engine import IdentityEngine
+from .generation_domain import require_generation
 from .inputs import InputManifest
 from .schema import IDENTITY_SCHEMA
 from .snapshot import Snapshot
@@ -14,6 +16,9 @@ from .specs import InputValue, validate_input_values
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
     from pathlib import Path
+
+    from .codemap import CodeMap
+    from .watcher import NativeLinuxBatchWatcher, WatchdogBatchWatcher
 
 
 class RepositoryIdentityMode(str, Enum):
@@ -53,7 +58,9 @@ class RepositoryIdentity:
             raise ValueError("local_observer must be reconcile, watcher, or manual")
         self.local_observer = local_observer
         self._engine: IdentityEngine | None = None
-        self._local_watcher = None
+        self._local_watcher: NativeLinuxBatchWatcher | WatchdogBatchWatcher | None = (
+            None
+        )
         self._manifest_handles: dict[str, str] = {}
         self._daemon_confirmed = False
         self._codemap = None
@@ -66,7 +73,12 @@ class RepositoryIdentity:
     def __enter__(self) -> RepositoryIdentity:
         return self
 
-    def __exit__(self, exc_type, exc, tb) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None:
         self.close()
 
     def close(self) -> None:
@@ -141,15 +153,20 @@ class RepositoryIdentity:
 
     @staticmethod
     def _snapshot_from_response(response: Mapping[str, object]) -> Snapshot:
+        size = response["size"]
+        if type(size) is not int:
+            raise ValueError("snapshot size must be an integer")
+        generation = response.get("generation")
+        if generation is not None:
+            generation = require_generation(generation, field="snapshot generation")
+        observed_paths = response.get("observed_paths", [])
+        if not isinstance(observed_paths, list):
+            raise ValueError("snapshot observed_paths must be an array")
         return Snapshot(
-            digest=Digest(hash=str(response["hash"]), size=int(response["size"])),
+            digest=Digest(hash=str(response["hash"]), size=size),
             manifest_fingerprint=str(response["manifest"]),
-            generation=None
-            if response.get("generation") is None
-            else int(response["generation"]),
-            observed_paths=tuple(
-                str(path) for path in response.get("observed_paths", [])
-            ),
+            generation=generation,
+            observed_paths=tuple(str(path) for path in observed_paths),
             mode=str(response.get("mode", "daemon")),
         )
 
@@ -208,7 +225,7 @@ class RepositoryIdentity:
                 self._daemon_confirmed = False
         return self._prepare_local_read().snapshot(manifest, verify=verify)
 
-    def code_map(self):
+    def code_map(self) -> CodeMap:
         """Return the lazily-created derived CodeMap for repository-intelligence queries.
 
         Importing or using Identity never loads CodeMap unless this method is called,

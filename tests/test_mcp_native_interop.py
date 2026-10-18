@@ -7,6 +7,7 @@ import sys
 from typing import TYPE_CHECKING
 
 import pytest
+from contract_assertions import assert_object
 
 from hashmarks._version import __version__
 from hashmarks.codemap.evidence_packet import TASK_EVIDENCE_DEFAULT_OPTIONS
@@ -18,16 +19,26 @@ from hashmarks.mcp_contract import (
     contract_from_tool_models,
     tool_description,
 )
+from hashmarks.mcp_sdk_server import close_sdk_server
 from hashmarks.operation_contract import operation_default_mode, operation_modes
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from mcp import ClientSession
 
 pytestmark = pytest.mark.host_mcp_sdk
 
 _MCP_AVAILABLE = importlib.util.find_spec("mcp") is not None
 _NATIVE_REASON = "Hashmarks MCP interop requires the optional mcp extra"
 _EXPECTED_TOOLS = list(MCP_TOOL_NAMES)
+
+
+def _text_content(block: object) -> str:
+    from mcp.types import TextContent
+
+    assert isinstance(block, TextContent)
+    return block.text
 
 
 def _repo(tmp_path: Path) -> Path:
@@ -47,8 +58,12 @@ def _repo(tmp_path: Path) -> Path:
 def _assert_canonical_result_mode_schemas(
     schemas: dict[str, dict[str, object]],
 ) -> dict[str, dict[str, object]]:
-    dependency = schemas["dependency_codemap"]["properties"]["result_mode"]
-    declarations = schemas["repository_declarations"]["properties"]["result_mode"]
+    dependency = assert_object(
+        assert_object(schemas["dependency_codemap"]["properties"])["result_mode"]
+    )
+    declarations = assert_object(
+        assert_object(schemas["repository_declarations"]["properties"])["result_mode"]
+    )
     assert dependency["enum"] == list(operation_modes("dependency_codemap"))
     assert dependency["default"] == operation_default_mode("dependency_codemap")
     assert declarations["enum"] == list(operation_modes("repository_declarations"))
@@ -60,7 +75,8 @@ def _assert_find_defaults(
     schemas: dict[str, dict[str, object]],
 ) -> None:
     assert (
-        schemas["find"]["properties"]["limit"]["default"] == FIND_DEFAULT_OPTIONS.limit
+        assert_object(assert_object(schemas["find"]["properties"])["limit"])["default"]
+        == FIND_DEFAULT_OPTIONS.limit
     )
 
 
@@ -68,18 +84,25 @@ def _assert_task_evidence_defaults(
     schemas: dict[str, dict[str, object]],
 ) -> None:
     defaults = TASK_EVIDENCE_DEFAULT_OPTIONS
-    task_properties = schemas["task_evidence"]["properties"]
-    assert task_properties["limit"]["default"] == defaults.limit
-    assert task_properties["per_role"]["default"] == defaults.per_role
-    assert task_properties["token_budget"]["default"] == defaults.token_budget
+    task_properties = assert_object(schemas["task_evidence"]["properties"])
+    assert assert_object(task_properties["limit"])["default"] == defaults.limit
+    assert assert_object(task_properties["per_role"])["default"] == defaults.per_role
     assert (
-        schemas["post_change"]["properties"]["token_budget"]["default"]
+        assert_object(task_properties["token_budget"])["default"]
+        == defaults.token_budget
+    )
+    assert (
+        assert_object(
+            assert_object(schemas["post_change"]["properties"])["token_budget"]
+        )["default"]
         == defaults.token_budget
     )
 
 
 @pytest.mark.skipif(not _MCP_AVAILABLE, reason=_NATIVE_REASON)
 def test_mcp_native_server_catalog_and_structured_call(tmp_path: Path) -> None:
+    from mcp.types import CallToolResult
+
     from hashmarks.mcp_server import build_server
 
     server = build_server(_repo(tmp_path), state_dir=tmp_path / "state")
@@ -102,13 +125,15 @@ def test_mcp_native_server_catalog_and_structured_call(tmp_path: Path) -> None:
         ] == _EXPECTED_TOOLS
         task_description = descriptions["task_evidence"]
         for phrase in (
-            "Semantic first choice",
-            "exploratory grep/read",
-            "retrieval from ownership",
-            "owner/ambiguity",
+            "Unknown paths",
+            "retrieval",
+            "ownership/ambiguity",
             "source/next-read",
             "verification",
             "freshness",
+            "structuredContent",
+            "readable text",
+            "JSON mirror",
         ):
             assert phrase in task_description
         schemas = _assert_canonical_result_mode_schemas(
@@ -128,14 +153,14 @@ def test_mcp_native_server_catalog_and_structured_call(tmp_path: Path) -> None:
             assert tool.output_schema is not None
 
         result = await server.call_tool("repository_context", {})
-        assert result.is_error is not True
+        assert isinstance(result, CallToolResult) and result.is_error is not True
         assert result.structured_content is not None
         assert result.structured_content["schema"] == "hashmarks.repository-capsule.v1"
 
     try:
         asyncio.run(exercise())
     finally:
-        server._hashmarks_surface.close()
+        close_sdk_server(server)
 
 
 @pytest.mark.skipif(not _MCP_AVAILABLE, reason=_NATIVE_REASON)
@@ -159,7 +184,7 @@ def test_mcp_native_server_can_expose_one_explicit_tool_projection(
     try:
         asyncio.run(exercise())
     finally:
-        server._hashmarks_surface.close()
+        close_sdk_server(server)
 
 
 @pytest.mark.skipif(not _MCP_AVAILABLE, reason=_NATIVE_REASON)
@@ -226,4 +251,51 @@ def test_mcp_native_stdio_initialize_catalog_call_and_error(tmp_path: Path) -> N
                     "recovery_authority": "consumer-owned",
                 }
 
+                await _assert_initial_delivery(session)
+
     asyncio.run(exercise())
+
+
+async def _assert_initial_delivery(session: ClientSession) -> None:
+    from hashmarks.codemap.task_evidence_initial import (
+        decode_initial_packet,
+    )
+    from hashmarks.evidence_presentation import (
+        FORMATS,
+        present_repository_evidence,
+    )
+
+    initial_identity = None
+    for mode in FORMATS:
+        initial = await session.call_tool(
+            "task_evidence",
+            arguments={
+                "task": "Fix flare041",
+                "result_mode": "initial",
+                "presentation": mode,
+            },
+        )
+        assert not initial.is_error
+        native = initial.structured_content
+        assert isinstance(native, dict)
+        logical = decode_initial_packet(native)
+        assert logical["ownership"]["owner"]["path"] == "src/feature.py"
+        identity = logical["evidence_packet_identity"]
+        if initial_identity is None:
+            initial_identity = identity
+        assert identity == initial_identity
+        assert len(initial.content) == 1
+        text = _text_content(initial.content[0])
+        if mode != "none":
+            projection = present_repository_evidence(native, format=mode)
+            assert (text if mode == "text" else json.loads(text)) == (
+                projection["text"] if mode == "text" else projection
+            )
+        assert (
+            "encoding" not in json.loads(text)
+            if mode in {"structured", "compact"}
+            else True
+        )
+    full = await session.call_tool("task_evidence", arguments={"task": "Fix flare041"})
+    assert full.structured_content["schema"] == "hashmarks.task-evidence.v5"
+    assert json.loads(_text_content(full.content[0])) == full.structured_content

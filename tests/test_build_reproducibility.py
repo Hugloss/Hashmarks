@@ -4,6 +4,8 @@ import hashlib
 import os
 from typing import TYPE_CHECKING
 
+import pytest
+
 import hashmarks_build
 
 if TYPE_CHECKING:
@@ -16,7 +18,7 @@ def _sha(path: Path) -> str:
 
 def test_sdist_is_reproducible_across_source_mtime_changes(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     release = tmp_path / "release"
     (release / "hashmarks").mkdir(parents=True)
@@ -47,7 +49,7 @@ def test_sdist_is_reproducible_across_source_mtime_changes(
 
 def test_wheel_is_reproducible_across_source_mtime_changes(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     release = tmp_path / "release"
     (release / "hashmarks").mkdir(parents=True)

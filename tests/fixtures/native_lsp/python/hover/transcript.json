@@ -19,11 +19,11 @@
         },
         "initializationOptions": {},
         "processId": null,
-        "rootUri": "file:///tmp/hashmarks-hover-capture-3kpqb84g/hover",
+        "rootUri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/hover",
         "workspaceFolders": [
           {
             "name": "fixture",
-            "uri": "file:///tmp/hashmarks-hover-capture-3kpqb84g/hover"
+            "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/hover"
           }
         ]
       }
@@ -152,7 +152,7 @@
         "textDocument": {
           "languageId": "python",
           "text": "def target(value: str) -> str:\n    \"\"\"Return caf\u00e9 text.\"\"\"\n    return value\n\n\ndef caller() -> str:\n    return target(\"caf\u00e9\")\n",
-          "uri": "file:///tmp/hashmarks-hover-capture-3kpqb84g/hover/src/source.py",
+          "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/hover/src/source.py",
           "version": 1
         }
       }
@@ -169,7 +169,7 @@
           "line": 0
         },
         "textDocument": {
-          "uri": "file:///tmp/hashmarks-hover-capture-3kpqb84g/hover/src/source.py"
+          "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/hover/src/source.py"
         }
       }
     }
@@ -179,7 +179,7 @@
       "jsonrpc": "2.0",
       "method": "window/logMessage",
       "params": {
-        "message": "Loading configuration file at /tmp/hashmarks-hover-capture-3kpqb84g/hover/pyrightconfig.json",
+        "message": "Loading configuration file at /tmp/hashmarks-lsp-repair-8orshh6c/hover/pyrightconfig.json",
         "type": 3
       }
     }
@@ -267,7 +267,7 @@
           "line": 0
         },
         "textDocument": {
-          "uri": "file:///tmp/hashmarks-hover-capture-3kpqb84g/hover/src/source.py"
+          "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/hover/src/source.py"
         },
         "workDoneToken": "hover:target"
       }
@@ -289,7 +289,7 @@
       "method": "textDocument/publishDiagnostics",
       "params": {
         "diagnostics": [],
-        "uri": "file:///tmp/hashmarks-hover-capture-3kpqb84g/hover/src/source.py",
+        "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/hover/src/source.py",
         "version": 1
       }
     }
@@ -327,7 +327,7 @@
           "line": 0
         },
         "textDocument": {
-          "uri": "file:///tmp/hashmarks-hover-capture-3kpqb84g/hover/src/source.py"
+          "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/hover/src/source.py"
         },
         "workDoneToken": 0
       }
@@ -366,7 +366,7 @@
           "line": 0
         },
         "textDocument": {
-          "uri": "file:///tmp/hashmarks-hover-capture-3kpqb84g/hover/src/source.py"
+          "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/hover/src/source.py"
         }
       }
     }
@@ -392,7 +392,7 @@
           "line": 0
         },
         "textDocument": {
-          "uri": "file:///tmp/hashmarks-hover-capture-3kpqb84g/hover/src/source.py"
+          "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/hover/src/source.py"
         }
       }
     }
@@ -413,7 +413,7 @@
               "line": 0
             }
           },
-          "uri": "file:///tmp/hashmarks-hover-capture-3kpqb84g/hover/src/source.py"
+          "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/hover/src/source.py"
         },
         {
           "range": {
@@ -426,7 +426,7 @@
               "line": 6
             }
           },
-          "uri": "file:///tmp/hashmarks-hover-capture-3kpqb84g/hover/src/source.py"
+          "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/hover/src/source.py"
         }
       ]
     }
@@ -442,7 +442,7 @@
           }
         ],
         "textDocument": {
-          "uri": "file:///tmp/hashmarks-hover-capture-3kpqb84g/hover/src/source.py",
+          "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/hover/src/source.py",
           "version": 2
         }
       }
@@ -459,7 +459,7 @@
           "line": 0
         },
         "textDocument": {
-          "uri": "file:///tmp/hashmarks-hover-capture-3kpqb84g/hover/src/source.py"
+          "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/hover/src/source.py"
         }
       }
     }
@@ -492,7 +492,7 @@
       "method": "textDocument/didClose",
       "params": {
         "textDocument": {
-          "uri": "file:///tmp/hashmarks-hover-capture-3kpqb84g/hover/src/source.py"
+          "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/hover/src/source.py"
         }
       }
     }
@@ -505,7 +505,7 @@
         "textDocument": {
           "languageId": "python",
           "text": "def target(value: str) -> str:\n    \"\"\"Return caf\u00e9 text.\"\"\"\n    return value\n\n\ndef caller() -> str:\n    return target(\"caf\u00e9\")\n",
-          "uri": "file:///tmp/hashmarks-hover-capture-3kpqb84g/hover/src/source.py",
+          "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/hover/src/source.py",
           "version": 1
         }
       }
@@ -522,7 +522,7 @@
           "line": 0
         },
         "textDocument": {
-          "uri": "file:///tmp/hashmarks-hover-capture-3kpqb84g/hover/src/source.py"
+          "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/hover/src/source.py"
         }
       }
     }
@@ -533,7 +533,7 @@
       "method": "textDocument/publishDiagnostics",
       "params": {
         "diagnostics": [],
-        "uri": "file:///tmp/hashmarks-hover-capture-3kpqb84g/hover/src/source.py"
+        "uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/hover/src/source.py"
       }
     }
   },

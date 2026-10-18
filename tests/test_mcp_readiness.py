@@ -6,12 +6,14 @@ import json
 from pathlib import Path
 
 import pytest
+from contract_assertions import assert_array, assert_object
 
 import hashmarks.cli as cli
 import hashmarks.mcp_readiness as readiness
 from hashmarks.codemap.repository_intelligence_query import QUERY_SURFACES
 from hashmarks.mcp_contract import MCP_TOOL_NAMES
 from hashmarks.mcp_readiness import MCP_READINESS_SCHEMA, mcp_readiness
+from hashmarks.mcp_sdk_server import close_sdk_server
 
 
 def test_native_server_advertises_restricted_query_surface(
@@ -34,12 +36,15 @@ def test_native_server_advertises_restricted_query_surface(
             "title": "Surface Name",
             "type": "string",
         }
-        assert server._hashmarks_projection_query_surfaces == (
+        assert getattr(server, "_hashmarks_projection_query_surfaces", None) == (
             "verification-explanation",
         )
-        assert server._hashmarks_query_surface_projection_explicit is True
+        assert (
+            getattr(server, "_hashmarks_query_surface_projection_explicit", None)
+            is True
+        )
     finally:
-        server._hashmarks_surface.close()
+        close_sdk_server(server)
 
 
 def test_native_server_advertises_full_query_surface_enum_by_default(
@@ -58,7 +63,7 @@ def test_native_server_advertises_full_query_surface_enum_by_default(
             QUERY_SURFACES
         )
     finally:
-        server._hashmarks_surface.close()
+        close_sdk_server(server)
 
 
 def test_native_server_advertises_selected_query_surface_enum(
@@ -79,11 +84,11 @@ def test_native_server_advertises_selected_query_surface_enum(
             "freshness",
         ]
     finally:
-        server._hashmarks_surface.close()
+        close_sdk_server(server)
 
 
 def test_mcp_readiness_projects_contract_and_launch(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -103,7 +108,9 @@ def test_mcp_readiness_projects_contract_and_launch(
         },
     )
 
-    async def observed(*_args, **_kwargs):
+    async def observed(
+        *_args: object, **_kwargs: object
+    ) -> tuple[tuple[str, ...], tuple[str, ...]]:
         return MCP_TOOL_NAMES, QUERY_SURFACES
 
     monkeypatch.setattr(readiness, "_observed_projection", observed)
@@ -147,7 +154,7 @@ def test_mcp_readiness_projects_contract_and_launch(
 
 
 def test_doctor_mcp_is_opt_in_and_machine_readable(
-    tmp_path: Path, monkeypatch, capsys
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     class Identity:
         def __init__(self, *_args, **_kwargs) -> None:
@@ -192,7 +199,7 @@ def test_doctor_mcp_is_opt_in_and_machine_readable(
 
 
 def test_mcp_readiness_qualifies_explicit_tool_projection(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -212,7 +219,9 @@ def test_mcp_readiness_qualifies_explicit_tool_projection(
         lambda *_args, **_kwargs: canonical,
     )
 
-    async def observed(*_args, **_kwargs):
+    async def observed(
+        *_args: object, **_kwargs: object
+    ) -> tuple[tuple[str, ...], None]:
         return ("task_evidence",), None
 
     monkeypatch.setattr(readiness, "_observed_projection", observed)
@@ -224,10 +233,12 @@ def test_mcp_readiness_qualifies_explicit_tool_projection(
 
     assert result["ready"] is True
     assert result["tools"] == list(MCP_TOOL_NAMES)
-    assert result["projection"]["tools"] == ["task_evidence"]
-    assert result["projection"]["observed_tools"] == ["task_evidence"]
-    assert str(result["projection"]["projection_identity"]).startswith("sha256:")
-    assert result["launch"]["args"][-3:] == [
+    assert assert_object(result["projection"])["tools"] == ["task_evidence"]
+    assert assert_object(result["projection"])["observed_tools"] == ["task_evidence"]
+    assert str(assert_object(result["projection"])["projection_identity"]).startswith(
+        "sha256:"
+    )
+    assert assert_array(assert_object(result["launch"])["args"])[-3:] == [
         "mcp",
         "--tool",
         "task_evidence",
@@ -235,7 +246,7 @@ def test_mcp_readiness_qualifies_explicit_tool_projection(
 
 
 def test_mcp_readiness_qualifies_query_surface_projection(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -255,7 +266,9 @@ def test_mcp_readiness_qualifies_query_surface_projection(
         lambda *_args, **_kwargs: canonical,
     )
 
-    async def observed(*_args, **_kwargs):
+    async def observed(
+        *_args: object, **_kwargs: object
+    ) -> tuple[tuple[str, ...], tuple[str, ...]]:
         return ("repository_intelligence_query",), ("verification-explanation",)
 
     monkeypatch.setattr(readiness, "_observed_projection", observed)
@@ -266,7 +279,7 @@ def test_mcp_readiness_qualifies_query_surface_projection(
         query_surfaces=("verification-explanation",),
     )
 
-    projection = result["projection"]
+    projection = assert_object(result["projection"])
     assert result["ready"] is True
     assert projection["tools"] == ["repository_intelligence_query"]
     assert projection["repository_intelligence_query_surfaces"] == [
@@ -275,7 +288,7 @@ def test_mcp_readiness_qualifies_query_surface_projection(
     assert projection["observed_repository_intelligence_query_surfaces"] == [
         "verification-explanation"
     ]
-    assert result["launch"]["args"][-5:] == [
+    assert assert_array(assert_object(result["launch"])["args"])[-5:] == [
         "mcp",
         "--tool",
         "repository_intelligence_query",
@@ -285,7 +298,7 @@ def test_mcp_readiness_qualifies_query_surface_projection(
 
 
 def test_mcp_readiness_fails_closed_on_query_surface_observation_drift(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -305,7 +318,9 @@ def test_mcp_readiness_fails_closed_on_query_surface_observation_drift(
         lambda *_args, **_kwargs: canonical,
     )
 
-    async def observed(*_args, **_kwargs):
+    async def observed(
+        *_args: object, **_kwargs: object
+    ) -> tuple[tuple[str, ...], tuple[str, ...]]:
         return ("repository_intelligence_query",), ("freshness",)
 
     monkeypatch.setattr(readiness, "_observed_projection", observed)
@@ -317,13 +332,13 @@ def test_mcp_readiness_fails_closed_on_query_surface_observation_drift(
     )
 
     assert result["ready"] is False
-    assert result["projection"]["observed_repository_intelligence_query_surfaces"] == [
-        "freshness"
-    ]
+    assert assert_object(result["projection"])[
+        "observed_repository_intelligence_query_surfaces"
+    ] == ["freshness"]
 
 
 def test_mcp_readiness_checks_default_query_surface_schema(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -343,7 +358,9 @@ def test_mcp_readiness_checks_default_query_surface_schema(
         lambda *_args, **_kwargs: canonical,
     )
 
-    async def observed(*_args, **_kwargs):
+    async def observed(
+        *_args: object, **_kwargs: object
+    ) -> tuple[tuple[str, ...], tuple[str, ...]]:
         return MCP_TOOL_NAMES, ("freshness",)
 
     monkeypatch.setattr(readiness, "_observed_projection", observed)

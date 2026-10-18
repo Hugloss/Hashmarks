@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from contract_assertions import assert_object, assert_present
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.project_graph import (
@@ -51,18 +52,18 @@ def test_directory_spelling_does_not_decide_owner_authority(
         root.mkdir()
         _owner_corpus(root, name)
         with CodeMap(root) as codemap:
-            codemap.sync()
+            codemap.index.sync()
             assert {"src/owner.py", f"{name}/owner.py"} <= set(codemap.store.paths())
-            vague = codemap.task_action_map("Fix handle_orbit behavior", limit=20)
-            explicit = codemap.task_action_map(
+            vague = codemap.tasks.action_map("Fix handle_orbit behavior", limit=20)
+            explicit = codemap.tasks.action_map(
                 f"Fix {name}/owner.py handle_orbit behavior", limit=20
             )
-            graph = codemap.ownership_relation_graph(
+            graph = codemap.ownership.relations(
                 "Fix handle_orbit behavior", f"tests/test_{name}.py", max_depth=3
             )
         assert vague["ambiguity"]["ambiguous"] is True
         assert vague["ownership_authority"]["owner_resolved"] is False
-        assert explicit["edit"]["path"] == f"{name}/owner.py"
+        assert assert_present(explicit["edit"])["path"] == f"{name}/owner.py"
         assert explicit["ambiguity"]["ambiguous"] is False
         assert graph["selected"] == f"{name}/owner.py"
         observations.append(
@@ -87,10 +88,12 @@ def test_project_names_have_no_generic_query_expansion(
         _write(root, f"app/{name}.py", f"def {name}_handler(): return 1\n")
         _write(root, "README.md", f"{name} handler reference\n")
         with CodeMap(root) as codemap:
-            codemap.sync()
+            codemap.index.sync()
             task = f"Fix {name} handler"
-            views.append(codemap.task_query_views(task))
-            paths.append(tuple(hit.path for hit in codemap.find_task(task, limit=5)))
+            views.append(codemap.search.task_query_views(task))
+            paths.append(
+                tuple(hit.path for hit in codemap.search.find_task(task, limit=5))
+            )
     assert {
         key: value.replace(brand, neutral) for key, value in views[0].items()
     } == views[1]
@@ -126,9 +129,9 @@ def test_qualified_reexport_outweighs_unrelated_duplicate(
         "def test_other(): assert handle_orbit() == 'other'\n",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        action = codemap.task_action_map("Fix src.case.handle_orbit", limit=20)
-    assert action["edit"]["path"] == "src/case/engine.py"
+        codemap.index.sync()
+        action = codemap.tasks.action_map("Fix src.case.handle_orbit", limit=20)
+    assert assert_present(action["edit"])["path"] == "src/case/engine.py"
     assert action["owner_basis"] == "exact-import-owner"
     assert action["ambiguity"]["ambiguous"] is False
 
@@ -140,16 +143,16 @@ def test_newly_admitted_directory_is_discovered_on_reopen_and_bounded_sync(
     _write(tmp_path, ".fastidentity/source.py", "def newly_visible(): return 2\n")
     state_dir = tmp_path / ".state"
     with CodeMap(tmp_path, state_dir=state_dir) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         codemap.store.delete_paths([".fastidentity/source.py"])
         codemap.store.set_meta("analysis_scope_conformance_identity", "old-scope")
     with CodeMap(tmp_path, state_dir=state_dir) as codemap:
-        assert {hit.path for hit in codemap.find("newly_visible")} == {
+        assert {hit.path for hit in codemap.search.find("newly_visible")} == {
             ".fastidentity/source.py"
         }
         codemap.store.delete_paths([".fastidentity/source.py"])
         codemap.store.set_meta("analysis_scope_conformance_identity", "old-scope")
-        codemap.sync(["ordinary.py"])
+        codemap.index.sync(["ordinary.py"])
         assert ".fastidentity/source.py" in codemap.store.paths()
 
 
@@ -158,7 +161,7 @@ def test_configured_fastidentity_state_is_excluded_from_codemap(
 ) -> None:
     _write(tmp_path, "src/owner.py", "def visible_owner(): return 1\n")
     with CodeMap(tmp_path, state_dir=tmp_path / ".fastidentity") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         assert "src/owner.py" in codemap.store.paths()
         assert not any(
             path.startswith(".fastidentity/") for path in codemap.store.paths()
@@ -228,14 +231,14 @@ def test_project_provider_name_does_not_decide_generation_freshness(
     _write(tmp_path, "source.py", "VALUE = 1\n")
     provider = _SemanticProjectProvider(provider_name, bind_generation=bind_generation)
     with CodeMap(tmp_path) as codemap:
-        codemap.project_graph_providers = (provider,)
-        codemap.sync()
-        codemap.enrich_projects((provider_name,))
-        assert codemap._evidence_fresh("project", provider_name) == (True, None)
+        codemap.native.producers.projects = (provider,)
+        codemap.index.sync()
+        codemap.native.enrich_projects((provider_name,))
+        assert codemap.native._evidence_fresh("project", provider_name) == (True, None)
 
         _write(tmp_path, "source.py", "VALUE = 2\n")
-        codemap.sync(["source.py"])
-        fresh, reason = codemap._evidence_fresh("project", provider_name)
+        codemap.index.sync(["source.py"])
+        fresh, reason = codemap.native._evidence_fresh("project", provider_name)
 
     assert fresh is expected_fresh
     if bind_generation:
@@ -265,16 +268,16 @@ def test_declared_project_capabilities_survive_provider_rename(
     with CodeMap(tmp_path) as codemap:
         provider = next(
             candidate
-            for candidate in codemap.project_graph_providers
+            for candidate in codemap.native.producers.projects
             if candidate.supports_shared_input_freshness_rebind
             and candidate.topology_manifest == ".hashmarks-project-links.toml"
         )
         provider.name = provider_name
-        codemap.sync()
-        codemap.enrich_projects(("npm-package-graph", provider_name))
+        codemap.index.sync()
+        codemap.native.enrich_projects(("npm-package-graph", provider_name))
 
         _write(tmp_path, "contract.json", '{"v":2}\n')
-        shared = codemap.task_change_impact("contract changed", ["contract.json"])
+        shared = codemap.changes.task_impact("contract changed", ["contract.json"])
 
         _write(
             tmp_path,
@@ -284,11 +287,11 @@ def test_declared_project_capabilities_survive_provider_rename(
             "target='npm:backend'\n"
             "kind='consumer'\n",
         )
-        topology = codemap.task_change_impact(
+        topology = codemap.changes.task_impact(
             "declared topology changed", [".hashmarks-project-links.toml"]
         )
 
-    assert shared["project_refresh"]["producer"] == provider_name
-    assert shared["project_refresh"]["mode"] == "freshness-rebind"
-    assert topology["project_refresh"]["producer"] == provider_name
-    assert topology["project_refresh"]["mode"] == "topology-recollect"
+    assert assert_object(shared["project_refresh"])["producer"] == provider_name
+    assert assert_object(shared["project_refresh"])["mode"] == "freshness-rebind"
+    assert assert_object(topology["project_refresh"])["producer"] == provider_name
+    assert assert_object(topology["project_refresh"])["mode"] == "topology-recollect"

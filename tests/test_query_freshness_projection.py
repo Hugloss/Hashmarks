@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from contract_assertions import assert_integer, assert_records
+
 from hashmarks.codemap import CodeMap
 
 
@@ -10,7 +12,7 @@ def _rewrite_without_observer(tmp_path: Path) -> tuple[Path, Path]:
     source.write_text("def old_owner():\n    return 1\n", encoding="utf-8")
     state = repo / ".state"
     with CodeMap(repo, state_dir=state) as codemap:
-        codemap.sync()
+        codemap.index.sync()
     source.write_text("def new_owner():\n    return 2\n", encoding="utf-8")
     return repo, state
 
@@ -20,12 +22,12 @@ def test_symbol_exposes_unknown_freshness_after_unsignaled_rewrite(
 ) -> None:
     repo, state = _rewrite_without_observer(tmp_path)
     with CodeMap(repo, state_dir=state) as codemap:
-        assert codemap.status()["daemon_generation_changed"] is None
-        value = codemap.symbol("old_owner")
+        assert codemap.views.status()["daemon_generation_changed"] is None
+        value = codemap.source.symbol("old_owner")
     assert value["stale"] is None
-    assert value["generation"] >= 1
+    assert assert_integer(value["generation"]) >= 1
     assert value["identity_generation"] is None
-    assert value["matches"][0]["name"] == "old_owner"
+    assert assert_records(value["matches"])[0]["name"] == "old_owner"
 
 
 def test_structured_persisted_queries_share_freshness_authority(tmp_path: Path) -> None:
@@ -39,16 +41,16 @@ def test_structured_persisted_queries_share_freshness_authority(tmp_path: Path) 
     )
     state = repo / ".state"
     with CodeMap(repo, state_dir=state) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         values = [
-            codemap.symbol("target"),
-            codemap.deps("caller"),
-            codemap.refs("target"),
-            codemap.affected("src/b.py"),
-            codemap.tests("src/b.py"),
-            codemap.projects(),
-            codemap.repository_instruction_scope("src/b.py"),
-            codemap.change_impact("src/b.py"),
+            codemap.source.symbol("target"),
+            codemap.relationships.deps("caller"),
+            codemap.relationships.refs("target"),
+            codemap.relationships.affected("src/b.py"),
+            codemap.relationships.tests("src/b.py"),
+            codemap.relationships.projects(),
+            codemap.context.instruction_scope("src/b.py"),
+            codemap.changes.impact("src/b.py"),
         ]
     for value in values:
         assert {"generation", "identity_generation", "stale"} <= value.keys()
@@ -60,6 +62,6 @@ def test_exact_outline_still_revalidates_path_without_global_observer(
 ) -> None:
     repo, state = _rewrite_without_observer(tmp_path)
     with CodeMap(repo, state_dir=state) as codemap:
-        value = codemap.outline("src/app.py")
-    assert value["symbols"][0]["name"] == "new_owner"
+        value = codemap.source.outline("src/app.py")
+    assert assert_records(value["symbols"])[0]["name"] == "new_owner"
     assert value["stale"] is None

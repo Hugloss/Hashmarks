@@ -6,6 +6,7 @@ import json
 import logging
 import time
 from collections import Counter, defaultdict
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -41,7 +42,7 @@ def _bytes(value: object) -> int:
     )
 
 
-def _task_candidate(packet: dict[str, object]) -> dict[str, object] | None:
+def _task_candidate(packet: Mapping[str, object]) -> dict[str, object] | None:
     ownership = packet.get("ownership")
     if not isinstance(ownership, dict):
         return None
@@ -49,7 +50,7 @@ def _task_candidate(packet: dict[str, object]) -> dict[str, object] | None:
     return candidate if isinstance(candidate, dict) else None
 
 
-def _task_verification_argv(packet: dict[str, object]) -> list[str]:
+def _task_verification_argv(packet: Mapping[str, object]) -> list[str]:
     verification = packet.get("verification")
     if not isinstance(verification, dict):
         return []
@@ -90,17 +91,17 @@ def _append_probe(path: Path, task_id: str) -> None:
 
 
 def _freeze_task_evidence(
-    repo: Path, tasks: list[object], token_budget: int
+    repo: Path, tasks: Sequence[Mapping[str, object]], token_budget: int
 ) -> tuple[list[dict[str, Any]], float]:
     frozen: list[dict[str, Any]] = []
     with CodeMap(repo) as codemap:
         sync_started = time.perf_counter()
-        codemap.sync()
+        codemap.index.sync()
         sync_ms = (time.perf_counter() - sync_started) * 1000.0
         for task in tasks:
             task_id = str(task["id"])
             query = str(task["query"])
-            previous = codemap.task_evidence(query, token_budget=token_budget)
+            previous = codemap.tasks.evidence(query, token_budget=token_budget)
             candidate = _task_candidate(previous)
             edit_path = (
                 str(candidate.get("path") or "") if candidate is not None else ""
@@ -110,14 +111,14 @@ def _freeze_task_evidence(
             _append_probe(repo / edit_path, task_id)
 
             started = time.perf_counter()
-            delta = codemap.task_post_change_delta(
+            delta = codemap.changes.task_delta(
                 query,
                 [edit_path],
                 previous_evidence=previous,
                 token_budget=token_budget,
             )
             delta_ms = (time.perf_counter() - started) * 1000.0
-            refreshed = codemap.task_evidence(query, token_budget=token_budget)
+            refreshed = codemap.tasks.evidence(query, token_budget=token_budget)
             frozen.append(
                 {
                     "id": task_id,

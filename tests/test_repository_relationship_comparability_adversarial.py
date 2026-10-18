@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from contract_assertions import assert_object, assert_records
+
 from hashmarks.codemap.engine import CodeMap
+from hashmarks.codemap.repository_observation import packet_digest
 
 
 def _binding() -> list[dict[str, object]]:
@@ -17,7 +20,7 @@ def _binding() -> list[dict[str, object]]:
 
 
 def _resign_packet(codemap: CodeMap, packet: dict[str, object]) -> None:
-    packet["bindings_identity"] = "sha256:" + codemap._packet_digest(
+    packet["bindings_identity"] = "sha256:" + packet_digest(
         "hashmarks.repository-evidence-bindings.v1",
         {key: value for key, value in packet.items() if key != "bindings_identity"},
     )
@@ -30,18 +33,18 @@ def _assert_config_transition(
     before_state: str,
     after_state: str,
 ) -> None:
-    assert delta["observer"]["changed"] is False
-    assert delta["bindings"]["preserved"] == []
-    changed = delta["bindings"]["changed"]
+    assert assert_object(delta["observer"])["changed"] is False
+    assert assert_object(delta["bindings"])["preserved"] == []
+    changed = assert_records(assert_object(delta["bindings"])["changed"])
     assert len(changed) == 1
     row = changed[0]
     assert row["binding_id"] == "relationship-authority"
-    assert row["definition"]["state"] == "changed"
-    assert row["direct_evidence"]["state"] == "preserved"
-    assert row["locator_evidence"]["state"] == "preserved"
-    assert row["member_evidence"]["state"] == "preserved"
+    assert assert_object(row["definition"])["state"] == "changed"
+    assert assert_object(row["direct_evidence"])["state"] == "preserved"
+    assert assert_object(row["locator_evidence"])["state"] == "preserved"
+    assert assert_object(row["member_evidence"])["state"] == "preserved"
 
-    relationships = row["relationship_evidence"]
+    relationships = assert_object(row["relationship_evidence"])
     assert relationships["state"] == "unknown"
     assert relationships["comparability"] == "observation-configuration-changed"
     assert relationships["facts"] == {
@@ -53,9 +56,15 @@ def _assert_config_transition(
         "state": "unknown",
         "changes": [],
     }
-    assert relationships["observation"]["changed"] is True
-    assert relationships["observation"]["before"]["state"] == before_state
-    assert relationships["observation"]["after"]["state"] == after_state
+    assert assert_object(relationships["observation"])["changed"] is True
+    assert (
+        assert_object(assert_object(relationships["observation"])["before"])["state"]
+        == before_state
+    )
+    assert (
+        assert_object(assert_object(relationships["observation"])["after"])["state"]
+        == after_state
+    )
 
     assert coverage["binding_impacts"] == [
         {
@@ -78,25 +87,25 @@ def test_relationship_observation_enable_disable_is_non_comparable_not_fact_chan
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        not_requested = codemap.repository_evidence_bindings(
+        codemap.index.sync()
+        not_requested = codemap.bindings.observe(
             _binding(),
             include_relationships=False,
         )
-        observed = codemap.repository_evidence_bindings(
+        observed = codemap.bindings.observe(
             _binding(),
             relationship_limit_per_path=8,
         )
-        disabled_again = codemap.repository_evidence_bindings(
+        disabled_again = codemap.bindings.observe(
             _binding(),
             include_relationships=False,
         )
 
-        enabled_delta = codemap.repository_evidence_binding_delta(
+        enabled_delta = codemap.bindings.delta(
             not_requested,
             observed,
         )
-        enabled_coverage = codemap.repository_evidence_coverage(
+        enabled_coverage = codemap.bindings.coverage(
             observed,
             changed_paths=[],
             change_set_complete=True,
@@ -104,11 +113,11 @@ def test_relationship_observation_enable_disable_is_non_comparable_not_fact_chan
             binding_delta_before=not_requested,
         )
 
-        disabled_delta = codemap.repository_evidence_binding_delta(
+        disabled_delta = codemap.bindings.delta(
             observed,
             disabled_again,
         )
-        disabled_coverage = codemap.repository_evidence_coverage(
+        disabled_coverage = codemap.bindings.coverage(
             disabled_again,
             changed_paths=[],
             change_set_complete=True,
@@ -139,20 +148,20 @@ def test_observer_change_keeps_relationship_facts_unknown_but_member_change_visi
     source.write_text("from alpha import VALUE\nKEEP = 1\n", encoding="utf-8")
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        before = codemap.repository_evidence_bindings(_binding())
+        codemap.index.sync()
+        before = codemap.bindings.observe(_binding())
 
         source.write_text("from beta import VALUE\nKEEP = 1\n", encoding="utf-8")
-        codemap.sync(["source.py"])
-        after = codemap.repository_evidence_bindings(_binding())
+        codemap.index.sync(["source.py"])
+        after = codemap.bindings.observe(_binding())
         after["observer"] = {
-            **after["observer"],
+            **assert_object(after["observer"]),
             "identity": "sha256:" + "a" * 64,
         }
         _resign_packet(codemap, after)
 
-        delta = codemap.repository_evidence_binding_delta(before, after)
-        coverage = codemap.repository_evidence_coverage(
+        delta = codemap.bindings.delta(before, after)
+        coverage = codemap.bindings.coverage(
             after,
             changed_paths=["source.py"],
             change_set_complete=True,
@@ -160,15 +169,15 @@ def test_observer_change_keeps_relationship_facts_unknown_but_member_change_visi
             binding_delta_before=before,
         )
 
-    assert delta["observer"]["changed"] is True
-    changed = delta["bindings"]["changed"]
+    assert assert_object(delta["observer"])["changed"] is True
+    changed = assert_records(assert_object(delta["bindings"])["changed"])
     assert len(changed) == 1
     row = changed[0]
     assert row["binding_id"] == "relationship-authority"
-    assert row["direct_evidence"]["state"] == "preserved"
-    assert row["member_evidence"]["state"] == "changed"
+    assert assert_object(row["direct_evidence"])["state"] == "preserved"
+    assert assert_object(row["member_evidence"])["state"] == "changed"
 
-    relationships = row["relationship_evidence"]
+    relationships = assert_object(row["relationship_evidence"])
     assert relationships["state"] == "unknown"
     assert relationships["comparability"] == "observer-changed"
     assert relationships["facts"] == {
@@ -180,7 +189,7 @@ def test_observer_change_keeps_relationship_facts_unknown_but_member_change_visi
         "state": "unknown",
         "changes": [],
     }
-    assert relationships["observation"]["changed"] is True
+    assert assert_object(relationships["observation"])["changed"] is True
 
     assert coverage["binding_impacts"] == [
         {

@@ -3,8 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
+from contract_assertions import assert_object
+
 from hashmarks.client import RepositoryObservation
 from hashmarks.codemap.engine import CodeMap
+from hashmarks.codemap.repository_evidence_bindings import RepositoryBindings
 from hashmarks.observation import ObservationState
 
 
@@ -35,17 +38,17 @@ def _changed_shared_member(
     codemap: CodeMap,
     root: Path,
 ) -> tuple[dict[str, object], dict[str, object], dict[str, object]]:
-    before = codemap.repository_evidence_bindings(
+    before = codemap.bindings.observe(
         _bindings(),
         include_relationships=False,
     )
     (root / "shared.py").write_text("ONE\ntwo\n", encoding="utf-8")
-    codemap.sync(["shared.py"])
-    after = codemap.repository_evidence_bindings(
+    codemap.index.sync(["shared.py"])
+    after = codemap.bindings.observe(
         _bindings(),
         include_relationships=False,
     )
-    delta = codemap.repository_evidence_binding_delta(before, after)
+    delta = codemap.bindings.delta(before, after)
     return before, after, delta
 
 
@@ -66,8 +69,8 @@ def _assert_binding_local_precision(coverage: dict[str, object]) -> None:
         "bound_range": "known",
         "reason": "binding-delta-supplied",
     }
-    assert coverage["coverage"]["state"] == "incomplete"
-    assert coverage["coverage"]["outside_classification"] == "unknown"
+    assert assert_object(coverage["coverage"])["state"] == "incomplete"
+    assert assert_object(coverage["coverage"])["outside_classification"] == "unknown"
     assert coverage["binding_impacts"] == [
         {
             "binding_id": "shared:first",
@@ -91,9 +94,9 @@ def test_incomplete_change_set_keeps_exact_precision_binding_local(
     (tmp_path / "outside.py").write_text("outside\n", encoding="utf-8")
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before, after, delta = _changed_shared_member(codemap, tmp_path)
-        coverage = codemap.repository_evidence_coverage(
+        coverage = codemap.bindings.coverage(
             after,
             changed_paths=["shared.py", "outside.py"],
             change_set_complete=False,
@@ -102,7 +105,7 @@ def test_incomplete_change_set_keeps_exact_precision_binding_local(
         )
 
     _assert_binding_local_precision(coverage)
-    assert coverage["coverage"]["source"] == "caller-asserted"
+    assert assert_object(coverage["coverage"])["source"] == "caller-asserted"
 
 
 def test_incomplete_repository_observation_keeps_same_precision_split(
@@ -113,7 +116,7 @@ def test_incomplete_repository_observation_keeps_same_precision_split(
     (tmp_path / "outside.py").write_text("outside\n", encoding="utf-8")
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before, after, delta = _changed_shared_member(codemap, tmp_path)
         observation = RepositoryObservation(
             state=ObservationState.DIRTY,
@@ -122,7 +125,7 @@ def test_incomplete_repository_observation_keeps_same_precision_split(
             paths_complete=False,
             dirty_path_count=2,
         )
-        coverage = codemap.repository_evidence_coverage(
+        coverage = codemap.bindings.coverage(
             after,
             repository_observation=observation,
             binding_delta=delta,
@@ -130,7 +133,7 @@ def test_incomplete_repository_observation_keeps_same_precision_split(
         )
 
     _assert_binding_local_precision(coverage)
-    assert coverage["coverage"]["source"] == "repository-observer"
+    assert assert_object(coverage["coverage"])["source"] == "repository-observer"
     assert coverage["change_set"] == {
         "source": "repository-observer",
         "state": "dirty",
@@ -144,17 +147,21 @@ def test_coverage_prepares_each_binding_scope_once(tmp_path: Path) -> None:
     (tmp_path / "shared.py").write_text("one\ntwo\n", encoding="utf-8")
     (tmp_path / "other.py").write_text("other\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        bindings = codemap.repository_evidence_bindings(
-            _bindings(), include_relationships=False
-        )
+        codemap.index.sync()
+        bindings = codemap.bindings.observe(_bindings(), include_relationships=False)
         with (
-            patch.object(CodeMap, "_binding_rows", wraps=CodeMap._binding_rows) as rows,
             patch.object(
-                CodeMap, "_binding_paths", wraps=CodeMap._binding_paths
+                RepositoryBindings,
+                "_binding_rows",
+                wraps=RepositoryBindings._binding_rows,
+            ) as rows,
+            patch.object(
+                RepositoryBindings,
+                "_binding_paths",
+                wraps=RepositoryBindings._binding_paths,
             ) as paths,
         ):
-            coverage = codemap.repository_evidence_coverage(
+            coverage = codemap.bindings.coverage(
                 bindings,
                 changed_paths=["shared.py", "outside.py"],
                 change_set_complete=False,
@@ -162,11 +169,11 @@ def test_coverage_prepares_each_binding_scope_once(tmp_path: Path) -> None:
 
     assert rows.call_count == 1
     assert paths.call_count == len(_bindings())
-    assert coverage["precision"]["bound_range"] == "unknown"
-    assert coverage["classification"]["outside_declared_bindings"] == []
-    assert coverage["classification"]["outside_declared_bindings_candidates"] == [
-        "outside.py"
-    ]
+    assert assert_object(coverage["precision"])["bound_range"] == "unknown"
+    assert assert_object(coverage["classification"])["outside_declared_bindings"] == []
+    assert assert_object(coverage["classification"])[
+        "outside_declared_bindings_candidates"
+    ] == ["outside.py"]
     assert coverage["binding_impacts"] == [
         {"binding_id": "shared:first", "reasons": ["bound-member-precision-unknown"]},
         {"binding_id": "shared:second", "reasons": ["bound-member-precision-unknown"]},

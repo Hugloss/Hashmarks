@@ -1,0 +1,121 @@
+"""Selected declaration source facts in the existing backend qualification ring.
+
+These observations qualify caller-nominated source disclosure, not answer-blind
+retrieval, runtime model validation, or verification sufficiency.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, cast
+
+from hashmarks.codemap import CodeMap
+from hashmarks.codemap.repository_declaration_selection import (
+    source_declaration_providers,
+)
+from hashmarks.digest import FILE_DOMAIN, hash_file
+
+from .backend_corpus import (
+    confined_file,
+    declaration_source_paths,
+    declaration_source_selection,
+)
+from .backend_gates import fact_state, presentation_conformance
+from .backend_grading import component_summary, validate_transport_capture
+from .backend_transport import capture_cli, capture_mcp
+from .common import write_json
+from .fact_grading import grade_facts
+
+
+def _source_bound(workspace: Path, packet: dict[str, Any], paths: list[str]) -> bool:
+    inputs = [
+        row
+        for provider in packet.get("providers", [])
+        for row in provider.get("inputs", [])
+    ]
+    expected = {
+        path: hash_file(confined_file(workspace, path), domain=FILE_DOMAIN).hash
+        for path in paths
+    }
+    bindings = (
+        packet.get("declarations", {})
+        .get("repository_evidence", {})
+        .get("bindings", [])
+    )
+    return (
+        bool(inputs)
+        and bool(bindings)
+        and {row["path"] for row in inputs} == set(paths)
+        and all(
+            row["state"] == "known-present"
+            and row["member_revision"] == expected[row["path"]]
+            for row in inputs
+        )
+        and all(
+            bool(binding["evidence"])
+            and all(
+                evidence["path"] in expected
+                and evidence["state"] == "known-present"
+                and evidence["member_revision"] == expected[evidence["path"]]
+                for evidence in binding["evidence"]
+            )
+            for binding in bindings
+        )
+    )
+
+
+def _grade(
+    workspace: Path, packet: dict[str, Any], rule: dict[str, Any], paths: list[str]
+) -> dict[str, Any]:
+    facts = grade_facts("declaration-source", {"packet": packet}, rule)
+    return {
+        "facts": fact_state(facts["classification"]),
+        "authority": facts["authority_violations"] == 0,
+        "revision": _source_bound(workspace, packet, paths),
+        "checks": facts["checks"],
+    }
+
+
+def observe_declarations(
+    workspace: Path,
+    state: Path,
+    inputs: dict[str, Any],
+    rule: dict[str, Any],
+    output: Path,
+    transports: tuple[str, ...],
+) -> dict[str, Any]:
+    """Compose existing source/API/transport owners with independent fact checks."""
+    paths = declaration_source_paths(inputs)
+    providers = source_declaration_providers(
+        "discovery", declaration_source_selection(inputs)
+    )
+    with CodeMap(workspace, state_dir=state) as codemap:
+        packet = cast(
+            "dict[str, Any]",
+            codemap.declarations.operation(
+                inputs["groups"],
+                result_mode=inputs["result_mode"],
+                providers=providers,
+            ),
+        )
+    write_json(output / "api.json", packet)
+    api = _grade(workspace, packet, rule, paths)
+    results: dict[str, list[dict[str, Any]]] = {}
+    case = {"operation": "repository_declarations", "inputs": inputs}
+    for transport, capture in (("cli", capture_cli), ("mcp", capture_mcp)):
+        captures = capture(workspace, state, case) if transport in transports else []
+        write_json(output / f"{transport}.json", captures)
+        grades = []
+        for row in captures:
+            validate_transport_capture(row)
+            response = row["response"]
+            native = response.get("result", response)
+            graded = _grade(workspace, native, rule, paths)
+            graded["parity"] = (
+                row["format"] == "none"
+                or presentation_conformance(native, response["presentation"])["valid"]
+                is True
+            )
+            grades.append({"format": row["format"], **graded})
+        results[transport] = grades
+    return component_summary(api, results)

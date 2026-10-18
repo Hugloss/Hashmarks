@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from hashmarks.codemap.find_engine import FindEngineMixin
+from hashmarks.codemap.find_engine import RepositorySearch
 from hashmarks.codemap.model import SearchHit
 from hashmarks.codemap.query_router import route_query
 
@@ -19,7 +19,7 @@ def test_control_hits_reserve_one_qualified_hit_per_preferred_domain() -> None:
         _hit("docs/low-score-architecture.md", 20.0),
     )
 
-    selected = FindEngineMixin._find_control_hits(route, ranked, limit=20)
+    selected = RepositorySearch._find_control_hits(route, ranked, limit=20)
 
     assert [hit.path for hit in selected] == [
         "README.md",

@@ -4,10 +4,16 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
 
 import pytest
+from contract_assertions import (
+    assert_object,
+    assert_present,
+    assert_records,
+    assert_text,
+)
 from native_evidence_support import (
     TASK,
     assert_projection,
@@ -19,16 +25,16 @@ from hashmarks.codemap import CodeMap
 from hashmarks.codemap.semantic_relationship_delta import semantic_relationship_delta
 
 
-def _claims(packet: Any) -> list[Any]:
+def _claims(packet: Mapping[str, object]) -> list[dict[str, object]]:
     return [
         claim
-        for observation in packet["observations"]
-        for claim in observation["claims"]
+        for observation in assert_records(packet["observations"])
+        for claim in assert_records(observation["claims"])
     ]
 
 
-def _observe(cm: CodeMap, target: str = "src/engine.ts::Engine") -> Any:
-    return cm.structural_locality(target, result_mode="relationships")
+def _observe(cm: CodeMap, target: str = "src/engine.ts::Engine") -> dict[str, object]:
+    return cm.structure.locality(target, result_mode="relationships")
 
 
 def test_native_scip_capture_bytes_and_input_revisions_are_revalidated(
@@ -64,24 +70,45 @@ def test_native_typescript_claims_move_remove_and_add_without_inferred_edges(
         for endpoint in ("before", "moved", "after", "before"):
             source = native_scip_corpus / "typescript" / endpoint
             materialize_scip(root, source)
-            cm.sync()
+            cm.index.sync()
             import_native_scip(cm, source)
             packets.append(_observe(cm))
     before, moved, removed, added = packets
     assert len(_claims(before)) == 1
     claim = _claims(before)[0]
     assert claim["kind"] == "implementation"
-    assert claim["source"]["key"]["symbol"].endswith("Engine#")
-    assert claim["target"]["key"]["symbol"].endswith("Contract#")
+    assert assert_text(
+        assert_object(assert_object(claim["source"])["key"])["symbol"]
+    ).endswith("Engine#")
+    assert assert_text(
+        assert_object(assert_object(claim["target"])["key"])["symbol"]
+    ).endswith("Contract#")
     movement = semantic_relationship_delta(before, moved)
     assert movement["comparable"] is True
-    assert movement["producer_deltas"][0]["facts"]["added"] == []
-    assert movement["producer_deltas"][0]["facts"]["removed"] == []
-    assert movement["producer_deltas"][0]["locators"]
+    assert (
+        assert_object(assert_records(movement["producer_deltas"])[0]["facts"])["added"]
+        == []
+    )
+    assert (
+        assert_object(assert_records(movement["producer_deltas"])[0]["facts"])[
+            "removed"
+        ]
+        == []
+    )
+    assert assert_records(movement["producer_deltas"])[0]["locators"]
     for old, new, changed in ((moved, removed, "removed"), (removed, added, "added")):
         delta = semantic_relationship_delta(old, new)
         assert delta["comparable"] is True
-        assert len(delta["producer_deltas"][0]["facts"][changed]) == 1
+        assert (
+            len(
+                assert_records(
+                    assert_object(assert_records(delta["producer_deltas"])[0]["facts"])[
+                        changed
+                    ]
+                )
+            )
+            == 1
+        )
         assert_projection(delta, "evidence_comparison", "relationships")
     for packet in packets:
         assert packet["negative_evidence_admissible"] is False
@@ -95,20 +122,24 @@ def test_native_typescript_method_reference_flag_is_not_a_call_or_inverse(
     source = native_scip_corpus / "typescript" / "before"
     materialize_scip(root, source)
     with CodeMap(root, state_dir=tmp_path / "state") as cm:
-        cm.sync()
+        cm.index.sync()
         import_native_scip(cm, source)
         method = _observe(cm, "src/engine.ts::normalize")
         with pytest.raises(KeyError, match="symbol not found"):
-            cm.structural_locality("src/engine.ts::normalize")
+            cm.structure.locality("src/engine.ts::normalize")
     claims = _claims(method)
     assert {claim["kind"] for claim in claims} == {"reference", "implementation"}
     assert len(claims) == 2
     assert all(
-        claim["source"]["key"]["symbol"].endswith("Engine#normalize().")
+        assert_text(
+            assert_object(assert_object(claim["source"])["key"])["symbol"]
+        ).endswith("Engine#normalize().")
         for claim in claims
     )
     assert all(
-        claim["target"]["key"]["symbol"].endswith("Contract#normalize().")
+        assert_text(
+            assert_object(assert_object(claim["target"])["key"])["symbol"]
+        ).endswith("Contract#normalize().")
         for claim in claims
     )
     assert_projection(method, "structural_locality", "relationships")
@@ -124,7 +155,7 @@ def test_native_scip_parameters_do_not_manufacture_definition_ambiguity(
     path = "src/engine.py" if language == "python" else "src/engine.ts"
     name = "normalize_widget" if language == "python" else "normalize"
     with CodeMap(root, state_dir=tmp_path / "state") as cm:
-        cm.sync()
+        cm.index.sync()
         import_native_scip(cm, source)
         definitions = cm.store.native_definitions_for_path(path, name=name)
         parameters = cm.store.native_definitions_for_path(path, name="value")
@@ -141,7 +172,7 @@ def test_native_scip_duplicate_method_names_remain_ambiguous(
     source = native_scip_corpus / "typescript" / "ambiguous"
     materialize_scip(root, source)
     with CodeMap(root, state_dir=tmp_path / "state") as cm:
-        cm.sync()
+        cm.index.sync()
         import_native_scip(cm, source)
         with pytest.raises(KeyError, match="ambiguous"):
             _observe(cm, "src/engine.ts::normalize")
@@ -156,7 +187,7 @@ def test_native_only_relationship_subject_cannot_cross_changed_visibility(
     source = native_scip_corpus / "typescript" / "before"
     materialize_scip(root, source)
     with CodeMap(root, state_dir=tmp_path / "state") as cm:
-        cm.sync()
+        cm.index.sync()
         import_native_scip(cm, source)
         assert len(_claims(_observe(cm, "src/engine.ts::normalize"))) == 2
         (root / ".hashmarks-context.toml").write_text(
@@ -173,37 +204,61 @@ def test_native_python_empty_claims_become_unavailable_before_reindex_and_reopen
     source = native_scip_corpus / "python" / "before"
     materialize_scip(root, source)
     with CodeMap(root, state_dir=state) as cm:
-        cm.sync()
+        cm.index.sync()
         import_native_scip(cm, source)
-        previous: Any = cm.task_evidence(TASK)
-        assert previous["semantic_relationships"]["observed_relationship_count"] == 0
+        previous = cm.tasks.evidence(TASK)
         assert (
-            previous["semantic_relationships"]["negative_evidence_admissible"] is False
+            assert_object(previous.get("semantic_relationships"))[
+                "observed_relationship_count"
+            ]
+            == 0
+        )
+        assert (
+            assert_object(previous.get("semantic_relationships"))[
+                "negative_evidence_admissible"
+            ]
+            is False
         )
         source = native_scip_corpus / "python" / "after"
         materialize_scip(root, source)
-        delta: Any = cm.task_post_change_delta(
+        delta = cm.changes.task_delta(
             TASK, ["src/engine.py"], previous_evidence=previous
         )
-        assert delta["semantic_relationships"]["after"] is None
+        assert assert_object(delta.get("semantic_relationships"))["after"] is None
         assert (
-            delta["semantic_relationships"]["claim_set_comparison"] == "not-performed"
+            assert_object(delta.get("semantic_relationships"))["claim_set_comparison"]
+            == "not-performed"
         )
-        assert "semantic_relationships" not in cm.task_evidence(TASK)
+        assert "semantic_relationships" not in cm.tasks.evidence(TASK)
         assert_projection(delta, "post_change")
         import_native_scip(cm, source)
-        current: Any = cm.task_evidence(TASK)
+        current = cm.tasks.evidence(TASK)
     with CodeMap(root, state_dir=state) as reopened:
-        restored: Any = reopened.task_evidence(TASK)
+        restored = reopened.tasks.evidence(TASK)
     with CodeMap(root, state_dir=tmp_path / "fresh") as fresh:
-        fresh.sync()
+        fresh.index.sync()
         import_native_scip(fresh, source)
-        rebuilt: Any = fresh.task_evidence(TASK)
+        rebuilt = fresh.tasks.evidence(TASK)
     for packet in (current, restored, rebuilt):
-        assert packet["semantic_relationships"]["observed_relationship_count"] == 0
-        assert packet["semantic_relationships"]["evidence"]["claims"] == []
-        assert packet["semantic_relationships"]["negative_evidence_admissible"] is False
-        assert packet["ownership"]["owner"]["path"] == "src/engine.py"
+        assert (
+            assert_object(packet.get("semantic_relationships"))[
+                "observed_relationship_count"
+            ]
+            == 0
+        )
+        assert (
+            assert_object(
+                assert_object(packet.get("semantic_relationships"))["evidence"]
+            )["claims"]
+            == []
+        )
+        assert (
+            assert_object(packet.get("semantic_relationships"))[
+                "negative_evidence_admissible"
+            ]
+            is False
+        )
+        assert assert_present(packet["ownership"]["owner"])["path"] == "src/engine.py"
         assert_projection(packet, "task_evidence")
 
 
@@ -214,28 +269,38 @@ def test_native_typescript_stale_index_is_not_current_or_replayed_after_deletion
     source = native_scip_corpus / "typescript" / "before"
     materialize_scip(root, source)
     with CodeMap(root, state_dir=state) as cm:
-        cm.sync()
+        cm.index.sync()
         import_native_scip(cm, source)
         before = _observe(cm)
         materialize_scip(root, native_scip_corpus / "typescript" / "after")
-        cm.sync(["src/engine.ts"])
+        cm.index.sync(["src/engine.ts"])
         stale = _observe(cm)
         with pytest.raises(KeyError, match="stale"):
             _observe(cm, "src/engine.ts::normalize")
-        assert stale["observations"][0]["freshness"] == "stale"
+        assert assert_records(stale["observations"])[0]["freshness"] == "stale"
         comparison = semantic_relationship_delta(before, stale)
         assert comparison["comparable"] is False
-        assert comparison["producer_deltas"][0]["facts"]["added"] == []
-        assert comparison["producer_deltas"][0]["facts"]["removed"] == []
+        assert (
+            assert_object(assert_records(comparison["producer_deltas"])[0]["facts"])[
+                "added"
+            ]
+            == []
+        )
+        assert (
+            assert_object(assert_records(comparison["producer_deltas"])[0]["facts"])[
+                "removed"
+            ]
+            == []
+        )
         assert_projection(comparison, "evidence_comparison", "relationships")
         (root / "src" / "engine.ts").unlink()
-        cm.sync(["src/engine.ts"])
-        current: Any = cm.task_evidence(
+        cm.index.sync(["src/engine.ts"])
+        current = cm.tasks.evidence(
             "Change Engine in src/engine.ts to document its behavior."
         )
         assert "semantic_relationships" not in current
     with CodeMap(root, state_dir=state) as reopened:
-        packet: Any = reopened.task_evidence(
+        packet = reopened.tasks.evidence(
             "Change Engine in src/engine.ts to document its behavior."
         )
     assert "semantic_relationships" not in packet

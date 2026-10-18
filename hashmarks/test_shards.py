@@ -10,6 +10,7 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import NotRequired, TypedDict
 
 from hashmarks._command_output import log_command_output
 
@@ -19,6 +20,18 @@ from .python_ast_cache import read_python_ast
 from .validation_inputs import require_mapping_for_validation
 
 logger = logging.getLogger(__name__)
+
+
+class TestSelectionValidation(TypedDict):
+    valid: bool
+    reasons: list[str]
+    missing_fields: list[str]
+    unexpected_fields: list[str]
+    membership_identity: object
+    expected_plan_identity: NotRequired[str | None]
+    expected_envelope_identity: NotRequired[str | None]
+    forbidden_execution_policy_paths: NotRequired[list[str]]
+
 
 SCHEMA = "hashmarks.test-shards.v3"
 ENVELOPE_SCHEMA = "hashmarks.repository-work-selection.v1"
@@ -92,6 +105,7 @@ _FORBIDDEN_EXECUTION_POLICY_KEYS = frozenset(
 # subdivision, scheduling, and resume behavior.
 PROCESS_SENSITIVE_NODEIDS = (
     "tests/test_codemap_watcher.py::test_codemap_watcher_keeps_map_hot_without_identity_daemon",
+    "tests/test_filesystem_lifecycle_native.py::test_native_child_replacement_is_separate_from_source_evidence",
 )
 
 # These are benchmark/measurement assertions, not release-correctness owners.
@@ -665,7 +679,7 @@ def _selection_membership(
         return None
 
 
-def validate_test_shard_plan(value: Mapping[str, object]) -> dict[str, object]:
+def validate_test_shard_plan(value: object) -> TestSelectionValidation:
     """Strictly validate v3 selection semantics without launching pytest."""
     value, root_reasons = require_mapping_for_validation(
         value, reason="invalid-selection-plan"
@@ -772,7 +786,9 @@ def _validate_repository(value: object, state: _ValidationState) -> None:
         state.reasons.append("invalid-selection-input-identity")
 
 
-def _validate_selection(value: object, state: _ValidationState) -> dict[str, object]:
+def _validate_selection(
+    value: object, state: _ValidationState
+) -> TestSelectionValidation:
     if not isinstance(value, Mapping):
         state.reasons.append("invalid-selection")
         return {
@@ -808,7 +824,9 @@ def _validate_authority(value: object, state: _ValidationState) -> None:
         state.reasons.append("execution-layer-authority-mismatch")
 
 
-def validate_work_selection_envelope(value: Mapping[str, object]) -> dict[str, object]:
+def validate_work_selection_envelope(
+    value: object,
+) -> TestSelectionValidation:
     """Strictly validate repository-work-selection evidence without admitting execution."""
     value, root_reasons = require_mapping_for_validation(
         value, reason="invalid-work-selection-envelope"
@@ -886,7 +904,7 @@ def _binding_mismatch_reasons(
 
 def validate_work_selection_repository_binding(
     root: Path,
-    value: Mapping[str, object],
+    value: object,
 ) -> dict[str, object]:
     """Re-prove one structurally valid envelope against current repository bytes."""
     value, _root_reasons = require_mapping_for_validation(
@@ -940,8 +958,13 @@ def _selected_shard(
     payload: Mapping[str, object], shard_count: int, shard_index: int
 ) -> tuple[str, ...]:
     _validate_shard_index(shard_count, shard_index)
-    row = payload["shards"][shard_index]  # type: ignore[index]
-    return tuple(row["nodeids"])  # type: ignore[index]
+    shards = payload["shards"]
+    assert isinstance(shards, list)
+    row = shards[shard_index]
+    assert isinstance(row, Mapping)
+    nodeids = row["nodeids"]
+    assert isinstance(nodeids, list)
+    return tuple(str(nodeid) for nodeid in nodeids)
 
 
 def select(root: Path, shard_count: int, shard_index: int) -> tuple[str, ...]:
@@ -954,7 +977,9 @@ def _emit_shard_plan(payload: Mapping[str, object], *, as_json: bool) -> None:
     if as_json:
         log_command_output(logger, json.dumps(payload, sort_keys=True))
         return
-    for row in payload["shards"]:  # type: ignore[union-attr]
+    shards = payload["shards"]
+    assert isinstance(shards, list)
+    for row in shards:
         log_command_output(
             logger,
             f"{row['index']}: {len(row['nodeids'])} tests / {row['weight_bytes']} source-weight bytes",

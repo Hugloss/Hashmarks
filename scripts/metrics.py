@@ -9,7 +9,9 @@ import subprocess
 import sys
 import time
 import tomllib
+from collections.abc import Callable
 from pathlib import Path
+from typing import TypeVar
 
 from hashmarks._command_output import log_command_output
 from hashmarks.codemap import CodeMap
@@ -17,6 +19,7 @@ from hashmarks.codemap import CodeMap
 logger = logging.getLogger(__name__)
 
 SCHEMA = "fastidentity.metrics.v1"
+_T = TypeVar("_T")
 
 
 def _run_json(argv: list[str], *, cwd: Path) -> dict:
@@ -40,7 +43,7 @@ def _run_json(argv: list[str], *, cwd: Path) -> dict:
         ) from exc
 
 
-def _timed(fn):
+def _timed(fn: Callable[[], _T]) -> tuple[_T, float]:
     started = time.perf_counter()
     value = fn()
     return value, time.perf_counter() - started
@@ -53,13 +56,15 @@ def _repo_inputs(root: Path) -> list[str]:
 
 def _codemap_probe(root: Path) -> dict:
     with CodeMap(root) as codemap:
-        first, first_s = _timed(codemap.sync)
-        second, second_s = _timed(codemap.sync)
-        hits, find_s = _timed(lambda: codemap.find("Identity impact", limit=10))
+        first, first_s = _timed(codemap.index.sync)
+        second, second_s = _timed(codemap.index.sync)
+        hits, find_s = _timed(lambda: codemap.search.find("Identity impact", limit=10))
         pack, context_s = _timed(
-            lambda: codemap.context("Identity impact", token_budget=1200, limit=10)
+            lambda: codemap.context.build(
+                "Identity impact", token_budget=1200, limit=10
+            )
         )
-        stats = codemap.status()
+        stats = codemap.views.status()
     return {
         "seconds": {
             "sync": first_s,

@@ -1,0 +1,1505 @@
+{
+  "cases": [
+    {
+      "after_test_relevance": "source-related-only",
+      "before_test_relevance": "unresolved",
+      "id": "fastapi-request-parameter-dependency-flattening",
+      "original_test_nomination": "tests/test_dependency_cache.py",
+      "source_review_limit": "Original cache-test nomination has no OpenAPI request. get_flat_params is directly called by fastapi/openapi/utils.py; selected OpenAPI test is source-related but complete runtime path and performance sensitivity remain unproven.",
+      "stages": {
+        "after": [
+          {
+            "assertions": [
+              {
+                "line": 27,
+                "source_syntax": "response.json() == snapshot({'openapi': '3.1.0', 'info': {'title': 'FastAPI', 'version': '0.1.0'}, 'paths': {'/users/{user_id}': {'get': {'summary': 'Read Users', 'operationId': 'read_users_users__user_id__get', 'parameters': [{'required': True, 'schema': {'title': 'User Id', 'type': 'integer'}, 'name': 'user_id', 'in': 'path'}], 'responses': {'200': {'description': 'Successful Response', 'content': {'application/json': {'schema': {}}}}, '422': {'description': 'Validation Error', 'content': {'application/json': {'schema': {'$ref': '#/components/schemas/HTTPValidationError'}}}}}}}}, 'components': {'schemas': {'HTTPValidationError': {'title': 'HTTPValidationError', 'type': 'object', 'properties': {'detail': {'title': 'Detail', 'type': 'array', 'items': {'$ref': '#/components/schemas/ValidationError'}}}}, 'ValidationError': {'title': 'ValidationError', 'required': ['loc', 'msg', 'type'], 'type': 'object', 'properties': {'loc': {'title': 'Location', 'type': 'array', 'items': {'anyOf': [{'type': 'string'}, {'type': 'integer'}]}}, 'msg': {'title': 'Message', 'type': 'string'}, 'type': {'title': 'Error Type', 'type': 'string'}, 'input': {'title': 'Input'}, 'ctx': {'title': 'Context', 'type': 'object'}}}}}})"
+              }
+            ],
+            "calls": [
+              {
+                "callee_syntax": "client.get",
+                "line": 26
+              },
+              {
+                "callee_syntax": "response.json",
+                "line": 27
+              },
+              {
+                "callee_syntax": "snapshot",
+                "line": 27
+              }
+            ],
+            "declaration_sha256": "6286605ee4c43e1cea2f9e1b00eb711535cf94904dc30367d3a591de3ae8f46f",
+            "end_line": 99,
+            "file_sha256": "55c6dacc6606cf3edaebb90925ba5e00bc04911ebf159d9f2099abc3b70e25c9",
+            "module_imports": [
+              {
+                "level": 0,
+                "module": "fastapi",
+                "names": [
+                  "Depends",
+                  "FastAPI"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "fastapi.testclient",
+                "names": [
+                  "TestClient"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "inline_snapshot",
+                "names": [
+                  "snapshot"
+                ]
+              }
+            ],
+            "path": "tests/test_param_in_path_and_dependency.py",
+            "source_identity": "sha256:47b72c06253a9f104581110f7106eb8d2ee332d1d4daee640dd58938c2a1b5ec:3131",
+            "start_line": 25,
+            "state": "unique-source-declaration",
+            "symbol": "test_openapi_schema"
+          }
+        ],
+        "before": [
+          {
+            "assertions": [
+              {
+                "line": 27,
+                "source_syntax": "response.json() == snapshot({'openapi': '3.1.0', 'info': {'title': 'FastAPI', 'version': '0.1.0'}, 'paths': {'/users/{user_id}': {'get': {'summary': 'Read Users', 'operationId': 'read_users_users__user_id__get', 'parameters': [{'required': True, 'schema': {'title': 'User Id', 'type': 'integer'}, 'name': 'user_id', 'in': 'path'}], 'responses': {'200': {'description': 'Successful Response', 'content': {'application/json': {'schema': {}}}}, '422': {'description': 'Validation Error', 'content': {'application/json': {'schema': {'$ref': '#/components/schemas/HTTPValidationError'}}}}}}}}, 'components': {'schemas': {'HTTPValidationError': {'title': 'HTTPValidationError', 'type': 'object', 'properties': {'detail': {'title': 'Detail', 'type': 'array', 'items': {'$ref': '#/components/schemas/ValidationError'}}}}, 'ValidationError': {'title': 'ValidationError', 'required': ['loc', 'msg', 'type'], 'type': 'object', 'properties': {'loc': {'title': 'Location', 'type': 'array', 'items': {'anyOf': [{'type': 'string'}, {'type': 'integer'}]}}, 'msg': {'title': 'Message', 'type': 'string'}, 'type': {'title': 'Error Type', 'type': 'string'}, 'input': {'title': 'Input'}, 'ctx': {'title': 'Context', 'type': 'object'}}}}}})"
+              }
+            ],
+            "calls": [
+              {
+                "callee_syntax": "client.get",
+                "line": 26
+              },
+              {
+                "callee_syntax": "response.json",
+                "line": 27
+              },
+              {
+                "callee_syntax": "snapshot",
+                "line": 27
+              }
+            ],
+            "declaration_sha256": "6286605ee4c43e1cea2f9e1b00eb711535cf94904dc30367d3a591de3ae8f46f",
+            "end_line": 99,
+            "file_sha256": "55c6dacc6606cf3edaebb90925ba5e00bc04911ebf159d9f2099abc3b70e25c9",
+            "module_imports": [
+              {
+                "level": 0,
+                "module": "fastapi",
+                "names": [
+                  "Depends",
+                  "FastAPI"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "fastapi.testclient",
+                "names": [
+                  "TestClient"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "inline_snapshot",
+                "names": [
+                  "snapshot"
+                ]
+              }
+            ],
+            "path": "tests/test_param_in_path_and_dependency.py",
+            "source_identity": "sha256:052a027a13065cadc21fb0538fb8ff106ba03e0c2e61adc5c18262354c59ff42:3131",
+            "start_line": 25,
+            "state": "unique-source-declaration",
+            "symbol": "test_openapi_schema"
+          }
+        ]
+      },
+      "sufficiency": "not-established",
+      "test_execution": "not-performed"
+    },
+    {
+      "after_test_relevance": "source-related-only",
+      "before_test_relevance": "unresolved",
+      "id": "fastapi-body-dependency-flattening",
+      "original_test_nomination": "tests/test_dependency_contextmanager.py",
+      "source_review_limit": "Selected test exercises a body-bearing route. Exact route-construction path to the changed body-field helper and performance sensitivity remain unproven.",
+      "stages": {
+        "after": [
+          {
+            "assertions": [
+              {
+                "line": 26,
+                "source_syntax": "response.status_code == 200"
+              },
+              {
+                "line": 27,
+                "source_syntax": "response.json() == {'item_id': 5, 'item': {'name': 'Foo', 'price': 50.5, 'description': None, 'tax': None}, 'q': 'bar'}"
+              }
+            ],
+            "calls": [
+              {
+                "callee_syntax": "client.put",
+                "line": 25
+              },
+              {
+                "callee_syntax": "response.json",
+                "line": 27
+              }
+            ],
+            "declaration_sha256": "57193d12eedf9518e7d49d9764f0a6dc03661d9cb044fe9dbeed13e2d538ad11",
+            "end_line": 36,
+            "file_sha256": "3c20f25a6d248eaaeb3c24f59b629575beda8dc619b9010e7e548367a4bef5dc",
+            "module_imports": [
+              {
+                "level": 0,
+                "module": "fastapi.testclient",
+                "names": [
+                  "TestClient"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "inline_snapshot",
+                "names": [
+                  "snapshot"
+                ]
+              },
+              {
+                "level": 3,
+                "module": "utils",
+                "names": [
+                  "needs_py310"
+                ]
+              }
+            ],
+            "path": "tests/test_tutorial/test_body_multiple_params/test_tutorial001.py",
+            "source_identity": "sha256:81a185020a65044497f5d5ba9560543d11b1bbeebcad623d73c4fbb905f2a3aa:3131",
+            "start_line": 24,
+            "state": "unique-source-declaration",
+            "symbol": "test_post_body_q_bar_content"
+          }
+        ],
+        "before": [
+          {
+            "assertions": [
+              {
+                "line": 26,
+                "source_syntax": "response.status_code == 200"
+              },
+              {
+                "line": 27,
+                "source_syntax": "response.json() == {'item_id': 5, 'item': {'name': 'Foo', 'price': 50.5, 'description': None, 'tax': None}, 'q': 'bar'}"
+              }
+            ],
+            "calls": [
+              {
+                "callee_syntax": "client.put",
+                "line": 25
+              },
+              {
+                "callee_syntax": "response.json",
+                "line": 27
+              }
+            ],
+            "declaration_sha256": "57193d12eedf9518e7d49d9764f0a6dc03661d9cb044fe9dbeed13e2d538ad11",
+            "end_line": 36,
+            "file_sha256": "3c20f25a6d248eaaeb3c24f59b629575beda8dc619b9010e7e548367a4bef5dc",
+            "module_imports": [
+              {
+                "level": 0,
+                "module": "fastapi.testclient",
+                "names": [
+                  "TestClient"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "inline_snapshot",
+                "names": [
+                  "snapshot"
+                ]
+              },
+              {
+                "level": 3,
+                "module": "utils",
+                "names": [
+                  "needs_py310"
+                ]
+              }
+            ],
+            "path": "tests/test_tutorial/test_body_multiple_params/test_tutorial001.py",
+            "source_identity": "sha256:6ec3c2f38a3d25c2f9e1b57be537e40c60f11a100931e8dd9077080001a7518e:3131",
+            "start_line": 24,
+            "state": "unique-source-declaration",
+            "symbol": "test_post_body_q_bar_content"
+          }
+        ]
+      },
+      "sufficiency": "not-established",
+      "test_execution": "not-performed"
+    },
+    {
+      "after_test_relevance": "source-related-only",
+      "before_test_relevance": "unresolved",
+      "id": "fastapi-repeat-dependency-bookkeeping",
+      "original_test_nomination": "tests/test_dependency_cache.py",
+      "source_review_limit": "Selected test declares use_cache=False behavior; direct correspondence to skip_repeats bookkeeping and performance sensitivity remain unproven.",
+      "stages": {
+        "after": [
+          {
+            "assertions": [
+              {
+                "line": 77,
+                "source_syntax": "response.status_code == 200"
+              },
+              {
+                "line": 78,
+                "source_syntax": "response.json() == {'counter': 2, 'subcounter': 1}"
+              },
+              {
+                "line": 80,
+                "source_syntax": "response.status_code == 200"
+              },
+              {
+                "line": 81,
+                "source_syntax": "response.json() == {'counter': 4, 'subcounter': 3}"
+              }
+            ],
+            "calls": [
+              {
+                "callee_syntax": "client.get",
+                "line": 76
+              },
+              {
+                "callee_syntax": "client.get",
+                "line": 79
+              },
+              {
+                "callee_syntax": "response.json",
+                "line": 78
+              },
+              {
+                "callee_syntax": "response.json",
+                "line": 81
+              }
+            ],
+            "declaration_sha256": "595c399446555a2b2904139b00719725f2f73ce781c5b48ad7fb1c651e495762",
+            "end_line": 81,
+            "file_sha256": "480df7b33fa74cc709dbd67d65ffcdb69565a04de01186f0750776fcde533601",
+            "module_imports": [
+              {
+                "level": 0,
+                "module": "fastapi",
+                "names": [
+                  "Depends",
+                  "FastAPI",
+                  "Security"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "fastapi.testclient",
+                "names": [
+                  "TestClient"
+                ]
+              }
+            ],
+            "path": "tests/test_dependency_cache.py",
+            "source_identity": "sha256:42017585e18ba0cd7e3aa8c4b587b1ba3bcca4d7c1c636992138c39943b86f01:3131",
+            "start_line": 74,
+            "state": "unique-source-declaration",
+            "symbol": "test_sub_counter_no_cache"
+          }
+        ],
+        "before": [
+          {
+            "assertions": [
+              {
+                "line": 77,
+                "source_syntax": "response.status_code == 200"
+              },
+              {
+                "line": 78,
+                "source_syntax": "response.json() == {'counter': 2, 'subcounter': 1}"
+              },
+              {
+                "line": 80,
+                "source_syntax": "response.status_code == 200"
+              },
+              {
+                "line": 81,
+                "source_syntax": "response.json() == {'counter': 4, 'subcounter': 3}"
+              }
+            ],
+            "calls": [
+              {
+                "callee_syntax": "client.get",
+                "line": 76
+              },
+              {
+                "callee_syntax": "client.get",
+                "line": 79
+              },
+              {
+                "callee_syntax": "response.json",
+                "line": 78
+              },
+              {
+                "callee_syntax": "response.json",
+                "line": 81
+              }
+            ],
+            "declaration_sha256": "595c399446555a2b2904139b00719725f2f73ce781c5b48ad7fb1c651e495762",
+            "end_line": 81,
+            "file_sha256": "480df7b33fa74cc709dbd67d65ffcdb69565a04de01186f0750776fcde533601",
+            "module_imports": [
+              {
+                "level": 0,
+                "module": "fastapi",
+                "names": [
+                  "Depends",
+                  "FastAPI",
+                  "Security"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "fastapi.testclient",
+                "names": [
+                  "TestClient"
+                ]
+              }
+            ],
+            "path": "tests/test_dependency_cache.py",
+            "source_identity": "sha256:308ee093da2a56b36cf3566a28e829c66d8696aa1789d54caff470fb5c94cbc3:3131",
+            "start_line": 74,
+            "state": "unique-source-declaration",
+            "symbol": "test_sub_counter_no_cache"
+          }
+        ]
+      },
+      "sufficiency": "not-established",
+      "test_execution": "not-performed"
+    },
+    {
+      "after_test_relevance": "source-related-only",
+      "before_test_relevance": "unresolved",
+      "id": "fastapi-dependency-model-memory",
+      "original_test_nomination": "tests/test_dependency_models.py",
+      "source_review_limit": "After test directly checks absence of instance __dict__ and derived helper values. It does not exist before; no invented before test or memory measurement.",
+      "stages": {
+        "after": [
+          {
+            "assertions": [
+              {
+                "line": 126,
+                "source_syntax": "_get_oauth_scopes(dependant=dependant) == []"
+              },
+              {
+                "line": 127,
+                "source_syntax": "not _uses_scopes(dependant=dependant, cache=uses_scopes_cache)"
+              },
+              {
+                "line": 128,
+                "source_syntax": "not _uses_scopes(dependant=dependant, cache=uses_scopes_cache)"
+              },
+              {
+                "line": 129,
+                "source_syntax": "_get_security_dependencies(dependant=dependant) == []"
+              },
+              {
+                "line": 130,
+                "source_syntax": "_get_computed_scope(dependant=dependant) is None"
+              },
+              {
+                "line": 131,
+                "source_syntax": "_get_cache_key(dependant=dependant) == (async_dependency, (), '')"
+              },
+              {
+                "line": 133,
+                "source_syntax": "not hasattr(dependant, '__dict__')"
+              }
+            ],
+            "calls": [
+              {
+                "callee_syntax": "Dependant",
+                "line": 123
+              },
+              {
+                "callee_syntax": "_get_oauth_scopes",
+                "line": 126
+              },
+              {
+                "callee_syntax": "_uses_scopes",
+                "line": 127
+              },
+              {
+                "callee_syntax": "_uses_scopes",
+                "line": 128
+              },
+              {
+                "callee_syntax": "_get_security_dependencies",
+                "line": 129
+              },
+              {
+                "callee_syntax": "_get_computed_scope",
+                "line": 130
+              },
+              {
+                "callee_syntax": "_get_cache_key",
+                "line": 131
+              },
+              {
+                "callee_syntax": "hasattr",
+                "line": 133
+              }
+            ],
+            "declaration_sha256": "97c43ee281ebec420e2a4ce3b62ed140ca4311900bd3858b87d609be9a3a6bff",
+            "end_line": 133,
+            "file_sha256": "660a2b49a79d7c3973922212e7b75ebda5ccdc3cbb1048e2a1bb84c3be3be50e",
+            "module_imports": [
+              {
+                "level": 0,
+                "module": "collections.abc",
+                "names": [
+                  "AsyncGenerator",
+                  "Generator"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "typing",
+                "names": [
+                  "Any"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "fastapi.dependencies.models",
+                "names": [
+                  "Dependant",
+                  "_get_cache_key",
+                  "_get_computed_scope",
+                  "_get_oauth_scopes",
+                  "_get_security_dependencies",
+                  "_get_security_scheme",
+                  "_is_async_gen_callable",
+                  "_is_async_gen_callable_cached",
+                  "_is_coroutine_callable",
+                  "_is_coroutine_callable_cached",
+                  "_is_gen_callable",
+                  "_is_gen_callable_cached",
+                  "_is_security_scheme",
+                  "_uses_scopes"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "fastapi.security",
+                "names": [
+                  "APIKeyHeader"
+                ]
+              }
+            ],
+            "path": "tests/test_dependency_models.py",
+            "source_identity": "sha256:4ecb7b1b292928e20ef99d7aeb071a0b3e3b6703c086b633458da6140094ff1e:3130",
+            "start_line": 122,
+            "state": "unique-source-declaration",
+            "symbol": "test_derived_values_are_not_stored_on_dependant"
+          }
+        ],
+        "before": [
+          {
+            "path": "tests/test_dependency_models.py",
+            "semantic_absence": "not-established",
+            "state": "path-absent-in-exact-tree",
+            "symbol": "test_derived_values_are_not_stored_on_dependant"
+          }
+        ]
+      },
+      "sufficiency": "not-established",
+      "test_execution": "not-performed"
+    },
+    {
+      "after_test_relevance": "source-related-only",
+      "before_test_relevance": "unresolved",
+      "id": "litestar-bound-method-providers",
+      "original_test_nomination": "tests/unit/test_di.py",
+      "source_review_limit": "After test directly constructs a bound generator method and checks Provide classification. It does not exist before; earlier broad Provide tests do not independently prove bound-method handling.",
+      "stages": {
+        "after": [
+          {
+            "assertions": [
+              {
+                "line": 333,
+                "source_syntax": "provide.has_async_generator_dependency is True"
+              },
+              {
+                "line": 334,
+                "source_syntax": "provide.has_sync_generator_dependency is False"
+              },
+              {
+                "line": 336,
+                "source_syntax": "provide.has_sync_callable is True"
+              }
+            ],
+            "calls": [
+              {
+                "callee_syntax": "Config",
+                "line": 329
+              },
+              {
+                "callee_syntax": "Provide",
+                "line": 330
+              }
+            ],
+            "declaration_sha256": "1da59a72b99a205bebd39d650db85a0bd2521ff2be77762ca067ee8b42e3b9c2",
+            "end_line": 336,
+            "file_sha256": "d3c4c6eed2a95362a461ec85ec5c3f5bfeb48e5aeafc33315d5719a565dde8ef",
+            "module_imports": [
+              {
+                "level": 0,
+                "module": "collections.abc",
+                "names": [
+                  "AsyncGenerator",
+                  "Generator"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "functools",
+                "names": [
+                  "partial"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "typing",
+                "names": [
+                  "Any"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "litestar.di",
+                "names": [
+                  "Provide"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "litestar.exceptions",
+                "names": [
+                  "ImproperlyConfiguredException",
+                  "LitestarWarning"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "litestar.types",
+                "names": [
+                  "Empty"
+                ]
+              }
+            ],
+            "path": "tests/unit/test_di.py",
+            "source_identity": "sha256:edd889b011e42bd9e52a75c8ec9882f12ef3793a500e83580f1ad502d2d21974:1403",
+            "start_line": 319,
+            "state": "unique-source-declaration",
+            "symbol": "test_bound_async_generator_method_detection"
+          }
+        ],
+        "before": [
+          {
+            "declaration_matches": 0,
+            "path": "tests/unit/test_di.py",
+            "state": "not-uniquely-declared",
+            "symbol": "test_bound_async_generator_method_detection"
+          }
+        ]
+      },
+      "sufficiency": "not-established",
+      "test_execution": "not-performed"
+    },
+    {
+      "after_test_relevance": "source-related-only",
+      "before_test_relevance": "unresolved",
+      "id": "litestar-stateful-callable-cleanup",
+      "original_test_nomination": "tests/unit/test_di.py",
+      "source_review_limit": "After test directly constructs a stateful generator provider and checks lifecycle counters. It does not exist before; no runtime execution or sufficient-coverage claim.",
+      "stages": {
+        "after": [
+          {
+            "assertions": [
+              {
+                "line": 248,
+                "source_syntax": "provide.has_sync_generator_dependency is True"
+              },
+              {
+                "line": 249,
+                "source_syntax": "provide.has_async_generator_dependency is False"
+              },
+              {
+                "line": 253,
+                "source_syntax": "isinstance(gen1, Generator)"
+              },
+              {
+                "line": 256,
+                "source_syntax": "session1 == 1"
+              },
+              {
+                "line": 257,
+                "source_syntax": "factory.call_count == 1"
+              },
+              {
+                "line": 258,
+                "source_syntax": "factory.cleanup_count == 0"
+              },
+              {
+                "line": 262,
+                "source_syntax": "isinstance(gen2, Generator)"
+              },
+              {
+                "line": 265,
+                "source_syntax": "session2 == 2"
+              },
+              {
+                "line": 266,
+                "source_syntax": "factory.call_count == 2"
+              },
+              {
+                "line": 267,
+                "source_syntax": "factory.cleanup_count == 0"
+              },
+              {
+                "line": 272,
+                "source_syntax": "factory.cleanup_count == 1"
+              },
+              {
+                "line": 277,
+                "source_syntax": "factory.cleanup_count == 2"
+              }
+            ],
+            "calls": [
+              {
+                "callee_syntax": "SyncGeneratorCallable",
+                "line": 244
+              },
+              {
+                "callee_syntax": "Provide",
+                "line": 245
+              },
+              {
+                "callee_syntax": "isinstance",
+                "line": 253
+              },
+              {
+                "callee_syntax": "next",
+                "line": 255
+              },
+              {
+                "callee_syntax": "isinstance",
+                "line": 262
+              },
+              {
+                "callee_syntax": "next",
+                "line": 264
+              },
+              {
+                "callee_syntax": "provide",
+                "line": 252
+              },
+              {
+                "callee_syntax": "provide",
+                "line": 261
+              },
+              {
+                "callee_syntax": "pytest.raises",
+                "line": 270
+              },
+              {
+                "callee_syntax": "next",
+                "line": 271
+              },
+              {
+                "callee_syntax": "pytest.raises",
+                "line": 275
+              },
+              {
+                "callee_syntax": "next",
+                "line": 276
+              }
+            ],
+            "declaration_sha256": "b66b39dd6bae713f95e2931fc2b842c7571a623e9ddd7d1e9f8e3626c25ea9c7",
+            "end_line": 277,
+            "file_sha256": "75dc315eec700fb5d548dd9b781aa6140f16e471d1c88d8998603b7fc86c58d6",
+            "module_imports": [
+              {
+                "level": 0,
+                "module": "collections.abc",
+                "names": [
+                  "AsyncGenerator",
+                  "Generator"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "functools",
+                "names": [
+                  "partial"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "typing",
+                "names": [
+                  "Any"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "litestar.di",
+                "names": [
+                  "Provide"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "litestar.exceptions",
+                "names": [
+                  "ImproperlyConfiguredException",
+                  "LitestarWarning"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "litestar.types",
+                "names": [
+                  "Empty"
+                ]
+              }
+            ],
+            "path": "tests/unit/test_di.py",
+            "source_identity": "sha256:28abe2f79328bb9b935d56a0c72f3fe973fc87918dd2c2d6a654c9d1825f5fa6:1400",
+            "start_line": 242,
+            "state": "unique-source-declaration",
+            "symbol": "test_stateful_sync_generator_with_cleanup"
+          }
+        ],
+        "before": [
+          {
+            "declaration_matches": 0,
+            "path": "tests/unit/test_di.py",
+            "state": "not-uniquely-declared",
+            "symbol": "test_stateful_sync_generator_with_cleanup"
+          }
+        ]
+      },
+      "sufficiency": "not-established",
+      "test_execution": "not-performed"
+    },
+    {
+      "after_test_relevance": "source-related-only",
+      "before_test_relevance": "unresolved",
+      "id": "litestar-cached-yield-provider",
+      "original_test_nomination": "tests/unit/test_di.py",
+      "source_review_limit": "After test requests generator use_cache=True and expects configuration error. It does not exist before; source relation is direct, actual execution remains external/unperformed.",
+      "stages": {
+        "after": [
+          {
+            "assertions": [],
+            "calls": [
+              {
+                "callee_syntax": "pytest.mark.parametrize",
+                "line": 158
+              },
+              {
+                "callee_syntax": "pytest.raises",
+                "line": 166
+              },
+              {
+                "callee_syntax": "Provide",
+                "line": 167
+              }
+            ],
+            "declaration_sha256": "64c1bad2abaea1c67e30b0863bdbe52f78fe511f163734edb60a1b5e4224070b",
+            "end_line": 167,
+            "file_sha256": "76f1c1f51ff8268be968bc1ba1d3e0eae682fb2517fa551569df0ab24978c2a8",
+            "module_imports": [
+              {
+                "level": 0,
+                "module": "functools",
+                "names": [
+                  "partial"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "typing",
+                "names": [
+                  "Any",
+                  "AsyncGenerator",
+                  "Generator"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "litestar.di",
+                "names": [
+                  "Provide"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "litestar.exceptions",
+                "names": [
+                  "ImproperlyConfiguredException",
+                  "LitestarWarning"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "litestar.types",
+                "names": [
+                  "Empty"
+                ]
+              }
+            ],
+            "path": "tests/unit/test_di.py",
+            "source_identity": "sha256:238218771c77647e5aac17437009817d637c1f0c45d3b8a67c6aaf8bb9fcb654:1228",
+            "start_line": 165,
+            "state": "unique-source-declaration",
+            "symbol": "test_raises_when_generator_dependency_is_cached"
+          }
+        ],
+        "before": [
+          {
+            "declaration_matches": 0,
+            "path": "tests/unit/test_di.py",
+            "state": "not-uniquely-declared",
+            "symbol": "test_raises_when_generator_dependency_is_cached"
+          }
+        ]
+      },
+      "sufficiency": "not-established",
+      "test_execution": "not-performed"
+    },
+    {
+      "after_test_relevance": "source-related-only",
+      "before_test_relevance": "unresolved",
+      "id": "litestar-named-dependency-markers",
+      "original_test_nomination": "tests/unit/test_kwargs/test_param_markers.py",
+      "source_review_limit": "After test declares NamedDependency and checks parameter/default/schema behavior. It does not exist before; remaining validation marker behavior is not qualified by this one test.",
+      "stages": {
+        "after": [
+          {
+            "assertions": [
+              {
+                "line": 365,
+                "source_syntax": "client.get('/').json() == 1"
+              },
+              {
+                "line": 369,
+                "source_syntax": "schema['paths']['/']['get'].get('parameters') is None"
+              }
+            ],
+            "calls": [
+              {
+                "callee_syntax": "get",
+                "line": 359
+              },
+              {
+                "callee_syntax": "create_test_client",
+                "line": 363
+              },
+              {
+                "callee_syntax": "client.get('/schema/openapi.json').json",
+                "line": 368
+              },
+              {
+                "callee_syntax": "client.get('/').json",
+                "line": 365
+              },
+              {
+                "callee_syntax": "schema['paths']['/']['get'].get",
+                "line": 369
+              },
+              {
+                "callee_syntax": "client.get",
+                "line": 368
+              },
+              {
+                "callee_syntax": "client.get",
+                "line": 365
+              }
+            ],
+            "declaration_sha256": "ba6bcb2ba9a1780a40cd5972fd11b35ca3412937130bea487a8473e14da3fca0",
+            "end_line": 369,
+            "file_sha256": "da2d8459998e3d5ebc8f15cb76eb747efc7cde7e9e6f4ebf6f88dc7a2d74cf27",
+            "module_imports": [
+              {
+                "level": 0,
+                "module": "typing",
+                "names": [
+                  "Annotated",
+                  "Any"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "litestar",
+                "names": [
+                  "Litestar",
+                  "get"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "litestar.di",
+                "names": [
+                  "NamedDependency"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "litestar.enums",
+                "names": [
+                  "ParamType"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "litestar.exceptions.base_exceptions",
+                "names": [
+                  "LitestarDeprecationWarning"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "litestar.openapi.spec",
+                "names": [
+                  "Parameter"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "litestar.params",
+                "names": [
+                  "CookieParameter",
+                  "Dependency",
+                  "FromCookie",
+                  "FromHeader",
+                  "FromPath",
+                  "FromQuery",
+                  "HeaderParameter",
+                  "Parameter",
+                  "ParameterKwarg",
+                  "PathParameter",
+                  "QueryParameter"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "litestar.testing",
+                "names": [
+                  "TestClient",
+                  "create_test_client"
+                ]
+              }
+            ],
+            "path": "tests/unit/test_kwargs/test_param_markers.py",
+            "source_identity": "sha256:8f57e9100ea2a9540363ff1afd5f94ab6455577ec1f9a010f3fb638ccb8d5a52:1387",
+            "start_line": 357,
+            "state": "unique-source-declaration",
+            "symbol": "test_named_dependency_explicit_marker"
+          }
+        ],
+        "before": [
+          {
+            "declaration_matches": 0,
+            "path": "tests/unit/test_kwargs/test_param_markers.py",
+            "state": "not-uniquely-declared",
+            "symbol": "test_named_dependency_explicit_marker"
+          }
+        ]
+      },
+      "sufficiency": "not-established",
+      "test_execution": "not-performed"
+    },
+    {
+      "after_test_relevance": "source-related-only",
+      "before_test_relevance": "unresolved",
+      "id": "faststream-default-dependency-provider",
+      "original_test_nomination": "tests/utils/context/test_depends.py",
+      "source_review_limit": "Original nominated test checks ordinary dependency invocation, not shared provider identity. A defect-sensitive existing test for the default provider identity is not yet established.",
+      "stages": {
+        "after": [
+          {
+            "assertions": [
+              {
+                "line": 25,
+                "source_syntax": "func(key=key)"
+              }
+            ],
+            "calls": [
+              {
+                "callee_syntax": "pytest.mark.asyncio",
+                "line": 17
+              },
+              {
+                "callee_syntax": "func",
+                "line": 25
+              },
+              {
+                "callee_syntax": "Depends",
+                "line": 22
+              }
+            ],
+            "declaration_sha256": "03047478e207219ce4273f60fbe578dbaad6029fbd6d9c2a971fbbfb7ca1e974",
+            "end_line": 25,
+            "file_sha256": "cc01726624c029024a90dc729ff4d9a27f621b73824eab7fb8a4ed3b16f2b055",
+            "module_imports": [
+              {
+                "level": 0,
+                "module": "typing",
+                "names": [
+                  "Annotated"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "faststream",
+                "names": [
+                  "Depends"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "faststream._internal.utils",
+                "names": [
+                  "apply_types"
+                ]
+              }
+            ],
+            "path": "tests/utils/context/test_depends.py",
+            "source_identity": "sha256:304dca377bccb9f0049721f3827c5e778ea8825fcd7f51a16141f9a582adb997:1805",
+            "start_line": 18,
+            "state": "unique-source-declaration",
+            "symbol": "test_sync_depends"
+          }
+        ],
+        "before": [
+          {
+            "assertions": [
+              {
+                "line": 25,
+                "source_syntax": "func(key=key)"
+              }
+            ],
+            "calls": [
+              {
+                "callee_syntax": "pytest.mark.asyncio",
+                "line": 17
+              },
+              {
+                "callee_syntax": "func",
+                "line": 25
+              },
+              {
+                "callee_syntax": "Depends",
+                "line": 22
+              }
+            ],
+            "declaration_sha256": "03047478e207219ce4273f60fbe578dbaad6029fbd6d9c2a971fbbfb7ca1e974",
+            "end_line": 25,
+            "file_sha256": "cc01726624c029024a90dc729ff4d9a27f621b73824eab7fb8a4ed3b16f2b055",
+            "module_imports": [
+              {
+                "level": 0,
+                "module": "typing",
+                "names": [
+                  "Annotated"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "faststream",
+                "names": [
+                  "Depends"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "faststream._internal.utils",
+                "names": [
+                  "apply_types"
+                ]
+              }
+            ],
+            "path": "tests/utils/context/test_depends.py",
+            "source_identity": "sha256:c4cb762edd886f95f8c113da3c3a28a6c2f3b0dbcde5160d87b69e1a6d95d315:1805",
+            "start_line": 18,
+            "state": "unique-source-declaration",
+            "symbol": "test_sync_depends"
+          }
+        ]
+      },
+      "sufficiency": "not-established",
+      "test_execution": "not-performed"
+    },
+    {
+      "after_test_relevance": "source-related-only",
+      "before_test_relevance": "unresolved",
+      "id": "faststream-composed-context-provider",
+      "original_test_nomination": "tests/utils/context/test_composition.py",
+      "source_review_limit": "After test constructs two contexts and checks composition priority. Test file absent before; no invented before counterpart.",
+      "stages": {
+        "after": [
+          {
+            "assertions": [
+              {
+                "line": 16,
+                "source_syntax": "context.context == {'key': 'value1', 'context': context}"
+              }
+            ],
+            "calls": [
+              {
+                "callee_syntax": "ContextRepo",
+                "line": 9
+              },
+              {
+                "callee_syntax": "ContextRepo",
+                "line": 10
+              },
+              {
+                "callee_syntax": "ContextRepoComposition",
+                "line": 11
+              },
+              {
+                "callee_syntax": "context1.set_global",
+                "line": 13
+              },
+              {
+                "callee_syntax": "context2.set_global",
+                "line": 14
+              }
+            ],
+            "declaration_sha256": "b6346efa04565576794679548e910f4bd20f13b07dd0656e6927903d3a405aa6",
+            "end_line": 16,
+            "file_sha256": "37c30fa2876a2b054048a77d4c4b41193717f99ca9a2ce482a1c8b369040e0b7",
+            "module_imports": [
+              {
+                "level": 0,
+                "module": "faststream._internal.context.composition",
+                "names": [
+                  "ContextRepoComposition"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "faststream._internal.context.repository",
+                "names": [
+                  "ContextRepo"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "faststream.exceptions",
+                "names": [
+                  "ContextError"
+                ]
+              }
+            ],
+            "path": "tests/utils/context/test_composition.py",
+            "source_identity": "sha256:446a39cbd40ea8133a5ce36d2477d4ff47125a293788359eafc9fadb544c5f33:2131",
+            "start_line": 8,
+            "state": "unique-source-declaration",
+            "symbol": "test_context"
+          }
+        ],
+        "before": [
+          {
+            "path": "tests/utils/context/test_composition.py",
+            "semantic_absence": "not-established",
+            "state": "path-absent-in-exact-tree",
+            "symbol": "test_context"
+          }
+        ]
+      },
+      "sufficiency": "not-established",
+      "test_execution": "not-performed"
+    },
+    {
+      "after_test_relevance": "source-related-only",
+      "before_test_relevance": "unresolved",
+      "id": "faststream-non-init-dependant-fields",
+      "original_test_nomination": "tests/fastapi/test_get_dependant.py",
+      "source_review_limit": "Nominated native-fields test is unchanged across the commit and declares no init=False field. It is not proof of the non-init constructor-copy regression; defect-sensitive test remains missing.",
+      "stages": {
+        "after": [
+          {
+            "assertions": [
+              {
+                "line": 20,
+                "source_syntax": "dependant.call is handler"
+              },
+              {
+                "line": 21,
+                "source_syntax": "len(dependant.dependencies) == 1"
+              },
+              {
+                "line": 22,
+                "source_syntax": "dependant.dependencies[0].call is dependency"
+              },
+              {
+                "line": 23,
+                "source_syntax": "dependant.model.__name__ == 'handler'"
+              },
+              {
+                "line": 24,
+                "source_syntax": "dependant.custom_fields == {}"
+              },
+              {
+                "line": 25,
+                "source_syntax": "[field.field_name for field in dependant.flat_params] == ['message']"
+              }
+            ],
+            "calls": [
+              {
+                "callee_syntax": "get_fastapi_dependant",
+                "line": 18
+              },
+              {
+                "callee_syntax": "len",
+                "line": 21
+              },
+              {
+                "callee_syntax": "Depends",
+                "line": 14
+              }
+            ],
+            "declaration_sha256": "bcf94fab34ddc0097060e2a9afd1aa9bbde0f2f3bb16b27bd6eff89070eee118",
+            "end_line": 25,
+            "file_sha256": "e3576bd8c52fd5e257bb7bee2e9f63d77ee2906767803ed9e98a31527af18c6e",
+            "module_imports": [
+              {
+                "level": 0,
+                "module": "typing",
+                "names": [
+                  "Annotated"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "fastapi",
+                "names": [
+                  "Depends"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "faststream._internal.fastapi.get_dependant",
+                "names": [
+                  "get_fastapi_dependant"
+                ]
+              }
+            ],
+            "path": "tests/fastapi/test_get_dependant.py",
+            "source_identity": "sha256:bbc1b057d83d7ec05b8b347d9febd79eaa53351d10963bc3ab156fcef446d12d:2122",
+            "start_line": 8,
+            "state": "unique-source-declaration",
+            "symbol": "test_get_fastapi_dependant_has_faststream_fields"
+          }
+        ],
+        "before": [
+          {
+            "assertions": [
+              {
+                "line": 20,
+                "source_syntax": "dependant.call is handler"
+              },
+              {
+                "line": 21,
+                "source_syntax": "len(dependant.dependencies) == 1"
+              },
+              {
+                "line": 22,
+                "source_syntax": "dependant.dependencies[0].call is dependency"
+              },
+              {
+                "line": 23,
+                "source_syntax": "dependant.model.__name__ == 'handler'"
+              },
+              {
+                "line": 24,
+                "source_syntax": "dependant.custom_fields == {}"
+              },
+              {
+                "line": 25,
+                "source_syntax": "[field.field_name for field in dependant.flat_params] == ['message']"
+              }
+            ],
+            "calls": [
+              {
+                "callee_syntax": "get_fastapi_dependant",
+                "line": 18
+              },
+              {
+                "callee_syntax": "len",
+                "line": 21
+              },
+              {
+                "callee_syntax": "Depends",
+                "line": 14
+              }
+            ],
+            "declaration_sha256": "bcf94fab34ddc0097060e2a9afd1aa9bbde0f2f3bb16b27bd6eff89070eee118",
+            "end_line": 25,
+            "file_sha256": "e3576bd8c52fd5e257bb7bee2e9f63d77ee2906767803ed9e98a31527af18c6e",
+            "module_imports": [
+              {
+                "level": 0,
+                "module": "typing",
+                "names": [
+                  "Annotated"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "fastapi",
+                "names": [
+                  "Depends"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "faststream._internal.fastapi.get_dependant",
+                "names": [
+                  "get_fastapi_dependant"
+                ]
+              }
+            ],
+            "path": "tests/fastapi/test_get_dependant.py",
+            "source_identity": "sha256:6c2ba2f0837458b224f75095046d7cb713cbd9759d813140c623fcbaa1c85cf0:2113",
+            "start_line": 8,
+            "state": "unique-source-declaration",
+            "symbol": "test_get_fastapi_dependant_has_faststream_fields"
+          }
+        ]
+      },
+      "sufficiency": "not-established",
+      "test_execution": "not-performed"
+    },
+    {
+      "after_test_relevance": "source-related-only",
+      "before_test_relevance": "unresolved",
+      "id": "faststream-dependant-constructor-metadata",
+      "original_test_nomination": "tests/fastapi/test_get_dependant.py",
+      "source_review_limit": "After test invokes get_fastapi_dependant and asserts added metadata fields and nested dependency. Test file absent before; no invented before counterpart.",
+      "stages": {
+        "after": [
+          {
+            "assertions": [
+              {
+                "line": 20,
+                "source_syntax": "dependant.call is handler"
+              },
+              {
+                "line": 21,
+                "source_syntax": "len(dependant.dependencies) == 1"
+              },
+              {
+                "line": 22,
+                "source_syntax": "dependant.dependencies[0].call is dependency"
+              },
+              {
+                "line": 23,
+                "source_syntax": "dependant.model.__name__ == 'handler'"
+              },
+              {
+                "line": 24,
+                "source_syntax": "dependant.custom_fields == {}"
+              },
+              {
+                "line": 25,
+                "source_syntax": "[field.field_name for field in dependant.flat_params] == ['message']"
+              }
+            ],
+            "calls": [
+              {
+                "callee_syntax": "get_fastapi_dependant",
+                "line": 18
+              },
+              {
+                "callee_syntax": "len",
+                "line": 21
+              },
+              {
+                "callee_syntax": "Depends",
+                "line": 14
+              }
+            ],
+            "declaration_sha256": "bcf94fab34ddc0097060e2a9afd1aa9bbde0f2f3bb16b27bd6eff89070eee118",
+            "end_line": 25,
+            "file_sha256": "e3576bd8c52fd5e257bb7bee2e9f63d77ee2906767803ed9e98a31527af18c6e",
+            "module_imports": [
+              {
+                "level": 0,
+                "module": "typing",
+                "names": [
+                  "Annotated"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "fastapi",
+                "names": [
+                  "Depends"
+                ]
+              },
+              {
+                "level": 0,
+                "module": "faststream._internal.fastapi.get_dependant",
+                "names": [
+                  "get_fastapi_dependant"
+                ]
+              }
+            ],
+            "path": "tests/fastapi/test_get_dependant.py",
+            "source_identity": "sha256:22b54379dfbb33818bf606b46313ec9b50f7d1ace66a57d5e16d5b905a0e27f3:2110",
+            "start_line": 8,
+            "state": "unique-source-declaration",
+            "symbol": "test_get_fastapi_dependant_has_faststream_fields"
+          }
+        ],
+        "before": [
+          {
+            "path": "tests/fastapi/test_get_dependant.py",
+            "semantic_absence": "not-established",
+            "state": "path-absent-in-exact-tree",
+            "symbol": "test_get_fastapi_dependant_has_faststream_fields"
+          }
+        ]
+      },
+      "sufficiency": "not-established",
+      "test_execution": "not-performed"
+    }
+  ],
+  "observer_outputs_used": false,
+  "original_nominations_and_assertions_preserved": true,
+  "required_remaining_proof": [
+    "before-revision test correspondence where later test is absent",
+    "direct or independently reviewed route/wiring correspondence",
+    "defect-sensitive default-provider/non-init-field tests",
+    "artifact-bound retrieval and adversarial witness review"
+  ],
+  "schema": "hashmarks.configuration-test-source-review.v1",
+  "scope": "exact test declarations, calls and assertions; source relation only, no inferred runtime reachability, executed verification or sufficient regression coverage",
+  "status": "INCOMPLETE"
+}

@@ -5,7 +5,7 @@ import os
 import shutil
 import subprocess
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -75,7 +75,12 @@ def _run_nx_graph(
     return None, f"nx graph failed: {detail}"
 
 
-def _nx_payload(stdout: str) -> tuple[dict[str, object] | None, str | None]:
+class _NxPayload(TypedDict):
+    nodes: dict[object, object]
+    dependencies: dict[object, object]
+
+
+def _nx_payload(stdout: str) -> tuple[_NxPayload | None, str | None]:
     try:
         payload = json.loads(stdout)
     except json.JSONDecodeError:
@@ -169,7 +174,7 @@ def _nx_edges(raw_deps: dict[object, object], known: set[str]) -> list[NxEdgeDat
 
 def _collect_nx_payload(
     nx: str, workspace: Path, timeout: float
-) -> tuple[dict[str, object] | None, str | None]:
+) -> tuple[_NxPayload | None, str | None]:
     completed, error = _run_nx_graph(nx, workspace, timeout)
     if completed is None:
         return None, error or "nx graph failed"

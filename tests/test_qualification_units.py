@@ -1,7 +1,15 @@
 import copy
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from contract_assertions import (
+    assert_array,
+    assert_number,
+    assert_object,
+    assert_records,
+    assert_text,
+)
 
 from hashmarks.qualification_units import (
     COVERAGE_SCHEMA,
@@ -14,7 +22,11 @@ from hashmarks.qualification_units import (
     validate_external_qualification_coverage,
     validate_native_qualification_handoff,
 )
-from hashmarks.test_shards import _nodeids, node_membership_identity
+from hashmarks.test_shards import (
+    PROCESS_SENSITIVE_NODEIDS,
+    _nodeids,
+    node_membership_identity,
+)
 
 
 def _root() -> Path:
@@ -29,8 +41,10 @@ def _coverage(plan: dict[str, object], unit: dict[str, object]) -> dict[str, obj
         "plan_identity": plan["plan_identity"],
         "unit_identity": unit["unit_identity"],
         "membership_identity": unit["membership_identity"],
-        "executed_nodeids": list(reversed(unit["nodeids"])),
-        "producer_implementation_identity": plan["producer"]["implementation_identity"],
+        "executed_nodeids": list(reversed(assert_array(unit["nodeids"]))),
+        "producer_implementation_identity": assert_object(plan["producer"])[
+            "implementation_identity"
+        ],
         "provenance_identity": qualification_coverage_provenance_identity(plan, unit),
         "execution_authority": "external",
         "result_authority": "external",
@@ -39,11 +53,15 @@ def _coverage(plan: dict[str, object], unit: dict[str, object]) -> dict[str, obj
 
 
 def test_owner_units_exactly_partition_repository_test_membership(
-    repository_qualification_plan,
+    repository_qualification_plan: dict[str, object],
 ) -> None:
     root = _root()
-    units = tuple(repository_qualification_plan["units"])
-    actual = [nodeid for unit in units for nodeid in unit["nodeids"]]
+    units = assert_records(repository_qualification_plan["units"])
+    actual = [
+        assert_text(nodeid)
+        for unit in units
+        for nodeid in assert_array(unit["nodeids"])
+    ]
     expected = [nodeid for nodeid, _weight in _nodeids(root)]
     assert len(actual) == len(set(actual))
     assert set(actual) == set(expected)
@@ -51,11 +69,17 @@ def test_owner_units_exactly_partition_repository_test_membership(
 
 
 def test_special_classifications_are_singleton_external_units(
-    repository_qualification_plan,
+    repository_qualification_plan: dict[str, object],
 ) -> None:
-    units = tuple(repository_qualification_plan["units"])
+    units = assert_records(repository_qualification_plan["units"])
     special = [unit for unit in units if unit["kind"] != "release-correctness"]
-    assert len([unit for unit in special if unit["kind"] == "process-sensitive"]) == 1
+    assert {
+        assert_text(nodeid)
+        for unit in special
+        if unit["kind"] == "process-sensitive"
+        for nodeid in assert_array(unit["nodeids"])
+    } == set(PROCESS_SENSITIVE_NODEIDS)
+    assert all(len(assert_array(unit["nodeids"])) == 1 for unit in special)
     assert len([unit for unit in special if unit["kind"] == "empirical-benchmark"]) == 6
     assert all(unit["preferred_granularity"] == "singleton" for unit in special)
     assert all(unit["execution_authority"] == "external" for unit in special)
@@ -64,9 +88,9 @@ def test_special_classifications_are_singleton_external_units(
 
 
 def test_release_correctness_units_prefer_file_granularity_without_runtime_policy(
-    repository_qualification_plan,
+    repository_qualification_plan: dict[str, object],
 ) -> None:
-    units = tuple(repository_qualification_plan["units"])
+    units = assert_records(repository_qualification_plan["units"])
     correctness = [unit for unit in units if unit["kind"] == "release-correctness"]
     assert correctness
     assert all(unit["preferred_granularity"] == "file" for unit in correctness)
@@ -80,10 +104,12 @@ def test_owner_plan_is_deterministic_and_binds_exact_membership_classification_a
     first = qualification_owner_plan(_root())
     second = qualification_owner_plan(_root())
     assert first == second
-    assert first["membership_identity"].startswith("sha256:")
-    assert first["classification_identity"].startswith("sha256:")
-    assert first["classification_policy_identity"].startswith("sha256:")
-    assert first["producer"]["implementation_identity"].startswith("sha256:")
+    assert assert_text(first["membership_identity"]).startswith("sha256:")
+    assert assert_text(first["classification_identity"]).startswith("sha256:")
+    assert assert_text(first["classification_policy_identity"]).startswith("sha256:")
+    assert assert_text(
+        assert_object(first["producer"])["implementation_identity"]
+    ).startswith("sha256:")
     assert first["test_node_count"] == len(_nodeids(_root()))
     assert first["authority"] == {
         "classification": "hashmarks",
@@ -94,10 +120,10 @@ def test_owner_plan_is_deterministic_and_binds_exact_membership_classification_a
 
 
 def test_external_coverage_validates_linkage_without_interpreting_pass_result(
-    repository_qualification_plan,
+    repository_qualification_plan: dict[str, object],
 ) -> None:
     plan = repository_qualification_plan
-    unit = plan["units"][0]
+    unit = assert_records(plan["units"])[0]
     coverage = _coverage(plan, unit)
     assert validate_external_qualification_coverage(plan, coverage) == {
         "coverage_valid": True,
@@ -116,42 +142,49 @@ def test_external_coverage_validates_linkage_without_interpreting_pass_result(
 
 
 def test_coverage_rejects_omission_duplicate_and_execution_policy(
-    repository_qualification_plan,
+    repository_qualification_plan: dict[str, object],
 ) -> None:
     plan = repository_qualification_plan
-    unit = next(row for row in plan["units"] if len(row["nodeids"]) >= 2)
+    unit = next(
+        row
+        for row in assert_records(plan["units"])
+        if len(assert_array(row["nodeids"])) >= 2
+    )
     base = _coverage(plan, unit)
 
-    omitted = dict(base, executed_nodeids=list(unit["nodeids"][:-1]))
-    assert (
-        "executed-membership-mismatch"
-        in validate_external_qualification_coverage(plan, omitted)["reasons"]
+    omitted = dict(base, executed_nodeids=list(assert_array(unit["nodeids"])[:-1]))
+    assert "executed-membership-mismatch" in assert_array(
+        validate_external_qualification_coverage(plan, omitted)["reasons"]
     )
 
-    duplicated = dict(base, executed_nodeids=[*unit["nodeids"], unit["nodeids"][0]])
-    assert (
-        "executed-membership-mismatch"
-        in validate_external_qualification_coverage(plan, duplicated)["reasons"]
+    duplicated = dict(
+        base,
+        executed_nodeids=[
+            *assert_array(unit["nodeids"]),
+            assert_array(unit["nodeids"])[0],
+        ],
+    )
+    assert "executed-membership-mismatch" in assert_array(
+        validate_external_qualification_coverage(plan, duplicated)["reasons"]
     )
 
     wrong_provenance = dict(base, provenance_identity="sha256:" + "f" * 64)
-    assert (
-        "provenance-linkage-mismatch"
-        in validate_external_qualification_coverage(plan, wrong_provenance)["reasons"]
+    assert "provenance-linkage-mismatch" in assert_array(
+        validate_external_qualification_coverage(plan, wrong_provenance)["reasons"]
     )
 
     with_timeout = dict(base)
     with_timeout["timeout"] = 30
     checked = validate_external_qualification_coverage(plan, with_timeout)
-    assert "coverage-fields-mismatch" in checked["reasons"]
-    assert "execution-policy-present" in checked["reasons"]
+    assert "coverage-fields-mismatch" in assert_array(checked["reasons"])
+    assert "execution-policy-present" in assert_array(checked["reasons"])
 
 
 def test_coverage_rejects_invalid_external_producer_metadata(
-    repository_qualification_plan,
+    repository_qualification_plan: dict[str, object],
 ) -> None:
     plan = repository_qualification_plan
-    unit = plan["units"][0]
+    unit = assert_records(plan["units"])[0]
     base = _coverage(plan, unit)
 
     invalid = (
@@ -171,11 +204,11 @@ def test_coverage_rejects_invalid_external_producer_metadata(
         coverage = dict(base, producer=producer)
         checked = validate_external_qualification_coverage(plan, coverage)
         assert checked["coverage_valid"] is False
-        assert expected_reason in checked["reasons"]
+        assert expected_reason in assert_array(checked["reasons"])
 
 
 def test_native_handoff_keeps_execution_result_and_certification_external(
-    repository_qualification_handoff,
+    repository_qualification_handoff: dict[str, object],
 ) -> None:
     handoff = repository_qualification_handoff
     assert handoff["execution_authority"] == "external"
@@ -248,7 +281,9 @@ def test_repository_identity_can_exclude_declared_runtime_state_path(
     assert repository_content_identity(tmp_path, excluded_paths=(runtime,)) != first
 
 
-def test_owner_plan_reuses_one_repository_classification_snapshot(monkeypatch) -> None:
+def test_owner_plan_reuses_one_repository_classification_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     import hashmarks.qualification_units as qualification_units_module
     import hashmarks.test_shards as test_shards_module
 
@@ -257,12 +292,12 @@ def test_owner_plan_reuses_one_repository_classification_snapshot(monkeypatch) -
     real_nodeids = qualification_units_module._nodeids
     real_identity = test_shards_module.repository_content_identity
 
-    def counted_nodeids(root: Path):
+    def counted_nodeids(root: Path) -> list[tuple[str, int]]:
         nonlocal nodeid_calls
         nodeid_calls += 1
         return real_nodeids(root)
 
-    def counted_identity(root: Path, *, excluded_paths=()):
+    def counted_identity(root: Path, *, excluded_paths: tuple[Path, ...] = ()) -> str:
         nonlocal identity_calls
         identity_calls += 1
         return real_identity(root, excluded_paths=excluded_paths)
@@ -274,13 +309,13 @@ def test_owner_plan_reuses_one_repository_classification_snapshot(monkeypatch) -
 
     plan = qualification_units_module.qualification_owner_plan(_root())
 
-    assert plan["test_node_count"] > 0
+    assert assert_number(plan["test_node_count"]) > 0
     assert nodeid_calls == 1
     assert identity_calls == 1
 
 
 def test_repository_identity_prunes_runtime_trees_before_walk(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     import hashmarks.test_shards as test_shards_module
 
@@ -294,8 +329,10 @@ def test_repository_identity_prunes_runtime_trees_before_walk(
     visited: list[str] = []
     real_walk = test_shards_module.os.walk
 
-    def observed_walk(*args, **kwargs):
-        for row in real_walk(*args, **kwargs):
+    def observed_walk(
+        root: Path, *, topdown: bool, followlinks: bool
+    ) -> Iterator[tuple[str, list[str], list[str]]]:
+        for row in real_walk(root, topdown=topdown, followlinks=followlinks):
             visited.append(Path(row[0]).relative_to(tmp_path).as_posix())
             yield row
 
@@ -323,10 +360,10 @@ def test_external_result_rejects_nonportable_or_coerced_identity_state() -> None
 
 
 def test_native_handoff_rejects_rehashed_unit_authority_tampering(
-    repository_qualification_handoff,
+    repository_qualification_handoff: dict[str, object],
 ) -> None:
     handoff = copy.deepcopy(repository_qualification_handoff)
-    unit = handoff["units"][0]
+    unit = assert_records(handoff["units"])[0]
     unit["execution_authority"] = "hashmarks"
     unit_payload = {key: value for key, value in unit.items() if key != "unit_identity"}
     unit["unit_identity"] = _identity(UNIT_SCHEMA, unit_payload)
@@ -338,19 +375,19 @@ def test_native_handoff_rejects_rehashed_unit_authority_tampering(
     )
     checked = validate_native_qualification_handoff(handoff)
     assert checked["valid"] is False
-    assert (
-        "qualification-unit-execution-authority-must-be-external" in checked["reasons"]
+    assert "qualification-unit-execution-authority-must-be-external" in assert_array(
+        checked["reasons"]
     )
 
 
 def test_coverage_rejects_rehashed_semantically_corrupt_hashmarks_plan(
-    repository_qualification_plan,
+    repository_qualification_plan: dict[str, object],
 ) -> None:
     original = repository_qualification_plan
-    unit = original["units"][0]
+    unit = assert_records(original["units"])[0]
     coverage = _coverage(original, unit)
     plan = copy.deepcopy(original)
-    mutated_unit = plan["units"][0]
+    mutated_unit = assert_records(plan["units"])[0]
     mutated_unit["timeout"] = 30
     unit_payload = {
         key: value for key, value in mutated_unit.items() if key != "unit_identity"
@@ -360,5 +397,7 @@ def test_coverage_rejects_rehashed_semantically_corrupt_hashmarks_plan(
     plan["plan_identity"] = _identity(PLAN_SCHEMA, plan_payload)
     checked = validate_external_qualification_coverage(plan, coverage)
     assert checked["coverage_valid"] is False
-    assert "qualification-unit-fields-mismatch" in checked["reasons"]
-    assert "qualification-unit-execution-policy-present" in checked["reasons"]
+    assert "qualification-unit-fields-mismatch" in assert_array(checked["reasons"])
+    assert "qualification-unit-execution-policy-present" in assert_array(
+        checked["reasons"]
+    )

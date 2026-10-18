@@ -132,10 +132,10 @@ def executable_acceptance_suite(
 
     root = Path(workspace)
     with CodeMap(root) as codemap:
-        sync = codemap.sync()
-        action = codemap.task_action_map(task, limit=limit)
-        first = codemap.task_decision_packet(task, limit=limit)
-        second = codemap.task_decision_packet(task, limit=limit)
+        sync = codemap.index.sync()
+        action = codemap.tasks.action_map(task, limit=limit)
+        first = codemap.tasks.decision_packet(task, limit=limit)
+        second = codemap.tasks.decision_packet(task, limit=limit)
 
     checks = _packet_checks(first, action)
     checks["deterministic_repeated_query"] = _stable_query_checks(first, second)

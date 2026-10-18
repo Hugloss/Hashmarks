@@ -3,141 +3,52 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, TypedDict, Unpack, cast
+from typing import TYPE_CHECKING, cast
 
-from hashmarks.digest import Digest
-from hashmarks.file_store import UnstableFileError
-from hashmarks.freshness import freshness_state
-from hashmarks.operation_contract import operation_schema
 from hashmarks.paths import normalize_relative_path
 
 from .change_impact import ChangeImpactOptions
-from .decision_session import diagnostic_producer
+from .decision_session import ReadScopeOwner, diagnostic_producer
 from .diagnostic_observation import (
     DIAGNOSTIC_DELTA_SCHEMA as DIAGNOSTIC_DELTA_SCHEMA,
 )
 from .diagnostic_observation import (
     RepositoryGenerationBinding as RepositoryGenerationBinding,
 )
-from .diagnostic_observation import (
-    diagnostic_observation_delta,
-    external_diagnostic_observation,
-)
-from .diagnostic_source_revision import (
-    EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA,
-    diagnostic_identity,
-    diagnostic_source_revision_evidence,
-)
 from .freshness_map import FreshnessMapOptions
-from .scoped_source_literals import ScopedSourceLiteralsMixin
-from .source_line_correspondence import (
-    source_line_anchors,
-    source_shape,
-    validated_source_lines,
+from .repository_observation import (
+    evidence_identity,
+    packet_digest,
+    repository_observer_packet,
+)
+
+REPOSITORY_DELTA_DEFAULT_OPTIONS = ChangeImpactOptions(
+    impact_limit_per_surface=4,
+    max_depth=3,
 )
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from .engine import CodeMap
+    from .decision_session import ReadScope
+    from .repository_changes import RepositoryChanges
 
 
-class _SourceObservationLineOptions(TypedDict, total=False):
-    """Typed optional line selectors; public keywords remain backward compatible."""
+@dataclass
+class _SnapshotReuse:
+    """Disposable snapshot reuse bound to one read scope."""
 
-    lines: Sequence[int]
-    context_lines: int
-    anchor_context_lines: int
-
-
-@dataclass(frozen=True, slots=True)
-class _RepositoryMemberSource:
-    rel: str
-    path: Path
-    row: Mapping[str, object] | None
-    visibility: str
-    indexed_revision: str
-
-
-@dataclass(frozen=True, slots=True)
-class _RepositoryMemberRead:
-    raw: bytes | None
-    digest: Digest | None
-
-
-@dataclass(slots=True)
-class _ScopedSourceAggregation:
-    """Ephemeral request-only accumulator; not a source or index authority."""
-
-    paths: list[str]
-    literal: str
-    limit: int
-    max_total_bytes: int
-    max_member_bytes: int
-    start_generation: int
-    context_lines: int = 0
-    members: list[dict[str, object]] = field(default_factory=list)
-    occurrences: list[dict[str, object]] = field(default_factory=list)
-    match_count: int = 0
-    consumed_bytes: int = 0
-    complete: bool = True
-    members_fresh: bool = True
-
-    def add(self, path: str, packet: Mapping[str, object]) -> None:
-        """Accumulate only actually scanned bytes and emitted match locations."""
-        shape = packet.get("source_shape")
-        if isinstance(shape, Mapping):
-            self.consumed_bytes += cast("int", shape.get("bytes") or 0)
-        count = packet.get("observed_match_count")
-        observed = packet.get("availability") == "observed" and isinstance(count, int)
-        self.complete = self.complete and observed
-        self.members_fresh = self.members_fresh and packet.get("freshness") == "current"
-        source_rows = cast("list[dict[str, object]]", packet["occurrences"])
-        selected = (
-            deepcopy(source_rows[: max(0, self.limit - len(self.occurrences))])
-            if observed
-            else []
-        )
-        if observed:
-            self.match_count += cast("int", count)
-            self.occurrences.extend(selected)
-        member = cast("Mapping[str, object]", packet["member"])
-        self.members.append(
-            {
-                "path": path,
-                "state": member["state"],
-                "reason": member.get("reason"),
-                "member_revision": member.get("member_revision"),
-                "availability": packet["availability"],
-                "observed_match_count": count,
-                "returned_occurrence_count": len(selected),
-            }
-        )
-
-
-def _observer_descriptor() -> dict[str, object]:
-    """Describe the observer capability separately from repository identity."""
-    return {
-        "producer": "hashmarks",
-        "surface": "repository-intelligence",
-        "schema": "hashmarks.repository-observer.v1",
-        "capabilities": [
-            "affected",
-            "dependencies",
-            "evidence-bindings",
-            "freshness",
-            "ownership",
-            "symbols",
-            "verification",
-        ],
-    }
+    scope: ReadScope | None = None
+    entries: dict[
+        tuple[int, str, tuple[str, ...], int, int, int, int], dict[str, object]
+    ] = field(default_factory=dict)
 
 
 REPOSITORY_SNAPSHOT_SCHEMA = "hashmarks.repository-intelligence-snapshot.v1"
 REPOSITORY_DELTA_SCHEMA = "hashmarks.repository-intelligence-delta.v1"
 
 
-class RepositoryDeltaMixin(ScopedSourceLiteralsMixin):
+class RepositoryDeltaMixin(ReadScopeOwner):
     """Bounded semantic snapshots and deltas over repository intelligence.
 
     Callers retain earlier producer snapshots and supply them after later
@@ -146,200 +57,17 @@ class RepositoryDeltaMixin(ScopedSourceLiteralsMixin):
     a historical repository store.
     """
 
-    def _repository_observer_packet(self) -> dict[str, object]:
-        """Return the canonical observer capability descriptor with stable identity."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        observer = _observer_descriptor()
-        return {
-            **observer,
-            "identity": "sha256:"
-            + self._packet_digest("hashmarks.repository-observer.v1", observer),
-        }
-
-    @staticmethod
-    def _evidence_identity(schema: str, value: Mapping[str, object]) -> str:
-        """Return a deterministic domain-separated identity for observer evidence."""
-        import hashlib
-        import json
-
-        raw = json.dumps(
-            value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
-        ).encode("utf-8")
-        digest = hashlib.sha256(schema.encode("utf-8") + b"\0" + raw).hexdigest()
-        return f"sha256:{digest}"
-
     @staticmethod
     def _delta_mapping(value: object, *, field: str) -> Mapping[str, object]:
         if not isinstance(value, Mapping):
             raise ValueError(f"{field} must be an object")
         return value
 
-    def _repository_member_source(
-        self, relpath: str
-    ) -> _RepositoryMemberSource | dict[str, object]:
-        self = cast("CodeMap", self)
-        rel = normalize_relative_path(relpath, allow_root=False)
-        decision = self.policy.decide(rel)
-        if not decision.index or decision.evidence_visibility.value == "deny":
-            return {
-                "path": rel,
-                "state": "unsupported",
-                "reason": "repository-evidence-denied",
-            }
-        if not self._path_admitted_for_analysis(rel):
-            return {
-                "path": rel,
-                "state": "unsupported",
-                "reason": "repository-evidence-not-admitted",
-            }
-        path = self.workspace / rel
-        cursor = self.workspace
-        for part in rel.split("/"):
-            cursor = cursor / part
-            if cursor.is_symlink():
-                return {
-                    "path": rel,
-                    "state": "unsupported",
-                    "reason": "symlink-evidence-not-observed",
-                }
-        if not path.is_file():
-            return {
-                "path": rel,
-                "state": "known-absent",
-                "reason": "member-not-present",
-            }
-        row = self._session_file_row(rel)
-        visibility = (
-            str(row.get("evidence_visibility") or decision.evidence_visibility.value)
-            if row is not None
-            else decision.evidence_visibility.value
-        )
-        indexed_revision = str(row.get("file_digest") or "") if row is not None else ""
-        return _RepositoryMemberSource(
-            rel=rel,
-            path=path,
-            row=row,
-            visibility=visibility,
-            indexed_revision=indexed_revision,
-        )
-
-    def _read_repository_member_source(
-        self,
-        source: _RepositoryMemberSource,
-        *,
-        include_bytes: bool,
-    ) -> _RepositoryMemberRead | dict[str, object]:
-        self = cast("CodeMap", self)
-        try:
-            if include_bytes:
-                raw, digest = self.file_store.read_bytes_stable(source.path)
-            elif source.row is None:
-                digest = self.file_store.digest(
-                    source.path,
-                    workspace=self.workspace,
-                    relative_path=source.rel,
-                    force=True,
-                )
-                raw = None
-            else:
-                digest = None
-                raw = None
-        except FileNotFoundError:
-            return {
-                "path": source.rel,
-                "state": "known-absent",
-                "reason": "member-not-present",
-            }
-        except (OSError, UnstableFileError):
-            return {
-                "path": source.rel,
-                "state": "unknown",
-                "reason": "member-read-unstable-or-unavailable",
-                **(
-                    {"member_revision": source.indexed_revision}
-                    if source.indexed_revision
-                    else {}
-                ),
-                "evidence_visibility": source.visibility,
-                "index_state": "indexed" if source.row is not None else "unindexed",
-            }
-        return _RepositoryMemberRead(raw, digest)
-
-    def _repository_member_observation(
-        self,
-        relpath: str,
-        *,
-        include_bytes: bool = False,
-    ) -> tuple[dict[str, object], bytes | None]:
-        """Observe one repository member through canonical policy/revision authority."""
-        self = cast("CodeMap", self)
-        source = self._repository_member_source(relpath)
-        if isinstance(source, dict):
-            return source, None
-        base: dict[str, object] = {"path": source.rel}
-        row = source.row
-        visibility = source.visibility
-        indexed_revision = source.indexed_revision
-
-        if include_bytes and visibility != "source":
-            return (
-                {
-                    **base,
-                    "state": "unsupported",
-                    "reason": "source-evidence-not-visible",
-                    **(
-                        {"member_revision": indexed_revision}
-                        if indexed_revision
-                        else {}
-                    ),
-                    "evidence_visibility": visibility,
-                    "index_state": "indexed" if row is not None else "unindexed",
-                },
-                None,
-            )
-
-        read = self._read_repository_member_source(source, include_bytes=include_bytes)
-        if isinstance(read, dict):
-            return read, None
-        raw, digest = read.raw, read.digest
-
-        if row is not None:
-            if digest is not None and digest.hash != indexed_revision:
-                return (
-                    {
-                        **base,
-                        "state": "unknown",
-                        "reason": "member-revision-mismatch",
-                        "member_revision": indexed_revision,
-                        "evidence_visibility": visibility,
-                        "index_state": "indexed",
-                    },
-                    None,
-                )
-            revision = indexed_revision
-            index_state = "indexed"
-        else:
-            assert digest is not None
-            revision = digest.hash
-            index_state = "unindexed"
-
-        return (
-            {
-                **base,
-                "state": "known-present",
-                "member_revision": revision,
-                "evidence_visibility": visibility,
-                "index_state": index_state,
-            },
-            raw,
-        )
-
     def _snapshot_paths(
         self, changed_paths: Sequence[str | Path]
     ) -> dict[str, dict[str, object]]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryChanges", self)
         paths = tuple(
             dict.fromkeys(
                 normalize_relative_path(path, allow_root=False)
@@ -351,10 +79,10 @@ class RepositoryDeltaMixin(ScopedSourceLiteralsMixin):
                 "changed_paths must contain at least one repository-relative path"
             )
         symbols_by_path = self.store.symbols_for_paths_many(paths, limit_per_path=32)
-        edges_by_path = self._session_edges_for_paths_many(paths, limit_per_path=32)
+        edges_by_path = self.reads.edges_for_paths_many(paths, limit_per_path=32)
         rows: dict[str, dict[str, object]] = {}
         for path in paths:
-            member, _raw = self._repository_member_observation(path)
+            member, _raw = self.source.member(path)
             revision = (
                 str(member.get("member_revision") or "")
                 if member.get("state") == "known-present"
@@ -369,7 +97,7 @@ class RepositoryDeltaMixin(ScopedSourceLiteralsMixin):
                             if symbol.get(key) is not None
                             and str(symbol.get(key) or "")
                         },
-                        "identity": self._evidence_identity(
+                        "identity": evidence_identity(
                             "hashmarks.symbol-evidence.v1",
                             {
                                 "path": path,
@@ -402,7 +130,7 @@ class RepositoryDeltaMixin(ScopedSourceLiteralsMixin):
                             for key in ("source", "kind", "target", "confidence")
                             if edge.get(key) is not None and str(edge.get(key) or "")
                         },
-                        "identity": self._evidence_identity(
+                        "identity": evidence_identity(
                             "hashmarks.relationship-evidence.v1",
                             {
                                 "path": path,
@@ -476,589 +204,6 @@ class RepositoryDeltaMixin(ScopedSourceLiteralsMixin):
             }
         return rows
 
-    _source_shape = staticmethod(source_shape)
-
-    @staticmethod
-    def _python_source_token_kinds(
-        text: str, path: str
-    ) -> dict[int, list[tuple[int, int, str]]]:
-        """Classify exact lexical tokens without guessing semantic ownership."""
-        if not path.endswith((".py", ".pyi")):
-            return {}
-        import io
-        import tokenize
-
-        kinds: dict[int, list[tuple[int, int, str]]] = {}
-        names = {
-            tokenize.NAME: "identifier",
-            tokenize.STRING: "string-literal",
-            tokenize.COMMENT: "comment",
-        }
-        try:
-            for token in tokenize.generate_tokens(io.StringIO(text).readline):
-                kind = names.get(token.type)
-                if kind is None or token.start[0] != token.end[0]:
-                    continue
-                kinds.setdefault(token.start[0], []).append(
-                    (token.start[1], token.end[1], kind)
-                )
-        except (tokenize.TokenError, IndentationError, SyntaxError):
-            return {}
-        return kinds
-
-    @staticmethod
-    def _source_occurrences(
-        text: str,
-        literal: str,
-        *,
-        member: Mapping[str, object],
-        limit: int,
-        symbols: Sequence[Mapping[str, object]],
-        token_kinds: Mapping[int, Sequence[tuple[int, int, str]]],
-    ) -> tuple[list[dict[str, object]], int]:
-        """Bound returned locations, not the count over the admitted member."""
-        hits: list[dict[str, object]] = []
-        count = 0
-        for line_number, line in enumerate(text.split("\n"), 1):
-            column = 0
-            while (column := line.find(literal, column)) >= 0:
-                count += 1
-                if len(hits) < limit:
-                    owners = [
-                        row
-                        for row in symbols
-                        if row.get("start_line") is not None
-                        and row.get("end_line") is not None
-                        and int(row["start_line"])
-                        <= line_number
-                        <= int(row["end_line"])
-                    ]
-                    owner = min(
-                        owners,
-                        key=lambda row: (
-                            int(row["end_line"]) - int(row["start_line"]),
-                            str(row.get("qualname") or ""),
-                        ),
-                        default=None,
-                    )
-                    occurrence_kind = next(
-                        (
-                            kind
-                            for start, end, kind in token_kinds.get(line_number, ())
-                            if start <= column and column + len(literal) <= end
-                        ),
-                        "unknown",
-                    )
-                    fact = {
-                        "occurrence_kind": occurrence_kind,
-                        "kind_basis": (
-                            "python-tokenizer"
-                            if occurrence_kind != "unknown"
-                            else "unknown"
-                        ),
-                        "path": member["path"],
-                        "member_revision": member["member_revision"],
-                        "line": line_number,
-                        "column": column + 1,
-                        "column_unit": "unicode-codepoint",
-                        "literal": literal,
-                        "enclosing_symbol": (
-                            str(owner.get("qualname") or owner.get("name") or "")
-                            if owner is not None
-                            else None
-                        ),
-                        "symbol_basis": (
-                            "indexed-containing-range"
-                            if owner is not None
-                            else "unknown"
-                        ),
-                    }
-                    hits.append(fact)
-                column += len(literal)
-        return hits, count
-
-    @staticmethod
-    def _source_context_excerpt(
-        lines: Sequence[str],
-        *,
-        line: int,
-        column: int,
-        literal_length: int,
-        anchor_role: str = "match",
-    ) -> list[dict[str, object]]:
-        """Bounded display-only context from the same admitted UTF-8 byte capture.
-
-        Column coordinates and occurrence identities continue to refer to the
-        original source. Never read again to construct context.
-        """
-        excerpt: list[dict[str, object]] = []
-        for number in range(max(1, line - 1), min(len(lines), line + 1) + 1):
-            source = lines[number - 1]
-            if source.endswith("\r"):
-                source = source[:-1]
-            # Reserve room for the entire <=256-character literal and nearby
-            # source even when the match is deep in a very long physical line.
-            start = max(0, column - 1 - 32) if number == line else 0
-            if number == line and start + 320 < column - 1 + literal_length:
-                start = column - 1 + literal_length - 320
-            excerpt.append(
-                {
-                    "line": number,
-                    "role": anchor_role if number == line else "context",
-                    "start_column": start + 1,
-                    "text": source[start : start + 320],
-                    "truncated_left": start > 0,
-                    "truncated_right": start + 320 < len(source),
-                }
-            )
-        return excerpt
-
-    @staticmethod
-    def _validate_source_observation(
-        literal: str | None,
-        limit: int,
-        max_bytes: int,
-        long_line_threshold: int,
-    ) -> None:
-        if not 1 <= limit <= 500 or not 1 <= max_bytes <= 8_388_608:
-            raise ValueError("source observation bounds are outside supported limits")
-        if not 1 <= long_line_threshold <= 1_000_000:
-            raise ValueError("long_line_threshold must be between 1 and 1000000")
-        if literal is not None and (
-            not literal or len(literal) > 256 or "\r" in literal or "\n" in literal
-        ):
-            raise ValueError(
-                "literal must be a nonempty single-line query <=256 characters"
-            )
-
-    def _bounded_source_observation(
-        self, relpath: str, max_bytes: int
-    ) -> tuple[dict[str, object], bytes | None]:
-        """Enforce the source budget while reusing canonical member authority."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        candidate = self._repository_member_source(relpath)
-        if isinstance(candidate, dict):
-            return candidate, None
-        try:
-            oversized = candidate.path.stat().st_size > max_bytes
-        except OSError:
-            oversized = False
-        if oversized:
-            return {
-                "path": candidate.rel,
-                "state": "unknown",
-                "reason": "source-size-bound",
-            }, None
-        member, raw = self._repository_member_observation(relpath, include_bytes=True)
-        if raw is not None and len(raw) > max_bytes:
-            return {
-                "path": member["path"],
-                "state": "unknown",
-                "reason": "source-size-bound",
-            }, None
-        return member, raw
-
-    def _source_evidenced_hits(
-        self,
-        hits: list[dict[str, object]],
-        *,
-        text: str,
-        literal: str,
-        context_lines: int,
-    ) -> None:
-        """Attach stable location IDs before optional display-only excerpts."""
-        source_lines = text.split("\n") if context_lines else []
-        if source_lines and text.endswith("\n"):
-            source_lines.pop()
-        for hit in hits:
-            hit["evidence_identity"] = self._evidence_identity(
-                "hashmarks.source-occurrence.v1", hit
-            )
-            if context_lines:
-                hit["context_excerpt"] = self._source_context_excerpt(
-                    source_lines,
-                    line=cast("int", hit["line"]),
-                    column=cast("int", hit["column"]),
-                    literal_length=len(literal),
-                )
-
-    def _attach_source_anchor_context(
-        self, packet: dict[str, object], text: str
-    ) -> None:
-        """Attach preview text only to qualified anchors from stable source bytes."""
-        if not cast("dict[str, int]", packet["limits"]).get("anchor_context_lines", 0):
-            return
-        source_lines = text.split("\n")
-        if text.endswith("\n"):
-            source_lines.pop()
-        for anchor in cast("list[dict[str, object]]", packet["line_anchors"]):
-            if anchor["state"] != "observed":
-                continue
-            anchor["context_excerpt"] = self._source_context_excerpt(
-                source_lines,
-                line=cast("int", anchor["line"]),
-                column=1,
-                literal_length=0,
-                anchor_role="anchor",
-            )
-
-    @staticmethod
-    def _validate_anchor_context_lines(value: object, requested: Sequence[int]) -> None:
-        """Reject malformed and unbounded line-preview requests before source work."""
-        if type(value) is not int or value not in (0, 1):
-            raise ValueError("anchor_context_lines must be 0 or 1")
-        if value and not 1 <= len(requested) <= 8:
-            raise ValueError("anchor_context_lines requires 1 to 8 explicit lines")
-
-    @staticmethod
-    def _record_source_context_limits(
-        packet: dict[str, object], match_lines: int, anchor_lines: int
-    ) -> None:
-        """Keep absent optional preview limits absent from legacy packets."""
-        limits = cast("dict[str, int]", packet["limits"])
-        if match_lines:
-            limits["context_lines"] = match_lines
-        if anchor_lines:
-            limits["anchor_context_lines"] = anchor_lines
-
-    def _source_observation_from_bytes(
-        self, packet: dict[str, object], raw: bytes
-    ) -> None:
-        """Complete a qualified single-member observation from the same byte capture."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        limit = cast("dict[str, int]", packet["limits"])["results"]
-        member = cast("dict[str, object]", packet["member"])
-        literal = cast("str | None", packet["literal_query"])
-        packet["source_shape"] = self._source_shape(
-            raw,
-            long_line_threshold=cast("int", packet["long_line_threshold"]),
-        )
-        if b"\x00" in raw:
-            packet["availability"] = "unsupported"
-            packet["reason"] = "null-byte-text"
-            return
-        try:
-            text = raw.decode("utf-8")
-        except UnicodeDecodeError:
-            packet["availability"] = "unsupported"
-            packet["reason"] = "invalid-utf8"
-            return
-
-        packet["completeness"] = "complete"
-        packet["truncation"] = "complete"
-        requested = cast("list[int]", packet["requested_lines"])
-        if requested:
-            packet["line_anchors"], packet["line_coverage"] = source_line_anchors(
-                raw, requested=requested, member=member
-            )
-            self._attach_source_anchor_context(packet, text)
-        if literal is None:
-            return
-        symbols = (
-            self.store.symbols_for_path(str(member["path"]))
-            if member.get("index_state") == "indexed"
-            else []
-        )
-        hits, count = self._source_occurrences(
-            text,
-            literal,
-            member=member,
-            limit=limit,
-            symbols=symbols,
-            token_kinds=self._python_source_token_kinds(text, str(member["path"])),
-        )
-        context_lines = cast("dict[str, int]", packet["limits"]).get("context_lines", 0)
-        self._source_evidenced_hits(
-            hits, text=text, literal=literal, context_lines=context_lines
-        )
-        packet["occurrences"] = hits
-        packet["observed_match_count"] = count
-        packet["truncation"] = "truncated" if count > limit else "complete"
-        packet["completeness"] = "incomplete" if count > limit else "complete"
-        if count == 0 and packet["freshness"] == "current":
-            packet["negative_evidence"] = "admissible-within-exact-member"
-
-    def source_observation(
-        self,
-        relpath: str,
-        *,
-        literal: str | None = None,
-        limit: int = 50,
-        max_bytes: int = 1_048_576,
-        long_line_threshold: int = 2_000,
-        **line_options: Unpack[_SourceObservationLineOptions],
-    ) -> dict[str, object]:
-        """Describe one stable source member, with no repository-wide absence claim."""
-        unexpected = set(line_options) - {
-            "lines",
-            "context_lines",
-            "anchor_context_lines",
-        }
-        if unexpected:
-            raise TypeError(f"unexpected source observation keyword: {min(unexpected)}")
-        lines = line_options.get("lines", ())
-        context_lines = line_options.get("context_lines", 0)
-        anchor_context_lines = line_options.get("anchor_context_lines", 0)
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        self._validate_source_observation(
-            literal, limit, max_bytes, long_line_threshold
-        )
-        if type(context_lines) is not int or context_lines not in (0, 1):
-            raise ValueError("context_lines must be 0 or 1")
-        if context_lines and literal is None:
-            raise ValueError("context_lines requires a literal")
-        requested = validated_source_lines(lines)
-        self._validate_anchor_context_lines(anchor_context_lines, requested)
-        generation_before = self.store.generation()
-        member, raw = self._bounded_source_observation(relpath, max_bytes)
-        generation, identity_generation, stale = self._generation_status()
-        packet: dict[str, object] = {
-            "schema": operation_schema("source_observation", "member"),
-            "member": member,
-            "generation": generation,
-            "identity_generation": identity_generation,
-            "freshness": (
-                "stale" if generation != generation_before else freshness_state(stale)
-            ),
-            "observation_scope": "exact-admitted-repository-member",
-            "limits": {"max_bytes": max_bytes, "results": limit},
-            "long_line_threshold": long_line_threshold,
-            "availability": "observed" if raw is not None else "unavailable",
-            "completeness": "unknown",
-            "source_shape": None,
-            "literal_query": literal,
-            "requested_lines": requested,
-            "line_anchors": [],
-            "line_coverage": "unknown" if requested else "not-requested",
-            "occurrences": [],
-            "observed_match_count": None,
-            "truncation": "unknown",
-            "negative_evidence": "not-admissible",
-            "authority": "repository-evidence-only",
-            "execution_effect": "none",
-        }
-        self._record_source_context_limits(packet, context_lines, anchor_context_lines)
-        if raw is None:
-            return packet
-        self._source_observation_from_bytes(packet, raw)
-        if packet["availability"] != "observed":
-            return packet
-        packet["observation_identity"] = self._evidence_identity(
-            operation_schema("source_observation", "member"),
-            {
-                "member": member,
-                "literal_query": literal,
-                "source_shape": packet["source_shape"],
-                "requested_lines": requested,
-                "line_anchors": packet["line_anchors"],
-                "line_coverage": packet["line_coverage"],
-                "occurrences": packet["occurrences"],
-                "observed_match_count": packet["observed_match_count"],
-                "truncation": packet["truncation"],
-            },
-        )
-        return packet
-
-    def _scoped_source_member(
-        self,
-        path: str,
-        literal: str,
-        limit: int,
-        available_bytes: int,
-        member_max_bytes: int,
-        context_lines: int,
-    ) -> dict[str, object]:
-        """Observe one selected member, or record an explicit exhausted budget."""
-        if available_bytes < 1:
-            return {
-                "member": {
-                    "path": path,
-                    "state": "unknown",
-                    "reason": "scope-byte-budget-exhausted",
-                },
-                "availability": "unavailable",
-                "observed_match_count": None,
-                "occurrences": [],
-                "freshness": "unknown",
-                "source_shape": None,
-            }
-        return self.source_observation(
-            path,
-            literal=literal,
-            limit=limit,
-            max_bytes=min(available_bytes, member_max_bytes),
-            context_lines=context_lines,
-        )
-
-    def _scoped_source_result(
-        self, batch: _ScopedSourceAggregation
-    ) -> dict[str, object]:
-        """Project request-local scan facts using the canonical generation owner."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        generation, identity_generation, stale = self._generation_status()
-        generation_matches = generation == batch.start_generation
-        coverage_complete = batch.complete and generation_matches
-        freshness = (
-            freshness_state(stale)
-            if generation_matches and batch.members_fresh
-            else "stale"
-        )
-        truncated = batch.match_count > len(batch.occurrences)
-        completeness = (
-            "unknown"
-            if not coverage_complete
-            else "incomplete"
-            if truncated
-            else "complete"
-        )
-        result: dict[str, object] = {
-            "schema": operation_schema("source_observation", "scope"),
-            "observation_scope": "explicit-member-set-only",
-            "paths": batch.paths,
-            "literal": batch.literal,
-            "generation": generation,
-            "identity_generation": identity_generation,
-            "freshness": freshness,
-            "member_count": len(batch.paths),
-            "member_observations": batch.members,
-            "source_coverage": "complete" if coverage_complete else "unknown",
-            "observed_match_count": batch.match_count,
-            "exact_match_count": batch.match_count if coverage_complete else None,
-            "occurrences": batch.occurrences,
-            "completeness": completeness,
-            "truncation": (
-                "truncated"
-                if truncated
-                else "complete"
-                if coverage_complete
-                else "unknown"
-            ),
-            "negative_evidence": (
-                "admissible-within-explicit-member-set"
-                if coverage_complete
-                and batch.match_count == 0
-                and freshness == "current"
-                else "not-admissible"
-            ),
-            "limits": {
-                "returned_occurrences": batch.limit,
-                "max_total_bytes": batch.max_total_bytes,
-                "max_member_bytes": batch.max_member_bytes,
-            },
-            "observed_source_bytes": batch.consumed_bytes,
-            "authority": "repository-evidence-only",
-            "execution_effect": "none",
-        }
-        if batch.context_lines:
-            cast("dict[str, int]", result["limits"])["context_lines"] = (
-                batch.context_lines
-            )
-        result["observation_identity"] = self._evidence_identity(
-            operation_schema("source_observation", "scope"),
-            {
-                "paths": batch.paths,
-                "literal": batch.literal,
-                "members": batch.members,
-                "matches": batch.occurrences,
-                "source_coverage": result["source_coverage"],
-                "observed_match_count": batch.match_count,
-                "truncation": result["truncation"],
-            },
-        )
-        return result
-
-    def scoped_source_occurrences(
-        self,
-        paths: Sequence[str],
-        literal: str,
-        *,
-        limit: int = 100,
-        max_total_bytes: int = 4_194_304,
-        max_member_bytes: int = 1_048_576,
-        context_lines: int = 0,
-    ) -> dict[str, object]:
-        """Observe an explicit member set; never imply repository-wide absence."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        if isinstance(paths, (str, bytes)) or not 1 <= len(paths) <= 32:
-            raise ValueError("scope must contain between 1 and 32 explicit paths")
-        if not 1 <= max_total_bytes <= 8_388_608:
-            raise ValueError("max_total_bytes must be between 1 and 8388608")
-        self._validate_source_observation(literal, limit, max_member_bytes, 2_000)
-        if type(context_lines) is not int or context_lines not in (0, 1):
-            raise ValueError("context_lines must be 0 or 1")
-        if literal is None:
-            raise ValueError("scoped source observations require a literal")
-        batch = _ScopedSourceAggregation(
-            paths=sorted(
-                {normalize_relative_path(path, allow_root=False) for path in paths}
-            ),
-            literal=literal,
-            limit=limit,
-            max_total_bytes=max_total_bytes,
-            max_member_bytes=max_member_bytes,
-            start_generation=self.store.generation(),
-            context_lines=context_lines,
-        )
-        for path in batch.paths:
-            batch.add(
-                path,
-                self._scoped_source_member(
-                    path,
-                    literal,
-                    max(1, limit - len(batch.occurrences)),
-                    max_total_bytes - batch.consumed_bytes,
-                    max_member_bytes,
-                    context_lines,
-                ),
-            )
-        return self._scoped_source_result(batch)
-
-    @staticmethod
-    def _diagnostic_identity(row: Mapping[str, object]) -> str:
-        """Canonical diagnostic identity independent of aggregate count/order."""
-        return diagnostic_identity(row)
-
-    diagnostic_source_revision_evidence = staticmethod(
-        diagnostic_source_revision_evidence
-    )
-
-    external_diagnostic_observation = staticmethod(external_diagnostic_observation)
-
-    def verification_relationship_evidence(
-        self,
-        *,
-        source: str,
-        target: str,
-        classification: str,
-        relation_kind: str,
-        provenance: str,
-    ) -> dict[str, object]:
-        """Describe an objective repository relationship without consumer policy."""
-        if classification not in {"direct", "related", "unknown"}:
-            raise ValueError("unsupported verification relationship classification")
-        if not relation_kind.strip():
-            raise ValueError("verification relationship kind must be nonblank")
-        payload = {
-            "source": source,
-            "target": target,
-            "classification": classification,
-            "relation_kind": relation_kind,
-            "provenance": provenance,
-        }
-        return {
-            **payload,
-            "evidence_identity": self._evidence_identity(
-                "hashmarks.verification-relationship.v1", payload
-            ),
-            "authority": "repository-relationship-only",
-            "execution_effect": "none",
-        }
-
     @staticmethod
     def external_observation_freshness(
         observation: Mapping[str, object],
@@ -1067,7 +212,7 @@ class RepositoryDeltaMixin(ScopedSourceLiteralsMixin):
         current_generation: int,
         changed_paths: Sequence[str] = (),
         dependency_paths: Sequence[str] = (),
-        change_set_complete: bool = False,
+        change_set_complete: object = False,
     ) -> dict[str, object]:
         """Scoped external freshness; disjoint partial changes prove no absence."""
         if not isinstance(change_set_complete, bool):
@@ -1107,13 +252,13 @@ class RepositoryDeltaMixin(ScopedSourceLiteralsMixin):
             "change_set_completeness": completeness,
             "intersection": intersection,
             "authority": "observation-freshness-only",
+            "freshness_scope": "repository-correspondence-only",
+            "producer_freshness": "unknown",
             "execution_effect": "none",
         }
 
-    diagnostic_observation_delta = staticmethod(diagnostic_observation_delta)
-
     @diagnostic_producer
-    def repository_intelligence_snapshot(
+    def snapshot(
         self,
         task: str,
         changed_paths: Sequence[str | Path],
@@ -1131,12 +276,15 @@ class RepositoryDeltaMixin(ScopedSourceLiteralsMixin):
         deep copy so mutation cannot become shared authority.
         """
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryChanges", self)
         snapshot_key = None
-        if self._decision_session_depth > 0:
-            generation = int(
-                self._decision_session_generation or self.store.generation()
-            )
+        if self.reads.depth > 0:
+            if self._snapshot_reuse.scope is not self.reads.scope:
+                self._snapshot_reuse.entries.clear()
+                self._snapshot_reuse.scope = self.reads.scope
+            scope = self.reads.scope
+            assert scope is not None
+            generation = scope.generation
             snapshot_key = (
                 generation,
                 task,
@@ -1146,13 +294,16 @@ class RepositoryDeltaMixin(ScopedSourceLiteralsMixin):
                 int(impact_limit_per_surface),
                 int(max_depth),
             )
-            cached = self._decision_snapshot_cache.get(snapshot_key)
+            cached = self._snapshot_reuse.entries.get(snapshot_key)
             if cached is not None:
-                self._decision_session_stats["snapshot_hit"] += 1
-                return deepcopy(cached)
-            self._decision_session_stats["snapshot_miss"] += 1
+                self.reads.count("snapshot_hit")
+                with self.reads.session(
+                    expected_generation=self._repository_generation(cached)
+                ):
+                    return deepcopy(cached)
+            self.reads.count("snapshot_miss")
 
-        brief = self.change_intelligence_brief(
+        brief = self.brief(
             task,
             changed_paths,
             limit=limit,
@@ -1160,44 +311,45 @@ class RepositoryDeltaMixin(ScopedSourceLiteralsMixin):
             impact_limit_per_surface=impact_limit_per_surface,
             max_depth=max_depth,
         )
-        freshness = self.evidence_freshness_map(
-            task,
-            changed_paths,
-            options=FreshnessMapOptions(
-                limit=limit,
-                per_role=per_role,
-                impact_limit_per_surface=impact_limit_per_surface,
-                max_depth=max_depth,
-            ),
-        )
-        payload: dict[str, object] = {
-            "schema": REPOSITORY_SNAPSHOT_SCHEMA,
-            "observer": self._repository_observer_packet(),
-            "repository": deepcopy(brief["repository"]),
-            "task_identity": brief["task_identity"],
-            "paths": self._snapshot_paths(changed_paths),
-            "affected": deepcopy(brief.get("affected") or {}),
-            "ownership": deepcopy(brief.get("ownership")),
-            "verification": self._snapshot_verification(brief),
-            "freshness": self._snapshot_freshness(freshness),
-            "bounds": deepcopy(brief.get("bounds") or {}),
-            "completeness": {
-                "state": "complete",
-                "scope": "bounded-explicit-change-set",
-                "dynamic_runtime_relationships": "unknown",
-            },
-            "storage": "derived-not-persisted",
-            "authority": "repository-intelligence-only",
-            "execution_effect": "none",
-        }
-        if "project_impact" in brief:
-            payload["project_impact"] = deepcopy(brief["project_impact"])
-        payload["snapshot_identity"] = "sha256:" + self._packet_digest(
-            REPOSITORY_SNAPSHOT_SCHEMA, payload
-        )
-        if snapshot_key is not None:
-            self._decision_snapshot_cache[snapshot_key] = deepcopy(payload)
-        return payload
+        with self.reads.session(expected_generation=self._repository_generation(brief)):
+            freshness = self.freshness_map(
+                task,
+                changed_paths,
+                options=FreshnessMapOptions(
+                    limit=limit,
+                    per_role=per_role,
+                    impact_limit_per_surface=impact_limit_per_surface,
+                    max_depth=max_depth,
+                ),
+            )
+            payload: dict[str, object] = {
+                "schema": REPOSITORY_SNAPSHOT_SCHEMA,
+                "observer": repository_observer_packet(),
+                "repository": deepcopy(brief["repository"]),
+                "task_identity": brief["task_identity"],
+                "paths": self._snapshot_paths(changed_paths),
+                "affected": deepcopy(brief.get("affected") or {}),
+                "ownership": deepcopy(brief.get("ownership")),
+                "verification": self._snapshot_verification(brief),
+                "freshness": self._snapshot_freshness(freshness),
+                "bounds": deepcopy(brief.get("bounds") or {}),
+                "completeness": {
+                    "state": "complete",
+                    "scope": "bounded-explicit-change-set",
+                    "dynamic_runtime_relationships": "unknown",
+                },
+                "storage": "derived-not-persisted",
+                "authority": "repository-intelligence-only",
+                "execution_effect": "none",
+            }
+            if "project_impact" in brief:
+                payload["project_impact"] = deepcopy(brief["project_impact"])
+            payload["snapshot_identity"] = "sha256:" + packet_digest(
+                REPOSITORY_SNAPSHOT_SCHEMA, payload
+            )
+            if snapshot_key is not None:
+                self._snapshot_reuse.entries[snapshot_key] = deepcopy(payload)
+            return payload
 
     def _validate_previous_snapshot(
         self,
@@ -1205,7 +357,7 @@ class RepositoryDeltaMixin(ScopedSourceLiteralsMixin):
         previous_snapshot: Mapping[str, object],
     ) -> tuple[Mapping[str, object], str]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryChanges", self)
         if previous_snapshot.get("schema") != REPOSITORY_SNAPSHOT_SCHEMA:
             raise ValueError(
                 "previous_snapshot must be a hashmarks.repository-intelligence-snapshot.v1 packet"
@@ -1214,13 +366,13 @@ class RepositoryDeltaMixin(ScopedSourceLiteralsMixin):
             previous_snapshot.get("repository"), field="previous_snapshot.repository"
         )
         repository_identity = str(repository.get("repository_identity") or "")
-        if repository_identity != self._repository_packet_identity():
+        if repository_identity != self.reads.repository_identity():
             raise ValueError("previous_snapshot repository-mismatch")
-        expected_task = self._packet_digest("hashmarks.task.v1", {"task": task})
+        expected_task = packet_digest("hashmarks.task.v1", {"task": task})
         if str(previous_snapshot.get("task_identity") or "") != expected_task:
             raise ValueError("previous_snapshot task-mismatch")
         identity = previous_snapshot.get("snapshot_identity")
-        expected_identity = "sha256:" + self._packet_digest(
+        expected_identity = "sha256:" + packet_digest(
             REPOSITORY_SNAPSHOT_SCHEMA,
             {
                 key: value
@@ -1382,7 +534,7 @@ class RepositoryDeltaMixin(ScopedSourceLiteralsMixin):
         return result
 
     @diagnostic_producer
-    def repository_intelligence_delta(
+    def delta(
         self,
         task: str,
         changed_paths: Sequence[str | Path],
@@ -1390,18 +542,14 @@ class RepositoryDeltaMixin(ScopedSourceLiteralsMixin):
         previous_snapshot: Mapping[str, object],
         limit: int = 20,
         per_role: int = 3,
-        options: ChangeImpactOptions = ChangeImpactOptions(
-            impact_limit_per_surface=4,
-            max_depth=3,
-        ),
+        options: ChangeImpactOptions | None = None,
     ) -> dict[str, object]:
+        options = options or REPOSITORY_DELTA_DEFAULT_OPTIONS
         """Return changed repository-intelligence facts between admitted states."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        previous_repository, repository_identity = self._validate_previous_snapshot(
-            task, previous_snapshot
-        )
-        current = self.repository_intelligence_snapshot(
+            self = cast("RepositoryChanges", self)
+        self._validate_previous_snapshot(task, previous_snapshot)
+        current = self.snapshot(
             task,
             changed_paths,
             limit=limit,
@@ -1409,6 +557,19 @@ class RepositoryDeltaMixin(ScopedSourceLiteralsMixin):
             impact_limit_per_surface=options.impact_limit_per_surface,
             max_depth=options.max_depth,
         )
+        return self._compare_snapshots(task, previous_snapshot, current)
+
+    def _compare_snapshots(
+        self,
+        task: str,
+        previous_snapshot: Mapping[str, object],
+        current: Mapping[str, object],
+    ) -> dict[str, object]:
+        """Compare explicit qualified values without observing a second endpoint."""
+        previous_repository, repository_identity = self._validate_previous_snapshot(
+            task, previous_snapshot
+        )
+        self._validate_previous_snapshot(task, current)
         current_repository = self._delta_mapping(
             current.get("repository"), field="current.repository"
         )
@@ -1416,9 +577,9 @@ class RepositoryDeltaMixin(ScopedSourceLiteralsMixin):
         changes = [row for row in changes if row.get("path") != ["snapshot_identity"]]
         changed_sections = sorted(
             {
-                str(row["path"][0])
+                str(path[0])
                 for row in changes
-                if isinstance(row.get("path"), list) and row["path"]
+                if isinstance(path := row.get("path"), list) and path
             }
         )
         previous_observer = self._delta_mapping(
@@ -1464,7 +625,7 @@ class RepositoryDeltaMixin(ScopedSourceLiteralsMixin):
             "authority": "repository-intelligence-only",
             "execution_effect": "none",
         }
-        payload["delta_identity"] = "sha256:" + self._packet_digest(
+        payload["delta_identity"] = "sha256:" + packet_digest(
             REPOSITORY_DELTA_SCHEMA, payload
         )
         return payload

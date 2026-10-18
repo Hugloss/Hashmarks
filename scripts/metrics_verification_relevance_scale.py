@@ -8,6 +8,7 @@ import shutil
 import tempfile
 import time
 from pathlib import Path
+from typing import TypedDict
 
 from hashmarks._command_output import log_command_output
 from hashmarks.codemap import (
@@ -17,6 +18,25 @@ from hashmarks.codemap import (
 logger = logging.getLogger(__name__)
 
 SCHEMA = "hashmarks.verification-relevance-scale.v1"
+
+
+class _ScaleRow(TypedDict):
+    distractor_tests: int
+    total_test_surfaces: int
+    task_sha256: str
+    expected_local_verification: str
+    baseline_canonical_verify: str
+    baseline_correct: bool
+    selected_verify: str
+    selected_correct: bool
+    selection_changed: bool
+    selection_reason: object
+    candidate_count: int
+    returned_candidates: int
+    verification_plan_available: bool
+    verification_scope: object
+    sync_ms: float
+    action_ms: float
 
 
 def _sha256_json(value: object) -> str:
@@ -58,7 +78,7 @@ def _materialize(root: Path, distractors: int, feature: int) -> tuple[str, str]:
 
 def collect(*, sizes: tuple[int, ...] = (10, 50, 100, 500)) -> dict[str, object]:
     base = Path(tempfile.mkdtemp(prefix="hashmarks-verification-scale-"))
-    rows: list[dict[str, object]] = []
+    rows: list[_ScaleRow] = []
     try:
         for offset, distractors in enumerate(sizes, 1):
             workspace = base / f"n{distractors}"
@@ -67,10 +87,10 @@ def collect(*, sizes: tuple[int, ...] = (10, 50, 100, 500)) -> dict[str, object]
             with CodeMap(workspace) as codemap:
                 timings = {}
                 started = time.perf_counter()
-                codemap.sync()
+                codemap.index.sync()
                 timings["sync_ms"] = (time.perf_counter() - started) * 1000.0
                 started = time.perf_counter()
-                action = codemap.task_action_map(task, limit=20)
+                action = codemap.tasks.action_map(task, limit=20)
                 timings["action_ms"] = (time.perf_counter() - started) * 1000.0
                 relevance = action["verification_relevance"]
                 selected = (
@@ -85,7 +105,7 @@ def collect(*, sizes: tuple[int, ...] = (10, 50, 100, 500)) -> dict[str, object]
                     else "",
                 }
                 plan = (
-                    codemap.verification_plan(
+                    codemap.verification.plan(
                         paths["selected"],
                         symbol=(str(selected.get("test_symbol") or "") or None)
                         if isinstance(selected, dict)
@@ -110,7 +130,8 @@ def collect(*, sizes: tuple[int, ...] = (10, 50, 100, 500)) -> dict[str, object]
                     "returned_candidates": len(relevance.get("candidates") or []),
                     "verification_plan_available": bool(plan.get("available")),
                     "verification_scope": plan.get("scope"),
-                    **timings,
+                    "sync_ms": timings["sync_ms"],
+                    "action_ms": timings["action_ms"],
                 }
             )
     finally:

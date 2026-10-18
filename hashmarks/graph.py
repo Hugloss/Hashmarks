@@ -17,8 +17,7 @@ class IdentityCycleError(RuntimeError):
 class _Node(Generic[K, V]):
     compute: Callable[[dict[K, V]], V]
     dependencies: tuple[K, ...] = ()
-    value: V | None = None
-    initialized: bool = False
+    value: tuple[V] | None = None
     version: int = 0
     dirty: bool = True
     dep_versions: dict[K, int] = field(default_factory=dict)
@@ -87,8 +86,8 @@ class IdentityGraph(Generic[K, V]):
             if node.dep_versions.get(dep_key) != dep_version:
                 dep_changed = True
 
-        if node.initialized and not node.dirty and not dep_changed:
-            return node.value  # type: ignore[return-value]
+        if node.value is not None and not node.dirty and not dep_changed:
+            return node.value[0]
 
         old_value = node.value
         new_value = node.compute(dep_values)
@@ -97,11 +96,10 @@ class IdentityGraph(Generic[K, V]):
         }
         node.dirty = False
 
-        if not node.initialized or new_value != old_value:
-            node.value = new_value
+        if old_value is None or new_value != old_value[0]:
+            node.value = (new_value,)
             node.version += 1
         else:
             node.value = old_value
 
-        node.initialized = True
-        return node.value  # type: ignore[return-value]
+        return node.value[0]

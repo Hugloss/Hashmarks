@@ -4,8 +4,9 @@ import argparse
 import json
 import logging
 from collections import defaultdict
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import NotRequired, TypedDict, TypeGuard
 
 from hashmarks._command_output import log_command_output
 
@@ -33,7 +34,108 @@ HASHMARKS_KINDS = {
 }
 
 
-def _validate_trace_event(event: Any, path: Path) -> None:
+class TraceEvent(TypedDict):
+    kind: str
+    path: NotRequired[str]
+    paths: NotRequired[list[str]]
+    returned_paths: NotRequired[list[str]]
+    evidence_paths: NotRequired[list[str]]
+    bytes: NotRequired[int]
+    estimated_tokens: NotRequired[int]
+    model_input_tokens: NotRequired[int]
+    started_at_ns: NotRequired[int]
+    finished_at_ns: NotRequired[int]
+    query: NotRequired[object]
+    fallback: NotRequired[object]
+
+
+class TraceDocument(TypedDict):
+    schema: str
+    mode: str
+    task_id: str
+    events: list[TraceEvent]
+    model_input_tokens: NotRequired[int | None]
+    success: NotRequired[bool]
+    patch_correct: NotRequired[bool]
+    run_id: NotRequired[object]
+    repository_identity: NotRequired[object]
+    task_revision: NotRequired[object]
+    model_identity: NotRequired[object]
+    model_config_identity: NotRequired[object]
+    model_input_tokens_source: NotRequired[object]
+
+
+class TraceSummary(TypedDict):
+    trace_schema: str
+    task_id: str
+    mode: str
+    run_id: object
+    repository_identity: object
+    task_revision: object
+    model_identity: object
+    model_config_identity: object
+    model_input_tokens_source: object
+    success: object
+    patch_correct: object
+    events: int
+    search_calls: int
+    file_reads: int
+    hashmarks_calls: int
+    fallback_searches: int
+    bytes_returned: int
+    estimated_exploration_tokens: int
+    model_input_tokens: object
+    verdict_source: NotRequired[object]
+    grader_identity: NotRequired[object]
+    grader_evidence_digest: NotRequired[object]
+    model_usage_source: NotRequired[object]
+    model_usage_provider_identity: NotRequired[object]
+    model_usage_evidence_digest: NotRequired[object]
+    model_output_tokens: NotRequired[object]
+
+
+class TracePair(TypedDict):
+    task_id: str
+    baseline: TraceSummary
+    hashmarks: TraceSummary
+    claim_eligible: bool
+    claim_blockers: list[str]
+    model_input_token_reduction: float | None
+    search_call_reduction: int
+    file_read_reduction: int
+    estimated_exploration_token_reduction: int
+
+
+class TraceComparisonSummary(TypedDict):
+    traces: int
+    external_verdicts: int
+    external_model_usages: int
+    tasks_seen: int
+    paired_tasks: int
+    incomplete_tasks: list[str]
+    claim_eligible_pairs: int
+    all_pairs_claim_eligible: bool
+    token_reduction_claim_eligible: bool
+    average_model_input_token_reduction: float | None
+    baseline_model_input_tokens: int | None
+    hashmarks_model_input_tokens: int | None
+    search_calls_avoided: int
+    file_reads_avoided: int
+    estimated_exploration_tokens_avoided: int
+    baseline_successes: int
+    hashmarks_successes: int
+    baseline_correct_patches: int
+    hashmarks_correct_patches: int
+
+
+class TraceComparison(TypedDict):
+    schema: str
+    traces: list[TraceSummary]
+    pairs: list[TracePair]
+    summary: TraceComparisonSummary
+
+
+def _validate_trace_event(event: object, path: Path) -> TypeGuard[TraceEvent]:
     if not isinstance(event, dict) or not isinstance(event.get("kind"), str):
         raise ValueError(f"invalid trace event: {path}")
     for field in (
@@ -67,17 +169,17 @@ def _validate_trace_event(event: Any, path: Path) -> None:
         and event["finished_at_ns"] < event["started_at_ns"]
     ):
         raise ValueError(f"finished_at_ns must be >= started_at_ns: {path}")
+    return True
 
 
-def _validate_exact_model_tokens(value: Any, path: Path) -> None:
+def _validate_exact_model_tokens(value: object, path: Path) -> None:
     if value is not None and (
         not isinstance(value, int) or isinstance(value, bool) or value < 0
     ):
         raise ValueError(f"model_input_tokens must be a non-negative integer: {path}")
 
 
-def load_trace(path: Path) -> dict[str, Any]:
-    value = json.loads(path.read_text(encoding="utf-8"))
+def _validate_trace_document(value: object, path: Path) -> TypeGuard[TraceDocument]:
     if not isinstance(value, dict) or value.get("schema") != TRACE_SCHEMA:
         raise ValueError(f"unsupported agent trace schema: {path}")
     if value.get("mode") not in {"baseline", "hashmarks"}:
@@ -91,13 +193,20 @@ def load_trace(path: Path) -> dict[str, Any]:
     events = value.get("events")
     if not isinstance(events, list):
         raise ValueError(f"trace events must be a list: {path}")
-    for event in events:
-        _validate_trace_event(event, path)
+    if not all(_validate_trace_event(event, path) for event in events):
+        raise ValueError(f"invalid trace event: {path}")
     _validate_exact_model_tokens(value.get("model_input_tokens"), path)
+    return True
+
+
+def load_trace(path: Path) -> TraceDocument:
+    value: object = json.loads(path.read_text(encoding="utf-8"))
+    if not _validate_trace_document(value, path):
+        raise ValueError(f"invalid agent trace: {path}")
     return value
 
 
-def load_verdict(path: Path) -> dict[str, Any]:
+def load_verdict(path: Path) -> dict[str, object]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict) or value.get("schema") != VERDICT_SCHEMA:
         raise ValueError(f"unsupported agent verdict schema: {path}")
@@ -113,7 +222,7 @@ def load_verdict(path: Path) -> dict[str, Any]:
     return value
 
 
-def load_usage(path: Path) -> dict[str, Any]:
+def load_usage(path: Path) -> dict[str, object]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict) or value.get("schema") != USAGE_SCHEMA:
         raise ValueError(f"unsupported agent model-usage schema: {path}")
@@ -140,7 +249,7 @@ def load_usage(path: Path) -> dict[str, Any]:
     return value
 
 
-def summarize(trace: dict[str, Any]) -> dict[str, object]:
+def summarize(trace: TraceDocument) -> TraceSummary:
     events = trace["events"]
     exact_model_tokens = trace.get("model_input_tokens")
     event_model_tokens = sum(int(e.get("model_input_tokens", 0)) for e in events)
@@ -171,7 +280,7 @@ def summarize(trace: dict[str, Any]) -> dict[str, object]:
 
 
 def _paired_identity_blockers(
-    baseline: dict[str, object], hashmarks: dict[str, object]
+    baseline: Mapping[str, object], hashmarks: Mapping[str, object]
 ) -> list[str]:
     reasons: list[str] = []
     for field in (
@@ -195,7 +304,7 @@ def _paired_identity_blockers(
 
 def _mode_blockers(
     mode: str,
-    row: dict[str, object],
+    row: Mapping[str, object],
     require_external_verdict: bool,
     require_external_usage: bool,
 ) -> list[str]:
@@ -221,8 +330,8 @@ def _mode_blockers(
 
 
 def _pair_gate(
-    baseline: dict[str, object],
-    hashmarks: dict[str, object],
+    baseline: Mapping[str, object],
+    hashmarks: Mapping[str, object],
     *,
     require_external_verdict: bool,
     require_external_usage: bool,
@@ -243,8 +352,8 @@ def _pair_gate(
 
 
 def _records_by_run(
-    records: list[dict[str, Any]], record_name: str
-) -> dict[tuple[str, str, str], dict[str, Any]]:
+    records: list[dict[str, object]], record_name: str
+) -> dict[tuple[str, str, str], dict[str, object]]:
     indexed = {}
     for record in records:
         key = (
@@ -259,9 +368,9 @@ def _records_by_run(
 
 
 def _bind_external_records(
-    rows: list[dict[str, object]],
-    verdicts: dict[tuple[str, str, str], dict[str, Any]],
-    usages: dict[tuple[str, str, str], dict[str, Any]],
+    rows: list[TraceSummary],
+    verdicts: dict[tuple[str, str, str], dict[str, object]],
+    usages: dict[tuple[str, str, str], dict[str, object]],
 ) -> None:
     for row in rows:
         run_id = row.get("run_id")
@@ -304,9 +413,9 @@ def _bind_external_records(
 
 
 def _rows_by_task(
-    rows: list[dict[str, object]], require_complete_pairs: bool
-) -> tuple[dict[str, dict[str, dict[str, object]]], list[str]]:
-    by_task: dict[str, dict[str, dict[str, object]]] = defaultdict(dict)
+    rows: list[TraceSummary], require_complete_pairs: bool
+) -> tuple[dict[str, dict[str, TraceSummary]], list[str]]:
+    by_task: dict[str, dict[str, TraceSummary]] = defaultdict(dict)
     duplicates = []
     for row in rows:
         task_id = str(row["task_id"])
@@ -329,11 +438,11 @@ def _rows_by_task(
 
 def _comparison_pair(
     task_id: str,
-    baseline: dict[str, object],
-    hashmarks: dict[str, object],
+    baseline: TraceSummary,
+    hashmarks: TraceSummary,
     require_external_verdict: bool,
     require_external_usage: bool,
-) -> dict[str, object]:
+) -> TracePair:
     base_tokens = baseline.get("model_input_tokens")
     hashmarks_tokens = hashmarks.get("model_input_tokens")
     token_reduction = None
@@ -367,6 +476,13 @@ def _comparison_pair(
     }
 
 
+def _qualified_model_tokens(summary: TraceSummary) -> int:
+    tokens = summary["model_input_tokens"]
+    if not isinstance(tokens, int) or isinstance(tokens, bool):
+        raise ValueError("qualified trace lacks exact model input tokens")
+    return tokens
+
+
 def compare(
     paths: list[Path],
     *,
@@ -375,7 +491,7 @@ def compare(
     require_complete_pairs: bool = False,
     require_external_verdict: bool = False,
     require_external_usage: bool = False,
-) -> dict[str, object]:
+) -> TraceComparison:
     rows = [summarize(load_trace(path)) for path in paths]
     verdicts = [load_verdict(path) for path in (verdict_paths or [])]
     usages = [load_usage(path) for path in (usage_paths or [])]
@@ -404,10 +520,10 @@ def compare(
         p for p in eligible_pairs if p["model_input_token_reduction"] is not None
     ]
     baseline_tokens_total = sum(
-        int(p["baseline"]["model_input_tokens"]) for p in eligible_token_pairs
+        _qualified_model_tokens(p["baseline"]) for p in eligible_token_pairs
     )
     hashmarks_tokens_total = sum(
-        int(p["hashmarks"]["model_input_tokens"]) for p in eligible_token_pairs
+        _qualified_model_tokens(p["hashmarks"]) for p in eligible_token_pairs
     )
     weighted_reduction = (
         1.0 - (hashmarks_tokens_total / baseline_tokens_total)
@@ -467,7 +583,7 @@ def compare(
 
 
 def gate(
-    report: dict[str, object],
+    report: Mapping[str, object],
     *,
     min_pairs: int,
     max_token_reduction: float | None = None,

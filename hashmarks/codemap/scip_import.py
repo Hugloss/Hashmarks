@@ -13,7 +13,7 @@ from .scip_relationship_adapter import scip_occurrence_payload, scip_source_snap
 from .semantic_relationship_model import CLAIM_LIMIT, content_identity
 
 if TYPE_CHECKING:
-    from .engine import CodeMap
+    from .native_evidence import RepositoryNativeEvidence
     from .scip_adapter import ScipOccurrence
 
 
@@ -27,7 +27,7 @@ class ScipImportRows:
 
 
 def _reference(
-    codemap: CodeMap,
+    codemap: RepositoryNativeEvidence,
     occurrence: ScipOccurrence,
     path: str,
     revision: str | None,
@@ -35,7 +35,7 @@ def _reference(
 ) -> dict[str, Any]:
     candidates = [
         row
-        for row in cast("list[dict[str, Any]]", codemap._session_symbols_for_path(path))
+        for row in cast("list[dict[str, Any]]", codemap.reads.symbols_for_path(path))
         if int(row["start_line"]) <= occurrence.line <= int(row["end_line"])
     ]
     candidates.sort(
@@ -114,7 +114,7 @@ def _definition(
 
 
 def collect_scip_rows(
-    codemap: CodeMap,
+    codemap: RepositoryNativeEvidence,
     producer: str,
     occurrences: Sequence[ScipOccurrence],
     provenance: Mapping[str, Any],
@@ -126,11 +126,11 @@ def collect_scip_rows(
         except ValueError:
             rows.skipped += 1
             continue
-        member = codemap._session_file_row(path)
+        member = codemap.reads.file_row(path)
         if (
             member is None
             or member["evidence_visibility"] == "deny"
-            or codemap.policy.decide(path).evidence_visibility.value == "deny"
+            or codemap.files.decide(path).evidence_visibility.value == "deny"
         ):
             rows.skipped += 1
             continue
@@ -139,7 +139,7 @@ def collect_scip_rows(
 
 
 def _append_occurrence(
-    codemap: CodeMap,
+    codemap: RepositoryNativeEvidence,
     producer: str,
     occurrence: ScipOccurrence,
     member: Mapping[str, Any],
@@ -170,7 +170,10 @@ def _append_occurrence(
 
 
 def publish_scip_claim_metadata(
-    codemap: CodeMap, producer: str, rows: ScipImportRows, provenance: Mapping[str, Any]
+    codemap: RepositoryNativeEvidence,
+    producer: str,
+    rows: ScipImportRows,
+    provenance: Mapping[str, Any],
 ) -> None:
     snapshot = codemap._evidence_snapshot("scip", producer)
     assert snapshot is not None

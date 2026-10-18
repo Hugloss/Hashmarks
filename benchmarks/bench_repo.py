@@ -4,15 +4,17 @@ import argparse
 import json
 import logging
 import time
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
-from hashmarks import Identity
 from hashmarks._command_output import log_command_output
+from hashmarks.identity import RepositoryIdentity
 
 logger = logging.getLogger(__name__)
 
 
-def timed(fn):
+def timed(fn: Callable[[], Any]) -> tuple[Any, float]:
     started = time.perf_counter()
     value = fn()
     return value, time.perf_counter() - started
@@ -28,7 +30,7 @@ def main() -> None:
     parser.add_argument("--hot-requests", type=int, default=20)
     args = parser.parse_args()
 
-    with Identity(Path(args.workspace), mode=args.mode) as identity:
+    with RepositoryIdentity(Path(args.workspace), mode=args.mode) as identity:
         first, first_s = timed(lambda: identity.snapshot(*args.input))
         hot = []
         last = first

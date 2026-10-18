@@ -74,6 +74,24 @@ def test_build_metadata_exposes_public_release_metadata() -> None:
     assert "Project-URL:" not in metadata
 
 
+@pytest.mark.parametrize("field", ["keywords", "classifiers"])
+@pytest.mark.parametrize("value", ['"one string"', '["valid", 1]'])
+def test_build_metadata_rejects_malformed_string_arrays(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, field: str, value: str
+) -> None:
+    _write_release(tmp_path, metadata_version="1.2.3", runtime_version="1.2.3")
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text(
+        pyproject.read_text(encoding="utf-8") + f"{field} = {value}\n", encoding="utf-8"
+    )
+    monkeypatch.setattr(hashmarks_build, "ROOT", tmp_path)
+
+    with pytest.raises(
+        RuntimeError, match=rf"project\.{field} must be an array of strings"
+    ):
+        hashmarks_build.build_wheel(tmp_path / "dist")
+
+
 def test_build_backend_projects_pep639_license_and_project_urls(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

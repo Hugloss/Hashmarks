@@ -1,4 +1,7 @@
 from pathlib import Path
+from typing import Any
+
+import pytest
 
 from hashmarks.codemap import CodeMap
 
@@ -37,7 +40,7 @@ def test_full_and_incremental_sync_share_dependency_scope_boundary(
 ) -> None:
     paths = _write_scope_fixture(tmp_path)
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        cold = codemap.sync()
+        cold = codemap.index.sync()
         assert cold.discovered == 2
         assert codemap.store.paths() == {"src/app.py", "src/node_modules_adapter.py"}
 
@@ -49,7 +52,7 @@ def test_full_and_incremental_sync_share_dependency_scope_boundary(
             "venv",
             "frontend/node_modules",
         ):
-            result = codemap.sync(paths=[rel])
+            result = codemap.index.sync(paths=[rel])
             assert result.discovered == 0
             assert codemap.store.paths() == {
                 "src/app.py",
@@ -61,13 +64,13 @@ def test_incremental_scope_pruning_is_segment_aware(tmp_path: Path) -> None:
     paths = _write_scope_fixture(tmp_path)
     rel = paths["lexical_neighbor"].relative_to(tmp_path).as_posix()
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        result = codemap.sync(paths=[rel])
+        result = codemap.index.sync(paths=[rel])
         assert result.discovered == 1
         assert codemap.store.paths() == {rel}
 
 
 def test_incremental_scope_removes_previously_admitted_dependency_rows(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     import hashmarks.codemap.repository_file_discovery as discovery
 
@@ -78,12 +81,12 @@ def test_incremental_scope_removes_previously_admitted_dependency_rows(
         # Simulate a pre-HM299 incremental admission through the same public
         # CodeMap surface, then restore the current scope contract.
         monkeypatch.setattr(discovery, "_PRUNE_DIRS", original_prune_dirs - {".venv"})
-        historical = codemap.sync(paths=[dep_rel])
+        historical = codemap.index.sync(paths=[dep_rel])
         assert historical.discovered == 1
         assert dep_rel in codemap.store.paths()
 
         monkeypatch.setattr(discovery, "_PRUNE_DIRS", original_prune_dirs)
-        result = codemap.sync(paths=[dep_rel])
+        result = codemap.index.sync(paths=[dep_rel])
         assert result.discovered == 0
         assert dep_rel not in codemap.store.paths()
 
@@ -101,17 +104,17 @@ def test_nested_repository_marker_removes_parent_scope_without_hiding_untracked_
     with CodeMap(
         parent, state_dir=state, artifact_db=state / "artifacts.sqlite3"
     ) as codemap:
-        assert codemap.sync().discovered == 2
+        assert codemap.index.sync().discovered == 2
         assert codemap.store.paths() == {"draft.py", "scratch/worker/owner.py"}
 
         # A nested Git worktree has a .git file. It is a different repository
         # even when its files are physically below the selected workspace.
         (nested / ".git").write_text("gitdir: /some/other/repository\n")
-        assert codemap.sync(paths=["scratch/worker/owner.py"]).discovered == 0
+        assert codemap.index.sync(paths=["scratch/worker/owner.py"]).discovered == 0
         assert codemap.store.paths() == {"draft.py"}
-        assert codemap.sync().discovered == 1
+        assert codemap.index.sync().discovered == 1
         assert codemap.store.paths() == {"draft.py"}
 
     with CodeMap(nested, state_dir=tmp_path / "nested-state") as selected:
-        assert selected.sync().discovered == 1
+        assert selected.index.sync().discovered == 1
         assert selected.store.paths() == {"owner.py"}

@@ -3,6 +3,8 @@ from pathlib import Path
 import pytest
 
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.decision_session import DecisionRefreshRequired
+from hashmarks.codemap.import_resolution import RepositoryImports
 
 
 def _write(root: Path, path: str, text: str) -> None:
@@ -16,8 +18,10 @@ def _owners(root: Path, target: str = "pkg.Public") -> tuple[list[str], bool]:
         root, "tests/test_public.py", f"from pkg import {target.rsplit('.', 1)[-1]}\n"
     )
     with CodeMap(root) as codemap:
-        codemap.sync()
-        return codemap._resolve_import_owner_evidence("tests/test_public.py", target)
+        codemap.index.sync()
+        return codemap._imports._resolve_import_owner_evidence(
+            "tests/test_public.py", target
+        )
 
 
 def test_reexport_cycle_remains_unresolved(tmp_path: Path) -> None:
@@ -28,6 +32,50 @@ def test_reexport_cycle_remains_unresolved(tmp_path: Path) -> None:
 
     assert owners == ["pkg/__init__.py"]
     assert ambiguous is True
+
+
+def test_stub_declaration_does_not_gain_runtime_export_authority(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "module.pyi", "class Public: ...\n")
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        imports = RepositoryImports(codemap.source)
+        assert imports._python_export_binding("module.pyi", "Public") == (
+            "unknown",
+            [],
+        )
+        assert imports._python_export_is_declaration("module.pyi", "Public") is True
+
+
+def test_binding_artifact_cannot_hide_a_reexport_change_within_read_scope(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "pkg/__init__.py", "from .left import Public\n")
+    _write(tmp_path, "pkg/left.py", "class Public: pass\n")
+    _write(tmp_path, "pkg/right.py", "class Public: pass\n")
+    _write(tmp_path, "use.py", "from pkg import Public\n")
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        imports = RepositoryImports(codemap.source)
+        with imports.reads.session():
+            owners, unresolved = imports._resolve_import_owner_evidence(
+                "use.py", "pkg.Public"
+            )
+            assert owners == ["pkg/__init__.py", "pkg/left.py"]
+            assert unresolved is False
+            (tmp_path / "pkg/__init__.py").write_text(
+                "if flag:\n    from .right import Public\n"
+            )
+            with pytest.raises(DecisionRefreshRequired):
+                imports._resolve_import_owner_evidence("use.py", "pkg.Public")
+        codemap.index.sync(["pkg/__init__.py"])
+        owners, unresolved = imports._resolve_import_owner_evidence(
+            "use.py", "pkg.Public"
+        )
+        assert owners == ["pkg/__init__.py"]
+        assert unresolved is True
+        assert imports.reads.depth == 0
 
 
 def test_two_module_reexport_cycle_keeps_only_the_facade(tmp_path: Path) -> None:
@@ -45,8 +93,8 @@ def test_relative_import_above_repository_root_has_no_owner(tmp_path: Path) -> N
     _write(tmp_path, "pkg/use.py", "from ...impl import Public\n")
     _write(tmp_path, "pkg/impl.py", "class Public: pass\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        owners = codemap._resolve_import_paths("pkg/use.py", "...impl.Public")
+        codemap.index.sync()
+        owners = codemap._imports._resolve_import_paths("pkg/use.py", "...impl.Public")
 
     assert owners == []
 
@@ -120,7 +168,7 @@ def test_reexport_hop_boundary(tmp_path: Path, hops: int) -> None:
         ("Public = 1", ("local", [])),
         ("other = Public = 1", ("local", [])),
         ("Public: int", ("local", [])),
-        ("Public, other = pair", ("unknown", [])),
+        ("Public, other = pair", ("local", [])),
         ("obj.Public = 1", ("unknown", [])),
         ("from .impl import Internal as Public", ("reexport", [".impl.Internal"])),
         ("from .impl import Public as Other", ("unknown", [])),
@@ -133,7 +181,7 @@ def test_reexport_hop_boundary(tmp_path: Path, hops: int) -> None:
             "from .a import Public\nPublic = 1\nfrom .b import Public",
             ("ambiguous", [".a.Public", ".b.Public"]),
         ),
-        ("if True:\n    from .impl import Public", ("unknown", [])),
+        ("if True:\n    from .impl import Public", ("ambiguous", [])),
     ],
 )
 def test_top_level_export_binding_authority(
@@ -141,7 +189,10 @@ def test_top_level_export_binding_authority(
 ) -> None:
     _write(tmp_path, "pkg/__init__.py", source + "\n")
     with CodeMap(tmp_path) as codemap:
-        assert codemap._python_export_binding("pkg/__init__.py", "Public") == binding
+        assert (
+            codemap._imports._python_export_binding("pkg/__init__.py", "Public")
+            == binding
+        )
 
 
 def test_reexport_target_bound_preserves_order_and_deduplicates(tmp_path: Path) -> None:
@@ -149,7 +200,7 @@ def test_reexport_target_bound_preserves_order_and_deduplicates(tmp_path: Path) 
     statements.extend(f"from .module{index} import Public" for index in range(18))
     _write(tmp_path, "pkg/__init__.py", "\n".join(statements))
     with CodeMap(tmp_path) as codemap:
-        targets = codemap._python_reexport_targets("pkg/__init__.py", "Public")
+        targets = codemap._imports._python_reexport_targets("pkg/__init__.py", "Public")
     assert targets == [".first.Internal"] + [
         f".module{index}.Public" for index in range(15)
     ]

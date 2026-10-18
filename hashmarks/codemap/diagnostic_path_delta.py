@@ -11,17 +11,12 @@ from hashmarks.operation_contract import operation_schema
 from hashmarks.paths import normalize_relative_path
 
 from .diagnostic_provenance import _revision_scope, member_collection_states
-from .evidence_correlation import EvidenceCorrelationMixin
-from .evidence_verification import VerificationMixin
-from .repository_evidence_binding_delta import RepositoryEvidenceBindingDeltaMixin
-
-
-class _RetainedRelationshipEvidence(
-    EvidenceCorrelationMixin, RepositoryEvidenceBindingDeltaMixin
-):
-    """Reuse native binding integrity validation without observing repository state."""
-
-    _packet_digest = staticmethod(VerificationMixin._packet_digest)
+from .evidence_correlation_replay import (
+    CorrelationPacketValidation,
+    validate_previous_correlation_size,
+)
+from .repository_evidence_binding_validation import validate_bindings_packet
+from .repository_observation import packet_digest
 
 
 def _canonical_path(value: object) -> str | None:
@@ -41,10 +36,10 @@ def _path_index(rows: Mapping[str, Mapping[str, object]]) -> dict[str | None, se
 
 
 def _relationship_packet(value: Mapping[str, object]) -> Mapping[str, Any]:
-    _RetainedRelationshipEvidence._validate_previous_correlation_size(value)
+    validate_previous_correlation_size(value)
     if value.get("schema") != operation_schema("correlate_evidence"):
         raise ValueError("relationship_evidence must be a canonical correlation packet")
-    expected = "sha256:" + VerificationMixin._packet_digest(
+    expected = "sha256:" + packet_digest(
         operation_schema("correlate_evidence"),
         {
             key: item
@@ -57,8 +52,8 @@ def _relationship_packet(value: Mapping[str, object]) -> Mapping[str, Any]:
     packet = value.get("repository_evidence")
     if not isinstance(packet, Mapping):
         raise ValueError("relationship_evidence repository evidence is missing")
-    validator = _RetainedRelationshipEvidence()
-    validator._validate_binding_delta_input(packet, name="relationship_evidence")
+    validator = CorrelationPacketValidation()
+    validate_bindings_packet(packet, name="relationship_evidence")
     validator._validate_correlation_projections(value, label="relationship_evidence")
     return packet
 

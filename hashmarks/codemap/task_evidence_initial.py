@@ -1,0 +1,565 @@
+"""Pure initial disclosure of an already observed task packet.
+
+This profile bounds presentation, never the producer's ownership or reference
+decision. The full packet identity and an omission ledger permit comparison
+with a later full observation; they are not durable replay state.
+"""
+
+from __future__ import annotations
+
+import base64
+import binascii
+import json
+import lzma
+import zlib
+from collections.abc import Mapping
+from copy import deepcopy
+from typing import TYPE_CHECKING, Any, Literal
+
+from hashmarks.digest import hash_bytes
+from hashmarks.operation_contract import operation_schema, validate_operation_response
+
+from .task_evidence_contract import read_initial_projection
+
+if TYPE_CHECKING:
+    from .task_evidence_types import (
+        CompressedInitialEnvelope,
+        InitialEnvelopeHeaders,
+        InitialTaskEvidenceEnvelope,
+        InitialTaskEvidenceProjection,
+        StringTableInitialEnvelope,
+    )
+
+_MAX_COMPRESSED_INITIAL_DECODED_BYTES = 1_048_576
+_MAX_INITIAL_LZMA_MEMORY_BYTES = 16_777_216
+
+
+def initial_packet_identity(packet: Mapping[str, object]) -> str:
+    """Bind the decoded semantic view, independent of its wire encoding."""
+    semantic = {
+        key: value for key, value in packet.items() if key != "evidence_packet_identity"
+    }
+    encoded = json.dumps(
+        semantic,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+    domain = operation_schema("task_evidence", "initial").encode("utf-8") + b"\0"
+    return "sha256:" + hash_bytes(encoded, domain=domain).hash
+
+
+def _collect_strings(value: object, strings: set[str]) -> None:
+    if isinstance(value, str):
+        strings.add(value)
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise ValueError("initial object keys must be strings")
+            strings.add(key)
+            _collect_strings(item, strings)
+    elif isinstance(value, list):
+        for item in value:
+            _collect_strings(item, strings)
+
+
+def _encode_strings(value: object, indices: dict[str, str]) -> object:
+    if isinstance(value, str):
+        return indices[value]
+    if isinstance(value, dict):
+        return {
+            indices[key]: _encode_strings(item, indices) for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_encode_strings(item, indices) for item in value]
+    return value
+
+
+def _initial_header(packet: Mapping[str, object], key: str) -> str:
+    value = packet.get(key)
+    if not isinstance(value, str):
+        raise ValueError(f"invalid initial packet header: {key}")
+    return value
+
+
+def _compressed_initial_data(
+    payload: bytes,
+) -> tuple[Literal["json+zlib", "json+lzma-base85"], str]:
+    """Choose the smaller wire representation without changing semantic data."""
+    deflated = base64.b64encode(zlib.compress(payload)).decode("ascii")
+    # Retain the complete payload history, bounded by the supported capacity.
+    # A larger dictionary only increases encoder memory for these packets.
+    dictionary_bytes = min(
+        _MAX_COMPRESSED_INITIAL_DECODED_BYTES,
+        max(4096, 1 << (len(payload) - 1).bit_length()),
+    )
+    packed = base64.b85encode(
+        lzma.compress(
+            payload,
+            filters=[
+                {
+                    "id": lzma.FILTER_LZMA2,
+                    "preset": 6,
+                    "dict_size": dictionary_bytes,
+                }
+            ],
+        )
+    ).decode("ascii")
+    return (
+        ("json+lzma-base85", packed)
+        if len(packed) < len(deflated)
+        else ("json+zlib", deflated)
+    )
+
+
+def encode_initial_packet(packet: Mapping[str, object]) -> InitialTaskEvidenceEnvelope:
+    """Losslessly serialize semantic facts; compression never changes identity."""
+    headers: InitialEnvelopeHeaders = {
+        "schema": _initial_header(packet, "schema"),
+        "source_evidence_identity": _initial_header(packet, "source_evidence_identity"),
+        "evidence_packet_identity": _initial_header(packet, "evidence_packet_identity"),
+    }
+    if headers["schema"] != operation_schema("task_evidence", "initial"):
+        raise ValueError("unsupported initial packet schema")
+    data = {key: value for key, value in packet.items() if key not in headers}
+    strings: set[str] = set()
+
+    _collect_strings(data, strings)
+    ordered = sorted(strings)
+    indices = {value: str(index) for index, value in enumerate(ordered)}
+    table: list[list[int | str]] = []
+    previous = ""
+    for value in ordered:
+        prefix = 0
+        while (
+            prefix < min(len(previous), len(value))
+            and previous[prefix] == value[prefix]
+        ):
+            prefix += 1
+        table.append([prefix, value[prefix:]])
+        previous = value
+
+    original: StringTableInitialEnvelope = {
+        "schema": headers["schema"],
+        "source_evidence_identity": headers["source_evidence_identity"],
+        "evidence_packet_identity": headers["evidence_packet_identity"],
+        "encoding": {"kind": "json-string-table.v1", "strings": table},
+        "data": _encode_strings(data, indices),
+    }
+    payload = json.dumps(
+        data,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    # This bounds decoder allocation, not valid packet capacity. Larger packets
+    # retain the uncompressed encoding and all their admitted fields.
+    if len(payload) > _MAX_COMPRESSED_INITIAL_DECODED_BYTES:
+        return original
+    kind, compressed = _compressed_initial_data(payload)
+    packed: CompressedInitialEnvelope = {
+        "schema": headers["schema"],
+        "source_evidence_identity": headers["source_evidence_identity"],
+        "evidence_packet_identity": headers["evidence_packet_identity"],
+        "encoding": {
+            "kind": kind,
+            "decoded_bytes": len(payload),
+        },
+        "data": compressed,
+    }
+    return packed if len(compressed) + 96 < len(payload) else original
+
+
+def _unpack_initial(encoding: dict[str, object], data: object) -> object:
+    limit = encoding.get("decoded_bytes")
+    if (
+        set(encoding) != {"kind", "decoded_bytes"}
+        or type(limit) is not int
+        or not 0 < limit <= _MAX_COMPRESSED_INITIAL_DECODED_BYTES
+        or not isinstance(data, str)
+        or len(data) > 2 * _MAX_COMPRESSED_INITIAL_DECODED_BYTES
+    ):
+        raise ValueError("invalid compressed initial payload")
+    try:
+        if encoding["kind"] == "json+lzma-base85":
+            raw = base64.b85decode(data)
+            bounded = lzma.LZMADecompressor(memlimit=_MAX_INITIAL_LZMA_MEMORY_BYTES)
+            payload = bounded.decompress(raw, max_length=limit + 1)
+            incomplete = not bounded.eof or bool(bounded.unused_data)
+        else:
+            raw = base64.b64decode(data, validate=True)
+            decoder = zlib.decompressobj()
+            payload = decoder.decompress(raw, limit + 1)
+            incomplete = (
+                not decoder.eof
+                or bool(decoder.unused_data)
+                or bool(decoder.unconsumed_tail)
+            )
+        if len(payload) != limit or incomplete:
+            raise ValueError(
+                "compressed initial payload differs from declared size or scope"
+            )
+        return json.loads(payload, object_pairs_hook=_unique_initial_object)
+    except (ValueError, zlib.error, lzma.LZMAError, binascii.Error) as exc:
+        raise ValueError("invalid compressed initial payload") from exc
+
+
+def _decode_string_table(encoding: Mapping[str, Any]) -> list[str]:
+    strings: list[str] = []
+    previous = ""
+    for row in encoding["strings"]:
+        if (
+            not isinstance(row, list)
+            or len(row) != 2
+            or type(row[0]) is not int
+            or not isinstance(row[1], str)
+            or not 0 <= row[0] <= len(previous)
+        ):
+            raise ValueError("invalid initial string table row")
+        value = previous[: row[0]] + row[1]
+        if strings and value <= previous:
+            raise ValueError("initial string table must be distinct and sorted")
+        strings.append(value)
+        previous = value
+
+    return strings
+
+
+def _decode_strings(encoding: Mapping[str, object], data: object) -> object:
+    strings = _decode_string_table(encoding)
+
+    def string(index: str) -> str:
+        if (
+            not index.isascii()
+            or not index.isdecimal()
+            or (len(index) > 1 and index[0] == "0")
+            or int(index) >= len(strings)
+        ):
+            raise ValueError("invalid initial string reference")
+        return strings[int(index)]
+
+    def decode(value: object) -> object:
+        if isinstance(value, str):
+            return string(value)
+        if isinstance(value, dict):
+            return _unique_initial_object(
+                [(string(key), decode(item)) for key, item in value.items()]
+            )
+        if isinstance(value, list):
+            return [decode(item) for item in value]
+        if value is None or type(value) in (bool, int, float):
+            return value
+        raise ValueError("invalid initial JSON value")
+
+    return decode(data)
+
+
+def _unique_initial_object(items: list[tuple[str, Any]]) -> dict[str, Any]:
+    decoded = dict(items)
+    if len(decoded) != len(items):
+        raise ValueError("initial string references alias an object key")
+    return decoded
+
+
+def _decode_initial_data(encoding: object, data: object) -> object:
+    if not isinstance(encoding, dict):
+        raise ValueError("invalid initial encoding")
+    if encoding.get("kind") in (
+        "json-string-table.v1+zlib",
+        "json+zlib",
+        "json+lzma-base85",
+    ):
+        data = _unpack_initial(encoding, data)
+        if encoding["kind"] in ("json+zlib", "json+lzma-base85"):
+            return data
+        if (
+            not isinstance(data, dict)
+            or set(data) != {"strings", "data"}
+            or not isinstance(data["strings"], list)
+        ):
+            raise ValueError("invalid compressed initial string table fields")
+        encoding = {"kind": "json-string-table.v1", "strings": data["strings"]}
+        data = data["data"]
+    if (
+        set(encoding) != {"kind", "strings"}
+        or encoding["kind"] != "json-string-table.v1"
+        or not isinstance(encoding["strings"], list)
+    ):
+        raise ValueError("invalid initial string table")
+    return _decode_strings(encoding, data)
+
+
+def decode_initial_packet(packet: Mapping[str, Any]) -> dict[str, Any]:
+    """Resolve wire references without conflating numeric strings and numbers."""
+    if packet.get("schema") != operation_schema("task_evidence", "initial"):
+        raise ValueError("unsupported initial packet schema")
+    if set(packet) != {
+        "schema",
+        "source_evidence_identity",
+        "evidence_packet_identity",
+        "encoding",
+        "data",
+    }:
+        raise ValueError("invalid initial packet fields")
+    data = _decode_initial_data(packet["encoding"], packet["data"])
+    if not isinstance(data, dict) or set(data) & {
+        "schema",
+        "source_evidence_identity",
+        "evidence_packet_identity",
+    }:
+        raise ValueError("invalid initial semantic data")
+    result = {
+        **{
+            key: packet[key]
+            for key in (
+                "schema",
+                "source_evidence_identity",
+                "evidence_packet_identity",
+            )
+        },
+        **data,
+    }
+    if initial_packet_identity(result) != result["evidence_packet_identity"]:
+        raise ValueError("initial semantic identity differs from decoded packet")
+    return result
+
+
+_LOCATOR_OMISSIONS = (
+    "canonical_rank",
+    "canonical_score",
+    "name",
+    "signature",
+    "namespace_overlap",
+    "namespace_terms",
+    "task_anchor_count",
+    "task_anchor_terms",
+    "runner_available",
+)
+
+
+def _locator(value: object) -> object:
+    if not isinstance(value, dict):
+        return value
+    omitted = set(_LOCATOR_OMISSIONS)
+    if not value.get("qualname") and not value.get("symbol"):
+        omitted.remove("name")
+    return {key: item for key, item in value.items() if key not in omitted}
+
+
+def _encode_rows(container: dict[str, Any], key: str, columns: list[str]) -> None:
+    rows = container.get(key)
+    if not isinstance(rows, list):
+        return
+    if not all(isinstance(row, dict) and set(row) == set(columns) for row in rows):
+        return
+    container[key + "_encoding"] = {"kind": "columns-rows.v1", "columns": columns}
+    container[key] = [[row[column] for column in columns] for row in rows]
+
+
+def _encode_task_matches(relevance: dict[str, Any]) -> None:
+    matches = relevance.get("task_matches")
+    if isinstance(matches, dict):
+        _encode_rows(
+            matches, "matches", ["path", "matched_term_count", "evidence_visibility"]
+        )
+
+
+def _encode_candidate_rows(relevance: dict[str, Any]) -> None:
+    rows = relevance.get("candidates")
+    if (
+        not isinstance(rows, list)
+        or not rows
+        or not all(isinstance(row, dict) for row in rows)
+    ):
+        return
+    columns = sorted(set.intersection(*(set(row) for row in rows)))
+    if not columns:
+        return
+    relevance["candidates_encoding"] = {
+        "kind": "columns-rows-with-extras.v1",
+        "columns": columns,
+    }
+    relevance["candidates"] = [
+        [
+            *[row[column] for column in columns],
+            {key: value for key, value in row.items() if key not in columns},
+        ]
+        for row in rows
+    ]
+
+
+def decode_initial_collection(
+    rows: object, encoding: Mapping[str, object]
+) -> list[dict[str, object]]:
+    """Read the explicit lossless table contract without guessing missing fields."""
+    columns = encoding.get("columns")
+    kind = encoding.get("kind")
+    if (
+        kind not in {"columns-rows.v1", "columns-rows-with-extras.v1"}
+        or not isinstance(columns, list)
+        or not all(isinstance(column, str) for column in columns)
+        or len(set(columns)) != len(columns)
+        or not isinstance(rows, list)
+    ):
+        raise ValueError("invalid initial collection encoding")
+    decoded = []
+    extras = kind == "columns-rows-with-extras.v1"
+    for row in rows:
+        if not isinstance(row, list) or len(row) != len(columns) + int(extras):
+            raise ValueError("initial collection row differs from declared columns")
+        record = dict(zip(columns, row[: len(columns)], strict=True))
+        if extras:
+            if not isinstance(row[-1], dict) or set(row[-1]) & set(columns):
+                raise ValueError("initial collection extras overwrite declared fields")
+            record.update(row[-1])
+        decoded.append(record)
+    return decoded
+
+
+def _encode_class_declarations(rows: list[dict[str, Any]]) -> None:
+    for row in rows:
+        for family in (
+            "class_declarations",
+            "same_name_declarations",
+            "direct_call_declarations",
+        ):
+            declarations = row.get(family)
+            if isinstance(declarations, dict):
+                _encode_rows(
+                    declarations,
+                    "declarations",
+                    ["path", "symbol", "start_line", "end_line"]
+                    + (["call_line"] if family == "direct_call_declarations" else []),
+                )
+
+
+def _project_verification(
+    verification: dict[str, Any], omissions: dict[str, Any]
+) -> None:
+    verification["selected"] = _locator(verification.get("selected"))
+    relevance = verification.get("relevance")
+    if isinstance(relevance, dict):
+        _encode_task_matches(relevance)
+        relevance["selected"] = _locator(relevance.get("selected"))
+        candidates = relevance.get("candidates", [])
+        # A selected verifier is not a completeness claim. Preserve every
+        # already-bounded alternative rather than silently dropping the test
+        # that answers the caller's question. Locators retain relationship and
+        # freshness qualifiers; only declared display fields are omitted.
+        projected = candidates
+        relevance["candidates"] = [_locator(row) for row in projected]
+        _encode_candidate_rows(relevance)
+        omissions["collections"]["/verification/relevance/candidates"] = {
+            "observed_in_source_packet": len(candidates),
+            "returned": len(projected),
+            "omitted": len(candidates) - len(projected),
+        }
+
+
+def _project_field_declarations(
+    rows: list[dict[str, Any]], omissions: dict[str, Any]
+) -> None:
+    for index, row in enumerate(rows):
+        context = row.get("field_declarations")
+        if not isinstance(context, dict) or "initial_field_selection" not in context:
+            continue
+        selected = context["initial_field_selection"]["fields"]
+        observed_fields = sum(
+            len(group["value"]["fields"]) for group in context["groups"]
+        )
+        if len(selected) == observed_fields:
+            continue
+        retained = []
+        for group_index, group in enumerate(context["groups"]):
+            fields = group["value"]["fields"]
+            chosen = [
+                field
+                for field_index, field in enumerate(fields)
+                if [group_index, field_index] in selected
+            ]
+            ref = f"/retrieval/results/{index}/field_declarations/groups/{group_index}/value/fields"
+            omissions["collections"][ref] = {
+                "observed_in_source_packet": len(fields),
+                "returned": len(chosen),
+                "omitted": len(fields) - len(chosen),
+            }
+            if chosen:
+                group["value"]["fields"] = chosen
+                retained.append(group)
+        context["groups"] = retained
+        context["initial_field_projection"] = {
+            "coverage": "projection-only",
+            "returned_groups": len(retained),
+            "returned_fields": len(selected),
+            "observed_fields": observed_fields,
+            "omitted_fields": observed_fields - len(selected),
+            "source_group_indexes": sorted({group for group, _ in selected}),
+            "source_field_indexes": selected,
+        }
+
+
+def initial_task_evidence(packet: Mapping[str, Any]) -> InitialTaskEvidenceProjection:
+    """Project existing facts, retaining qualifiers and accounting for detail loss."""
+    validate_operation_response("task_evidence", packet)
+    result = deepcopy(dict(packet))
+    result["schema"] = operation_schema("task_evidence", "initial")
+    result["source_evidence_identity"] = result.pop("evidence_packet_identity")
+    omissions: dict[str, Any] = {
+        "locator_fields": list(_LOCATOR_OMISSIONS),
+        "locator_scopes": [
+            "/ownership/owner",
+            "/ownership/candidate",
+            "/ownership/ambiguity/alternatives/*",
+            "/verification/selected",
+            "/verification/relevance/selected",
+            "/verification/relevance/candidates/*",
+        ],
+        "sections": [],
+        "collections": {},
+    }
+    ownership = result["ownership"]
+    for key in ("owner", "candidate"):
+        ownership[key] = _locator(ownership.get(key))
+    ambiguity = ownership.get("ambiguity")
+    if isinstance(ambiguity, dict) and isinstance(ambiguity.get("alternatives"), list):
+        ambiguity["alternatives"] = [_locator(row) for row in ambiguity["alternatives"]]
+    source = ownership.get("source_evidence")
+    if isinstance(source, dict) and "content" in source:
+        source.pop("content")
+        omissions["sections"].append("/ownership/source_evidence/content")
+    retrieval = result["retrieval"]
+    rows = retrieval["results"]
+    # Preserve the first three retrieval rows and already admitted declaration
+    # supplements. No authority or retrieval decision is made by this profile.
+    retained = rows[:3] + [row for row in rows[3:] if row.get("supplement")][:2]
+    owner = ownership.get("owner")
+    if isinstance(owner, dict):
+        owner_row = next(
+            (row for row in rows if row.get("path") == owner.get("path")), None
+        )
+        if owner_row is not None and owner_row not in retained:
+            retained.append(owner_row)
+    retrieval["results"] = retained
+    _encode_class_declarations(retained)
+    _project_field_declarations(retained, omissions)
+    omissions["collections"]["/retrieval/results"] = {
+        "observed_in_source_packet": len(rows),
+        "returned": len(retained),
+        "omitted": len(rows) - len(retained),
+    }
+    _project_verification(result["verification"], omissions)
+    if "related" in result:
+        result.pop("related")
+        omissions["sections"].append("/related")
+    result["initial_projection"] = {
+        "authority": "projection-only",
+        "omissions": omissions,
+        "expansion": {
+            "operation": "task_evidence",
+            "result_mode": "default",
+            "identity_check": "compare-full-packet-identity; changed source may differ",
+        },
+        "negative_evidence_from_omissions": "not-admissible",
+    }
+    return read_initial_projection(result)

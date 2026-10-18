@@ -38,6 +38,9 @@ help:
 	  '  make dependency-dogfood  Check genuine uv/Maven dependency add, change, and removal evidence' \
 	  '  make semantic-evidence-dogfood  Check offline native dependency/SCIP/LSP changes and CLI/MCP evidence' \
 	  '  make semantic-evidence-live  Regenerate the bounded corpus with installed Maven, uv and SCIP producers' \
+	  '  make backend-evidence-dogfood  Measure pinned genuine backend revision workflows through CLI/MCP' \
+	  '  make backend-native-dogfood  Replay explicit genuine backend SCIP specimens through CLI/MCP' \
+	  '  make backend-native-live  Capture fresh backend SCIP specimens and qualify their source binding' \
 	  '  make check          Junior-friendly local check: setup + compile + CodeMap + tests' \
 	  '  make bootstrap      Offline runtime-only bootstrap (CI/prepared environments)' \
 	  '  make start          Bootstrap and start the identity daemon' \
@@ -211,6 +214,28 @@ ruff: ruff-check ruff-format-check
 lint: ruff lint-debt
 
 .PHONY: dependency-dogfood semantic-evidence-dogfood semantic-evidence-live
+.PHONY: backend-evidence-dogfood backend-native-dogfood backend-native-live backend-evidence-aggregate
+BACKEND_SOURCES ?= .hashmarks/backend-e2e/sources/sources.json
+BACKEND_SUITE ?= benchmarks/repository_evaluation/manifests/backend-v1/suite.json
+BACKEND_OUTPUT ?= .hashmarks/backend-e2e/qualification
+backend-evidence-dogfood:
+	@$(UV_RUN) --offline --no-sync --group test python -m scripts.repository_evaluation.run_backend --suite "$(BACKEND_SUITE)" --sources-file "$(BACKEND_SOURCES)" --output-dir "$(BACKEND_OUTPUT)"
+
+BACKEND_NATIVE_CAPTURES ?= .hashmarks/backend-e2e/native-backend/captures
+BACKEND_NATIVE_OUTPUT ?= .hashmarks/backend-e2e/native-backend/qualification
+BACKEND_NATIVE_LIVE_CAPTURES ?= .hashmarks/backend-e2e/native-live/captures
+BACKEND_NATIVE_LIVE_OUTPUT ?= .hashmarks/backend-e2e/native-live/qualification
+backend-native-dogfood:
+	@$(UV_RUN) --offline --no-sync --group test python -m scripts.repository_evaluation.run_backend_native --suite "$(BACKEND_SUITE)" --sources-file "$(BACKEND_SOURCES)" --capture-root "$(BACKEND_NATIVE_CAPTURES)" --output-dir "$(BACKEND_NATIVE_OUTPUT)"
+
+backend-native-live:
+	@$(UV_RUN) --offline --no-sync --group test python -m scripts.repository_evaluation.run_backend_native --suite "$(BACKEND_SUITE)" --sources-file "$(BACKEND_SOURCES)" --capture-root "$(BACKEND_NATIVE_LIVE_CAPTURES)" --output-dir "$(BACKEND_NATIVE_LIVE_OUTPUT)" --regenerate
+
+BACKEND_CAMPAIGN ?= benchmarks/repository_evaluation/manifests/backend-campaign-v1/campaign.json
+BACKEND_REPORTS ?= .hashmarks/backend-e2e/campaign/reports.json
+backend-evidence-aggregate:
+	@$(UV_RUN) --offline --no-sync --group test python -m scripts.repository_evaluation.aggregate_backend --campaign "$(BACKEND_CAMPAIGN)" --sources-file "$(BACKEND_SOURCES)" --reports-file "$(BACKEND_REPORTS)" --output-dir "$(BACKEND_OUTPUT)"
+
 dependency-dogfood:
 	@$(UV_RUN) --offline --no-sync --group test python -m pytest -v tests/test_dependency_dogfood.py
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import subprocess
-from types import SimpleNamespace
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import pytest
@@ -17,6 +17,8 @@ from hashmarks.codemap.repository_index_store import (
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from hashmarks.codemap.providers import StructuralNode, StructuralTree
 
 pytestmark = pytest.mark.host_git
 
@@ -41,25 +43,30 @@ def _repo(tmp_path: Path) -> Path:
     return repo
 
 
-def test_clean_base_sync_publishes_shared_snapshot(tmp_path: Path, monkeypatch) -> None:
+def test_clean_base_sync_publishes_shared_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "cache"))
     repo = _repo(tmp_path)
     with CodeMap(repo) as codemap:
-        result = codemap.sync()
+        result = codemap.index.sync()
     base = git_base_identity(repo)
     assert base is not None
     snapshot = default_base_snapshot(repo, base)
+    assert snapshot.is_relative_to(tmp_path / "cache")
     assert snapshot.is_file()
     assert result.overlay_paths == 0
 
 
 def test_sibling_worktree_reuses_clean_base_snapshot_and_keeps_dirty_overlay_local(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "cache"))
     repo = _repo(tmp_path)
     with CodeMap(repo) as codemap:
-        first = codemap.sync()
+        first = codemap.index.sync()
     sibling = tmp_path / "sibling"
     subprocess.run(
         [
@@ -77,24 +84,25 @@ def test_sibling_worktree_reuses_clean_base_snapshot_and_keeps_dirty_overlay_loc
     )
     # The sibling uses a different workspace DB/state, but same common-dir artifact/base cache.
     with CodeMap(sibling) as codemap:
-        reused = codemap.sync()
+        reused = codemap.index.sync()
     assert reused.base_snapshot_reused == 2
     assert reused.parsed_artifacts == 0
     (sibling / "b.py").write_text("def beta():\n    return 3\n")
     with CodeMap(sibling) as codemap:
-        dirty = codemap.sync()
+        dirty = codemap.index.sync()
     assert dirty.overlay_paths == 1
     assert dirty.base_snapshot_reused == 1
     assert codemap is not None
 
 
 def test_assume_unchanged_path_must_match_snapshot_bytes_before_reuse(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "cache"))
     repo = _repo(tmp_path)
     with CodeMap(repo) as codemap:
-        codemap.sync()
+        codemap.index.sync()
 
     subprocess.run(
         ["git", "-C", str(repo), "update-index", "--assume-unchanged", "a.py"],
@@ -106,7 +114,7 @@ def test_assume_unchanged_path_must_match_snapshot_bytes_before_reuse(
     assert git_overlay_paths(repo) == set()
 
     with CodeMap(repo) as codemap:
-        result = codemap.sync()
+        result = codemap.index.sync()
         assert result.overlay_paths == 0
         assert result.base_snapshot_reused == 1
         assert result.parsed_artifacts == 1
@@ -114,33 +122,55 @@ def test_assume_unchanged_path_must_match_snapshot_bytes_before_reuse(
         assert codemap.store.symbol("omega")
 
 
+class _EmptyNode:
+    type = "module"
+    start_byte = 0
+    end_byte = 0
+    start_point = (0, 0)
+    end_point = (0, 0)
+    children: tuple[StructuralNode, ...] = ()
+    named_children: tuple[StructuralNode, ...] = ()
+
+    def child_by_field_name(self, _name: str, /) -> None:
+        return None
+
+
+@dataclass
+class _EmptyTree:
+    root_node: StructuralNode
+
+
+class _EmptyParser:
+    def parse(self, _source: bytes, /) -> StructuralTree:
+        return _EmptyTree(_EmptyNode())
+
+
 def _range_provider(version: str) -> TreeSitterRangeProvider:
-    root = SimpleNamespace(named_children=())
-    parser = SimpleNamespace(parse=lambda source: SimpleNamespace(root_node=root))
-    return TreeSitterRangeProvider(lambda language: parser, version=version)
+    return TreeSitterRangeProvider(lambda _: _EmptyParser(), version=version)
 
 
 @pytest.mark.parametrize("next_provider", ["unavailable", "v2"])
 def test_base_snapshot_requires_current_parser_provider_identity(
-    tmp_path: Path, monkeypatch, next_provider: str
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, next_provider: str
 ) -> None:
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "cache"))
     repo = _repo(tmp_path)
-    with CodeMap(repo) as codemap:
-        codemap.range_provider = _range_provider("v1")
-        codemap.sync()
-        before = {
-            path: str(codemap.store.file_row(path)["artifact_key"])
-            for path in ("a.py", "b.py")
-        }
+    with CodeMap(repo, range_provider=_range_provider("v1")) as codemap:
+        codemap.index.sync()
+        before = {}
+        for path in ("a.py", "b.py"):
+            row = codemap.store.file_row(path)
+            assert row is not None
+            before[path] = str(row["artifact_key"])
 
-    with CodeMap(repo) as codemap:
-        codemap.range_provider = (
-            TreeSitterRangeProvider(None)
-            if next_provider == "unavailable"
-            else _range_provider(next_provider)
-        )
-        result = codemap.sync()
+    provider = (
+        TreeSitterRangeProvider(None)
+        if next_provider == "unavailable"
+        else _range_provider(next_provider)
+    )
+    with CodeMap(repo, range_provider=provider) as codemap:
+        result = codemap.index.sync()
         assert result.base_snapshot_reused == 0
         assert result.parsed_artifacts == 2
         for path in ("a.py", "b.py"):
@@ -150,14 +180,15 @@ def test_base_snapshot_requires_current_parser_provider_identity(
             assert str(row["artifact_key"]) == artifact_key_for(
                 str(row["file_digest"]),
                 "python",
-                range_provider=codemap.range_provider,
+                range_provider=codemap.index.range_provider,
             )
 
 
 def test_base_snapshot_reprojects_current_python_module_identity(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "cache"))
     repo = tmp_path / "repo"
     repo.mkdir()
     subprocess.run(["git", "init", "-q", str(repo)], check=True)
@@ -179,7 +210,7 @@ def test_base_snapshot_reprojects_current_python_module_identity(
     subprocess.run(["git", "-C", str(repo), "commit", "-qm", "base"], check=True)
 
     with CodeMap(repo) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before = codemap.store.file_row("src/pkg/mod.py")
         assert before is not None
         assert before["module_name"] == "pkg.mod"
@@ -191,7 +222,7 @@ def test_base_snapshot_reprojects_current_python_module_identity(
     assert git_overlay_paths(repo) == {"pyproject.toml"}
 
     with CodeMap(repo) as codemap:
-        result = codemap.sync()
+        result = codemap.index.sync()
         after = codemap.store.file_row("src/pkg/mod.py")
         assert after is not None
         assert result.base_snapshot_reused == 1

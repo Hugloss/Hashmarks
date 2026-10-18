@@ -6,7 +6,7 @@ graph, evidence ranking, runtime inference or agent-side tool execution.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 
 MAX_BACKEND_NAVIGATION_READS = 8
 
@@ -28,7 +28,9 @@ def _model_read_candidates(
     path: str, group: Mapping[str, object], value: Mapping[str, object]
 ) -> list[dict[str, object]]:
     scope = group["scope"]
+    assert isinstance(scope, Mapping)
     class_line = scope["class_line"]
+    assert isinstance(class_line, int)
     rows = [
         _source_read(
             path,
@@ -37,11 +39,18 @@ def _model_read_candidates(
             ["inspect-class-base-and-nearby-import-syntax"],
         )
     ]
-    for field in value["fields"]:
+    fields = value["fields"]
+    assert isinstance(fields, Sequence)
+    for field in fields:
+        assert isinstance(field, Mapping)
         reasons: list[str] = []
-        if field["annotation"]["state"] != "direct-annotation-syntax":
+        annotation = field["annotation"]
+        assert isinstance(annotation, Mapping)
+        if annotation["state"] != "direct-annotation-syntax":
             reasons.append("annotation-syntax-unresolved")
-        if field["default"]["state"] not in {
+        default = field["default"]
+        assert isinstance(default, Mapping)
+        if default["state"] not in {
             "not-supplied",
             "literal-kind-only",
         }:
@@ -57,9 +66,13 @@ def _environment_read_candidates(
     path: str, group: Mapping[str, object], value: Mapping[str, object]
 ) -> list[dict[str, object]]:
     reasons: list[str] = []
-    if value["key"]["state"] != "literal-key-syntax":
+    key = value["key"]
+    assert isinstance(key, Mapping)
+    if key["state"] != "literal-key-syntax":
         reasons.append("environment-key-expression-unresolved")
-    if value["default"]["state"] in {
+    default = value["default"]
+    assert isinstance(default, Mapping)
+    if default["state"] in {
         "dynamic-or-unsupported",
         "ambiguous-explicit-syntax",
         "over-bound",
@@ -75,7 +88,10 @@ def _environment_read_candidates(
         reasons.append("environment-target-effect-unverified")
     if not reasons:
         return []
-    evidence = group["declarations"][0]["evidence"][0]
+    declarations = group["declarations"]
+    assert isinstance(declarations, Sequence)
+    evidence = declarations[0]["evidence"][0]
+    assert isinstance(evidence, Mapping)
     return [_source_read(path, evidence["start_line"], evidence["end_line"], reasons)]
 
 
@@ -85,9 +101,17 @@ def backend_evidence_navigation(group: dict[str, object]) -> None:
     This is intentionally not a claim about runtime API compatibility or a
     guarantee that further source reads will settle a runtime question.
     """
-    kind = group["concept"]["kind"]
-    path = group["scope"]["path"]
-    value = group["declarations"][0]["value"]
+    concept = group["concept"]
+    assert isinstance(concept, Mapping)
+    kind = concept["kind"]
+    scope = group["scope"]
+    assert isinstance(scope, Mapping)
+    path = scope["path"]
+    assert isinstance(path, str)
+    declarations = group["declarations"]
+    assert isinstance(declarations, Sequence)
+    value = declarations[0]["value"]
+    assert isinstance(value, dict)
     if kind == "python-model-class-syntax":
         candidates = _model_read_candidates(path, group, value)
     elif kind == "python-env-access-syntax":

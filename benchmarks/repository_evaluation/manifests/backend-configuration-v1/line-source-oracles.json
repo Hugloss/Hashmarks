@@ -1,0 +1,113 @@
+{
+  "cases": [
+    {
+      "id": "litestar-named-dependency-markers",
+      "scope": "source spelling only; no runtime marker binding or constructor compatibility claim",
+      "stages": {
+        "after": {
+          "exact_source_line": "NamedDependency = Annotated[T, Dependency(kind=\"named\")]",
+          "file_sha256": "8458ce16267ed2e63a49713b7c576e29caa4d5859666c664a6fe096e650a4d0c",
+          "line": 42,
+          "line_digest_basis": "hashmarks.source-line.v1 NUL prefix plus physical line bytes excluding LF; CR retained",
+          "line_sha256": "40aff66bc751a16948666da6cba87ffa1c1128e5223850069260d6b8e274d6f2",
+          "path": "litestar/di.py",
+          "public_request": {
+            "context_lines": {
+              "lines": [
+                42
+              ],
+              "radius": 1
+            },
+            "paths": [
+              "litestar/di.py"
+            ],
+            "result_mode": "member"
+          },
+          "source": "litestar-named-dependency-markers-after",
+          "source_identity": "sha256:8f57e9100ea2a9540363ff1afd5f94ab6455577ec1f9a010f3fb638ccb8d5a52:1387",
+          "source_range_sha256": "05847745c675c71d14f49d9895ebe4ae7d1daf6405753363e5125e9a2d406730"
+        },
+        "before": {
+          "exact_source_line": "__all__ = (\"Provide\",)",
+          "file_sha256": "608c274bea8da26a963045cbb3dfd8d651d60ec665ce9fe06e7d6e5cb80852c6",
+          "line": 26,
+          "line_digest_basis": "hashmarks.source-line.v1 NUL prefix plus physical line bytes excluding LF; CR retained",
+          "line_sha256": "2b4a69affd27b3d92befb542d24c354dbb13a6468725eda6cd562da71d2c273a",
+          "path": "litestar/di.py",
+          "public_request": {
+            "context_lines": {
+              "lines": [
+                26
+              ],
+              "radius": 1
+            },
+            "paths": [
+              "litestar/di.py"
+            ],
+            "result_mode": "member"
+          },
+          "source": "litestar-named-dependency-markers-before",
+          "source_identity": "sha256:675f5936274fdf7313e73a80951aed10dc624de59c236cc2825173163a1fcdfb:1387",
+          "source_range_sha256": "acf878d4dd9a5e0ee2d30acbeb8d9c3ed4b37a350c0262f3b94801e18fb63833"
+        }
+      }
+    },
+    {
+      "id": "faststream-non-init-dependant-fields",
+      "scope": "source spelling only; no runtime marker binding or constructor compatibility claim",
+      "stages": {
+        "after": {
+          "exact_source_line": "        if field.init",
+          "file_sha256": "19607814dec2c0046f3db0462c5d7997a34ca9508d90c6bea4bc449129fc71c2",
+          "line": 35,
+          "line_digest_basis": "hashmarks.source-line.v1 NUL prefix plus physical line bytes excluding LF; CR retained",
+          "line_sha256": "be8620733e19f413c4cc8ce8dc6e0fb27a9c7b95ad4e1e9567dae8fbc3082162",
+          "path": "faststream/_internal/fastapi/get_dependant.py",
+          "public_request": {
+            "context_lines": {
+              "lines": [
+                35
+              ],
+              "radius": 1
+            },
+            "paths": [
+              "faststream/_internal/fastapi/get_dependant.py"
+            ],
+            "result_mode": "member"
+          },
+          "source": "faststream-non-init-dependant-fields-after",
+          "source_identity": "sha256:bbc1b057d83d7ec05b8b347d9febd79eaa53351d10963bc3ab156fcef446d12d:2122",
+          "source_range_sha256": "6b168e39576047729ee898b25872b6411b2d78e9ece47bde5dfaf77173ef981b"
+        },
+        "before": {
+          "exact_source_line": "        field.name: getattr(dependant, field.name) for field in fields(dependant)",
+          "file_sha256": "bc41691d0880458259d35f77b045dcbde315d1ada0d28f366c8e74c1620cbe2c",
+          "line": 33,
+          "line_digest_basis": "hashmarks.source-line.v1 NUL prefix plus physical line bytes excluding LF; CR retained",
+          "line_sha256": "41ce076e91aa0c3556518435cab6a770d4554444d4f63e10293965bd5c899244",
+          "path": "faststream/_internal/fastapi/get_dependant.py",
+          "public_request": {
+            "context_lines": {
+              "lines": [
+                33
+              ],
+              "radius": 1
+            },
+            "paths": [
+              "faststream/_internal/fastapi/get_dependant.py"
+            ],
+            "result_mode": "member"
+          },
+          "source": "faststream-non-init-dependant-fields-before",
+          "source_identity": "sha256:6c2ba2f0837458b224f75095046d7cb713cbd9759d813140c623fcbaa1c85cf0:2113",
+          "source_range_sha256": "8cce866f04ecd3b2da6116a3ab1da5ea582d7cbbcbc5d7a4270477aa3624cd55"
+        }
+      }
+    }
+  ],
+  "observer_outputs_used": false,
+  "schema": "hashmarks.configuration-line-source-oracles.v1",
+  "scope": "two exact source-spelling slices; no semantic absence, runtime marker binding, provider wiring or constructor compatibility claim",
+  "source_line_digest_basis": "hashmarks.source-line.v1 NUL prefix plus physical bytes excluding LF; raw source-range SHA retains terminators",
+  "status": "INCOMPLETE"
+}

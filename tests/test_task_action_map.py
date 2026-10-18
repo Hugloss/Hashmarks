@@ -3,10 +3,14 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
+from contract_assertions import assert_present
+
 from hashmarks.codemap import CodeMap
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from pytest import MonkeyPatch
 
 
 def test_task_action_map_routes_source_test_contract_without_changing_ranking(
@@ -25,25 +29,27 @@ def test_task_action_map_routes_source_test_contract_without_changing_ranking(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        canonical = codemap.find_task(
+        codemap.index.sync()
+        canonical = codemap.search.find_task(
             "WidgetEngine implementation test contract", limit=20
         )
-        action = codemap.task_action_map(
+        action = codemap.tasks.action_map(
             "WidgetEngine implementation test contract", limit=20
         )
 
     assert [row["path"] for row in action["canonical"]] == [
         hit.path for hit in canonical
     ]
-    assert [row["canonical_rank"] for row in action["canonical"]] == list(
+    assert [row.get("canonical_rank") for row in action["canonical"]] == list(
         range(1, len(action["canonical"]) + 1)
     )
     assert all("canonical_score" in row for row in action["canonical"])
     assert all("roles" in row for row in action["canonical"])
     assert action["ranking_effect"] == "none"
     assert action["discovery_effect"] == "none"
+    assert action["edit"] is not None
     assert action["edit"]["path"] == "src/widget.py"
+    assert action["verify"] is not None
     assert action["verify"]["path"] == "tests/test_widget.py"
     assert "edit" not in next(
         row for row in action["canonical"] if row["path"] == "tests/test_widget.py"
@@ -61,16 +67,15 @@ def test_task_action_map_never_uses_benchmark_corpus_as_edit(tmp_path: Path) -> 
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        action = codemap.task_action_map(
+        codemap.index.sync()
+        action = codemap.tasks.action_map(
             "resolve_manifest registered manifest implementation", limit=20
         )
 
+    assert action["edit"] is not None
     assert action["edit"]["path"] == "src/resolver.py"
     assert all(
-        not str(row["path"]).startswith("benchmarks/")
-        for row in [action["edit"]]
-        if row
+        not str(row["path"]).startswith("benchmarks/") for row in [action["edit"]]
     )
 
 
@@ -82,11 +87,12 @@ def test_task_action_map_generic_build_word_does_not_force_makefile(
     (tmp_path / "Makefile").write_text("build:\n\t@echo build\n")
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        action = codemap.task_action_map(
+        codemap.index.sync()
+        action = codemap.tasks.action_map(
             "GoImpactAdapter build project impact implementation", limit=20
         )
 
+    assert action["edit"] is not None
     assert action["edit"]["path"] == "pkg/adapter.py"
 
 
@@ -103,11 +109,12 @@ def test_source_tree_test_prefixed_module_remains_editable_source(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        action = codemap.task_action_map(
+        codemap.index.sync()
+        action = codemap.tasks.action_map(
             "Change shard_batch_size implementation from 8 to 4", limit=20
         )
 
+    assert action["edit"] is not None
     assert action["edit"]["path"] == "src/tooling/test_batches.py"
 
 
@@ -120,12 +127,13 @@ def test_explicit_test_repair_can_select_test_as_edit_surface(tmp_path: Path) ->
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        action = codemap.task_action_map(
+        codemap.index.sync()
+        action = codemap.tasks.action_map(
             "Strengthen the WorkspaceLease regression test to assert the contract",
             limit=20,
         )
 
+    assert action["edit"] is not None
     assert action["edit"]["path"] == "tests/test_lease.py"
 
 
@@ -142,11 +150,13 @@ def test_verify_test_language_does_not_turn_test_into_edit_authority(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        action = codemap.task_action_map(
+        codemap.index.sync()
+        action = codemap.tasks.action_map(
             "change widget implementation and verify widget test", limit=20
         )
+    assert action["edit"] is not None
     assert action["edit"]["path"] == "src/owner.py"
+    assert action["verify"] is not None
     assert action["verify"]["path"] == "tests/test_owner.py"
 
 
@@ -160,12 +170,13 @@ def test_explicit_pytest_shard_tuning_selects_makefile(tmp_path: Path) -> None:
     (tmp_path / "Makefile").write_text("PYTEST_BATCH_SIZE := 8\ntest:\n\tpytest -q\n")
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        action = codemap.task_action_map(
+        codemap.index.sync()
+        action = codemap.tasks.action_map(
             "Change pytest batch shard size from 8 to 4 while keeping the timeout unchanged",
             limit=20,
         )
 
+    assert action["edit"] is not None
     assert action["edit"]["path"] == "Makefile"
 
 
@@ -180,12 +191,13 @@ def test_camelcase_task_anchor_matches_snake_case_owner(tmp_path: Path) -> None:
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        action = codemap.task_action_map(
+        codemap.index.sync()
+        action = codemap.tasks.action_map(
             "Fix CandidateCheckpoint marker validation in the active implementation",
             limit=20,
         )
 
+    assert action["edit"] is not None
     assert action["edit"]["path"] == "src/runtime/checkpoint.py"
 
 
@@ -203,9 +215,10 @@ def test_unique_exact_identifier_outweighs_close_nonexact_runtime_name(
 
     task = "Change WorkspaceLease expired behavior before replacement"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        action = codemap.task_action_map(task, limit=20)
+        codemap.index.sync()
+        action = codemap.tasks.action_map(task, limit=20)
 
+    assert action["edit"] is not None
     assert action["edit"]["path"] == "src/models/workspace_lease.py"
     assert action["owner_basis"] in {"exact-symbol", "unique-exact-symbol"}
     assert action["ambiguity"]["ambiguous"] is False
@@ -224,12 +237,14 @@ def test_task_action_map_exposes_resolved_ownership_trace_and_authority(
         "from src.engine import apply_widget\ndef test_widget(): assert apply_widget('x') == 'x'\n"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        action = codemap.task_action_map("apply_widget implementation test", limit=20)
+        codemap.index.sync()
+        action = codemap.tasks.action_map("apply_widget implementation test", limit=20)
 
     trace = action["ownership_decision_trace"]
     authority = action["ownership_authority"]
     assert trace["status"] == "resolved"
+    assert trace["selected"] is not None
+    assert action["edit"] is not None
     assert trace["selected"]["path"] == action["edit"]["path"]
     assert authority["owner_resolved"] is True
     assert authority["resolved_owner"] == action["edit"]["path"]
@@ -239,8 +254,8 @@ def test_task_action_map_no_edit_fails_closed(tmp_path: Path) -> None:
     (tmp_path / "tests").mkdir()
     (tmp_path / "tests" / "test_only.py").write_text("def test_widget():\n    pass\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        action = codemap.task_action_map("widget test verification", limit=20)
+        codemap.index.sync()
+        action = codemap.tasks.action_map("widget test verification", limit=20)
 
     assert action["edit"] is None
     assert action["ownership_decision_trace"]["status"] == "unresolved"
@@ -249,10 +264,10 @@ def test_task_action_map_no_edit_fails_closed(tmp_path: Path) -> None:
 
 
 def test_task_action_map_skips_structural_owner_after_exact_resolution(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
     """A stronger exact owner must terminate before weaker structural traversal."""
-    from hashmarks.codemap.ownership_graph import OwnershipGraphMixin
+    from hashmarks.codemap.ownership_graph import RepositoryOwnership
 
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
@@ -263,20 +278,27 @@ def test_task_action_map_skips_structural_owner_after_exact_resolution(
     (tmp_path / "INVARIANTS.md").write_text("WidgetEngine contract and policy.\n")
 
     calls: list[str] = []
-    original = OwnershipGraphMixin._structural_owner_candidate
+    original = RepositoryOwnership._structural_owner_candidate
 
-    def counted(self, start_path: str, *, max_depth: int = 2, task: str = ""):
+    def counted(
+        self: RepositoryOwnership,
+        start_path: str,
+        *,
+        max_depth: int = 2,
+        task: str = "",
+    ) -> object:
         calls.append(start_path)
         return original(self, start_path, max_depth=max_depth, task=task)
 
-    monkeypatch.setattr(OwnershipGraphMixin, "_structural_owner_candidate", counted)
+    monkeypatch.setattr(RepositoryOwnership, "_structural_owner_candidate", counted)
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        action = codemap.task_action_map(
+        codemap.index.sync()
+        action = codemap.tasks.action_map(
             "WidgetEngine implementation test contract", limit=20
         )
 
+    assert action["edit"] is not None
     assert action["edit"]["path"] == "src/widget.py"
     assert action["owner_basis"] in {"exact-symbol", "unique-exact-symbol"}
     assert calls == []
@@ -302,11 +324,14 @@ def test_qualified_module_function_target_wins_over_lexically_stronger_sibling(
 
     task = "Refactor repository_understanding_policy.evaluate without changing behavior"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        action = codemap.task_action_map(task, limit=20)
+        codemap.index.sync()
+        action = codemap.tasks.action_map(task, limit=20)
 
+    assert action["edit"] is not None
     assert action["edit"]["path"] == "src/repository_understanding_policy.py"
+    assert "name" in action["edit"]
     assert action["edit"]["name"] == "evaluate"
+    assert "exact_identifier_projection" in action["edit"]
     assert action["edit"]["exact_identifier_projection"] is True
 
 
@@ -323,8 +348,8 @@ def test_qualified_module_function_target_stays_ambiguous_across_duplicate_modul
 
     task = "Refactor repository_understanding_policy.evaluate without changing behavior"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        action = codemap.task_action_map(task, limit=20)
+        codemap.index.sync()
+        action = codemap.tasks.action_map(task, limit=20)
 
     assert action["ambiguity"]["ambiguous"] is True
     assert action["ambiguity"]["reason"] == "multiple-exact-identifier-edit-owners"
@@ -342,11 +367,14 @@ def test_qualified_module_function_does_not_match_wrong_module(
 
     task = "Refactor missing_policy.evaluate without changing behavior"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        context = codemap._task_action_map_context(task, 20)
-        evidence = codemap._task_action_exact_identifier_edit_candidates(
-            task, context.rows, context.failed
-        )
+        codemap.index.sync()
+        with codemap.reads.session() as _task_read_scope:
+            context = codemap.ownership.observe_candidates(
+                codemap.tasks._task_observation(task, 20), 20
+            )
+            evidence = codemap.ownership._task_action_exact_identifier_edit_candidates(
+                task, context.rows, context.failed
+            )
 
     assert evidence.candidates == []
     assert evidence.search_complete is True
@@ -378,15 +406,19 @@ def test_qualified_target_recovers_from_index_when_canonical_limit_excludes_sour
 
     task = "Refactor test_batches.main without changing behavior"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        action = codemap.task_action_map(task, limit=1, per_role=1)
+        codemap.index.sync()
+        action = codemap.tasks.action_map(task, limit=1, per_role=1)
 
     assert [row["path"] for row in action["canonical"]] == [
         "tests/test_test_batches.py"
     ]
+    assert action["edit"] is not None
     assert action["edit"]["path"] == "src/test_batches.py"
+    assert "name" in action["edit"]
     assert action["edit"]["name"] == "main"
+    assert "exact_identifier_projection" in action["edit"]
     assert action["edit"]["exact_identifier_projection"] is True
+    assert "qualified_identifier_index_projection" in action["edit"]
     assert action["edit"]["qualified_identifier_index_projection"] is True
     assert action["ambiguity"]["ambiguous"] is False
 
@@ -413,16 +445,22 @@ def test_structural_owner_projection_preserves_unique_qualified_symbol_evidence(
 
     task = "Refactor capability.target without changing behavior"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        action = codemap.task_action_map(task, limit=20)
-        evidence = codemap.task_evidence(task, limit=20)
+        codemap.index.sync()
+        action = codemap.tasks.action_map(task, limit=20)
+        evidence = codemap.tasks.evidence(task, limit=20)
 
+    assert action["edit"] is not None
     assert action["edit"]["path"] == "src/capability.py"
+    assert "name" in action["edit"]
     assert action["edit"]["name"] == "target"
+    assert "qualname" in action["edit"]
     assert action["edit"]["qualname"] == "target"
+    assert "exact_identifier_projection" in action["edit"]
     assert action["edit"]["exact_identifier_projection"] is True
     ownership = evidence["ownership"]
+    assert ownership["candidate"] is not None
     assert ownership["candidate"]["path"] == "src/capability.py"
+    assert ownership["source_evidence"] is not None
     assert ownership["source_evidence"]["symbol"] == "target"
     assert ownership["source_evidence"]["content"].startswith("def target(value):")
     assert "UnrelatedError" not in ownership["source_evidence"]["content"]
@@ -443,11 +481,14 @@ def test_qualified_identifier_does_not_inherit_plain_same_name_ambiguity(
 
     task = "Refactor bootstrap._require_regular without changing behavior"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        action = codemap.task_action_map(task, limit=20)
+        codemap.index.sync()
+        action = codemap.tasks.action_map(task, limit=20)
 
+    assert action["edit"] is not None
     assert action["edit"]["path"] == "src/bootstrap.py"
+    assert "name" in action["edit"]
     assert action["edit"]["name"] == "_require_regular"
+    assert "exact_identifier_projection" in action["edit"]
     assert action["edit"]["exact_identifier_projection"] is True
     assert action["ambiguity"]["ambiguous"] is False
     assert action["ownership_authority"]["owner_resolved"] is True
@@ -471,13 +512,13 @@ def test_exact_identifier_authority_is_invariant_across_presentation_limits(
 
     task = "Refactor target.globally_unique_owner without changing behavior"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         results = [
-            codemap.task_action_map(task, limit=limit, per_role=1)
+            codemap.tasks.action_map(task, limit=limit, per_role=1)
             for limit in (1, 10, 100)
         ]
 
-    assert {row["edit"]["path"] for row in results} == {"src/target.py"}
+    assert {assert_present(row["edit"])["path"] for row in results} == {"src/target.py"}
     assert {row["owner_basis"] for row in results} == {"qualified-symbol"}
     assert {row["ownership_authority"]["resolved_owner"] for row in results} == {
         "src/target.py"
@@ -505,9 +546,9 @@ def test_duplicate_exact_identifier_stays_ambiguous_across_presentation_limits(
 
     task = "Refactor evaluate without changing behavior"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         results = [
-            codemap.task_action_map(task, limit=limit, per_role=1)
+            codemap.tasks.action_map(task, limit=limit, per_role=1)
             for limit in (1, 10, 100)
         ]
 
@@ -530,13 +571,13 @@ def test_literal_path_authority_is_invariant_across_presentation_limits(
     )
     task = "Change src/owner.py owner behavior"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         results = [
-            codemap.task_action_map(task, limit=limit, per_role=1)
+            codemap.tasks.action_map(task, limit=limit, per_role=1)
             for limit in (1, 10, 100)
         ]
 
-    assert {row["edit"]["path"] for row in results} == {"src/owner.py"}
+    assert {assert_present(row["edit"])["path"] for row in results} == {"src/owner.py"}
     assert {row["owner_basis"] for row in results} == {"literal-path"}
     assert {
         row["ownership_authority"]["authority_proof_identity"] for row in results
@@ -556,9 +597,9 @@ def test_authority_proof_identity_ignores_per_role_presentation_bounds(
             "def duplicate_owner(value):\n    return value\n", encoding="utf-8"
         )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         results = [
-            codemap.task_action_map("Fix duplicate_owner", limit=20, per_role=per_role)
+            codemap.tasks.action_map("Fix duplicate_owner", limit=20, per_role=per_role)
             for per_role in (1, 2, 4)
         ]
 
@@ -572,10 +613,6 @@ def test_authority_proof_identity_ignores_per_role_presentation_bounds(
     assert len(presentation_ids) == 3
     assert all(row["ambiguity"]["ambiguous"] for row in results)
     assert all(not row["ownership_authority"]["owner_resolved"] for row in results)
-    # The selected edit candidate is reported separately; alternatives contain
-    # only the remaining competing rows. Four duplicate owners therefore produce
-    # three alternatives. Presentation bounds may truncate those alternatives,
-    # but must never change the proof identity or ambiguity decision.
     assert [len(row["ambiguity"]["alternatives"]) for row in results] == [1, 2, 3]
     assert {
         row["authority_non_interference"]["total_candidates"] for row in results
@@ -598,9 +635,9 @@ def test_resolved_authority_proof_identity_ignores_per_role_bounds(
         "def unique_owner(value):\n    return value\n", encoding="utf-8"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         results = [
-            codemap.task_action_map(
+            codemap.tasks.action_map(
                 "Refactor owner.unique_owner without changing behavior",
                 limit=20,
                 per_role=per_role,
@@ -635,11 +672,11 @@ def test_exact_owner_authority_survives_codemap_reopen(tmp_path: Path) -> None:
     state_dir = tmp_path / ".state"
 
     with CodeMap(tmp_path, state_dir=state_dir) as codemap:
-        codemap.sync()
-        cold = codemap.task_action_map(task, limit=1, per_role=1)
+        codemap.index.sync()
+        cold = codemap.tasks.action_map(task, limit=1, per_role=1)
 
     with CodeMap(tmp_path, state_dir=state_dir) as codemap:
-        warm = codemap.task_action_map(task, limit=100, per_role=5)
+        warm = codemap.tasks.action_map(task, limit=100, per_role=5)
 
     assert cold["ownership_authority"]["resolved_owner"] == "src/owner.py"
     assert warm["ownership_authority"]["resolved_owner"] == "src/owner.py"
@@ -660,11 +697,11 @@ def test_duplicate_owner_ambiguity_survives_codemap_reopen(tmp_path: Path) -> No
     state_dir = tmp_path / ".state"
 
     with CodeMap(tmp_path, state_dir=state_dir) as codemap:
-        codemap.sync()
-        cold = codemap.task_action_map(task, limit=1, per_role=1)
+        codemap.index.sync()
+        cold = codemap.tasks.action_map(task, limit=1, per_role=1)
 
     with CodeMap(tmp_path, state_dir=state_dir) as codemap:
-        warm = codemap.task_action_map(task, limit=100, per_role=5)
+        warm = codemap.tasks.action_map(task, limit=100, per_role=5)
 
     assert cold["ambiguity"]["ambiguous"] is True
     assert warm["ambiguity"]["ambiguous"] is True
@@ -677,7 +714,7 @@ def test_duplicate_owner_ambiguity_survives_codemap_reopen(tmp_path: Path) -> No
 
 
 def test_unresolved_edit_owner_cannot_rerank_verification(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
@@ -700,28 +737,35 @@ def test_unresolved_edit_owner_cannot_rerank_verification(
     task = "Fix target behavior and verify the b regression"
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        context = codemap._task_action_map_context(task, 20)
-        selection = codemap._task_action_surface_owner_state(task, context, 20, 3)
-        assert selection.owner_basis is None
-        assert selection.structural_owner is None
-        assert selection.verify is not None
-        initial_verify = str(selection.verify["path"])
-
-        def fail_if_provisional_edit_drives_verification(*_args, **_kwargs):
-            raise AssertionError(
-                "unadmitted edit must not drive verification relevance"
+        codemap.index.sync()
+        with codemap.reads.session() as _task_read_scope:
+            context = codemap.ownership.observe_candidates(
+                codemap.tasks._task_observation(task, 20), 20
             )
+            selection = codemap.ownership.nominate(task, context, 20, 3)
+            assert selection.owner_basis is None
+            assert selection.structural_owner is None
+            assert selection.verify is not None
+            initial_verify = str(selection.verify["path"])
 
-        monkeypatch.setattr(
-            codemap,
-            "_verification_relevance",
-            fail_if_provisional_edit_drives_verification,
-        )
-        choices = codemap._task_action_projection_choices(task, context, selection, 20)
+            def fail_if_provisional_edit_drives_verification(*_args, **_kwargs) -> None:
+                raise AssertionError(
+                    "unadmitted edit must not drive verification relevance"
+                )
+
+            monkeypatch.setattr(
+                codemap.verification,
+                "for_owner",
+                fail_if_provisional_edit_drives_verification,
+            )
+            choices = codemap.tasks._task_action_projection_choices(
+                task, context, selection, 20
+            )
 
     assert choices.verify is not None
     assert choices.verify["path"] == initial_verify
+    assert choices.verification_relevance["selected"] is not None
+    assert "selection_reason" in choices.verification_relevance["selected"]
     assert (
         choices.verification_relevance["selected"]["selection_reason"]
         == "canonical-verification-without-edit-owner"
@@ -756,14 +800,17 @@ def test_ranked_candidate_without_positive_proof_is_not_owner_authority(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        action = codemap.task_action_map("Change policy.evaluate behavior", limit=20)
+        codemap.index.sync()
+        action = codemap.tasks.action_map("Change policy.evaluate behavior", limit=20)
 
+    assert action["edit"] is not None
     assert action["edit"]["path"] == "src/policy.py"
     assert action["owner_basis"] is None
     assert action["ownership_authority"]["owner_resolved"] is False
     assert action["ownership_authority"]["candidate_owner"] == "src/policy.py"
+    assert action["verification_relevance"]["selected"] is not None
     assert (
         action["verification_relevance"]["selected"]["path"] == "tests/test_policy.py"
     )
+    assert "direct_reference" in action["verification_relevance"]["selected"]
     assert action["verification_relevance"]["selected"]["direct_reference"] is True

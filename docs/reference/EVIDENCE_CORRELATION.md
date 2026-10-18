@@ -51,7 +51,7 @@ Hashmarks does not ingest or retain the producing log stream. A parser, observab
 
 ## Public Python surface
 
-Use `CodeMap.correlate_evidence(...)`:
+Use `CodeMap.correlation.observe(...)`:
 
 ~~~python
 from hashmarks import CodeMap
@@ -74,14 +74,22 @@ bundles = [
 ]
 
 with CodeMap(".") as codemap:
-    codemap.sync()
-    packet = codemap.correlate_evidence(
+    codemap.index.sync()
+    packet = codemap.correlation.observe(
         bundles,
         path_mappings=[{"external_prefix": "/app", "repository_prefix": ""}],
     )
 ~~~
 
 Schema: **`hashmarks.evidence-correlation.v2`**.
+
+The CLI exposes the same request through `hashmarks correlate-evidence
+--input-json request.json`. The JSON object requires `bundles` and accepts
+`path_mappings`, `relationship_limit_per_path`, `include_relationships` and
+`previous_correlation`. Omitted options retain the CodeMap defaults. Unknown
+fields are rejected. Use `--presentation structured`, `compact` or `text` to
+include a projection alongside the canonical correlation packet. The existing
+MCP `correlate_evidence` tool exposes the same observation contract.
 
 The result contains the original claims, resolution state, canonical repository evidence from the existing repository-evidence-binding authority, source-equivalence state, completeness, provenance-bearing repository identities, and an overall correlation identity. `definition_options` retains the normalized relationship request (`include_relationships` and `relationship_limit_per_path`, which is null when relationships were not requested). A previous v2 packet is checked against its retained definition inputs, anchor-to-binding references, source-equivalence and completeness projections, and same-target correspondence before delta comparison; v1 packets are not accepted as replay input. This does not re-resolve historical anchors against the current repository state.
 
@@ -170,7 +178,7 @@ External evidence is **request-scoped and not persisted** by the correlation con
 A consumer may supply a previous correlation packet:
 
 ~~~python
-after = codemap.correlate_evidence(
+after = codemap.correlation.observe(
     bundles,
     previous_correlation=before,
 )

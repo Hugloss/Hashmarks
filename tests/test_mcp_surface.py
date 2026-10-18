@@ -4,9 +4,12 @@ import inspect
 import json
 import sys
 import types
+from collections.abc import Callable
 from pathlib import Path
+from typing import Never, NoReturn
 
 import pytest
+from contract_assertions import assert_array, assert_object, assert_records, assert_text
 
 from hashmarks import mcp_server, mcp_surface, repository_retry
 from hashmarks.codemap import CodeMap
@@ -14,10 +17,51 @@ from hashmarks.codemap.change_impact import (
     CHANGE_IMPACT_DEFAULT_REQUEST,
     ChangeImpactOptions,
 )
+from hashmarks.codemap.decision_session import RepeatedSourceChangeError
 from hashmarks.codemap.evidence_packet import TASK_EVIDENCE_DEFAULT_OPTIONS
+from hashmarks.codemap.repository_observation import packet_digest
 from hashmarks.file_store import UnstableFileError
 from hashmarks.mcp_contract import tool_contract
 from hashmarks.mcp_surface import HashmarksMcpSurface, McpSurfaceError
+
+
+def _server_surface(server: object) -> HashmarksMcpSurface:
+    surface = getattr(server, "_hashmarks_surface", None)
+    assert isinstance(surface, HashmarksMcpSurface)
+    return surface
+
+
+def _registered_tool(
+    registered: list[dict[str, object]], name: str
+) -> Callable[..., object]:
+    tool = next(row["fn"] for row in registered if row["name"] == name)
+    assert callable(tool)
+    return tool
+
+
+def _install_sdk(
+    monkeypatch: pytest.MonkeyPatch,
+    server_type: type,
+    error_type: type[Exception],
+    annotations_type: type,
+) -> None:
+    modules = {
+        name: types.ModuleType(name)
+        for name in (
+            "mcp",
+            "mcp.server",
+            "mcp.server.mcpserver",
+            "mcp.server.mcpserver.exceptions",
+            "mcp.types",
+        )
+    }
+    vars(modules["mcp.server"])["MCPServer"] = server_type
+    vars(modules["mcp.server.mcpserver.exceptions"])["ToolError"] = error_type
+    vars(modules["mcp.types"]).update(
+        ToolAnnotations=annotations_type, CallToolResult=object
+    )
+    for name, module in modules.items():
+        monkeypatch.setitem(sys.modules, name, module)
 
 
 def _repo(tmp_path: Path) -> Path:
@@ -46,7 +90,9 @@ def test_mcp_surface_exposes_only_bounded_repository_intelligence(
 
         found = surface.find("flare041", limit=5)
         assert found["schema"] == "hashmarks.find.v2"
-        assert any(row["path"] == "src/feature.py" for row in found["results"])
+        assert any(
+            row["path"] == "src/feature.py" for row in assert_records(found["results"])
+        )
 
         evidence = surface.task_evidence("change flare041 behavior", token_budget=256)
         assert evidence["schema"] == "hashmarks.task-evidence.v5"
@@ -83,7 +129,7 @@ def test_mcp_change_impact_consumes_canonical_semantic_defaults(
         )
         return {"schema": "hashmarks.task-change-impact.v1"}
 
-    monkeypatch.setattr(surface._map, "task_change_impact", project)
+    monkeypatch.setattr(surface._map.changes, "task_impact", project)
     try:
         surface.change_impact("inspect widget", ["src/widget.py"])
     finally:
@@ -117,7 +163,10 @@ def test_mcp_surface_rejects_unbounded_or_empty_inputs(tmp_path: Path) -> None:
             surface.find("flare041", limit=51)
         with pytest.raises(McpSurfaceError, match="changed_paths exceeds"):
             surface.change_impact("task", [f"p{i}.py" for i in range(257)])
-        huge = {"schema": "hashmarks.task-evidence.v5", "payload": "x" * 300_000}
+        huge: dict[str, object] = {
+            "schema": "hashmarks.task-evidence.v5",
+            "payload": "x" * 300_000,
+        }
         with pytest.raises(McpSurfaceError, match="encoded bytes"):
             surface.post_change("task", ["src/feature.py"], huge)
         with pytest.raises((ValueError, McpSurfaceError)):
@@ -154,15 +203,17 @@ def test_mcp_surface_correlates_external_evidence_without_interpreting_it(
             path_mappings=[{"external_prefix": "/app", "repository_prefix": ""}],
             include_relationships=False,
         )
-        anchor = packet["bundles"][0]["anchors"][0]
+        anchor = assert_records(assert_records(packet["bundles"])[0]["anchors"])[0]
         assert packet["schema"] == "hashmarks.evidence-correlation.v2"
         assert packet["causation"] == "not-inferred"
         assert packet["interpretation_authority"] == "consumer-owned"
-        assert anchor["resolution"]["repository_path"] == "src/feature.py"
-        assert anchor["source_equivalence"]["state"] == "unknown"
+        assert (
+            assert_object(anchor["resolution"])["repository_path"] == "src/feature.py"
+        )
+        assert assert_object(anchor["source_equivalence"])["state"] == "unknown"
 
         with pytest.raises(McpSurfaceError, match="bundles must be a list"):
-            surface.correlate_evidence({})  # type: ignore[arg-type]
+            surface.correlate_evidence(json.loads("{}"))
         with pytest.raises(McpSurfaceError, match="relationship_limit_per_path"):
             surface.correlate_evidence([], relationship_limit_per_path=1001)
     finally:
@@ -203,10 +254,10 @@ def test_mcp_correlation_accepts_core_legal_request_above_old_transport_cap(
         surface.close()
 
     assert packet["schema"] == "hashmarks.evidence-correlation.v2"
-    assert packet["bounds"]["request_max_bytes"] == 1_048_576
+    assert assert_object(packet["bounds"])["request_max_bytes"] == 1_048_576
     assert all(
-        anchor["resolution"]["state"] == "unresolved"
-        for anchor in packet["bundles"][0]["anchors"]
+        assert_object(anchor["resolution"])["state"] == "unresolved"
+        for anchor in assert_records(assert_records(packet["bundles"])[0]["anchors"])
     )
 
 
@@ -249,9 +300,11 @@ def test_mcp_correlation_round_trips_max_repeated_anchor_set(
     finally:
         surface.close()
 
-    assert len(before["repository_evidence"]["bindings"]) == 1
     assert (
-        after["delta_from_previous"]["schema"]
+        len(assert_array(assert_object(before["repository_evidence"])["bindings"])) == 1
+    )
+    assert (
+        assert_object(after["delta_from_previous"])["schema"]
         == "hashmarks.evidence-correlation-delta.v2"
     )
 
@@ -265,9 +318,9 @@ def test_mcp_find_truncated_only_when_an_extra_hit_exists(tmp_path: Path) -> Non
     surface = HashmarksMcpSurface(str(repo), state_dir=str(tmp_path / "state"))
     try:
         one = surface.find("flare041", limit=1)
-        assert len(one["results"]) == 1
+        assert len(assert_array(one["results"])) == 1
         assert one["truncated"] is True
-        assert "find-result-limit" in one["omissions"]
+        assert "find-result-limit" in assert_array(one["omissions"])
         assert one["uniqueness_evidence"] == "not-admissible"
 
         exact = surface.find("feature_two.py", limit=10)
@@ -290,7 +343,7 @@ def test_mcp_find_qualifies_absence_and_uniqueness_against_freshness(
             generation = surface._map.store.generation()
             return generation, generation, False
 
-        monkeypatch.setattr(surface._map, "_generation_status", current_generation)
+        monkeypatch.setattr(surface._map.reads, "generation_status", current_generation)
 
         missing = surface.find("definitely_missing_symbol", limit=10)
         assert missing["query_intent"] == "identifier"
@@ -307,7 +360,9 @@ def test_mcp_find_qualifies_absence_and_uniqueness_against_freshness(
 
         conceptual = surface.find("where is definitely_missing behavior", limit=10)
         assert conceptual["negative_evidence"] == "not-admissible"
-        assert "query-intent-not-exact" in conceptual["admissibility_reasons"]
+        assert "query-intent-not-exact" in assert_array(
+            conceptual["admissibility_reasons"]
+        )
     finally:
         surface.close()
 
@@ -327,6 +382,7 @@ def test_mcp_find_qualifies_absence_and_uniqueness_against_freshness(
         ),
         RuntimeError("CodeMap generation changed during decision session"),
         UnstableFileError("file changed while hashing: src/feature.py"),
+        RepeatedSourceChangeError("src/feature.py"),
     ],
 )
 def test_mcp_transient_repository_races_are_retried_from_scratch(
@@ -357,6 +413,12 @@ def test_mcp_retry_does_not_hide_unrelated_runtime_failures() -> None:
     with pytest.raises(RuntimeError, match="real implementation failure"):
         repository_retry.retry_transient_repository_race(operation)
     assert calls == 1
+
+
+def test_source_drift_message_alone_does_not_authorize_recomputation() -> None:
+    assert not repository_retry.is_transient_repository_race(
+        RuntimeError("CodeMap path remained stale after refresh: src/feature.py")
+    )
 
 
 def test_mcp_retry_propagates_unrelated_failure_after_transient_race() -> None:
@@ -465,7 +527,7 @@ def test_mcp_surface_classifies_exhausted_transient_race(
         str(_repo(tmp_path)), state_dir=str(tmp_path / "state")
     )
 
-    def exhausted(_operation):
+    def exhausted(_operation: Callable[..., object]) -> Never:
         raise RuntimeError("CodeMap generation changed during decision session")
 
     monkeypatch.setattr(mcp_surface, "retry_transient_repository_race", exhausted)
@@ -523,7 +585,7 @@ def test_mcp_surface_read_centralizes_gate_and_retry(
     )
     calls: list[object] = []
 
-    def fake_retry(operation):
+    def fake_retry(operation: Callable[..., object]) -> str:
         calls.append(operation)
         return "fresh"
 
@@ -539,10 +601,10 @@ def test_mcp_server_boundary_translates_only_surface_errors() -> None:
     class FakeToolError(Exception):
         pass
 
-    def invalid() -> None:
+    def invalid() -> NoReturn:
         raise McpSurfaceError("invalid query")
 
-    def broken() -> None:
+    def broken() -> NoReturn:
         raise RuntimeError("implementation bug")
 
     with pytest.raises(FakeToolError, match="invalid query") as translated:
@@ -570,6 +632,7 @@ def _assert_registered_task_evidence_defaults(
     task_evidence_tool = next(
         row["fn"] for row in registered if row["name"] == "task_evidence"
     )
+    assert callable(task_evidence_tool)
     parameters = inspect.signature(task_evidence_tool).parameters
     defaults = TASK_EVIDENCE_DEFAULT_OPTIONS
     assert parameters["limit"].default == defaults.limit
@@ -587,6 +650,7 @@ def _assert_registered_change_impact_defaults(
     change_impact_tool = next(
         row["fn"] for row in registered if row["name"] == "change_impact"
     )
+    assert callable(change_impact_tool)
     parameters = inspect.signature(change_impact_tool).parameters
     assert parameters["max_depth"].default == defaults.options.max_depth
 
@@ -613,8 +677,10 @@ def test_mcp_server_registers_exact_small_read_only_tool_catalog(
             self.description = kwargs.get("description")
             self.instructions = kwargs.get("instructions")
 
-        def tool(self, **metadata):
-            def decorate(fn):
+        def tool(
+            self, **metadata: object
+        ) -> Callable[[Callable[..., object]], Callable[..., object]]:
+            def decorate(fn: Callable[..., object]) -> Callable[..., object]:
                 registered.append({"fn": fn, **metadata})
                 return fn
 
@@ -626,21 +692,7 @@ def test_mcp_server_registers_exact_small_read_only_tool_catalog(
     class FakeToolError(Exception):
         pass
 
-    mcp_module = types.ModuleType("mcp")
-    server_module = types.ModuleType("mcp.server")
-    mcpserver_module = types.ModuleType("mcp.server.mcpserver")
-    exceptions_module = types.ModuleType("mcp.server.mcpserver.exceptions")
-    types_module = types.ModuleType("mcp.types")
-    server_module.MCPServer = FakeMCPServer
-    exceptions_module.ToolError = FakeToolError
-    types_module.ToolAnnotations = FakeToolAnnotations
-    monkeypatch.setitem(sys.modules, "mcp", mcp_module)
-    monkeypatch.setitem(sys.modules, "mcp.server", server_module)
-    monkeypatch.setitem(sys.modules, "mcp.server.mcpserver", mcpserver_module)
-    monkeypatch.setitem(
-        sys.modules, "mcp.server.mcpserver.exceptions", exceptions_module
-    )
-    monkeypatch.setitem(sys.modules, "mcp.types", types_module)
+    _install_sdk(monkeypatch, FakeMCPServer, FakeToolError, FakeToolAnnotations)
 
     from hashmarks.mcp_server import build_server
 
@@ -676,6 +728,7 @@ def test_mcp_server_registers_exact_small_read_only_tool_catalog(
         ]
         for row in registered:
             annotations = row["annotations"]
+            assert isinstance(annotations, FakeToolAnnotations)
             assert annotations.values == {
                 "read_only_hint": True,
                 "destructive_hint": False,
@@ -687,23 +740,19 @@ def test_mcp_server_registers_exact_small_read_only_tool_catalog(
         _assert_registered_public_defaults(registered)
 
         with pytest.raises(FakeToolError, match="query must not be empty"):
-            next(row["fn"] for row in registered if row["name"] == "find")(" ", limit=5)
+            _registered_tool(registered, "find")(" ", limit=5)
         with pytest.raises(McpSurfaceError, match="query must not be empty"):
-            server._hashmarks_surface.find(" ", limit=5)
+            _server_surface(server).find(" ", limit=5)
 
-        dependency_tool = next(
-            row["fn"] for row in registered if row["name"] == "dependency_codemap"
-        )
-        declaration_tool = next(
-            row["fn"] for row in registered if row["name"] == "repository_declarations"
-        )
+        dependency_tool = _registered_tool(registered, "dependency_codemap")
+        declaration_tool = _registered_tool(registered, "repository_declarations")
         with pytest.raises(FakeToolError, match="result_mode must be one of"):
             dependency_tool({}, result_mode="history")
         with pytest.raises(FakeToolError, match="result_mode must be one of"):
             declaration_tool([], result_mode="compare")
 
     finally:
-        server._hashmarks_surface.close()
+        _server_surface(server).close()
 
 
 def test_mcp_server_rejects_mode_specific_response_schema_drift(
@@ -719,8 +768,10 @@ def test_mcp_server_rejects_mode_specific_response_schema_drift(
         def __init__(self, _name: str, **_kwargs):
             pass
 
-        def tool(self, **metadata):
-            def decorate(fn):
+        def tool(
+            self, **metadata: object
+        ) -> Callable[[Callable[..., object]], Callable[..., object]]:
+            def decorate(fn: Callable[..., object]) -> Callable[..., object]:
                 registered.append({"fn": fn, **metadata})
                 return fn
 
@@ -729,34 +780,22 @@ def test_mcp_server_rejects_mode_specific_response_schema_drift(
     class FakeToolError(Exception):
         pass
 
-    mcp_module = types.ModuleType("mcp")
-    server_module = types.ModuleType("mcp.server")
-    mcpserver_module = types.ModuleType("mcp.server.mcpserver")
-    exceptions_module = types.ModuleType("mcp.server.mcpserver.exceptions")
-    types_module = types.ModuleType("mcp.types")
-    server_module.MCPServer = FakeMCPServer
-    exceptions_module.ToolError = FakeToolError
-    types_module.ToolAnnotations = FakeToolAnnotations
-    monkeypatch.setitem(sys.modules, "mcp", mcp_module)
-    monkeypatch.setitem(sys.modules, "mcp.server", server_module)
-    monkeypatch.setitem(sys.modules, "mcp.server.mcpserver", mcpserver_module)
-    monkeypatch.setitem(
-        sys.modules, "mcp.server.mcpserver.exceptions", exceptions_module
-    )
-    monkeypatch.setitem(sys.modules, "mcp.types", types_module)
+    _install_sdk(monkeypatch, FakeMCPServer, FakeToolError, FakeToolAnnotations)
 
     server = mcp_server.build_server(_repo(tmp_path), state_dir=tmp_path / "state")
     try:
-        server._hashmarks_surface.dependency_codemap = lambda *_args, **_kwargs: {
-            "schema": "hashmarks.dependency-resolution-explain.v1"
-        }
-        tool = next(
-            row["fn"] for row in registered if row["name"] == "dependency_codemap"
+        monkeypatch.setattr(
+            _server_surface(server),
+            "dependency_codemap",
+            lambda *_args, **_kwargs: {
+                "schema": "hashmarks.dependency-resolution-explain.v1"
+            },
         )
+        tool = _registered_tool(registered, "dependency_codemap")
         with pytest.raises(RuntimeError, match="response schema drift"):
             tool({}, result_mode="compare")
     finally:
-        server._hashmarks_surface.close()
+        _server_surface(server).close()
 
 
 def test_mcp_server_construction_does_not_scan_or_build_repository(
@@ -781,8 +820,10 @@ def test_mcp_server_construction_does_not_scan_or_build_repository(
             self.description = kwargs.get("description")
             self.instructions = kwargs.get("instructions")
 
-        def tool(self, **metadata):
-            def decorate(fn):
+        def tool(
+            self, **metadata: object
+        ) -> Callable[[Callable[..., object]], Callable[..., object]]:
+            def decorate(fn: Callable[..., object]) -> Callable[..., object]:
                 registered.append(str(metadata["name"]))
                 return fn
 
@@ -791,21 +832,7 @@ def test_mcp_server_construction_does_not_scan_or_build_repository(
     class FakeToolError(Exception):
         pass
 
-    mcp_module = types.ModuleType("mcp")
-    server_module = types.ModuleType("mcp.server")
-    mcpserver_module = types.ModuleType("mcp.server.mcpserver")
-    exceptions_module = types.ModuleType("mcp.server.mcpserver.exceptions")
-    types_module = types.ModuleType("mcp.types")
-    server_module.MCPServer = FakeMCPServer
-    exceptions_module.ToolError = FakeToolError
-    types_module.ToolAnnotations = FakeToolAnnotations
-    monkeypatch.setitem(sys.modules, "mcp", mcp_module)
-    monkeypatch.setitem(sys.modules, "mcp.server", server_module)
-    monkeypatch.setitem(sys.modules, "mcp.server.mcpserver", mcpserver_module)
-    monkeypatch.setitem(
-        sys.modules, "mcp.server.mcpserver.exceptions", exceptions_module
-    )
-    monkeypatch.setitem(sys.modules, "mcp.types", types_module)
+    _install_sdk(monkeypatch, FakeMCPServer, FakeToolError, FakeToolAnnotations)
 
     from hashmarks.mcp_server import build_server
 
@@ -829,13 +856,13 @@ def test_mcp_server_construction_does_not_scan_or_build_repository(
             "evidence_comparison",
         ]
         # Construction may initialize empty SQLite files, but it must not build a generation.
-        status = server._hashmarks_surface._map.status()
+        status = _server_surface(server)._map.views.status()
         assert status["generation"] == 0
-        assert status["build"]["state"] == "NEVER_SYNCED"
-        assert status["build"]["complete"] is False
+        assert assert_object(status["build"])["state"] == "NEVER_SYNCED"
+        assert assert_object(status["build"])["complete"] is False
         assert status["files"] == 0
     finally:
-        server._hashmarks_surface.close()
+        _server_surface(server).close()
 
 
 def test_mcp_task_evidence_preserves_canonical_authority_proof_identity(
@@ -846,7 +873,7 @@ def test_mcp_task_evidence_preserves_canonical_authority_proof_identity(
     try:
         task = "change flare041 behavior"
         direct = surface._read(
-            lambda: surface._map.task_action_map(task, limit=20, per_role=3)
+            lambda: surface._map.tasks.action_map(task, limit=20, per_role=3)
         )
         evidence = surface.task_evidence(task, token_budget=256)
     finally:
@@ -981,12 +1008,27 @@ def test_mcp_surface_qualifies_and_queries_dependency_codemap(tmp_path: Path) ->
         surface.close()
 
     assert packet["schema"] == "hashmarks.dependency-codemap.v1"
-    assert packet["observation"]["schema"] == "hashmarks.dependency-resolution.v3"
+    assert (
+        assert_object(packet["observation"])["schema"]
+        == "hashmarks.dependency-resolution.v3"
+    )
     assert packet["producer_authority"] == "caller-claimed"
-    assert packet["observation"]["producer_authority"] == "caller-claimed"
-    assert packet["queries"]["results"][0]["result"][0]["node_id"] == "lib@1"
-    assert packet["queries"]["producer_authority"] == "caller-claimed"
-    assert packet["queries"]["results"][0]["producer_authority"] == "caller-claimed"
+    assert (
+        assert_object(packet["observation"])["producer_authority"] == "caller-claimed"
+    )
+    assert (
+        assert_records(
+            assert_records(assert_object(packet["queries"])["results"])[0]["result"]
+        )[0]["node_id"]
+        == "lib@1"
+    )
+    assert assert_object(packet["queries"])["producer_authority"] == "caller-claimed"
+    assert (
+        assert_records(assert_object(packet["queries"])["results"])[0][
+            "producer_authority"
+        ]
+        == "caller-claimed"
+    )
     assert packet["causation"] == "not-inferred"
 
 
@@ -1057,7 +1099,7 @@ def test_mcp_dependency_codemap_explain_and_compare_reuse_core_authority(
         explained = surface.dependency_codemap(snapshot, result_mode="explain")
         compared = surface.dependency_codemap(
             changed,
-            previous_observation=observed["observation"],
+            previous_observation=assert_object(observed["observation"]),
             result_mode="compare",
         )
 
@@ -1081,7 +1123,7 @@ def test_mcp_dependency_codemap_explain_and_compare_reuse_core_authority(
         ):
             surface.dependency_codemap(
                 snapshot,
-                previous_observation=observed["observation"],
+                previous_observation=assert_object(observed["observation"]),
             )
         with pytest.raises(McpSurfaceError, match="result_mode must be one of"):
             surface.dependency_codemap(snapshot, result_mode="history")
@@ -1091,18 +1133,18 @@ def test_mcp_dependency_codemap_explain_and_compare_reuse_core_authority(
     assert observed["schema"] == "hashmarks.dependency-codemap.v1"
     assert explained["schema"] == "hashmarks.dependency-resolution-explain.v1"
     assert (
-        explained["semantic_result"]["observation_identity"]
-        == observed["observation"]["observation_identity"]
+        assert_object(explained["semantic_result"])["observation_identity"]
+        == assert_object(observed["observation"])["observation_identity"]
     )
     assert compared["schema"] == "hashmarks.dependency-resolution-delta.v3"
     assert compared["comparability"] == "comparable"
-    assert compared["change_axes"]["semantic_definition"] == "unchanged"
-    assert compared["change_axes"]["semantic_resolution"] == "changed"
-    transition = compared["component_selection_transitions"]
+    assert assert_object(compared["change_axes"])["semantic_definition"] == "unchanged"
+    assert assert_object(compared["change_axes"])["semantic_resolution"] == "changed"
+    transition = assert_records(compared["component_selection_transitions"])
     assert len(transition) == 1
     assert transition[0]["component_id"] == "lib"
-    assert [row["version"] for row in transition[0]["removed"]] == ["1"]
-    assert [row["version"] for row in transition[0]["added"]] == ["2"]
+    assert [row["version"] for row in assert_records(transition[0]["removed"])] == ["1"]
+    assert [row["version"] for row in assert_records(transition[0]["added"])] == ["2"]
     assert transition[0]["changed"] == []
 
 
@@ -1165,15 +1207,18 @@ def test_mcp_surface_projects_repository_declarations_without_choosing_winner(
     try:
         packet = surface.repository_declarations(groups)
         with pytest.raises(McpSurfaceError, match="groups must be a list"):
-            surface.repository_declarations({})  # type: ignore[arg-type]
+            surface.repository_declarations(json.loads("{}"))
     finally:
         surface.close()
 
     assert packet["schema"] == "hashmarks.repository-declarations.v1"
-    assert packet["groups"][0]["comparison"]["state"] == "differing"
+    assert (
+        assert_object(assert_records(packet["groups"])[0]["comparison"])["state"]
+        == "differing"
+    )
     assert all(
-        row["semantic_declaration_identity"].startswith("sha256:")
-        for row in packet["groups"][0]["declarations"]
+        assert_text(row["semantic_declaration_identity"]).startswith("sha256:")
+        for row in assert_records(assert_records(packet["groups"])[0]["declarations"])
     )
     assert packet["winner"] == "not-selected"
     assert packet["interpretation_authority"] == "consumer-owned"
@@ -1243,7 +1288,7 @@ def test_mcp_repository_declarations_explain_reuses_typed_projection(
     assert observation["schema"] == "hashmarks.repository-declarations.v1"
     assert explanation["schema"] == "hashmarks.repository-declaration-explain.v1"
     assert (
-        explanation["semantic_result"]["observation_identity"]
+        assert_object(explanation["semantic_result"])["observation_identity"]
         == observation["observation_identity"]
     )
     assert explanation["semantic_value_authority"] == "provider-claimed"
@@ -1265,8 +1310,8 @@ def test_mcp_correlation_preserves_core_authority_and_completeness(
         }
     ]
     with CodeMap(repo) as codemap:
-        codemap.sync()
-        core = codemap.correlate_evidence(bundles, include_relationships=False)
+        codemap.index.sync()
+        core = codemap.correlation.observe(bundles, include_relationships=False)
     surface = HashmarksMcpSurface(str(repo), state_dir=str(tmp_path / "mcp-state"))
     try:
         projected = surface.correlate_evidence(bundles, include_relationships=False)
@@ -1283,7 +1328,10 @@ def test_mcp_correlation_preserves_core_authority_and_completeness(
         "execution_effect",
     ):
         assert projected[key] == core[key]
-    assert projected["completeness"]["negative_evidence"] == "not-admissible"
+    assert (
+        assert_object(projected["completeness"])["negative_evidence"]
+        == "not-admissible"
+    )
 
 
 def test_mcp_correlation_rejects_recomputed_outer_identity_over_tampered_nested_evidence(
@@ -1309,7 +1357,7 @@ def test_mcp_correlation_rejects_recomputed_outer_identity_over_tampered_nested_
         tampered["repository_evidence"]["bindings"][0]["binding_id"] = (
             "repository-evidence:forged"
         )
-        tampered["correlation_identity"] = "sha256:" + surface._map._packet_digest(
+        tampered["correlation_identity"] = "sha256:" + packet_digest(
             "hashmarks.evidence-correlation.v2",
             {
                 key: value

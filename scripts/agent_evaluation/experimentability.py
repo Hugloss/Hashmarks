@@ -198,19 +198,14 @@ def classify_decision(packet: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def decision_trace(packet: Mapping[str, Any]) -> dict[str, Any]:
-    identity = (
-        packet.get("identity") if isinstance(packet.get("identity"), Mapping) else {}
-    )
+    raw_identity = packet.get("identity")
+    identity = raw_identity if isinstance(raw_identity, Mapping) else {}
+    raw_discrimination = packet.get("discrimination")
     discrimination = (
-        packet.get("discrimination")
-        if isinstance(packet.get("discrimination"), Mapping)
-        else {}
+        raw_discrimination if isinstance(raw_discrimination, Mapping) else {}
     )
-    candidates = (
-        discrimination.get("candidates")
-        if isinstance(discrimination.get("candidates"), list)
-        else []
-    )
+    raw_candidates = discrimination.get("candidates")
+    candidates = raw_candidates if isinstance(raw_candidates, list) else []
     emitted = []
     for key in ("edit", "verify", "contract"):
         row = packet.get(key)

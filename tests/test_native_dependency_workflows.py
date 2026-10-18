@@ -19,7 +19,7 @@ from hashmarks.codemap import CodeMap
 from hashmarks.evidence_presentation import FORMATS, present_repository_evidence
 
 
-def reactor_capture(root: Path, source: Path, paths: list[str]) -> Any:
+def reactor_capture(root: Path, source: Path, paths: list[str]) -> dict[str, object]:
     contexts = ("alpha", "beta")
     return maven_dependency_observation(
         trees={
@@ -36,7 +36,9 @@ def reactor_capture(root: Path, source: Path, paths: list[str]) -> Any:
     )
 
 
-def _maven_capture(root: Path, source: Path, paths: list[str], scenario: str) -> Any:
+def _maven_capture(
+    root: Path, source: Path, paths: list[str], scenario: str
+) -> dict[str, object]:
     if scenario == "multi-module":
         return reactor_capture(root, source, paths)
     return dependency_capture("maven", source, input_revisions(root, paths))
@@ -52,12 +54,12 @@ def test_maven_manifest_replacement_stale_bindings_and_downstream_transitions(
         root, source, materialize_dependency(root, source), scenario
     )
     with CodeMap(root, state_dir=state) as cm:
-        cm.sync()
-        before: Any = cm.dependency_resolution_evidence(original)
+        cm.index.sync()
+        before: Any = cm.dependencies.observe(original)
         after_source = native_dependency_corpus / "maven" / scenario / "after"
         materialize_dependency(root, after_source)
-        cm.sync()
-        stale: Any = cm.dependency_resolution_evidence(original)
+        cm.index.sync()
+        stale: Any = cm.dependencies.observe(original)
         mismatches = {
             row["path"]
             for row in stale["repository_inputs"]
@@ -72,9 +74,9 @@ def test_maven_manifest_replacement_stale_bindings_and_downstream_transitions(
             sorted(path.relative_to(root).as_posix() for path in root.rglob("pom.xml")),
             scenario,
         )
-        after: Any = cm.dependency_resolution_evidence(raw)
-        delta: Any = cm.dependency_resolution_delta(before, after)
-        graphs: Any = cm.dependency_resolution_queries(
+        after: Any = cm.dependencies.observe(raw)
+        delta: Any = cm.dependencies.delta(before, after)
+        graphs: Any = cm.dependencies.queries(
             after,
             [
                 {
@@ -85,7 +87,7 @@ def test_maven_manifest_replacement_stale_bindings_and_downstream_transitions(
                 for row in after["roots"]
             ],
         )
-        bounded: Any = cm.dependency_resolution_queries(
+        bounded: Any = cm.dependencies.queries(
             after,
             [
                 {
@@ -138,7 +140,7 @@ def test_maven_manifest_replacement_stale_bindings_and_downstream_transitions(
         )
     with CodeMap(root, state_dir=state) as cm:
         assert semantic_dependency_fields(
-            cm.dependency_resolution_evidence(raw)
+            cm.dependencies.observe(raw)
         ) == semantic_dependency_fields(after)
 
 
@@ -160,8 +162,8 @@ def test_uv_workspace_changes_observe_selection_and_preserve_unknown_module_owne
         assert (root / "packages/orphan/pyproject.toml").exists() == orphan
         raw = dependency_capture("uv", source, input_revisions(root, paths))
         with CodeMap(root, state_dir=state) as cm:
-            cm.sync()
-            current: Any = cm.dependency_resolution_evidence(raw)
+            cm.index.sync()
+            current: Any = cm.dependencies.observe(raw)
             library = next(
                 row
                 for row in current["selections"]
@@ -182,12 +184,12 @@ def test_uv_workspace_changes_observe_selection_and_preserve_unknown_module_owne
                 == orphan
             )
             if previous is not None:
-                reused: Any = cm.dependency_resolution_evidence(old_raw)
+                reused: Any = cm.dependencies.observe(old_raw)
                 assert any(
                     row["source_equivalence"] != "proven"
                     for row in reused["repository_inputs"]
                 )
-                delta: Any = cm.dependency_resolution_delta(previous, current)
+                delta: Any = cm.dependencies.delta(previous, current)
                 assert delta["change_axes"]["repository_inputs"] == "changed"
                 if name == "version":
                     assert len(delta["component_selection_transitions"]) == 1
@@ -195,9 +197,9 @@ def test_uv_workspace_changes_observe_selection_and_preserve_unknown_module_owne
                     assert delta["components_removed"] == ["workspace-orphan"]
                 assert_projection(delta, "dependency_codemap", "compare")
         with CodeMap(root, state_dir=tmp_path / ("fresh-" + name)) as cm:
-            cm.sync()
+            cm.index.sync()
             assert semantic_dependency_fields(
-                cm.dependency_resolution_evidence(raw)
+                cm.dependencies.observe(raw)
             ) == semantic_dependency_fields(current)
         previous, old_raw = current, raw
     source = native_dependency_corpus / "uv" / "workspace" / "rootless"

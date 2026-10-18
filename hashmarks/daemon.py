@@ -7,7 +7,7 @@ import secrets
 import socket
 import socketserver
 import threading
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 from .client import default_socket_path, prepare_default_state_dir
 from .engine import IdentityEngine
@@ -41,25 +41,39 @@ _MAX_REGISTERED_MANIFESTS = 1024
 
 _UNIX_STREAM_SERVER = getattr(socketserver, "UnixStreamServer", None)
 
-if _UNIX_STREAM_SERVER is not None:
 
-    class _UnixServer(socketserver.ThreadingMixIn, _UNIX_STREAM_SERVER):
-        """Thread-per-request Unix socket owner with explicit state locking."""
+class _ResponseStream(Protocol):
+    def write(self, data: bytes, /) -> object: ...
 
-        allow_reuse_address = False
-        request_queue_size = 128
-        daemon_threads = False
-        block_on_close = True
+    def flush(self) -> None: ...
 
+
+# BaseServer is an import-safe class base only. Public startup still rejects
+# platforms without UnixStreamServer before constructing a listening server.
+if TYPE_CHECKING:
+    from socketserver import BaseServer as _IdentityServerBase
 else:
+    _IdentityServerBase = getattr(
+        socketserver, "UnixStreamServer", socketserver.BaseServer
+    )
 
-    class _UnixServer:
-        """Import-safe placeholder when the platform has no Unix socket server."""
+
+class _UnixServer(socketserver.ThreadingMixIn, _IdentityServerBase):
+    """Thread-per-request Unix socket owner with explicit state locking."""
+
+    allow_reuse_address = False
+    request_queue_size = 128
+    daemon_threads = False
+    block_on_close = True
+    identity_daemon: IdentityDaemon
 
 
 class _RequestHandler(socketserver.StreamRequestHandler):
     def handle(self) -> None:
-        daemon: IdentityDaemon = self.server.identity_daemon  # type: ignore[attr-defined]
+        server = self.server
+        if not isinstance(server, _UnixServer):
+            raise RuntimeError("identity request requires the identity daemon server")
+        daemon = server.identity_daemon
         raw = self.rfile.readline(_MAX_REQUEST + 1)
         if len(raw) > _MAX_REQUEST:
             daemon._write_response(
@@ -117,7 +131,7 @@ class IdentityDaemon:
         self._request_count = 0
 
     @staticmethod
-    def _write_response(stream, response: dict[str, Any]) -> None:
+    def _write_response(stream: _ResponseStream, response: dict[str, object]) -> None:
         stream.write(
             (json.dumps(response, separators=(",", ":"), sort_keys=True) + "\n").encode(
                 "utf-8"
@@ -358,7 +372,7 @@ class IdentityDaemon:
             "stop": self._stop_response,
         }
         op = request.get("op")
-        handler = handlers.get(op)
+        handler = handlers.get(op) if isinstance(op, str) else None
         if handler is None:
             raise ValueError(f"unknown operation: {op!r}")
         return handler(request)
@@ -395,7 +409,7 @@ class IdentityDaemon:
         self._watcher = watcher
         try:
             server = _UnixServer(str(self.socket_path), _RequestHandler)
-            server.identity_daemon = self  # type: ignore[attr-defined]
+            server.identity_daemon = self
             self._server = server
             os.chmod(self.socket_path, 0o600)
             server.serve_forever(poll_interval=0.1)

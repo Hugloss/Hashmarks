@@ -4,6 +4,8 @@ import os
 import zipfile
 from pathlib import Path
 
+from contract_assertions import assert_array, assert_records
+
 from hashmarks.producer_identity import (
     PRODUCER_IDENTITY_PROVENANCE_SCHEMA,
     _producer_implementation_identity_from_resource,
@@ -20,7 +22,7 @@ def _package(root: Path, *, engine: str = "VALUE = 1\n") -> Path:
 
 
 def _rows(receipt: dict[str, object]) -> dict[str, dict[str, object]]:
-    return {str(row["path"]): row for row in receipt["inputs"]}  # type: ignore[index]
+    return {str(row["path"]): row for row in assert_records(receipt["inputs"])}  # type: ignore[index]
 
 
 def test_producer_identity_provenance_explains_same_version_byte_drift(
@@ -100,8 +102,8 @@ def test_producer_identity_provenance_is_relative_bounded_metadata() -> None:
     assert (
         receipt["implementation_identity"] == native_producer_implementation_identity()
     )
-    assert receipt["input_count"] == len(receipt["inputs"])
-    for row in receipt["inputs"]:  # type: ignore[union-attr]
+    assert receipt["input_count"] == len(assert_array(receipt["inputs"]))
+    for row in assert_records(receipt["inputs"]):
         path = str(row["path"])
         assert not Path(path).is_absolute()
         assert ".." not in Path(path).parts

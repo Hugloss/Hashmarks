@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -75,7 +76,7 @@ def _trace(
     ],
 )
 def test_trace_rejects_malformed_evidence(
-    tmp_path: Path, mutation, message: str
+    tmp_path: Path, mutation: Callable[[dict[str, object]], None], message: str
 ) -> None:
     path = _trace(tmp_path / "trace.json", "baseline")
     value = json.loads(path.read_text())

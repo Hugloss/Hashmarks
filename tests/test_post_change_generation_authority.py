@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.model import SyncResult
 
 
 def _repo(root: Path) -> tuple[Path, Path, str]:
@@ -27,24 +28,24 @@ def _install_competing_writer(
     other: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    original_sync = reader.sync
+    original_sync = reader.index.sync
 
-    def racing_sync(paths=None):
+    def racing_sync(paths: list[str] | None = None) -> SyncResult:
         result = original_sync(paths)
         other.write_text("def other(): return 'new'\n", encoding="utf-8")
-        writer.sync(["src/other.py"])
+        writer.index.sync(["src/other.py"])
         return result
 
-    monkeypatch.setattr(reader, "sync", racing_sync)
+    monkeypatch.setattr(reader.index, "sync", racing_sync)
 
 
 @pytest.mark.parametrize(
     "method_name",
     [
-        "task_change_impact",
-        "refresh_after_change",
-        "refresh_after_change_brief",
-        "refresh_after_change_delta",
+        "task_impact",
+        "refresh",
+        "refresh_brief",
+        "refresh_delta",
     ],
 )
 def test_post_sync_composition_rejects_competing_generation(
@@ -59,11 +60,11 @@ def test_post_sync_composition_rejects_competing_generation(
         CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as reader,
         CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as writer,
     ):
-        reader.sync()
+        reader.index.sync()
         source.write_text("def widget(): return 'new'\n", encoding="utf-8")
         _install_competing_writer(reader, writer, other, monkeypatch)
 
-        operation = getattr(reader, method_name)
+        operation = getattr(reader.changes, method_name)
         with pytest.raises(
             RuntimeError,
             match="CodeMap generation changed before expected decision session",
@@ -82,8 +83,8 @@ def test_post_change_delta_rejects_competing_generation_after_sync(
         CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as reader,
         CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as writer,
     ):
-        reader.sync()
-        previous = reader.task_evidence(task)
+        reader.index.sync()
+        previous = reader.tasks.evidence(task)
         source.write_text("def widget(): return 'new'\n", encoding="utf-8")
         _install_competing_writer(reader, writer, other, monkeypatch)
 
@@ -91,11 +92,44 @@ def test_post_change_delta_rejects_competing_generation_after_sync(
             RuntimeError,
             match="CodeMap generation changed before expected decision session",
         ):
-            reader.task_post_change_delta(
+            reader.changes.task_delta(
                 task,
                 ["src/owner.py"],
                 previous_evidence=previous,
             )
+
+
+def test_post_change_delta_rejects_a_mixed_before_revision_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source, other, task = _repo(tmp_path)
+    with (
+        CodeMap(tmp_path, state_dir=tmp_path / ".state") as reader,
+        CodeMap(tmp_path, state_dir=tmp_path / ".state") as writer,
+    ):
+        reader.index.sync()
+        previous = reader.tasks.evidence(task)
+        source.write_text("def widget(): return 'new'\n")
+        original = reader.reads.file_row
+        changed = False
+
+        def publish_between_reads(path: str) -> dict[str, object] | None:
+            nonlocal changed
+            row = original(path)
+            if path == "src/owner.py" and not changed:
+                changed = True
+                other.write_text("def other(): return 'new'\n")
+                writer.index.sync(["src/other.py"])
+            return row
+
+        monkeypatch.setattr(reader.reads, "file_row", publish_between_reads)
+        with pytest.raises(RuntimeError, match="generation changed"):
+            reader.changes.task_delta(
+                task,
+                ["src/owner.py", "src/other.py"],
+                previous_evidence=previous,
+            )
+        assert changed
 
 
 def _declared_project_repo(root: Path) -> None:
@@ -131,27 +165,27 @@ def test_declared_freshness_rebind_rejects_competing_generation(
         CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as reader,
         CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as writer,
     ):
-        reader.sync()
-        reader.enrich_projects(("npm-package-graph", "declared-project-links"))
-        original_sync = reader.sync
+        reader.index.sync()
+        reader.native.enrich_projects(("npm-package-graph", "declared-project-links"))
+        original_sync = reader.index.sync
 
-        def racing_sync(paths=None):
+        def racing_sync(paths: list[str] | None = None) -> SyncResult:
             result = original_sync(paths)
             (tmp_path / "src" / "other.py").write_text(
                 "def other(): return 'new'\n",
                 encoding="utf-8",
             )
-            writer.sync(["src/other.py"])
+            writer.index.sync(["src/other.py"])
             return result
 
-        monkeypatch.setattr(reader, "sync", racing_sync)
+        monkeypatch.setattr(reader.index, "sync", racing_sync)
         (tmp_path / "contract.json").write_text('{"v":2}\n', encoding="utf-8")
 
         with pytest.raises(
             RuntimeError,
             match="CodeMap generation changed before project freshness rebind",
         ):
-            reader.task_change_impact("contract changed", ["contract.json"])
+            reader.changes.task_impact("contract changed", ["contract.json"])
 
 
 def test_project_enrichment_rejects_stale_expected_generation(tmp_path: Path) -> None:
@@ -162,19 +196,19 @@ def test_project_enrichment_rejects_stale_expected_generation(tmp_path: Path) ->
         CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as reader,
         CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as writer,
     ):
-        reader.sync()
+        reader.index.sync()
         expected_generation = reader.store.generation()
         (tmp_path / "src" / "other.py").write_text(
             "def other(): return 'new'\n",
             encoding="utf-8",
         )
-        writer.sync(["src/other.py"])
+        writer.index.sync(["src/other.py"])
 
         with pytest.raises(
             RuntimeError,
             match="CodeMap generation changed before project enrichment",
         ):
-            reader.enrich_projects(
+            reader.native.enrich_projects(
                 ("npm-package-graph",),
                 expected_generation=expected_generation,
             )

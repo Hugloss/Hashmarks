@@ -6,6 +6,7 @@ import time
 from typing import TYPE_CHECKING
 
 import pytest
+from contract_assertions import assert_array, assert_object, assert_records, assert_text
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.repository_intelligence_query import (
@@ -42,23 +43,28 @@ def test_change_intelligence_brief_is_compact_identity_bound_repository_truth(
 ) -> None:
     task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        packet = codemap.task_decision_packet(task)
-        brief = codemap.change_intelligence_brief(task, ["src/case/engine.py"])
+        codemap.index.sync()
+        packet = codemap.tasks.decision_packet(task)
+        brief = codemap.changes.brief(task, ["src/case/engine.py"])
 
     assert brief["schema"] == "hashmarks.change-intelligence-brief.v1"
     assert brief["authority"] == "repository-intelligence-only"
     assert brief["execution_effect"] == "none"
     assert brief["completeness"] == "not-claimed"
     assert (
-        brief["repository"]["repository_identity"]
-        == packet["identity"]["repository_identity"]
+        assert_object(brief["repository"])["repository_identity"]
+        == assert_object(packet["identity"])["repository_identity"]
     )
-    assert brief["changed"][0]["revision"]
-    assert "ember" in brief["changed"][0]["symbols"]
-    assert brief["verification"]["member"] == "tests/test_ember.py"
-    assert brief["verification"]["explanation_identity"].startswith("sha256:")
-    assert brief["affected"]["verification"][0]["path"] == "tests/test_ember.py"
+    assert assert_records(brief["changed"])[0]["revision"]
+    assert "ember" in assert_array(assert_records(brief["changed"])[0]["symbols"])
+    assert assert_object(brief["verification"])["member"] == "tests/test_ember.py"
+    assert assert_text(
+        assert_object(brief["verification"])["explanation_identity"]
+    ).startswith("sha256:")
+    assert (
+        assert_records(assert_object(brief["affected"])["verification"])[0]["path"]
+        == "tests/test_ember.py"
+    )
     assert len(json.dumps(brief, sort_keys=True)) < len(
         json.dumps(packet, sort_keys=True)
     )
@@ -72,21 +78,22 @@ def test_change_intelligence_brief_preserves_project_provenance_and_valid_change
 ) -> None:
     task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         monkeypatch.setattr(
-            codemap,
-            "task_change_impact",
+            codemap.changes,
+            "task_impact",
             lambda *args, **kwargs: {
+                "generation": codemap.index.publication_binding()[0],
                 "changed": [{"path": "src/case/engine.py"}, "invalid-row"],
                 "surfaces": {},
                 "bounds": {"limit": 20},
                 "project_impact": {"identity": "sha256:project"},
             },
         )
-        brief = codemap.change_intelligence_brief(task, ["src/case/engine.py"])
-    assert len(brief["changed"]) == 1
-    assert brief["changed"][0]["path"] == "src/case/engine.py"
-    assert brief["changed"][0]["revision"]
+        brief = codemap.changes.brief(task, ["src/case/engine.py"])
+    assert len(assert_records(brief["changed"])) == 1
+    assert assert_records(brief["changed"])[0]["path"] == "src/case/engine.py"
+    assert assert_records(brief["changed"])[0]["revision"]
     assert brief["project_impact"] == {"identity": "sha256:project"}
 
 
@@ -96,11 +103,15 @@ def test_verification_explanation_selected_and_why_not_are_deterministic(
     task = _repo(tmp_path)
     (tmp_path / "tests" / "test_other.py").write_text("def test_other(): assert True\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        first = codemap.explain_verification_selection(task)
-        second = codemap.explain_verification_selection(task)
-        why_not = codemap.explain_verification_selection(task, "tests/test_other.py")
-        absent = codemap.explain_verification_selection(task, "tests/not_present.py")
+        codemap.index.sync()
+        first = codemap.tasks.explain_verification_selection(task)
+        second = codemap.tasks.explain_verification_selection(task)
+        why_not = codemap.tasks.explain_verification_selection(
+            task, "tests/test_other.py"
+        )
+        absent = codemap.tasks.explain_verification_selection(
+            task, "tests/not_present.py"
+        )
 
     assert first == second
     assert first["status"] == "selected"
@@ -145,9 +156,9 @@ def test_verification_explanation_preserves_bounded_candidate_reason(
         "task_anchor_terms": ["ember"],
     }
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         monkeypatch.setattr(
-            codemap,
+            codemap.tasks,
             "verification_relevance",
             lambda *args, **kwargs: {
                 "selected": selected,
@@ -155,12 +166,12 @@ def test_verification_explanation_preserves_bounded_candidate_reason(
                 "selection_reason": "qualified-reference",
             },
         )
-        explanation = codemap.explain_verification_selection(
+        explanation = codemap.tasks.explain_verification_selection(
             task, "tests/test_other.py"
         )
     assert explanation["status"] == "not-selected"
     assert explanation["reason"] == expected_reason
-    assert {row["reason"] for row in explanation["facts"]} >= {
+    assert {row["reason"] for row in assert_records(explanation["facts"])} >= {
         "namespace-locality",
         "task-anchor",
         "canonical-rank",
@@ -199,7 +210,7 @@ def test_service_exposes_change_brief_and_verification_explanation(
                 member_path="tests/test_ember.py"
             ),
         )["result"]
-        assert brief["verification"]["member"] == "tests/test_ember.py"
+        assert assert_object(brief["verification"])["member"] == "tests/test_ember.py"
         assert explanation["status"] == "selected"
     finally:
         client.stop()

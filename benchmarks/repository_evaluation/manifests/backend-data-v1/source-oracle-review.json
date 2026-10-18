@@ -1,0 +1,2847 @@
+{
+  "active_campaign_changed": false,
+  "capability_reviewed": false,
+  "cases": [
+    {
+      "capability_reviewed": false,
+      "causal_test_relevance": "not-reviewed",
+      "id": "fastapi-recursive-default-serialization",
+      "problem_id": "aadfcce76380ab169fe172d5cda21722e53c4924",
+      "runtime_compatibility": "not-established",
+      "semantic_pair_relationship": "not-established",
+      "stages": {
+        "after": {
+          "argument_pointer": "/argument_syntax/keywords/*",
+          "boundary_file_sha256": "4cc09230eca6435892f6bc25a2185e214dbedfe994d5103feb63ad269137caad",
+          "call_source": "jsonable_encoder(key, by_alias=by_alias, exclude_unset=exclude_unset, exclude_defaults=exclude_defaults, exclude_none=exclude_none, custom_encoder=custom_encoder, sqlalchemy_safe=sqlalchemy_safe)",
+          "call_source_label": {
+            "end_line": 306,
+            "path": "fastapi/encoders.py",
+            "sha256": "af2c9b7c071d9069eb0800d6af627ed4699fc01e4031603db3e54971f9a9f0b8",
+            "start_line": 298
+          },
+          "content_identity": "sha256:2f615ba2fb85aaf8b0b9ff1b3577150ebbf786798df49be2cb6481eb9c65dce5:3134",
+          "declaration": {
+            "declaration_line": 129,
+            "end_line": 366,
+            "path": "fastapi/encoders.py",
+            "sha256": "0372b84692c51e8bbef2f4e48e05af71813e973c94bc2926be6d9ebaecf527a4",
+            "start_line": 129,
+            "symbol": "jsonable_encoder"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "name": "exclude_defaults",
+            "name_state": "literal",
+            "value": {
+              "identifier": "exclude_defaults",
+              "state": "identifier-syntax"
+            }
+          },
+          "expected_site": {
+            "callee_identifier_syntax": "jsonable_encoder",
+            "end_line": 306,
+            "line": 298,
+            "positional_argument_count": 1,
+            "syntax_kind": "call"
+          },
+          "line_file_sha256": "4cc09230eca6435892f6bc25a2185e214dbedfe994d5103feb63ad269137caad",
+          "reviewed_lines": [
+            {
+              "line": 298,
+              "line_sha256": "09f8a3f73499337dd7ad0317e37ea395d4c5f988d3f4cfaac95036c3968b495a",
+              "path": "fastapi/encoders.py",
+              "source_label": {
+                "end_line": 298,
+                "path": "fastapi/encoders.py",
+                "sha256": "db53fd2e7b949b5832bad65c1acf8ee436ef5d6502de4bb53051225a5d8f8bf3",
+                "start_line": 298
+              },
+              "text": "                encoded_key = jsonable_encoder("
+            },
+            {
+              "line": 302,
+              "line_sha256": "8966c0da8f4163f4e8f7315a3ab503eab2139432a42fe95eeefe4085ff1faea1",
+              "path": "fastapi/encoders.py",
+              "source_label": {
+                "end_line": 302,
+                "path": "fastapi/encoders.py",
+                "sha256": "e01fb4e0d865ba59e0a56eab59652fdcfe257116f7267c45b2006f6db9d3b9bc",
+                "start_line": 302
+              },
+              "text": "                    exclude_defaults=exclude_defaults,"
+            },
+            {
+              "line": 307,
+              "line_sha256": "4824df188bb6b40971e70ebf33db05fd4a9fd399e5a75903bf71babfd3ae5bcf",
+              "path": "fastapi/encoders.py",
+              "source_label": {
+                "end_line": 307,
+                "path": "fastapi/encoders.py",
+                "sha256": "9d9a7739417fbef60615ae767453898ca2a52dd44d25fda1094ec9b8c528e960",
+                "start_line": 307
+              },
+              "text": "                encoded_value = jsonable_encoder("
+            },
+            {
+              "line": 311,
+              "line_sha256": "8966c0da8f4163f4e8f7315a3ab503eab2139432a42fe95eeefe4085ff1faea1",
+              "path": "fastapi/encoders.py",
+              "source_label": {
+                "end_line": 311,
+                "path": "fastapi/encoders.py",
+                "sha256": "e01fb4e0d865ba59e0a56eab59652fdcfe257116f7267c45b2006f6db9d3b9bc",
+                "start_line": 311
+              },
+              "text": "                    exclude_defaults=exclude_defaults,"
+            },
+            {
+              "line": 316,
+              "line_sha256": "0de441c5f9f05112f691da7cdfa2166fbbbf5fb1759c08bc0792c08f51ba4525",
+              "path": "fastapi/encoders.py",
+              "source_label": {
+                "end_line": 316,
+                "path": "fastapi/encoders.py",
+                "sha256": "4f849f4e83bc51d3aa7c805f33e043959c688c148433613e040c997edadb7ac9",
+                "start_line": 316
+              },
+              "text": "                encoded_dict[encoded_key] = encoded_value"
+            },
+            {
+              "line": 317,
+              "line_sha256": "fb6b5c90d23c5d5eecbfe173b6a5c51135b9dff0c213445dab1c867e71e8f906",
+              "path": "fastapi/encoders.py",
+              "source_label": {
+                "end_line": 317,
+                "path": "fastapi/encoders.py",
+                "sha256": "00e2b0051a5562137e0994c2eaef251488381fccd44b194b8f522269bb6960a8",
+                "start_line": 317
+              },
+              "text": "        return encoded_dict"
+            }
+          ],
+          "same_callee_occurrences": 6,
+          "selection": "explicit reviewed line within nominated exact declaration; no inferred reachability",
+          "source": "fastapi-recursive-default-serialization-after"
+        },
+        "before": {
+          "argument_pointer": "/argument_syntax/keywords/*",
+          "boundary_file_sha256": "9b63869eaf64f7802571de9440cf2bee2c27f9c8ef25da4e291549b9047af13f",
+          "call_source": "jsonable_encoder(key, by_alias=by_alias, exclude_unset=exclude_unset, exclude_none=exclude_none, custom_encoder=custom_encoder, sqlalchemy_safe=sqlalchemy_safe)",
+          "call_source_label": {
+            "end_line": 305,
+            "path": "fastapi/encoders.py",
+            "sha256": "fb499471d4c33bbea5e72a71ee4f1e041f95509aef10df47baa567a11c35efea",
+            "start_line": 298
+          },
+          "content_identity": "sha256:2ce7cfa1a7a0340ea62a8a38237ef804b5092124e9fd3b0f9bff4f3272683ca9:3134",
+          "declaration": {
+            "declaration_line": 129,
+            "end_line": 364,
+            "path": "fastapi/encoders.py",
+            "sha256": "e765d5a78b4458ba22d8897f71c7c9ed66fb209c8fdb7002146a49cdb12a8b93",
+            "start_line": 129,
+            "symbol": "jsonable_encoder"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "name": "exclude_unset",
+            "name_state": "literal",
+            "value": {
+              "identifier": "exclude_unset",
+              "state": "identifier-syntax"
+            }
+          },
+          "expected_site": {
+            "callee_identifier_syntax": "jsonable_encoder",
+            "end_line": 305,
+            "line": 298,
+            "positional_argument_count": 1,
+            "syntax_kind": "call"
+          },
+          "line_file_sha256": "9b63869eaf64f7802571de9440cf2bee2c27f9c8ef25da4e291549b9047af13f",
+          "reviewed_lines": [
+            {
+              "line": 298,
+              "line_sha256": "09f8a3f73499337dd7ad0317e37ea395d4c5f988d3f4cfaac95036c3968b495a",
+              "path": "fastapi/encoders.py",
+              "source_label": {
+                "end_line": 298,
+                "path": "fastapi/encoders.py",
+                "sha256": "db53fd2e7b949b5832bad65c1acf8ee436ef5d6502de4bb53051225a5d8f8bf3",
+                "start_line": 298
+              },
+              "text": "                encoded_key = jsonable_encoder("
+            },
+            {
+              "line": 301,
+              "line_sha256": "5899c137f3fb1f7fbc7315229b08151975b09536da5fdf3dcea205cc6fd654bf",
+              "path": "fastapi/encoders.py",
+              "source_label": {
+                "end_line": 301,
+                "path": "fastapi/encoders.py",
+                "sha256": "a78755ca06ebf437f2b57ad69c9b33ae804c6d6accd9b19c9b3a81e13cac904e",
+                "start_line": 301
+              },
+              "text": "                    exclude_unset=exclude_unset,"
+            },
+            {
+              "line": 306,
+              "line_sha256": "4824df188bb6b40971e70ebf33db05fd4a9fd399e5a75903bf71babfd3ae5bcf",
+              "path": "fastapi/encoders.py",
+              "source_label": {
+                "end_line": 306,
+                "path": "fastapi/encoders.py",
+                "sha256": "9d9a7739417fbef60615ae767453898ca2a52dd44d25fda1094ec9b8c528e960",
+                "start_line": 306
+              },
+              "text": "                encoded_value = jsonable_encoder("
+            },
+            {
+              "line": 309,
+              "line_sha256": "5899c137f3fb1f7fbc7315229b08151975b09536da5fdf3dcea205cc6fd654bf",
+              "path": "fastapi/encoders.py",
+              "source_label": {
+                "end_line": 309,
+                "path": "fastapi/encoders.py",
+                "sha256": "a78755ca06ebf437f2b57ad69c9b33ae804c6d6accd9b19c9b3a81e13cac904e",
+                "start_line": 309
+              },
+              "text": "                    exclude_unset=exclude_unset,"
+            },
+            {
+              "line": 314,
+              "line_sha256": "0de441c5f9f05112f691da7cdfa2166fbbbf5fb1759c08bc0792c08f51ba4525",
+              "path": "fastapi/encoders.py",
+              "source_label": {
+                "end_line": 314,
+                "path": "fastapi/encoders.py",
+                "sha256": "4f849f4e83bc51d3aa7c805f33e043959c688c148433613e040c997edadb7ac9",
+                "start_line": 314
+              },
+              "text": "                encoded_dict[encoded_key] = encoded_value"
+            },
+            {
+              "line": 315,
+              "line_sha256": "fb6b5c90d23c5d5eecbfe173b6a5c51135b9dff0c213445dab1c867e71e8f906",
+              "path": "fastapi/encoders.py",
+              "source_label": {
+                "end_line": 315,
+                "path": "fastapi/encoders.py",
+                "sha256": "00e2b0051a5562137e0994c2eaef251488381fccd44b194b8f522269bb6960a8",
+                "start_line": 315
+              },
+              "text": "        return encoded_dict"
+            }
+          ],
+          "same_callee_occurrences": 6,
+          "selection": "explicit reviewed line within nominated exact declaration; no inferred reachability",
+          "source": "fastapi-recursive-default-serialization-before"
+        }
+      }
+    },
+    {
+      "capability_reviewed": false,
+      "causal_test_relevance": "not-reviewed",
+      "id": "fastapi-iterable-serialization-options",
+      "problem_id": "d6537f774b0e80e376e2cf4e0fa998a38c6d0c09",
+      "runtime_compatibility": "not-established",
+      "semantic_pair_relationship": "not-established",
+      "stages": {
+        "after": {
+          "argument_pointer": "/argument_syntax/keywords/*",
+          "boundary_file_sha256": "5dbd393970fb29ee95629574dbc5f186d3330b8587735d7e694f55e754a99729",
+          "call_source": "create_model_field(name=response_name, type_=route.response_model, mode='serialization')",
+          "call_source_label": {
+            "end_line": 1104,
+            "path": "fastapi/routing.py",
+            "sha256": "b54fbbe48092c2b883025a92ff5e5cb26e22d41eb7b20b235796c2f40fce0002",
+            "start_line": 1100
+          },
+          "content_identity": "sha256:df4f016032a76da5d2cf29af9f1495356b42c1c79b493145b23db0ad61d03e32:3135",
+          "declaration": {
+            "declaration_line": 953,
+            "end_line": 1115,
+            "path": "fastapi/routing.py",
+            "sha256": "6764aa75703ea243378769ce2706fe633073cf7a18c34a9d37e6f8c80ac39964",
+            "start_line": 953,
+            "symbol": "_populate_api_route_state"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "name": "type_",
+            "name_state": "literal",
+            "value": {
+              "identifier": "route.response_model",
+              "state": "identifier-syntax"
+            }
+          },
+          "expected_site": {
+            "callee_identifier_syntax": "create_model_field",
+            "end_line": 1104,
+            "line": 1100,
+            "positional_argument_count": 0,
+            "syntax_kind": "call"
+          },
+          "line_file_sha256": "5dbd393970fb29ee95629574dbc5f186d3330b8587735d7e694f55e754a99729",
+          "reviewed_lines": [
+            {
+              "line": 1079,
+              "line_sha256": "25bf93eda5a27cdc749860900f34cd815b8adfa006ba87453b01eaab2dae439c",
+              "path": "fastapi/routing.py",
+              "source_label": {
+                "end_line": 1079,
+                "path": "fastapi/routing.py",
+                "sha256": "3f3e7b83109b5d80c649ab5c3b426cf22b4e7833b5af817ec14502f7a853868d",
+                "start_line": 1079
+              },
+              "text": "            if stream_item is not None and is_generator:"
+            },
+            {
+              "line": 1094,
+              "line_sha256": "e1864b1591b2419a138710f81cbb16b145c1b53c64f60122da88f29e20a6a438",
+              "path": "fastapi/routing.py",
+              "source_label": {
+                "end_line": 1094,
+                "path": "fastapi/routing.py",
+                "sha256": "2eed49e44cad2f5cb0a1c2e6be84883bfd3347bf4440a9460f79bb9e68820b37",
+                "start_line": 1094
+              },
+              "text": "    route.response_model = response_model"
+            },
+            {
+              "line": 1095,
+              "line_sha256": "bad56a2185e5c88cf57e634e7bfbc8a124733d9a4926681ac3ddd23f84291e52",
+              "path": "fastapi/routing.py",
+              "source_label": {
+                "end_line": 1095,
+                "path": "fastapi/routing.py",
+                "sha256": "984f4cb0c8da19ba9d938ee2cbbeb89f28e8b75f7d79d67a84ec2a4875ca6bef",
+                "start_line": 1095
+              },
+              "text": "    if route.response_model:"
+            },
+            {
+              "line": 1100,
+              "line_sha256": "61764a24cd40761beb212a4eb109a3028050c1d1c779d6c3a6b4faa219aec5e0",
+              "path": "fastapi/routing.py",
+              "source_label": {
+                "end_line": 1100,
+                "path": "fastapi/routing.py",
+                "sha256": "eddb01578e0d5380b6f09f236df17c3aa4c82fe457a03c0dca902993e6459f83",
+                "start_line": 1100
+              },
+              "text": "        route.response_field = create_model_field("
+            },
+            {
+              "line": 1102,
+              "line_sha256": "6aab6e4e93c9286afc4bb216121ef26d752f0d5fbc018ae9acdd71cf92a13516",
+              "path": "fastapi/routing.py",
+              "source_label": {
+                "end_line": 1102,
+                "path": "fastapi/routing.py",
+                "sha256": "5e8e40050b65a1acfba02be8f4d601e7654c418f64afcd43de4f8ef96e1e0a51",
+                "start_line": 1102
+              },
+              "text": "            type_=route.response_model,"
+            },
+            {
+              "line": 1103,
+              "line_sha256": "5dd867b2c4842c08708a2ce5b938d96381b5f195360eb9fcf76f0d16d43f32ae",
+              "path": "fastapi/routing.py",
+              "source_label": {
+                "end_line": 1103,
+                "path": "fastapi/routing.py",
+                "sha256": "fdebc15919589a5d250243ea224f9e29e0e51b080e29fb3b07f8aa30baa2fdc2",
+                "start_line": 1103
+              },
+              "text": "            mode=\"serialization\","
+            }
+          ],
+          "same_callee_occurrences": 3,
+          "selection": "explicit reviewed line within nominated exact declaration; no inferred reachability",
+          "source": "fastapi-iterable-serialization-options-after"
+        },
+        "before": {
+          "argument_pointer": "/argument_syntax/keywords/*",
+          "boundary_file_sha256": "e8e5b1c239c33e798f338b0bf207b0b2e6e7d0d6b0ebd3d7769fc8e438011b40",
+          "call_source": "create_model_field(name=response_name, type_=route.response_model, mode='serialization')",
+          "call_source_label": {
+            "end_line": 1056,
+            "path": "fastapi/routing.py",
+            "sha256": "b54fbbe48092c2b883025a92ff5e5cb26e22d41eb7b20b235796c2f40fce0002",
+            "start_line": 1052
+          },
+          "content_identity": "sha256:ccf6682ec80563d9b74bfd2cc89c8a31afda4a96c35f00d7340a037661fda23a:3135",
+          "declaration": {
+            "declaration_line": 953,
+            "end_line": 1115,
+            "path": "fastapi/routing.py",
+            "sha256": "32b2f5120273c7f76d9c859d2d40c84f3ce8f3472350bc6147faa5295802ced4",
+            "start_line": 953,
+            "symbol": "_populate_api_route_state"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "name": "type_",
+            "name_state": "literal",
+            "value": {
+              "identifier": "route.response_model",
+              "state": "identifier-syntax"
+            }
+          },
+          "expected_site": {
+            "callee_identifier_syntax": "create_model_field",
+            "end_line": 1056,
+            "line": 1052,
+            "positional_argument_count": 0,
+            "syntax_kind": "call"
+          },
+          "line_file_sha256": "e8e5b1c239c33e798f338b0bf207b0b2e6e7d0d6b0ebd3d7769fc8e438011b40",
+          "reviewed_lines": [
+            {
+              "line": 996,
+              "line_sha256": "30424552b6b2cea9a97bfeb6548f9087e232d4c4bef05e260cfeef97364afa79",
+              "path": "fastapi/routing.py",
+              "source_label": {
+                "end_line": 996,
+                "path": "fastapi/routing.py",
+                "sha256": "1ffe495e5e743ff8892cb76bb7e1fb79d45b917065c417098d2d5f3cdf7527f6",
+                "start_line": 996
+              },
+              "text": "            if stream_item is not None:"
+            },
+            {
+              "line": 1011,
+              "line_sha256": "e1864b1591b2419a138710f81cbb16b145c1b53c64f60122da88f29e20a6a438",
+              "path": "fastapi/routing.py",
+              "source_label": {
+                "end_line": 1011,
+                "path": "fastapi/routing.py",
+                "sha256": "2eed49e44cad2f5cb0a1c2e6be84883bfd3347bf4440a9460f79bb9e68820b37",
+                "start_line": 1011
+              },
+              "text": "    route.response_model = response_model"
+            },
+            {
+              "line": 1047,
+              "line_sha256": "bad56a2185e5c88cf57e634e7bfbc8a124733d9a4926681ac3ddd23f84291e52",
+              "path": "fastapi/routing.py",
+              "source_label": {
+                "end_line": 1047,
+                "path": "fastapi/routing.py",
+                "sha256": "984f4cb0c8da19ba9d938ee2cbbeb89f28e8b75f7d79d67a84ec2a4875ca6bef",
+                "start_line": 1047
+              },
+              "text": "    if route.response_model:"
+            },
+            {
+              "line": 1052,
+              "line_sha256": "61764a24cd40761beb212a4eb109a3028050c1d1c779d6c3a6b4faa219aec5e0",
+              "path": "fastapi/routing.py",
+              "source_label": {
+                "end_line": 1052,
+                "path": "fastapi/routing.py",
+                "sha256": "eddb01578e0d5380b6f09f236df17c3aa4c82fe457a03c0dca902993e6459f83",
+                "start_line": 1052
+              },
+              "text": "        route.response_field = create_model_field("
+            },
+            {
+              "line": 1054,
+              "line_sha256": "6aab6e4e93c9286afc4bb216121ef26d752f0d5fbc018ae9acdd71cf92a13516",
+              "path": "fastapi/routing.py",
+              "source_label": {
+                "end_line": 1054,
+                "path": "fastapi/routing.py",
+                "sha256": "5e8e40050b65a1acfba02be8f4d601e7654c418f64afcd43de4f8ef96e1e0a51",
+                "start_line": 1054
+              },
+              "text": "            type_=route.response_model,"
+            },
+            {
+              "line": 1055,
+              "line_sha256": "5dd867b2c4842c08708a2ce5b938d96381b5f195360eb9fcf76f0d16d43f32ae",
+              "path": "fastapi/routing.py",
+              "source_label": {
+                "end_line": 1055,
+                "path": "fastapi/routing.py",
+                "sha256": "fdebc15919589a5d250243ea224f9e29e0e51b080e29fb3b07f8aa30baa2fdc2",
+                "start_line": 1055
+              },
+              "text": "            mode=\"serialization\","
+            }
+          ],
+          "same_callee_occurrences": 3,
+          "selection": "explicit reviewed line within nominated exact declaration; no inferred reachability",
+          "source": "fastapi-iterable-serialization-options-before"
+        }
+      }
+    },
+    {
+      "capability_reviewed": false,
+      "causal_test_relevance": "not-reviewed",
+      "id": "fastapi-stream-response-arguments",
+      "problem_id": "e92a0dc3ce5ecbebb8655dbe5465cb61d48f9fc0",
+      "runtime_compatibility": "not-established",
+      "semantic_pair_relationship": "not-established",
+      "stages": {
+        "after": {
+          "argument_pointer": "/argument_syntax/keywords/*",
+          "boundary_file_sha256": "f473e9bfc0198408297a80fd5c70f1983e8103b5174d117cb6122c7a178f43ef",
+          "call_source": "StreamingResponse(sse_stream_content, media_type='text/event-stream', **response_args)",
+          "call_source_label": {
+            "end_line": 640,
+            "path": "fastapi/routing.py",
+            "sha256": "2f8f3846df1a178b0efeac35c19ccf133c62350314d36970f3c4f8cfee84c733",
+            "start_line": 636
+          },
+          "content_identity": "sha256:1fe24849ff6f86a3a96dda19b6d7e90bcf34611c1ebb3444daf16fb5e2bb2c51:3137",
+          "declaration": {
+            "declaration_line": 404,
+            "end_line": 757,
+            "path": "fastapi/routing.py",
+            "sha256": "a3518cbaa76806b92d0bb46b69c2e46f24bfa275a2817652f788c984ac1aecc0",
+            "start_line": 404,
+            "symbol": "get_request_handler.app"
+          },
+          "expected_argument": {
+            "expansion": true,
+            "name": null,
+            "name_state": "mapping-expansion",
+            "value": {
+              "identifier": "response_args",
+              "state": "identifier-syntax"
+            }
+          },
+          "expected_site": {
+            "callee_identifier_syntax": "StreamingResponse",
+            "end_line": 640,
+            "line": 636,
+            "positional_argument_count": 1,
+            "syntax_kind": "call"
+          },
+          "line_file_sha256": "f473e9bfc0198408297a80fd5c70f1983e8103b5174d117cb6122c7a178f43ef",
+          "reviewed_lines": [
+            {
+              "line": 358,
+              "line_sha256": "9ec48fffb7028f9e0509c47ab4f3eb78f50abc123f6bd8214fec1d86c90ab4c5",
+              "path": "fastapi/routing.py",
+              "source_label": {
+                "end_line": 358,
+                "path": "fastapi/routing.py",
+                "sha256": "042af9bda47de9928a5108676aeecb6faa6902c64452d9a78458b2407c5116f4",
+                "start_line": 358
+              },
+              "text": "    response_args: dict[str, Any] = {"
+            },
+            {
+              "line": 359,
+              "line_sha256": "5889dffc666ca74dded563b86d6e10ac7a9a6eaabdacd26d81a4b9c19f7b2819",
+              "path": "fastapi/routing.py",
+              "source_label": {
+                "end_line": 359,
+                "path": "fastapi/routing.py",
+                "sha256": "c926757ced4f1b010016566a7e6fb4e959d8068d74da4b5786cc940cac37bf0b",
+                "start_line": 359
+              },
+              "text": "        \"background\": solved_result.background_tasks,"
+            },
+            {
+              "line": 366,
+              "line_sha256": "f5f60a62db683995ea79dcb5cdc8ddbaabc6ab66e2641d43f5c64fb0619f8923",
+              "path": "fastapi/routing.py",
+              "source_label": {
+                "end_line": 366,
+                "path": "fastapi/routing.py",
+                "sha256": "e0d5556536f76bd77e774f5fdfbeda944a01a05f9b8dd52ecc12f0c8c7d1f488",
+                "start_line": 366
+              },
+              "text": "    if current_status_code is not None:"
+            },
+            {
+              "line": 367,
+              "line_sha256": "4672b4568d9c0964cb7f55aaaeb23c5edf92d76a74df3c1612ef1efa47ea66bd",
+              "path": "fastapi/routing.py",
+              "source_label": {
+                "end_line": 367,
+                "path": "fastapi/routing.py",
+                "sha256": "4dce3b944dd1dc0381bc91f54d562c0c579c0ba375ce309e2d35b9a01bee3d48",
+                "start_line": 367
+              },
+              "text": "        response_args[\"status_code\"] = current_status_code"
+            },
+            {
+              "line": 369,
+              "line_sha256": "d455e389566a68ce61952e87303226714153c9576e5c9a680ebef2c7e7a6f79c",
+              "path": "fastapi/routing.py",
+              "source_label": {
+                "end_line": 369,
+                "path": "fastapi/routing.py",
+                "sha256": "70fbfb39aeefab29e396e9d4d26ef7a279c29b6210789c0b446cebb6f6282f37",
+                "start_line": 369
+              },
+              "text": "        response_args[\"status_code\"] = solved_result.response.status_code"
+            },
+            {
+              "line": 370,
+              "line_sha256": "2271c9ddd89809f26f7135d381355f35a3cdaa8b351d887e857d7186780e09e7",
+              "path": "fastapi/routing.py",
+              "source_label": {
+                "end_line": 370,
+                "path": "fastapi/routing.py",
+                "sha256": "c4648b5ed10e5e3790da882cc931128f3c31522a95a007a5dff59774b7f9c161",
+                "start_line": 370
+              },
+              "text": "    return response_args"
+            },
+            {
+              "line": 633,
+              "line_sha256": "3cb683eb23a320ec92ba3993ac8ce4ba86307aea3cb9f804f62061479b228c5e",
+              "path": "fastapi/routing.py",
+              "source_label": {
+                "end_line": 633,
+                "path": "fastapi/routing.py",
+                "sha256": "11f658edd4a106d21be14b41e34c9c55a8d3aa15f20b066d2aa6577da379c8f7",
+                "start_line": 633
+              },
+              "text": "                response_args = _build_response_args("
+            },
+            {
+              "line": 639,
+              "line_sha256": "3f07ddb00066f9aa7aa02699f74dc8297f687138a5f59e5602d30c33c522e19b",
+              "path": "fastapi/routing.py",
+              "source_label": {
+                "end_line": 639,
+                "path": "fastapi/routing.py",
+                "sha256": "fe244af558b30a62c9543b8778d40c061d909d736eebaa23729ff792b5656110",
+                "start_line": 639
+              },
+              "text": "                    **response_args,"
+            }
+          ],
+          "same_callee_occurrences": 2,
+          "selection": "explicit reviewed line within nominated exact declaration; no inferred reachability",
+          "source": "fastapi-stream-response-arguments-after"
+        },
+        "before": {
+          "argument_pointer": "/argument_syntax/positional/*",
+          "boundary_file_sha256": "5dbd393970fb29ee95629574dbc5f186d3330b8587735d7e694f55e754a99729",
+          "call_source": "StreamingResponse(sse_stream_content, media_type='text/event-stream', background=solved_result.background_tasks)",
+          "call_source_label": {
+            "end_line": 637,
+            "path": "fastapi/routing.py",
+            "sha256": "bf50e32db81002f3dfcbddd67719c1c5ac0ab5946e5cbf052e926550d10976f7",
+            "start_line": 633
+          },
+          "content_identity": "sha256:096d9f50ec265f730b8f1b20693bc6f60abed94c990a469e28e5fae39efeaa9e:3136",
+          "declaration": {
+            "declaration_line": 404,
+            "end_line": 751,
+            "path": "fastapi/routing.py",
+            "sha256": "0e6390e6b22abcfb84ef42e7f0a7d593d28f2aac193c3ba47faa890587bb5506",
+            "start_line": 404,
+            "symbol": "get_request_handler.app"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "position": 0,
+            "value": {
+              "identifier": "sse_stream_content",
+              "state": "identifier-syntax"
+            }
+          },
+          "expected_site": {
+            "callee_identifier_syntax": "StreamingResponse",
+            "end_line": 637,
+            "line": 633,
+            "positional_argument_count": 1,
+            "syntax_kind": "call"
+          },
+          "line_file_sha256": "5dbd393970fb29ee95629574dbc5f186d3330b8587735d7e694f55e754a99729",
+          "reviewed_lines": [
+            {
+              "line": 358,
+              "line_sha256": "9ec48fffb7028f9e0509c47ab4f3eb78f50abc123f6bd8214fec1d86c90ab4c5",
+              "path": "fastapi/routing.py",
+              "source_label": {
+                "end_line": 358,
+                "path": "fastapi/routing.py",
+                "sha256": "042af9bda47de9928a5108676aeecb6faa6902c64452d9a78458b2407c5116f4",
+                "start_line": 358
+              },
+              "text": "    response_args: dict[str, Any] = {"
+            },
+            {
+              "line": 359,
+              "line_sha256": "5889dffc666ca74dded563b86d6e10ac7a9a6eaabdacd26d81a4b9c19f7b2819",
+              "path": "fastapi/routing.py",
+              "source_label": {
+                "end_line": 359,
+                "path": "fastapi/routing.py",
+                "sha256": "c926757ced4f1b010016566a7e6fb4e959d8068d74da4b5786cc940cac37bf0b",
+                "start_line": 359
+              },
+              "text": "        \"background\": solved_result.background_tasks,"
+            },
+            {
+              "line": 366,
+              "line_sha256": "f5f60a62db683995ea79dcb5cdc8ddbaabc6ab66e2641d43f5c64fb0619f8923",
+              "path": "fastapi/routing.py",
+              "source_label": {
+                "end_line": 366,
+                "path": "fastapi/routing.py",
+                "sha256": "e0d5556536f76bd77e774f5fdfbeda944a01a05f9b8dd52ecc12f0c8c7d1f488",
+                "start_line": 366
+              },
+              "text": "    if current_status_code is not None:"
+            },
+            {
+              "line": 367,
+              "line_sha256": "4672b4568d9c0964cb7f55aaaeb23c5edf92d76a74df3c1612ef1efa47ea66bd",
+              "path": "fastapi/routing.py",
+              "source_label": {
+                "end_line": 367,
+                "path": "fastapi/routing.py",
+                "sha256": "4dce3b944dd1dc0381bc91f54d562c0c579c0ba375ce309e2d35b9a01bee3d48",
+                "start_line": 367
+              },
+              "text": "        response_args[\"status_code\"] = current_status_code"
+            },
+            {
+              "line": 369,
+              "line_sha256": "d455e389566a68ce61952e87303226714153c9576e5c9a680ebef2c7e7a6f79c",
+              "path": "fastapi/routing.py",
+              "source_label": {
+                "end_line": 369,
+                "path": "fastapi/routing.py",
+                "sha256": "70fbfb39aeefab29e396e9d4d26ef7a279c29b6210789c0b446cebb6f6282f37",
+                "start_line": 369
+              },
+              "text": "        response_args[\"status_code\"] = solved_result.response.status_code"
+            },
+            {
+              "line": 370,
+              "line_sha256": "2271c9ddd89809f26f7135d381355f35a3cdaa8b351d887e857d7186780e09e7",
+              "path": "fastapi/routing.py",
+              "source_label": {
+                "end_line": 370,
+                "path": "fastapi/routing.py",
+                "sha256": "c4648b5ed10e5e3790da882cc931128f3c31522a95a007a5dff59774b7f9c161",
+                "start_line": 370
+              },
+              "text": "    return response_args"
+            },
+            {
+              "line": 633,
+              "line_sha256": "8d37345629dae5b8bef966faa2f83de87df271d7f38aeac42887db9ef9ed4ead",
+              "path": "fastapi/routing.py",
+              "source_label": {
+                "end_line": 633,
+                "path": "fastapi/routing.py",
+                "sha256": "624c5a147f8b0b9b4e524844bb19b8916f5e2b75638b3da8716c39a4307ef6b8",
+                "start_line": 633
+              },
+              "text": "                response = StreamingResponse("
+            },
+            {
+              "line": 636,
+              "line_sha256": "da0cc937d34cdc748ad12498979bdeaf6b774caf1050016a3f631b75c1684e69",
+              "path": "fastapi/routing.py",
+              "source_label": {
+                "end_line": 636,
+                "path": "fastapi/routing.py",
+                "sha256": "581c1de9f17f7086b4ac6e5f5ad8a15dd44d105a4f22204580009037b4133c65",
+                "start_line": 636
+              },
+              "text": "                    background=solved_result.background_tasks,"
+            }
+          ],
+          "same_callee_occurrences": 2,
+          "selection": "explicit reviewed line within nominated exact declaration; no inferred reachability",
+          "source": "fastapi-stream-response-arguments-before"
+        }
+      }
+    },
+    {
+      "capability_reviewed": false,
+      "causal_test_relevance": "not-reviewed",
+      "id": "fastapi-frontend-dependency-metadata",
+      "problem_id": "d62354434b2e508fe89024213b220ca8e67dea5e",
+      "runtime_compatibility": "not-established",
+      "semantic_pair_relationship": "not-established",
+      "stages": {
+        "after": {
+          "argument_pointer": "/argument_syntax/positional/*",
+          "boundary_file_sha256": "7b1ef65fb6b209445dc43be070a23324b7879aef9c6b9f63e6968234b7723b55",
+          "call_source": "response.headers.raw.extend(solved_result.response.headers.raw)",
+          "call_source_label": {
+            "end_line": 2204,
+            "path": "fastapi/routing.py",
+            "sha256": "6360fba910f9061eaf0eb028e13a4eb5f34bb53052dda9785d894b2a3e2866af",
+            "start_line": 2204
+          },
+          "content_identity": "sha256:ee55ff2c006c3d9384ac2c2324a294980aa77e044749f0fed690917501b4f9e2:3137",
+          "declaration": {
+            "declaration_line": 2171,
+            "end_line": 2207,
+            "path": "fastapi/routing.py",
+            "sha256": "e88fe8af032d3004eed7c190b6b65a45b108a9a47e90268ce6382593bca8eb2f",
+            "start_line": 2171,
+            "symbol": "_FrontendRouteGroup.handle"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "position": 0,
+            "value": {
+              "identifier": "solved_result.response.headers.raw",
+              "state": "identifier-syntax"
+            }
+          },
+          "expected_site": {
+            "callee_identifier_syntax": "response.headers.raw.extend",
+            "end_line": 2204,
+            "line": 2204,
+            "positional_argument_count": 1,
+            "syntax_kind": "call"
+          },
+          "line_file_sha256": "13693375ab95e32424e5434c21f928463634af5ee1261cf3e04031381bdf47d9",
+          "reviewed_lines": [
+            {
+              "line": 725,
+              "line_sha256": "32200fef74caa065910c1a2982429ba59d616601d47b23deb3db7380415d292b",
+              "path": "fastapi/dependencies/utils.py",
+              "source_label": {
+                "end_line": 725,
+                "path": "fastapi/dependencies/utils.py",
+                "sha256": "2e9f43a5971e0e0853d5bd50e51990c65a1b58b4541a0c6569bcb9c8921e84aa",
+                "start_line": 725
+              },
+              "text": "    return SolvedDependency("
+            },
+            {
+              "line": 726,
+              "line_sha256": "29a6b512c9f02c27bb141ba42f98c4cefb84226f682e2e4a3b9077378f0df86d",
+              "path": "fastapi/dependencies/utils.py",
+              "source_label": {
+                "end_line": 726,
+                "path": "fastapi/dependencies/utils.py",
+                "sha256": "d289c88c5b56a60e4d2d57d4bdc15af64ba0679ec6a97fef50afea4d5076609f",
+                "start_line": 726
+              },
+              "text": "        values=values,"
+            },
+            {
+              "line": 728,
+              "line_sha256": "5ac798bd1f77d7b328258f940314f47b8f45aba7e88ec8980f020c02f8df9cad",
+              "path": "fastapi/dependencies/utils.py",
+              "source_label": {
+                "end_line": 728,
+                "path": "fastapi/dependencies/utils.py",
+                "sha256": "6fac8c2123c841acbd0a71a28525aa5fed9b8ba2df669a3b07a1138ae8d705ef",
+                "start_line": 728
+              },
+              "text": "        background_tasks=background_tasks,"
+            },
+            {
+              "line": 729,
+              "line_sha256": "56d24ddb9d6cbc2057c6960b0a64984e1b9bf57c887c547ff00f3cc190717cdb",
+              "path": "fastapi/dependencies/utils.py",
+              "source_label": {
+                "end_line": 729,
+                "path": "fastapi/dependencies/utils.py",
+                "sha256": "3f53f4bcbca127b94e20e3519eff051f9f23d9dceac37941d97bcf0fee68553a",
+                "start_line": 729
+              },
+              "text": "        response=response,"
+            },
+            {
+              "line": 730,
+              "line_sha256": "ee7a6fc54de45a418c284631b8fb9f8078e9a2d4fe8972d421d44b38bec90b6a",
+              "path": "fastapi/dependencies/utils.py",
+              "source_label": {
+                "end_line": 730,
+                "path": "fastapi/dependencies/utils.py",
+                "sha256": "9bedf3c447e3924c2bd299643655e153776be459f3d51a192917a53058f64e03",
+                "start_line": 730
+              },
+              "text": "        dependency_cache=dependency_cache,"
+            }
+          ],
+          "same_callee_occurrences": 1,
+          "selection": "explicit reviewed line within nominated exact declaration; no inferred reachability",
+          "source": "fastapi-frontend-dependency-metadata-after"
+        },
+        "before": {
+          "argument_pointer": "/argument_syntax/positional/*",
+          "boundary_file_sha256": "7c34cefb6c3e2790d2537c0d9964cf8bd66c54fa7ae606d9d464f9fba46a17dc",
+          "call_source": "route.handle(scope, receive, send)",
+          "call_source_label": {
+            "end_line": 2193,
+            "path": "fastapi/routing.py",
+            "sha256": "261a98a667fccb7a5c33f6773cb1f581262d34a69196d36043295dee1baf3859",
+            "start_line": 2193
+          },
+          "content_identity": "sha256:ee07c0ecb11869c82f3e9c5bdc287e4862cbacdddae764e218af7aa8f2580dcb:3137",
+          "declaration": {
+            "declaration_line": 2163,
+            "end_line": 2195,
+            "path": "fastapi/routing.py",
+            "sha256": "2683524ff4c3017b690a3d960e1ed7bd9acd62407f8d204063728b17df235741",
+            "start_line": 2163,
+            "symbol": "_FrontendRouteGroup.handle"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "position": 0,
+            "value": {
+              "identifier": "scope",
+              "state": "identifier-syntax"
+            }
+          },
+          "expected_site": {
+            "callee_identifier_syntax": "route.handle",
+            "end_line": 2193,
+            "line": 2193,
+            "positional_argument_count": 3,
+            "syntax_kind": "call"
+          },
+          "line_file_sha256": "13693375ab95e32424e5434c21f928463634af5ee1261cf3e04031381bdf47d9",
+          "reviewed_lines": [
+            {
+              "line": 725,
+              "line_sha256": "32200fef74caa065910c1a2982429ba59d616601d47b23deb3db7380415d292b",
+              "path": "fastapi/dependencies/utils.py",
+              "source_label": {
+                "end_line": 725,
+                "path": "fastapi/dependencies/utils.py",
+                "sha256": "2e9f43a5971e0e0853d5bd50e51990c65a1b58b4541a0c6569bcb9c8921e84aa",
+                "start_line": 725
+              },
+              "text": "    return SolvedDependency("
+            },
+            {
+              "line": 726,
+              "line_sha256": "29a6b512c9f02c27bb141ba42f98c4cefb84226f682e2e4a3b9077378f0df86d",
+              "path": "fastapi/dependencies/utils.py",
+              "source_label": {
+                "end_line": 726,
+                "path": "fastapi/dependencies/utils.py",
+                "sha256": "d289c88c5b56a60e4d2d57d4bdc15af64ba0679ec6a97fef50afea4d5076609f",
+                "start_line": 726
+              },
+              "text": "        values=values,"
+            },
+            {
+              "line": 728,
+              "line_sha256": "5ac798bd1f77d7b328258f940314f47b8f45aba7e88ec8980f020c02f8df9cad",
+              "path": "fastapi/dependencies/utils.py",
+              "source_label": {
+                "end_line": 728,
+                "path": "fastapi/dependencies/utils.py",
+                "sha256": "6fac8c2123c841acbd0a71a28525aa5fed9b8ba2df669a3b07a1138ae8d705ef",
+                "start_line": 728
+              },
+              "text": "        background_tasks=background_tasks,"
+            },
+            {
+              "line": 729,
+              "line_sha256": "56d24ddb9d6cbc2057c6960b0a64984e1b9bf57c887c547ff00f3cc190717cdb",
+              "path": "fastapi/dependencies/utils.py",
+              "source_label": {
+                "end_line": 729,
+                "path": "fastapi/dependencies/utils.py",
+                "sha256": "3f53f4bcbca127b94e20e3519eff051f9f23d9dceac37941d97bcf0fee68553a",
+                "start_line": 729
+              },
+              "text": "        response=response,"
+            },
+            {
+              "line": 730,
+              "line_sha256": "ee7a6fc54de45a418c284631b8fb9f8078e9a2d4fe8972d421d44b38bec90b6a",
+              "path": "fastapi/dependencies/utils.py",
+              "source_label": {
+                "end_line": 730,
+                "path": "fastapi/dependencies/utils.py",
+                "sha256": "9bedf3c447e3924c2bd299643655e153776be459f3d51a192917a53058f64e03",
+                "start_line": 730
+              },
+              "text": "        dependency_cache=dependency_cache,"
+            }
+          ],
+          "same_callee_occurrences": 2,
+          "selection": "explicit reviewed line within nominated exact declaration; no inferred reachability",
+          "source": "fastapi-frontend-dependency-metadata-before"
+        }
+      }
+    },
+    {
+      "capability_reviewed": false,
+      "causal_test_relevance": "not-reviewed",
+      "id": "litestar-serializer-keyerror-boundary",
+      "problem_id": "673c1e93f9fe467f4839976c51d072668ecd98e1",
+      "runtime_compatibility": "not-established",
+      "semantic_pair_relationship": "not-established",
+      "stages": {
+        "after": {
+          "argument_pointer": "/argument_syntax/keywords/*",
+          "boundary_file_sha256": "94b165d0bb9836aebc9bc69869bc8777f3c32ddb2b0c6059df6c8d11ee764e1e",
+          "call_source": "msgspec.json.encode(value, enc_hook=serializer)",
+          "call_source_label": {
+            "end_line": 165,
+            "path": "litestar/serialization/msgspec_hooks.py",
+            "sha256": "05ca7fc202d90c7de28cd278002103d9680c099fb5df00c8d12f4a252d75219c",
+            "start_line": 165
+          },
+          "content_identity": "sha256:23940180141205ac3d2d633f117337521ba42e68586a9fadb9c8fc2cc9e6c0c2:1402",
+          "declaration": {
+            "declaration_line": 151,
+            "end_line": 167,
+            "path": "litestar/serialization/msgspec_hooks.py",
+            "sha256": "f56b47ed732d83ce9ee294015e15bab61b1e4c14472f89068367cc6a22f4e6c8",
+            "start_line": 151,
+            "symbol": "encode_json"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "name": "enc_hook",
+            "name_state": "literal",
+            "value": {
+              "identifier": "serializer",
+              "state": "identifier-syntax"
+            }
+          },
+          "expected_site": {
+            "callee_identifier_syntax": "msgspec.json.encode",
+            "end_line": 165,
+            "line": 165,
+            "positional_argument_count": 1,
+            "syntax_kind": "call"
+          },
+          "line_file_sha256": "94b165d0bb9836aebc9bc69869bc8777f3c32ddb2b0c6059df6c8d11ee764e1e",
+          "reviewed_lines": [
+            {
+              "line": 87,
+              "line_sha256": "f01292ae7498bff77d82978fa9c4ed50051f1123943d9dc88d67700092d8687a",
+              "path": "litestar/serialization/msgspec_hooks.py",
+              "source_label": {
+                "end_line": 87,
+                "path": "litestar/serialization/msgspec_hooks.py",
+                "sha256": "6f82071c21d7df93baf07180912926d54e63adf6d1a4ef6b099154f97c22d278",
+                "start_line": 87
+              },
+              "text": "    for base in value.__class__.__mro__[:-1]:"
+            },
+            {
+              "line": 88,
+              "line_sha256": "f412dc6b80507118cd1aa1c3e38a0a4a07328ba20fb2a072f20d95a4c1054c1f",
+              "path": "litestar/serialization/msgspec_hooks.py",
+              "source_label": {
+                "end_line": 88,
+                "path": "litestar/serialization/msgspec_hooks.py",
+                "sha256": "b569cb09280ee0781945e48d4041bd2dfaae691ad2eabf5d3cba0846c7216caa",
+                "start_line": 88
+              },
+              "text": "        try:"
+            },
+            {
+              "line": 89,
+              "line_sha256": "d0b76b5b4be510c4c8c1f6b0b6365453555eae84c9c3677fec6aa4524d9dd3c4",
+              "path": "litestar/serialization/msgspec_hooks.py",
+              "source_label": {
+                "end_line": 89,
+                "path": "litestar/serialization/msgspec_hooks.py",
+                "sha256": "69c98fd39510f43bd3f43c812c3ec63607a2d436a94b7e01ba2ef17ff14fef10",
+                "start_line": 89
+              },
+              "text": "            encoder = type_encoders[base]"
+            },
+            {
+              "line": 90,
+              "line_sha256": "9fc68b74a4289daac06ab90039798dd4534ba9fa775c2101f8b73cc94ac57408",
+              "path": "litestar/serialization/msgspec_hooks.py",
+              "source_label": {
+                "end_line": 90,
+                "path": "litestar/serialization/msgspec_hooks.py",
+                "sha256": "4f9e842857c92cd0a1f6453103c42cf9d11bc281dff5891940b3fc41da52f3a0",
+                "start_line": 90
+              },
+              "text": "        except KeyError:"
+            },
+            {
+              "line": 91,
+              "line_sha256": "441119cd4d7e90fa1cb254aff882d82750708b077c9cff181598ac67b9b30909",
+              "path": "litestar/serialization/msgspec_hooks.py",
+              "source_label": {
+                "end_line": 91,
+                "path": "litestar/serialization/msgspec_hooks.py",
+                "sha256": "f6ad052c44b953f0d83286a2dddec2185e7f189db0e4f502c6f06f34758454a4",
+                "start_line": 91
+              },
+              "text": "            continue"
+            },
+            {
+              "line": 92,
+              "line_sha256": "0f0f81f625f8a05cda1c42ad13eb2ab412af77155bdfeae69d070a59202db193",
+              "path": "litestar/serialization/msgspec_hooks.py",
+              "source_label": {
+                "end_line": 92,
+                "path": "litestar/serialization/msgspec_hooks.py",
+                "sha256": "a97b47bb81ce93cba67afc08698a80cfa093a8667e9c9f965337818d6578d185",
+                "start_line": 92
+              },
+              "text": "        else:"
+            },
+            {
+              "line": 93,
+              "line_sha256": "71ac70b8581c675b29018910ba5fa441f55a3a25436a8fce94ed2dcbe7cc97f0",
+              "path": "litestar/serialization/msgspec_hooks.py",
+              "source_label": {
+                "end_line": 93,
+                "path": "litestar/serialization/msgspec_hooks.py",
+                "sha256": "fc2b1bb7e7fdc66c2d64f29c0d8ec020d43a8d515897e9f0459d8305d3269dbb",
+                "start_line": 93
+              },
+              "text": "            return encoder(value)"
+            },
+            {
+              "line": 95,
+              "line_sha256": "7c3c05803c22248ac468c8d9d4d99918c5bbad44ebd8b899c12ccf579c4b55b3",
+              "path": "litestar/serialization/msgspec_hooks.py",
+              "source_label": {
+                "end_line": 95,
+                "path": "litestar/serialization/msgspec_hooks.py",
+                "sha256": "6ca82996029d9836e069f70c9470004ef043e68f47cfc5fc62eaedf31e4158ee",
+                "start_line": 95
+              },
+              "text": "    raise TypeError(f\"Unsupported type: {type(value)!r}\")"
+            }
+          ],
+          "same_callee_occurrences": 1,
+          "selection": "explicit reviewed line within nominated exact declaration; no inferred reachability",
+          "source": "litestar-serializer-keyerror-boundary-after"
+        },
+        "before": {
+          "argument_pointer": "/argument_syntax/keywords/*",
+          "boundary_file_sha256": "47b7c429bc954ef65926b0c723a7fb7898675db182bc3fc9209906864342c31f",
+          "call_source": "msgspec.json.encode(value, enc_hook=serializer)",
+          "call_source_label": {
+            "end_line": 164,
+            "path": "litestar/serialization/msgspec_hooks.py",
+            "sha256": "05ca7fc202d90c7de28cd278002103d9680c099fb5df00c8d12f4a252d75219c",
+            "start_line": 164
+          },
+          "content_identity": "sha256:d0f35bd3e4b7295088f06a749a26bbfdd43dabbf24eb69cfdc082ee73fad2545:1402",
+          "declaration": {
+            "declaration_line": 150,
+            "end_line": 166,
+            "path": "litestar/serialization/msgspec_hooks.py",
+            "sha256": "f56b47ed732d83ce9ee294015e15bab61b1e4c14472f89068367cc6a22f4e6c8",
+            "start_line": 150,
+            "symbol": "encode_json"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "name": "enc_hook",
+            "name_state": "literal",
+            "value": {
+              "identifier": "serializer",
+              "state": "identifier-syntax"
+            }
+          },
+          "expected_site": {
+            "callee_identifier_syntax": "msgspec.json.encode",
+            "end_line": 164,
+            "line": 164,
+            "positional_argument_count": 1,
+            "syntax_kind": "call"
+          },
+          "line_file_sha256": "47b7c429bc954ef65926b0c723a7fb7898675db182bc3fc9209906864342c31f",
+          "reviewed_lines": [
+            {
+              "line": 87,
+              "line_sha256": "f01292ae7498bff77d82978fa9c4ed50051f1123943d9dc88d67700092d8687a",
+              "path": "litestar/serialization/msgspec_hooks.py",
+              "source_label": {
+                "end_line": 87,
+                "path": "litestar/serialization/msgspec_hooks.py",
+                "sha256": "6f82071c21d7df93baf07180912926d54e63adf6d1a4ef6b099154f97c22d278",
+                "start_line": 87
+              },
+              "text": "    for base in value.__class__.__mro__[:-1]:"
+            },
+            {
+              "line": 88,
+              "line_sha256": "f412dc6b80507118cd1aa1c3e38a0a4a07328ba20fb2a072f20d95a4c1054c1f",
+              "path": "litestar/serialization/msgspec_hooks.py",
+              "source_label": {
+                "end_line": 88,
+                "path": "litestar/serialization/msgspec_hooks.py",
+                "sha256": "b569cb09280ee0781945e48d4041bd2dfaae691ad2eabf5d3cba0846c7216caa",
+                "start_line": 88
+              },
+              "text": "        try:"
+            },
+            {
+              "line": 89,
+              "line_sha256": "d0b76b5b4be510c4c8c1f6b0b6365453555eae84c9c3677fec6aa4524d9dd3c4",
+              "path": "litestar/serialization/msgspec_hooks.py",
+              "source_label": {
+                "end_line": 89,
+                "path": "litestar/serialization/msgspec_hooks.py",
+                "sha256": "69c98fd39510f43bd3f43c812c3ec63607a2d436a94b7e01ba2ef17ff14fef10",
+                "start_line": 89
+              },
+              "text": "            encoder = type_encoders[base]"
+            },
+            {
+              "line": 90,
+              "line_sha256": "71ac70b8581c675b29018910ba5fa441f55a3a25436a8fce94ed2dcbe7cc97f0",
+              "path": "litestar/serialization/msgspec_hooks.py",
+              "source_label": {
+                "end_line": 90,
+                "path": "litestar/serialization/msgspec_hooks.py",
+                "sha256": "fc2b1bb7e7fdc66c2d64f29c0d8ec020d43a8d515897e9f0459d8305d3269dbb",
+                "start_line": 90
+              },
+              "text": "            return encoder(value)"
+            },
+            {
+              "line": 91,
+              "line_sha256": "9fc68b74a4289daac06ab90039798dd4534ba9fa775c2101f8b73cc94ac57408",
+              "path": "litestar/serialization/msgspec_hooks.py",
+              "source_label": {
+                "end_line": 91,
+                "path": "litestar/serialization/msgspec_hooks.py",
+                "sha256": "4f9e842857c92cd0a1f6453103c42cf9d11bc281dff5891940b3fc41da52f3a0",
+                "start_line": 91
+              },
+              "text": "        except KeyError:"
+            },
+            {
+              "line": 92,
+              "line_sha256": "441119cd4d7e90fa1cb254aff882d82750708b077c9cff181598ac67b9b30909",
+              "path": "litestar/serialization/msgspec_hooks.py",
+              "source_label": {
+                "end_line": 92,
+                "path": "litestar/serialization/msgspec_hooks.py",
+                "sha256": "f6ad052c44b953f0d83286a2dddec2185e7f189db0e4f502c6f06f34758454a4",
+                "start_line": 92
+              },
+              "text": "            continue"
+            },
+            {
+              "line": 94,
+              "line_sha256": "7c3c05803c22248ac468c8d9d4d99918c5bbad44ebd8b899c12ccf579c4b55b3",
+              "path": "litestar/serialization/msgspec_hooks.py",
+              "source_label": {
+                "end_line": 94,
+                "path": "litestar/serialization/msgspec_hooks.py",
+                "sha256": "6ca82996029d9836e069f70c9470004ef043e68f47cfc5fc62eaedf31e4158ee",
+                "start_line": 94
+              },
+              "text": "    raise TypeError(f\"Unsupported type: {type(value)!r}\")"
+            }
+          ],
+          "same_callee_occurrences": 1,
+          "selection": "explicit reviewed line within nominated exact declaration; no inferred reachability",
+          "source": "litestar-serializer-keyerror-boundary-before"
+        }
+      }
+    },
+    {
+      "capability_reviewed": false,
+      "causal_test_relevance": "not-reviewed",
+      "id": "litestar-nested-field-renaming",
+      "problem_id": "dfe872c6379142d6c5a266a6e5a19fa48dacddb8",
+      "runtime_compatibility": "not-established",
+      "semantic_pair_relationship": "not-established",
+      "stages": {
+        "after": {
+          "argument_pointer": "/argument_syntax/keywords/*",
+          "boundary_file_sha256": "dfb07a71c0a8e2842f7d20b163aeaa493b0cb36b536962960eb6421ab8558dfa",
+          "call_source": "TransferDTOFieldDefinition.from_dto_field_definition(field_definition=field_definition, serialization_name=serialization_name, transfer_type=transfer_type, is_partial=self.dto_factory.config.partial, is_excluded=_should_exclude_field(field_definition=field_definition, exclude=exclude, include=include, is_data_field=self.is_data_field))",
+          "call_source_label": {
+            "end_line": 186,
+            "path": "litestar/dto/_backend.py",
+            "sha256": "62bcd4b59e7df16acbafc6e5e7490bcae18bffe3ba97776e9e5d7122a4514724",
+            "start_line": 175
+          },
+          "content_identity": "sha256:428904513705e72d9890326af2cf952d5b987fda459fe2d5ceb0f2b440865347:1226",
+          "declaration": {
+            "declaration_line": 128,
+            "end_line": 188,
+            "path": "litestar/dto/_backend.py",
+            "sha256": "3b93a57f876d35e39c30c6efd72a0d60a8f0f09b35ffdcc56b030941b6e5c6cd",
+            "start_line": 128,
+            "symbol": "DTOBackend.parse_model"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "name": "serialization_name",
+            "name_state": "literal",
+            "value": {
+              "identifier": "serialization_name",
+              "state": "identifier-syntax"
+            }
+          },
+          "expected_site": {
+            "callee_identifier_syntax": "TransferDTOFieldDefinition.from_dto_field_definition",
+            "end_line": 186,
+            "line": 175,
+            "positional_argument_count": 0,
+            "syntax_kind": "call"
+          },
+          "line_file_sha256": "dfb07a71c0a8e2842f7d20b163aeaa493b0cb36b536962960eb6421ab8558dfa",
+          "reviewed_lines": [
+            {
+              "line": 166,
+              "line_sha256": "9e2cd6b713c05a73a9fc66fe4b82b8734cf91a30be6d08d37e5ebed4c8391c3c",
+              "path": "litestar/dto/_backend.py",
+              "source_label": {
+                "end_line": 166,
+                "path": "litestar/dto/_backend.py",
+                "sha256": "d6214c6129a955fbcf39335a4a51f73313dbd8d95a7a098ae7f803ca331eab49",
+                "start_line": 166
+              },
+              "text": "            if rename := rename_fields.get(field_definition.name):"
+            },
+            {
+              "line": 167,
+              "line_sha256": "5e79e397e6d2e7c115fafec84c760b3783c7af07fcc5282c0084376f8483a452",
+              "path": "litestar/dto/_backend.py",
+              "source_label": {
+                "end_line": 167,
+                "path": "litestar/dto/_backend.py",
+                "sha256": "9043032e5ebc8d18fd7c3dbb8e3a037f97ca3d54d464936e08151eaa843a9014",
+                "start_line": 167
+              },
+              "text": "                serialization_name = rename"
+            },
+            {
+              "line": 173,
+              "line_sha256": "42744bdb2d948fa068fb3b746b8c1e9d8ea6bd07b6f1a8b14f2e8fa0833852e9",
+              "path": "litestar/dto/_backend.py",
+              "source_label": {
+                "end_line": 173,
+                "path": "litestar/dto/_backend.py",
+                "sha256": "95877803c006a25e6ce3e4e7d699f557a26c9da6cc66714eb1e67ebacd531d2d",
+                "start_line": 173
+              },
+              "text": "                serialization_name = field_definition.name"
+            },
+            {
+              "line": 177,
+              "line_sha256": "97167996c7a7b8582f8283aee225087f114a63ceddc63c1ac18f66033f7c69c2",
+              "path": "litestar/dto/_backend.py",
+              "source_label": {
+                "end_line": 177,
+                "path": "litestar/dto/_backend.py",
+                "sha256": "ffaa3c3098bf3de90c13328506808af35aa18d7b50ce132bc765d90fef3c9d4a",
+                "start_line": 177
+              },
+              "text": "                serialization_name=serialization_name,"
+            },
+            {
+              "line": 653,
+              "line_sha256": "f7d8ef3679e2677f3f05af14adde4c140782c0fda85da28c106246a19fc3beda",
+              "path": "litestar/dto/_backend.py",
+              "source_label": {
+                "end_line": 653,
+                "path": "litestar/dto/_backend.py",
+                "sha256": "57c396d036a9ae3c910a420ade35db597327be8c0347e022154102f1bb61529e",
+                "start_line": 653
+              },
+              "text": "        should_use_serialization_name = not override_serialization_name and is_data_field"
+            },
+            {
+              "line": 654,
+              "line_sha256": "2f8fa4a904994fdade746a1df05bce9efa603606bbc1d5bd8b4f58dd32e5f63a",
+              "path": "litestar/dto/_backend.py",
+              "source_label": {
+                "end_line": 654,
+                "path": "litestar/dto/_backend.py",
+                "sha256": "394e8bf188c0c5e6633ba720a834dbd06728dac7af8e8797bf1ab8b7fca014d4",
+                "start_line": 654
+              },
+              "text": "        source_name = field_definition.serialization_name if should_use_serialization_name else field_definition.name"
+            },
+            {
+              "line": 667,
+              "line_sha256": "a4fdeca42bd67dab73642c13db7e9acc7fb480c0c94bc1f469a2289f855795fb",
+              "path": "litestar/dto/_backend.py",
+              "source_label": {
+                "end_line": 667,
+                "path": "litestar/dto/_backend.py",
+                "sha256": "961bb414aa6c44e2323cc8f04732f62a38d82c47cad50c6e32d2b349adad7be3",
+                "start_line": 667
+              },
+              "text": "        destination_name = field_definition.name if is_data_field else field_definition.serialization_name"
+            },
+            {
+              "line": 669,
+              "line_sha256": "4974f1c0a3fb8bc2fcdf7b1fe041f77d9c6e3072dee2a0126ee2902ebf3e9faf",
+              "path": "litestar/dto/_backend.py",
+              "source_label": {
+                "end_line": 669,
+                "path": "litestar/dto/_backend.py",
+                "sha256": "2a860e2b651f13be6576f33b1704df0baa33ac5f35c28b9c07a5fadc1b311062",
+                "start_line": 669
+              },
+              "text": "            source_instance[source_name]"
+            }
+          ],
+          "same_callee_occurrences": 1,
+          "selection": "explicit reviewed line within nominated exact declaration; no inferred reachability",
+          "source": "litestar-nested-field-renaming-after"
+        },
+        "before": {
+          "argument_pointer": "/argument_syntax/keywords/*",
+          "boundary_file_sha256": "9ee66601f8b31c0faa2362a8358269daa46c0816b09654c26e5f3662f4603508",
+          "call_source": "TransferDTOFieldDefinition.from_dto_field_definition(field_definition=field_definition, serialization_name=serialization_name, transfer_type=transfer_type, is_partial=self.dto_factory.config.partial, is_excluded=_should_exclude_field(field_definition=field_definition, exclude=exclude, include=include, is_data_field=self.is_data_field))",
+          "call_source_label": {
+            "end_line": 153,
+            "path": "litestar/dto/_backend.py",
+            "sha256": "62bcd4b59e7df16acbafc6e5e7490bcae18bffe3ba97776e9e5d7122a4514724",
+            "start_line": 142
+          },
+          "content_identity": "sha256:6cebbf6639f31b217dbf1ba9b1cf6b3d8627f68575e6dbd1f7b0762a1646c49a:1226",
+          "declaration": {
+            "declaration_line": 101,
+            "end_line": 155,
+            "path": "litestar/dto/_backend.py",
+            "sha256": "90b1f3515f99acbc7c82d1b5e7ed582eb3512ed22f529b4f625f2f10d1e89a1c",
+            "start_line": 101,
+            "symbol": "DTOBackend.parse_model"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "name": "serialization_name",
+            "name_state": "literal",
+            "value": {
+              "identifier": "serialization_name",
+              "state": "identifier-syntax"
+            }
+          },
+          "expected_site": {
+            "callee_identifier_syntax": "TransferDTOFieldDefinition.from_dto_field_definition",
+            "end_line": 153,
+            "line": 142,
+            "positional_argument_count": 0,
+            "syntax_kind": "call"
+          },
+          "line_file_sha256": "9ee66601f8b31c0faa2362a8358269daa46c0816b09654c26e5f3662f4603508",
+          "reviewed_lines": [
+            {
+              "line": 133,
+              "line_sha256": "0171f5939f644500a4f8a4602c26edbae9f5015a58602b6170607f82a2b186f5",
+              "path": "litestar/dto/_backend.py",
+              "source_label": {
+                "end_line": 133,
+                "path": "litestar/dto/_backend.py",
+                "sha256": "6363f9851fb73eef62d5f3b96581cd595d46c40cbdf90e798b1b17d6b8e4ecc7",
+                "start_line": 133
+              },
+              "text": "            if rename := self.dto_factory.config.rename_fields.get(field_definition.name):"
+            },
+            {
+              "line": 134,
+              "line_sha256": "5e79e397e6d2e7c115fafec84c760b3783c7af07fcc5282c0084376f8483a452",
+              "path": "litestar/dto/_backend.py",
+              "source_label": {
+                "end_line": 134,
+                "path": "litestar/dto/_backend.py",
+                "sha256": "9043032e5ebc8d18fd7c3dbb8e3a037f97ca3d54d464936e08151eaa843a9014",
+                "start_line": 134
+              },
+              "text": "                serialization_name = rename"
+            },
+            {
+              "line": 140,
+              "line_sha256": "42744bdb2d948fa068fb3b746b8c1e9d8ea6bd07b6f1a8b14f2e8fa0833852e9",
+              "path": "litestar/dto/_backend.py",
+              "source_label": {
+                "end_line": 140,
+                "path": "litestar/dto/_backend.py",
+                "sha256": "95877803c006a25e6ce3e4e7d699f557a26c9da6cc66714eb1e67ebacd531d2d",
+                "start_line": 140
+              },
+              "text": "                serialization_name = field_definition.name"
+            },
+            {
+              "line": 144,
+              "line_sha256": "97167996c7a7b8582f8283aee225087f114a63ceddc63c1ac18f66033f7c69c2",
+              "path": "litestar/dto/_backend.py",
+              "source_label": {
+                "end_line": 144,
+                "path": "litestar/dto/_backend.py",
+                "sha256": "ffaa3c3098bf3de90c13328506808af35aa18d7b50ce132bc765d90fef3c9d4a",
+                "start_line": 144
+              },
+              "text": "                serialization_name=serialization_name,"
+            },
+            {
+              "line": 591,
+              "line_sha256": "f7d8ef3679e2677f3f05af14adde4c140782c0fda85da28c106246a19fc3beda",
+              "path": "litestar/dto/_backend.py",
+              "source_label": {
+                "end_line": 591,
+                "path": "litestar/dto/_backend.py",
+                "sha256": "57c396d036a9ae3c910a420ade35db597327be8c0347e022154102f1bb61529e",
+                "start_line": 591
+              },
+              "text": "        should_use_serialization_name = not override_serialization_name and is_data_field"
+            },
+            {
+              "line": 592,
+              "line_sha256": "2f8fa4a904994fdade746a1df05bce9efa603606bbc1d5bd8b4f58dd32e5f63a",
+              "path": "litestar/dto/_backend.py",
+              "source_label": {
+                "end_line": 592,
+                "path": "litestar/dto/_backend.py",
+                "sha256": "394e8bf188c0c5e6633ba720a834dbd06728dac7af8e8797bf1ab8b7fca014d4",
+                "start_line": 592
+              },
+              "text": "        source_name = field_definition.serialization_name if should_use_serialization_name else field_definition.name"
+            },
+            {
+              "line": 605,
+              "line_sha256": "a4fdeca42bd67dab73642c13db7e9acc7fb480c0c94bc1f469a2289f855795fb",
+              "path": "litestar/dto/_backend.py",
+              "source_label": {
+                "end_line": 605,
+                "path": "litestar/dto/_backend.py",
+                "sha256": "961bb414aa6c44e2323cc8f04732f62a38d82c47cad50c6e32d2b349adad7be3",
+                "start_line": 605
+              },
+              "text": "        destination_name = field_definition.name if is_data_field else field_definition.serialization_name"
+            },
+            {
+              "line": 607,
+              "line_sha256": "4974f1c0a3fb8bc2fcdf7b1fe041f77d9c6e3072dee2a0126ee2902ebf3e9faf",
+              "path": "litestar/dto/_backend.py",
+              "source_label": {
+                "end_line": 607,
+                "path": "litestar/dto/_backend.py",
+                "sha256": "2a860e2b651f13be6576f33b1704df0baa33ac5f35c28b9c07a5fadc1b311062",
+                "start_line": 607
+              },
+              "text": "            source_instance[source_name]"
+            }
+          ],
+          "same_callee_occurrences": 1,
+          "selection": "explicit reviewed line within nominated exact declaration; no inferred reachability",
+          "source": "litestar-nested-field-renaming-before"
+        }
+      }
+    },
+    {
+      "capability_reviewed": false,
+      "causal_test_relevance": "not-reviewed",
+      "id": "litestar-dtodata-renamed-instance",
+      "problem_id": "031df7f45e69200624779356074f6f9470d2c1b3",
+      "runtime_compatibility": "not-established",
+      "semantic_pair_relationship": "not-established",
+      "stages": {
+        "after": {
+          "argument_pointer": "/argument_syntax/keywords/*",
+          "boundary_file_sha256": "f6be5d47560857ae9fe5bcfb10bc428b6e7bca694fb7c33197b5c9bf4ac48ab4",
+          "call_source": "self._backend.transfer_data_from_builtins(data, override_serialization_name=True)",
+          "call_source_label": {
+            "end_line": 37,
+            "path": "litestar/dto/data_structures.py",
+            "sha256": "9de62fedbd78597977e994c13e8ef38e217be606e1cf462e7c254b34c236f9f4",
+            "start_line": 35
+          },
+          "content_identity": "sha256:71ce3223abcbcf76856234874f8d83e6734e4aee8fbd777368a2bd23b492d579:1175",
+          "declaration": {
+            "declaration_line": 26,
+            "end_line": 37,
+            "path": "litestar/dto/data_structures.py",
+            "sha256": "4e8fb06f9a5784cb97085b5d4c51c9aa89a9864fef8aa144a952e2b872f138c6",
+            "start_line": 26,
+            "symbol": "DTOData.create_instance"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "name": "override_serialization_name",
+            "name_state": "literal",
+            "value": {
+              "kind": "bool",
+              "state": "literal-syntax",
+              "value": true
+            }
+          },
+          "expected_site": {
+            "callee_identifier_syntax": "self._backend.transfer_data_from_builtins",
+            "end_line": 37,
+            "line": 35,
+            "positional_argument_count": 1,
+            "syntax_kind": "call"
+          },
+          "line_file_sha256": "05e331f3e123665a5a509513288b88fb3197c0ccf2d480b78c64f590223f5f79",
+          "reviewed_lines": [
+            {
+              "line": 263,
+              "line_sha256": "6411ba3e310cbcf536f4ef47155f0172fd2bacf70386760d5c600f720c0bae7d",
+              "path": "litestar/dto/_backend.py",
+              "source_label": {
+                "end_line": 263,
+                "path": "litestar/dto/_backend.py",
+                "sha256": "40f331292e377767970f3db586dc6bc706e73a096ee2d2a7a048aee3160134a6",
+                "start_line": 263
+              },
+              "text": "        self.override_serialization_name = override_serialization_name"
+            },
+            {
+              "line": 264,
+              "line_sha256": "7999f34b93680740a16637f8374255685fb9eee6ba24f13da0a78084e3bed99d",
+              "path": "litestar/dto/_backend.py",
+              "source_label": {
+                "end_line": 264,
+                "path": "litestar/dto/_backend.py",
+                "sha256": "378376cef774666aa140b363d330c3afc986be39276fc9fffafcffb8797b8a7a",
+                "start_line": 264
+              },
+              "text": "        data = _transfer_data("
+            },
+            {
+              "line": 266,
+              "line_sha256": "b5af9c1d9293551f309d04fa91dc2630d80ef79f31bb26233a1b713d77f7e66c",
+              "path": "litestar/dto/_backend.py",
+              "source_label": {
+                "end_line": 266,
+                "path": "litestar/dto/_backend.py",
+                "sha256": "740818098cf793796fa7532c66b38f58dffc76bbbf170f583b293c253c3dbfd0",
+                "start_line": 266
+              },
+              "text": "            source_data=builtins,"
+            },
+            {
+              "line": 270,
+              "line_sha256": "1b46dc5bcc2f48f93e6da9735145a03107889ed98508273fd5c59620c1000e2d",
+              "path": "litestar/dto/_backend.py",
+              "source_label": {
+                "end_line": 270,
+                "path": "litestar/dto/_backend.py",
+                "sha256": "60b8aa34657fdebaafd80b29651d5c429de468f2e710540290b06ef1466165de",
+                "start_line": 270
+              },
+              "text": "            override_serialization_name=self.override_serialization_name,"
+            },
+            {
+              "line": 272,
+              "line_sha256": "62c0c0605879e22258380f0ab58bfef9226666abd1773793f4b9d9e8f70d66d0",
+              "path": "litestar/dto/_backend.py",
+              "source_label": {
+                "end_line": 272,
+                "path": "litestar/dto/_backend.py",
+                "sha256": "f6ecfeccea22aee99156c9735ad4bc01dbe581dd0cd868b5929a15101728a1e7",
+                "start_line": 272
+              },
+              "text": "        self.override_serialization_name = False"
+            },
+            {
+              "line": 273,
+              "line_sha256": "8f759661dea248392d344138daea2d10a33eae3fbedb392a077d00c137d561e3",
+              "path": "litestar/dto/_backend.py",
+              "source_label": {
+                "end_line": 273,
+                "path": "litestar/dto/_backend.py",
+                "sha256": "8c25e3aec1b13f90a38cb2cccbf9df83bc5fe660281792ec73074270230c72b6",
+                "start_line": 273
+              },
+              "text": "        return data"
+            },
+            {
+              "line": 589,
+              "line_sha256": "f7d8ef3679e2677f3f05af14adde4c140782c0fda85da28c106246a19fc3beda",
+              "path": "litestar/dto/_backend.py",
+              "source_label": {
+                "end_line": 589,
+                "path": "litestar/dto/_backend.py",
+                "sha256": "57c396d036a9ae3c910a420ade35db597327be8c0347e022154102f1bb61529e",
+                "start_line": 589
+              },
+              "text": "        should_use_serialization_name = not override_serialization_name and is_data_field"
+            },
+            {
+              "line": 590,
+              "line_sha256": "2f8fa4a904994fdade746a1df05bce9efa603606bbc1d5bd8b4f58dd32e5f63a",
+              "path": "litestar/dto/_backend.py",
+              "source_label": {
+                "end_line": 590,
+                "path": "litestar/dto/_backend.py",
+                "sha256": "394e8bf188c0c5e6633ba720a834dbd06728dac7af8e8797bf1ab8b7fca014d4",
+                "start_line": 590
+              },
+              "text": "        source_name = field_definition.serialization_name if should_use_serialization_name else field_definition.name"
+            }
+          ],
+          "same_callee_occurrences": 1,
+          "selection": "explicit reviewed line within nominated exact declaration; no inferred reachability",
+          "source": "litestar-dtodata-renamed-instance-after"
+        },
+        "before": {
+          "argument_pointer": "/argument_syntax/positional/*",
+          "boundary_file_sha256": "c1aa0cb1fc75b9f5fb0d5b2370acf9612abf594ce1f44ab788391d4fa884aa55",
+          "call_source": "self._backend.transfer_data_from_builtins(data)",
+          "call_source_label": {
+            "end_line": 35,
+            "path": "litestar/dto/data_structures.py",
+            "sha256": "c2bcb165a5159338140a436b5ad9f9e5025b36e1d1b6ddab0ccebdd56b4a71b8",
+            "start_line": 35
+          },
+          "content_identity": "sha256:91536580a4011ac8018598794e41706c6d3995b5b5b3bf32f6a7d66f63f93530:1175",
+          "declaration": {
+            "declaration_line": 26,
+            "end_line": 35,
+            "path": "litestar/dto/data_structures.py",
+            "sha256": "5ea806318c7bf5730e1c8dc5cd016ee256a6ab607fb5ae630c9a94397176de79",
+            "start_line": 26,
+            "symbol": "DTOData.create_instance"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "position": 0,
+            "value": {
+              "identifier": "data",
+              "state": "identifier-syntax"
+            }
+          },
+          "expected_site": {
+            "callee_identifier_syntax": "self._backend.transfer_data_from_builtins",
+            "end_line": 35,
+            "line": 35,
+            "positional_argument_count": 1,
+            "syntax_kind": "call"
+          },
+          "line_file_sha256": "b085933d61a5ace9fb583158cab4a5d96da07f1008085dec9fc25fee7cfc3eff",
+          "reviewed_lines": [
+            {
+              "line": 262,
+              "line_sha256": "ddcb9bc1248280b3094704d0322d01242b4465b5d62d84ce2f97c603607f3bd2",
+              "path": "litestar/dto/_backend.py",
+              "source_label": {
+                "end_line": 262,
+                "path": "litestar/dto/_backend.py",
+                "sha256": "1d5723f9eb156e8ec5c2579ba22e7708cfc04c788b1efab668a234b6aa24acc4",
+                "start_line": 262
+              },
+              "text": "        return _transfer_data("
+            },
+            {
+              "line": 264,
+              "line_sha256": "b5af9c1d9293551f309d04fa91dc2630d80ef79f31bb26233a1b713d77f7e66c",
+              "path": "litestar/dto/_backend.py",
+              "source_label": {
+                "end_line": 264,
+                "path": "litestar/dto/_backend.py",
+                "sha256": "740818098cf793796fa7532c66b38f58dffc76bbbf170f583b293c253c3dbfd0",
+                "start_line": 264
+              },
+              "text": "            source_data=builtins,"
+            },
+            {
+              "line": 267,
+              "line_sha256": "6037e9d15a0b7b19992239fcaa2d090abbd061e14379c0a1700cdee61f117a1e",
+              "path": "litestar/dto/_backend.py",
+              "source_label": {
+                "end_line": 267,
+                "path": "litestar/dto/_backend.py",
+                "sha256": "0287c652bc1fe535d73936d3b3ca537cc6fb817230b7eddf65fe922bcf163330",
+                "start_line": 267
+              },
+              "text": "            is_data_field=self.is_data_field,"
+            },
+            {
+              "line": 268,
+              "line_sha256": "1064fcb66621ccdb88a0ab8a477051f90f9dbdd0d7197cfc2b502c8a59fdebb3",
+              "path": "litestar/dto/_backend.py",
+              "source_label": {
+                "end_line": 268,
+                "path": "litestar/dto/_backend.py",
+                "sha256": "2a0bef2db5b86423e2959060826dad71b285cb1e32947cd6e55055a868f118b7",
+                "start_line": 268
+              },
+              "text": "            is_dto_data_type=self.is_dto_data_type,"
+            },
+            {
+              "line": 583,
+              "line_sha256": "cfe640be43b6785cc9845871feebf9165f3abb633f0ea6abe59c393ef1d9ef91",
+              "path": "litestar/dto/_backend.py",
+              "source_label": {
+                "end_line": 583,
+                "path": "litestar/dto/_backend.py",
+                "sha256": "1165056d667ceea63e0324984935cbf077a7973b9fac769521eeb078781f1976",
+                "start_line": 583
+              },
+              "text": "        should_use_serialization_name = is_data_field and not is_dto_data_type"
+            },
+            {
+              "line": 584,
+              "line_sha256": "2f8fa4a904994fdade746a1df05bce9efa603606bbc1d5bd8b4f58dd32e5f63a",
+              "path": "litestar/dto/_backend.py",
+              "source_label": {
+                "end_line": 584,
+                "path": "litestar/dto/_backend.py",
+                "sha256": "394e8bf188c0c5e6633ba720a834dbd06728dac7af8e8797bf1ab8b7fca014d4",
+                "start_line": 584
+              },
+              "text": "        source_name = field_definition.serialization_name if should_use_serialization_name else field_definition.name"
+            }
+          ],
+          "same_callee_occurrences": 1,
+          "selection": "explicit reviewed line within nominated exact declaration; no inferred reachability",
+          "source": "litestar-dtodata-renamed-instance-before"
+        }
+      }
+    },
+    {
+      "capability_reviewed": false,
+      "causal_test_relevance": "not-reviewed",
+      "id": "litestar-url-encoded-string-values",
+      "problem_id": "e50ffb978c6e34588d7ed4cec71a2bec18d19a92",
+      "runtime_compatibility": "not-established",
+      "semantic_pair_relationship": "not-established",
+      "stages": {
+        "after": {
+          "argument_pointer": "/argument_syntax/keywords/*",
+          "boundary_file_sha256": "e0a2c62708f34b14d7fd3a2c08bb9857363a1ffe43a2a41c4fc4def1064e0916",
+          "call_source": "convert(obj=builtins, type=self.annotation, dec_hook=connection_context.default_deserializer, strict=False)",
+          "call_source_label": {
+            "end_line": 257,
+            "path": "litestar/dto/_backend.py",
+            "sha256": "332eae33a8dc10dfe69d38ceb8e0a0be2200ef838a0c8db346e5c81f9056c77e",
+            "start_line": 255
+          },
+          "content_identity": "sha256:f720f2256fd9fe338faf3741a09dbf530257403b503ecd4e151f176743c4b0ec:1178",
+          "declaration": {
+            "declaration_line": 245,
+            "end_line": 257,
+            "path": "litestar/dto/_backend.py",
+            "sha256": "2893ff02cf57e116809ed6a88024544274f8bc81a367db90e4bdc6c86b22ac25",
+            "start_line": 245,
+            "symbol": "DTOBackend.parse_builtins"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "name": "strict",
+            "name_state": "literal",
+            "value": {
+              "kind": "bool",
+              "state": "literal-syntax",
+              "value": false
+            }
+          },
+          "expected_site": {
+            "callee_identifier_syntax": "convert",
+            "end_line": 257,
+            "line": 255,
+            "positional_argument_count": 0,
+            "syntax_kind": "call"
+          },
+          "line_file_sha256": "091ac8669a91ac3de3883c55409461c8a758f15cd938d116074fa41632a8fe4a",
+          "reviewed_lines": [
+            {
+              "line": 15,
+              "line_sha256": "ad15ab5b4cd96871f21f2ca01c605d60389ffffc9364a41cc0bc35f59ff9579f",
+              "path": "litestar/_parsers.py",
+              "source_label": {
+                "end_line": 15,
+                "path": "litestar/_parsers.py",
+                "sha256": "4563d2ace727d3f05b895025c7ac365c1496c78d9ffc95b94e69f1b77afea86f",
+                "start_line": 15
+              },
+              "text": "def parse_url_encoded_form_data(encoded_data: bytes) -> dict[str, Any]:"
+            },
+            {
+              "line": 24,
+              "line_sha256": "9fe887e455e44dcc68c6ef90261b891fd3931480fa3c417b8dae83524a71fa01",
+              "path": "litestar/_parsers.py",
+              "source_label": {
+                "end_line": 24,
+                "path": "litestar/_parsers.py",
+                "sha256": "5275990b5b7b22f5ebbcc1bb911cf5ac3eb53e257cfa6690f103ef8775e48fa4",
+                "start_line": 24
+              },
+              "text": "    return parse_url_encoded_dict(qs=encoded_data, parse_numbers=False)"
+            }
+          ],
+          "same_callee_occurrences": 1,
+          "selection": "explicit reviewed line within nominated exact declaration; no inferred reachability",
+          "source": "litestar-url-encoded-string-values-after"
+        },
+        "before": {
+          "argument_pointer": "/argument_syntax/keywords/*",
+          "boundary_file_sha256": "af76b3ffb6d74de41148b9cad4bb0f305f1fdb17ee449318e5e3518c8e25bff0",
+          "call_source": "convert(obj=builtins, type=self.annotation, dec_hook=connection_context.default_deserializer)",
+          "call_source_label": {
+            "end_line": 255,
+            "path": "litestar/dto/_backend.py",
+            "sha256": "90c661f1d95a09ef52dfe8eceefc3e2255a0ca2106c8b4a5fd0fe645a945b7bf",
+            "start_line": 255
+          },
+          "content_identity": "sha256:ad2ba4dbfda9dbd172a00005bebf0d69d4d941284d3cc83cb01584b6b589f2bd:1178",
+          "declaration": {
+            "declaration_line": 245,
+            "end_line": 255,
+            "path": "litestar/dto/_backend.py",
+            "sha256": "1e952ce5b701b3972cf3a068466e7d1fa918b194850032ceee088879d88a5f59",
+            "start_line": 245,
+            "symbol": "DTOBackend.parse_builtins"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "name": "obj",
+            "name_state": "literal",
+            "value": {
+              "identifier": "builtins",
+              "state": "identifier-syntax"
+            }
+          },
+          "expected_site": {
+            "callee_identifier_syntax": "convert",
+            "end_line": 255,
+            "line": 255,
+            "positional_argument_count": 0,
+            "syntax_kind": "call"
+          },
+          "line_file_sha256": "bb71798dfbeeca51f78bf58db86c9a5dd72231513a37e79972a7fecaf5a2ce3e",
+          "reviewed_lines": [
+            {
+              "line": 15,
+              "line_sha256": "ad15ab5b4cd96871f21f2ca01c605d60389ffffc9364a41cc0bc35f59ff9579f",
+              "path": "litestar/_parsers.py",
+              "source_label": {
+                "end_line": 15,
+                "path": "litestar/_parsers.py",
+                "sha256": "4563d2ace727d3f05b895025c7ac365c1496c78d9ffc95b94e69f1b77afea86f",
+                "start_line": 15
+              },
+              "text": "def parse_url_encoded_form_data(encoded_data: bytes) -> dict[str, Any]:"
+            },
+            {
+              "line": 24,
+              "line_sha256": "4e9e96d7d314b91d81b195e9720e70e338a0cdf75cc53b2c1c86447a92bb83f2",
+              "path": "litestar/_parsers.py",
+              "source_label": {
+                "end_line": 24,
+                "path": "litestar/_parsers.py",
+                "sha256": "57607705b2700859be925c889647a060961a5b5d881e7ea3c8570a9897180c3d",
+                "start_line": 24
+              },
+              "text": "    return parse_url_encoded_dict(encoded_data)"
+            }
+          ],
+          "same_callee_occurrences": 1,
+          "selection": "explicit reviewed line within nominated exact declaration; no inferred reachability",
+          "source": "litestar-url-encoded-string-values-before"
+        }
+      }
+    },
+    {
+      "capability_reviewed": false,
+      "causal_test_relevance": "not-reviewed",
+      "id": "faststream-keyed-none-tombstone",
+      "problem_id": "5b98b87c433c28dabbb21d092fc854e4ecb0bcbd",
+      "runtime_compatibility": "not-established",
+      "semantic_pair_relationship": "not-established",
+      "stages": {
+        "after": {
+          "argument_pointer": "/argument_syntax/positional/*",
+          "boundary_file_sha256": "1c94e4a719263d740d807101a67bddf9477dcd1343c3488295e28df6978d29ec",
+          "call_source": "self.codec.encode(cmd.body, self.serializer)",
+          "call_source_label": {
+            "end_line": 118,
+            "path": "faststream/kafka/publisher/producer.py",
+            "sha256": "a8cfeba477c7b6775ea900dc237b3c7d850fda4e2d391d29f95e6ed5719054c9",
+            "start_line": 118
+          },
+          "content_identity": "sha256:cc26fbd852862bc1f5f07eab02dcfbe54d95add539b2b227b44c89a007461f01:2104",
+          "declaration": {
+            "declaration_line": 108,
+            "end_line": 136,
+            "path": "faststream/kafka/publisher/producer.py",
+            "sha256": "7a7eb958f44cf184240e65fc20f50a23e26c40cc14381d227ff58ba0ee26edcc",
+            "start_line": 107,
+            "symbol": "AioKafkaFastProducerImpl.publish"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "position": 0,
+            "value": {
+              "identifier": "cmd.body",
+              "state": "identifier-syntax"
+            }
+          },
+          "expected_site": {
+            "callee_identifier_syntax": "self.codec.encode",
+            "end_line": 118,
+            "line": 118,
+            "positional_argument_count": 2,
+            "syntax_kind": "call"
+          },
+          "line_file_sha256": "6e05a57131f5c99e0615a06805cdaa73dcd34da222256c986fea400360d46fca",
+          "reviewed_lines": [
+            {
+              "line": 142,
+              "line_sha256": "583212cfb7a841dbde66ef2a7b2d1df72c9c53ef31ed9408076852ac5921cb9b",
+              "path": "faststream/confluent/publisher/producer.py",
+              "source_label": {
+                "end_line": 142,
+                "path": "faststream/confluent/publisher/producer.py",
+                "sha256": "cd3b26f1815c326d59b917fb9e93390431cbc8063ad15c77e6900271b65c331b",
+                "start_line": 142
+              },
+              "text": "        if cmd.body is None:"
+            },
+            {
+              "line": 143,
+              "line_sha256": "bf543801c452c3387b483dfdc378b0cc2d2fa1ffda8787cfe5acea2b876a5424",
+              "path": "faststream/confluent/publisher/producer.py",
+              "source_label": {
+                "end_line": 143,
+                "path": "faststream/confluent/publisher/producer.py",
+                "sha256": "b7ddab9eabd8a534f3a1fb1910f84e3d33bb6f3eead444bc13bbd30821a4a5c8",
+                "start_line": 143
+              },
+              "text": "            message, content_type = None, None"
+            },
+            {
+              "line": 145,
+              "line_sha256": "0b4da955670895b3afd8cb9dd4e9ccc99d6b8818ccbdc761bb9eaca6fd0acf8c",
+              "path": "faststream/confluent/publisher/producer.py",
+              "source_label": {
+                "end_line": 145,
+                "path": "faststream/confluent/publisher/producer.py",
+                "sha256": "a8cfeba477c7b6775ea900dc237b3c7d850fda4e2d391d29f95e6ed5719054c9",
+                "start_line": 145
+              },
+              "text": "            message, content_type = await self.codec.encode(cmd.body, self.serializer)"
+            },
+            {
+              "line": 147,
+              "line_sha256": "eb40b3af027768fd3c6c0a3302cf41687e10cdcd7f841971e27255311c30c9a5",
+              "path": "faststream/confluent/publisher/producer.py",
+              "source_label": {
+                "end_line": 147,
+                "path": "faststream/confluent/publisher/producer.py",
+                "sha256": "1ef740e8373e54248f2825993ccd172369c252a202cad37232389f30052b7b1a",
+                "start_line": 147
+              },
+              "text": "        headers_to_send = {"
+            },
+            {
+              "line": 148,
+              "line_sha256": "61d072c77e78b62fb4b078b0a3505c60c7db923eb8dcfe514a79ce2917707e38",
+              "path": "faststream/confluent/publisher/producer.py",
+              "source_label": {
+                "end_line": 148,
+                "path": "faststream/confluent/publisher/producer.py",
+                "sha256": "c44e1ee33d3764fa86e02234fca44b45f4462ebc7a6bd2e53688ffda42a6dbe5",
+                "start_line": 148
+              },
+              "text": "            \"content-type\": content_type or \"\","
+            },
+            {
+              "line": 152,
+              "line_sha256": "02f2c3de8b6c4a0155f2eba007135fa7b64fd621b906904805ed639093ea4ad3",
+              "path": "faststream/confluent/publisher/producer.py",
+              "source_label": {
+                "end_line": 152,
+                "path": "faststream/confluent/publisher/producer.py",
+                "sha256": "c2b2e1663264e32a13aca3c365378ad90e7d413dbd51123ea1373860779a3b42",
+                "start_line": 152
+              },
+              "text": "        return await self._producer.producer.send("
+            },
+            {
+              "line": 154,
+              "line_sha256": "37a30d37673ca42ad8a997cd58369e65cca29404bec242e2298750841cecb710",
+              "path": "faststream/confluent/publisher/producer.py",
+              "source_label": {
+                "end_line": 154,
+                "path": "faststream/confluent/publisher/producer.py",
+                "sha256": "759979c511467dd5f901d95a282767689b670aa9ecfd5c3d78c7f561dc17f2dd",
+                "start_line": 154
+              },
+              "text": "            value=message,"
+            },
+            {
+              "line": 155,
+              "line_sha256": "899ecf2039a91a50aea4ee50acd9047533a62dc14e9a4dd441b82063ff4cc8c8",
+              "path": "faststream/confluent/publisher/producer.py",
+              "source_label": {
+                "end_line": 155,
+                "path": "faststream/confluent/publisher/producer.py",
+                "sha256": "a1743d2153a3c997fc42c9a7fa8525537e3b4707603f62dd83896f1190fae59f",
+                "start_line": 155
+              },
+              "text": "            key=cmd.key,"
+            }
+          ],
+          "same_callee_occurrences": 1,
+          "selection": "explicit reviewed line within nominated exact declaration; no inferred reachability",
+          "source": "faststream-keyed-none-tombstone-after"
+        },
+        "before": {
+          "argument_pointer": "/argument_syntax/positional/*",
+          "boundary_file_sha256": "851808b8d0299cf8a66a01245b12196574d55313fe9a6edbf956a11eb65faf32",
+          "call_source": "self.codec.encode(cmd.body, self.serializer)",
+          "call_source_label": {
+            "end_line": 113,
+            "path": "faststream/kafka/publisher/producer.py",
+            "sha256": "b7a875248d27b5b04bf2f72fdf25d75c4af527afa43c8fe0597805e455b4f30e",
+            "start_line": 113
+          },
+          "content_identity": "sha256:76dbae6a9c7629a697e81a152325b0c89d7548a47990b3932715c0fb474e14ef:2104",
+          "declaration": {
+            "declaration_line": 108,
+            "end_line": 131,
+            "path": "faststream/kafka/publisher/producer.py",
+            "sha256": "2476365ca420417d5e51da658262972e02fdf09e84e831739b695687d221c5b1",
+            "start_line": 107,
+            "symbol": "AioKafkaFastProducerImpl.publish"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "position": 0,
+            "value": {
+              "identifier": "cmd.body",
+              "state": "identifier-syntax"
+            }
+          },
+          "expected_site": {
+            "callee_identifier_syntax": "self.codec.encode",
+            "end_line": 113,
+            "line": 113,
+            "positional_argument_count": 2,
+            "syntax_kind": "call"
+          },
+          "line_file_sha256": "e3b0477b3f94ac1784b8f461afb82efc7ea5f0250f742838ad2f02f9441545c3",
+          "reviewed_lines": [
+            {
+              "line": 142,
+              "line_sha256": "5a8f3dfdaa6c7bccf42755f6d08b656429437bb0dc694e52a3d55e048e50de45",
+              "path": "faststream/confluent/publisher/producer.py",
+              "source_label": {
+                "end_line": 142,
+                "path": "faststream/confluent/publisher/producer.py",
+                "sha256": "b7a875248d27b5b04bf2f72fdf25d75c4af527afa43c8fe0597805e455b4f30e",
+                "start_line": 142
+              },
+              "text": "        message, content_type = await self.codec.encode(cmd.body, self.serializer)"
+            },
+            {
+              "line": 144,
+              "line_sha256": "eb40b3af027768fd3c6c0a3302cf41687e10cdcd7f841971e27255311c30c9a5",
+              "path": "faststream/confluent/publisher/producer.py",
+              "source_label": {
+                "end_line": 144,
+                "path": "faststream/confluent/publisher/producer.py",
+                "sha256": "1ef740e8373e54248f2825993ccd172369c252a202cad37232389f30052b7b1a",
+                "start_line": 144
+              },
+              "text": "        headers_to_send = {"
+            },
+            {
+              "line": 145,
+              "line_sha256": "61d072c77e78b62fb4b078b0a3505c60c7db923eb8dcfe514a79ce2917707e38",
+              "path": "faststream/confluent/publisher/producer.py",
+              "source_label": {
+                "end_line": 145,
+                "path": "faststream/confluent/publisher/producer.py",
+                "sha256": "c44e1ee33d3764fa86e02234fca44b45f4462ebc7a6bd2e53688ffda42a6dbe5",
+                "start_line": 145
+              },
+              "text": "            \"content-type\": content_type or \"\","
+            },
+            {
+              "line": 149,
+              "line_sha256": "02f2c3de8b6c4a0155f2eba007135fa7b64fd621b906904805ed639093ea4ad3",
+              "path": "faststream/confluent/publisher/producer.py",
+              "source_label": {
+                "end_line": 149,
+                "path": "faststream/confluent/publisher/producer.py",
+                "sha256": "c2b2e1663264e32a13aca3c365378ad90e7d413dbd51123ea1373860779a3b42",
+                "start_line": 149
+              },
+              "text": "        return await self._producer.producer.send("
+            },
+            {
+              "line": 151,
+              "line_sha256": "37a30d37673ca42ad8a997cd58369e65cca29404bec242e2298750841cecb710",
+              "path": "faststream/confluent/publisher/producer.py",
+              "source_label": {
+                "end_line": 151,
+                "path": "faststream/confluent/publisher/producer.py",
+                "sha256": "759979c511467dd5f901d95a282767689b670aa9ecfd5c3d78c7f561dc17f2dd",
+                "start_line": 151
+              },
+              "text": "            value=message,"
+            },
+            {
+              "line": 152,
+              "line_sha256": "899ecf2039a91a50aea4ee50acd9047533a62dc14e9a4dd441b82063ff4cc8c8",
+              "path": "faststream/confluent/publisher/producer.py",
+              "source_label": {
+                "end_line": 152,
+                "path": "faststream/confluent/publisher/producer.py",
+                "sha256": "a1743d2153a3c997fc42c9a7fa8525537e3b4707603f62dd83896f1190fae59f",
+                "start_line": 152
+              },
+              "text": "            key=cmd.key,"
+            }
+          ],
+          "same_callee_occurrences": 1,
+          "selection": "explicit reviewed line within nominated exact declaration; no inferred reachability",
+          "source": "faststream-keyed-none-tombstone-before"
+        }
+      }
+    },
+    {
+      "capability_reviewed": false,
+      "causal_test_relevance": "not-reviewed",
+      "id": "faststream-decoded-none-cache",
+      "problem_id": "0876b55ab9dea96a7533bcf6171d79febd37a2e2",
+      "runtime_compatibility": "not-established",
+      "semantic_pair_relationship": "not-established",
+      "stages": {
+        "after": {
+          "argument_pointer": "/argument_syntax/positional/*",
+          "boundary_file_sha256": "e22e5bf5b030430e569e777c004f05bf2ebdecbac1457be62bd85d4c77075b84",
+          "call_source": "self.__decoded_caches.get(self.__decoder, _NOT_CACHED)",
+          "call_source_label": {
+            "end_line": 102,
+            "path": "faststream/message/message.py",
+            "sha256": "c119456655cf0901c70cfdc8fbe80b4a7beb89c52c0b5e54a4647027e77d3a5a",
+            "start_line": 102
+          },
+          "content_identity": "sha256:98fc366596deeb2f813bbdc5789c8106e27ee712fc24e2e78856356ac6328eb5:1865",
+          "declaration": {
+            "declaration_line": 93,
+            "end_line": 106,
+            "path": "faststream/message/message.py",
+            "sha256": "be6b8327ecae37f6cb1025300933435d6a1e39757c87583f95d2e462ce452602",
+            "start_line": 93,
+            "symbol": "StreamMessage.decode"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "position": 1,
+            "value": {
+              "identifier": "_NOT_CACHED",
+              "state": "identifier-syntax"
+            }
+          },
+          "expected_site": {
+            "callee_identifier_syntax": "self.__decoded_caches.get",
+            "end_line": 102,
+            "line": 102,
+            "positional_argument_count": 2,
+            "syntax_kind": "call"
+          },
+          "line_file_sha256": "73fb00d7d7c6a51d5f442f0c743d9e169f1c362a1e7b38e8ea8ed416cdb5bb51",
+          "reviewed_lines": [
+            {
+              "line": 82,
+              "line_sha256": "5d92523e69859c1ed92ddd137c8fe36a4d478492aced5315ab91be6df640ecb0",
+              "path": "faststream/_internal/endpoint/call_wrapper.py",
+              "source_label": {
+                "end_line": 82,
+                "path": "faststream/_internal/endpoint/call_wrapper.py",
+                "sha256": "786bbf88af49d808acfc1ff09f574482efb9d6a74bb784097fe51c0718a285b6",
+                "start_line": 82
+              },
+              "text": "    async def call_wrapped("
+            },
+            {
+              "line": 88,
+              "line_sha256": "0f209443425f4233d6747d488287b36d018e97152d67e062a8392a310af6e26f",
+              "path": "faststream/_internal/endpoint/call_wrapper.py",
+              "source_label": {
+                "end_line": 88,
+                "path": "faststream/_internal/endpoint/call_wrapper.py",
+                "sha256": "d47946a32688a986318bf45da48379d963fa0a559a44df396d913f0f7767bb3b",
+                "start_line": 88
+              },
+              "text": "        if self.is_test:"
+            },
+            {
+              "line": 89,
+              "line_sha256": "3cba28ec584bb4b0e4e2dc7cdb1ab2f0e7efa67b827394a8f6e9284a6cc19e07",
+              "path": "faststream/_internal/endpoint/call_wrapper.py",
+              "source_label": {
+                "end_line": 89,
+                "path": "faststream/_internal/endpoint/call_wrapper.py",
+                "sha256": "5a4107483cce5fa64d3603037b4e2cc2e9a589e211e8c8f0682f4a0e58e8931b",
+                "start_line": 89
+              },
+              "text": "            self.mock(await message.decode())"
+            },
+            {
+              "line": 90,
+              "line_sha256": "6ea45b91ad2d68677a9e6b2cdb75f69562c2baa7ef6b494819bb4788648b2972",
+              "path": "faststream/_internal/endpoint/call_wrapper.py",
+              "source_label": {
+                "end_line": 90,
+                "path": "faststream/_internal/endpoint/call_wrapper.py",
+                "sha256": "b5e86158402860fd3d8ff9f1f4d1c4e6a0770b57279aeb140b3d3d76321641aa",
+                "start_line": 90
+              },
+              "text": "        return await self._wrapped_call(message)"
+            }
+          ],
+          "same_callee_occurrences": 1,
+          "selection": "explicit reviewed line within nominated exact declaration; no inferred reachability",
+          "source": "faststream-decoded-none-cache-after"
+        },
+        "before": {
+          "argument_pointer": "/argument_syntax/positional/*",
+          "boundary_file_sha256": "33061823d03c9e2fc3145008302867fea14daa38a1eb5a161f1fd10c79d26c8d",
+          "call_source": "self.__decoded_caches.get(self.__decoder)",
+          "call_source_label": {
+            "end_line": 99,
+            "path": "faststream/message/message.py",
+            "sha256": "84350d1b93cdcc64edd75a2db738acc9d2a40535fc15d5482edeea0f5daf4905",
+            "start_line": 99
+          },
+          "content_identity": "sha256:83f54975edf42f1f6ab882e08f422549a4c4415f4f0ee455f645a483dd914ae3:1864",
+          "declaration": {
+            "declaration_line": 91,
+            "end_line": 102,
+            "path": "faststream/message/message.py",
+            "sha256": "ec4a9a328c7328341a106ff489046e4c5801bc2c905b602796679bedd40a82fc",
+            "start_line": 91,
+            "symbol": "StreamMessage.decode"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "position": 0,
+            "value": {
+              "identifier": "self.__decoder",
+              "state": "identifier-syntax"
+            }
+          },
+          "expected_site": {
+            "callee_identifier_syntax": "self.__decoded_caches.get",
+            "end_line": 99,
+            "line": 99,
+            "positional_argument_count": 1,
+            "syntax_kind": "call"
+          },
+          "line_file_sha256": "73fb00d7d7c6a51d5f442f0c743d9e169f1c362a1e7b38e8ea8ed416cdb5bb51",
+          "reviewed_lines": [
+            {
+              "line": 82,
+              "line_sha256": "5d92523e69859c1ed92ddd137c8fe36a4d478492aced5315ab91be6df640ecb0",
+              "path": "faststream/_internal/endpoint/call_wrapper.py",
+              "source_label": {
+                "end_line": 82,
+                "path": "faststream/_internal/endpoint/call_wrapper.py",
+                "sha256": "786bbf88af49d808acfc1ff09f574482efb9d6a74bb784097fe51c0718a285b6",
+                "start_line": 82
+              },
+              "text": "    async def call_wrapped("
+            },
+            {
+              "line": 88,
+              "line_sha256": "0f209443425f4233d6747d488287b36d018e97152d67e062a8392a310af6e26f",
+              "path": "faststream/_internal/endpoint/call_wrapper.py",
+              "source_label": {
+                "end_line": 88,
+                "path": "faststream/_internal/endpoint/call_wrapper.py",
+                "sha256": "d47946a32688a986318bf45da48379d963fa0a559a44df396d913f0f7767bb3b",
+                "start_line": 88
+              },
+              "text": "        if self.is_test:"
+            },
+            {
+              "line": 89,
+              "line_sha256": "3cba28ec584bb4b0e4e2dc7cdb1ab2f0e7efa67b827394a8f6e9284a6cc19e07",
+              "path": "faststream/_internal/endpoint/call_wrapper.py",
+              "source_label": {
+                "end_line": 89,
+                "path": "faststream/_internal/endpoint/call_wrapper.py",
+                "sha256": "5a4107483cce5fa64d3603037b4e2cc2e9a589e211e8c8f0682f4a0e58e8931b",
+                "start_line": 89
+              },
+              "text": "            self.mock(await message.decode())"
+            },
+            {
+              "line": 90,
+              "line_sha256": "6ea45b91ad2d68677a9e6b2cdb75f69562c2baa7ef6b494819bb4788648b2972",
+              "path": "faststream/_internal/endpoint/call_wrapper.py",
+              "source_label": {
+                "end_line": 90,
+                "path": "faststream/_internal/endpoint/call_wrapper.py",
+                "sha256": "b5e86158402860fd3d8ff9f1f4d1c4e6a0770b57279aeb140b3d3d76321641aa",
+                "start_line": 90
+              },
+              "text": "        return await self._wrapped_call(message)"
+            }
+          ],
+          "same_callee_occurrences": 1,
+          "selection": "explicit reviewed line within nominated exact declaration; no inferred reachability",
+          "source": "faststream-decoded-none-cache-before"
+        }
+      }
+    },
+    {
+      "capability_reviewed": false,
+      "causal_test_relevance": "not-reviewed",
+      "id": "faststream-parser-decoder-precedence",
+      "problem_id": "254b0a83d4d493573eb06f2f1f6390b5ffb1969d",
+      "runtime_compatibility": "not-established",
+      "semantic_pair_relationship": "not-established",
+      "stages": {
+        "after": {
+          "argument_pointer": "/argument_syntax/positional/*",
+          "boundary_file_sha256": "1c739b2ad16401c7f12b9e21987f1788f265f873a9d6bb7bf87005f6f8e6d81e",
+          "call_source": "ParserComposition(decoder, self._decoder)",
+          "call_source_label": {
+            "end_line": 154,
+            "path": "faststream/_internal/endpoint/subscriber/usecase.py",
+            "sha256": "5e8d46e04b3b89b19388427b5208e248162be6a1708066d592c4bb3987eb3bd0",
+            "start_line": 154
+          },
+          "content_identity": "sha256:095559d5ddcca5bacc560147b653875000a7245ca352d34f1a229073e1dd21d7:1820",
+          "declaration": {
+            "declaration_line": 119,
+            "end_line": 158,
+            "path": "faststream/_internal/endpoint/subscriber/usecase.py",
+            "sha256": "b12bf255af845be52d435a1004733199366022dae7fb377e3e9de058dc93950d",
+            "start_line": 119,
+            "symbol": "SubscriberUsecase._get_parser_and_decoder"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "position": 0,
+            "value": {
+              "identifier": "decoder",
+              "state": "identifier-syntax"
+            }
+          },
+          "expected_site": {
+            "callee_identifier_syntax": "ParserComposition",
+            "end_line": 154,
+            "line": 154,
+            "positional_argument_count": 2,
+            "syntax_kind": "call"
+          },
+          "line_file_sha256": "5d05453f0c07af20a4d26a1e770126636b90d3203d98ebc2249f14979b8db0b3",
+          "reviewed_lines": [
+            {
+              "line": 88,
+              "line_sha256": "88715835ace3f9aa2583770913a176503b36430237da1ee3d8c3a2f365e61c2b",
+              "path": "faststream/redis/parser/binary.py",
+              "source_label": {
+                "end_line": 88,
+                "path": "faststream/redis/parser/binary.py",
+                "sha256": "71ac1825b0c3cd3eb8c241555f1cf9cc6ae5cdb53d53c0c1de345a94902d5965",
+                "start_line": 88
+              },
+              "text": "                parsed_data = json_loads(data)"
+            },
+            {
+              "line": 89,
+              "line_sha256": "6202fd74542322440276e678a2dde1ea1253679f447ce9d82efa54c22a98b083",
+              "path": "faststream/redis/parser/binary.py",
+              "source_label": {
+                "end_line": 89,
+                "path": "faststream/redis/parser/binary.py",
+                "sha256": "a7281d8bd2318591eebd950d6e90f37cd8830f8bb6bfa07285305b16c4820f6e",
+                "start_line": 89
+              },
+              "text": "                final_data = parsed_data[\"data\"].encode()"
+            },
+            {
+              "line": 90,
+              "line_sha256": "6445bf4ac5a0e84ede31b4e7d87f8266275504b7afb07781b667cd9dc99cae32",
+              "path": "faststream/redis/parser/binary.py",
+              "source_label": {
+                "end_line": 90,
+                "path": "faststream/redis/parser/binary.py",
+                "sha256": "84910ff862a1ed4e08ef398954cf4aa2d7d4072b72f78e28e12ca5a857655c33",
+                "start_line": 90
+              },
+              "text": "                headers = parsed_data[\"headers\"]"
+            },
+            {
+              "line": 92,
+              "line_sha256": "35045f23e62fc40053650f470b02686cc8afbe8f104bd7adb1b332f26ce9c100",
+              "path": "faststream/redis/parser/binary.py",
+              "source_label": {
+                "end_line": 92,
+                "path": "faststream/redis/parser/binary.py",
+                "sha256": "8c4a63e52088193bc03972cd1551146b94bf30ed6bcc9e50d322111a8b1504f0",
+                "start_line": 92
+              },
+              "text": "        except Exception:"
+            },
+            {
+              "line": 95,
+              "line_sha256": "28e9d6506b2e7702d525507f0c0828b05653d4facb9e28511e2a622c210e2b3f",
+              "path": "faststream/redis/parser/binary.py",
+              "source_label": {
+                "end_line": 95,
+                "path": "faststream/redis/parser/binary.py",
+                "sha256": "122b5d5059dd52a8ebeb13509234f7bf89810f0821b61d87fd076e37ae5d4e3e",
+                "start_line": 95
+              },
+              "text": "            return JSONMessageFormat.parse(data)"
+            },
+            {
+              "line": 97,
+              "line_sha256": "2f9df1743555365a3e004e3c8c9349391e3b503be066e008b65751344651d0d2",
+              "path": "faststream/redis/parser/binary.py",
+              "source_label": {
+                "end_line": 97,
+                "path": "faststream/redis/parser/binary.py",
+                "sha256": "a42bf36cd1ce81eab133f799278d2354a07bd45ae1f848f9895a4fca18cb3ecd",
+                "start_line": 97
+              },
+              "text": "        return final_data, headers"
+            }
+          ],
+          "same_callee_occurrences": 2,
+          "selection": "explicit reviewed line within nominated exact declaration; no inferred reachability",
+          "source": "faststream-parser-decoder-precedence-after"
+        },
+        "before": {
+          "argument_pointer": "/argument_syntax/positional/*",
+          "boundary_file_sha256": "4c343ed398cb0ed9de3aac05985624924f75ee60634948f6674fd366c4bf4542",
+          "call_source": "ParserComposition(decoder, self._decoder)",
+          "call_source_label": {
+            "end_line": 127,
+            "path": "faststream/_internal/endpoint/subscriber/usecase.py",
+            "sha256": "0a91597be1e4d7d7a8e8f41451b50aba17f5c771ab6e1ac4224a8bd6f8ed0b23",
+            "start_line": 127
+          },
+          "content_identity": "sha256:4f415d874e2267a2f868195f437d58d55afb74a693ca7613943c0f86e89344fd:1820",
+          "declaration": {
+            "declaration_line": 119,
+            "end_line": 139,
+            "path": "faststream/_internal/endpoint/subscriber/usecase.py",
+            "sha256": "a6d9e5bfe4c268df3a6cf604057dc31601b2b8945a6922416b6d39ac5f8b5a6b",
+            "start_line": 119,
+            "symbol": "SubscriberUsecase._build_fastdepends_model"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "position": 0,
+            "value": {
+              "identifier": "decoder",
+              "state": "identifier-syntax"
+            }
+          },
+          "expected_site": {
+            "callee_identifier_syntax": "ParserComposition",
+            "end_line": 127,
+            "line": 127,
+            "positional_argument_count": 2,
+            "syntax_kind": "call"
+          },
+          "line_file_sha256": "947bd0074d8e2a6a1a8e9e74e0a05c345ec88ce455bc35d91a962e5901e23cba",
+          "reviewed_lines": [
+            {
+              "line": 87,
+              "line_sha256": "88715835ace3f9aa2583770913a176503b36430237da1ee3d8c3a2f365e61c2b",
+              "path": "faststream/redis/parser/binary.py",
+              "source_label": {
+                "end_line": 87,
+                "path": "faststream/redis/parser/binary.py",
+                "sha256": "71ac1825b0c3cd3eb8c241555f1cf9cc6ae5cdb53d53c0c1de345a94902d5965",
+                "start_line": 87
+              },
+              "text": "                parsed_data = json_loads(data)"
+            },
+            {
+              "line": 88,
+              "line_sha256": "6202fd74542322440276e678a2dde1ea1253679f447ce9d82efa54c22a98b083",
+              "path": "faststream/redis/parser/binary.py",
+              "source_label": {
+                "end_line": 88,
+                "path": "faststream/redis/parser/binary.py",
+                "sha256": "a7281d8bd2318591eebd950d6e90f37cd8830f8bb6bfa07285305b16c4820f6e",
+                "start_line": 88
+              },
+              "text": "                final_data = parsed_data[\"data\"].encode()"
+            },
+            {
+              "line": 89,
+              "line_sha256": "6445bf4ac5a0e84ede31b4e7d87f8266275504b7afb07781b667cd9dc99cae32",
+              "path": "faststream/redis/parser/binary.py",
+              "source_label": {
+                "end_line": 89,
+                "path": "faststream/redis/parser/binary.py",
+                "sha256": "84910ff862a1ed4e08ef398954cf4aa2d7d4072b72f78e28e12ca5a857655c33",
+                "start_line": 89
+              },
+              "text": "                headers = parsed_data[\"headers\"]"
+            },
+            {
+              "line": 91,
+              "line_sha256": "35045f23e62fc40053650f470b02686cc8afbe8f104bd7adb1b332f26ce9c100",
+              "path": "faststream/redis/parser/binary.py",
+              "source_label": {
+                "end_line": 91,
+                "path": "faststream/redis/parser/binary.py",
+                "sha256": "8c4a63e52088193bc03972cd1551146b94bf30ed6bcc9e50d322111a8b1504f0",
+                "start_line": 91
+              },
+              "text": "        except Exception:"
+            },
+            {
+              "line": 93,
+              "line_sha256": "e32a0a01fb1a1ec6779ab45792b834ea9ec49611b0f1e9d4bf5ab3ab277c1955",
+              "path": "faststream/redis/parser/binary.py",
+              "source_label": {
+                "end_line": 93,
+                "path": "faststream/redis/parser/binary.py",
+                "sha256": "644117b3120c810b6ada6491e6186bd94748abf4c19dea6a3bbade9f8ee75032",
+                "start_line": 93
+              },
+              "text": "            final_data = data"
+            },
+            {
+              "line": 94,
+              "line_sha256": "810eb337a09ec10088ab3a3a7590535de84ccbb1981593c65415b3f003a6d0ff",
+              "path": "faststream/redis/parser/binary.py",
+              "source_label": {
+                "end_line": 94,
+                "path": "faststream/redis/parser/binary.py",
+                "sha256": "736aedd8fedebbfa16477b7028a4c9b32487d5c0062525ed64c62042ac6e16ad",
+                "start_line": 94
+              },
+              "text": "            headers = {}"
+            },
+            {
+              "line": 96,
+              "line_sha256": "2f9df1743555365a3e004e3c8c9349391e3b503be066e008b65751344651d0d2",
+              "path": "faststream/redis/parser/binary.py",
+              "source_label": {
+                "end_line": 96,
+                "path": "faststream/redis/parser/binary.py",
+                "sha256": "a42bf36cd1ce81eab133f799278d2354a07bd45ae1f848f9895a4fca18cb3ecd",
+                "start_line": 96
+              },
+              "text": "        return final_data, headers"
+            }
+          ],
+          "same_callee_occurrences": 2,
+          "selection": "explicit reviewed line within nominated exact declaration; no inferred reachability",
+          "source": "faststream-parser-decoder-precedence-before"
+        }
+      }
+    },
+    {
+      "capability_reviewed": false,
+      "causal_test_relevance": "not-reviewed",
+      "id": "faststream-address-escape-correspondence",
+      "problem_id": "425e08861e24290adce8ec9a8de21e7d48f5e757",
+      "runtime_compatibility": "not-established",
+      "semantic_pair_relationship": "not-established",
+      "stages": {
+        "after": {
+          "argument_pointer": "/argument_syntax/keywords/*",
+          "boundary_file_sha256": "a5ffc86e039f9a5c900bcecd846d97b0047e11aa3aae37c16e1324247a2b56d7",
+          "call_source": "RabbitPublisherConfig(routing_address=routing_address, message_kwargs=message_kwargs, queue=queue, exchange=exchange, _outer_config=config)",
+          "call_source_label": {
+            "end_line": 42,
+            "path": "faststream/rabbit/publisher/factory.py",
+            "sha256": "3b3457b73a177f200981d11c3d8ecb256c96b8631d4496f7ca8f48804d7048a7",
+            "start_line": 35
+          },
+          "content_identity": "sha256:2c7754bc2725279b28c7d6790bfd79b31b52e6341edd71737c5fcd5b84aac285:2156",
+          "declaration": {
+            "declaration_line": 17,
+            "end_line": 62,
+            "path": "faststream/rabbit/publisher/factory.py",
+            "sha256": "45ab7dbde532c4f058b0cf9c12079dd35474e5ea9987fcde89170d12105cd980",
+            "start_line": 17,
+            "symbol": "create_publisher"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "name": "routing_address",
+            "name_state": "literal",
+            "value": {
+              "identifier": "routing_address",
+              "state": "identifier-syntax"
+            }
+          },
+          "expected_site": {
+            "callee_identifier_syntax": "RabbitPublisherConfig",
+            "end_line": 42,
+            "line": 35,
+            "positional_argument_count": 0,
+            "syntax_kind": "call"
+          },
+          "line_file_sha256": "c7177e2a6824150fc964f3a0c30d9c30835363d0d868ccf86989dd1bd485c46f",
+          "reviewed_lines": [
+            {
+              "line": 35,
+              "line_sha256": "787fe66e785faae97091e35d47b5357f90f7cac8ae568146788255d0ae2bdd94",
+              "path": "faststream/_internal/utils/path.py",
+              "source_label": {
+                "end_line": 35,
+                "path": "faststream/_internal/utils/path.py",
+                "sha256": "ea7bd21740cf13caa82a348987ed9b437a1db8dfa34ab1ba735c102f32f5dde2",
+                "start_line": 35
+              },
+              "text": "    def __init__(self, declaration: str, syntax: \"AddressSyntax\") -> None:"
+            },
+            {
+              "line": 36,
+              "line_sha256": "dacbecc54126093e159bd6d741f8927914f5fb2a73ba11911fd4a2c5ad745715",
+              "path": "faststream/_internal/utils/path.py",
+              "source_label": {
+                "end_line": 36,
+                "path": "faststream/_internal/utils/path.py",
+                "sha256": "e199be5b83caa8b42a7f19fccbbb5d1c4ffcfdf4694c05cdd6a825d0c415d320",
+                "start_line": 36
+              },
+              "text": "        self._declaration = declaration"
+            },
+            {
+              "line": 39,
+              "line_sha256": "952a61a3c66968d4afb54b5c088577a06caf868f621095b7f004be68efb8a62c",
+              "path": "faststream/_internal/utils/path.py",
+              "source_label": {
+                "end_line": 39,
+                "path": "faststream/_internal/utils/path.py",
+                "sha256": "4eae30191a1bd93eb607cda9d0e884d48cc8f5df36c023dccf1a6faeb99512cc",
+                "start_line": 39
+              },
+              "text": "        self.template = _restore_literal_braces(declaration)"
+            },
+            {
+              "line": 42,
+              "line_sha256": "b3c9effe73b023548c35682da9b03c4295a923411afe7946bae5979c6175d5fa",
+              "path": "faststream/_internal/utils/path.py",
+              "source_label": {
+                "end_line": 42,
+                "path": "faststream/_internal/utils/path.py",
+                "sha256": "3fd19c1fe6359a1e13044da174592a3ba630e034a38cad1c6c760506096bd4f9",
+                "start_line": 42
+              },
+              "text": "        self._syntax = syntax"
+            },
+            {
+              "line": 43,
+              "line_sha256": "47d7bb6fc78d0dcf12b5d2fa0cd9fe66e8e7de8e2b1854440dc3f5d3f67946d0",
+              "path": "faststream/_internal/utils/path.py",
+              "source_label": {
+                "end_line": 43,
+                "path": "faststream/_internal/utils/path.py",
+                "sha256": "aa1a5ffedbfd4063a67b2eb718c637854c253f92f63b8709500245bd51cd76e9",
+                "start_line": 43
+              },
+              "text": "        self._compiled: tuple[Pattern[str] | None, str] | None = None"
+            }
+          ],
+          "same_callee_occurrences": 1,
+          "selection": "explicit reviewed line within nominated exact declaration; no inferred reachability",
+          "source": "faststream-address-escape-correspondence-after"
+        },
+        "before": {
+          "argument_pointer": "/argument_syntax/keywords/*",
+          "boundary_file_sha256": "83680ec122e401f74983556998a0259e677776eedb7fe037620e1608baf33d29",
+          "call_source": "RabbitPublisherConfig(routing_key=routing_key, message_kwargs=message_kwargs, queue=queue, exchange=exchange, _outer_config=config)",
+          "call_source_label": {
+            "end_line": 35,
+            "path": "faststream/rabbit/publisher/factory.py",
+            "sha256": "ac0cc8e39fd9f7475aeafc9202a98b1a604570d508c27c97f62e2f0299e0d69a",
+            "start_line": 28
+          },
+          "content_identity": "sha256:77da7af07f2ee0d3622efd8b74059a3cbe629d7068b94e62f0b8ed864d2f7e7b:2160",
+          "declaration": {
+            "declaration_line": 14,
+            "end_line": 55,
+            "path": "faststream/rabbit/publisher/factory.py",
+            "sha256": "f372fbb3c684c560b6e4ed6e4298cbb9c25a8bdac22520faa05c0a22aabd075c",
+            "start_line": 14,
+            "symbol": "create_publisher"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "name": "routing_key",
+            "name_state": "literal",
+            "value": {
+              "identifier": "routing_key",
+              "state": "identifier-syntax"
+            }
+          },
+          "expected_site": {
+            "callee_identifier_syntax": "RabbitPublisherConfig",
+            "end_line": 35,
+            "line": 28,
+            "positional_argument_count": 0,
+            "syntax_kind": "call"
+          },
+          "line_file_sha256": "f053b457fc41dd4886c0257d8aa34c019197fe902b9de70f40c9d8c2d0930793",
+          "reviewed_lines": [
+            {
+              "line": 40,
+              "line_sha256": "b03b524b349ab301c7db1cd89e5d828e19e7073892d1376188db33622a7ee0c0",
+              "path": "faststream/_internal/utils/path.py",
+              "source_label": {
+                "end_line": 40,
+                "path": "faststream/_internal/utils/path.py",
+                "sha256": "2a513522664870e4cde6db55784283cc288d0d7f09ce402d7874b3a3c5746b23",
+                "start_line": 40
+              },
+              "text": "    def __init__(self, template: str, syntax: AddressSyntax) -> None:"
+            },
+            {
+              "line": 41,
+              "line_sha256": "ccbc55dc5683dbdd48bf96c7a632a943936b8f0d74d38590047703eb23e7ec6f",
+              "path": "faststream/_internal/utils/path.py",
+              "source_label": {
+                "end_line": 41,
+                "path": "faststream/_internal/utils/path.py",
+                "sha256": "2e14ce221d1e715b5d2f83359b37737ffc2275f847963d2937fd354ed2c9d641",
+                "start_line": 41
+              },
+              "text": "        self.template = template"
+            },
+            {
+              "line": 44,
+              "line_sha256": "b3c9effe73b023548c35682da9b03c4295a923411afe7946bae5979c6175d5fa",
+              "path": "faststream/_internal/utils/path.py",
+              "source_label": {
+                "end_line": 44,
+                "path": "faststream/_internal/utils/path.py",
+                "sha256": "3fd19c1fe6359a1e13044da174592a3ba630e034a38cad1c6c760506096bd4f9",
+                "start_line": 44
+              },
+              "text": "        self._syntax = syntax"
+            },
+            {
+              "line": 45,
+              "line_sha256": "47d7bb6fc78d0dcf12b5d2fa0cd9fe66e8e7de8e2b1854440dc3f5d3f67946d0",
+              "path": "faststream/_internal/utils/path.py",
+              "source_label": {
+                "end_line": 45,
+                "path": "faststream/_internal/utils/path.py",
+                "sha256": "aa1a5ffedbfd4063a67b2eb718c637854c253f92f63b8709500245bd51cd76e9",
+                "start_line": 45
+              },
+              "text": "        self._compiled: tuple[Pattern[str] | None, str] | None = None"
+            }
+          ],
+          "same_callee_occurrences": 1,
+          "selection": "explicit reviewed line within nominated exact declaration; no inferred reachability",
+          "source": "faststream-address-escape-correspondence-before"
+        }
+      }
+    }
+  ],
+  "observer_outputs_used": false,
+  "problem_distinctness_reviewed": false,
+  "schema": "hashmarks.data-source-oracle-review.v1",
+  "scope": "Source-authored positive physical-line and direct-call syntax only. No data-flow, runtime compatibility, test sufficiency, semantic absence or exact pair correspondence.",
+  "status": "INCOMPLETE"
+}

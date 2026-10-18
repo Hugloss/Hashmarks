@@ -22,12 +22,12 @@ CATEGORIES = (
 SCHEMA = "hashmarks.full-edit-agent-corpus.v1"
 
 
-def _w(p: Path, t: str):
+def _w(p: Path, t: str) -> None:
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(t, encoding="utf-8")
 
 
-def _digest(x):
+def _digest(x: object) -> str:
     return (
         "sha256:"
         + hashlib.sha256(
@@ -46,16 +46,16 @@ def _validate_destinations(root: Path, *paths: Path) -> None:
 
 
 def _case(root: Path, index: int, category: str) -> tuple[dict, dict]:
-    case = {
+    case: dict[str, str] = {
         "task_id": f"edit-{index:03d}",
         "namespace": f"case_{index:03d}",
         "behavior": f"flare{index:03d}",
     }
     namespace = case["namespace"]
     behavior = case["behavior"]
+    repo = root / case["task_id"]
     case.update(
         {
-            "repo": root / case["task_id"],
             "owner": f"src/{namespace}/engine.py",
             "route": f"src/{namespace}/route.py",
             "legacy": f"src/{namespace}/legacy.py",
@@ -69,11 +69,11 @@ def _case(root: Path, index: int, category: str) -> tuple[dict, dict]:
     )
     case["expected_edit"] = case["owner"]
     _w(
-        case["repo"] / "pyproject.toml",
+        repo / "pyproject.toml",
         "[tool.pytest.ini_options]\ntestpaths=['tests']\n",
     )
-    _w(case["repo"] / "src/__init__.py", "")
-    _w(case["repo"] / f"src/{namespace}/__init__.py", "")
+    _w(repo / "src/__init__.py", "")
+    _w(repo / f"src/{namespace}/__init__.py", "")
     if category == "duplicate-symbol-decoy":
         case["legacy_text"] += (
             f"\ndef apply_{namespace}(value: str) -> str:\n    return value + '-old'\n"
@@ -86,7 +86,7 @@ def _case(root: Path, index: int, category: str) -> tuple[dict, dict]:
         )
     elif category == "cross-layer-ownership":
         _w(
-            case["repo"] / f"frontend/{namespace}/client.ts",
+            repo / f"frontend/{namespace}/client.ts",
             f"export const {behavior}=(v:string)=>fetch('/api/{behavior}?v='+v);\n",
         )
         case["query"] = (
@@ -94,7 +94,7 @@ def _case(root: Path, index: int, category: str) -> tuple[dict, dict]:
             "behavior owner so it returns '-new'"
         )
     elif category == "configuration-ownership":
-        _w(case["repo"] / case["config"], "mode = 'old'\n")
+        _w(repo / case["config"], "mode = 'old'\n")
         case["engine"] = (
             "from pathlib import Path\n\n"
             + f"def apply_{namespace}(value: str) -> str:\n    mode='old' if \"mode = 'old'\" in Path(__file__).with_name('policy.toml').read_text() else 'new'\n    return value + '-' + mode\n"
@@ -119,7 +119,7 @@ def _case(root: Path, index: int, category: str) -> tuple[dict, dict]:
         ("legacy", case["legacy_text"]),
         ("verify", test_text),
     ):
-        _w(case["repo"] / case[path_key], text)
+        _w(repo / case[path_key], text)
     return {
         "id": case["task_id"],
         "query": case["query"],
@@ -136,7 +136,7 @@ def _case(root: Path, index: int, category: str) -> tuple[dict, dict]:
 
 def generate(
     root: Path, public_path: Path, secret_path: Path, *, cases_per_category: int = 10
-):
+) -> dict[str, object]:
     root = root.resolve()
     public_path = public_path.resolve()
     secret_path = secret_path.resolve()
@@ -169,7 +169,7 @@ def generate(
     }
 
 
-def main():
+def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", type=Path, required=True)
     ap.add_argument("--public", type=Path, required=True)

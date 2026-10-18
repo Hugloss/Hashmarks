@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from typing import cast
 
 MAX_QUERIES = 32
 MAX_RESULTS = 256
@@ -71,14 +72,14 @@ def _bounds(request: Mapping[str, object]) -> tuple[int, int, int]:
 
 
 def _limited(
-    rows: list[object],
+    rows: Sequence[object],
     *,
     max_results: int,
     omissions: list[dict[str, object]],
 ) -> list[object]:
     if len(rows) > max_results:
         omissions.append({"reason": "result-limit", "omitted": len(rows) - max_results})
-    return rows[:max_results]
+    return list(rows[:max_results])
 
 
 def _adjacency(
@@ -272,14 +273,16 @@ def _coverage_complete(
 ) -> bool:
     rows = [
         row
-        for row in observation.get("coverage", ())
+        for row in cast(Iterable, observation.get("coverage", ()))
         if isinstance(row, Mapping)
         and str(row.get("kind") or "") == kind
         and (not context or str(row.get("context") or "") == context)
     ]
     if not context:
         declared_contexts = {
-            str(value) for value in observation.get("contexts", ()) if str(value)
+            str(value)
+            for value in cast(Iterable[object], observation.get("contexts", ()))
+            if str(value)
         }
         covered_contexts = {str(row.get("context") or "") for row in rows}
         if declared_contexts - covered_contexts:
@@ -317,7 +320,9 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
     context = _text(request.get("context"), label="dependency query context")
     module = _text(request.get("module"), label="dependency query module")
     declared_contexts = {
-        str(value) for value in observation.get("contexts", ()) if str(value)
+        str(value)
+        for value in cast(Iterable, observation.get("contexts", ()))
+        if str(value)
     }
     if context and context not in declared_contexts:
         raise ValueError(f"unknown dependency query context: {context}")
@@ -328,12 +333,12 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
 
     selections = {
         str(row["node_id"]): row
-        for row in observation.get("selections", ())
+        for row in cast(Iterable, observation.get("selections", ()))
         if isinstance(row, Mapping) and row.get("node_id")
     }
     relationships = [
         row
-        for row in observation.get("relationships", ())
+        for row in cast(Iterable, observation.get("relationships", ()))
         if isinstance(row, Mapping)
         and (not context or str(row.get("context") or "") == context)
     ]
@@ -343,7 +348,7 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
             raise ValueError("component query requires component_id")
         rows = [
             dict(row)
-            for row in observation.get("components", ())
+            for row in cast(Iterable, observation.get("components", ()))
             if isinstance(row, Mapping)
             and str(row.get("component_id") or "") == component_id
         ]
@@ -358,7 +363,7 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
     elif operation == "inventory":
         rows = [
             dict(row)
-            for row in observation.get("inventory", ())
+            for row in cast(Iterable, observation.get("inventory", ()))
             if isinstance(row, Mapping)
             and (not node_id or str(row.get("node_id") or "") == node_id)
             and (not context or str(row.get("context") or "") == context)
@@ -389,7 +394,7 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
             raise ValueError("module-owners query requires module")
         rows = [
             dict(row)
-            for row in observation.get("module_ownership", ())
+            for row in cast(Iterable, observation.get("module_ownership", ()))
             if isinstance(row, Mapping)
             and str(row.get("module") or "") == module
             and (not context or str(row.get("context") or "") == context)

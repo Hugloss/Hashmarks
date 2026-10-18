@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from contract_assertions import assert_object, assert_records, assert_text
+
 from hashmarks.codemap.engine import CodeMap
 
 
@@ -29,7 +31,10 @@ def _bindings() -> list[dict[str, object]]:
 
 
 def _delta_by_id(delta: dict[str, object]) -> dict[str, dict[str, object]]:
-    return {row["binding_id"]: row for row in delta["bindings"]["changed"]}
+    return {
+        assert_text(row["binding_id"]): row
+        for row in assert_records(assert_object(delta["bindings"])["changed"])
+    }
 
 
 def test_relationship_fact_change_is_path_shared_but_range_impact_stays_local(
@@ -42,14 +47,14 @@ def test_relationship_fact_change_is_path_shared_but_range_impact_stays_local(
     (tmp_path / "unrelated.py").write_text("OTHER = 1\n", encoding="utf-8")
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        before = codemap.repository_evidence_bindings(_bindings())
+        codemap.index.sync()
+        before = codemap.bindings.observe(_bindings())
 
         source.write_text("from beta import VALUE\nKEEP = 1\n", encoding="utf-8")
-        codemap.sync(["source.py"])
-        after = codemap.repository_evidence_bindings(_bindings())
-        delta = codemap.repository_evidence_binding_delta(before, after)
-        coverage = codemap.repository_evidence_coverage(
+        codemap.index.sync(["source.py"])
+        after = codemap.bindings.observe(_bindings())
+        delta = codemap.bindings.delta(before, after)
+        coverage = codemap.bindings.coverage(
             after,
             changed_paths=["source.py"],
             change_set_complete=True,
@@ -62,17 +67,17 @@ def test_relationship_fact_change_is_path_shared_but_range_impact_stays_local(
 
     direct = changed["source:direct"]
     stable = changed["source:stable-range"]
-    assert direct["direct_evidence"]["state"] == "changed"
-    assert stable["direct_evidence"]["state"] == "preserved"
+    assert assert_object(direct["direct_evidence"])["state"] == "changed"
+    assert assert_object(stable["direct_evidence"])["state"] == "preserved"
 
     for row in (direct, stable):
-        relationships = row["relationship_evidence"]
+        relationships = assert_object(row["relationship_evidence"])
         assert relationships["state"] == "changed"
         assert relationships["comparability"] == "comparable"
-        assert relationships["facts"]["state"] == "changed"
-        assert relationships["locators"]["state"] == "unchanged"
+        assert assert_object(relationships["facts"])["state"] == "changed"
+        assert assert_object(relationships["locators"])["state"] == "unchanged"
 
-    assert delta["bindings"]["preserved"] == ["unrelated"]
+    assert assert_object(delta["bindings"])["preserved"] == ["unrelated"]
     assert coverage["binding_impacts"] == [
         {
             "binding_id": "source:direct",
@@ -118,17 +123,17 @@ def test_relationship_locator_move_stays_separate_and_does_not_leak_bindings(
     ]
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        before = codemap.repository_evidence_bindings(bindings)
+        codemap.index.sync()
+        before = codemap.bindings.observe(bindings)
 
         source.write_text(
             "PAD = 0\nfrom dependency import VALUE\nKEEP = 1\n",
             encoding="utf-8",
         )
-        codemap.sync(["source.py"])
-        after = codemap.repository_evidence_bindings(bindings)
-        delta = codemap.repository_evidence_binding_delta(before, after)
-        coverage = codemap.repository_evidence_coverage(
+        codemap.index.sync(["source.py"])
+        after = codemap.bindings.observe(bindings)
+        delta = codemap.bindings.delta(before, after)
+        coverage = codemap.bindings.coverage(
             after,
             changed_paths=["source.py"],
             change_set_complete=True,
@@ -139,14 +144,14 @@ def test_relationship_locator_move_stays_separate_and_does_not_leak_bindings(
     changed = _delta_by_id(delta)
     assert set(changed) == {"source:stable"}
     row = changed["source:stable"]
-    assert row["direct_evidence"]["state"] == "preserved"
-    relationships = row["relationship_evidence"]
+    assert assert_object(row["direct_evidence"])["state"] == "preserved"
+    relationships = assert_object(row["relationship_evidence"])
     assert relationships["state"] == "changed"
-    assert relationships["facts"]["state"] == "unchanged"
-    assert relationships["locators"]["state"] == "changed"
-    assert relationships["observation"]["changed"] is False
+    assert assert_object(relationships["facts"])["state"] == "unchanged"
+    assert assert_object(relationships["locators"])["state"] == "changed"
+    assert assert_object(relationships["observation"])["changed"] is False
 
-    assert delta["bindings"]["preserved"] == ["unrelated"]
+    assert assert_object(delta["bindings"])["preserved"] == ["unrelated"]
     assert coverage["binding_impacts"] == [
         {
             "binding_id": "source:stable",

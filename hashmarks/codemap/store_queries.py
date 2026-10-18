@@ -4,9 +4,14 @@ import json
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Sequence
 
     from .repository_index_store import WorkspaceMapStore
+
+
+# Bounded semantic readers retain at most 1,024 references and request one
+# additional row to distinguish a complete prefix from a truncated universe.
+MAX_REFERENCE_QUERY_ROWS = 1025
 
 
 class WorkspaceMapQueryMixin:
@@ -19,7 +24,7 @@ class WorkspaceMapQueryMixin:
             ).fetchone()
         return row is not None
 
-    def derived_paths(self, paths) -> set[str]:
+    def derived_paths(self, paths: Iterable[str]) -> set[str]:
         """Return paths with derived evidence using bounded SQLite batches."""
         if TYPE_CHECKING:
             self = cast("WorkspaceMapStore", self)
@@ -38,7 +43,9 @@ class WorkspaceMapQueryMixin:
                 result.update(str(row[0]) for row in rows)
         return result
 
-    def file_reuse_rows(self, paths) -> dict[str, tuple[str, str, str, str, bool]]:
+    def file_reuse_rows(
+        self, paths: Iterable[str]
+    ) -> dict[str, tuple[str, str, str, str, bool]]:
         """Load only warm-reuse authority fields in bounded SQLite batches."""
         if TYPE_CHECKING:
             self = cast("WorkspaceMapStore", self)
@@ -238,7 +245,11 @@ class WorkspaceMapQueryMixin:
         return [dict(row) for row in rows]
 
     def refs_many(
-        self, targets: Iterable[str], *, limit_per_target: int = 100
+        self,
+        targets: Iterable[str],
+        *,
+        limit_per_target: int = 100,
+        preferred_paths: Iterable[str] = (),
     ) -> dict[str, list[dict]]:
         """Read bounded reverse-reference prefixes without scanning every same-name edge.
 
@@ -247,6 +258,9 @@ class WorkspaceMapQueryMixin:
         per-target bound.  Resolve each distinct short identity through the ordered
         covering index instead, so SQLite can stop at ``limit_per_target`` while
         preserving the established deterministic ``path,line`` prefix semantics.
+        A preferred path set changes ordering only: its references come first,
+        then other paths fill the same row limit. No references are filtered
+        out of the global observation scope merely for lacking preference.
         """
         if TYPE_CHECKING:
             self = cast("WorkspaceMapStore", self)
@@ -257,21 +271,45 @@ class WorkspaceMapQueryMixin:
             return {}
         if limit_per_target < 1:
             raise ValueError("limit_per_target must be >= 1")
-        limit_per_target = min(int(limit_per_target), 1024)
+        limit_per_target = min(int(limit_per_target), MAX_REFERENCE_QUERY_ROWS)
         target_short = {target: target.rsplit(".", 1)[-1] for target in unique_targets}
         unique_shorts = list(dict.fromkeys(target_short.values()))
+        preferred = sorted(set(preferred_paths))
+        prioritized = (
+            self.refs_many_for_paths(
+                unique_shorts, preferred, limit_per_target=limit_per_target
+            )
+            if preferred
+            else {}
+        )
         self._count_read("refs_many")
         by_short: dict[str, list[dict]] = {}
         with self._lock:
             for short in unique_shorts:
-                rows = self._db.execute(
-                    """SELECT e.*,f.evidence_visibility
+                head = prioritized.get(short, [])
+                remaining = limit_per_target - len(head)
+                exclusion = (
+                    " AND e.path NOT IN (SELECT value FROM json_each(?))"
+                    if preferred
+                    else ""
+                )
+                parameters = (
+                    (short, json.dumps(preferred), remaining)
+                    if preferred
+                    else (short, remaining)
+                )
+                rows = (
+                    self._db.execute(
+                        f"""SELECT e.*,f.evidence_visibility
                     FROM edge e JOIN file_map f ON f.path=e.path
-                    WHERE e.target_short=?
+                    WHERE e.target_short=?{exclusion}
                     ORDER BY e.path,e.line LIMIT ?""",
-                    (short, limit_per_target),
-                ).fetchall()
-                by_short[short] = [dict(row) for row in rows]
+                        parameters,
+                    ).fetchall()
+                    if remaining
+                    else []
+                )
+                by_short[short] = [*head, *(dict(row) for row in rows)]
         return {
             target: [dict(row) for row in by_short[target_short[target]]]
             for target in unique_targets
@@ -293,7 +331,7 @@ class WorkspaceMapQueryMixin:
         suffix = str(target_suffix).strip(".")
         if not short or not suffix:
             return []
-        limit = min(int(limit), 1024)
+        limit = min(int(limit), MAX_REFERENCE_QUERY_ROWS)
         self._count_read("refs_matching_target_suffix")
         with self._lock:
             rows = self._db.execute(
@@ -304,6 +342,49 @@ class WorkspaceMapQueryMixin:
                 (short, suffix, "%" + suffix, limit),
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def refs_many_for_paths(
+        self,
+        targets: Iterable[str],
+        paths: Iterable[str],
+        *,
+        limit_per_target: int = 100,
+    ) -> dict[str, list[dict]]:
+        """Read candidate references inside explicit paths before bounding rows.
+
+        Path membership is caller input, not repository-negative or relationship
+        authority. Returned same-name rows still require semantic qualification.
+        """
+        if TYPE_CHECKING:
+            self = cast("WorkspaceMapStore", self)
+        unique_targets = list(
+            dict.fromkeys(str(target) for target in targets if target)
+        )
+        selected_paths = sorted(set(str(path) for path in paths if path))
+        if limit_per_target < 1 or len(selected_paths) > 4096:
+            raise ValueError(
+                "scoped references require a positive bound and at most 4096 paths"
+            )
+        if not unique_targets or not selected_paths:
+            return {target: [] for target in unique_targets}
+        limit = min(int(limit_per_target), MAX_REFERENCE_QUERY_ROWS)
+        shorts = {target: target.rsplit(".", 1)[-1] for target in unique_targets}
+        by_short: dict[str, list[dict]] = {}
+        self._count_read("refs_many_for_paths")
+        with self._lock:
+            for short in dict.fromkeys(shorts.values()):
+                rows = self._db.execute(
+                    """SELECT e.*,f.evidence_visibility
+                    FROM edge e JOIN file_map f ON f.path=e.path
+                    WHERE e.target_short=? AND e.path IN (SELECT value FROM json_each(?))
+                    ORDER BY e.path,e.line LIMIT ?""",
+                    (short, json.dumps(selected_paths), limit),
+                ).fetchall()
+                by_short[short] = [dict(row) for row in rows]
+        return {
+            target: [dict(row) for row in by_short[shorts[target]]]
+            for target in unique_targets
+        }
 
     def edges_from_many(
         self, seeds: Iterable[tuple[str, str]], *, limit_per_seed: int = 100
@@ -446,7 +527,7 @@ class WorkspaceMapQueryMixin:
         return total, {str(row["token"]): int(row["documents"]) for row in rows}
 
     def lexical_file_candidates(
-        self, tokens: list[str], limit: int = 100
+        self, tokens: list[str], limit: int = 100, *, paths: Iterable[str] | None = None
     ) -> list[dict]:
         if TYPE_CHECKING:
             self = cast("WorkspaceMapStore", self)
@@ -455,11 +536,15 @@ class WorkspaceMapQueryMixin:
             return []
         self._count_read("lexical_file_candidates")
         placeholders = ",".join("?" for _ in unique)
+        scope = "" if paths is None else " AND path IN (SELECT value FROM json_each(?))"
+        parameters = [*unique]
+        if paths is not None:
+            parameters.append(json.dumps(sorted(set(paths))))
         with self._lock:
             rows = self._db.execute(
                 f"""WITH matched AS (
                     SELECT token,path FROM lexical
-                    WHERE token IN ({placeholders})
+                    WHERE token IN ({placeholders}){scope}
                     GROUP BY token,path
                 ), ranked AS (
                     SELECT path,COUNT(*) AS matches FROM matched
@@ -470,7 +555,7 @@ class WorkspaceMapQueryMixin:
                 SELECT ranked.path,f.language,f.evidence_visibility,f.full_tokens,f.outline,ranked.matches
                 FROM ranked JOIN file_map f ON f.path=ranked.path
                 ORDER BY ranked.matches DESC,ranked.path""",
-                (*unique, limit),
+                (*parameters, limit),
             ).fetchall()
         return [dict(row) for row in rows]
 
@@ -579,6 +664,135 @@ class WorkspaceMapQueryMixin:
                 """SELECT s.*, f.evidence_visibility FROM symbol s JOIN file_map f ON f.path=s.path
                 ORDER BY s.path,s.start_line LIMIT ?""",
                 (limit,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def lexical_declaration_candidates(
+        self,
+        pairs: Sequence[tuple[str, str]],
+        terms: Sequence[str],
+        *,
+        limit: int = 32,
+    ) -> list[dict[str, object]]:
+        """Observe query-token conjunctions inside source-visible callable spans.
+
+        The closest indexed callable contains the matched line. This is lexical
+        containment, not runtime ownership, invocation, or repository absence.
+        """
+        if TYPE_CHECKING:
+            self = cast("WorkspaceMapStore", self)
+        if type(limit) is not int or not 1 <= limit <= 32:
+            raise ValueError("lexical declaration limit must be between 1 and 32")
+        if len(pairs) > 32 or len(terms) > 32 or any(a == b for a, b in pairs):
+            raise ValueError("lexical lookup requires bounded distinct token pairs")
+        if not pairs or not terms:
+            return []
+        self._count_read("lexical_declaration_candidates")
+        with self._lock:
+            rows = self._db.execute(
+                """WITH pair_tokens AS (
+                    SELECT p.key pair_index,t.value token
+                    FROM json_each(?) p,json_each(p.value) t
+                ), matches AS (
+                    SELECT p.pair_index,l.path,l.line
+                    FROM pair_tokens p JOIN lexical l ON l.token=p.token
+                    JOIN file_map f ON f.path=l.path
+                    WHERE f.evidence_visibility='source'
+                    GROUP BY p.pair_index,l.path,l.line
+                    HAVING COUNT(DISTINCT l.token)=2
+                ), enclosing AS (
+                    SELECT m.*,s.qualname,s.start_line,s.end_line,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY m.pair_index,m.path,m.line
+                            ORDER BY s.end_line-s.start_line,s.qualname
+                        ) closest
+                    FROM matches m JOIN symbol s ON s.path=m.path
+                    AND m.line BETWEEN s.start_line AND s.end_line
+                    WHERE s.kind IN ('function','method')
+                ), alternatives AS (
+                    SELECT *,ROW_NUMBER() OVER (
+                        PARTITION BY path,qualname,start_line,end_line
+                        ORDER BY pair_index,line
+                    ) first_site
+                    FROM enclosing WHERE closest=1 AND line>start_line
+                ), selected AS (
+                    SELECT * FROM alternatives WHERE first_site=1
+                    ORDER BY pair_index,path,line LIMIT ?
+                )
+                SELECT s.*,f.file_digest,f.evidence_visibility,
+                    a.line match_line,a.pair_index,
+                    json_group_array(DISTINCT l.token) matched_terms
+                FROM selected a JOIN symbol s ON s.path=a.path
+                    AND s.qualname=a.qualname AND s.start_line=a.start_line
+                    AND s.end_line=a.end_line
+                JOIN file_map f ON f.path=s.path
+                JOIN lexical l ON l.path=s.path
+                    AND l.line BETWEEN s.start_line AND s.end_line
+                WHERE l.token IN (SELECT value FROM json_each(?))
+                GROUP BY s.path,s.qualname,s.start_line,s.end_line
+                ORDER BY a.pair_index,s.path,a.line""",
+                (json.dumps(pairs), limit, json.dumps(tuple(terms))),
+            ).fetchall()
+        result: list[dict[str, object]] = []
+        for row in rows:
+            value = dict(row)
+            matched: object = json.loads(value["matched_terms"])
+            if not isinstance(matched, list) or not all(
+                isinstance(term, str) for term in matched
+            ):
+                raise ValueError("indexed lexical terms must be strings")
+            value["matched_terms"] = matched
+            result.append(value)
+        return result
+
+    def declaration_context_candidates(
+        self,
+        groups: Sequence[Sequence[str]],
+        paths: Sequence[str],
+        *,
+        limit: int = 32,
+    ) -> list[dict[str, object]]:
+        """Find bounded callable hints whose declared context adds query terms.
+
+        Substring prefixes are a coarse SQL prefilter only. The retrieval owner
+        qualifies identifier parts before using a row; this is not resolution or
+        an exhaustive declaration/absence observation.
+        """
+        if TYPE_CHECKING:
+            self = cast("WorkspaceMapStore", self)
+        if type(limit) is not int or not 1 <= limit <= 32:
+            raise ValueError("declaration context limit must be between 1 and 32")
+        if len(groups) > 32 or any(len(group) > 32 for group in groups):
+            raise ValueError("declaration context requires bounded query groups")
+        if len(paths) > 64:
+            raise ValueError("declaration context requires at most 64 paths")
+        if not groups or not paths:
+            return []
+        prefixes = [
+            sorted({term.lower()[:5] for term in group if term}) for group in groups
+        ]
+        self._count_read("declaration_context_candidates")
+        with self._lock:
+            rows = self._db.execute(
+                """WITH query_terms AS (
+                    SELECT g.key group_index,t.value token
+                    FROM json_each(?) g,json_each(g.value) t
+                )
+                SELECT s.*,f.evidence_visibility,
+                    COUNT(DISTINCT q.group_index) context_matches,
+                    COUNT(DISTINCT CASE WHEN instr(lower(s.name),q.token)>0
+                        THEN q.group_index END) own_matches
+                FROM symbol s JOIN file_map f ON f.path=s.path
+                JOIN query_terms q ON instr(
+                    lower(s.qualname || ' ' || s.signature),q.token)>0
+                WHERE s.path IN (SELECT value FROM json_each(?))
+                    AND s.kind IN ('function','method')
+                    AND f.evidence_visibility IN ('source','outline')
+                GROUP BY s.path,s.qualname,s.start_line,s.end_line
+                HAVING context_matches>=2 AND context_matches>own_matches
+                ORDER BY own_matches DESC,context_matches DESC,s.path,s.start_line,s.qualname
+                LIMIT ?""",
+                (json.dumps(prefixes), json.dumps(list(paths)), limit),
             ).fetchall()
         return [dict(row) for row in rows]
 

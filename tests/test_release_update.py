@@ -17,10 +17,15 @@ class _Response:
     def __init__(self, payload: bytes) -> None:
         self._payload = payload
 
-    def __enter__(self):
+    def __enter__(self) -> _Response:
         return self
 
-    def __exit__(self, exc_type, exc, tb) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: object,
+    ) -> None:
         del exc_type, exc, tb
 
     def read(self, size: int = -1) -> bytes:
@@ -87,10 +92,12 @@ def test_release_comparisons_reuse_qualified_version_keys(
     assert parsed == [current, latest]
 
 
-def test_latest_release_request_is_public_and_repository_neutral(monkeypatch) -> None:
+def test_latest_release_request_is_public_and_repository_neutral(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     seen: list[Request] = []
 
-    def urlopen(request: Request, *, timeout: float):
+    def urlopen(request: Request, *, timeout: float) -> _Response:
         assert timeout == 1.0
         seen.append(request)
         return _Response(_latest("0.25.0"))
@@ -133,7 +140,7 @@ def test_automatic_update_check_respects_environment_boundaries(
 
 
 def test_periodic_check_is_cached_outside_repository_state(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     calls: list[str] = []
@@ -168,7 +175,9 @@ def test_periodic_check_is_cached_outside_repository_state(
     assert not (tmp_path / ".hashmarks").exists()
 
 
-def test_corrupt_periodic_cache_is_disposable(monkeypatch, tmp_path: Path) -> None:
+def test_corrupt_periodic_cache_is_disposable(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     cache = tmp_path / "cache" / "hashmarks" / "update-check.json"
     cache.parent.mkdir(parents=True)
     cache.write_text("{broken", encoding="utf-8")
@@ -193,7 +202,7 @@ def test_corrupt_periodic_cache_is_disposable(monkeypatch, tmp_path: Path) -> No
 
 
 def test_network_failure_is_non_fatal_and_throttled(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     calls = 0
@@ -229,7 +238,7 @@ def test_network_failure_is_non_fatal_and_throttled(
 
 
 def test_package_manager_environment_configuration_does_not_create_authority(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delattr(release_update.sys, "frozen", raising=False)
     monkeypatch.setenv("UV_TOOL_DIR", "/arbitrary/uv-tools")
@@ -241,7 +250,7 @@ def test_package_manager_environment_configuration_does_not_create_authority(
 
 
 def test_external_python_upgrade_reports_native_tool_handoff_without_mutation(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     latest_version = _next_patch_version()
@@ -296,7 +305,7 @@ def test_external_python_upgrade_reports_native_tool_handoff_without_mutation(
     ],
 )
 def test_cli_command_semantics_opt_out_of_automatic_update_awareness(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
     argv: list[str],
     handler_name: str,
 ) -> None:
@@ -321,9 +330,9 @@ def test_cli_command_semantics_opt_out_of_automatic_update_awareness(
     ],
 )
 def test_declared_cli_semantics_opt_in_to_automatic_update_awareness(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
     argv: list[str],
-    module,
+    module: object,
     handler_name: str,
 ) -> None:
     calls: list[str] = []
@@ -339,7 +348,7 @@ def test_declared_cli_semantics_opt_in_to_automatic_update_awareness(
 
 
 def test_periodic_external_installation_reports_update_without_manager_selection(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.setattr(cli, "_interactive_terminal", lambda: True)
@@ -372,7 +381,7 @@ def test_periodic_external_installation_reports_update_without_manager_selection
 
 
 def test_cli_upgrade_reports_up_to_date_without_installation_detection(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.setattr(
@@ -397,7 +406,7 @@ def test_cli_upgrade_reports_up_to_date_without_installation_detection(
 
 
 def test_managed_standalone_requires_canonical_installed_name(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     installed_name = "hashmarks.exe" if release_update.os.name == "nt" else "hashmarks"
@@ -416,7 +425,7 @@ def test_managed_standalone_requires_canonical_installed_name(
 
 
 def test_raw_frozen_release_asset_is_not_treated_as_installed_standalone(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     executable = tmp_path / "hashmarks-linux-x86_64"
@@ -428,7 +437,7 @@ def test_raw_frozen_release_asset_is_not_treated_as_installed_standalone(
 
 
 def test_standalone_upgrade_offers_two_explicit_choices_and_skip_does_not_mutate(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -472,7 +481,7 @@ def test_standalone_upgrade_offers_two_explicit_choices_and_skip_does_not_mutate
 
 
 def test_cli_executes_the_exact_displayed_standalone_command(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     latest_version = _next_patch_version()
@@ -505,7 +514,7 @@ def test_cli_executes_the_exact_displayed_standalone_command(
 
 
 def test_standalone_prerequisites_are_resolved_only_after_upgrade_consent(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     latest_version = _next_patch_version()
@@ -538,7 +547,7 @@ def test_standalone_prerequisites_are_resolved_only_after_upgrade_consent(
 
 
 def test_standalone_upgrade_noninteractive_prints_command_without_mutation(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -571,7 +580,7 @@ def test_standalone_upgrade_noninteractive_prints_command_without_mutation(
 
 
 def test_standalone_delegation_executes_the_displayed_native_command(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     installed_name = "hashmarks.exe" if release_update.os.name == "nt" else "hashmarks"

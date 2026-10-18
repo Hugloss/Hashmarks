@@ -4,6 +4,7 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 
+from .query_primitives import _query_terms
 from .repository_domains import RepositoryDomain
 
 
@@ -391,3 +392,15 @@ def route_query(query: str) -> QueryRoute:
         reason,
         preferred_domains,
     )
+
+
+@dataclass(frozen=True)
+class NormalizedTaskQuery:
+    text: str
+    route: QueryRoute
+    terms: tuple[str, ...]
+
+
+def normalize_task_query(task: str) -> NormalizedTaskQuery:
+    """Bind task text, route and lexical terms once without granting authority."""
+    return NormalizedTaskQuery(task, route_query(task), tuple(_query_terms(task)))

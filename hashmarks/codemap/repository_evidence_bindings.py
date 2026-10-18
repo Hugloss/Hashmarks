@@ -2,17 +2,28 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Mapping, Sequence
+from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, cast
+from pathlib import Path
+from typing import TYPE_CHECKING
 
+from hashmarks.file_store import UnstableFileError
+from hashmarks.freshness import freshness_state
 from hashmarks.operation_contract import operation_schema
 from hashmarks.paths import normalize_relative_path
 
-from .decision_session import decision_scoped
-from .evidence_freshness import freshness_state
+from .decision_session import ReadScopeOwner, decision_scoped
+from .repository_evidence_binding_delta import RepositoryEvidenceBindingDeltaMixin
+from .repository_evidence_coverage import RepositoryEvidenceCoverageMixin
+from .repository_observation import (
+    evidence_identity,
+    packet_digest,
+    repository_observer_packet,
+)
 
 if TYPE_CHECKING:
-    from .engine import CodeMap
+    from .decision_session import DecisionScope
+    from .repository_source import RepositorySource
 
 
 _MAX_BINDINGS = 256
@@ -20,6 +31,21 @@ _MAX_EVIDENCE_PER_BINDING = 256
 _MAX_DEPENDENCIES_PER_BINDING = 512
 _MAX_UNIQUE_PATHS = 2048
 _MAX_RELATIONSHIPS_PER_PATH = 1000
+
+
+def _binding_coordinate(value: object) -> int:
+    if not isinstance(value, (int, str, float, bytes, bytearray)):
+        raise TypeError("repository evidence coordinates must be numeric")
+    return int(value)
+
+
+def _binding_member_stamp(path: Path) -> tuple[int, ...] | None:
+    """Request-local reuse check only; member digests remain content authority."""
+    try:
+        stat = path.stat()
+    except OSError:
+        return None
+    return (stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,9 +74,13 @@ class _BindingObservationRequest:
     include_relationships: bool
     seen: set[str] = field(default_factory=set)
     unique_paths: set[str] = field(default_factory=set)
+    observations: dict[EvidenceSpan, dict[str, object]] = field(default_factory=dict)
+    stamps: dict[str, tuple[int, ...]] = field(default_factory=dict)
 
 
-class RepositoryEvidenceBindingsMixin:
+class RepositoryBindings(
+    RepositoryEvidenceBindingDeltaMixin, RepositoryEvidenceCoverageMixin, ReadScopeOwner
+):
     """Observe opaque consumer bindings to exact repository evidence.
 
     This surface owns repository facts only. Binding identifiers are opaque;
@@ -58,12 +88,20 @@ class RepositoryEvidenceBindingsMixin:
     authority.
     """
 
+    def __init__(self, source: RepositorySource) -> None:
+        self.source = source
+        self.workspace = source.workspace
+
+    @property
+    def reads(self) -> DecisionScope:
+        return self.source.reads
+
     @staticmethod
     def _binding_span(raw: Mapping[str, object]) -> EvidenceSpan:
         path = normalize_relative_path(str(raw.get("path") or ""), allow_root=False)
         try:
-            start = int(raw["start_line"])
-            end = int(raw["end_line"])
+            start = _binding_coordinate(raw["start_line"])
+            end = _binding_coordinate(raw["end_line"])
         except (KeyError, TypeError, ValueError) as exc:
             raise ValueError(
                 "evidence span requires integer start_line/end_line"
@@ -91,21 +129,8 @@ class RepositoryEvidenceBindingsMixin:
             raise ValueError("evidence scope must be 'lines' or 'member'")
         return cls._binding_span(raw)
 
-    @staticmethod
-    def _physical_lines(raw: bytes) -> list[bytes]:
-        """Split physical repository lines only on LF while preserving exact bytes."""
-        if not raw:
-            return []
-        parts = raw.split(b"\n")
-        lines = [part + b"\n" for part in parts[:-1]]
-        if parts[-1]:
-            lines.append(parts[-1])
-        return lines
-
     def _observe_span(self, span: EvidenceSpan) -> dict[str, object]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        member, raw = self._repository_member_observation(span.path, include_bytes=True)
+        member, raw = self.source.member(span.path, include_bytes=True)
         base: dict[str, object] = {
             "scope": "lines",
             "path": span.path,
@@ -138,7 +163,7 @@ class RepositoryEvidenceBindingsMixin:
                 "reason": "member-not-utf8-text",
             }
 
-        lines = self._physical_lines(raw)
+        lines = self.source._physical_lines(raw)
         if span.end_line > len(lines):
             return {
                 **base,
@@ -164,12 +189,44 @@ class RepositoryEvidenceBindingsMixin:
     def _observe_reference(self, ref: EvidenceReference) -> dict[str, object]:
         if isinstance(ref, EvidenceSpan):
             return self._observe_span(ref)
-        member, _raw = self._repository_member_observation(ref.path)
+        member, _raw = self.source.member(ref.path)
         return {
             "scope": "member",
             **member,
             "member_state": member["state"],
         }
+
+    def _observe_reference_once(
+        self, ref: EvidenceReference, request: _BindingObservationRequest
+    ) -> dict[str, object]:
+        if not isinstance(ref, EvidenceSpan):
+            return self._observe_reference(ref)
+        source = self.source._repository_member_source(ref.path)
+        if isinstance(source, dict):
+            return self._observe_reference(ref)
+        stamp = _binding_member_stamp(source.path)
+        if ref.path in request.stamps and stamp != request.stamps[ref.path]:
+            raise UnstableFileError(
+                f"binding source changed during observation: {ref.path}"
+            )
+        cached = request.observations.get(ref)
+        if (
+            cached is not None
+            and cached.get("member_revision") == source.indexed_revision
+        ):
+            return deepcopy(cached)
+        observed = self._observe_reference(ref)
+        if stamp is not None and observed.get("state") == "known-present":
+            request.stamps[ref.path] = stamp
+            request.observations[ref] = deepcopy(observed)
+        return observed
+
+    def _validate_binding_snapshot(self, request: _BindingObservationRequest) -> None:
+        for path, stamp in request.stamps.items():
+            if _binding_member_stamp(self.workspace / path) != stamp:
+                raise UnstableFileError(
+                    f"binding source changed during observation: {path}"
+                )
 
     @staticmethod
     def _reference_definition(ref: EvidenceReference) -> dict[str, object]:
@@ -186,8 +243,6 @@ class RepositoryEvidenceBindingsMixin:
         self, evidence: Sequence[Mapping[str, object]], *, limit_per_path: int
     ) -> dict[str, object]:
         """Project bounded indexed relationships without inventing dependency authority."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         paths = sorted(
             {
                 str(row.get("path") or "")
@@ -195,7 +250,7 @@ class RepositoryEvidenceBindingsMixin:
                 if row.get("state") == "known-present" and row.get("path")
             }
         )
-        edges = self._session_edges_for_paths_many(paths, limit_per_path=limit_per_path)
+        edges = self.reads.edges_for_paths_many(paths, limit_per_path=limit_per_path)
         relationships: list[dict[str, object]] = []
         for path in paths:
             for edge in edges.get(path, ()):
@@ -215,7 +270,7 @@ class RepositoryEvidenceBindingsMixin:
                             if edge.get("line") is not None
                             else {}
                         ),
-                        "identity": self._evidence_identity(
+                        "identity": evidence_identity(
                             "hashmarks.relationship-evidence.v1", fact
                         ),
                         "provenance": {
@@ -227,7 +282,7 @@ class RepositoryEvidenceBindingsMixin:
         relationships.sort(
             key=lambda row: (
                 str(row.get("path") or ""),
-                int(row.get("line") or 0),
+                _binding_coordinate(row.get("line") or 0),
                 str(row.get("kind") or ""),
                 str(row.get("target") or ""),
             )
@@ -271,7 +326,7 @@ class RepositoryEvidenceBindingsMixin:
             raise ValueError(f"duplicate binding_id: {binding_id}")
         request.seen.add(binding_id)
         references = self._binding_references(raw_binding.get("evidence"))
-        evidence = [self._observe_reference(ref) for ref in references]
+        evidence = [self._observe_reference_once(ref, request) for ref in references]
         declared_dependencies = sorted(
             {
                 normalize_relative_path(path, allow_root=False)
@@ -288,10 +343,7 @@ class RepositoryEvidenceBindingsMixin:
             raise ValueError(
                 f"binding request exceeds {_MAX_UNIQUE_PATHS} unique paths"
             )
-        dependencies = [
-            self._repository_member_observation(path)[0]
-            for path in declared_dependencies
-        ]
+        dependencies = [self.source.member(path)[0] for path in declared_dependencies]
         definition_payload = {
             "binding_id": binding_id,
             "evidence": [self._reference_definition(ref) for ref in references],
@@ -328,19 +380,19 @@ class RepositoryEvidenceBindingsMixin:
         return {
             **binding_payload,
             "binding_definition_identity": "sha256:"
-            + self._packet_digest(
+            + packet_digest(
                 "hashmarks.repository-evidence-binding-definition.v1",
                 definition_payload,
             ),
             "binding_observation_identity": "sha256:"
-            + self._packet_digest(
+            + packet_digest(
                 "hashmarks.repository-evidence-binding-observation.v1",
                 binding_payload,
             ),
         }
 
     @decision_scoped
-    def repository_evidence_bindings(
+    def observe(
         self,
         bindings: Sequence[Mapping[str, object]],
         *,
@@ -349,8 +401,6 @@ class RepositoryEvidenceBindingsMixin:
         include_relationships: bool = True,
     ) -> dict[str, object]:
         """Return deterministic exact-span evidence for opaque consumer bindings."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         if not isinstance(bindings, Sequence) or isinstance(bindings, (str, bytes)):
             raise ValueError("bindings must be a sequence")
         if len(bindings) > _MAX_BINDINGS:
@@ -375,7 +425,7 @@ class RepositoryEvidenceBindingsMixin:
                 + ", ".join(sorted(unknown_dependency_bindings))
             )
 
-        generation, identity_generation, stale = self._generation_status()
+        generation, identity_generation, stale = self.reads.generation_status()
         request = _BindingObservationRequest(
             dependency_paths=dependency_paths or {},
             relationship_limit_per_path=relationship_limit_per_path,
@@ -385,13 +435,14 @@ class RepositoryEvidenceBindingsMixin:
         for raw_binding in bindings:
             assert isinstance(raw_binding, Mapping)
             rows.append(self._observe_binding(raw_binding, request))
+        self._validate_binding_snapshot(request)
         rows.sort(key=lambda row: str(row["binding_id"]))
         payload: dict[str, object] = {
             "schema": operation_schema("repository_evidence", "observation"),
-            "observer": self._repository_observer_packet(),
+            "observer": repository_observer_packet(),
             "repository": {
-                "repository_identity": self._repository_packet_identity(),
-                "source_identity": self._source_packet_identity(
+                "repository_identity": self.reads.repository_identity(),
+                "source_identity": self.source.packet_identity(
                     generation=generation,
                     identity_generation=identity_generation,
                     stale=stale,
@@ -409,7 +460,7 @@ class RepositoryEvidenceBindingsMixin:
             "authority": "repository-intelligence-only",
             "execution_effect": "none",
         }
-        payload["bindings_identity"] = "sha256:" + self._packet_digest(
+        payload["bindings_identity"] = "sha256:" + packet_digest(
             operation_schema("repository_evidence", "observation"), payload
         )
         return payload

@@ -9,8 +9,9 @@ from __future__ import annotations
 from copy import deepcopy
 
 import pytest
+from contract_assertions import assert_present
 
-from hashmarks.codemap.scip_adapter import parse_scip_json
+from hashmarks.codemap.scip_adapter import ScipOccurrence, parse_scip_json
 from hashmarks.codemap.scip_relationship_adapter import scip_occurrence_payload
 
 
@@ -42,7 +43,7 @@ def _index(
     }
 
 
-def _single(index: dict):
+def _single(index: dict) -> ScipOccurrence:
     producer, rows = parse_scip_json(index)
     assert producer == "fixture:1"
     assert len(rows) == 1
@@ -83,18 +84,29 @@ def test_preserves_documentation_roles_and_original_producer_metadata() -> None:
 def test_empty_documentation_is_not_missing_or_negative_evidence() -> None:
     unavailable = _single(_index(supply_docs=False))
     observed_empty = _single(_index(documentation=[]))
-    assert unavailable.declaration_metadata["documentation_state"] == "not-supplied"
-    assert "documentation" not in unavailable.declaration_metadata
-    assert observed_empty.declaration_metadata["documentation_state"] == "supplied"
-    assert observed_empty.declaration_metadata["documentation"] == []
-    assert observed_empty.declaration_metadata["negative_evidence_admissible"] is False
+    assert (
+        assert_present(unavailable.declaration_metadata)["documentation_state"]
+        == "not-supplied"
+    )
+    assert "documentation" not in assert_present(unavailable.declaration_metadata)
+    assert (
+        assert_present(observed_empty.declaration_metadata)["documentation_state"]
+        == "supplied"
+    )
+    assert assert_present(observed_empty.declaration_metadata)["documentation"] == []
+    assert (
+        assert_present(observed_empty.declaration_metadata)[
+            "negative_evidence_admissible"
+        ]
+        is False
+    )
 
 
 def test_large_documentation_keeps_bounded_prefix_and_omission_count() -> None:
     docs = ["a" * 3000 for _ in range(10)]
     original = deepcopy(docs)
     row = _single(_index(documentation=docs))
-    metadata = row.declaration_metadata
+    metadata = assert_present(row.declaration_metadata)
     assert docs == original
     assert len(metadata["documentation"]) == 4
     assert sum(map(len, metadata["documentation"])) == 8192
@@ -105,8 +117,8 @@ def test_large_documentation_keeps_bounded_prefix_and_omission_count() -> None:
 
 def test_unknown_role_bits_are_not_promoted_to_known_roles() -> None:
     row = _single(_index(roles=1 | 1024, documentation=[]))
-    assert row.occurrence_roles["observed_roles"] == ["definition"]
-    assert row.occurrence_roles["unrecognized_role_bits"] == 1024
+    assert assert_present(row.occurrence_roles)["observed_roles"] == ["definition"]
+    assert assert_present(row.occurrence_roles)["unrecognized_role_bits"] == 1024
 
 
 @pytest.mark.parametrize("invalid", ["a doc string", [42], {"text": "x"}])

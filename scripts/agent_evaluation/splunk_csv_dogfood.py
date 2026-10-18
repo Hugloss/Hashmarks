@@ -7,6 +7,7 @@ import io
 import json
 import logging
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -198,7 +199,7 @@ def _starts_logical_record(line: str) -> bool:
     return bool(_TIMESTAMP_START.match(row[1]))
 
 
-def _logical_records(handle: TextIO):
+def _logical_records(handle: TextIO) -> Iterator[tuple[int, str]]:
     current: list[str] = []
     ordinal = 0
     for line in handle:
@@ -634,7 +635,7 @@ class _TrackingLineIterator:
         return text
 
 
-def _strict_logical_records(handle: TextIO):
+def _strict_logical_records(handle: TextIO) -> Iterator[tuple[int, str]]:
     tracker = _TrackingLineIterator(handle)
     reader = csv.reader(tracker, strict=True)
     ordinal = 0
@@ -718,8 +719,8 @@ def _selection_context_truncated(selection: _AnchorSelection) -> bool:
 
 def _selection_metadata_truncated(selection: _AnchorSelection) -> bool:
     return any(
-        isinstance(anchor.get("metadata"), dict)
-        and anchor["metadata"].get("metadata_values_truncated") is True
+        isinstance(metadata := anchor.get("metadata"), dict)
+        and metadata.get("metadata_values_truncated") is True
         for anchor in selection.anchors
     )
 
@@ -1032,15 +1033,24 @@ def correlate(
     if not isinstance(bundle, dict):
         raise ValueError("dogfood report has no bundle")
     with CodeMap(workspace) as codemap:
-        sync = codemap.sync()
-        packet = codemap.correlate_evidence(
+        sync = codemap.index.sync()
+        packet = codemap.correlation.observe(
             [bundle],
             path_mappings=path_mappings,
             include_relationships=False,
         )
     states: dict[str, int] = {}
-    for anchor in packet["bundles"][0]["anchors"]:
-        state = str(anchor["resolution"]["state"])
+    bundles = packet["bundles"]
+    assert isinstance(bundles, list)
+    qualified_bundle = bundles[0]
+    assert isinstance(qualified_bundle, dict)
+    anchors = qualified_bundle["anchors"]
+    assert isinstance(anchors, list)
+    for anchor in anchors:
+        assert isinstance(anchor, dict)
+        resolution = anchor["resolution"]
+        assert isinstance(resolution, dict)
+        state = str(resolution["state"])
         states[state] = states.get(state, 0) + 1
     return {
         "sync": sync,
@@ -1088,13 +1098,20 @@ def main() -> int:
         json.dumps(
             {
                 "schema": SCHEMA,
-                **report["summary"],
+                **_summary_fields(report),
                 "output": str(args.output),
             },
             sort_keys=True,
         ),
     )
     return 0
+
+
+def _summary_fields(report: dict[str, object]) -> dict[str, object]:
+    summary = report["summary"]
+    if not isinstance(summary, dict):
+        raise ValueError("dogfood summary must be an object")
+    return summary
 
 
 if __name__ == "__main__":

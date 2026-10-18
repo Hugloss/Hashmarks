@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
-from typing import BinaryIO
+from typing import Any, BinaryIO, Protocol
 
 from .schema import DIGEST_ALGORITHM
 
@@ -30,7 +30,13 @@ class Digest:
         return f"{self.algorithm}:{self.hash}:{self.size}"
 
 
-def _new_hasher(domain: bytes):
+class _Hasher(Protocol):
+    def update(self, data: bytes, /) -> None: ...
+
+    def hexdigest(self) -> str: ...
+
+
+def _new_hasher(domain: bytes) -> _Hasher:
     h = sha256()
     h.update(domain)
     return h

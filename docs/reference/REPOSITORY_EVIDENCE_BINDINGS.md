@@ -22,8 +22,8 @@ bindings = [
 ]
 
 with CodeMap(".") as codemap:
-    codemap.sync()
-    packet = codemap.repository_evidence_bindings(
+    codemap.index.sync()
+    packet = codemap.bindings.observe(
         bindings,
         dependency_paths={
             "consumer:contract-a": ["pyproject.toml"],
@@ -165,7 +165,7 @@ The invariant is: **loss of relationship comparability removes authority to clai
 Compare two binding packets with:
 
 ~~~python
-delta = codemap.repository_evidence_binding_delta(before, after)
+delta = codemap.bindings.delta(before, after)
 ~~~
 
 Schema: **hashmarks.repository-evidence-binding-delta.v1**
@@ -194,7 +194,7 @@ Relationship facts are compared by their repository relationship evidence identi
 Use:
 
 ~~~python
-coverage = codemap.repository_evidence_coverage(
+coverage = codemap.bindings.coverage(
     current_packet,
     changed_paths=["src/owner.py"],
     change_set_complete=True,
@@ -335,7 +335,18 @@ helper does **not** revalidate a caller-supplied binding packet, prove current
 repository bytes, or decide whether work should resume. To qualify actual
 producer packets and local preservation/change, callers must obtain a fresh
 CodeMap observation and use the existing
-`CodeMap.repository_evidence_binding_delta(before, after)` contract with
+`CodeMap.bindings.delta(before, after)` contract with
 both original and fresh native packets. When the original native packet has
 not been retained, its opaque identity alone cannot reconstruct that proof.
 Do not promote a descriptor's old freshness to current evidence.
+
+## Repeated exact spans in one request
+
+Distinct opaque consumer bindings to the same exact member/line span reuse one
+qualified stable byte capture within that request. Each binding still receives
+independent output data and the original member revision. Repository admission
+and indexed revision are checked before reuse; device/inode/size/mtime/ctime are
+request-local mutation guards, never content identities. A changed stamp during
+reuse or the final request check raises `UnstableFileError` rather than returning
+a clean mixed snapshot. No observation cache survives the request. Unknown,
+unsupported and denied evidence gains no additional authority through reuse.

@@ -11,6 +11,8 @@ import pytest
 from hashmarks.client import IdentityClient
 from hashmarks.codemap.repository_index_store import WorkspaceMapStore
 from hashmarks.daemon import IdentityDaemon
+from hashmarks.inputs import InputManifest
+from hashmarks.snapshot import Snapshot
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -72,11 +74,11 @@ def _start_blocked_snapshot_daemon(
     release = threading.Event()
     original_snapshot = daemon.engine.snapshot
 
-    def blocking_snapshot(*args, **kwargs):
+    def blocking_snapshot(manifest: InputManifest, *, verify: bool = False) -> Snapshot:
         entered.set()
         if not release.wait(timeout=5):
             raise TimeoutError("test did not release blocked snapshot")
-        return original_snapshot(*args, **kwargs)
+        return original_snapshot(manifest, verify=verify)
 
     monkeypatch.setattr(daemon.engine, "snapshot", blocking_snapshot)
     server_thread = threading.Thread(target=daemon.serve_forever, daemon=True)
@@ -91,7 +93,7 @@ def _start_blocked_snapshot_daemon(
 
 
 def test_workspace_generation_bump_is_one_atomic_read_modify_write(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     store = WorkspaceMapStore(tmp_path / "map.sqlite3")
     try:
@@ -135,7 +137,7 @@ def test_workspace_generation_bump_is_one_atomic_read_modify_write(
 
 @pytest.mark.skipif(os.name != "posix", reason="Unix identity daemon transport")
 def test_identity_daemon_status_is_not_serialized_behind_large_snapshot(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     server = _start_blocked_snapshot_daemon(tmp_path, monkeypatch)
     slow_client = server.client()
@@ -184,7 +186,7 @@ def test_identity_daemon_status_is_not_serialized_behind_large_snapshot(
 
 @pytest.mark.skipif(os.name != "posix", reason="Unix identity daemon transport")
 def test_registered_manifest_can_be_dropped_while_snapshot_uses_immutable_handle(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     server = _start_blocked_snapshot_daemon(tmp_path, monkeypatch)
     owner = server.client()
@@ -213,7 +215,9 @@ def test_registered_manifest_can_be_dropped_while_snapshot_uses_immutable_handle
     server.stop(control)
 
 
-def test_workspace_generation_bump_is_atomic_across_store_instances(tmp_path):
+def test_workspace_generation_bump_is_atomic_across_store_instances(
+    tmp_path: Path,
+) -> None:
     from hashmarks.codemap.repository_index_store import WorkspaceMapStore
 
     db = tmp_path / "codemap.sqlite3"
@@ -222,7 +226,7 @@ def test_workspace_generation_bump_is_atomic_across_store_instances(tmp_path):
     values: list[int] = []
     values_lock = threading.Lock()
 
-    def bump(store):
+    def bump(store: WorkspaceMapStore) -> None:
         barrier.wait(timeout=5)
         value = store.bump_generation()
         with values_lock:

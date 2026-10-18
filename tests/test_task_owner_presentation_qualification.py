@@ -6,6 +6,7 @@ from copy import deepcopy
 from typing import Any
 
 import pytest
+from contract_assertions import assert_object, assert_records, assert_text
 
 from hashmarks.evidence_presentation import present_repository_evidence
 
@@ -39,9 +40,15 @@ def _packet() -> dict[str, Any]:
     }
 
 
-def _rows(packet: dict[str, Any], *, format: str = "compact") -> list[dict[str, Any]]:
+def _rows(
+    packet: dict[str, Any], *, format: str = "compact"
+) -> list[dict[str, object]]:
     projection = present_repository_evidence(packet, format=format)
-    return [row for group in projection["groups"] for row in group["findings"]]
+    return [
+        row
+        for group in assert_records(projection["groups"])
+        for row in assert_records(group["findings"])
+    ]
 
 
 def test_current_resolved_complete_owner_keeps_native_paths_and_source() -> None:
@@ -57,7 +64,7 @@ def test_current_resolved_complete_owner_keeps_native_paths_and_source() -> None
     assert source["source_refs"] == ["/ownership/source_evidence"]
     assert owner["details"] == native["ownership"]["owner"]
     assert source["details"] == native["ownership"]["source_evidence"]
-    ctx = owner["source_context"]["task_ownership"]
+    ctx = assert_object(assert_object(owner["source_context"])["task_ownership"])
     assert ctx["display_qualification"] == "producer-claimed-qualified"
     assert ctx["freshness_state"] == "current"
     assert ctx["proof_scope_complete"] is True
@@ -113,7 +120,11 @@ def assert_unqualified(packet: dict[str, Any]) -> None:
     original = deepcopy(packet)
     for format in ("structured", "compact", "text"):
         result = present_repository_evidence(packet, format=format)
-        rows = [row for group in result["groups"] for row in group["findings"]]
+        rows = [
+            row
+            for group in assert_records(result["groups"])
+            for row in assert_records(group["findings"])
+        ]
         owner = next(row for row in rows if row["kind"] == "unqualified_owner")
         source = next(row for row in rows if row["kind"] == "unqualified_owner_source")
         assert "qualified_owner" not in {row["kind"] for row in rows}
@@ -124,10 +135,12 @@ def assert_unqualified(packet: dict[str, Any]) -> None:
         assert source["details"] == packet["ownership"]["source_evidence"]
         assert owner["source_refs"] == ["/ownership/owner"]
         assert source["source_refs"] == ["/ownership/source_evidence"]
-        owner_context = owner["source_context"]["task_ownership"]
+        owner_context = assert_object(
+            assert_object(owner["source_context"])["task_ownership"]
+        )
         assert owner_context["display_qualification"] == "unqualified"
         if format == "text":
-            assert "unqualified_owner" in result["text"]
+            assert "unqualified_owner" in assert_text(result["text"])
     assert packet == original
 
 
@@ -161,11 +174,11 @@ def test_incomplete_owner_does_not_hide_native_qualification_or_source() -> None
     assert result["coverage"] == "projection-only"
     assert any(
         row["source_refs"] == ["/ownership"]
-        for group in result["groups"]
-        for row in group["findings"]
+        for group in assert_records(result["groups"])
+        for row in assert_records(group["findings"])
     )
     assert any(
         row["source_refs"] == ["/evidence_receipt"]
-        for group in result["groups"]
-        for row in group["findings"]
+        for group in assert_records(result["groups"])
+        for row in assert_records(group["findings"])
     )

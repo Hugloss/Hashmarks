@@ -102,7 +102,7 @@ Qualified observations expose `root_evidence` separately from semantic `roots`, 
 
 Built-in adapters declare a stable `producer.adapter_semantics` token that identifies the semantic interpretation contract used to translate producer-native bytes. This token is not the package version, implementation commit, or producer artifact schema version. Refactors that preserve interpretation keep the same token; a semantic interpretation change requires a new token.
 
-`CodeMap.dependency_resolution_derivation_authority(observation)` is a pure read-only projection over an already-qualified v3 observation. It revalidates the supplied packet and returns schema `hashmarks.dependency-resolution-derivation.v1` with:
+`CodeMap.dependencies.derivation_authority(observation)` is a pure read-only projection over an already-qualified v3 observation. It revalidates the supplied packet and returns schema `hashmarks.dependency-resolution-derivation.v1` with:
 
 - the existing definition, resolution, and observation identities;
 - exact repository binding and repository-input equivalence;
@@ -116,7 +116,7 @@ The derivation projection is intentionally not a history store or another reposi
 
 ### Explain projection
 
-`CodeMap.dependency_resolution_explain(observation)` is a pure read-only explanation of one already-qualified dependency endpoint. It returns schema `hashmarks.dependency-resolution-explain.v1` and contains:
+`CodeMap.dependencies.explain(observation)` is a pure read-only explanation of one already-qualified dependency endpoint. It returns schema `hashmarks.dependency-resolution-explain.v1` and contains:
 
 - a compact semantic-result summary using the existing definition, resolution, and observation identities;
 - the declared contexts and roots;
@@ -127,7 +127,7 @@ Explanation is endpoint-local. It does not require the observation to match the 
 
 ### Endpoint delta and independent change axes
 
-`CodeMap.dependency_resolution_delta(before, after)` returns schema `hashmarks.dependency-resolution-delta.v3` and compares two structurally valid qualified packets supplied explicitly by the caller. Repository identity and CodeMap generation are both comparison axes, not a request for Hashmarks to reconstruct either endpoint.
+`CodeMap.dependencies.delta(before, after)` returns schema `hashmarks.dependency-resolution-delta.v3` and compares two structurally valid qualified packets supplied explicitly by the caller. Repository identity and CodeMap generation are both comparison axes, not a request for Hashmarks to reconstruct either endpoint.
 
 The existing semantic component/selection/inventory/relationship delta remains factual. In addition, `change_axes` keeps independent dimensions separate:
 

@@ -1,3 +1,7 @@
+from pathlib import Path
+
+from contract_assertions import assert_array, assert_object, assert_records
+
 from hashmarks.symbolic_identity import symbolic_nomination_record, symbolic_task_terms
 
 
@@ -23,7 +27,9 @@ def test_symbolic_nomination_fails_closed_on_competing_paths() -> None:
     assert result["ranking_effect"] == "none"
 
 
-def test_decision_packet_exposes_nomination_without_ranking_authority(tmp_path) -> None:
+def test_decision_packet_exposes_nomination_without_ranking_authority(
+    tmp_path: Path,
+) -> None:
     from hashmarks.codemap import CodeMap
 
     (tmp_path / "src").mkdir()
@@ -38,16 +44,19 @@ def test_decision_packet_exposes_nomination_without_ranking_authority(tmp_path) 
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        packet = codemap.task_decision_packet(
+        codemap.index.sync()
+        packet = codemap.tasks.decision_packet(
             "Fix NormalizeWidget implementation",
             limit=20,
         )
 
-    nomination = packet["symbolic_nomination"]
-    assert "normalize_widget" in nomination["terms"]
+    nomination = assert_object(packet["symbolic_nomination"])
+    assert "normalize_widget" in assert_array(nomination["terms"])
     assert nomination["status"] in {"resolved", "ambiguous"}
-    assert any(row["name"] == "normalize_widget" for row in nomination["candidates"])
+    assert any(
+        row["name"] == "normalize_widget"
+        for row in assert_records(nomination["candidates"])
+    )
     assert nomination["authority"] == "nomination-only"
     assert nomination["ranking_effect"] == "none"
     assert packet["ranking_effect"] == "none"

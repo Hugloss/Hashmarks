@@ -11,7 +11,9 @@ from hashmarks.native_pants import collect_pants_targets
 def test_collect_pants_targets_normalizes_valid_rows(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+    def fake_run(
+        *args: list[str], **kwargs: list[str]
+    ) -> subprocess.CompletedProcess[str]:
         assert args[0] == ["pants", "peek", "--exclude-defaults", "::"]
         assert kwargs["cwd"] == tmp_path
         return subprocess.CompletedProcess(
@@ -68,7 +70,7 @@ def test_collect_pants_targets_rejects_failed_or_invalid_peek(
 def test_collect_pants_targets_reports_process_error(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    def fail(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+    def fail(*args: list[str], **kwargs: list[str]) -> subprocess.CompletedProcess[str]:
         raise OSError("cannot start")
 
     monkeypatch.setattr(subprocess, "run", fail)

@@ -12,15 +12,41 @@ from .change_line_evidence import (
     normalize_changed_line_spans,
     observe_changed_line_spans,
 )
-from .decision_session import diagnostic_producer
+from .decision_session import ReadScope, ReadScopeOwner, diagnostic_producer
 from .model import EvidenceVisibility
 from .project_impact_codec import compact_project_impact
 from .repository_domains import RepositoryDomain, classify_repository_path
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Mapping, Sequence
 
-    from .engine import CodeMap
+    from .decision_session import DecisionScope
+    from .ownership_relation_types import OwnershipPathHop
+    from .repository_changes import RepositoryChanges
+
+
+def _reported_change_paths(paths: Sequence[str | Path]) -> tuple[str, ...]:
+    normalized = tuple(
+        dict.fromkeys(normalize_relative_path(path, allow_root=False) for path in paths)
+    )
+    if not normalized:
+        raise ValueError(
+            "changed_paths must contain at least one repository-relative path"
+        )
+    return normalized
+
+
+@dataclass
+class _ImpactOwnerReuse:
+    """Disposable impact owner reuse bound to one read scope."""
+
+    scope: ReadScope | None = None
+    entries: dict[
+        tuple[int, str, int, int],
+        tuple[
+            str, dict[str, object] | None, str, list[str], dict[tuple[str, str], str]
+        ],
+    ] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -81,7 +107,7 @@ class _ImpactCandidate:
 class _ImpactState:
     """Request-local bounds and accumulated repository impact evidence."""
 
-    owner: CodeMap
+    reads: DecisionScope
     changed: tuple[str, ...]
     per_surface_limit: int
     surfaces: dict[str, list[dict[str, object]]] = field(
@@ -127,7 +153,7 @@ class _ImpactState:
         return tuple(dict.fromkeys(roles)) or ("other",)
 
     def visible(self, path: str) -> bool:
-        row = self.owner._session_file_row(path)
+        row = self.reads.file_row(path)
         return (
             row is not None
             and EvidenceVisibility(str(row["evidence_visibility"]))
@@ -243,7 +269,7 @@ class _ImpactState:
         return compact_project_impact(verbose) if encoding == "compact" else verbose
 
 
-class ChangeImpactMixin:
+class ChangeImpactMixin(ReadScopeOwner):
     def _refresh_declared_project_impact(
         self,
         normalized: tuple[str, ...],
@@ -251,11 +277,11 @@ class ChangeImpactMixin:
         expected_generation: int,
     ) -> tuple[dict[str, object] | None, int | None]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryChanges", self)
         provider = next(
             (
                 candidate
-                for candidate in self.project_graph_providers
+                for candidate in self.native.producers.projects
                 if candidate.supports_shared_input_freshness_rebind
                 and candidate.topology_manifest is not None
             ),
@@ -265,23 +291,23 @@ class ChangeImpactMixin:
             return None, None
         producer = provider.name
         declared_file = provider.topology_manifest
-        fresh, freshness_reason = self._evidence_fresh("project", producer)
+        fresh, freshness_reason = self.native._evidence_fresh("project", producer)
         if (
             fresh
             or not freshness_reason
             or not freshness_reason.startswith("manifest changed: ")
         ):
             return None, None
-        changed_manifests = self._evidence_manifest_changes("project", producer)
+        changed_manifests = self.native._evidence_manifest_changes("project", producer)
         reported = set(normalized)
         shared_only = bool(changed_manifests) and all(
             rel != declared_file
             and rel in reported
-            and self._project_shared_input(rel, producer)
+            and self.native._project_shared_input(rel, producer)
             for rel in changed_manifests
         )
         rebind_generation = (
-            self._rebind_project_freshness(
+            self.native._rebind_project_freshness(
                 producer, expected_generation=expected_generation
             )
             if shared_only
@@ -302,7 +328,7 @@ class ChangeImpactMixin:
         if declared_file not in changed_manifests or declared_file not in reported:
             return None, None
         if provider.detect(self.workspace):
-            refreshed = self.enrich_projects(
+            refreshed = self.native.enrich_projects(
                 (producer,), expected_generation=expected_generation
             )
             return (
@@ -316,7 +342,7 @@ class ChangeImpactMixin:
                         cast("Sequence[object]", refreshed.get("warnings") or ())
                     ),
                 },
-                int(refreshed["generation"]),
+                int(cast("int | str", refreshed["generation"])),
             )
         return None, None
 
@@ -329,23 +355,23 @@ class ChangeImpactMixin:
         effective_project_impact_limit: int,
     ) -> _ImpactState:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        state = _ImpactState(self, normalized, impact_limit_per_surface)
+            self = cast("RepositoryChanges", self)
+        state = _ImpactState(self.reads, normalized, impact_limit_per_surface)
         for changed in normalized:
             root_projects = {
                 str(row.get("project_id") or "")
-                for row in self._fresh_projects_for_path(changed)[:1]
+                for row in self.native._fresh_projects_for_path(changed)[:1]
                 if str(row.get("project_id") or "")
             }
             if root_projects:
-                fragment = self._fresh_project_dependents_with_provenance(
+                fragment = self.native._fresh_project_dependents_with_provenance(
                     root_projects,
                     max_depth=max_depth,
                     limit=effective_project_impact_limit,
                 )
                 state.merge_project_fragment(fragment)
             try:
-                impact = self.change_impact(
+                impact = self.impact(
                     changed,
                     max_depth=max_depth,
                     limit_per_surface=impact_limit_per_surface,
@@ -356,12 +382,15 @@ class ChangeImpactMixin:
         return state
 
     def _change_impact_owner_cache_key(
-        self, task: str, action: dict[str, object]
+        self, task: str, action: Mapping[str, object]
     ) -> tuple[int, str, int, int] | None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        if self._decision_session_depth <= 0:
+            self = cast("RepositoryChanges", self)
+        if self.reads.depth <= 0:
             return None
+        if self._impact_owner_reuse.scope is not self.reads.scope:
+            self._impact_owner_reuse.entries.clear()
+            self._impact_owner_reuse.scope = self.reads.scope
         bounds = action.get("bounds")
         defaults = CHANGE_IMPACT_DEFAULT_REQUEST
         limit = (
@@ -374,12 +403,14 @@ class ChangeImpactMixin:
             if isinstance(bounds, dict)
             else defaults.per_role
         )
-        generation = int(self._decision_session_generation or self.store.generation())
+        generation = int(self.reads.generation or self.store.generation())
         return generation, task, limit, per_role
 
-    def _same_package_go_owner(self, verify_path: str, visible) -> str | None:
+    def _same_package_go_owner(
+        self, verify_path: str, visible: Callable[[str], bool]
+    ) -> str | None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryChanges", self)
         parent = Path(verify_path).parent
         siblings = [
             candidate
@@ -392,10 +423,14 @@ class ChangeImpactMixin:
         return siblings[0] if len(siblings) == 1 else None
 
     def _reconstruct_change_impact_owner_edges(
-        self, task: str, edit_path: str, verify_path: str, visible
-    ) -> list[dict[str, object]] | None:
+        self,
+        task: str,
+        edit_path: str,
+        verify_path: str,
+        visible: Callable[[str], bool],
+    ) -> list[OwnershipPathHop] | None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryChanges", self)
         starts = [verify_path]
         if verify_path.endswith("_test.go"):
             same_package = self._same_package_go_owner(verify_path, visible)
@@ -403,7 +438,7 @@ class ChangeImpactMixin:
                 starts.insert(0, same_package)
         for start in starts:
             try:
-                reconstructed = self.ownership_relation_graph(task, start, max_depth=3)
+                reconstructed = self.ownership.relations(task, start, max_depth=3)
             except (KeyError, PermissionError, ValueError):
                 continue
             candidate_edges = reconstructed.get("owner_path")
@@ -436,16 +471,20 @@ class ChangeImpactMixin:
                 relations[(source, target)] = str(edge.get("relation") or "related")
         return chain, relations
 
-    def _change_impact_owner_chain(self, task: str, action: dict[str, object], visible):
+    def _change_impact_owner_chain(
+        self, task: str, action: Mapping[str, object], visible: Callable[[str], bool]
+    ) -> tuple[
+        str, dict[str, object] | None, str, list[str], dict[tuple[str, str], str]
+    ]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryChanges", self)
         cache_key = self._change_impact_owner_cache_key(task, action)
         if cache_key is not None:
-            cached = self._decision_change_impact_owner_chain_cache.get(cache_key)
+            cached = self._impact_owner_reuse.entries.get(cache_key)
             if cached is not None:
-                self._decision_session_stats["impact_owner_chain_hit"] += 1
+                self.reads.count("impact_owner_chain_hit")
                 return deepcopy(cached)
-            self._decision_session_stats["impact_owner_chain_miss"] += 1
+            self.reads.count("impact_owner_chain_miss")
 
         ownership = action.get("ownership_resolution")
         owner_edges = (
@@ -468,7 +507,7 @@ class ChangeImpactMixin:
         chain, relations = self._owner_chain_from_edges(owner_edges)
         result = (edit_path, verify, verify_path, chain, relations)
         if cache_key is not None:
-            self._decision_change_impact_owner_chain_cache[cache_key] = deepcopy(result)
+            self._impact_owner_reuse.entries[cache_key] = deepcopy(result)
         return result
 
     @staticmethod
@@ -501,13 +540,13 @@ class ChangeImpactMixin:
         chain: list[str],
     ) -> None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryChanges", self)
         changed_hits_task = edit_path in state.changed or any(
             path in state.changed for path in chain
         )
         if not changed_hits_task or verify is None:
             return
-        plan = self.verification_plan(
+        plan = self.verification.plan(
             verify_path,
             symbol=str(verify.get("verification_test_symbol") or "")
             or str(verify.get("name") or "")
@@ -519,7 +558,7 @@ class ChangeImpactMixin:
         }
         for key in ("runner", "scope", "confidence"):
             if key in plan:
-                verification_meta[key] = plan[key]
+                verification_meta[key] = plan.get(key)
         state.add(
             _ImpactCandidate(
                 verify_path,
@@ -536,7 +575,7 @@ class ChangeImpactMixin:
     ) -> list[dict[str, object]]:
         evidence: list[dict[str, object]] = []
         for path in state.changed:
-            row = state.owner._session_file_row(path)
+            row = state.reads.file_row(path)
             if row is None:
                 evidence.append(
                     {
@@ -606,7 +645,7 @@ class ChangeImpactMixin:
         return result
 
     @diagnostic_producer
-    def task_change_impact(
+    def task_impact(
         self,
         task: str,
         changed_paths: Sequence[str | Path],
@@ -625,25 +664,16 @@ class ChangeImpactMixin:
         follow-up work.
         """
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryChanges", self)
         options.validate()
-        normalized = tuple(
-            dict.fromkeys(
-                normalize_relative_path(path, allow_root=False)
-                for path in changed_paths
-            )
-        )
-        if not normalized:
-            raise ValueError(
-                "changed_paths must contain at least one repository-relative path"
-            )
+        normalized = _reported_change_paths(changed_paths)
         spans = normalize_changed_line_spans(options.changed_line_spans, normalized)
 
         # A standalone CLI/service call may arrive before a warm map exists.
         # Establish the repository map once, then keep the post-change refresh
         # bounded to the caller-reported paths.
-        self._ensure_map_ready()
-        sync_result = self.sync(normalized)
+        self.reads.ready()
+        sync_result = self.index.sync(normalized)
 
         # Declared project links are topology owned by the repository.  A
         # caller-reported edit to one of that provider's freshness-bound shared
@@ -659,8 +689,8 @@ class ChangeImpactMixin:
             sync_result.generation if refresh_generation is None else refresh_generation
         )
 
-        with self.decision_session(expected_generation=decision_generation):
-            action = self.task_action_map(task, limit=limit, per_role=per_role)
+        def observe(scope: ReadScope) -> dict[str, object]:
+            action = self.tasks.action_map(task, limit=limit, per_role=per_role)
             state = self._change_impact_surface_state(
                 normalized,
                 max_depth=options.max_depth,
@@ -675,10 +705,12 @@ class ChangeImpactMixin:
                 state, edit_path, verify, verify_path, chain
             )
             result = self._project_change_impact(
-                state, decision_generation, options, declared_refresh
+                state, scope.generation, options, declared_refresh
             )
             if spans:
                 result["changed_line_evidence"] = observe_changed_line_spans(
-                    self, spans
+                    self.source, spans
                 )
             return validate_operation_response("change_impact", result)
+
+        return self.reads.observe(observe, expected_generation=decision_generation)

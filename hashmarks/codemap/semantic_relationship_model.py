@@ -18,6 +18,25 @@ from .diagnostic_provenance import COLLECTION_STATES
 OBSERVATION_SCHEMA = operation_schema("structural_locality", "relationships")
 DELTA_SCHEMA = operation_schema("evidence_comparison", "relationships")
 AUTHORITY = "external-producer-claims-only"
+
+
+def validated_position(value: object) -> dict[str, int]:
+    if not isinstance(value, Mapping) or set(value) != {"line", "character"}:
+        raise ValueError("relationship position requires line and character")
+    if any(type(value[key]) is not int or not 0 <= value[key] < 2**31 for key in value):
+        raise ValueError("relationship positions must be nonnegative LSP integers")
+    return dict(value)
+
+
+def validated_range(value: object) -> dict[str, Any]:
+    if not isinstance(value, Mapping) or set(value) != {"start", "end"}:
+        raise ValueError("relationship range requires start and end")
+    start, end = validated_position(value["start"]), validated_position(value["end"])
+    if (start["line"], start["character"]) > (end["line"], end["character"]):
+        raise ValueError("relationship range is reversed")
+    return {"start": start, "end": end}
+
+
 PACKET_MAX_BYTES = 524_288
 CAPTURE_MAX_BYTES = 1_048_576
 OBSERVATION_LIMIT = 32
@@ -41,7 +60,7 @@ def content_identity(value: object) -> str:
     return "sha256:" + hashlib.sha256(raw).hexdigest()
 
 
-def portable_copy(value: Any, *, maximum: int = CAPTURE_MAX_BYTES) -> Any:
+def portable_copy(value: object, *, maximum: int = CAPTURE_MAX_BYTES) -> object:
     try:
         raw = json.dumps(value, ensure_ascii=False, allow_nan=False).encode("utf-8")
     except (TypeError, ValueError) as exc:
@@ -304,7 +323,7 @@ def _validate_call_site_source(claim: Mapping[str, Any]) -> None:
     site = basis.get("call_site_source")
     if site is None:  # Existing v1 packets before call-site qualification.
         return
-    if not isinstance(site, Mapping) or set(site) != {
+    required = {
         "path",
         "ranges",
         "position_encoding",
@@ -312,8 +331,19 @@ def _validate_call_site_source(claim: Mapping[str, Any]) -> None:
         "state",
         "authority",
         "negative_evidence_admissible",
+    }
+    if not isinstance(site, Mapping) or not required <= set(site) <= required | {
+        "declaration_context"
     }:
         raise ValueError("invalid call-site source qualification")
+    _validate_call_site_fields(site, basis)
+    if "declaration_context" in site:
+        _validate_declaration_context(site["declaration_context"], site)
+
+
+def _validate_call_site_fields(
+    site: Mapping[str, Any], basis: Mapping[str, Any]
+) -> None:
     if (
         site["authority"] != "caller-supplied-call-site-source-correspondence-only"
         or site["negative_evidence_admissible"] is not False
@@ -346,6 +376,75 @@ def _validate_call_site_source(claim: Mapping[str, Any]) -> None:
         )
 
 
+def _validate_declaration_context(value: object, site: Mapping[str, Any]) -> None:
+    if not isinstance(value, Mapping):
+        raise ValueError("invalid call-site declaration context")
+    if (
+        value.get("authority") != "indexed-lexical-range-correspondence-only"
+        or value.get("negative_evidence_admissible") is not False
+    ):
+        raise ValueError("declaration context cannot strengthen call authority")
+    if value.get("state") not in {
+        "unresolved",
+        "index-revision-unqualified",
+        "within-declaration-range",
+        "outside-declaration-range",
+    }:
+        raise ValueError("invalid declaration context state")
+    qualified = value.get("state") in {
+        "within-declaration-range",
+        "outside-declaration-range",
+    }
+    required = {"state", "authority", "negative_evidence_admissible"}
+    if qualified:
+        required |= {"path", "symbol_id", "declaration_range", "source_binding"}
+    if set(value) != required:
+        raise ValueError("invalid declaration context fields")
+    if qualified:
+        _validate_declaration_binding(value, site)
+        _validate_declaration_containment(value, site)
+
+
+def _validate_declaration_binding(
+    value: Mapping[str, Any], site: Mapping[str, Any]
+) -> None:
+    binding = value.get("source_binding")
+    if (
+        not isinstance(binding, Mapping)
+        or binding != site["source_binding"]
+        or binding.get("state") != "matching"
+        or value.get("path") != site["path"]
+    ):
+        raise ValueError("declaration context requires matching source")
+    _validate_binding(binding)
+    if not isinstance(value.get("symbol_id"), str) or not isinstance(
+        value.get("declaration_range"), Mapping
+    ):
+        raise ValueError("declaration context requires an indexed declaration")
+
+
+def _validate_declaration_containment(
+    value: Mapping[str, Any], site: Mapping[str, Any]
+) -> None:
+    scope = validated_range(value["declaration_range"])
+    ranges = site["ranges"]
+    if not isinstance(ranges, list) or not ranges:
+        raise ValueError("declaration context requires source ranges")
+
+    def point(position: Mapping[str, int]) -> tuple[int, int]:
+        return position["line"], position["character"]
+
+    inside = all(
+        point(scope["start"]) <= point(row["start"])
+        and point(row["end"]) <= point(scope["end"])
+        for row in (validated_range(item) for item in ranges)
+    )
+    if inside != (value["state"] == "within-declaration-range"):
+        raise ValueError("declaration context contradicts retained ranges")
+    if not value["symbol_id"].startswith(str(site["path"]) + "::"):
+        raise ValueError("declaration context contradicts member identity")
+
+
 def _validate_claim(claim: object, producer: str) -> None:
     if not isinstance(claim, Mapping) or claim.get("kind") not in RELATIONSHIP_KINDS:
         raise ValueError("invalid direct relationship claim")
@@ -366,6 +465,7 @@ def _validate_claim(claim: object, producer: str) -> None:
 
 def validate_relationship_observation(payload: Mapping[str, Any]) -> dict[str, Any]:
     value = portable_copy(dict(payload), maximum=PACKET_MAX_BYTES)
+    assert isinstance(value, dict)
     if value.get("schema") != OBSERVATION_SCHEMA or value.get("authority") != AUTHORITY:
         raise ValueError("invalid relationship observation schema or authority")
     if (

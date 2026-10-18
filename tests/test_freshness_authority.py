@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from contract_assertions import assert_array
 
 import hashmarks.codemap.find_engine as find_engine_module
 import hashmarks.evidence_context as evidence_context_module
@@ -33,14 +34,14 @@ def test_find_claim_admission_consumes_canonical_freshness(
     )
 
     with CodeMap(repo) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         monkeypatch.setattr(
             find_engine_module,
             "freshness_state",
             lambda _stale: "stale",
         )
-        result = codemap.find_packet("src/missing.py")
+        result = codemap.search.packet("src/missing.py")
 
     assert result["freshness"] == "stale"
     assert result["negative_evidence"] == "not-admissible"
-    assert "repository-freshness-stale" in result["admissibility_reasons"]
+    assert "repository-freshness-stale" in assert_array(result["admissibility_reasons"])

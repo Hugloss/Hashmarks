@@ -3,6 +3,8 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+from hashmarks.python_ast_cache import read_python_ast
+
 _IMPORT_RESOLUTION_METHODS = {
     "_python_reexport_targets",
     "_python_export_binding",
@@ -19,7 +21,7 @@ _IMPORT_RESOLUTION_METHODS = {
 
 
 def _class_methods(path: Path, class_name: str) -> set[str]:
-    tree = ast.parse(path.read_text(encoding="utf-8"))
+    tree = read_python_ast(path).tree
     owner = next(
         node
         for node in tree.body
@@ -31,13 +33,13 @@ def _class_methods(path: Path, class_name: str) -> set[str]:
 def test_import_resolution_has_one_explicit_owner() -> None:
     root = Path(__file__).resolve().parents[1]
     resolver = _class_methods(
-        root / "hashmarks/codemap/import_resolution.py", "ImportResolutionMixin"
+        root / "hashmarks/codemap/import_resolution.py", "RepositoryImports"
     )
     graph = _class_methods(
-        root / "hashmarks/codemap/evidence_graph.py", "EvidenceGraphMixin"
+        root / "hashmarks/codemap/evidence_graph.py", "RepositoryRelationships"
     )
     ownership = _class_methods(
-        root / "hashmarks/codemap/ownership_graph.py", "OwnershipGraphMixin"
+        root / "hashmarks/codemap/ownership_graph.py", "RepositoryOwnership"
     )
 
     assert resolver >= _IMPORT_RESOLUTION_METHODS

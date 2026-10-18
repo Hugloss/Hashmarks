@@ -3,10 +3,19 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
+from contract_assertions import (
+    assert_array,
+    assert_integer,
+    assert_object,
+    assert_records,
+)
 
 from hashmarks import CodeMap
+from hashmarks.codemap.diagnostic_observation import (
+    diagnostic_observation_delta,
+    external_diagnostic_observation,
+)
 from hashmarks.codemap.repository_delta import (
-    RepositoryDeltaMixin,
     RepositoryGenerationBinding,
 )
 
@@ -21,7 +30,7 @@ def _diagnostics(
     column: int = 12,
     collection: str = "fresh-complete",
 ) -> dict[str, object]:
-    return RepositoryDeltaMixin.external_diagnostic_observation(
+    return external_diagnostic_observation(
         producer="pyright",
         binding=RepositoryGenerationBinding("repository:fixture", generation),
         environment_identity="pyright:fixture",
@@ -54,18 +63,18 @@ def _capture(
     file = tmp_path / "src.py"
     file.write_text(old, encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        before_source = codemap.source_observation("src.py", lines=[old_line])
+        codemap.index.sync()
+        before_source = codemap.source.observe("src.py", lines=[old_line])
         before = _diagnostics(
-            int(before_source["generation"]), old_line, column=columns[0]
+            assert_integer(before_source["generation"]), old_line, column=columns[0]
         )
         file.write_text(new, encoding="utf-8")
-        codemap.sync()
-        after_source = codemap.source_observation("src.py", lines=[new_line])
+        codemap.index.sync()
+        after_source = codemap.source.observe("src.py", lines=[new_line])
         after = _diagnostics(
-            int(after_source["generation"]), new_line, column=columns[1]
+            assert_integer(after_source["generation"]), new_line, column=columns[1]
         )
-    return RepositoryDeltaMixin.diagnostic_observation_delta(
+    return diagnostic_observation_delta(
         before, after, before_source=before_source, after_source=after_source
     )
 
@@ -80,18 +89,18 @@ def test_source_backed_unique_moved_line_preserves_raw_diagnostic_identities(
         old_line=2,
         new_line=3,
     )
-    assert len(delta["diagnostics"]["added"]) == 1
-    assert len(delta["diagnostics"]["removed"]) == 1
-    proof = delta["diagnostics"]["source_correspondence"]
-    assert len(proof["supported"]) == 1
-    assert proof["unresolved"] == []
-    moved = proof["supported"][0]
+    assert len(assert_array(assert_object(delta["diagnostics"])["added"])) == 1
+    assert len(assert_array(assert_object(delta["diagnostics"])["removed"])) == 1
+    proof = assert_object(delta["diagnostics"])["source_correspondence"]
+    assert len(assert_array(assert_object(proof)["supported"])) == 1
+    assert assert_object(proof)["unresolved"] == []
+    moved = assert_records(assert_object(proof)["supported"])[0]
     assert moved["state"] == "source-line-correspondence"
     assert moved["before_line"] == 2
     assert moved["after_line"] == 3
     assert moved["diagnostic_identity_authority"] is False
     assert moved["before_member_revision"] != moved["after_member_revision"]
-    assert proof["diagnostic_identity_authority"] is False
+    assert assert_object(proof)["diagnostic_identity_authority"] is False
 
 
 @pytest.mark.parametrize("endpoint", ["before", "after"])
@@ -102,42 +111,42 @@ def test_source_line_correspondence_respects_explicit_producer_revisions(
     file = tmp_path / "src.py"
     file.write_text("def example():\n    print(missing)\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        before_source = codemap.source_observation("src.py", lines=[2])
-        before = _diagnostics(int(before_source["generation"]), 2)
+        codemap.index.sync()
+        before_source = codemap.source.observe("src.py", lines=[2])
+        before = _diagnostics(assert_integer(before_source["generation"]), 2)
         file.write_text(
             "def example():\n    other = 1\n    print(missing)\n", encoding="utf-8"
         )
-        codemap.sync()
-        after_source = codemap.source_observation("src.py", lines=[3])
-        after = _diagnostics(int(after_source["generation"]), 3)
+        codemap.index.sync()
+        after_source = codemap.source.observe("src.py", lines=[3])
+        after = _diagnostics(assert_integer(after_source["generation"]), 3)
     packet, source = (
         (before, before_source) if endpoint == "before" else (after, after_source)
     )
     packet["source_revisions"] = {
-        "src.py": source["member"]["member_revision"]
+        "src.py": assert_object(source["member"])["member_revision"]
         if claim == "matching"
         else "a" * 64
     }
     if claim == "malformed":
         packet["source_revisions"] = {"outside.py": "not-a-revision"}
         with pytest.raises(ValueError):
-            RepositoryDeltaMixin.diagnostic_observation_delta(
+            diagnostic_observation_delta(
                 before, after, before_source=before_source, after_source=after_source
             )
         return
-    delta = RepositoryDeltaMixin.diagnostic_observation_delta(
+    delta = diagnostic_observation_delta(
         before, after, before_source=before_source, after_source=after_source
     )
-    correspondence = delta["diagnostics"]["source_correspondence"]
+    correspondence = assert_object(delta["diagnostics"])["source_correspondence"]
     if claim == "matching":
-        assert len(correspondence["supported"]) == 1
-        assert correspondence["unresolved"] == []
+        assert len(assert_array(assert_object(correspondence)["supported"])) == 1
+        assert assert_object(correspondence)["unresolved"] == []
     else:
-        assert correspondence["supported"] == []
-        assert correspondence["unresolved"][0]["reason"] == (
-            "diagnostic-source-revision-mismatch"
-        )
+        assert assert_object(correspondence)["supported"] == []
+        assert assert_records(assert_object(correspondence)["unresolved"])[0][
+            "reason"
+        ] == ("diagnostic-source-revision-mismatch")
 
 
 @pytest.mark.parametrize(
@@ -159,54 +168,65 @@ def test_changed_or_duplicate_source_lines_do_not_prove_correspondence(
     tmp_path: Path, old: str, new: str, reason: str
 ) -> None:
     delta = _capture(tmp_path, old=old, new=new, old_line=2, new_line=3)
-    result = delta["diagnostics"]["source_correspondence"]
-    assert result["supported"] == []
-    assert result["unresolved"][0]["reason"] == reason
+    result = assert_object(delta["diagnostics"])["source_correspondence"]
+    assert assert_object(result)["supported"] == []
+    assert assert_records(assert_object(result)["unresolved"])[0]["reason"] == reason
 
 
 def test_changed_diagnostic_column_does_not_prove_correspondence(
     tmp_path: Path,
 ) -> None:
-    result = _capture(
-        tmp_path,
-        old="def example():\n    print(missing)\n",
-        new="def example():\n    y = 1\n    print(missing)\n",
-        old_line=2,
-        new_line=3,
-        columns=(12, 14),
-    )["diagnostics"]["source_correspondence"]
-    assert result["supported"] == []
-    assert result["unresolved"][0]["reason"] == "diagnostic-column-not-preserved"
+    result = assert_object(
+        _capture(
+            tmp_path,
+            old="def example():\n    print(missing)\n",
+            new="def example():\n    y = 1\n    print(missing)\n",
+            old_line=2,
+            new_line=3,
+            columns=(12, 14),
+        )["diagnostics"]
+    )["source_correspondence"]
+    assert assert_object(result)["supported"] == []
+    assert (
+        assert_records(assert_object(result)["unresolved"])[0]["reason"]
+        == "diagnostic-column-not-preserved"
+    )
 
 
 def test_missing_or_blank_line_anchor_fails_closed(tmp_path: Path) -> None:
     file = tmp_path / "src.py"
     file.write_text("x = 1\n\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        packet = codemap.source_observation("src.py", lines=[2, 500])
+        codemap.index.sync()
+        packet = codemap.source.observe("src.py", lines=[2, 500])
     assert packet["availability"] == "observed"
     assert packet["line_coverage"] == "unknown"
-    assert [row["state"] for row in packet["line_anchors"]] == ["unknown", "unknown"]
+    assert [row["state"] for row in assert_records(packet["line_anchors"])] == [
+        "unknown",
+        "unknown",
+    ]
 
 
 def test_source_line_anchor_is_exact_revision_bound_and_unique(tmp_path: Path) -> None:
     path = tmp_path / "src.py"
     path.write_bytes(b"a = 1\r\nb = 2\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        packet = codemap.source_observation("src.py", lines=[1, 2])
+        codemap.index.sync()
+        packet = codemap.source.observe("src.py", lines=[1, 2])
     assert packet["line_coverage"] == "complete"
     assert packet["completeness"] == "complete"
-    assert len(packet["line_anchors"]) == 2
-    assert all(row["matching_physical_lines"] == 1 for row in packet["line_anchors"])
+    assert len(assert_array(packet["line_anchors"])) == 2
     assert all(
-        row["member_revision"] == packet["member"]["member_revision"]
-        for row in packet["line_anchors"]
+        row["matching_physical_lines"] == 1
+        for row in assert_records(packet["line_anchors"])
+    )
+    assert all(
+        row["member_revision"] == assert_object(packet["member"])["member_revision"]
+        for row in assert_records(packet["line_anchors"])
     )
     assert (
-        packet["line_anchors"][0]["line_sha256"]
-        != packet["line_anchors"][1]["line_sha256"]
+        assert_object(assert_array(packet["line_anchors"])[0])["line_sha256"]
+        != assert_object(assert_array(packet["line_anchors"])[1])["line_sha256"]
     )
 
 
@@ -216,19 +236,19 @@ def test_source_line_scope_is_rejected_before_read(
 ) -> None:
     with CodeMap(tmp_path) as codemap:
         with pytest.raises(ValueError, match="lines"):
-            codemap.source_observation("src.py", lines=lines)
+            codemap.source.observe("src.py", lines=lines)
 
 
 def test_unsupported_or_stale_member_has_no_source_anchors(tmp_path: Path) -> None:
     path = tmp_path / "src.py"
     path.write_text("original = 1\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        before = codemap.source_observation("src.py", lines=[1])
+        codemap.index.sync()
+        before = codemap.source.observe("src.py", lines=[1])
         path.write_text("replaced = 1\n", encoding="utf-8")
-        stale = codemap.source_observation("src.py", lines=[1])
-        denied = codemap.source_observation(".env", lines=[1])
-    assert len(before["line_anchors"]) == 1
+        stale = codemap.source.observe("src.py", lines=[1])
+        denied = codemap.source.observe(".env", lines=[1])
+    assert len(assert_array(before["line_anchors"])) == 1
     assert stale["line_anchors"] == []
     assert stale["line_coverage"] == "unknown"
     assert denied["line_anchors"] == []
@@ -238,9 +258,7 @@ def test_source_correspondence_requires_both_snapshots() -> None:
     before = _diagnostics(1, 2)
     after = _diagnostics(2, 3)
     with pytest.raises(ValueError, match="both endpoint"):
-        RepositoryDeltaMixin.diagnostic_observation_delta(
-            before, after, before_source={}
-        )
+        diagnostic_observation_delta(before, after, before_source={})
 
 
 def test_mismatched_source_generation_never_supports_correspondence(
@@ -255,16 +273,21 @@ def test_mismatched_source_generation_never_supports_correspondence(
     )
     before = _diagnostics(987654, 2)
     after = _diagnostics(987655, 3)
-    source_pair = delta["diagnostics"]["source_correspondence"]
-    assert len(source_pair["supported"]) == 1
-    result = RepositoryDeltaMixin.diagnostic_observation_delta(
-        before,
-        after,
-        before_source={"schema": "hashmarks.source-observation.v1"},
-        after_source={"schema": "hashmarks.source-observation.v1"},
-    )["diagnostics"]["source_correspondence"]
-    assert result["supported"] == []
-    assert result["unresolved"][0]["reason"] == "missing-canonical-member"
+    source_pair = assert_object(delta["diagnostics"])["source_correspondence"]
+    assert len(assert_array(assert_object(source_pair)["supported"])) == 1
+    result = assert_object(
+        diagnostic_observation_delta(
+            before,
+            after,
+            before_source={"schema": "hashmarks.source-observation.v1"},
+            after_source={"schema": "hashmarks.source-observation.v1"},
+        )["diagnostics"]
+    )["source_correspondence"]
+    assert assert_object(result)["supported"] == []
+    assert (
+        assert_records(assert_object(result)["unresolved"])[0]["reason"]
+        == "missing-canonical-member"
+    )
 
 
 def test_same_generation_unadmitted_source_change_cannot_prove_movement() -> None:

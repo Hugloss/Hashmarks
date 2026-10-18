@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import unquote, urlsplit
 
@@ -13,10 +14,12 @@ from hashmarks.paths import normalize_relative_path
 from .semantic_relationship_model import CANDIDATE_LIMIT, content_identity
 
 if TYPE_CHECKING:
-    from .engine import CodeMap
+    from .decision_session import DecisionScope
+    from .repository_index_store import WorkspaceMapStore
+    from .repository_source import RepositorySource
 
 
-def uri_member(uri: object, workspace: Any) -> str | None:
+def uri_member(uri: object, workspace: Path) -> str | None:
     if not isinstance(uri, str):
         raise ValueError("LSP location URI must be a string")
     value = urlsplit(uri)
@@ -24,30 +27,11 @@ def uri_member(uri: object, workspace: Any) -> str | None:
         return None
     if value.query or value.fragment or "\x00" in unquote(value.path):
         raise ValueError("LSP file URI is malformed")
-    from pathlib import Path
-
     try:
         relative = Path(unquote(value.path)).relative_to(workspace)
     except ValueError:
         return None
     return normalize_relative_path(relative.as_posix(), allow_root=False)
-
-
-def validated_position(value: object) -> dict[str, int]:
-    if not isinstance(value, Mapping) or set(value) != {"line", "character"}:
-        raise ValueError("relationship position requires line and character")
-    if any(type(value[key]) is not int or not 0 <= value[key] < 2**31 for key in value):
-        raise ValueError("relationship positions must be nonnegative LSP integers")
-    return dict(value)
-
-
-def validated_range(value: object) -> dict[str, Any]:
-    if not isinstance(value, Mapping) or set(value) != {"start", "end"}:
-        raise ValueError("relationship range requires start and end")
-    start, end = validated_position(value["start"]), validated_position(value["end"])
-    if (start["line"], start["character"]) > (end["line"], end["character"]):
-        raise ValueError("relationship range is reversed")
-    return {"start": start, "end": end}
 
 
 def character_offset(text: str, units: int, encoding: str) -> int | None:
@@ -68,22 +52,26 @@ def character_offset(text: str, units: int, encoding: str) -> int | None:
 class RelationshipSourceResolver:
     """Reuse one canonical stable member read for each admitted path."""
 
-    def __init__(self, codemap: CodeMap) -> None:
-        self.codemap = codemap
+    def __init__(
+        self, source: RepositorySource, reads: DecisionScope, store: WorkspaceMapStore
+    ) -> None:
+        self.source = source
+        self.reads = reads
+        self.store = store
         self.members: dict[str, tuple[dict[str, Any], bytes | None]] = {}
 
     def admitted(self, path: str) -> bool:
-        row = self.codemap._session_file_row(path)
+        row = self.reads.file_row(path)
         return (
             row is not None
             and row.get("evidence_visibility") != "deny"
-            and self.codemap._path_admitted_for_analysis(path)
-            and self.codemap.policy.decide(path).evidence_visibility.value != "deny"
+            and self.source.files.is_admitted(path)
+            and self.source.files.decide(path).evidence_visibility.value != "deny"
         )
 
     def member(self, path: str) -> tuple[dict[str, Any], bytes | None]:
         if path not in self.members:
-            self.members[path] = self.codemap._bounded_source_observation(
+            self.members[path] = self.source._bounded_source_observation(
                 path, 1_048_576
             )
         return self.members[path]
@@ -115,7 +103,7 @@ class RelationshipSourceResolver:
             "provenance": snapshot.get("provenance"),
             "observed_at_import": snapshot.get("observed_at_import"),
             "source_observation_identity": content_identity(
-                {"member": member, "generation": self.codemap.store.generation()}
+                {"member": member, "generation": self.store.generation()}
             ),
             "member_state": member.get("state"),
             "reason": member.get("reason"),
@@ -128,6 +116,8 @@ class RelationshipSourceResolver:
         locator: Mapping[str, Any],
         snapshot: Mapping[str, Any],
         name: str,
+        *,
+        query: bool = False,
     ) -> bool:
         position = locator["start"]
         encoding = locator.get("position_encoding", "unknown")
@@ -146,7 +136,11 @@ class RelationshipSourceResolver:
             return False
         codec = "utf-16-le" if encoding == "utf-16" else encoding
         offset = character_offset(lines[line], position["character"], codec)
-        return offset is not None and _name_at_offset(lines[line], name, offset)
+        return offset is not None and (
+            _name_at_query_offset(lines[line], name, offset)
+            if query
+            else _name_at_offset(lines[line], name, offset)
+        )
 
     def candidates(
         self,
@@ -155,6 +149,7 @@ class RelationshipSourceResolver:
         snapshot: Mapping[str, Any],
         *,
         name: str | None = None,
+        query: bool = False,
     ) -> dict[str, Any]:
         if not self.admitted(path) or locator is None:
             return {
@@ -166,9 +161,7 @@ class RelationshipSourceResolver:
         position = locator["start"]
         rows = [
             row
-            for row in cast(
-                "list[dict[str, Any]]", self.codemap._session_symbols_for_path(path)
-            )
+            for row in cast("list[dict[str, Any]]", self.reads.symbols_for_path(path))
             if int(row["start_line"]) == position["line"] + 1
             and (name is None or row["name"] == name)
             and row.get("evidence_visibility") != "deny"
@@ -178,7 +171,9 @@ class RelationshipSourceResolver:
         qualified = (
             len(rows) == 1
             and binding["state"] == "matching"
-            and self.position_qualified(path, locator, snapshot, str(rows[0]["name"]))
+            and self.position_qualified(
+                path, locator, snapshot, str(rows[0]["name"]), query=query
+            )
         )
         return {
             "state": "incomplete-candidate-search"
@@ -211,6 +206,16 @@ class RelationshipSourceResolver:
             "source_binding": binding,
             "negative_evidence_admissible": False,
         }
+
+
+def _name_at_query_offset(text: str, name: str, offset: int) -> bool:
+    """An LSP query cursor may lie inside one unambiguous declaration token."""
+    starts = [
+        match.start()
+        for match in re.finditer(re.escape(name), text)
+        if _name_at_offset(text, name, match.start())
+    ]
+    return len(starts) == 1 and starts[0] <= offset < starts[0] + len(name)
 
 
 def _name_at_offset(text: str, name: str, offset: int) -> bool:

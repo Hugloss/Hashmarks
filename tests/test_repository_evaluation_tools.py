@@ -3,9 +3,12 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from typing import TypedDict
 
 import pytest
+from contract_assertions import assert_records, assert_text
 
+from hashmarks.codemap import CodeMap
 from scripts.repository_evaluation.compare_runs import compare_runs
 from scripts.repository_evaluation.grade_cases import grade_run
 from scripts.repository_evaluation.merge_runs import merge_runs
@@ -117,6 +120,10 @@ def test_repository_evaluation_receipt_rejects_target_repository_identity_drift(
         run_cases(workspace=repo, cases_path=cases, receipts_dir=receipts)
 
 
+class SelectionOptions(TypedDict, total=False):
+    shard_count: int
+
+
 @pytest.mark.parametrize(
     ("case_rows", "options", "message"),
     [
@@ -138,7 +145,7 @@ def test_repository_evaluation_receipt_rejects_target_repository_identity_drift(
 def test_repository_evaluation_rejects_invalid_selection_contract(
     tmp_path: Path,
     case_rows: list[object],
-    options: dict[str, int],
+    options: SelectionOptions,
     message: str,
 ) -> None:
     repo = tmp_path / "repo"
@@ -497,8 +504,17 @@ def test_repository_evaluation_grader_rejects_malformed_inputs(
 def test_profile_comparison_uses_same_version_noise_floor() -> None:
     from scripts.repository_evaluation.compare_profiles import compare_profiles
 
-    def doc(median: int):
+    def doc(median: int) -> dict[str, object]:
         return {
+            "schema": "hashmarks.repository-evaluation-profile.v1",
+            "cases_sha256": "sha256:cases",
+            "repository_identity": "sha256:repository",
+            "producer_implementation_identity": "sha256:observer",
+            "evaluator_implementation_identity": "sha256:evaluator",
+            "warmups": 2,
+            "samples": 9,
+            "shard_count": 1,
+            "shard_index": 0,
             "cases": [
                 {
                     "id": "x",
@@ -506,25 +522,34 @@ def test_profile_comparison_uses_same_version_noise_floor() -> None:
                     "semantic_fingerprint": "sha256:same",
                     "semantic_stable": True,
                 }
-            ]
+            ],
         }
 
     result = compare_profiles(
         baseline=doc(100), candidate=doc(94), repeat=doc(96), minimum_gain_pct=3.0
     )
-    assert result["cases"][0]["same_version_noise_pct"] == 4.0
-    assert result["cases"][0]["decision"] == "WIN"
+    assert assert_records(result["cases"])[0]["same_version_noise_pct"] == 4.0
+    assert assert_records(result["cases"])[0]["decision"] == "WIN"
     noisy = compare_profiles(
         baseline=doc(100), candidate=doc(94), repeat=doc(93), minimum_gain_pct=3.0
     )
-    assert noisy["cases"][0]["decision"] == "NOISE_BAND"
+    assert assert_records(noisy["cases"])[0]["decision"] == "NOISE_BAND"
 
 
 def test_profile_comparison_uses_per_case_noise_not_global_p90() -> None:
     from scripts.repository_evaluation.compare_profiles import compare_profiles
 
-    def doc(x: int, y: int):
+    def doc(x: int, y: int) -> dict[str, object]:
         return {
+            "schema": "hashmarks.repository-evaluation-profile.v1",
+            "cases_sha256": "sha256:cases",
+            "repository_identity": "sha256:repository",
+            "producer_implementation_identity": "sha256:observer",
+            "evaluator_implementation_identity": "sha256:evaluator",
+            "warmups": 2,
+            "samples": 9,
+            "shard_count": 1,
+            "shard_index": 0,
             "cases": [
                 {
                     "id": "stable",
@@ -538,7 +563,7 @@ def test_profile_comparison_uses_per_case_noise_not_global_p90() -> None:
                     "semantic_fingerprint": "sha256:n",
                     "semantic_stable": True,
                 },
-            ]
+            ],
         }
 
     result = compare_profiles(
@@ -547,9 +572,9 @@ def test_profile_comparison_uses_per_case_noise_not_global_p90() -> None:
         repeat=doc(100, 60),
         minimum_gain_pct=3.0,
     )
-    rows = {row["id"]: row for row in result["cases"]}
+    rows = {row["id"]: row for row in assert_records(result["cases"])}
     assert result["noise_floor_percent"] == 40.0
-    assert "diagnostic only" in result["noise_floor_authority"]
+    assert "diagnostic only" in assert_text(result["noise_floor_authority"])
     assert rows["stable"]["required_gain_pct"] == 3.0
     assert rows["stable"]["decision"] == "WIN"
 
@@ -557,7 +582,7 @@ def test_profile_comparison_uses_per_case_noise_not_global_p90() -> None:
 def test_profile_shards_merge_strict_identity_and_complete() -> None:
     from scripts.repository_evaluation.merge_profiles import merge_profiles
 
-    def shard(index: int, case_id: str):
+    def shard(index: int, case_id: str) -> dict[str, object]:
         return {
             "schema": "hashmarks.repository-evaluation-profile.v1",
             "suite": "s",
@@ -590,6 +615,98 @@ def test_profile_shards_merge_strict_identity_and_complete() -> None:
         merge_profiles([shard(0, "same"), shard(1, "same")])
 
 
+def test_profile_measures_nominated_public_operation_without_action_map_proxy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import hashlib
+    from collections.abc import Sequence
+
+    from hashmarks.codemap.repository_source import RepositorySource
+    from hashmarks.codemap.repository_tasks import RepositoryTasks
+    from scripts.repository_evaluation.profile_cases import profile_cases
+
+    repo = tmp_path / "repo"
+    _write(repo, "src/live.py", "def active_target():\n    return 1\n")
+    cases = tmp_path / "cases.json"
+    cases.write_text(
+        json.dumps(
+            {
+                "schema": "hashmarks.repository-evaluation-cases.v1",
+                "suite": "public-profile",
+                "cases": [
+                    {
+                        "id": "member",
+                        "operation": "source_observation",
+                        "inputs": {"paths": ["src/live.py"]},
+                    }
+                ],
+            }
+        )
+    )
+    packets = []
+    original = RepositorySource.observe
+
+    def observe(
+        source: RepositorySource,
+        relpath: str,
+        *,
+        context_lines: int,
+        lines: Sequence[int],
+        anchor_context_lines: int,
+    ) -> dict[str, object]:
+        packet = original(
+            source,
+            relpath,
+            context_lines=context_lines,
+            lines=lines,
+            anchor_context_lines=anchor_context_lines,
+        )
+        packets.append(packet)
+        return packet
+
+    def disallow_proxy(*_args: object, **_kwargs: object) -> None:
+        pytest.fail("public operation profiling must not substitute action-map timing")
+
+    monkeypatch.setattr(RepositorySource, "observe", observe)
+    monkeypatch.setattr(RepositoryTasks, "action_map", disallow_proxy)
+    result = profile_cases(workspace=repo, cases_path=cases, warmups=1, samples=3)
+    assert len(packets) == 4
+    row = result["cases"][0]
+    assert row["operation"] == "source_observation"
+    assert len(row["samples_ns"]) == 3
+    assert (
+        row["semantic_fingerprint"]
+        == "sha256:"
+        + hashlib.sha256(
+            json.dumps(
+                packets[1], sort_keys=True, separators=(",", ":"), ensure_ascii=False
+            ).encode()
+        ).hexdigest()
+    )
+    assert result["evaluator_implementation_identity"].startswith("sha256:")
+
+
+def test_profile_shard_merge_rejects_evaluator_drift() -> None:
+    from scripts.repository_evaluation.merge_profiles import merge_profiles
+
+    baseline = {
+        "schema": "hashmarks.repository-evaluation-profile.v1",
+        "suite": "source-only",
+        "shard_count": 2,
+        "shard_index": 0,
+        "cases": [{"id": "first"}],
+        "evaluator_implementation_identity": "sha256:first",
+    }
+    candidate = {
+        **baseline,
+        "shard_index": 1,
+        "cases": [{"id": "second"}],
+        "evaluator_implementation_identity": "sha256:second",
+    }
+    with pytest.raises(ValueError, match="profile identity mismatch"):
+        merge_profiles([baseline, candidate])
+
+
 def test_paired_profile_interleaves_semantics_and_fails_closed_on_noise(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -604,7 +721,7 @@ def test_paired_profile_interleaves_semantics_and_fails_closed_on_noise(
     timings = iter([100, 100, 100, 100, 100, 140, 100, 60, 100, 140])
     original = profiles._run_action
 
-    def fake(codemap, case):
+    def fake(codemap: CodeMap, case: dict[str, object]) -> tuple[float, str]:
         elapsed, _ = original(codemap, case)
         with contextlib.suppress(StopIteration):
             elapsed = next(timings)

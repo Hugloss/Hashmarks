@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from contract_assertions import assert_object
+
 from hashmarks.product_acceptance import (
     executable_acceptance_suite,
     observability_capabilities,
@@ -42,17 +44,25 @@ def test_scale_class_contract_is_explicit_and_monotonic() -> None:
 
 def test_observability_capabilities_are_bounded() -> None:
     result = observability_capabilities()
-    assert result["values"]["executable_acceptance_suite"] is True
-    assert result["values"]["symbolic_identity_nomination"] is True
-    assert result["values"]["ownership_graph_economics_receipt"] is True
-    assert result["values"]["producer_implementation_identity"] is True
-    assert result["values"]["same_version_implementation_drift_detection"] is True
-    assert result["values"]["qualification_classification_identity"] is True
-    assert result["values"]["qualification_coverage_validation"] is True
-    assert result["values"]["qualification_classification_economics"] is True
-    assert result["values"]["native_qualification_handoff"] is True
-    assert result["values"]["graph_nodes_traversed_exact"] is False
-    assert result["values"]["sort_operations_exact"] is False
+    assert assert_object(result["values"])["executable_acceptance_suite"] is True
+    assert assert_object(result["values"])["symbolic_identity_nomination"] is True
+    assert assert_object(result["values"])["ownership_graph_economics_receipt"] is True
+    assert assert_object(result["values"])["producer_implementation_identity"] is True
+    assert (
+        assert_object(result["values"])["same_version_implementation_drift_detection"]
+        is True
+    )
+    assert (
+        assert_object(result["values"])["qualification_classification_identity"] is True
+    )
+    assert assert_object(result["values"])["qualification_coverage_validation"] is True
+    assert (
+        assert_object(result["values"])["qualification_classification_economics"]
+        is True
+    )
+    assert assert_object(result["values"])["native_qualification_handoff"] is True
+    assert assert_object(result["values"])["graph_nodes_traversed_exact"] is False
+    assert assert_object(result["values"])["sort_operations_exact"] is False
     assert result["boundary"] == "repository-intelligence-only"
 
 
@@ -65,11 +75,13 @@ def test_executable_acceptance_suite_passes_small_repository(tmp_path: Path) -> 
     )
 
     assert result["passed"] is True
-    assert result["checks"]["identity_present"] is True
-    assert result["checks"]["ownership_fail_closed"] is True
-    assert result["checks"]["selection_envelope_valid"] is True
-    assert result["checks"]["downstream_boundary_external"] is True
-    assert result["checks"]["symbolic_nomination_non_authoritative"] is True
-    assert result["checks"]["deterministic_repeated_query"] is True
-    assert result["checks"]["cold_warm_semantic_equivalence"] is True
+    assert assert_object(result["checks"])["identity_present"] is True
+    assert assert_object(result["checks"])["ownership_fail_closed"] is True
+    assert assert_object(result["checks"])["selection_envelope_valid"] is True
+    assert assert_object(result["checks"])["downstream_boundary_external"] is True
+    assert (
+        assert_object(result["checks"])["symbolic_nomination_non_authoritative"] is True
+    )
+    assert assert_object(result["checks"])["deterministic_repeated_query"] is True
+    assert assert_object(result["checks"])["cold_warm_semantic_equivalence"] is True
     assert result["boundary"] == "repository-intelligence-only"

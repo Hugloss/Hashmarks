@@ -9,6 +9,7 @@ from copy import deepcopy
 from pathlib import Path
 
 import pytest
+from contract_assertions import assert_array, assert_object, assert_records
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.lsp_relationship_adapter import (
@@ -118,46 +119,52 @@ def test_lsp_direct_claims_are_request_local(
     repo: Path, method: str, subject: str, kind: str, source: str, target: str
 ) -> None:
     with CodeMap(repo) as cm:
-        cm.sync()
-        result = cm.structural_locality(
+        cm.index.sync()
+        result = cm.structure.locality(
             f"source.py::{subject}",
             result_mode="relationships",
             supplied_observations=[_capture(repo, method)],
         )
     rows = [
         claim
-        for producer in result["observations"]
-        for claim in producer["claims"]
+        for producer in assert_records(result["observations"])
+        for claim in assert_records(producer["claims"])
         if producer["producer"] == "fixture-language-server"
     ]
     assert len(rows) == 1
     assert rows[0]["kind"] == kind
     assert rows[0]["negative_evidence_admissible"] is False
-    assert rows[0]["source"]["locator"]["path"] == source
-    assert rows[0]["target"]["locator"]["path"] == target
-    assert rows[0]["source"]["source_binding"]["state"] == "matching"
+    assert assert_object(assert_object(rows[0]["source"])["locator"])["path"] == source
+    assert assert_object(assert_object(rows[0]["target"])["locator"])["path"] == target
+    assert (
+        assert_object(assert_object(rows[0]["source"])["source_binding"])["state"]
+        == "matching"
+    )
     if kind == "call":
-        assert rows[0]["basis"]["fromRanges"] == [_range(4, 11, 17)]
+        assert assert_object(rows[0]["basis"])["fromRanges"] == [_range(4, 11, 17)]
     else:
-        assert rows[0]["basis"]["fromRanges"] == []
+        assert assert_object(rows[0]["basis"])["fromRanges"] == []
 
 
 def test_prepare_call_hierarchy_exposes_no_invented_edges(repo: Path) -> None:
     with CodeMap(repo) as cm:
-        cm.sync()
-        result = cm.structural_locality(
+        cm.index.sync()
+        result = cm.structure.locality(
             "source.py::target",
             result_mode="relationships",
             supplied_observations=[_capture(repo, "textDocument/prepareCallHierarchy")],
         )
     producer = next(
         row
-        for row in result["observations"]
+        for row in assert_records(result["observations"])
         if row["producer"] == "fixture-language-server"
     )
     assert producer["claims"] == []
-    assert producer["accounting"]["prepare_items_received"] == 1
-    assert len(producer["capability"]["prepared_candidates"]) == 1
+    assert assert_object(producer["accounting"])["prepare_items_received"] == 1
+    assert (
+        len(assert_array(assert_object(producer["capability"])["prepared_candidates"]))
+        == 1
+    )
     assert producer["negative_evidence_admissible"] is False
 
 
@@ -198,7 +205,9 @@ def test_projection_replay_proves_native_semantic_parity(format: str) -> None:
     assert validate_evidence_presentation(packet, projection)["valid"] is True
     assert projection["coverage"] == "projection-only"
     assert (
-        projection["groups"][0]["findings"][0]["assertion"]
+        assert_records(assert_records(projection["groups"])[0]["findings"])[0][
+            "assertion"
+        ]
         == "candidate_correspondence"
     )
     assert "<instruction>" in str(projection)
@@ -208,7 +217,9 @@ def test_projection_rejects_claim_upgrade_and_omitted_context() -> None:
     packet = _packet()
     projection = present_repository_evidence(packet, format="compact")
     upgraded = deepcopy(projection)
-    upgraded["groups"][0]["findings"][0]["assertion"] = "observed_fact"
+    assert_records(assert_records(upgraded["groups"])[0]["findings"])[0][
+        "assertion"
+    ] = "observed_fact"
     with pytest.raises(ValueError, match="differs"):
         validate_evidence_presentation(packet, upgraded)
     omitted = deepcopy(projection)
@@ -220,8 +231,8 @@ def test_projection_rejects_claim_upgrade_and_omitted_context() -> None:
 
 def test_reacquisition_reference_is_scope_only_not_current_proof(repo: Path) -> None:
     with CodeMap(repo) as cm:
-        cm.sync()
-        packet = cm.repository_evidence_bindings(
+        cm.index.sync()
+        packet = cm.bindings.observe(
             [
                 {
                     "binding_id": "consumer:source",
@@ -243,9 +254,9 @@ def test_reacquisition_reference_is_scope_only_not_current_proof(repo: Path) -> 
     )
     assert reference["source_packet_identity"] == packet["bindings_identity"]
     assert reference["current_freshness_proven"] is False
-    assert reference["requery"]["include_relationships"] is False
-    assert len(reference["requery"]["evidence"]) == 2
-    assert reference["requery"]["binding_id"] == "consumer:source"
+    assert assert_object(reference["requery"])["include_relationships"] is False
+    assert len(assert_array(assert_object(reference["requery"])["evidence"])) == 2
+    assert assert_object(reference["requery"])["binding_id"] == "consumer:source"
 
 
 def _producer_claim(producer: str, *, matching: bool) -> dict:
@@ -319,7 +330,10 @@ def test_cli_captured_reference_preserves_canonical_packet(
         encoding="utf-8",
     )
     printed = []
-    monkeypatch.setattr("hashmarks.repository_cli._print", printed.append)
+    monkeypatch.setattr(
+        "hashmarks.repository_cli._print",
+        lambda value, **_encoding: printed.append(value),
+    )
     monkeypatch.setenv("HASHMARKS_NO_UPDATE_CHECK", "1")
     assert (
         main(
@@ -355,10 +369,8 @@ def test_legacy_relationship_packet_without_correspondence_still_validates(
     repo: Path,
 ) -> None:
     with CodeMap(repo) as cm:
-        cm.sync()
-        packet = cm.structural_locality(
-            "source.py::target", result_mode="relationships"
-        )
+        cm.index.sync()
+        packet = cm.structure.locality("source.py::target", result_mode="relationships")
     legacy = deepcopy(packet)
     legacy.pop("producer_correspondence")
     legacy.pop("evidence_identity")
@@ -371,12 +383,12 @@ def test_legacy_relationship_packet_without_correspondence_still_validates(
 
 def test_forged_cross_producer_correspondence_is_rejected(repo: Path) -> None:
     with CodeMap(repo) as cm:
-        cm.sync()
-        packet = cm.structural_locality(
-            "source.py::target", result_mode="relationships"
-        )
+        cm.index.sync()
+        packet = cm.structure.locality("source.py::target", result_mode="relationships")
     tampered = deepcopy(packet)
-    tampered["producer_correspondence"]["negative_evidence_admissible"] = True
+    assert_object(tampered["producer_correspondence"])[
+        "negative_evidence_admissible"
+    ] = True
     tampered.pop("evidence_identity")
     tampered["evidence_identity"] = content_identity(tampered)
     with pytest.raises(ValueError, match="correspondence"):

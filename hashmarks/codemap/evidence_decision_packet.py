@@ -7,11 +7,12 @@ from typing import TYPE_CHECKING, cast
 
 from hashmarks.operation_contract import operation_response, operation_schema
 
-from .decision_session import incomplete_decision_scoped
-from .evidence_verification import _VerificationSelectionState
+from .decision_session import ReadScopeOwner, incomplete_decision_scoped
+from .repository_observation import packet_digest
+from .verification_relevance_model import _VerificationSelectionState
 
 if TYPE_CHECKING:
-    from .engine import CodeMap
+    from .repository_tasks import RepositoryTasks
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,7 +80,7 @@ class _DecisionPacketTiming:
         }
 
 
-class DecisionPacketMixin:
+class DecisionPacketMixin(ReadScopeOwner):
     @staticmethod
     def _decision_packet_candidates(
         action: Mapping[str, object],
@@ -129,8 +130,12 @@ class DecisionPacketMixin:
         return {
             "needed": needed,
             "reason": reason,
-            "candidates": self._decision_packet_candidates(action, candidate, verify),
-            "ambiguity": ambiguity if bool(ambiguity.get("ambiguous")) else None,
+            "candidates": self._decision_packet_candidates(
+                action, cast(Mapping[str, object] | None, candidate), verify
+            ),
+            "ambiguity": ambiguity
+            if bool(cast(Mapping[str, object], ambiguity).get("ambiguous"))
+            else None,
             "candidate_scope": "repository-evidence-only",
             "interpretation": "evidence-discrimination-only",
             "consumer_action": "external",
@@ -165,11 +170,11 @@ class DecisionPacketMixin:
     ) -> tuple[dict[str, object], object, object, str]:
         """Bind packet evidence to repository, task, context and verification selection."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        generation, identity_generation, stale = self._generation_status()
-        task_identity = self._packet_digest("hashmarks.task.v1", {"task": task})
-        context_digest = self._packet_digest("hashmarks.work-context.v1", work_context)
-        verification_digest = self._packet_digest(
+            self = cast("RepositoryTasks", self)
+        generation, identity_generation, stale = self.reads.generation_status()
+        task_identity = packet_digest("hashmarks.task.v1", {"task": task})
+        context_digest = packet_digest("hashmarks.work-context.v1", work_context)
+        verification_digest = packet_digest(
             "hashmarks.verification-plan.v1", verification
         )
         verification_membership, source_identity, selection_envelope = (
@@ -177,7 +182,7 @@ class DecisionPacketMixin:
                 _VerificationSelectionState(
                     generation=generation,
                     identity_generation=identity_generation,
-                    stale=stale,
+                    stale=cast(bool, stale),
                     verify=verify,
                     action=action,
                     verification_digest=verification_digest,
@@ -189,8 +194,8 @@ class DecisionPacketMixin:
             source_identity,
             selection_envelope,
         )
-        repository_identity = self._repository_packet_identity()
-        decision_generation = self._packet_digest(
+        repository_identity = self.reads.repository_identity()
+        decision_generation = packet_digest(
             "hashmarks.decision-generation.v1",
             {
                 "repository_identity": repository_identity,
@@ -224,8 +229,24 @@ class DecisionPacketMixin:
         )
 
     @operation_response("task_decision_packet")
+    def decision_packet(
+        self,
+        task: str,
+        *,
+        limit: int = TASK_DECISION_DEFAULT_OPTIONS.limit,
+        per_role: int = TASK_DECISION_DEFAULT_OPTIONS.per_role,
+        token_budget: int = TASK_DECISION_DEFAULT_OPTIONS.token_budget,
+    ) -> dict[str, object]:
+        """Reconcile task evidence before its generation-bound observation."""
+        if TYPE_CHECKING:
+            self = cast("RepositoryTasks", self)
+        self.prepare(task, limit)
+        return self._observe_task_decision_packet(
+            task, limit=limit, per_role=per_role, token_budget=token_budget
+        )
+
     @incomplete_decision_scoped
-    def task_decision_packet(
+    def _observe_task_decision_packet(
         self,
         task: str,
         *,
@@ -235,9 +256,9 @@ class DecisionPacketMixin:
     ) -> dict[str, object]:
         """Return bounded repository evidence for one task decision."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         timing = _DecisionPacketTiming()
-        action = self.task_action_map(
+        action = self.action_map(
             task,
             limit=limit,
             per_role=per_role,
@@ -248,7 +269,7 @@ class DecisionPacketMixin:
         verify = (
             action.get("verify") if isinstance(action.get("verify"), dict) else None
         )
-        build = self._codemap_build_state()
+        build = self.index._codemap_build_state()
         discrimination = self._decision_packet_discrimination(
             action=action,
             verify=verify,
@@ -256,7 +277,7 @@ class DecisionPacketMixin:
         )
 
         timing.begin_phase()
-        work_context = self.work_context(action, token_budget=token_budget)
+        work_context = self.context.work(action, token_budget=token_budget)
         timing.record("work_context")
         timing.begin_phase()
         verification = self._task_decision_verification_plan(verify)
@@ -284,20 +305,20 @@ class DecisionPacketMixin:
             "ownership_authority": action.get("ownership_authority"),
             "verify": verify,
             "verification_relevance": action.get("verification_relevance"),
-            "symbolic_nomination": self._symbolic_task_nomination(task),
+            "symbolic_nomination": self.search._symbolic_task_nomination(task),
             "verification_plan": verification,
             "verification_membership": verification_membership,
             "verification_selection_envelope": selection_envelope,
             "downstream_verification_contract": self._downstream_verification_contract(
-                selection_envelope
+                cast(Mapping[str, object] | None, selection_envelope)
             ),
             "evidence_surfaces": {
                 "edit": None
                 if edit is None
-                else self._index_surface_for_path(str(edit.get("path") or "")),
+                else self.index._index_surface_for_path(str(edit.get("path") or "")),
                 "verify": None
                 if verify is None
-                else self._index_surface_for_path(str(verify.get("path") or "")),
+                else self.index._index_surface_for_path(str(verify.get("path") or "")),
             },
             "contract": action.get("contract"),
             "ownership_resolution": action.get("ownership_resolution"),
@@ -326,7 +347,5 @@ class DecisionPacketMixin:
             "consumer_action": "external",
             "ranking_effect": "none",
             "discovery_effect": action.get("discovery_effect", "none"),
-            "decision_metrics": timing.as_payload(
-                session_active=self._decision_session_depth > 0
-            ),
+            "decision_metrics": timing.as_payload(session_active=self.reads.depth > 0),
         }

@@ -5,8 +5,15 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from types import ModuleType
 
 import pytest
+from contract_assertions import (
+    assert_array,
+    assert_number,
+    assert_object,
+    assert_records,
+)
 
 
 def _run_benchmark_script(script: str, root: Path) -> dict:
@@ -21,7 +28,7 @@ def _run_benchmark_script(script: str, root: Path) -> dict:
     return json.loads(output.read_text(encoding="utf-8"))
 
 
-def _load_script(name: str, path: Path):
+def _load_script(name: str, path: Path) -> ModuleType:
     del name
     module = ".".join(path.with_suffix("").parts)
     return importlib.import_module(module)
@@ -80,7 +87,7 @@ def test_agent_suite_rejects_nested_repository_roots(tmp_path: Path) -> None:
 
 
 def test_suite_protocol_identity_binds_corpus_workspace_and_parameters(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     module = importlib.import_module("scripts.agent_evaluation.metrics_agent_suite")
     corpus = tmp_path / "tasks.json"
@@ -455,18 +462,19 @@ def test_worker_failed_verification_ab_recovers_without_hidden_answers(
     from scripts.agent_evaluation.metrics_worker_failed_verification_ab import _identity
 
     assert first["protocol_identity"] == _identity(first["protocol"])
-    assert first["summary"]["tasks"] == 18
-    assert first["summary"]["injected_failed_edits"] == 18
-    assert first["summary"]["repeat_repeated_failed_edits"] == 18
-    assert (
-        first["summary"]["fresh_correct_recoveries"]
-        > first["summary"]["repeat_correct_recoveries"]
+    assert assert_object(first["summary"])["tasks"] == 18
+    assert assert_object(first["summary"])["injected_failed_edits"] == 18
+    assert assert_object(first["summary"])["repeat_repeated_failed_edits"] == 18
+    assert assert_number(
+        assert_object(first["summary"])["fresh_correct_recoveries"]
+    ) > assert_number(assert_object(first["summary"])["repeat_correct_recoveries"])
+    assert assert_object(first["summary"])["guided_correct_recoveries"] == 18
+    assert assert_object(first["summary"])["guided_repeated_failed_edits"] == 0
+    assert assert_object(first["summary"])["guided_different_wrong_edits"] == 0
+    assert assert_object(first["protocol"])["injection_authority"] == "grader-only"
+    assert "expected_files" in assert_array(
+        assert_object(first["protocol"])["worker_hidden_fields"]
     )
-    assert first["summary"]["guided_correct_recoveries"] == 18
-    assert first["summary"]["guided_repeated_failed_edits"] == 0
-    assert first["summary"]["guided_different_wrong_edits"] == 0
-    assert first["protocol"]["injection_authority"] == "grader-only"
-    assert "expected_files" in first["protocol"]["worker_hidden_fields"]
 
 
 def test_worker_failed_verification_worker_rejects_hidden_fields(
@@ -511,51 +519,72 @@ def test_agent_economics_native_baseline_is_answer_blind(tmp_path: Path) -> None
     first = collect(tmp_path / "first", strategies=("native",))
     second = collect(tmp_path / "second", strategies=("native",))
     assert first["protocol_identity"] == second["protocol_identity"]
-    assert first["summary"]["tasks"] == 18
-    assert first["summary"]["native_repository_scan_bytes"] > 0
-    assert first["summary"]["native_correct_verifications"] == 18
-    assert first["protocol"]["worker_public_fields"] == ["id", "query"]
+    assert assert_object(first["summary"])["tasks"] == 18
+    assert (
+        assert_number(assert_object(first["summary"])["native_repository_scan_bytes"])
+        > 0
+    )
+    assert assert_object(first["summary"])["native_correct_verifications"] == 18
+    assert assert_object(first["protocol"])["worker_public_fields"] == ["id", "query"]
 
 
 def test_agent_economics_hashmarks_reduces_archaeology_cost(tmp_path: Path) -> None:
     from scripts.agent_evaluation.metrics_agent_economics import collect
 
     value = collect(tmp_path / "paired", strategies=("native", "hashmarks"))
-    s = value["summary"]
-    assert s["hashmarks_correct_first_edits"] > s["native_correct_first_edits"]
+    s = assert_object(value["summary"])
+    assert assert_number(s["hashmarks_correct_first_edits"]) > assert_number(
+        s["native_correct_first_edits"]
+    )
     assert s["hashmarks_correct_verifications"] == 18
     assert s["hashmarks_repository_scan_bytes"] == 0
-    assert s["hashmarks_evidence_approx_tokens"] < s["native_repository_scan_bytes"] / 4
+    assert (
+        assert_number(s["hashmarks_evidence_approx_tokens"])
+        < assert_number(s["native_repository_scan_bytes"]) / 4
+    )
 
 
 def test_fielded_bm25_economics_is_additive_and_answer_blind(tmp_path: Path) -> None:
     from scripts.agent_evaluation.metrics_bm25_economics import collect
 
     value = collect(tmp_path / "bm25")
-    assert value["summary"]["tasks"] == 18
-    assert value["summary"]["current_hashmarks_correct_first"] == 16
+    assert assert_object(value["summary"])["tasks"] == 18
     assert (
-        value["summary"]["bm25_correct_first"]
-        < value["summary"]["current_hashmarks_correct_first"]
+        assert_number(
+            assert_object(value["summary"])["current_hashmarks_correct_first"]
+        )
+        == 16
     )
+    assert assert_number(
+        assert_object(value["summary"])["bm25_correct_first"]
+    ) < assert_number(
+        assert_object(value["summary"])["current_hashmarks_correct_first"]
+    )
+    assert assert_number(
+        assert_object(value["summary"])["candidate_fused_correct_first"]
+    ) < assert_number(
+        assert_object(value["summary"])["current_hashmarks_correct_first"]
+    )
+    assert assert_object(value["summary"])["promotion_decision"] == "reject"
     assert (
-        value["summary"]["candidate_fused_correct_first"]
-        < value["summary"]["current_hashmarks_correct_first"]
+        assert_object(value["summary"])["canonical_after_experiment_correct_first"]
+        == 16
     )
-    assert value["summary"]["promotion_decision"] == "reject"
-    assert value["summary"]["canonical_after_experiment_correct_first"] == 16
-    assert value["protocol"]["hidden_fields"] == ["expected_files", "expected_symbols"]
+    assert assert_object(value["protocol"])["hidden_fields"] == [
+        "expected_files",
+        "expected_symbols",
+    ]
 
 
 def test_constrained_bm25_does_not_earn_promotion(tmp_path: Path) -> None:
     from scripts.agent_evaluation.metrics_bm25_constrained import collect
 
     value = collect(tmp_path / "constrained")
-    s = value["summary"]
+    s = assert_object(value["summary"])
     assert s["current_hashmarks_correct_first"] == 16
-    assert s["constrained_bm25_correct_first"] <= 16
+    assert assert_number(s["constrained_bm25_correct_first"]) <= 16
     assert s["role_resolved_correct_first"] == 18
-    assert s["bm25_incremental_gain"] <= 0
+    assert assert_number(s["bm25_incremental_gain"]) <= 0
     assert s["promotion_decision"] == "reject"
 
 
@@ -565,13 +594,13 @@ def test_retrieval_residuals_reject_new_recall_indexes_for_ambiguity_only_misses
     from scripts.agent_evaluation.metrics_retrieval_residuals import collect
 
     value = collect(tmp_path / "residuals")
-    s = value["summary"]
+    s = assert_object(value["summary"])
     assert s["tasks"] == 18
     assert s["top1_correct"] == 16
     assert s["top5_any_expected"] == 18
     assert s["top20_all_expected"] == 18
-    assert s["residual_counts"]["role-authority-ambiguity"] == 2
-    assert s["residual_counts"]["discovery-miss"] == 0
+    assert assert_object(s["residual_counts"])["role-authority-ambiguity"] == 2
+    assert assert_object(s["residual_counts"])["discovery-miss"] == 0
     assert s["ngram_admission"] is False
     assert s["embedding_admission"] is False
     assert s["retrieval_subagent_admission"] is True
@@ -582,7 +611,7 @@ def test_selective_scout_targets_only_observed_ambiguity(tmp_path: Path) -> None
     from scripts.agent_evaluation.metrics_selective_scout import collect
 
     value = collect(tmp_path / "scout")
-    s = value["summary"]
+    s = assert_object(value["summary"])
     assert s["no_scout_correct_final"] == 16
     assert s["selective_scout_correct_final"] == 18
     assert s["selective_scout_wrong_final"] == 0
@@ -590,7 +619,10 @@ def test_selective_scout_targets_only_observed_ambiguity(tmp_path: Path) -> None
     assert s["always_scout_scout_spawns"] == 18
     assert s["always_extra_spawns_vs_selective"] == 16
     assert s["selective_spawn_rate"] == 2 / 18
-    assert value["protocol"]["hidden_fields"] == ["expected_files", "expected_symbols"]
+    assert assert_object(value["protocol"])["hidden_fields"] == [
+        "expected_files",
+        "expected_symbols",
+    ]
 
 
 def test_codex_agent_economics_preflight_reports_missing_binary() -> None:
@@ -632,12 +664,12 @@ def test_codex_agent_economics_exec_contract_with_fake_codex(tmp_path: Path) -> 
         tmp_path / "run",
     )
     assert value["returncode"] == 0
-    assert value["final"]["task_id"] == "t1"
-    assert value["usage"]["input_tokens"] == 101
-    assert value["usage"]["total_tokens"] == 124
-    assert "--output-schema" in value["command"]
-    assert "--output-last-message" in value["command"]
-    assert "-C" in value["command"]
+    assert assert_object(value["final"])["task_id"] == "t1"
+    assert assert_object(value["usage"])["input_tokens"] == 101
+    assert assert_object(value["usage"])["total_tokens"] == 124
+    assert "--output-schema" in assert_array(value["command"])
+    assert "--output-last-message" in assert_array(value["command"])
+    assert "-C" in assert_array(value["command"])
 
 
 def test_codex_selective_scout_rejects_path_outside_worker_visible_candidates(
@@ -654,7 +686,7 @@ def test_codex_selective_scout_rejects_path_outside_worker_visible_candidates(
     ws = tmp_path / "repo"
     ws.mkdir()
     (ws / "a.py").write_text("x=1\n")
-    pkt = {
+    pkt: dict[str, object] = {
         "ambiguity": {
             "alternatives": [
                 {"role": "implementation", "path": "a.py", "canonical_rank": 1}
@@ -676,15 +708,18 @@ def test_codex_selective_scout_rejects_path_outside_worker_visible_candidates(
         tmp_path / "run",
     )
     assert result["returncode"] == 0
-    assert result["final"]["recommended_path"] is None
-    assert result["final"]["reason"] == "rejected-non-candidate-scout-output"
-    assert result["usage"]["total_tokens"] == 15
+    assert assert_object(result["final"])["recommended_path"] is None
+    assert (
+        assert_object(result["final"])["reason"]
+        == "rejected-non-candidate-scout-output"
+    )
+    assert assert_object(result["usage"])["total_tokens"] == 15
 
 
 def test_codex_selective_scout_prompt_is_answer_blind() -> None:
     from scripts.agent_evaluation.codex_selective_scout_economics import _scout_prompt
 
-    pkt = {
+    pkt: dict[str, object] = {
         "ambiguity": {
             "alternatives": [
                 {"role": "authority", "path": "AGENTS.md", "canonical_rank": 4},
@@ -734,8 +769,8 @@ def test_codex_rollout_usage_recovers_thread_and_token_counts(tmp_path: Path) ->
     value = recover(events, sessions)
     assert value["recovered"] is True
     assert value["thread_id"] == "thread-123"
-    assert value["usage"]["total_tokens"] == 150
-    assert value["usage"]["input_tokens"] == 120
+    assert assert_object(value["usage"])["total_tokens"] == 150
+    assert assert_object(value["usage"])["input_tokens"] == 120
 
 
 def test_codex_economics_matrix_plan_is_fail_closed_without_codex(
@@ -750,10 +785,10 @@ def test_codex_economics_matrix_plan_is_fail_closed_without_codex(
         parse_variant("strong-native:strong-model:medium:native"),
     ]
     value = plan(variants, tmp_path, "definitely-no-codex-here", None)
-    assert value["preflight"]["available"] is False
+    assert assert_object(value["preflight"])["available"] is False
     assert value["execution_units"] == 18 + 18 + 21 + 18
-    assert len(value["variants"]) == 4
-    assert value["variants"][2]["strategy"] == "selective-real"
+    assert len(assert_array(value["variants"])) == 4
+    assert assert_records(value["variants"])[2]["strategy"] == "selective-real"
 
 
 def test_agent_suite_parser_owns_normal_workload_defaults() -> None:

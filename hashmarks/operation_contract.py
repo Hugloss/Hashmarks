@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from functools import wraps
-from typing import Callable, TypeVar, cast
+from typing import TypeVar, cast
 
 OPERATION_CONTRACT_SCHEMA = "hashmarks.operation-contract.v1"
 
@@ -67,7 +68,10 @@ OPERATION_CONTRACTS = (
     ),
     OperationContract(
         "task_evidence",
-        (("default", "hashmarks.task-evidence.v5"),),
+        (
+            ("default", "hashmarks.task-evidence.v5"),
+            ("initial", "hashmarks.task-evidence-initial.v2"),
+        ),
     ),
     OperationContract(
         "change_impact",
@@ -90,6 +94,7 @@ OPERATION_CONTRACTS = (
         (
             ("observation", "hashmarks.repository-declarations.v1"),
             ("explain", "hashmarks.repository-declaration-explain.v1"),
+            ("discovery", "hashmarks.repository-declaration-discovery.v1"),
         ),
     ),
     OperationContract(
@@ -285,7 +290,7 @@ def validate_operation_response(
 
 _OperationResponse = TypeVar(
     "_OperationResponse",
-    bound=Callable[..., dict[str, object]],
+    bound=Callable[..., Mapping[str, object]],
 )
 
 
@@ -300,12 +305,10 @@ def operation_response(
 
     def decorate(function: _OperationResponse) -> _OperationResponse:
         @wraps(function)
-        def wrapped(*args: object, **kwargs: object) -> dict[str, object]:
-            return validate_operation_response(
-                operation,
-                function(*args, **kwargs),
-                mode=mode,
-            )
+        def wrapped(*args: object, **kwargs: object) -> Mapping[str, object]:
+            response = function(*args, **kwargs)
+            validate_operation_response(operation, response, mode=mode)
+            return response
 
         return cast(_OperationResponse, wrapped)
 

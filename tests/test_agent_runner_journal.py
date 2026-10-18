@@ -6,20 +6,16 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from scripts.agent_evaluation import agent_runner_journal as journal_owner
+
 if TYPE_CHECKING:
     from pathlib import Path
 
-_MODULE = __import__("scripts.agent_evaluation.agent_runner_journal", fromlist=["*"])
 
-
-def _load():
-    return _MODULE
-
-
-def _init(module, journal: Path) -> None:
-    module.init_journal(
+def _init(journal: Path) -> None:
+    journal_owner.init_journal(
         journal,
-        module.JournalIdentity(
+        journal_owner.JournalIdentity(
             runner_identity="runner:oh-goon:v1",
             task_id="t1",
             task_revision="v1",
@@ -36,14 +32,13 @@ def _init(module, journal: Path) -> None:
 def test_journal_records_out_of_order_files_and_finalizes_in_sequence(
     tmp_path: Path,
 ) -> None:
-    module = _load()
     journal = tmp_path / "journal"
-    _init(module, journal)
-    module.record_event(
+    _init(journal)
+    journal_owner.record_event(
         journal,
         {"sequence": 2, "tool": "read", "path": "src/a.py", "estimated_tokens": 20},
     )
-    module.record_event(
+    journal_owner.record_event(
         journal,
         {
             "sequence": 0,
@@ -53,10 +48,12 @@ def test_journal_records_out_of_order_files_and_finalizes_in_sequence(
             "estimated_tokens": 5,
         },
     )
-    module.record_event(journal, {"sequence": 1, "tool": "edit", "path": "src/a.py"})
+    journal_owner.record_event(
+        journal, {"sequence": 1, "tool": "edit", "path": "src/a.py"}
+    )
     raw = tmp_path / "raw.json"
     normalized = tmp_path / "trace.json"
-    payload = module.finalize_journal(journal, raw, normalized_output=normalized)
+    payload = journal_owner.finalize_journal(journal, raw, normalized_output=normalized)
     assert [event["sequence"] for event in payload["events"]] == [0, 1, 2]
     trace = json.loads(normalized.read_text())
     assert trace["schema"] == "hashmarks.agent-trace.v2"
@@ -70,12 +67,13 @@ def test_journal_records_out_of_order_files_and_finalizes_in_sequence(
 def test_duplicate_sequence_fails_without_overwriting_first_event(
     tmp_path: Path,
 ) -> None:
-    module = _load()
     journal = tmp_path / "journal"
-    _init(module, journal)
-    module.record_event(journal, {"sequence": 0, "tool": "search", "query": "first"})
+    _init(journal)
+    journal_owner.record_event(
+        journal, {"sequence": 0, "tool": "search", "query": "first"}
+    )
     with pytest.raises(ValueError, match="already exists"):
-        module.record_event(
+        journal_owner.record_event(
             journal, {"sequence": 0, "tool": "search", "query": "second"}
         )
     event = json.loads((journal / "events" / "00000000000000000000.json").read_text())
@@ -83,40 +81,38 @@ def test_duplicate_sequence_fails_without_overwriting_first_event(
 
 
 def test_undeclared_tool_and_path_escape_fail_before_recording(tmp_path: Path) -> None:
-    module = _load()
     journal = tmp_path / "journal"
-    _init(module, journal)
+    _init(journal)
     with pytest.raises(ValueError, match="not explicitly declared"):
-        module.record_event(journal, {"sequence": 0, "tool": "mystery"})
+        journal_owner.record_event(journal, {"sequence": 0, "tool": "mystery"})
     with pytest.raises(ValueError, match="repository-relative"):
-        module.record_event(
+        journal_owner.record_event(
             journal, {"sequence": 1, "tool": "read", "path": "../secret"}
         )
     assert list((journal / "events").glob("*.json")) == []
 
 
 def test_journal_init_is_create_only(tmp_path: Path) -> None:
-    module = _load()
     journal = tmp_path / "journal"
-    _init(module, journal)
+    _init(journal)
     with pytest.raises(ValueError, match="already exists"):
-        _init(module, journal)
+        _init(journal)
 
 
 def test_finalize_rejects_sequence_gap(tmp_path: Path) -> None:
-    module = _load()
     journal = tmp_path / "journal"
-    _init(module, journal)
-    module.record_event(journal, {"sequence": 0, "tool": "search", "query": "x"})
-    module.record_event(journal, {"sequence": 2, "tool": "read", "path": "src/a.py"})
+    _init(journal)
+    journal_owner.record_event(journal, {"sequence": 0, "tool": "search", "query": "x"})
+    journal_owner.record_event(
+        journal, {"sequence": 2, "tool": "read", "path": "src/a.py"}
+    )
     with pytest.raises(ValueError, match="sequence gap"):
-        module.finalize_journal(journal, tmp_path / "raw.json")
+        journal_owner.finalize_journal(journal, tmp_path / "raw.json")
 
 
 def test_journal_cli_runs_complete_lifecycle(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    module = _load()
     journal = tmp_path / "journal"
     tool_map = tmp_path / "tool-map.json"
     output = tmp_path / "raw.json"
@@ -161,7 +157,7 @@ def test_journal_cli_runs_complete_lifecycle(
     ]
     for command in commands:
         monkeypatch.setattr(sys, "argv", command)
-        module.main()
+        journal_owner.main()
 
     captured = capsys.readouterr().out
     payload = json.loads(output.read_text(encoding="utf-8"))

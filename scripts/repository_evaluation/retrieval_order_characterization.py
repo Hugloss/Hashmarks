@@ -51,7 +51,7 @@ def _broad_rows(codemap: CodeMap, *, limit: int) -> list[tuple[str, str]]:
 def _find_rows(codemap: CodeMap, *, limit: int) -> list[tuple[str, str]]:
     return [
         (hit.path, str(hit.qualname or ""))
-        for hit in codemap.find("needle", limit=limit)
+        for hit in codemap.search.find("needle", limit=limit)
     ]
 
 
@@ -86,7 +86,7 @@ def _cold_run(
     with CodeMap(
         root, state_dir=state, artifact_db=state / "artifacts.sqlite3"
     ) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         return {
             "content_identity": _content_identity(root),
             "broad_rows": _broad_rows(codemap, limit=broad_limit),
@@ -122,7 +122,7 @@ def characterize_retrieval_order(
         with CodeMap(
             root, state_dir=state, artifact_db=state / "artifacts.sqlite3"
         ) as codemap:
-            codemap.sync()
+            codemap.index.sync()
             before = {
                 "broad": _broad_rows(codemap, limit=broad_limit),
                 "find": _find_rows(codemap, limit=find_limit),
@@ -136,9 +136,9 @@ def characterize_retrieval_order(
             target_path.write_text(
                 "def unrelated_name():\n    return -1\n", encoding="utf-8"
             )
-            codemap.sync([target])
+            codemap.index.sync([target])
             target_path.write_text(originals[target], encoding="utf-8")
-            codemap.sync([target])
+            codemap.index.sync([target])
             identities["restored"] = _content_identity(root)
             after = {
                 "broad": _broad_rows(codemap, limit=broad_limit),

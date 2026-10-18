@@ -1,0 +1,19 @@
+{
+  "checks_per_stage": 12,
+  "new_grader_sha256": "61d1bf05050ae2cc0585b2a85d7d0f92f957446b57e56876039fe6b0fa842e29",
+  "original_grader_sha256": "94ec99af82879e0a0886486a3a12fac7c9d0f7742fe79c881a666a2234654e8c",
+  "original_suite_sha256": "36f908b1377fe7f92c77056a74949aace6c7128c2675686fea3ff0ba415365f6",
+  "problem": "faststream-default-dependency-provider",
+  "remaining": [
+    "display-fact qualification",
+    "complete task/causal-test review",
+    "required initial witness requalification",
+    "unseen holdouts and capability breadth"
+  ],
+  "schema": "hashmarks.configuration-initial-field-oracle-review.v1",
+  "scope": "initial exposure of an existing source-authored declaration fact; no runtime provider identity, complete task sufficiency, eligibility or capability promotion",
+  "source_review_sha256": "ca880f55c7a82037b4eecd95fea66c7c1496c1d23a00f4a79377cd09606c20c5",
+  "status": "INCOMPLETE",
+  "unchanged_original_oracles": true,
+  "unchanged_tasks_sources_membership_thresholds_and_review_flags": true
+}

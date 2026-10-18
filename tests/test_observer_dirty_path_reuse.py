@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import pytest
+
 from hashmarks.client import RepositoryObservation
 from hashmarks.codemap.engine import CodeMap
 from hashmarks.daemon import IdentityDaemon
@@ -16,7 +18,7 @@ class _BarrierWatcher:
         return True
 
 
-def test_daemon_observe_exposes_complete_bounded_dirty_paths(tmp_path: Path):
+def test_daemon_observe_exposes_complete_bounded_dirty_paths(tmp_path: Path) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     daemon = IdentityDaemon(workspace, state_dir=tmp_path / "state")
@@ -35,7 +37,9 @@ def test_daemon_observe_exposes_complete_bounded_dirty_paths(tmp_path: Path):
     daemon.engine.close()
 
 
-def test_daemon_observe_fails_closed_when_dirty_set_is_oversized(tmp_path: Path):
+def test_daemon_observe_fails_closed_when_dirty_set_is_oversized(
+    tmp_path: Path,
+) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     daemon = IdentityDaemon(workspace, state_dir=tmp_path / "state")
@@ -58,7 +62,7 @@ def _indexed_map(tmp_path: Path) -> CodeMap:
     workspace.mkdir()
     (workspace / "a.py").write_text("def before():\n    return 1\n", encoding="utf-8")
     codemap = CodeMap(workspace, artifact_db=tmp_path / "artifacts.sqlite3")
-    codemap.sync()
+    codemap.index.sync()
     codemap.store.set_meta("identity_generation", "1")
     return codemap
 
@@ -80,7 +84,9 @@ def _observation(
     )
 
 
-def test_map_ready_reuses_one_atomic_complete_observation(tmp_path: Path, monkeypatch):
+def test_map_ready_reuses_one_atomic_complete_observation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     codemap = _indexed_map(tmp_path)
     calls: list[object] = []
     observations = 0
@@ -91,10 +97,12 @@ def test_map_ready_reuses_one_atomic_complete_observation(tmp_path: Path, monkey
         return _observation()
 
     try:
-        monkeypatch.setattr(codemap, "_daemon_observation", sample)
-        monkeypatch.setattr(codemap, "sync", lambda paths=None: calls.append(paths))
+        monkeypatch.setattr(codemap._observation_source, "observe", sample)
+        monkeypatch.setattr(
+            codemap.index, "sync", lambda paths=None: calls.append(paths)
+        )
 
-        codemap._ensure_map_ready()
+        codemap.reads.ready()
 
         assert calls == [("a.py",)]
         assert observations == 1
@@ -103,39 +111,45 @@ def test_map_ready_reuses_one_atomic_complete_observation(tmp_path: Path, monkey
 
 
 def test_map_ready_falls_back_to_full_sync_without_authoritative_change_set(
-    tmp_path: Path, monkeypatch
-):
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     codemap = _indexed_map(tmp_path)
     calls: list[object] = []
     try:
         monkeypatch.setattr(
-            codemap,
-            "_daemon_observation",
+            codemap._observation_source,
+            "observe",
             lambda: _observation(paths=(), paths_complete=False, dirty_path_count=1),
         )
-        monkeypatch.setattr(codemap, "sync", lambda paths=None: calls.append(paths))
+        monkeypatch.setattr(
+            codemap.index, "sync", lambda paths=None: calls.append(paths)
+        )
 
-        codemap._ensure_map_ready()
+        codemap.reads.ready()
 
         assert calls == [None]
     finally:
         codemap.close()
 
 
-def test_map_ready_clean_matching_generation_does_not_sync(tmp_path: Path, monkeypatch):
+def test_map_ready_clean_matching_generation_does_not_sync(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     codemap = _indexed_map(tmp_path)
     calls: list[object] = []
     try:
         monkeypatch.setattr(
-            codemap,
-            "_daemon_observation",
+            codemap._observation_source,
+            "observe",
             lambda: _observation(
                 state=ObservationState.CLEAN, generation=1, paths=(), dirty_path_count=0
             ),
         )
-        monkeypatch.setattr(codemap, "sync", lambda paths=None: calls.append(paths))
+        monkeypatch.setattr(
+            codemap.index, "sync", lambda paths=None: calls.append(paths)
+        )
 
-        codemap._ensure_map_ready()
+        codemap.reads.ready()
 
         assert calls == []
     finally:
@@ -143,14 +157,14 @@ def test_map_ready_clean_matching_generation_does_not_sync(tmp_path: Path, monke
 
 
 def test_map_ready_unknown_generation_change_falls_back_to_full_sync(
-    tmp_path: Path, monkeypatch
-):
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     codemap = _indexed_map(tmp_path)
     calls: list[object] = []
     try:
         monkeypatch.setattr(
-            codemap,
-            "_daemon_observation",
+            codemap._observation_source,
+            "observe",
             lambda: _observation(
                 state=ObservationState.UNKNOWN,
                 generation=2,
@@ -159,9 +173,11 @@ def test_map_ready_unknown_generation_change_falls_back_to_full_sync(
                 dirty_path_count=0,
             ),
         )
-        monkeypatch.setattr(codemap, "sync", lambda paths=None: calls.append(paths))
+        monkeypatch.setattr(
+            codemap.index, "sync", lambda paths=None: calls.append(paths)
+        )
 
-        codemap._ensure_map_ready()
+        codemap.reads.ready()
 
         assert calls == [None]
     finally:

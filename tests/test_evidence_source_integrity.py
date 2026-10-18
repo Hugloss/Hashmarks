@@ -6,6 +6,7 @@ from copy import deepcopy
 from pathlib import Path
 
 import pytest
+from contract_assertions import assert_object, assert_records, assert_text
 
 from hashmarks import CodeMap
 from hashmarks.codemap.semantic_relationship_model import (
@@ -78,17 +79,17 @@ def _capture(path: Path, *, method: str, revision: str | None = None) -> dict:
 
 def _claim(root: Path, capture: dict, *, subject: str) -> tuple[dict, dict]:
     with CodeMap(root) as codemap:
-        codemap.sync()
-        packet = codemap.structural_locality(
+        codemap.index.sync()
+        packet = codemap.structure.locality(
             f"src.py::{subject}",
             result_mode="relationships",
             supplied_observations=[capture],
         )
     rows = [
         claim
-        for observation in packet["observations"]
+        for observation in assert_records(packet["observations"])
         if observation["producer"] == "fixture-lsp"
-        for claim in observation["claims"]
+        for claim in assert_records(observation["claims"])
     ]
     assert len(rows) == 1
     return packet, rows[0]
@@ -144,6 +145,7 @@ def test_stale_source_does_not_become_qualified_call_site(repo: Path) -> None:
     site = claim["basis"]["call_site_source"]
     assert site["state"] == "revision-different"
     assert site["source_binding"]["state"] == "different"
+    assert "declaration_context" not in site
 
 
 def test_range_outside_caller_is_not_a_current_call_site(repo: Path) -> None:
@@ -151,6 +153,34 @@ def test_range_outside_caller_is_not_a_current_call_site(repo: Path) -> None:
     capture["response"]["result"][0]["fromRanges"] = [_range(1, 4, 1, 10)]
     _packet, claim = _claim(repo, capture, subject="target")
     assert claim["basis"]["call_site_source"]["state"] == "outside-caller-item"
+
+
+def test_short_producer_item_preserves_independent_source_declaration_context(
+    repo: Path,
+) -> None:
+    capture = _capture(repo / "src.py", method="callHierarchy/incomingCalls")
+    item = capture["response"]["result"][0]["from"]
+    item["range"] = item["selectionRange"]
+    _packet, claim = _claim(repo, capture, subject="target")
+    site = claim["basis"]["call_site_source"]
+    assert site["state"] == "outside-caller-item"
+    context = site["declaration_context"]
+    assert context["state"] == "within-declaration-range"
+    assert context["symbol_id"] == "src.py::caller"
+    assert context["authority"] == "indexed-lexical-range-correspondence-only"
+    assert context["negative_evidence_admissible"] is False
+    assert claim["basis"]["captured_location"]["item"]["range"] == item["range"]
+
+
+def test_source_declaration_context_does_not_accept_another_function_body(
+    repo: Path,
+) -> None:
+    capture = _capture(repo / "src.py", method="callHierarchy/incomingCalls")
+    capture["response"]["result"][0]["fromRanges"] = [_range(1, 4, 1, 10)]
+    _packet, claim = _claim(repo, capture, subject="target")
+    site = claim["basis"]["call_site_source"]
+    assert site["state"] == "outside-caller-item"
+    assert site["declaration_context"]["state"] == "outside-declaration-range"
 
 
 def test_out_of_bounds_position_is_not_qualified(repo: Path) -> None:
@@ -196,10 +226,54 @@ def test_source_site_authority_cannot_be_forged_with_recomputed_digests(
         validate_relationship_observation(forged)
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("authority", "exact-runtime-caller"),
+        ("negative_evidence_admissible", True),
+        ("state", "outside-declaration-range"),
+        ("symbol_id", "elsewhere.py::caller"),
+        (
+            "declaration_range",
+            {
+                "start": {"line": True, "character": 0},
+                "end": {"line": 8, "character": 0},
+            },
+        ),
+    ],
+)
+def test_declaration_context_cannot_be_strengthened_by_rehashing(
+    repo: Path, field: str, value: object
+) -> None:
+    packet, _ = _claim(
+        repo,
+        _capture(repo / "src.py", method="callHierarchy/incomingCalls"),
+        subject="target",
+    )
+    forged = deepcopy(packet)
+    observation = next(
+        row for row in forged["observations"] if row["producer"] == "fixture-lsp"
+    )
+    site = observation["claims"][0]["basis"]["call_site_source"]
+    site["declaration_context"][field] = value
+    observation["observation_identity"] = content_identity(
+        {
+            key: item
+            for key, item in observation.items()
+            if key != "observation_identity"
+        }
+    )
+    forged["evidence_identity"] = content_identity(
+        {key: item for key, item in forged.items() if key != "evidence_identity"}
+    )
+    with pytest.raises(ValueError):
+        validate_relationship_observation(forged)
+
+
 def _source_binding(root: Path, *, include_relationships: bool = False) -> dict:
     with CodeMap(root) as codemap:
-        codemap.sync()
-        return codemap.repository_evidence_bindings(
+        codemap.index.sync()
+        return codemap.bindings.observe(
             [
                 {
                     "binding_id": "source:entry",
@@ -223,7 +297,7 @@ def test_reacquisition_descriptor_preserves_exact_scope_and_identity(
     packet = _source_binding(repo)
     desc = describe_evidence_binding_reacquisition(packet, binding_id="source:entry")
     assert validate_reacquisition_descriptor(desc) == desc
-    assert desc["descriptor_identity"].startswith("sha256:")
+    assert assert_text(desc["descriptor_identity"]).startswith("sha256:")
     assert desc["current_freshness_proven"] is False
     comparison = compare_reacquisition_observation(desc, packet)
     assert comparison["definition_correspondence"] == "matching-claim"
@@ -236,7 +310,7 @@ def test_modified_reacquisition_selector_is_rejected(repo: Path) -> None:
         _source_binding(repo), binding_id="source:entry"
     )
     forged = deepcopy(desc)
-    forged["requery"]["evidence"][0]["end_line"] = 2
+    assert_records(assert_object(forged["requery"])["evidence"])[0]["end_line"] = 2
     with pytest.raises(ValueError, match="identity"):
         validate_reacquisition_descriptor(forged)
 

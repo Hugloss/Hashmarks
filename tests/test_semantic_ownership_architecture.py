@@ -4,14 +4,90 @@ import ast
 import importlib.util
 from pathlib import Path
 
+from hashmarks.codemap import CodeMap
 from hashmarks.python_ast_cache import read_python_ast
 
 ROOT = Path(__file__).resolve().parents[1]
 CODEMAP = ROOT / "hashmarks" / "codemap"
 
 
-def _tree(path: Path) -> ast.AST:
+def _tree(path: Path) -> ast.Module:
     return read_python_ast(path).tree
+
+
+def _relationship_cache_writers(tree: ast.Module) -> list[tuple[str, str, int]]:
+    writers = []
+    for cls in (node for node in tree.body if isinstance(node, ast.ClassDef)):
+        for method in (node for node in cls.body if isinstance(node, ast.FunctionDef)):
+            for node in ast.walk(method):
+                if (
+                    isinstance(node, ast.Attribute)
+                    and isinstance(node.ctx, ast.Store)
+                    and isinstance(node.value, ast.Name)
+                    and node.value.id == "self"
+                    and node.attr == "_reverse_file_graph_cache"
+                ):
+                    writers.append((cls.name, method.name, node.lineno))
+    return writers
+
+
+def test_relationship_cache_writes_stay_with_its_owner() -> None:
+    violations = []
+    for path in sorted(CODEMAP.glob("*.py")):
+        for cls, method, line in _relationship_cache_writers(_tree(path)):
+            if path.name == "evidence_graph.py" and cls == "RepositoryRelationships":
+                continue
+            violations.append(f"{path.name}:{method}:{line}")
+    assert violations == [], violations
+
+
+def test_relationship_cache_guard_detects_all_direct_assignment_forms() -> None:
+    tree = ast.parse(
+        "class ForeignOwner:\n"
+        "    def publish(self):\n"
+        "        self._reverse_file_graph_cache = None\n"
+        "        self._reverse_file_graph_cache: object = None\n"
+        "        self._reverse_file_graph_cache += other\n"
+    )
+    assert _relationship_cache_writers(tree) == [
+        ("ForeignOwner", "publish", 3),
+        ("ForeignOwner", "publish", 4),
+        ("ForeignOwner", "publish", 5),
+    ]
+
+
+def _effective_method_collisions(cls: type[object]) -> dict[str, list[str]]:
+    definitions: dict[str, list[str]] = {}
+    for owner in cls.__mro__:
+        for name, value in vars(owner).items():
+            if name.startswith("__"):
+                continue
+            if callable(value) or isinstance(
+                value, (staticmethod, classmethod, property)
+            ):
+                definitions.setdefault(name, []).append(owner.__qualname__)
+    return {name: owners for name, owners in definitions.items() if len(owners) > 1}
+
+
+def test_codemap_has_no_accidental_effective_method_shadowing() -> None:
+    assert _effective_method_collisions(CodeMap) == {}
+
+
+def test_effective_method_guard_detects_a_mixin_collision() -> None:
+    class First:
+        def resolve_owner(self) -> str:
+            return "first"
+
+    class Second:
+        def resolve_owner(self) -> str:
+            return "second"
+
+    class Colliding(First, Second):
+        pass
+
+    assert _effective_method_collisions(Colliding) == {
+        "resolve_owner": [First.__qualname__, Second.__qualname__]
+    }
 
 
 def test_codemap_cannot_import_dependency_adapters() -> None:
@@ -30,7 +106,7 @@ def test_codemap_cannot_import_dependency_adapters() -> None:
                 )
                 modules = [module, *(f"{module}.{alias.name}" for alias in node.names)]
             else:
-                modules = []
+                continue
             if any(
                 module == "hashmarks.adapters"
                 or module.startswith("hashmarks.adapters.")
@@ -68,15 +144,27 @@ def test_dependency_core_cannot_branch_on_producer_format() -> None:
 
 def test_repository_member_observation_has_one_semantic_owner() -> None:
     definitions: list[str] = []
+    retired: list[str] = []
     for path in sorted(CODEMAP.glob("*.py")):
-        for node in ast.walk(_tree(path)):
+        tree = _tree(path)
+        for node in ast.walk(tree):
             if (
                 isinstance(node, ast.FunctionDef)
                 and node.name == "_repository_member_observation"
             ):
-                definitions.append(f"{path.name}:{node.lineno}")
+                retired.append(f"{path.name}:{node.lineno}")
+        for cls in (node for node in tree.body if isinstance(node, ast.ClassDef)):
+            if cls.name != "RepositorySource":
+                continue
+            definitions.extend(
+                f"{path.name}:{node.lineno}"
+                for node in cls.body
+                if isinstance(node, ast.FunctionDef) and node.name == "member"
+            )
+
     assert len(definitions) == 1
-    assert definitions[0].startswith("repository_delta.py:")
+    assert definitions[0].startswith("repository_source.py:")
+    assert retired == []
 
 
 def test_evidence_binding_projection_does_not_read_repository_bytes_directly() -> None:
@@ -96,15 +184,20 @@ def test_evidence_binding_projection_does_not_read_repository_bytes_directly() -
 
 def test_canonical_freshness_vocabulary_is_owned_once() -> None:
     owner = (ROOT / "hashmarks" / "freshness.py").read_text(encoding="utf-8")
-    codemap_freshness = (CODEMAP / "evidence_freshness.py").read_text(encoding="utf-8")
     state_doc = (
         ROOT / "docs" / "reference" / "STATE_AND_SEMANTIC_OWNERS.md"
     ).read_text(encoding="utf-8")
     assert 'FRESHNESS_STATES = frozenset({"current", "stale", "unknown"})' in owner
     assert "def freshness_state(" in owner
-    assert "from hashmarks.freshness import FRESHNESS_STATES, freshness_state" in (
-        codemap_freshness
-    )
+    for name in (
+        "repository_evidence_bindings.py",
+        "freshness_map.py",
+        "evidence_packet.py",
+        "change_intelligence.py",
+    ):
+        consumer = (CODEMAP / name).read_text(encoding="utf-8")
+        assert "from hashmarks.freshness import freshness_state" in consumer
+        assert "from .evidence_freshness import freshness_state" not in consumer
     assert "current" in state_doc and "stale" in state_doc and "unknown" in state_doc
 
     freshness_map = (CODEMAP / "freshness_map.py").read_text(encoding="utf-8")
@@ -123,7 +216,7 @@ def test_binding_modules_are_projection_owners_not_second_change_authorities() -
         encoding="utf-8"
     )
     coverage = (CODEMAP / "repository_evidence_coverage.py").read_text(encoding="utf-8")
-    assert "_repository_member_observation(" in bindings
+    assert "self.source.member(" in bindings
     assert "binding_definition_identity" in bindings
     assert "binding_observation_identity" in bindings
     assert "declared_dependencies" in delta
@@ -156,8 +249,8 @@ def test_declarations_reuse_repository_evidence_authorities() -> None:
             violations.append(f"{path.name}:{node.lineno}:{node.func.attr}")
 
     assert violations == []
-    assert "self.repository_evidence_bindings(" in source
-    assert "self.repository_evidence_binding_delta(" in source
+    assert "self.bindings.observe(" in source
+    assert "self.bindings.delta(" in source
 
 
 def test_declaration_provider_context_has_no_raw_workspace_authority() -> None:
@@ -178,7 +271,7 @@ def test_declaration_provider_context_has_no_raw_workspace_authority() -> None:
     assert "workspace" not in declared_names
 
     discovery = discovery_path.read_text(encoding="utf-8")
-    assert "self._iter_admitted_repository_files(" in discovery
+    assert "self.files.iter_files(" in discovery
     assert "MAX_PROVIDER_ENUMERATED_PATHS + 1" in discovery
     assert 'item.visibility.value != "deny"' in discovery
     assert (
@@ -189,8 +282,8 @@ def test_declaration_provider_context_has_no_raw_workspace_authority() -> None:
 
 def test_repository_file_discovery_has_one_semantic_owner() -> None:
     owned = {
-        "_path_admitted_for_analysis",
-        "_iter_admitted_repository_files",
+        "is_admitted",
+        "iter_files",
     }
     definitions: dict[str, list[str]] = {name: [] for name in owned}
     for path in sorted(CODEMAP.glob("*.py")):
@@ -210,25 +303,23 @@ def test_repository_file_discovery_has_one_semantic_owner() -> None:
     assert "os.walk(" not in indexing
     assert "os.walk(" not in declarations
     assert "os.walk(" in owner
-    assert "self.policy.decide(" in owner
+    assert "self.decide(" in owner
+    assert "from .engine import CodeMap" not in owner
+    assert "RepositoryFileDiscoveryMixin" not in owner
 
 
 def test_repository_derived_file_evidence_uses_canonical_admission_owner() -> None:
     indexing = (CODEMAP / "indexing_lifecycle.py").read_text(encoding="utf-8")
-    engine = (CODEMAP / "engine.py").read_text(encoding="utf-8")
+    native = (CODEMAP / "native_evidence.py").read_text(encoding="utf-8")
     freshness = (CODEMAP / "evidence_freshness.py").read_text(encoding="utf-8")
-    graph = (CODEMAP / "evidence_graph.py").read_text(encoding="utf-8")
 
     assert '.rglob("pyproject.toml")' not in indexing
-    assert 'self._visible_repository_manifests("pyproject.toml")' in indexing
-    assert (
-        "default_project_graph_providers(\n            self._visible_repository_manifests"
-        in engine
-    )
+    assert 'self.files.visible_manifests("pyproject.toml")' in indexing
+    assert "default_project_graph_providers(self.files.visible_manifests)" in native
     assert "def _manifest_admitted(" in freshness
-    assert "self._path_admitted_for_analysis(relpath)" in freshness
-    assert "self.policy.decide(relpath)" in freshness
-    assert "self._admit_project_graph(" in graph
-    assert graph.index("self._admit_project_graph(") < graph.index(
+    assert "self.files.is_admitted(relpath)" in freshness
+    assert "self.files.decide(relpath)" in freshness
+    assert "self._admit_project_graph(" in native
+    assert native.index("self._admit_project_graph(") < native.index(
         "self.store.replace_project_graph("
     )

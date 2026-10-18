@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import ast
+from collections.abc import Iterator, Mapping, Sequence
+from dataclasses import dataclass
 from enum import Enum
+from functools import lru_cache
+from types import MappingProxyType
 
 
 def static_string_names(value: ast.expr | None) -> list[str] | None:
@@ -31,49 +35,213 @@ def python_reexport_targets(tree: ast.Module, exported_name: str) -> list[str]:
     return targets
 
 
+@dataclass(frozen=True, slots=True)
+class PythonExportBinding:
+    kind: str
+    targets: tuple[str, ...] = ()
+    declaration: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class PythonExportBindings:
+    """Read-only binding syntax within one already parsed file snapshot."""
+
+    body: tuple[ast.stmt, ...]
+    writes: Mapping[ast.stmt, frozenset[str]]
+
+    def binding(self, name: str) -> PythonExportBinding:
+        return _export_binding(self.body, name, self.writes)
+
+
+@lru_cache(maxsize=256)
+def python_export_bindings(
+    absolute_path: str,
+    source_identity: tuple[int, int, int, int, int],
+    tree: ast.Module,
+) -> PythonExportBindings:
+    """Index one stable, read-only AST; callers retain freshness/visibility authority.
+
+    Path, full parser-snapshot identity and the actual tree bind this disposable
+    acceleration. Source-only APIs remain uncached and observe their input tree.
+    """
+    return PythonExportBindings(
+        tuple(tree.body),
+        MappingProxyType(
+            {
+                statement: frozenset(_binding_writes(statement))
+                for statement in tree.body
+            }
+        ),
+    )
+
+
+def _export_binding(
+    body: Sequence[ast.stmt],
+    name: str,
+    writes: Mapping[ast.stmt, frozenset[str]] | None = None,
+) -> PythonExportBinding:
+    bindings: list[PythonExportBinding] = []
+    for node in body:
+        if isinstance(node, ast.AnnAssign) and node.value is None and bindings:
+            continue
+        binding = _statement_export_binding(
+            node, name, None if writes is None else writes.get(node)
+        )
+        if binding is not None:
+            bindings.append(binding)
+    reexports = [row for row in bindings if row.kind in {"reexport", "star", "module"}]
+    if len(reexports) > 1:
+        targets = tuple(dict.fromkeys(t for row in reexports for t in row.targets))
+        return PythonExportBinding("ambiguous", targets)
+    return bindings[-1] if bindings else PythonExportBinding("unknown")
+
+
 def python_export_binding(
     tree: ast.Module, exported_name: str
 ) -> tuple[str, list[str]]:
-    """Preserve statement ordering without resolving competing re-exports."""
-    bindings = [
-        binding
-        for node in tree.body
-        if (binding := _statement_export_binding(node, exported_name)) is not None
-    ]
-    reexports = [values for kind, values in bindings if kind in {"reexport", "star"}]
-    if len(reexports) > 1:
-        targets = [target for values in reexports for target in values]
-        return "ambiguous", list(dict.fromkeys(targets))
-    return bindings[-1] if bindings else ("unknown", [])
+    """Preserve ordered binding qualification under the canonical syntax owner."""
+    binding = _export_binding(tree.body, exported_name)
+    return binding.kind, list(binding.targets)
+
+
+def python_export_is_declaration(tree: ast.Module, exported_name: str) -> bool:
+    return _export_binding(tree.body, exported_name).declaration is not None
+
+
+def _binding_children(node: ast.AST) -> list[ast.AST]:
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+        body = set(node.body)
+        return [child for child in ast.iter_child_nodes(node) if child not in body]
+    if isinstance(node, ast.Lambda):
+        return [node.args]
+    if isinstance(node, ast.comprehension):
+        return [node.iter, *node.ifs]
+    return list(ast.iter_child_nodes(node))
+
+
+def _binding_writes(node: ast.AST) -> Iterator[str]:
+    # Nested bodies are local; definition headers and walrus expressions can
+    # still bind the containing scope. Comprehension iteration targets are local.
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+        yield node.name
+    if isinstance(node, ast.Name):
+        if isinstance(node.ctx, (ast.Store, ast.Del)):
+            yield node.id
+        return
+    if isinstance(node, (ast.Import, ast.ImportFrom)):
+        yield from (a.asname or a.name.split(".")[0] for a in node.names)
+        return
+    if isinstance(
+        node, (ast.ExceptHandler, ast.MatchAs, ast.MatchStar, ast.MatchMapping)
+    ):
+        bound_name = getattr(node, "name", getattr(node, "rest", None))
+        if isinstance(bound_name, str):
+            yield bound_name
+    for child in _binding_children(node):
+        yield from _binding_writes(child)
+
+
+def _writes_name(node: ast.AST, name: str) -> bool:
+    return any(bound == name for bound in _binding_writes(node))
+
+
+def python_function_scope_binds(
+    definitions: Mapping[str, tuple[ast.FunctionDef | ast.AsyncFunctionDef, ...]],
+    qualname: str,
+    name: str,
+) -> bool:
+    """Preserve local/closure shadowing before admitting module import identity.
+
+    Unrelated methods and nested bodies cannot rebind this callable's names.
+    Duplicate declarations or an unknown callable scope remain unresolved.
+    """
+    parts = qualname.split(".")
+    for depth in range(1, len(parts) + 1):
+        functions = definitions.get(".".join(parts[:depth]), ())
+        if not functions and depth < len(parts):
+            continue
+        if len(functions) != 1:
+            return True
+        function = functions[0]
+        arguments = [
+            *function.args.posonlyargs,
+            *function.args.args,
+            *function.args.kwonlyargs,
+        ]
+        arguments.extend(
+            arg
+            for arg in (function.args.vararg, function.args.kwarg)
+            if arg is not None
+        )
+        if any(argument.arg == name for argument in arguments) or any(
+            _writes_name(statement, name) for statement in function.body
+        ):
+            return True
+    return False
 
 
 def _statement_export_binding(
-    node: ast.stmt, exported_name: str
-) -> tuple[str, list[str]] | None:
-    match node:
-        case (
-            ast.FunctionDef(name=name)
-            | ast.AsyncFunctionDef(name=name)
-            | ast.ClassDef(name=name)
-        ) if name == exported_name:
-            return "local", []
-        case ast.Assign(targets=targets) if any(
-            isinstance(item, ast.Name) and item.id == exported_name for item in targets
-        ):
-            return "local", []
-        case ast.AnnAssign(target=ast.Name(id=name)) if name == exported_name:
-            return "local", []
-        case ast.ImportFrom():
-            kind, targets = _import_from_binding(node, exported_name)
-            if targets:
-                return kind, targets
-    return None
+    node: ast.stmt, name: str, writes: frozenset[str] | None = None
+) -> PythonExportBinding | None:
+    if (
+        isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+        and node.name == name
+    ):
+        return PythonExportBinding("local", declaration=node)
+    if isinstance(node, ast.ImportFrom):
+        kind, targets = _import_from_binding(node, name)
+        return PythonExportBinding(kind, tuple(targets)) if targets else None
+    if isinstance(node, ast.Import):
+        targets = tuple(
+            alias.name if alias.asname else alias.name.split(".")[0]
+            for alias in node.names
+            if (alias.asname or alias.name.split(".")[0]) == name
+        )
+        return PythonExportBinding("module", targets) if targets else None
+    if not (_writes_name(node, name) if writes is None else name in writes):
+        return None
+    if isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+        return PythonExportBinding("local")
+    return PythonExportBinding("ambiguous")
+
+
+def python_class_node(tree: ast.Module, qualname: str) -> ast.ClassDef | None:
+    """Qualify every class component with the same ordered binding analysis."""
+    body = tree.body
+    selected: ast.ClassDef | None = None
+    for part in qualname.split("."):
+        binding = _export_binding(body, part)
+        if not isinstance(binding.declaration, ast.ClassDef):
+            return None
+        selected = binding.declaration
+        body = selected.body
+    return selected
+
+
+def python_class_member_binding(
+    node: ast.ClassDef, name: str
+) -> tuple[str, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef | None]:
+    """Expose the same ordered binding rule inside one declared class scope."""
+    binding = _export_binding(node.body, name)
+    return binding.kind, binding.declaration
+
+
+def python_function_body_binds(
+    node: ast.FunctionDef | ast.AsyncFunctionDef, name: str
+) -> bool:
+    """Observe writes in the body separately from formal argument bindings."""
+    return any(_writes_name(statement, name) for statement in node.body)
+
+
+def python_import_target(node: ast.ImportFrom, name: str) -> str:
+    """One spelling for indexed and qualified relative import evidence."""
+    prefix = "." * node.level + (node.module or "")
+    return f"{prefix}.{name}" if node.module else f"{prefix}{name}"
 
 
 def _import_from_binding(
     node: ast.ImportFrom, exported_name: str
 ) -> tuple[str, list[str]]:
-    prefix = "." * int(node.level) + (node.module or "")
     targets: list[str] = []
     star = False
     for alias in node.names:
@@ -84,10 +252,26 @@ def _import_from_binding(
             name = alias.name
         else:
             continue
-        target = f"{prefix}.{name}" if prefix else name
+        target = python_import_target(node, name)
         if target:
             targets.append(target)
     return "star" if star else "reexport", list(dict.fromkeys(targets))
+
+
+def python_import_alias_targets(tree: ast.Module, name: str) -> list[tuple[str, str]]:
+    """Nominate at most seventeen explicit top-level imported alias bindings."""
+    rows: list[tuple[str, str]] = []
+    for node in tree.body:
+        if not isinstance(node, ast.ImportFrom):
+            continue
+        for alias in node.names:
+            if alias.name == name:
+                rows.append(
+                    (alias.asname or alias.name, python_import_target(node, name))
+                )
+                if len(rows) == 17:
+                    return rows
+    return rows
 
 
 class AllExportStatus(Enum):

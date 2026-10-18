@@ -1,5 +1,5 @@
 from other import target as other_target
 
 
-def duplicate():
+def duplicate() -> int:
     return other_target()

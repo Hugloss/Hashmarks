@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from copy import deepcopy
 
+from contract_assertions import assert_array, assert_object
+
 from hashmarks import (
     native_producer_implementation_identity,
     validate_repository_intelligence_evidence,
@@ -39,7 +41,7 @@ def test_public_validator_binds_current_decision_to_loaded_producer() -> None:
         _decision_packet(), require_fresh=True
     )
     assert checked["valid"] is True
-    normalized = checked["normalized"]
+    normalized = assert_object(checked["normalized"])
     assert normalized["evidence_kind"] == "decision"
     assert normalized["repository_identity"] == "repo:one"
     assert normalized["codemap_generation"] == 7
@@ -55,16 +57,16 @@ def test_public_validator_binds_current_decision_to_loaded_producer() -> None:
 
 def test_public_validator_rejects_stale_or_inconsistent_decision() -> None:
     stale = _decision_packet()
-    stale["identity"]["stale"] = True
+    assert_object(stale["identity"])["stale"] = True
     checked = validate_repository_intelligence_evidence(stale, require_fresh=True)
     assert checked["valid"] is False
-    assert "fresh-evidence-required" in checked["reasons"]
+    assert "fresh-evidence-required" in assert_array(checked["reasons"])
 
     inconsistent = _decision_packet()
     inconsistent["canonical_generation"] = 8
     checked = validate_repository_intelligence_evidence(inconsistent)
     assert checked["valid"] is False
-    assert "canonical-generation-mismatch" in checked["reasons"]
+    assert "canonical-generation-mismatch" in assert_array(checked["reasons"])
 
 
 def test_public_validator_owns_current_schema_registry_without_legacy_aliases() -> None:
@@ -75,7 +77,7 @@ def test_public_validator_owns_current_schema_registry_without_legacy_aliases() 
     ):
         checked = validate_repository_intelligence_evidence({"schema": schema})
         assert checked["valid"] is False
-        assert "unsupported-evidence-schema" in checked["reasons"]
+        assert "unsupported-evidence-schema" in assert_array(checked["reasons"])
 
     checked = validate_repository_intelligence_evidence(
         {
@@ -96,7 +98,7 @@ def test_public_validator_owns_current_schema_registry_without_legacy_aliases() 
         }
     )
     assert checked["valid"] is True
-    assert checked["normalized"]["evidence_kind"] == "impact"
+    assert assert_object(checked["normalized"])["evidence_kind"] == "impact"
 
 
 def test_public_validator_treats_action_map_as_evidence_not_execution() -> None:
@@ -121,11 +123,11 @@ def test_public_validator_treats_action_map_as_evidence_not_execution() -> None:
         }
     )
     assert checked["valid"] is True
-    assert checked["normalized"]["evidence_kind"] == "action-map"
+    assert assert_object(checked["normalized"])["evidence_kind"] == "action-map"
     assert checked["execution_authority"] == "external"
 
     tampered = deepcopy(checked)
-    assert tampered["normalized"]["evidence_kind"] == "action-map"
+    assert assert_object(tampered["normalized"])["evidence_kind"] == "action-map"
 
 
 def test_public_validator_requires_executable_shape_only_for_available_verification() -> (
@@ -144,8 +146,8 @@ def test_public_validator_requires_executable_shape_only_for_available_verificat
         }
     )
     assert checked["valid"] is True
-    assert checked["normalized"]["evidence_kind"] == "verification"
-    assert checked["normalized"]["available"] is True
+    assert assert_object(checked["normalized"])["evidence_kind"] == "verification"
+    assert assert_object(checked["normalized"])["available"] is True
 
     invalid = validate_repository_intelligence_evidence(
         {
@@ -157,7 +159,7 @@ def test_public_validator_requires_executable_shape_only_for_available_verificat
         }
     )
     assert invalid["valid"] is False
-    assert "invalid-verification-argv" in invalid["reasons"]
+    assert "invalid-verification-argv" in assert_array(invalid["reasons"])
 
 
 def test_public_validator_checks_snapshot_and_delta_observer_authority() -> None:
@@ -178,8 +180,8 @@ def test_public_validator_checks_snapshot_and_delta_observer_authority() -> None
     }
     checked = validate_repository_intelligence_evidence(snapshot, require_fresh=True)
     assert checked["valid"] is True
-    assert checked["normalized"]["repository_identity"] == "repo:one"
-    assert checked["normalized"]["codemap_generation"] == 11
+    assert assert_object(checked["normalized"])["repository_identity"] == "repo:one"
+    assert assert_object(checked["normalized"])["codemap_generation"] == 11
 
     delta = {
         "schema": "hashmarks.repository-intelligence-delta.v1",
@@ -192,7 +194,7 @@ def test_public_validator_checks_snapshot_and_delta_observer_authority() -> None
     }
     checked = validate_repository_intelligence_evidence(delta)
     assert checked["valid"] is True
-    assert checked["normalized"]["codemap_generation"] == 11
+    assert assert_object(checked["normalized"])["codemap_generation"] == 11
 
 
 def test_public_validator_rejects_nonportable_payload() -> None:
@@ -209,5 +211,5 @@ def test_public_validator_rejects_nonportable_payload() -> None:
         }
     )
     assert checked["valid"] is False
-    assert "nonportable-evidence-payload" in checked["reasons"]
+    assert "nonportable-evidence-payload" in assert_array(checked["reasons"])
     assert checked["normalized"] is None

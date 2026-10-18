@@ -24,6 +24,7 @@ async def _observed_projection(
     tool_names: tuple[str, ...],
     query_surfaces: tuple[str, ...] | list[str] | None = None,
 ) -> tuple[tuple[str, ...], tuple[str, ...] | None]:
+    from .mcp_sdk_server import close_sdk_server
     from .mcp_server import build_server
 
     server = build_server(
@@ -48,8 +49,9 @@ async def _observed_projection(
             properties.get("surface_name") if isinstance(properties, Mapping) else None
         )
         choices = surface.get("enum") if isinstance(surface, Mapping) else None
-        if isinstance(surface, Mapping) and isinstance(surface.get("const"), str):
-            observed_surfaces = (surface["const"],)
+        constant = surface.get("const") if isinstance(surface, Mapping) else None
+        if isinstance(constant, str):
+            observed_surfaces = (constant,)
         else:
             observed_surfaces = (
                 tuple(choices)
@@ -59,7 +61,7 @@ async def _observed_projection(
             )
         return names, observed_surfaces
     finally:
-        server._hashmarks_surface.close()
+        close_sdk_server(server)
 
 
 def mcp_readiness(

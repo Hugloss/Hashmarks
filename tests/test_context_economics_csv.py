@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import csv
 import json
+from pathlib import Path
 
 import pytest
+from contract_assertions import assert_array, assert_object, assert_records
 
 from scripts.agent_evaluation.context_economics_csv import INPUT_SCHEMA, main
 
 
-def _lane(tokens, elapsed):
+def _lane(tokens: int | None, elapsed: int) -> dict[str, object]:
     return {
         "tasks": [
             {
@@ -36,7 +38,9 @@ def _lane(tokens, elapsed):
     }
 
 
-def _report(native=None, hashmarks=None):
+def _report(
+    native: dict[str, object] | None = None, hashmarks: dict[str, object] | None = None
+) -> dict[str, object]:
     return {
         "schema": INPUT_SCHEMA,
         "protocol_identity": "sha256:p",
@@ -57,7 +61,9 @@ def _report(native=None, hashmarks=None):
     }
 
 
-def _run(tmp_path, monkeypatch, report):
+def _run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, report: dict[str, object]
+) -> tuple[Path, Path]:
     source = tmp_path / "r.json"
     raw = tmp_path / "raw.csv"
     summary = tmp_path / "summary.csv"
@@ -79,8 +85,8 @@ def _run(tmp_path, monkeypatch, report):
 
 
 def test_context_economics_csv_preserves_token_counters_and_paired_reduction(
-    tmp_path, monkeypatch
-):
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     raw, summary = _run(tmp_path, monkeypatch, _report())
     with raw.open(encoding="utf-8", newline="") as handle:
         rows = list(csv.DictReader(handle))
@@ -91,8 +97,8 @@ def test_context_economics_csv_preserves_token_counters_and_paired_reduction(
 
 
 def test_context_economics_csv_does_not_infer_missing_token_usage(
-    tmp_path, monkeypatch
-):
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     lane = _lane(None, 10)
     raw, _ = _run(tmp_path, monkeypatch, _report(lane, lane))
     with raw.open(encoding="utf-8", newline="") as handle:
@@ -103,26 +109,43 @@ def test_context_economics_csv_does_not_infer_missing_token_usage(
     )
 
 
-def test_context_economics_csv_rejects_wrong_input_schema(tmp_path, monkeypatch):
+def test_context_economics_csv_rejects_wrong_input_schema(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     report = _report()
     report["schema"] = "wrong"
     with pytest.raises(ValueError, match="input must use schema"):
         _run(tmp_path, monkeypatch, report)
 
 
-def test_context_economics_csv_rejects_duplicate_condition_rows(tmp_path, monkeypatch):
+def test_context_economics_csv_rejects_duplicate_condition_rows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     report = _report()
-    duplicate = dict(report["repositories"][0]["lanes"]["native"]["tasks"][0])
-    report["repositories"][0]["lanes"]["native"]["tasks"].append(duplicate)
+    lanes = assert_object(assert_records(report["repositories"])[0]["lanes"])
+    tasks = assert_array(assert_object(lanes["native"])["tasks"])
+    tasks.append(dict(assert_object(tasks[0])))
     with pytest.raises(ValueError, match="duplicate economics row"):
         _run(tmp_path, monkeypatch, report)
 
 
 def test_context_economics_csv_rejects_duplicate_raw_run_identity(
-    tmp_path, monkeypatch
-):
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     report = _report()
-    duplicate = dict(report["repositories"][0]["lanes"]["native"]["raw_runs"][0])
-    report["repositories"][0]["lanes"]["native"]["raw_runs"].append(duplicate)
+    lanes = assert_object(assert_records(report["repositories"])[0]["lanes"])
+    runs = assert_array(assert_object(lanes["native"])["raw_runs"])
+    runs.append(dict(assert_object(runs[0])))
     with pytest.raises(ValueError, match="duplicate raw run task_id"):
         _run(tmp_path, monkeypatch, report)
+
+
+@pytest.mark.parametrize("counter", ["input_tokens", "total_tokens"])
+def test_context_economics_csv_rejects_boolean_measurement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, counter: str
+) -> None:
+    lane = _lane(1000, 100)
+    task = assert_records(lane["tasks"])[0]
+    assert_object(task["usage"])[counter] = True
+    with pytest.raises(ValueError, match="measurements must be numeric"):
+        _run(tmp_path, monkeypatch, _report(native=lane))

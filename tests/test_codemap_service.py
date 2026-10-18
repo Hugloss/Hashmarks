@@ -5,10 +5,13 @@ import threading
 import time
 from typing import TYPE_CHECKING
 
-from hashmarks.codemap import CodeMap, CodeMapService, CodeMapServiceClient
+from contract_assertions import assert_object, assert_records
+
+from hashmarks.codemap import CodeMapService, CodeMapServiceClient
 from hashmarks.codemap.evidence_packet import (
     TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS,
 )
+from hashmarks.codemap.repository_tasks import RepositoryTasks
 from hashmarks.operation_contract import operation_schema
 
 if TYPE_CHECKING:
@@ -44,6 +47,8 @@ def test_codemap_service_shares_one_warm_authority(tmp_path: Path) -> None:
         assert status["syncs"] == 1
         assert client_a.find_task("NxImpactAdapter")[0]["path"] == "src/adapter.py"
         action = client_b.task_action_map("NxImpactAdapter implementation test")
+        assert action["edit"] is not None
+        assert action["verify"] is not None
         assert action["edit"]["path"] == "src/adapter.py"
         assert action["verify"]["path"] == "tests/test_adapter.py"
         packet = client_b.task_decision_packet("NxImpactAdapter implementation test")
@@ -113,7 +118,7 @@ def test_service_refresh_after_change_brief_avoids_full_packet_surface(
 
 def test_budget_sweep_defaults_have_one_core_owner(tmp_path: Path) -> None:
     assert (
-        inspect.signature(CodeMap.task_decision_brief_budget_sweep)
+        inspect.signature(RepositoryTasks.decision_brief_budget_sweep)
         .parameters["budgets"]
         .default
         is TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS
@@ -151,7 +156,9 @@ def test_budget_sweep_defaults_have_one_core_owner(tmp_path: Path) -> None:
         thread.join(timeout=5)
 
     expected = list(TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS)
-    assert [row["budget"] for row in raw["rows"]] == expected
+    assert [
+        row["budget"] for row in assert_records(assert_object(raw)["rows"])
+    ] == expected
     assert [row["budget"] for row in typed["rows"]] == expected
 
 
@@ -232,6 +239,9 @@ def test_service_agent_task_start_returns_bounded_source_evidence(
         assert start["schema"] == operation_schema("task_evidence")
         ownership = start["ownership"]
         assert ownership["status"] == "resolved"
+        assert ownership["owner"] is not None
+        assert ownership["source_budget"] is not None
+        assert ownership["source_evidence"] is not None
         assert ownership["owner"]["path"] == "src/engine.py"
         assert ownership["source_budget"]["complete"] is True
         assert ownership["source_evidence"]["representation"] == "source-range"

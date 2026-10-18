@@ -157,8 +157,8 @@ def _freeze_task(base: Path, task: dict) -> tuple[dict, float]:
     changed = str(task["changed"])
     with CodeMap(repo, artifact_db=repo / "artifacts.sqlite3") as codemap:
         started = time.perf_counter()
-        codemap.sync()
-        codemap.enrich_projects(
+        codemap.index.sync()
+        codemap.native.enrich_projects(
             ("npm-package-graph", "maven-pom-graph", "declared-project-links")
         )
         sync_ms = (time.perf_counter() - started) * 1000.0
@@ -174,7 +174,7 @@ def _freeze_task(base: Path, task: dict) -> tuple[dict, float]:
                 encoding="utf-8",
             )
         started = time.perf_counter()
-        packet = codemap.task_change_impact(str(task["query"]), [changed])
+        packet = codemap.changes.task_impact(str(task["query"]), [changed])
         impact_ms = (time.perf_counter() - started) * 1000.0
     return {
         "id": task["id"],

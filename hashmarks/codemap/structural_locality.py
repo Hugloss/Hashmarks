@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import ast
-import hashlib
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -18,13 +17,33 @@ from hashmarks.paths import normalize_relative_path
 from hashmarks.producer_identity import native_producer_implementation_identity
 from hashmarks.python_ast_cache import read_python_ast
 
+from .decision_session import ReadScopeOwner, decision_scoped
 from .model import EvidenceVisibility
+from .ownership.filesystem_lifecycle import locality_lifecycle
+from .python_exports import (
+    python_class_member_binding,
+    python_class_node,
+    python_function_body_binds,
+    python_function_scope_binds,
+)
+from .repository_domains import is_test_path
+from .structural_locality_model import (
+    LOCALITY_SCHEMA,
+    LocalityNode,
+    LocalityNodeFacts,
+    locality_coordinate,
+    locality_identity,
+)
+from .structural_search import AstGrepSearchProvider
 
 if TYPE_CHECKING:
-    from .engine import CodeMap
+    from .decision_session import DecisionScope
+    from .evidence_graph import RepositoryRelationships
+    from .import_resolution import RepositoryImports
+    from .native_evidence import RepositoryNativeEvidence
+    from .repository_source import RepositorySource
 
-STRUCTURAL_LOCALITY_SCHEMA = operation_schema("structural_locality")
-STRUCTURAL_LOCALITY_DELTA_SCHEMA = operation_schema("structural_locality_delta")
+STRUCTURAL_LOCALITY_SCHEMA = LOCALITY_SCHEMA
 _LOCALITY_SYMBOL_CANDIDATE_LIMIT = 64
 
 
@@ -40,13 +59,6 @@ class _SelfClsCallTarget:
 class _NamedSymbolCandidateEvidence:
     rows: list[dict[str, object]]
     complete: bool
-
-
-def _identity(payload: Mapping[str, object]) -> str:
-    encoded = json.dumps(
-        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    ).encode("utf-8")
-    return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
 
 def _symbol_id(row: Mapping[str, object]) -> str:
@@ -138,17 +150,6 @@ def _freshness(stale: object) -> str:
     return "unknown"
 
 
-def _python_node_binds_name(node: ast.AST, name: str) -> bool:
-    if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
-        return node.id == name
-    if isinstance(node, (ast.Import, ast.ImportFrom)):
-        return any(
-            (alias.asname or alias.name.rsplit(".", 1)[-1]) == name
-            for alias in node.names
-        )
-    return False
-
-
 def _binding_result(
     rows: Sequence[dict[str, object]],
     fallback: Sequence[dict[str, object]],
@@ -160,8 +161,40 @@ def _binding_result(
     return None, sorted(_symbol_id(row) for row in rows or fallback), unresolved
 
 
-class StructuralLocalityMixin:
-    """Project bounded structural-locality facts without refactor recommendations."""
+class RepositoryStructure(ReadScopeOwner):
+    """Own bounded structural searches and exact source/call locality evidence."""
+
+    def __init__(
+        self,
+        source: RepositorySource,
+        imports: RepositoryImports,
+        native: RepositoryNativeEvidence,
+        relationships: RepositoryRelationships,
+        *,
+        search_provider: AstGrepSearchProvider | None = None,
+    ) -> None:
+        if any(
+            owner.reads is not source.reads
+            for owner in (imports, native, relationships)
+        ):
+            raise ValueError("Structural inputs must share one repository read scope")
+        self.source = source
+        self.imports = imports
+        self.native = native
+        self.relationships = relationships
+        self.files = source.files
+        self.index = source.index
+        self.store = source.store
+        self.workspace = source.workspace
+        self.search_provider = (
+            AstGrepSearchProvider(self.workspace)
+            if search_provider is None
+            else search_provider
+        )
+
+    @property
+    def reads(self) -> DecisionScope:
+        return self.source.reads
 
     @staticmethod
     def _validate_locality_bounds(
@@ -175,8 +208,6 @@ class StructuralLocalityMixin:
             raise ValueError("ref_limit_per_symbol must be between 1 and 1024")
 
     def _exact_locality_target(self, target: str) -> dict[str, object]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         if "::" not in target:
             raise ValueError(
                 "structural locality requires an exact path::qualname target"
@@ -188,7 +219,7 @@ class StructuralLocalityMixin:
         qualname = qualname.strip()
         if not qualname:
             raise ValueError("target path and qualname must be non-empty")
-        self._ensure_path_current(path)
+        self.source.ensure_current(path)
         row = self.store.symbol_at(path, qualname)
         if row is None:
             raise KeyError(f"symbol not found: {target}")
@@ -204,8 +235,6 @@ class StructuralLocalityMixin:
     def _visible_named_symbol_candidates(
         self, name: str
     ) -> _NamedSymbolCandidateEvidence:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         probe = self.store.visible_symbol_candidates(
             name, limit=_LOCALITY_SYMBOL_CANDIDATE_LIMIT + 1
         )
@@ -214,34 +243,26 @@ class StructuralLocalityMixin:
             complete=len(probe) <= _LOCALITY_SYMBOL_CANDIDATE_LIMIT,
         )
 
+    def _qualified_path_symbols(self, path: str) -> list[dict[str, object]]:
+        """Observe the complete admitted file scope before binding a declaration."""
+        decision = self.source.files.decide(path)
+        if (
+            not decision.index
+            or decision.evidence_visibility is not EvidenceVisibility.SOURCE
+        ):
+            return []
+        self.source.ensure_current(path)
+        return self.reads.symbols_for_path(path)
+
     def _python_function_locally_binds(self, path: str, source: str, name: str) -> bool:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         if not path.endswith(".py") or not source or not name:
             return False
         try:
-            tree = read_python_ast(self.workspace / path, errors="replace").tree
+            snapshot = read_python_ast(self.workspace / path, errors="replace")
         except (OSError, SyntaxError, UnicodeError, ValueError):
             return True
-        function_name = source.rsplit(".", 1)[-1]
-        matching = [
-            node
-            for node in ast.walk(tree)
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-            and node.name == function_name
-        ]
-        if len(matching) != 1:
-            return True
-        function = matching[0]
-        arguments = [
-            *function.args.posonlyargs,
-            *function.args.args,
-            *function.args.kwonlyargs,
-            *(() if function.args.vararg is None else (function.args.vararg,)),
-            *(() if function.args.kwarg is None else (function.args.kwarg,)),
-        ]
-        return any(argument.arg == name for argument in arguments) or any(
-            _python_node_binds_name(node, name) for node in ast.walk(function)
+        return python_function_scope_binds(
+            snapshot.function_definitions_by_qualname, source, name
         )
 
     def _python_plain_call_binding(
@@ -250,62 +271,52 @@ class StructuralLocalityMixin:
         source_path: str,
         source_qualname: str,
         short: str,
-        candidates: list[dict[str, object]],
+        evidence: _NamedSymbolCandidateEvidence,
     ) -> tuple[dict[str, object] | None, list[str], bool]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+        candidates = evidence.rows
         candidate_ids = sorted(_symbol_id(row) for row in candidates)
         if self._python_function_locally_binds(source_path, source_qualname, short):
             return None, candidate_ids, False
-        kind, targets = self._python_export_binding(source_path, short)
+        kind, targets = self.imports._python_export_binding(source_path, short)
+        if kind in {"ambiguous", "star"} or (kind == "local" and not evidence.complete):
+            return None, candidate_ids, True
         if kind == "local":
+            declared = self.imports._python_export_is_declaration(source_path, short)
             local = [
-                row for row in candidates if str(row.get("path") or "") == source_path
+                row
+                for row in candidates
+                if declared and str(row.get("path") or "") == source_path
             ]
-            return _binding_result(local, candidates, unresolved=len(local) > 1)
+            return _binding_result(
+                local, candidates, unresolved=not declared or len(local) > 1
+            )
         if kind == "reexport" and len(targets) == 1:
-            owners, unresolved = self._resolve_import_owner_evidence(
+            symbols, unresolved = self.imports._resolve_import_symbol_evidence(
                 source_path, targets[0]
             )
             if unresolved:
-                return None, candidate_ids, True, True
-            owner_paths = set(owners)
+                return None, candidate_ids, True
             owned = [
-                row for row in candidates if str(row.get("path") or "") in owner_paths
+                row
+                for path, qualname in symbols
+                for row in self._qualified_path_symbols(path)
+                if str(row.get("qualname") or "") == qualname
             ]
-            return _binding_result(owned, candidates, unresolved=bool(owners))
-        if kind in {"ambiguous", "star"}:
-            return None, candidate_ids, True
+            return _binding_result(owned, candidates, unresolved=bool(symbols))
         return None, candidate_ids, False
 
     def _python_class_node(self, path: str, qualname: str) -> ast.ClassDef | None:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         if not path.endswith(".py") or not qualname:
             return None
         try:
             tree = read_python_ast(self.workspace / path, errors="replace").tree
         except (OSError, SyntaxError, UnicodeError, ValueError):
             return None
-        body: Sequence[ast.stmt] = tree.body
-        selected: ast.ClassDef | None = None
-        for part in qualname.split("."):
-            matches = [
-                node
-                for node in body
-                if isinstance(node, ast.ClassDef) and node.name == part
-            ]
-            if len(matches) != 1:
-                return None
-            selected = matches[0]
-            body = selected.body
-        return selected
+        return python_class_node(tree, qualname)
 
     def _python_class_bases(
         self, path: str, qualname: str
     ) -> tuple[list[tuple[str, str]], bool]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         node = self._python_class_node(path, qualname)
         if node is None:
             return [], True
@@ -318,11 +329,11 @@ class StructuralLocalityMixin:
             if self._python_class_node(path, base.id) is not None:
                 bases.append((path, base.id))
                 continue
-            kind, targets = self._python_export_binding(path, base.id)
+            kind, targets = self.imports._python_export_binding(path, base.id)
             if kind != "reexport" or len(targets) != 1:
                 unresolved = True
                 continue
-            owners, import_unresolved = self._resolve_import_owner_evidence(
+            owners, import_unresolved = self.imports._resolve_import_owner_evidence(
                 path, targets[0]
             )
             class_name = targets[0].lstrip(".").rsplit(".", 1)[-1]
@@ -345,15 +356,16 @@ class StructuralLocalityMixin:
         path: str,
         class_qualname: str,
         method: str,
-        candidates: list[dict[str, object]],
         seen: frozenset[tuple[str, str]] = frozenset(),
     ) -> tuple[dict[str, object] | None, bool]:
         key = (path, class_qualname)
         if key in seen:
             return None, True
-        direct = self._python_direct_method_owners(
-            path, class_qualname, method, candidates
+        direct, unresolved = self._python_direct_method_owners(
+            path, class_qualname, method, self._qualified_path_symbols(path)
         )
+        if unresolved:
+            return None, True
         if direct:
             return (direct[0], False) if len(direct) == 1 else (None, True)
 
@@ -367,7 +379,6 @@ class StructuralLocalityMixin:
                 path=base_path,
                 class_qualname=base_qualname,
                 method=method,
-                candidates=candidates,
                 seen=seen | {key},
             )
             ambiguous = ambiguous or base_ambiguous
@@ -378,19 +389,29 @@ class StructuralLocalityMixin:
         owner = next(iter(owners.values())) if owners else None
         return owner, False
 
-    @staticmethod
     def _python_direct_method_owners(
+        self,
         path: str,
         class_qualname: str,
         method: str,
         candidates: Sequence[dict[str, object]],
-    ) -> list[dict[str, object]]:
-        return [
+    ) -> tuple[list[dict[str, object]], bool]:
+        class_node = self._python_class_node(path, class_qualname)
+        if class_node is None:
+            return [], True
+        kind, declaration = python_class_member_binding(class_node, method)
+        if declaration is None:
+            return [], kind != "unknown"
+        owners = [
             row
             for row in candidates
             if str(row.get("path") or "") == path
             and str(row.get("qualname") or "") == f"{class_qualname}.{method}"
+            and locality_coordinate(row["start_line"])
+            <= declaration.lineno
+            <= locality_coordinate(row["end_line"])
         ]
+        return owners, not owners
 
     @staticmethod
     def _python_self_cls_target(
@@ -412,9 +433,9 @@ class StructuralLocalityMixin:
         )
 
     @staticmethod
-    def _python_receiver_matches_method(
+    def _python_receiver_method(
         class_node: ast.ClassDef, target: _SelfClsCallTarget
-    ) -> bool:
+    ) -> ast.FunctionDef | ast.AsyncFunctionDef | None:
         methods = [
             node
             for node in class_node.body
@@ -422,11 +443,11 @@ class StructuralLocalityMixin:
             and node.name == target.source_method
         ]
         if len(methods) != 1:
-            return False
+            return None
         source_node = methods[0]
         positional = [*source_node.args.posonlyargs, *source_node.args.args]
         if not positional or positional[0].arg != target.receiver:
-            return False
+            return None
         decorators = {
             (
                 decorator.id
@@ -438,8 +459,8 @@ class StructuralLocalityMixin:
             for decorator in source_node.decorator_list
         }
         if target.receiver == "cls":
-            return "classmethod" in decorators
-        return not {"classmethod", "staticmethod"} & decorators
+            return source_node if "classmethod" in decorators else None
+        return source_node if not {"classmethod", "staticmethod"} & decorators else None
 
     def _python_self_cls_call_binding(
         self,
@@ -453,18 +474,22 @@ class StructuralLocalityMixin:
         if call_target is None:
             return None
         class_node = self._python_class_node(source_path, call_target.class_qualname)
-        if class_node is None or not self._python_receiver_matches_method(
-            class_node, call_target
-        ):
+        source_node = (
+            self._python_receiver_method(class_node, call_target)
+            if class_node
+            else None
+        )
+        if source_node is None:
             return None
+        candidate_ids = sorted(_symbol_id(row) for row in candidates)
+        if python_function_body_binds(source_node, call_target.receiver):
+            return None, candidate_ids, True
 
         owner, unresolved = self._python_method_owner(
             path=source_path,
             class_qualname=call_target.class_qualname,
             method=call_target.method,
-            candidates=candidates,
         )
-        candidate_ids = sorted(_symbol_id(row) for row in candidates)
         if owner is None:
             return None, candidate_ids, unresolved
         return owner, [_symbol_id(owner)], False
@@ -500,24 +525,17 @@ class StructuralLocalityMixin:
         root: str,
         candidates: list[dict[str, object]],
     ) -> tuple[dict[str, object] | None, list[str], bool, bool]:
-        qualified = [
-            row
-            for row in candidates
-            if str(row.get("path") or "") == source_path
-            and str(row.get("qualname") or "") == target
-        ]
+        candidate_ids = sorted(_symbol_id(row) for row in candidates)
+        if self._python_class_node(source_path, root) is None:
+            return None, candidate_ids, True, True
+        class_name, method = target.rsplit(".", 1)
+        qualified, _unresolved = self._python_direct_method_owners(
+            source_path, class_name, method, self._qualified_path_symbols(source_path)
+        )
         if len(qualified) == 1:
             return qualified[0], [_symbol_id(qualified[0])], False, True
-        evidence = self._visible_named_symbol_candidates(root)
-        root_present = any(
-            str(row.get("path") or "") == source_path
-            and str(row.get("qualname") or "") == root
-            for row in evidence.rows
-        )
-        if not evidence.complete:
-            return None, sorted(_symbol_id(row) for row in candidates), True, False
         resolved, ids, unresolved = _binding_result(
-            qualified, candidates, unresolved=root_present
+            qualified, candidates, unresolved=True
         )
         return resolved, ids, unresolved, True
 
@@ -529,36 +547,39 @@ class StructuralLocalityMixin:
         candidates: list[dict[str, object]],
     ) -> tuple[dict[str, object] | None, list[str], bool, bool]:
         candidate_ids = sorted(_symbol_id(row) for row in candidates)
-        owners, unresolved = self._resolve_import_owner_evidence(
+        symbols, unresolved = self.imports._resolve_import_symbol_evidence(
             source_path, import_target
         )
-        if unresolved:
+        if unresolved or len(symbols) != 1:
+            data_binding = self._python_imported_data_binding(
+                source_path, import_target
+            )
+            return None, candidate_ids, not data_binding, data_binding
+        path, class_name = symbols[0]
+        if self._python_class_node(path, class_name) is None:
             return None, candidate_ids, True, True
-        owner_paths = set(owners)
-        imported_name = import_target.rsplit(".", 1)[-1]
-        evidence = self._visible_named_symbol_candidates(imported_name)
-        if not evidence.complete:
-            return None, candidate_ids, True, False
-        class_present = any(
-            str(row.get("path") or "") in owner_paths
-            and str(row.get("qualname") or "") == imported_name
-            and str(row.get("kind") or "") == "class"
-            for row in evidence.rows
-        )
-        if not class_present:
-            return None, candidate_ids, False, True
         member = target.split(".", 1)[1]
-        qualified_name = f"{imported_name}.{member}"
-        qualified = [
-            row
-            for row in candidates
-            if str(row.get("path") or "") in owner_paths
-            and str(row.get("qualname") or "") == qualified_name
-        ]
+        qualified_name = f"{class_name}.{member}"
+        class_qualname, method = qualified_name.rsplit(".", 1)
+        qualified, _unresolved = self._python_direct_method_owners(
+            path, class_qualname, method, self._qualified_path_symbols(path)
+        )
         resolved, ids, unresolved = _binding_result(
             qualified, candidates, unresolved=True
         )
         return resolved, ids, unresolved, True
+
+    def _python_imported_data_binding(self, path: str, target: str) -> bool:
+        """Keep admitted imported data in the existing external/unindexed category."""
+        owners, unresolved = self.imports._resolve_import_owner_evidence(path, target)
+        if unresolved:
+            return False
+        name = target.rsplit(".", 1)[-1]
+        return any(
+            self.imports._python_export_binding(owner, name)[0] == "local"
+            and not self.imports._python_export_is_declaration(owner, name)
+            for owner in owners
+        )
 
     def _python_repository_qualified_call_binding(
         self,
@@ -574,8 +595,10 @@ class StructuralLocalityMixin:
             source_path, source_qualname, root
         ):
             return None, candidate_ids, False, True
-        kind, targets = self._python_export_binding(source_path, root)
-        if kind == "local":
+        kind, targets = self.imports._python_export_binding(source_path, root)
+        if kind == "local" and self.imports._python_export_is_declaration(
+            source_path, root
+        ):
             return self._python_local_qualified_call_binding(
                 source_path, target, root, candidates
             )
@@ -583,7 +606,7 @@ class StructuralLocalityMixin:
             return self._python_reexport_qualified_call_binding(
                 source_path, target, targets[0], candidates
             )
-        return None, candidate_ids, kind in {"ambiguous", "star"}, True
+        return None, candidate_ids, kind in {"local", "ambiguous", "star"}, True
 
     def _resolve_call_target(
         self, edge: Mapping[str, object]
@@ -592,41 +615,52 @@ class StructuralLocalityMixin:
         short = target.rsplit(".", 1)[-1]
         if not short:
             return None, [], False, True
-        evidence = self._visible_named_symbol_candidates(short)
+        source_path = str(edge.get("path") or "")
+        name = (
+            self.imports._python_imported_call_name(source_path, short)
+            if target == short
+            else short
+        )
+        evidence = self._visible_named_symbol_candidates(name)
         candidates = evidence.rows
         candidate_ids = sorted(_symbol_id(row) for row in candidates)
-        if not evidence.complete:
-            return None, candidate_ids, True, False
-        source_path = str(edge.get("path") or "")
         source_qualname = str(edge.get("source") or "")
         source_row = self.store.file_row(source_path)
         language = "" if source_row is None else str(source_row["language"] or "")
         if language == "python" and target != short:
-            return self._python_qualified_call_binding(
+            binding = self._python_qualified_call_binding(
                 source_path=source_path,
                 source_qualname=source_qualname,
                 target=target,
                 candidates=candidates,
             )
+            if binding[0] is not None or evidence.complete:
+                return binding
+            return None, binding[1], True, False
         if language == "python":
             resolved, ids, unresolved = self._python_plain_call_binding(
                 source_path=source_path,
                 source_qualname=source_qualname,
                 short=short,
-                candidates=candidates,
+                evidence=evidence,
             )
-            return resolved, ids, unresolved, True
-        return None, candidate_ids, bool(candidate_ids), True
+            if resolved is not None:
+                return resolved, ids, False, True
+            return None, ids, unresolved or not evidence.complete, evidence.complete
+        return (
+            None,
+            candidate_ids,
+            bool(candidate_ids) or not evidence.complete,
+            evidence.complete,
+        )
 
     def _locality_callers(
         self, row: Mapping[str, object], *, ref_limit: int
     ) -> tuple[list[dict[str, object]], bool, list[dict[str, object]]]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        name = str(row["name"])
         target_id = _symbol_id(row)
-        raw_refs = [dict(ref) for ref in self.store.refs(name, limit=ref_limit)]
-        reference_bound_complete = len(raw_refs) < ref_limit
+        raw_refs, reference_bound_complete = (
+            self.imports._python_call_reference_candidates(row, ref_limit)
+        )
         raw = [ref for ref in raw_refs if str(ref.get("kind") or "") == "call"]
         callers: dict[tuple[str, str], dict[str, object]] = {}
         unresolved: list[dict[str, object]] = []
@@ -672,7 +706,7 @@ class StructuralLocalityMixin:
                 unresolved,
                 key=lambda item: (
                     str(item["path"]),
-                    int(item["line"] or 0),
+                    locality_coordinate(item["line"] or 0),
                     str(item["source"] or ""),
                 ),
             ),
@@ -684,10 +718,10 @@ class StructuralLocalityMixin:
         *,
         navigation_depth: int,
         ref_limit: int,
-    ) -> dict[str, object]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+    ) -> LocalityNode:
         path = str(row["path"])
+        start = locality_coordinate(row["start_line"])
+        end = locality_coordinate(row["end_line"])
         file_row = self.store.file_row(path)
         digest = "" if file_row is None else str(file_row["file_digest"])
         forwarding: bool | None = None
@@ -696,7 +730,7 @@ class StructuralLocalityMixin:
         if language == "python":
             forwarding, forwarding_provider = _forwarding_only_python_symbol(
                 self.workspace / path,
-                start_line=int(row["start_line"]),
+                start_line=start,
                 name=str(row["name"]),
             )
         callers, caller_reference_bound_complete, unresolved_callers = (
@@ -706,15 +740,15 @@ class StructuralLocalityMixin:
             "path": path,
             "qualname": str(row["qualname"]),
             "file_digest": digest,
-            "lines": [int(row["start_line"]), int(row["end_line"])],
+            "lines": [start, end],
         }
-        semantic = {
+        semantic: LocalityNodeFacts = {
             "path": path,
             "qualname": str(row["qualname"]),
             "name": str(row["name"]),
             "kind": str(row["kind"]),
             "signature": str(row["signature"]),
-            "lines": [int(row["start_line"]), int(row["end_line"])],
+            "lines": [start, end],
             "navigation_depth": navigation_depth,
             "file_digest": digest,
             "forwarding_only": forwarding,
@@ -727,8 +761,8 @@ class StructuralLocalityMixin:
         return {
             "symbol_id": _symbol_id(row),
             **semantic,
-            "symbol_source_identity": _identity(source_semantic),
-            "symbol_evidence_identity": _identity(semantic),
+            "symbol_source_identity": locality_identity(source_semantic),
+            "symbol_evidence_identity": locality_identity(semantic),
         }
 
     def _locality_graph(
@@ -739,13 +773,13 @@ class StructuralLocalityMixin:
         call_limit_per_symbol: int,
         ref_limit_per_symbol: int,
     ) -> tuple[
-        list[dict[str, object]],
+        list[LocalityNode],
         list[dict[str, object]],
         list[dict[str, object]],
         list[dict[str, object]],
     ]:
         queue: list[tuple[dict[str, object], int]] = [(dict(target_row), 0)]
-        nodes: dict[str, dict[str, object]] = {}
+        nodes: dict[str, LocalityNode] = {}
         edges: list[dict[str, object]] = []
         unresolved_calls: list[dict[str, object]] = []
         external_calls: list[dict[str, object]] = []
@@ -765,6 +799,7 @@ class StructuralLocalityMixin:
                     str(row["path"]), str(row["qualname"])
                 )
                 if str(edge.get("kind") or "") == "call"
+                and edge.get("source") == row["qualname"]
             ]
             for edge in outgoing[:call_limit_per_symbol]:
                 (
@@ -798,7 +833,7 @@ class StructuralLocalityMixin:
         ordered_nodes = sorted(nodes.values(), key=_locality_node_sort_key)
         return ordered_nodes, edges, unresolved_calls, external_calls
 
-    def structural_locality(  # noqa: PLR0913 - retain traversal bounds alongside explicit observation inputs
+    def locality(  # noqa: PLR0913 - retain traversal bounds alongside explicit observation inputs
         self,
         target: str,
         *,
@@ -817,16 +852,14 @@ class StructuralLocalityMixin:
         )
 
         captures = normalize_lsp_captures(supplied_observations)
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         if result_mode not in ("default", "relationships"):
             raise ValueError("result_mode must be default or relationships")
         self._validate_locality_bounds(
             max_depth, call_limit_per_symbol, ref_limit_per_symbol
         )
         if refresh:
-            self.sync()
-        with self.decision_session():
+            self.index.sync()
+        with self.reads.session():
             if result_mode == "relationships":
                 result = semantic_relationship_observation(
                     self, exact_relationship_target(self, target), captures
@@ -845,7 +878,7 @@ class StructuralLocalityMixin:
                             self, self._exact_locality_target(target), captures
                         )
                     )
-                    result["evidence_identity"] = _identity(
+                    result["evidence_identity"] = locality_identity(
                         {
                             key: value
                             for key, value in result.items()
@@ -878,7 +911,7 @@ class StructuralLocalityMixin:
     def _scip_target_resolution(
         self, producer: str, target_symbol: str, source_path: str
     ) -> dict[str, object]:
-        fresh, _reason = self._evidence_fresh("scip", producer)
+        fresh, _reason = self.native._evidence_fresh("scip", producer)
         candidates = self.store.native_definitions_for_symbol(
             target_symbol,
             producer=producer,
@@ -893,9 +926,9 @@ class StructuralLocalityMixin:
             path = str(candidate["path"])
             symbols = [
                 row
-                for row in self._session_symbols_for_path(path)
+                for row in self.reads.symbols_for_path(path)
                 if str(row["name"]) == str(candidate["display_name"])
-                and int(row["start_line"]) == int(candidate["line"])
+                and locality_coordinate(row["start_line"]) == int(candidate["line"])
             ]
             symbol_ids = sorted(_symbol_id(row) for row in symbols)
             mapped.update(symbol_ids)
@@ -934,12 +967,10 @@ class StructuralLocalityMixin:
         self, raw_rows: Sequence[Mapping[str, object]]
     ) -> tuple[dict[str, tuple[bool, str | None]], bool]:
         freshness = {
-            producer: self._evidence_fresh("scip", producer)
+            producer: self.native._evidence_fresh("scip", producer)
             for producer in {str(row["producer"]) for row in raw_rows}
         }
-        statuses = [
-            row for row in self._native_evidence_status() if row.get("kind") == "scip"
-        ]
+        statuses = [row for row in self.native.status() if row.get("kind") == "scip"]
         for row in statuses[:64]:
             producer = str(row["producer"])
             freshness.setdefault(
@@ -1074,8 +1105,12 @@ class StructuralLocalityMixin:
         Used only to describe available evidence for an already-selected exact
         repository symbol. It neither resolves owners nor proves absent edges.
         """
-        definitions, definition_truncated = self._fresh_native_definitions_for_path(
-            str(row["path"]), name=str(row["name"]), line=int(row["start_line"])
+        definitions, definition_truncated = (
+            self.native._fresh_native_definitions_for_path(
+                str(row["path"]),
+                name=str(row["name"]),
+                line=locality_coordinate(row["start_line"]),
+            )
         )
         if not definitions:
             return None
@@ -1083,7 +1118,7 @@ class StructuralLocalityMixin:
             self._scip_decoded_relationships(definitions[:128])
         )
         count = sum(len(decoded[id(item)][0]) for item in definitions[:128])
-        file_row = self._session_file_row(str(row["path"]))
+        file_row = self.reads.file_row(str(row["path"]))
         current_revision = (
             str(file_row["file_digest"])
             if file_row is not None and file_row.get("file_digest")
@@ -1127,7 +1162,7 @@ class StructuralLocalityMixin:
         raw_rows = self.store.native_definitions_for_path(
             str(target_row["path"]),
             name=str(target_row["name"]),
-            line=int(target_row["start_line"]),
+            line=locality_coordinate(target_row["start_line"]),
             limit=129,
         )
         source_truncated = len(raw_rows) >= 129
@@ -1240,9 +1275,7 @@ class StructuralLocalityMixin:
         edit, or infer semantic responsibility. Ambiguous static call targets stay
         unresolved instead of being counted as reuse or ownership.
         """
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        self._ensure_map_ready()
+        self.reads.ready()
         target_row = self._exact_locality_target(target)
 
         (
@@ -1256,22 +1289,15 @@ class StructuralLocalityMixin:
             call_limit_per_symbol=call_limit_per_symbol,
             ref_limit_per_symbol=ref_limit_per_symbol,
         )
-        verification_paths = sorted(
-            {
-                str(path)
-                for path in self.tests(str(target_row["path"]), max_depth=3).get(
-                    "tests", []
-                )
-            }
-        )
         target_node = next(
             row for row in ordered_nodes if row["symbol_id"] == _symbol_id(target_row)
         )
+        verification_paths = self._locality_verification_paths(target_row, target_node)
         dimensions = {
             "symbol_count": len(ordered_nodes),
             "file_count": len({str(row["path"]) for row in ordered_nodes}),
             "max_navigation_depth": max(
-                (int(row["navigation_depth"]) for row in ordered_nodes), default=0
+                (row["navigation_depth"] for row in ordered_nodes), default=0
             ),
             "forwarding_only_symbol_count": sum(
                 1 for row in ordered_nodes if row["forwarding_only"] is True
@@ -1288,9 +1314,9 @@ class StructuralLocalityMixin:
             ),
             "unresolved_call_count": len(unresolved_calls),
             "external_or_unindexed_call_count": len(external_or_unindexed_calls),
-            "target_exact_caller_count": int(target_node["exact_caller_count"]),
+            "target_exact_caller_count": target_node["exact_caller_count"],
         }
-        repository_identity = "sha256:" + self._workspace_fingerprint_from_store()
+        repository_identity = "sha256:" + self.index._workspace_fingerprint_from_store()
         configuration = {
             "max_depth": max_depth,
             "call_limit_per_symbol": call_limit_per_symbol,
@@ -1300,7 +1326,7 @@ class StructuralLocalityMixin:
             "call_resolution": "unambiguous-indexed-symbol-only",
             "refresh": refresh,
         }
-        freshness_fields = self._query_freshness_fields()
+        freshness_fields = self.reads.freshness_fields()
         freshness_state = (
             "current" if refresh else _freshness(freshness_fields.get("stale"))
         )
@@ -1311,7 +1337,7 @@ class StructuralLocalityMixin:
             "provider_implementation_identity": native_producer_implementation_identity(),
             "repository_identity": repository_identity,
             "source_identity": target_node["symbol_source_identity"],
-            "measurement_configuration_identity": _identity(configuration),
+            "measurement_configuration_identity": locality_identity(configuration),
             "target": target,
             "target_symbol_id": _symbol_id(target_row),
             "freshness": {
@@ -1325,7 +1351,7 @@ class StructuralLocalityMixin:
                 edges,
                 key=lambda item: (
                     str(item["source_symbol_id"]),
-                    int(item["line"] or 0),
+                    locality_coordinate(item["line"] or 0),
                     str(item["target_text"]),
                 ),
             ),
@@ -1333,7 +1359,7 @@ class StructuralLocalityMixin:
                 unresolved_calls,
                 key=lambda item: (
                     str(item.get("source_symbol_id") or ""),
-                    int(item.get("line") or 0),
+                    locality_coordinate(item.get("line") or 0),
                     str(item.get("target_text") or item.get("reason") or ""),
                 ),
             ),
@@ -1341,7 +1367,7 @@ class StructuralLocalityMixin:
                 external_or_unindexed_calls,
                 key=lambda item: (
                     str(item.get("source_symbol_id") or ""),
-                    int(item.get("line") or 0),
+                    locality_coordinate(item.get("line") or 0),
                     str(item.get("target_text") or ""),
                 ),
             ),
@@ -1357,7 +1383,80 @@ class StructuralLocalityMixin:
         # Preserve unavailable and stale provider coverage without making it a
         # repository-negative relationship claim.
         semantic.update(self._scip_direct_relationships(target_row, target_node))
-        return {**semantic, "evidence_identity": _identity(semantic)}
+        semantic["resource_lifecycle"] = locality_lifecycle(
+            self, ordered_nodes, max_depth, call_limit_per_symbol, ref_limit_per_symbol
+        )
+        return {**semantic, "evidence_identity": locality_identity(semantic)}
+
+    @operation_response("structural")
+    @decision_scoped
+    def search(
+        self, pattern: str, *, language: str | None = None, limit: int = 100
+    ) -> dict[str, object]:
+        """Syntax-aware search through an optional local ast-grep authority."""
+        self.reads.ready()
+        raw, warnings = self.search_provider.search(
+            self.workspace, pattern, language=language, limit=max(limit * 4, limit)
+        )
+        matches: list[dict[str, object]] = []
+        for row in raw:
+            raw_path = row.get("file")
+            if not raw_path:
+                continue
+            try:
+                rel = normalize_relative_path(
+                    str(raw_path).replace("\\", "/"), allow_root=False
+                )
+            except ValueError:
+                continue
+            mapped = self.reads.file_row(rel)
+            if mapped is None:
+                continue
+            visibility = EvidenceVisibility(str(mapped["evidence_visibility"]))
+            # ast-grep's match text is implementation content, so outline-only
+            # files are intentionally not disclosed by this operation.
+            if visibility is not EvidenceVisibility.SOURCE:
+                continue
+            range_value = row.get("range") if isinstance(row.get("range"), dict) else {}
+            start_value = (
+                range_value.get("start") if isinstance(range_value, dict) else {}
+            )
+            end_value = range_value.get("end") if isinstance(range_value, dict) else {}
+            matches.append(
+                {
+                    "path": rel,
+                    "text": str(row.get("text") or ""),
+                    "language": row.get("language"),
+                    "range": [
+                        int((start_value or {}).get("line", 0)) + 1,
+                        int((end_value or {}).get("line", 0)) + 1,
+                    ],
+                    "producer": "ast-grep",
+                }
+            )
+            if len(matches) >= limit:
+                break
+        return {
+            "schema": operation_schema("structural"),
+            **self.reads.freshness_fields(),
+            "pattern": pattern,
+            "available": self.search_provider.available,
+            "provider": self.search_provider.status().as_dict(),
+            "matches": matches,
+            "warnings": list(warnings),
+        }
+
+    def _locality_verification_paths(
+        self, target: Mapping[str, object], node: Mapping[str, object]
+    ) -> list[str]:
+        """Add qualified indexed test callers to existing bounded impact evidence."""
+        affected = cast(
+            "Sequence[str]",
+            self.relationships.tests(str(target["path"]), max_depth=3).get("tests", []),
+        )
+        callers = cast("Sequence[Mapping[str, object]]", node["exact_callers"])
+        direct = {str(row["path"]) for row in callers if is_test_path(str(row["path"]))}
+        return sorted(set(map(str, affected)) | direct)
 
 
 def _candidate_search_contract(complete: bool) -> dict[str, object]:
@@ -1389,201 +1488,10 @@ def _locality_edge_record(
     }
 
 
-def _locality_node_sort_key(item: Mapping[str, object]) -> tuple[int, str, int, str]:
-    lines = item["lines"]
-    assert isinstance(lines, Sequence) and not isinstance(
-        lines, (str, bytes, bytearray)
-    )
+def _locality_node_sort_key(item: LocalityNode) -> tuple[int, str, int, str]:
     return (
-        int(item["navigation_depth"]),
-        str(item["path"]),
-        int(lines[0]),
-        str(item["qualname"]),
+        item["navigation_depth"],
+        item["path"],
+        item["lines"][0],
+        item["qualname"],
     )
-
-
-def _packet_identity_valid(packet: Mapping[str, object]) -> bool:
-    identity = packet.get("evidence_identity")
-    if not isinstance(identity, str) or not identity:
-        return False
-    semantic = {
-        str(key): value for key, value in packet.items() if key != "evidence_identity"
-    }
-    return identity == _identity(semantic)
-
-
-def _delta_incomparability_reasons(
-    before: Mapping[str, object], after: Mapping[str, object]
-) -> list[str]:
-    checks = (
-        ("before-schema", before.get("schema") == STRUCTURAL_LOCALITY_SCHEMA),
-        ("after-schema", after.get("schema") == STRUCTURAL_LOCALITY_SCHEMA),
-        ("before-provider", before.get("provider") == "hashmarks"),
-        ("after-provider", after.get("provider") == "hashmarks"),
-        (
-            "provider-version",
-            before.get("provider_version") == after.get("provider_version"),
-        ),
-        (
-            "provider-implementation",
-            before.get("provider_implementation_identity")
-            == after.get("provider_implementation_identity"),
-        ),
-        ("before-evidence-identity", _packet_identity_valid(before)),
-        ("after-evidence-identity", _packet_identity_valid(after)),
-        ("target", before.get("target") == after.get("target")),
-        (
-            "measurement-configuration",
-            before.get("measurement_configuration_identity")
-            == after.get("measurement_configuration_identity"),
-        ),
-        (
-            "repository-state-not-distinct",
-            before.get("repository_identity") != after.get("repository_identity"),
-        ),
-    )
-    issues = [label for label, valid in checks if not valid]
-    for label, packet in (("before", before), ("after", after)):
-        freshness = packet.get("freshness")
-        if not isinstance(freshness, Mapping) or freshness.get("state") != "current":
-            issues.append(f"{label}-freshness")
-        if not isinstance(packet.get("evidence_identity"), str):
-            issues.append(f"{label}-identity")
-    return issues
-
-
-def _delta_nodes(packet: Mapping[str, object]) -> dict[str, Mapping[str, object]]:
-    rows = packet.get("nodes", [])
-    if not isinstance(rows, Sequence) or isinstance(rows, (str, bytes, bytearray)):
-        return {}
-    return {
-        str(row.get("symbol_id")): row
-        for row in rows
-        if isinstance(row, Mapping) and row.get("symbol_id")
-    }
-
-
-def _integer_dimension_delta(
-    before: object, after: object
-) -> tuple[dict[str, int], bool]:
-    if not isinstance(before, Mapping) or not isinstance(after, Mapping):
-        return {}, False
-    delta: dict[str, int] = {}
-    for key in sorted(set(before) & set(after)):
-        left, right = before.get(key), after.get(key)
-        if (
-            isinstance(left, int)
-            and not isinstance(left, bool)
-            and isinstance(right, int)
-            and not isinstance(right, bool)
-        ):
-            delta[str(key)] = right - left
-    return delta, True
-
-
-def _native_relation_evidence(
-    packet: Mapping[str, object],
-) -> tuple[set[str], set[tuple[str, str, str, str, str]], bool]:
-    raw = packet.get("native_semantic_relationships")
-    if not isinstance(raw, Mapping) or raw.get("truncated") is not False:
-        return set(), set(), False
-    producers = raw.get("producer_bindings")
-    rows = raw.get("relationships")
-    if not isinstance(producers, list) or not isinstance(rows, list):
-        return set(), set(), False
-    keys: set[tuple[str, str, str, str, str]] = set()
-    for row in rows:
-        if not isinstance(row, Mapping) or any(
-            not isinstance(row.get(key), (str, int)) or isinstance(row.get(key), bool)
-            for key in ("producer", "source_symbol", "kind", "target_symbol", "line")
-        ):
-            return set(), set(), False
-        keys.add(
-            (
-                str(row["producer"]),
-                str(row["source_symbol"]),
-                str(row["kind"]),
-                str(row["target_symbol"]),
-                str(row["line"]),
-            )
-        )
-    return {str(value) for value in producers}, keys, True
-
-
-def _string_set(packet: Mapping[str, object], key: str) -> set[str]:
-    values = packet.get(key, [])
-    if not isinstance(values, Sequence) or isinstance(values, (str, bytes, bytearray)):
-        return set()
-    return {str(value) for value in values if value}
-
-
-def _native_relationship_delta(
-    before: Mapping[str, object],
-    after: Mapping[str, object],
-    endpoint_issues: Sequence[str],
-) -> dict[str, object]:
-    before_producers, before_relations, before_valid = _native_relation_evidence(before)
-    after_producers, after_relations, after_valid = _native_relation_evidence(after)
-    reasons = []
-    if endpoint_issues:
-        reasons.append("structural-endpoints-incomparable")
-    if not before_valid:
-        reasons.append("before-relationship-observation-incomplete")
-    if not after_valid:
-        reasons.append("after-relationship-observation-incomplete")
-    if not before_producers or before_producers != after_producers:
-        reasons.append("producer-bindings-differ-or-unobserved")
-    comparable = not reasons
-    return {
-        "native_relationships_comparable": comparable,
-        "native_relationships_incomparability_reasons": sorted(set(reasons)),
-        "native_relationships_added": sorted(after_relations - before_relations)
-        if comparable
-        else [],
-        "native_relationships_removed": sorted(before_relations - after_relations)
-        if comparable
-        else [],
-    }
-
-
-@operation_response("structural_locality_delta")
-def structural_locality_delta(
-    before: Mapping[str, object], after: Mapping[str, object]
-) -> dict[str, object]:
-    """Compare two structural-locality packets without interpreting the tradeoff."""
-    issues = _delta_incomparability_reasons(before, after)
-    before_nodes, after_nodes = _delta_nodes(before), _delta_nodes(after)
-    dimension_delta, dimensions_valid = _integer_dimension_delta(
-        before.get("dimensions"), after.get("dimensions")
-    )
-    if not dimensions_valid:
-        issues.append("dimensions")
-    before_verifiers = _string_set(before, "verification_paths")
-    after_verifiers = _string_set(after, "verification_paths")
-    native_delta = _native_relationship_delta(before, after, issues)
-    # No comparable producer at either endpoint means no absence claim.
-    semantic = {
-        "schema": STRUCTURAL_LOCALITY_DELTA_SCHEMA,
-        "target": before.get("target"),
-        "before_evidence_identity": before.get("evidence_identity"),
-        "after_evidence_identity": after.get("evidence_identity"),
-        "before_repository_identity": before.get("repository_identity"),
-        "after_repository_identity": after.get("repository_identity"),
-        "measurement_configuration_identity": before.get(
-            "measurement_configuration_identity"
-        ),
-        "comparable": not issues,
-        "incomparability_reasons": sorted(set(issues)),
-        "introduced_symbol_ids": sorted(set(after_nodes) - set(before_nodes)),
-        "removed_symbol_ids": sorted(set(before_nodes) - set(after_nodes)),
-        "dimension_delta": dimension_delta,
-        "verification_paths_added": sorted(after_verifiers - before_verifiers),
-        "verification_paths_removed": sorted(before_verifiers - after_verifiers),
-        **native_delta,
-        "claims": {
-            "architectural_improvement": False,
-            "refactor_recommendation": False,
-            "consumer_policy_applied": False,
-        },
-    }
-    return {**semantic, "evidence_identity": _identity(semantic)}

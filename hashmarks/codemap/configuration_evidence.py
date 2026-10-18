@@ -5,15 +5,19 @@ import re
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, TypedDict, cast
 
 from .python_ast import estimate_tokens
 from .query_primitives import _TASK_STOPWORDS, _WORD_RE
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Sequence, Set
 
-    from .engine import CodeMap
+    from .repository_tasks import RepositoryTasks
+    from .task_evidence_types import (
+        SourceReadPending,
+        TaskSourceEvidence,
+    )
 
 
 @dataclass
@@ -46,6 +50,14 @@ class _JsonContainerScan:
         return False
 
 
+class _ConfigCandidate(TypedDict):
+    kind: str
+    name: str
+    start: int
+    end: int
+    score: tuple[int, int]
+
+
 class ConfigurationEvidenceMixin:
     """Exact task-local configuration evidence projection.
 
@@ -71,7 +83,7 @@ class ConfigurationEvidenceMixin:
 
     @classmethod
     def _config_candidate_score(
-        cls, name: str, task_terms: frozenset[str]
+        cls, name: str, task_terms: Set[str]
     ) -> tuple[int, int] | None:
         parts = cls._config_name_parts(name)
         if not parts or not set(parts).issubset(task_terms):
@@ -82,7 +94,7 @@ class ConfigurationEvidenceMixin:
         return (len(set(parts)), len(name))
 
     @staticmethod
-    def _yaml_section_end(lines: list[str], start_index: int, indent: int) -> int:
+    def _yaml_section_end(lines: Sequence[str], start_index: int, indent: int) -> int:
         end = start_index
         for index in range(start_index + 1, len(lines)):
             raw = lines[index]
@@ -105,7 +117,7 @@ class ConfigurationEvidenceMixin:
 
     @staticmethod
     def _json_value_end(
-        lines: list[str], start_index: int, value_text: str
+        lines: Sequence[str], start_index: int, value_text: str
     ) -> int | None:
         stripped = value_text.strip()
         if not stripped:
@@ -131,8 +143,8 @@ class ConfigurationEvidenceMixin:
         return None
 
     def _toml_key_candidate(
-        self, raw: str, index: int, section: str, task_terms: set[str]
-    ) -> dict[str, object] | None:
+        self, raw: str, index: int, section: str, task_terms: Set[str]
+    ) -> _ConfigCandidate | None:
         match = re.match(
             r'^\s*([A-Za-z0-9_.-]+|"[^"]+"|\'[^\']+\')\s*=\s*(.+?)\s*$', raw
         )
@@ -161,14 +173,14 @@ class ConfigurationEvidenceMixin:
         self,
         source: str,
         lines: Sequence[str],
-        task_terms: set[str],
-    ) -> list[dict[str, object]] | None:
+        task_terms: Set[str],
+    ) -> list[_ConfigCandidate] | None:
         """Return exact TOML key/section candidates, or None for invalid syntax."""
         try:
             tomllib.loads(source)
         except tomllib.TOMLDecodeError:
             return None
-        candidates: list[dict[str, object]] = []
+        candidates: list[_ConfigCandidate] = []
         section = ""
         headers: list[tuple[int, str]] = []
         for index, raw in enumerate(lines):
@@ -206,14 +218,14 @@ class ConfigurationEvidenceMixin:
         self,
         source: str,
         lines: Sequence[str],
-        task_terms: set[str],
-    ) -> list[dict[str, object]] | None:
+        task_terms: Set[str],
+    ) -> list[_ConfigCandidate] | None:
         """Return exact JSON key ranges, or None for invalid syntax."""
         try:
             json.loads(source)
         except json.JSONDecodeError:
             return None
-        candidates: list[dict[str, object]] = []
+        candidates: list[_ConfigCandidate] = []
         for index, raw in enumerate(lines):
             match = re.match(r'^\s*"([^"\\]+)"\s*:\s*(.*)$', raw)
             if not match:
@@ -238,10 +250,10 @@ class ConfigurationEvidenceMixin:
     def _yaml_config_candidates(
         self,
         lines: Sequence[str],
-        task_terms: set[str],
-    ) -> list[dict[str, object]]:
+        task_terms: Set[str],
+    ) -> list[_ConfigCandidate]:
         """Return indentation-bounded YAML key/section candidates."""
-        candidates: list[dict[str, object]] = []
+        candidates: list[_ConfigCandidate] = []
         stack: list[tuple[int, str]] = []
         for index, raw in enumerate(lines):
             if (
@@ -288,8 +300,8 @@ class ConfigurationEvidenceMixin:
         return candidates
 
     def _config_candidates(
-        self, source: str, suffix: str, task_terms: set[str]
-    ) -> list[dict[str, object]] | None:
+        self, source: str, suffix: str, task_terms: Set[str]
+    ) -> list[_ConfigCandidate] | None:
         lines = source.splitlines()
         if suffix == ".toml":
             return self._toml_config_candidates(source, lines, task_terms)
@@ -303,9 +315,9 @@ class ConfigurationEvidenceMixin:
         role: str,
         suffix: str,
         source: str,
-        candidates: list[dict[str, object]],
+        candidates: list[_ConfigCandidate],
         token_budget: int,
-    ) -> tuple[dict[str, object] | None, dict[str, object] | None]:
+    ) -> tuple[TaskSourceEvidence | None, SourceReadPending | None]:
         if not candidates:
             return None, {
                 "role": role,
@@ -335,7 +347,7 @@ class ConfigurationEvidenceMixin:
         if source.endswith("\n") and end == len(lines) - 1:
             content += "\n"
         estimated_tokens = estimate_tokens(content)
-        pending = {
+        pending: SourceReadPending = {
             "role": role,
             "path": path,
             "lines": [start + 1, end + 1],
@@ -368,7 +380,7 @@ class ConfigurationEvidenceMixin:
         task: str,
         role: str,
         token_budget: int,
-    ) -> tuple[dict[str, object] | None, dict[str, object] | None]:
+    ) -> tuple[TaskSourceEvidence | None, SourceReadPending | None]:
         """Project an exact task-mentioned config key/section from one owner.
 
         This runs only after ``task_action_map`` has already selected ``path``.
@@ -378,7 +390,7 @@ class ConfigurationEvidenceMixin:
         be unique.  Unsupported/ambiguous syntax remains an explicit next-read.
         """
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryTasks", self)
         suffix = Path(path).suffix.lower()
         if suffix not in {".toml", ".json", ".yaml", ".yml"} or not task.strip():
             return None, None
@@ -394,7 +406,7 @@ class ConfigurationEvidenceMixin:
         # If this changes the CodeMap generation, task_evidence marks the
         # packet stale rather than pretending the earlier ownership decision
         # remained generation-bound.
-        self._ensure_path_current(path)
+        self.source.ensure_current(path)
         try:
             source = (self.workspace / path).read_text(encoding="utf-8")
         except (OSError, PermissionError, FileNotFoundError):

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import re
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -195,7 +196,7 @@ def test_mcp_contract_identity_binds_wire_schema_and_server_version() -> None:
     ],
 )
 def test_mcp_contract_rejects_independent_catalog_drift(
-    mutation,
+    mutation: Callable[[object], object],
     message: str,
 ) -> None:
     observation = _observation()
@@ -235,7 +236,7 @@ def test_mcp_contract_rejects_independent_catalog_drift(
 )
 def test_mcp_contract_rejects_native_result_mode_schema_drift(
     name: str,
-    mutation,
+    mutation: Callable[[object], object],
     message: str,
 ) -> None:
     observation = _observation()
@@ -327,7 +328,7 @@ def test_host_schema_expectations_derive_from_canonical_contract() -> None:
 
 
 def test_mcp_tool_projection_is_canonical_order_and_identity_bound() -> None:
-    canonical = {
+    canonical: dict[str, object] = {
         "contract_identity": "sha256:canonical",
     }
     assert normalize_mcp_tool_names(["task_evidence", "find"]) == (
@@ -350,7 +351,7 @@ def test_mcp_tool_projection_is_canonical_order_and_identity_bound() -> None:
 
 
 def test_mcp_query_surface_projection_is_canonical_and_identity_bound() -> None:
-    canonical = {"contract_identity": "sha256:canonical"}
+    canonical: dict[str, object] = {"contract_identity": "sha256:canonical"}
 
     assert normalize_mcp_query_surfaces(["verification-explanation", "freshness"]) == (
         "verification-explanation",
@@ -377,7 +378,7 @@ def test_mcp_query_surface_projection_is_canonical_and_identity_bound() -> None:
 
 
 def test_mcp_query_surface_projection_rejects_invalid_authority() -> None:
-    canonical = {"contract_identity": "sha256:canonical"}
+    canonical: dict[str, object] = {"contract_identity": "sha256:canonical"}
 
     with pytest.raises(ValueError, match="at least one surface"):
         normalize_mcp_query_surfaces([])
@@ -394,7 +395,7 @@ def test_mcp_query_surface_projection_rejects_invalid_authority() -> None:
 
 
 def test_query_surface_projection_does_not_change_legacy_tool_projection() -> None:
-    canonical = {"contract_identity": "sha256:canonical"}
+    canonical: dict[str, object] = {"contract_identity": "sha256:canonical"}
     legacy = mcp_projection_summary(canonical, ("task_evidence",))
 
     assert "repository_intelligence_query_surfaces" not in legacy

@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from contract_assertions import assert_records
 
 from hashmarks.codemap import CodeMap
 
@@ -21,12 +22,12 @@ def _dependency_path(root: Path) -> Path:
 
 
 def _simulate_historical_dependency_row(
-    codemap: CodeMap, rel: str, monkeypatch
+    codemap: CodeMap, rel: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    original = codemap._path_admitted_for_analysis
-    monkeypatch.setattr(codemap, "_path_admitted_for_analysis", lambda _rel: True)
-    assert codemap.outline(rel)["path"] == rel
-    monkeypatch.setattr(codemap, "_path_admitted_for_analysis", original)
+    original = codemap.files.is_admitted
+    monkeypatch.setattr(codemap.files, "is_admitted", lambda _rel: True)
+    assert codemap.source.outline(rel)["path"] == rel
+    monkeypatch.setattr(codemap.files, "is_admitted", original)
     codemap.store.set_meta(
         "analysis_scope_conformance_identity", "historical-pre-hm303"
     )
@@ -42,16 +43,16 @@ def test_global_queries_retire_historical_pruned_rows_before_returning_evidence(
     rel = dependency.relative_to(tmp_path).as_posix()
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         _simulate_historical_dependency_row(codemap, rel, monkeypatch)
         assert rel in codemap.store.paths()
 
-        assert codemap.find("dependency_impl") == ()
+        assert codemap.search.find("dependency_impl") == ()
         assert rel not in codemap.store.paths()
         with pytest.raises(KeyError, match="symbol not found"):
-            codemap.symbol("dependency_impl")
-        assert codemap.derived_graph(rel)["nodes"] == []
-        assert {hit.path for hit in codemap.find("owned")} == {"src/app.py"}
+            codemap.source.symbol("dependency_impl")
+        assert codemap.index.derived_graph(rel)["nodes"] == []
+        assert {hit.path for hit in codemap.search.find("owned")} == {"src/app.py"}
 
 
 def test_stable_scope_identity_avoids_repeated_repository_map_scan(
@@ -59,7 +60,7 @@ def test_stable_scope_identity_avoids_repeated_repository_map_scan(
 ) -> None:
     _write(tmp_path / "src" / "app.py", "def owned():\n    return 1\n")
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         identity = codemap.store.meta("analysis_scope_conformance_identity")
         assert identity and identity.startswith("sha256:")
         with patch.object(
@@ -67,8 +68,11 @@ def test_stable_scope_identity_avoids_repeated_repository_map_scan(
             "paths",
             side_effect=AssertionError("stable scope must not rescan persisted paths"),
         ):
-            assert {hit.path for hit in codemap.find("owned")} == {"src/app.py"}
-            assert codemap.symbol("owned")["matches"][0]["path"] == "src/app.py"
+            assert {hit.path for hit in codemap.search.find("owned")} == {"src/app.py"}
+            assert (
+                assert_records(codemap.source.symbol("owned")["matches"])[0]["path"]
+                == "src/app.py"
+            )
 
 
 @pytest.mark.parametrize("paths", [None, ["src/app.py"]])
@@ -78,14 +82,14 @@ def test_scope_reconciliation_persists_one_complete_conformance_snapshot(
     _write(tmp_path / "src/app.py", "def owned():\n    return 1\n")
     _write(tmp_path / "src/other.py", "def other():\n    return 2\n")
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         codemap.store.set_meta("analysis_scope_conformance_identity", "old-scope")
         with patch.object(
-            codemap,
+            codemap.index,
             "_analysis_scope_conformance_payload",
-            wraps=codemap._analysis_scope_conformance_payload,
+            wraps=codemap.index._analysis_scope_conformance_payload,
         ) as observe:
-            result = codemap.sync(paths)
+            result = codemap.index.sync(paths)
         assert observe.call_count == 1
         assert result.discovered == 2
         encoded = codemap.store.meta("analysis_scope_conformance_payload")
@@ -108,7 +112,7 @@ def test_context_policy_change_retires_historical_rows_on_reopen(
     artifact_db = tmp_path / "artifacts.sqlite3"
 
     with CodeMap(tmp_path, state_dir=state_dir, artifact_db=artifact_db) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         assert "private/hidden.py" in codemap.store.paths()
         assert "src/node_modules_adapter.py" in codemap.store.paths()
 
@@ -118,9 +122,9 @@ def test_context_policy_change_retires_historical_rows_on_reopen(
     )
 
     with CodeMap(tmp_path, state_dir=state_dir, artifact_db=artifact_db) as codemap:
-        assert codemap.find("hidden") == ()
+        assert codemap.search.find("hidden") == ()
         assert "private/hidden.py" not in codemap.store.paths()
-        assert {hit.path for hit in codemap.find("adapter")} == {
+        assert {hit.path for hit in codemap.search.find("adapter")} == {
             "src/node_modules_adapter.py"
         }
 
@@ -132,16 +136,17 @@ def test_live_context_policy_deny_converges_without_reopening_codemap(
     _write(hidden, "def hidden_owner():\n    return 2\n")
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         assert (
-            codemap.symbol("hidden_owner")["matches"][0]["path"] == "private/hidden.py"
+            assert_records(codemap.source.symbol("hidden_owner")["matches"])[0]["path"]
+            == "private/hidden.py"
         )
         (tmp_path / ".hashmarks-context.toml").write_text(
             '[[rule]]\npattern = "private/**"\nindex = false\n',
             encoding="utf-8",
         )
         with pytest.raises(KeyError, match="symbol not found"):
-            codemap.symbol("hidden_owner")
+            codemap.source.symbol("hidden_owner")
         assert "private/hidden.py" not in codemap.store.paths()
 
 
@@ -157,12 +162,13 @@ def test_live_context_policy_reallow_discovers_newly_admitted_paths(
     )
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(KeyError, match="symbol not found"):
-            codemap.symbol("hidden_owner")
+            codemap.source.symbol("hidden_owner")
         policy.unlink()
         assert (
-            codemap.symbol("hidden_owner")["matches"][0]["path"] == "private/hidden.py"
+            assert_records(codemap.source.symbol("hidden_owner")["matches"])[0]["path"]
+            == "private/hidden.py"
         )
 
 
@@ -179,14 +185,14 @@ def test_live_custom_context_policy_path_is_authority_not_construction_snapshot(
         policy_path=policy,
         artifact_db=tmp_path / "artifacts.sqlite3",
     ) as codemap:
-        codemap.sync()
-        assert codemap.symbol("hidden_owner")["matches"]
+        codemap.index.sync()
+        assert codemap.source.symbol("hidden_owner")["matches"]
         policy.write_text(
             '[[rule]]\npattern = "private/**"\nindex = false\n',
             encoding="utf-8",
         )
         with pytest.raises(KeyError, match="symbol not found"):
-            codemap.symbol("hidden_owner")
+            codemap.source.symbol("hidden_owner")
 
 
 def test_invalid_live_context_policy_fails_closed_before_persisted_evidence(
@@ -195,8 +201,8 @@ def test_invalid_live_context_policy_fails_closed_before_persisted_evidence(
     _write(tmp_path / "src" / "app.py", "def owned():\n    return 1\n")
     policy = tmp_path / ".hashmarks-context.toml"
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
-        assert codemap.symbol("owned")["matches"]
+        codemap.index.sync()
+        assert codemap.source.symbol("owned")["matches"]
         policy.write_text("[[rule]\n", encoding="utf-8")
         with pytest.raises(tomllib.TOMLDecodeError):
-            codemap.symbol("owned")
+            codemap.source.symbol("owned")

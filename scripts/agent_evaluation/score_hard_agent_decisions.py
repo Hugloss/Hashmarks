@@ -29,10 +29,10 @@ def _freeze_packets(
     frozen: list[dict[str, Any]] = []
     with CodeMap(repo) as codemap:
         sync_started = time.perf_counter()
-        codemap.sync()
+        codemap.index.sync()
         sync_ms = (time.perf_counter() - sync_started) * 1000
         for task in tasks:
-            packet = codemap.task_decision_packet(
+            packet = codemap.tasks.decision_packet(
                 str(task["query"]), token_budget=token_budget
             )
             frozen.append({"id": str(task["id"]), "packet": packet})

@@ -165,6 +165,12 @@ def _percentile(values: list[float], p: float) -> float | None:
     return ordered[lo] + (ordered[hi] - ordered[lo]) * (index - lo)
 
 
+def _number(value: object) -> float:
+    if not isinstance(value, (int, float, str)) or isinstance(value, bool):
+        raise ValueError("economics measurements must be numeric")
+    return float(value)
+
+
 def _summary(rows: list[dict[str, object]]) -> list[dict[str, object]]:
     by_key: dict[tuple[str, str], dict[str, dict[str, object]]] = {}
     for row in rows:
@@ -179,12 +185,12 @@ def _summary(rows: list[dict[str, object]]) -> list[dict[str, object]]:
             for pair in paired
             if pair["native"].get(metric) is not None
             and pair["hashmarks"].get(metric) is not None
-            and float(pair["native"][metric]) > 0
+            and _number(pair["native"][metric]) > 0
         ]
         reductions = [
             100.0
-            * (float(pair["native"][metric]) - float(pair["hashmarks"][metric]))
-            / float(pair["native"][metric])
+            * (_number(pair["native"][metric]) - _number(pair["hashmarks"][metric]))
+            / _number(pair["native"][metric])
             for pair in usable
         ]
         out.append(
@@ -205,7 +211,7 @@ def _summary(rows: list[dict[str, object]]) -> list[dict[str, object]]:
         lane_rows = [row for row in rows if row["condition"] == lane]
         successes = sum(bool(row["joint_success"]) for row in lane_rows)
         tokens = [
-            float(row["total_tokens"])
+            _number(row["total_tokens"])
             for row in lane_rows
             if row["total_tokens"] is not None
         ]

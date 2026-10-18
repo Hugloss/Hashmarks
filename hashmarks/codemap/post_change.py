@@ -4,7 +4,7 @@ import time
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Literal, cast
 
 from hashmarks.evidence_context import validate_evidence_context
 from hashmarks.operation_contract import (
@@ -14,13 +14,23 @@ from hashmarks.operation_contract import (
 )
 from hashmarks.paths import normalize_relative_path
 
-from .change_impact import ChangeImpactMixin
+from .change_impact import ChangeImpactMixin, _reported_change_paths
+from .decision_session import ReadScope
 from .evidence_packet import TASK_EVIDENCE_DEFAULT_OPTIONS
+from .repository_observation import packet_digest
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from .engine import CodeMap
+    from .repository_changes import RepositoryChanges
+    from .task_evidence_types import (
+        PreviousTaskEvidence,
+        TaskEvidencePacket,
+        TaskEvidenceProvenance,
+        TaskPathChange,
+        TaskPostChangeDelta,
+        TaskPostChangeReplacement,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,7 +88,7 @@ class PostChangeMixin(ChangeImpactMixin):
 
     def _post_change_attach_relationship_evidence(
         self,
-        result: dict[str, object],
+        result: TaskPostChangeDelta,
         previous: Mapping[str, object],
         current: Mapping[str, object],
     ) -> None:
@@ -86,55 +96,39 @@ class PostChangeMixin(ChangeImpactMixin):
         if relationships is None:
             return
         result["semantic_relationships"] = relationships
-        key = "invalidated" if relationships["changed"] else "reused"
-        cast("list[str]", result[key]).append("semantic-relationship-evidence")
+        key: Literal["invalidated", "reused"] = (
+            "invalidated" if relationships["changed"] else "reused"
+        )
+        result[key].append("semantic-relationship-evidence")
         if relationships["changed"]:
             result["change"] = "changed"
 
     @staticmethod
     def _post_change_previous_value(packet: Mapping[str, object], key: str) -> object:
-        ownership = (
-            packet.get("ownership")
-            if isinstance(packet.get("ownership"), Mapping)
-            else {}
-        )
-        verification = (
-            packet.get("verification")
-            if isinstance(packet.get("verification"), Mapping)
-            else {}
-        )
+        ownership = packet.get("ownership")
+        ownership = ownership if isinstance(ownership, Mapping) else {}
+        verification = packet.get("verification")
+        verification = verification if isinstance(verification, Mapping) else {}
         value = packet.get(key)
         if key == "candidate_path":
-            candidate = (
-                ownership.get("candidate")
-                if isinstance(ownership.get("candidate"), Mapping)
-                else {}
-            )
+            candidate = ownership.get("candidate")
+            candidate = candidate if isinstance(candidate, Mapping) else {}
             value = str(candidate.get("path") or "") or None
         elif key == "candidate_basis":
             value = str(ownership.get("candidate_basis") or "") or None
         elif key == "owner_path":
-            owner = (
-                ownership.get("owner")
-                if isinstance(ownership.get("owner"), Mapping)
-                else {}
-            )
+            owner = ownership.get("owner")
+            owner = owner if isinstance(owner, Mapping) else {}
             value = str(owner.get("path") or "") or None
         elif key == "owner_basis":
             value = str(ownership.get("basis") or "") or None
         elif key == "verification_path":
-            selected = (
-                verification.get("selected")
-                if isinstance(verification.get("selected"), Mapping)
-                else {}
-            )
+            selected = verification.get("selected")
+            selected = selected if isinstance(selected, Mapping) else {}
             value = str(selected.get("path") or "") or None
         elif key == "verification_argv":
-            plan = (
-                verification.get("plan")
-                if isinstance(verification.get("plan"), Mapping)
-                else {}
-            )
+            plan = verification.get("plan")
+            plan = plan if isinstance(plan, Mapping) else {}
             argv = plan.get("argv")
             value = (
                 tuple(str(item) for item in argv) if isinstance(argv, list) else None
@@ -177,10 +171,10 @@ class PostChangeMixin(ChangeImpactMixin):
         self, paths: Sequence[str]
     ) -> dict[str, str | None]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryChanges", self)
         revisions: dict[str, str | None] = {}
         for path in paths:
-            row = self._session_file_row(path)
+            row = self.reads.file_row(path)
             revisions[path] = (
                 None
                 if row is None or not row["file_digest"]
@@ -192,12 +186,12 @@ class PostChangeMixin(ChangeImpactMixin):
         self,
         paths: Sequence[str],
         before_revisions: Mapping[str, str | None],
-    ) -> list[dict[str, object]]:
+    ) -> list[TaskPathChange]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        changes: list[dict[str, object]] = []
+            self = cast("RepositoryChanges", self)
+        changes: list[TaskPathChange] = []
         for path in paths:
-            row = self._session_file_row(path)
+            row = self.reads.file_row(path)
             after_revision = (
                 None
                 if row is None or not row["file_digest"]
@@ -214,7 +208,7 @@ class PostChangeMixin(ChangeImpactMixin):
                 state = "unchanged"
             else:
                 state = "changed"
-            item: dict[str, object] = {"path": path, "state": state}
+            item: TaskPathChange = {"path": path, "state": state}
             if state in {"added", "changed"} and after_revision is not None:
                 item["revision"] = after_revision
             changes.append(item)
@@ -229,23 +223,27 @@ class PostChangeMixin(ChangeImpactMixin):
         *,
         generation_before: int,
     ) -> list[str]:
+        if TYPE_CHECKING:
+            self = cast("RepositoryChanges", self)
         reasons: list[str] = []
         if (
             str(receipt.get("repository_identity") or "")
-            != self._repository_packet_identity()
+            != self.reads.repository_identity()
         ):
             reasons.append("repository-mismatch")
-        expected_task = self._packet_digest("hashmarks.task.v1", {"task": task})
+        expected_task = packet_digest("hashmarks.task.v1", {"task": task})
         if str(receipt.get("task_identity") or "") != expected_task:
             reasons.append("task-mismatch")
         if receipt.get("codemap_generation") != generation_before:
             reasons.append("codemap-generation-mismatch")
         context = validate_evidence_context(receipt, provenance)
         if not context["valid"]:
-            reasons.extend(str(reason) for reason in context["reasons"])
+            reasons.extend(
+                str(reason) for reason in cast("Sequence[str]", context["reasons"])
+            )
         packet_identity = previous_evidence.get("evidence_packet_identity")
         packet_schema = str(previous_evidence.get("schema") or "")
-        expected_packet_identity = "sha256:" + self._packet_digest(
+        expected_packet_identity = "sha256:" + packet_digest(
             packet_schema,
             {
                 key: value
@@ -286,11 +284,11 @@ class PostChangeMixin(ChangeImpactMixin):
 
     def _post_change_previous_index_binding(
         self,
-        previous_evidence: dict[str, object],
+        previous_evidence: Mapping[str, object],
         previous_provenance: Mapping[str, object],
     ) -> tuple[str, str | None]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryChanges", self)
         previous_candidate = self._post_change_previous_value(
             previous_evidence, "candidate_path"
         )
@@ -301,7 +299,7 @@ class PostChangeMixin(ChangeImpactMixin):
         )
         if not isinstance(previous_candidate, str) or not previous_revision:
             return "unbound", previous_revision
-        row = self._session_file_row(previous_candidate)
+        row = self.reads.file_row(previous_candidate)
         indexed_before = (
             None if row is None or not row["file_digest"] else str(row["file_digest"])
         )
@@ -316,37 +314,30 @@ class PostChangeMixin(ChangeImpactMixin):
         limit: int,
         per_role: int,
         token_budget: int,
-    ) -> tuple[dict[str, object], Mapping[str, object], str]:
+    ) -> tuple[TaskEvidencePacket, TaskEvidenceProvenance, str]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        current = self.task_evidence(
+            self = cast("RepositoryChanges", self)
+        current = self.tasks.evidence(
             task,
             limit=limit,
             per_role=per_role,
             token_budget=token_budget,
         )
-        provenance = (
-            current.get("provenance")
-            if isinstance(current.get("provenance"), Mapping)
-            else {}
-        )
-        ownership = (
-            current.get("ownership")
-            if isinstance(current.get("ownership"), Mapping)
-            else {}
-        )
+        provenance = current["provenance"]
+        ownership = current.get("ownership")
+        ownership = ownership if isinstance(ownership, Mapping) else {}
         return current, provenance, str(ownership.get("status") or "unresolved")
 
     def _post_change_evidence_diff(
         self,
-        previous_evidence: dict[str, object],
-        current: dict[str, object],
+        previous_evidence: Mapping[str, object],
+        current: TaskEvidencePacket,
         previous_provenance: Mapping[str, object],
-        provenance: Mapping[str, object],
+        provenance: TaskEvidenceProvenance,
         *,
         generation_changed: bool,
         previous_revision: str | None,
-    ) -> tuple[list[str], list[str], dict[str, object]]:
+    ) -> tuple[list[str], list[str], TaskPostChangeReplacement]:
         invalidated, reused, ownership_changed, verification_changed = (
             self._post_change_authority_diff(
                 previous_evidence,
@@ -354,12 +345,12 @@ class PostChangeMixin(ChangeImpactMixin):
                 generation_changed=generation_changed,
             )
         )
-        replacement: dict[str, object] = {}
+        replacement: TaskPostChangeReplacement = {}
 
-        if ownership_changed and isinstance(current.get("ownership"), Mapping):
-            replacement["ownership"] = dict(current["ownership"])
-        if verification_changed and isinstance(current.get("verification"), Mapping):
-            replacement["verification"] = dict(current["verification"])
+        if ownership_changed:
+            replacement["ownership"] = current["ownership"].copy()
+        if verification_changed:
+            replacement["verification"] = current["verification"].copy()
 
         previous_why = (
             str(previous_provenance.get("why"))
@@ -383,64 +374,57 @@ class PostChangeMixin(ChangeImpactMixin):
         if previous_why != current_why or self._post_change_previous_value(
             previous_evidence, "candidate_path"
         ) != self._post_change_previous_value(current, "candidate_path"):
-            replacement["provenance"] = {
-                key: provenance[key] for key in ("why", "revision") if key in provenance
-            }
+            replacement["provenance"] = (
+                {"why": provenance["why"], "revision": provenance["revision"]}
+                if "revision" in provenance
+                else {"why": provenance["why"]}
+            )
         return invalidated, reused, replacement
 
-    def task_post_change_delta(
+    def task_delta(
         self,
         task: str,
         changed_paths: Sequence[str | Path],
         *,
-        previous_evidence: dict[str, object],
+        previous_evidence: PreviousTaskEvidence,
         limit: int = TASK_EVIDENCE_DEFAULT_OPTIONS.limit,
         per_role: int = TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
         token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
-    ) -> dict[str, object]:
+    ) -> TaskPostChangeDelta:
         """Refresh changed paths and report role-separated evidence invalidation."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryChanges", self)
         if token_budget < 1:
             raise ValueError("token_budget must be >= 1")
         if not isinstance(previous_evidence, dict) or previous_evidence.get(
             "schema"
-        ) not in {"hashmarks.task-evidence.v4", operation_schema("task_evidence")}:
+        ) != operation_schema("task_evidence"):
             raise ValueError(
-                "previous_evidence must be a hashmarks.task-evidence.v4 "
-                f"or {operation_schema('task_evidence')} packet"
+                f"previous_evidence must be a {operation_schema('task_evidence')} packet"
             )
-        normalized = tuple(
-            dict.fromkeys(
-                normalize_relative_path(path, allow_root=False)
-                for path in changed_paths
-            )
-        )
-        if not normalized:
-            raise ValueError(
-                "changed_paths must contain at least one repository-relative path"
-            )
+        normalized = _reported_change_paths(changed_paths)
 
         generation_before = self.store.generation()
-        self._validate_post_change_previous_evidence(
-            task,
-            previous_evidence,
-            generation_before=generation_before,
-        )
-        before_revisions = self._post_change_revision_snapshot(normalized)
-        previous_provenance = (
-            previous_evidence.get("provenance")
-            if isinstance(previous_evidence.get("provenance"), Mapping)
-            else {}
-        )
-        previous_index_binding, previous_revision = (
-            self._post_change_previous_index_binding(
+        with self.reads.session(expected_generation=generation_before):
+            self._validate_post_change_previous_evidence(
+                task,
                 previous_evidence,
-                previous_provenance,
+                generation_before=generation_before,
             )
-        )
-        sync_result = self.sync(normalized)
-        with self.decision_session(expected_generation=sync_result.generation):
+            before_revisions = self._post_change_revision_snapshot(normalized)
+            previous_provenance = previous_evidence.get("provenance")
+            previous_provenance = (
+                previous_provenance if isinstance(previous_provenance, Mapping) else {}
+            )
+            previous_index_binding, previous_revision = (
+                self._post_change_previous_index_binding(
+                    previous_evidence,
+                    previous_provenance,
+                )
+            )
+        sync_result = self.index.sync(normalized)
+
+        def observe(scope: ReadScope) -> TaskPostChangeDelta:
             current, provenance, ownership_status = self._post_change_current_evidence(
                 task,
                 limit=limit,
@@ -452,10 +436,10 @@ class PostChangeMixin(ChangeImpactMixin):
                 current,
                 previous_provenance,
                 provenance,
-                generation_changed=sync_result.generation != generation_before,
+                generation_changed=scope.generation != generation_before,
                 previous_revision=previous_revision,
             )
-            result: dict[str, object] = {
+            result: TaskPostChangeDelta = {
                 "schema": operation_schema("post_change"),
                 "change": "changed" if invalidated else "unchanged",
                 "ownership_status": ownership_status,
@@ -463,14 +447,10 @@ class PostChangeMixin(ChangeImpactMixin):
                     normalized, before_revisions
                 ),
                 "generation_before": generation_before,
-                "generation_after": sync_result.generation,
+                "generation_after": scope.generation,
                 "invalidated": invalidated,
                 "reused": reused,
-                "freshness": str(
-                    current["freshness"].get("state") or "unknown"
-                    if isinstance(current.get("freshness"), Mapping)
-                    else "unknown"
-                ),
+                "freshness": str(current["freshness"].get("state") or "unknown"),
                 "scope": "changed-paths-only",
                 "consumer_owner": "external",
             }
@@ -493,10 +473,13 @@ class PostChangeMixin(ChangeImpactMixin):
                 }
             if replacement:
                 result["replacement"] = replacement
-            return validate_operation_response("post_change", result)
+            validate_operation_response("post_change", result)
+            return result
+
+        return self.reads.observe(observe, expected_generation=sync_result.generation)
 
     @operation_response("refresh_after_change_delta")
-    def refresh_after_change_delta(
+    def refresh_delta(
         self,
         task: str,
         changed_paths: Sequence[str | Path],
@@ -504,30 +487,21 @@ class PostChangeMixin(ChangeImpactMixin):
         options: PostChangeOptions = POST_CHANGE_DEFAULT_OPTIONS,
     ) -> dict[str, object]:
         """Refresh changed paths and expose only changed action anchors."""
-        self = cast("CodeMap", self)
-        normalized = tuple(
-            dict.fromkeys(
-                normalize_relative_path(path, allow_root=False)
-                for path in changed_paths
-            )
-        )
-        if not normalized:
-            raise ValueError(
-                "changed_paths must contain at least one repository-relative path"
-            )
-        before = self.store.generation()
-        sync_result = self.sync(normalized)
-        with self.decision_session(expected_generation=sync_result.generation):
-            brief = self.task_decision_brief(
+        self = cast("RepositoryChanges", self)
+        normalized = _reported_change_paths(changed_paths)
+        sync_result = self.index.sync(normalized)
+
+        def observe(scope: ReadScope) -> dict[str, object]:
+            brief = self.tasks.decision_brief(
                 task,
                 limit=options.limit,
                 per_role=options.per_role,
                 token_budget=options.token_budget,
             )
-            edit = brief.get("edit") if isinstance(brief.get("edit"), dict) else None
-            verify = (
-                brief.get("verify") if isinstance(brief.get("verify"), dict) else None
-            )
+            edit = brief.get("edit")
+            edit = edit if isinstance(edit, dict) else None
+            verify = brief.get("verify")
+            verify = verify if isinstance(verify, dict) else None
             current_edit = str(edit.get("path")) if edit and edit.get("path") else None
             current_verify = (
                 str(verify.get("path")) if verify and verify.get("path") else None
@@ -545,7 +519,7 @@ class PostChangeMixin(ChangeImpactMixin):
             result: dict[str, object] = {
                 "schema": operation_schema("refresh_after_change_delta"),
                 "changed_paths": list(normalized),
-                "generation": sync_result.generation,
+                "generation": scope.generation,
             }
             if edit is not None and current_edit != prior_edit:
                 result["edit"] = dict(edit)
@@ -563,8 +537,10 @@ class PostChangeMixin(ChangeImpactMixin):
                 result["safe"] = False
             return result
 
+        return self.reads.observe(observe, expected_generation=sync_result.generation)
+
     @operation_response("refresh_after_change_brief")
-    def refresh_after_change_brief(
+    def refresh_brief(
         self,
         task: str,
         changed_paths: Sequence[str | Path],
@@ -575,23 +551,15 @@ class PostChangeMixin(ChangeImpactMixin):
     ) -> dict[str, object]:
         """Refresh changed paths and return a compact post-refresh decision."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        normalized = tuple(
-            dict.fromkeys(
-                normalize_relative_path(path, allow_root=False)
-                for path in changed_paths
-            )
-        )
-        if not normalized:
-            raise ValueError(
-                "changed_paths must contain at least one repository-relative path"
-            )
+            self = cast("RepositoryChanges", self)
+        normalized = _reported_change_paths(changed_paths)
         before = self.store.generation()
         started = time.perf_counter()
-        sync_result = self.sync(normalized)
+        sync_result = self.index.sync(normalized)
         refresh_ms = (time.perf_counter() - started) * 1000.0
-        with self.decision_session(expected_generation=sync_result.generation):
-            brief = self.task_decision_brief(
+
+        def observe(scope: ReadScope) -> dict[str, object]:
+            brief = self.tasks.decision_brief(
                 task,
                 limit=limit,
                 per_role=per_role,
@@ -601,15 +569,17 @@ class PostChangeMixin(ChangeImpactMixin):
                 "schema": operation_schema("refresh_after_change_brief"),
                 "changed_paths": list(normalized),
                 "generation_before": before,
-                "generation_after": sync_result.generation,
+                "generation_after": scope.generation,
                 "refresh_ms": refresh_ms,
                 "decision_brief": brief,
                 "scope": "changed-paths-only",
                 "consumer_owner": "external",
             }
 
+        return self.reads.observe(observe, expected_generation=sync_result.generation)
+
     @operation_response("refresh_after_change")
-    def refresh_after_change(
+    def refresh(
         self,
         task: str,
         changed_paths: Sequence[str | Path],
@@ -624,23 +594,15 @@ class PostChangeMixin(ChangeImpactMixin):
         owns only incremental repository evidence refresh and evidence regeneration.
         """
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        normalized = tuple(
-            dict.fromkeys(
-                normalize_relative_path(path, allow_root=False)
-                for path in changed_paths
-            )
-        )
-        if not normalized:
-            raise ValueError(
-                "changed_paths must contain at least one repository-relative path"
-            )
+            self = cast("RepositoryChanges", self)
+        normalized = _reported_change_paths(changed_paths)
         before = self.store.generation()
         started = time.perf_counter()
-        sync_result = self.sync(normalized)
+        sync_result = self.index.sync(normalized)
         refresh_ms = (time.perf_counter() - started) * 1000.0
-        with self.decision_session(expected_generation=sync_result.generation):
-            packet = self.task_decision_packet(
+
+        def observe(scope: ReadScope) -> dict[str, object]:
+            packet = self.tasks.decision_packet(
                 task,
                 limit=limit,
                 per_role=per_role,
@@ -650,10 +612,12 @@ class PostChangeMixin(ChangeImpactMixin):
                 "schema": operation_schema("refresh_after_change"),
                 "changed_paths": list(normalized),
                 "generation_before": before,
-                "generation_after": sync_result.generation,
+                "generation_after": scope.generation,
                 "refresh_ms": refresh_ms,
                 "sync": sync_result.as_dict(),
                 "packet": packet,
                 "scope": "changed-paths-only",
                 "consumer_owner": "external",
             }
+
+        return self.reads.observe(observe, expected_generation=sync_result.generation)

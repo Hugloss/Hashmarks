@@ -1,0 +1,113 @@
+{
+  "capability_reviewed": false,
+  "model_stage_unit_count": 8,
+  "oracle_file": "source-oracles.json",
+  "oracle_sha256": "48af886a74bf5a5c444414c70a631ae06d0dac6364813fa0b80fd58c15f2451c",
+  "problem_count": 3,
+  "qualification_effect": "no capability promotion, review flag, expected fact, threshold or witness membership changed",
+  "repository_count": 3,
+  "review_method": "stable cached Python AST and direct source-span SHA-256; complete pinned repository-content identities recomputed separately",
+  "runtime_validation": "not-established",
+  "schema": "hashmarks.backend-model-source-review.v1",
+  "scope": "source-only review of the existing model oracle; identity, class/range, annotation and literal/call syntax; no observer output used",
+  "sources": {
+    "fastapi-dict-exclude-defaults-after": {
+      "commit": "aadfcce76380ab169fe172d5cda21722e53c4924",
+      "repository_content_identity": "sha256:2f615ba2fb85aaf8b0b9ff1b3577150ebbf786798df49be2cb6481eb9c65dce5:3134"
+    },
+    "fastapi-dict-exclude-defaults-before": {
+      "commit": "4ffd45172059cb32c3326cedde2c7ecf579c5db8",
+      "repository_content_identity": "sha256:2ce7cfa1a7a0340ea62a8a38237ef804b5092124e9fd3b0f9bff4f3272683ca9:3134"
+    },
+    "litestar-notrequired-field-schema-after": {
+      "commit": "ce3ff9e6de8a3f69b45e8ab2c716908cb7c9b749",
+      "repository_content_identity": "sha256:ce20973c71352bb8bdae5bd6cf1f625629f34c0ba6a62c456d16941d11c1cb93:1445"
+    },
+    "litestar-notrequired-field-schema-before": {
+      "commit": "7c9d0e0dd8c68c92d162ad65f39f44f3b75cbcd4",
+      "repository_content_identity": "sha256:e610dde327395441f4825327418c68a8b9010ccc5fd47b5ce7cbc2fa8c683e82:1445"
+    },
+    "sqlmodel-field-discriminator-after": {
+      "commit": "073023d84546490bd5dce86ce94fe6e8914db7c2",
+      "repository_content_identity": "sha256:52c47becdd7c2af0a5795317b693725fa5a1b8005eeae2b48c00affe87ce7c79:508"
+    },
+    "sqlmodel-field-discriminator-before": {
+      "commit": "43353a45817b30a51b7904d0b30e500bbbcef7ca",
+      "repository_content_identity": "sha256:aac1ee4905b23bbef428faf1cb80d87561a10fd0e02bff8534f929e054151cc2:508"
+    }
+  },
+  "units": [
+    {
+      "file_sha256": "20c0ecf8b721f7eb3b56e557e45f02510074146fa430c0f2b6009563da221129",
+      "oracle_pointer": "/cases/0/source_oracles/before/0",
+      "path": "tests/test_jsonable_encoder.py",
+      "verified_field_count": 3,
+      "verified_span_sha256": [
+        "93ca3fefc43f16425e44e6c5b130e69c583b5aeba884ae9e284a4c92b42b8b12"
+      ]
+    },
+    {
+      "file_sha256": "cea093a4d8b99f5e2728b05b172378582f8add4b7199390bb47058dfe532b8a5",
+      "oracle_pointer": "/cases/0/source_oracles/after/0",
+      "path": "tests/test_jsonable_encoder.py",
+      "verified_field_count": 3,
+      "verified_span_sha256": [
+        "93ca3fefc43f16425e44e6c5b130e69c583b5aeba884ae9e284a4c92b42b8b12"
+      ]
+    },
+    {
+      "file_sha256": "90b5463e3af1dd81260a3c631ffb2b315dfd51d4561c25e979b796f32f45476c",
+      "oracle_pointer": "/cases/1/source_oracles/before/0",
+      "path": "tests/unit/test_plugins/test_pydantic/test_schema_plugin.py",
+      "verified_field_count": 1,
+      "verified_span_sha256": [
+        "44f1c77f96cba95da3d75485dfb9ea7ba722a8c9f88d540614c740157635ce80"
+      ]
+    },
+    {
+      "file_sha256": "57771a4ae6495ced6c29782c7dd2b454debcb959d7b1f56e2b46c74641455937",
+      "oracle_pointer": "/cases/1/source_oracles/after/0",
+      "path": "tests/unit/test_plugins/test_pydantic/test_schema_plugin.py",
+      "verified_field_count": 1,
+      "verified_span_sha256": [
+        "44f1c77f96cba95da3d75485dfb9ea7ba722a8c9f88d540614c740157635ce80"
+      ]
+    },
+    {
+      "file_sha256": "ac49564064d174c3d1e842f26728072fee1bef5475c752ec8ee57d2797d1aea7",
+      "oracle_pointer": "/cases/2/source_oracles/before/0",
+      "path": "tests/test_pydantic/test_field.py",
+      "verified_field_count": 2,
+      "verified_span_sha256": [
+        "7656aae5a392b08fe3153613d30206c596e13e0513b75548c48f81cd6eb5afa4"
+      ]
+    },
+    {
+      "file_sha256": "b21557e4579b5d2562679f9f43d0e5eb6e4ecbb0ce7aa9fc1ddee25df1abf5ad",
+      "oracle_pointer": "/cases/2/source_oracles/after/0",
+      "path": "tests/test_pydantic/test_field.py",
+      "verified_field_count": 1,
+      "verified_span_sha256": [
+        "115df9108ec154121881fe20902d6f190b1b21fa93bc09d840af3a4098e2f840"
+      ]
+    },
+    {
+      "file_sha256": "b21557e4579b5d2562679f9f43d0e5eb6e4ecbb0ce7aa9fc1ddee25df1abf5ad",
+      "oracle_pointer": "/cases/2/source_oracles/after/1",
+      "path": "tests/test_pydantic/test_field.py",
+      "verified_field_count": 1,
+      "verified_span_sha256": [
+        "e1f32eefa3746ac2c88fe4e31e33e43a3052fd8c93976a51c6a34ba4318adcb3"
+      ]
+    },
+    {
+      "file_sha256": "b21557e4579b5d2562679f9f43d0e5eb6e4ecbb0ce7aa9fc1ddee25df1abf5ad",
+      "oracle_pointer": "/cases/2/source_oracles/after/2",
+      "path": "tests/test_pydantic/test_field.py",
+      "verified_field_count": 1,
+      "verified_span_sha256": [
+        "41bc67ce9b75852a44a892baea5f3e5aa7ff78ff56dd1cda5e6d832fdac69f12"
+      ]
+    }
+  ]
+}

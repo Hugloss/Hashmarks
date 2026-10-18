@@ -8,12 +8,23 @@ from __future__ import annotations
 
 import ast
 from collections.abc import Sequence
+from typing import TypedDict
 
 MAX_HANDLER_PARAMETERS = 16
 MAX_ANNOTATION_CHARS = 192
 MAX_DEFAULT_KEYWORDS = 8
 MAX_ANNOTATED_METADATA = 4
 MAX_DIRECT_NAME_CHARS = 128
+
+
+class HandlerParameter(TypedDict):
+    name: str
+    kind: str
+    start_line: int
+    end_line: int
+    annotation: dict[str, object]
+    annotated_metadata: dict[str, object]
+    default: dict[str, object]
 
 
 def _annotation(node: ast.expr | None) -> dict[str, object]:
@@ -57,6 +68,24 @@ def _reference(node: ast.expr) -> dict[str, object]:
     return _callee(node)
 
 
+def _keyword_references(
+    keywords: Sequence[tuple[str, ast.expr]],
+) -> dict[str, object]:
+    """Retain direct identifier syntax within the already returned keyword bound."""
+    references = [(name, _reference(value)) for name, value in keywords]
+    if not any(
+        reference["state"] in {"name-syntax", "member-syntax"}
+        for _name, reference in references
+    ):
+        return {}
+    return {
+        "keyword_references": [
+            {"keyword": name, "reference": reference} for name, reference in references
+        ],
+        "keyword_reference_scope": "returned-direct-keyword-values",
+    }
+
+
 def _default(node: ast.expr | None) -> dict[str, object]:
     if node is None:
         return {"state": "not-supplied"}
@@ -80,7 +109,7 @@ def _default(node: ast.expr | None) -> dict[str, object]:
     if not isinstance(node, ast.Call):
         return {"state": "dynamic-or-unsupported"}
     keywords = [
-        kw.arg if len(kw.arg) <= MAX_DIRECT_NAME_CHARS else "<over-bound>"
+        (kw.arg if len(kw.arg) <= MAX_DIRECT_NAME_CHARS else "<over-bound>", kw.value)
         for kw in node.keywords
         if kw.arg is not None
     ]
@@ -91,8 +120,9 @@ def _default(node: ast.expr | None) -> dict[str, object]:
         "first_argument_reference": (
             _reference(node.args[0]) if node.args else {"state": "not-supplied"}
         ),
-        "keyword_names": keywords[:MAX_DEFAULT_KEYWORDS],
+        "keyword_names": [name for name, _value in keywords[:MAX_DEFAULT_KEYWORDS]],
         "keyword_names_omitted": max(0, len(keywords) - MAX_DEFAULT_KEYWORDS),
+        **_keyword_references(keywords[:MAX_DEFAULT_KEYWORDS]),
         "has_argument_expansion": any(isinstance(arg, ast.Starred) for arg in node.args)
         or any(kw.arg is None for kw in node.keywords),
         "runtime_binding": "not-established",
@@ -125,7 +155,7 @@ def _metadata(annotation: ast.expr | None) -> dict[str, object]:
     }
 
 
-def _parameter(node: ast.arg, kind: str, default: ast.expr | None) -> dict[str, object]:
+def _parameter(node: ast.arg, kind: str, default: ast.expr | None) -> HandlerParameter:
     if len(node.arg) > MAX_DIRECT_NAME_CHARS:
         raise ValueError("handler parameter name exceeds identifier bound")
     return {
@@ -146,7 +176,7 @@ def _parameter(node: ast.arg, kind: str, default: ast.expr | None) -> dict[str, 
 
 def _all_parameters(
     declaration: ast.FunctionDef | ast.AsyncFunctionDef,
-) -> list[dict[str, object]]:
+) -> list[HandlerParameter]:
     args = declaration.args
     count = (
         len(args.posonlyargs)
@@ -160,7 +190,7 @@ def _all_parameters(
     positional = [*args.posonlyargs, *args.args]
     padding = len(positional) - len(args.defaults)
     defaults: list[ast.expr | None] = [None] * padding + list(args.defaults)
-    records: list[dict[str, object]] = []
+    records: list[HandlerParameter] = []
     for index, (arg, default) in enumerate(zip(positional, defaults, strict=True)):
         kind = (
             "positional-only"

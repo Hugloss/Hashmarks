@@ -9,8 +9,11 @@ from hashmarks.observation import ObservationState
 from hashmarks.operation_contract import operation_schema
 from hashmarks.paths import normalize_relative_path
 
+from .repository_evidence_binding_validation import validate_bindings_packet
+from .repository_observation import packet_digest
+
 if TYPE_CHECKING:
-    from .engine import CodeMap
+    from .repository_evidence_bindings import RepositoryBindings
 
 
 @dataclass(frozen=True)
@@ -387,7 +390,7 @@ class RepositoryEvidenceCoverageMixin:
                 "binding_delta must be a repository evidence binding delta"
             )
         delta_identity = binding_delta.get("delta_identity")
-        expected_delta_identity = "sha256:" + self._packet_digest(
+        expected_delta_identity = "sha256:" + packet_digest(
             operation_schema("evidence_comparison", "bindings"),
             {
                 key: value
@@ -427,7 +430,9 @@ class RepositoryEvidenceCoverageMixin:
         binding_delta: Mapping[str, object] | None,
         binding_delta_before: Mapping[str, object] | None,
     ) -> None:
-        self._validate_binding_delta_input(
+        if TYPE_CHECKING:
+            self = cast("RepositoryBindings", self)
+        validate_bindings_packet(
             bindings_packet,
             name="bindings_packet",
         )
@@ -438,7 +443,7 @@ class RepositoryEvidenceCoverageMixin:
             if isinstance(repository, Mapping)
             else ""
         )
-        if repository_identity != self._repository_packet_identity():
+        if repository_identity != self.reads.repository_identity():
             raise ValueError("bindings_packet repository-mismatch")
         if binding_delta is not None:
             self._validate_coverage_binding_delta(
@@ -450,7 +455,7 @@ class RepositoryEvidenceCoverageMixin:
                 raise ValueError(
                     "binding_delta_before is required to authenticate binding_delta"
                 )
-            replayed_delta = self.repository_evidence_binding_delta(
+            replayed_delta = self.delta(
                 binding_delta_before,
                 bindings_packet,
             )
@@ -542,7 +547,7 @@ class RepositoryEvidenceCoverageMixin:
             ),
         }
 
-    def repository_evidence_coverage(
+    def coverage(
         self,
         bindings_packet: Mapping[str, object],
         *,
@@ -554,7 +559,7 @@ class RepositoryEvidenceCoverageMixin:
     ) -> dict[str, object]:
         """Classify changes while preserving change-set authority and precision."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryBindings", self)
         self._validate_coverage_packets(
             bindings_packet,
             binding_delta,
@@ -602,7 +607,7 @@ class RepositoryEvidenceCoverageMixin:
             "authority": "repository-intelligence-only",
             "execution_effect": "none",
         }
-        payload["coverage_identity"] = "sha256:" + self._packet_digest(
+        payload["coverage_identity"] = "sha256:" + packet_digest(
             operation_schema("repository_evidence", "coverage"), payload
         )
         return payload

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from . import dependency_resolution_contract as _contract
 from .dependency_resolution_evidence import (
@@ -13,6 +13,9 @@ from .dependency_resolution_evidence import (
     _objects,
 )
 
+if TYPE_CHECKING:
+    from .repository_dependencies import RepositoryDependencies
+
 
 class DependencyResolutionDerivationMixin:
     """Project derivation authority from an already-qualified dependency packet.
@@ -21,10 +24,12 @@ class DependencyResolutionDerivationMixin:
     repository binding, and source authority remain owned by dependency evidence.
     """
 
-    def dependency_resolution_derivation_authority(
+    def derivation_authority(
         self,
         observation: Mapping[str, object],
     ) -> dict[str, object]:
+        if TYPE_CHECKING:
+            self = cast("RepositoryDependencies", self)
         self._require_qualified_dependency_observation_v3(observation)
 
         producer = cast("Mapping[str, object]", observation["producer"])
@@ -107,7 +112,7 @@ class DependencyResolutionDerivationMixin:
             "evidence_sources": evidence_sources,
         }
 
-    def dependency_resolution_explain(
+    def explain(
         self,
         observation: Mapping[str, object],
     ) -> dict[str, object]:
@@ -115,7 +120,7 @@ class DependencyResolutionDerivationMixin:
 
         The supplied endpoint need not match current repository state.
         """
-        derivation = self.dependency_resolution_derivation_authority(observation)
+        derivation = self.derivation_authority(observation)
         counts = {
             field: len(cast("Sequence[object]", observation[field]))
             for field in (

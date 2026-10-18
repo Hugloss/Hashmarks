@@ -1,10 +1,11 @@
 import pytest
+from contract_assertions import assert_object
 
 from hashmarks.codemap.decision_contract import DecisionPacketContract
 from hashmarks.generation_domain import MAX_PORTABLE_GENERATION
 
 
-def packet():
+def packet() -> dict[str, object]:
     return {
         "schema": "hashmarks.task-decision-packet.v2",
         "task": "fix owner",
@@ -21,7 +22,7 @@ def packet():
 
 
 @pytest.mark.parametrize("value", [True, False, -1, MAX_PORTABLE_GENERATION + 1])
-def test_decision_generation_rejects_invalid_portable_domain(value):
+def test_decision_generation_rejects_invalid_portable_domain(value: object) -> None:
     value_packet = packet()
     value_packet["canonical_generation"] = value
     with pytest.raises(ValueError):
@@ -29,23 +30,25 @@ def test_decision_generation_rejects_invalid_portable_domain(value):
 
 
 @pytest.mark.parametrize("value", ["false", 1, 0, None])
-def test_decision_ambiguity_rejects_non_boolean(value):
+def test_decision_ambiguity_rejects_non_boolean(value: object) -> None:
     value_packet = packet()
-    value_packet["discrimination"]["ambiguity"]["ambiguous"] = value
+    assert_object(assert_object(value_packet["discrimination"])["ambiguity"])[
+        "ambiguous"
+    ] = value
     with pytest.raises(ValueError):
         DecisionPacketContract.parse(value_packet)
 
 
 @pytest.mark.parametrize("field", ["edit", "verify"])
 @pytest.mark.parametrize("path", ["", "   "])
-def test_decision_selection_rejects_blank_path(field, path):
+def test_decision_selection_rejects_blank_path(field: str, path: str) -> None:
     value_packet = packet()
     value_packet[field] = {"path": path}
     with pytest.raises(ValueError):
         DecisionPacketContract.parse(value_packet)
 
 
-def test_decision_generation_accepts_zero_and_portable_maximum():
+def test_decision_generation_accepts_zero_and_portable_maximum() -> None:
     for value in (0, MAX_PORTABLE_GENERATION):
         value_packet = packet()
         value_packet["canonical_generation"] = value
@@ -66,11 +69,13 @@ def test_decision_generation_accepts_zero_and_portable_maximum():
         ("edit", [], "evidence selection must be an object or null"),
     ],
 )
-def test_decision_packet_rejects_invalid_contract_fields(field, value, message):
+def test_decision_packet_rejects_invalid_contract_fields(
+    field: str, value: object, message: str
+) -> None:
     value_packet = packet()
     if "." in field:
         parent, child = field.split(".", 1)
-        value_packet[parent][child] = value
+        assert_object(value_packet[parent])[child] = value
     else:
         value_packet[field] = value
     with pytest.raises(ValueError, match=message):

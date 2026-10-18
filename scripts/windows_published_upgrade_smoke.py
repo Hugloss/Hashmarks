@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib
 import json
 import os
 import queue
@@ -13,11 +14,21 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import Protocol, runtime_checkable
 from urllib.request import Request, urlopen
 
-if TYPE_CHECKING:
-    from winpty import PtyProcess
+
+class _TerminalProcess(Protocol):
+    def read(self, size: int) -> str: ...
+    def write(self, text: str) -> object: ...
+    def isalive(self) -> bool: ...
+    def terminate(self, *, force: bool) -> object: ...
+
+
+@runtime_checkable
+class _ProcessFactory(Protocol):
+    def spawn(self, argv: list[str], *, env: dict[str, str]) -> _TerminalProcess: ...
+
 
 _TAG = re.compile(r"^v([0-9]+)\.([0-9]+)\.([0-9]+)$")
 _WINDOWS_ASSET = "hashmarks-windows-x86_64.exe"
@@ -117,7 +128,7 @@ def _install_previous(installer: Path, tag: str, root: Path) -> Path:
     return target
 
 
-def _read_terminal(process: PtyProcess, output: queue.Queue[str | None]) -> None:
+def _read_terminal(process: _TerminalProcess, output: queue.Queue[str | None]) -> None:
     try:
         while True:
             chunk = process.read(1024)
@@ -131,7 +142,7 @@ def _read_terminal(process: PtyProcess, output: queue.Queue[str | None]) -> None
 
 
 def _await_upgrade_choice(
-    process: PtyProcess, output: queue.Queue[str | None], deadline: float
+    process: _TerminalProcess, output: queue.Queue[str | None], deadline: float
 ) -> str:
     transcript = ""
     selected = False
@@ -178,13 +189,15 @@ def _await_installed_bytes(
 def _interactive_upgrade(
     target: Path, *, expected_version: str, expected_hash: str
 ) -> None:
-    from winpty import PtyProcess
+    process_factory = importlib.import_module("winpty").PtyProcess
+    if not isinstance(process_factory, _ProcessFactory):
+        raise TypeError("Windows PTY provider must expose a process factory")
 
     env = os.environ.copy()
     env.pop("GH_TOKEN", None)
     env.pop("HASHMARKS_DOWNLOAD_BASE_URL", None)
     env["HASHMARKS_SKIP_PATH_UPDATE"] = "1"
-    process = PtyProcess.spawn([str(target), "upgrade"], env=env)
+    process = process_factory.spawn([str(target), "upgrade"], env=env)
     output: queue.Queue[str | None] = queue.Queue()
     threading.Thread(target=_read_terminal, args=(process, output), daemon=True).start()
     deadline = time.monotonic() + 180

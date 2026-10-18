@@ -26,7 +26,7 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-from mcp_host_gate_common import (  # noqa: E402 - import follows standalone script path setup
+from scripts.mcp_host_gate_common import (  # noqa: E402 - import follows standalone script path setup
     validate_basic_qualification_proof,
 )
 
@@ -87,7 +87,7 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _is_uv_registration(command: Any, args: Any = None) -> bool:
+def _is_uv_registration(command: object, args: object | None = None) -> bool:
     expected = list(source_mcp_command("."))
     if isinstance(command, list):
         return command == expected

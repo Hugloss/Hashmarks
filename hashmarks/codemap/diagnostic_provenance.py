@@ -33,9 +33,10 @@ def _revision_scope(scope_paths: object) -> set[str]:
     if (
         not isinstance(scope_paths, Sequence)
         or isinstance(scope_paths, (str, bytes))
-        or any(not isinstance(path, str) for path in scope_paths)
+        or len(scope_paths) > 32
+        or any(not isinstance(path, str) or len(path) > 8192 for path in scope_paths)
     ):
-        raise ValueError("scope_paths must be a sequence of strings")
+        raise ValueError("scope_paths must contain at most 32 bounded path strings")
     return {normalize_relative_path(path, allow_root=False) for path in scope_paths}
 
 

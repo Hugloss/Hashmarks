@@ -11,6 +11,8 @@ from hashmarks.codemap.evidence_packet import (
     TASK_EVIDENCE_DEFAULT_OPTIONS,
     TaskEvidenceOptions,
 )
+from hashmarks.codemap.repository_changes import RepositoryChanges
+from hashmarks.codemap.repository_tasks import RepositoryTasks
 from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
 from hashmarks.mcp_surface import HashmarksMcpSurface
 from hashmarks.operation_contract import operation_schema
@@ -20,30 +22,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def test_task_evidence_defaults_have_one_owner(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    defaults = TASK_EVIDENCE_DEFAULT_OPTIONS
-    for owner in (
-        CodeMap.task_evidence,
-        CodeMap.task_post_change_delta,
-        CodeMapServiceClient.task_evidence,
-        CodeMapServiceClient.task_post_change_delta,
-    ):
-        parameters = inspect.signature(owner).parameters
-        assert parameters["limit"].default == defaults.limit
-        assert parameters["per_role"].default == defaults.per_role
-        assert parameters["token_budget"].default == defaults.token_budget
-
-    surface_parameters = inspect.signature(HashmarksMcpSurface.task_evidence).parameters
-    assert surface_parameters["limit"].default == defaults.limit
-    assert surface_parameters["per_role"].default == defaults.per_role
-    assert surface_parameters["token_budget"].default == defaults.token_budget
-    post_change_parameters = inspect.signature(
-        HashmarksMcpSurface.post_change
-    ).parameters
-    assert post_change_parameters["token_budget"].default == defaults.token_budget
-
+def _assert_cli_defaults(defaults: TaskEvidenceOptions) -> None:
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="command", required=True)
     add_repository_cli(
@@ -69,10 +48,37 @@ def test_task_evidence_defaults_have_one_owner(
     assert post_change_args.per_role == defaults.per_role
     assert post_change_args.budget == defaults.token_budget
 
+
+def test_task_evidence_defaults_have_one_owner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    defaults = TASK_EVIDENCE_DEFAULT_OPTIONS
+    for owner in (
+        RepositoryTasks.evidence,
+        RepositoryChanges.task_delta,
+        CodeMapServiceClient.task_evidence,
+        CodeMapServiceClient.task_post_change_delta,
+    ):
+        parameters = inspect.signature(owner).parameters
+        assert parameters["limit"].default == defaults.limit
+        assert parameters["per_role"].default == defaults.per_role
+        assert parameters["token_budget"].default == defaults.token_budget
+
+    surface_parameters = inspect.signature(HashmarksMcpSurface.task_evidence).parameters
+    assert surface_parameters["limit"].default == defaults.limit
+    assert surface_parameters["per_role"].default == defaults.per_role
+    assert surface_parameters["token_budget"].default == defaults.token_budget
+    post_change_parameters = inspect.signature(
+        HashmarksMcpSurface.post_change
+    ).parameters
+    assert post_change_parameters["token_budget"].default == defaults.token_budget
+
+    _assert_cli_defaults(defaults)
+
     captured: dict[str, object] = {}
 
-    class _Map:
-        def task_evidence(
+    class _TaskViews:
+        def evidence(
             self,
             task: str,
             *,
@@ -92,7 +98,8 @@ def test_task_evidence_defaults_have_one_owner(
             )
             return {"schema": operation_schema("task_evidence")}
 
-        def task_post_change_delta(
+    class _Changes:
+        def task_delta(
             self,
             task: str,
             changed_paths: list[str],
@@ -113,6 +120,10 @@ def test_task_evidence_defaults_have_one_owner(
             )
             return {"schema": operation_schema("post_change")}
 
+    class _Map:
+        tasks = _TaskViews()
+        changes = _Changes()
+
     service = CodeMapService(tmp_path, socket_path=tmp_path / "service.sock")
     monkeypatch.setattr(service, "_map", lambda: _Map())
     service._task_evidence_response({"task": "inspect widget"})
@@ -129,7 +140,7 @@ def test_task_evidence_defaults_have_one_owner(
 
     surface = HashmarksMcpSurface(str(tmp_path), state_dir=str(tmp_path / "state"))
     real_map = surface._map
-    surface._map = _Map()
+    monkeypatch.setattr(surface, "_map", _Map())
     try:
         surface.post_change(
             "inspect widget",

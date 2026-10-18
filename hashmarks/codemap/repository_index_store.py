@@ -9,7 +9,7 @@ import threading
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol, TypedDict, cast
 
 from hashmarks.paths import canonical_host_path
 from hashmarks.sqlite_boundary import configure_sqlite_connection, sqlite_transaction
@@ -25,7 +25,39 @@ from .model import (
 from .store_queries import WorkspaceMapQueryMixin
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable
+    from collections.abc import Callable, Generator, Iterable, Mapping, Sequence
+
+    from .project_graph import ProjectEdge, ProjectNode
+    from .typescript_resolver import NativeFileEdge
+
+
+class _NativeFileEdge(Protocol):
+    @property
+    def source(self) -> str: ...
+
+    @property
+    def target(self) -> str: ...
+
+    @property
+    def kind(self) -> str: ...
+
+    @property
+    def confidence(self) -> str: ...
+
+    @property
+    def producer(self) -> str: ...
+
+    @property
+    def specifier(self) -> str | None: ...
+
+
+class RepositoryIndexEconomics(TypedDict):
+    """Counts and surface facts returned by the canonical repository store."""
+
+    files: int
+    lexical_occurrences: int
+    parse_errors: int
+    surfaces: dict[str, dict[str, int]]
 
 
 class WorkspaceStateMismatchError(ValueError):
@@ -157,8 +189,9 @@ def git_overlay_paths(
     return _parse_git_overlay_paths(completed.stdout, state_rel=state_rel)
 
 
-def _symbol_from(value: dict) -> SymbolRecord:
+def _symbol_from(value: dict[str, object]) -> SymbolRecord:
     lines = value.get("lines") or [1, 1]
+    assert isinstance(lines, list)
     return SymbolRecord(
         name=str(value["name"]),
         qualname=str(value["qualname"]),
@@ -166,18 +199,18 @@ def _symbol_from(value: dict) -> SymbolRecord:
         signature=str(value["signature"]),
         start_line=int(lines[0]),
         end_line=int(lines[1]),
-        signature_tokens=int(value.get("signature_tokens", 0)),
-        body_tokens=int(value.get("body_tokens", 0)),
+        signature_tokens=int(cast(int, value.get("signature_tokens", 0))),
+        body_tokens=int(cast(int, value.get("body_tokens", 0))),
         parent=None if value.get("parent") is None else str(value["parent"]),
     )
 
 
-def _edge_from(value: dict) -> EdgeRecord:
+def _edge_from(value: dict[str, object]) -> EdgeRecord:
     return EdgeRecord(
         source=None if value.get("source") is None else str(value["source"]),
         kind=str(value["kind"]),
         target=str(value["target"]),
-        line=None if value.get("line") is None else int(value["line"]),
+        line=None if value.get("line") is None else int(cast(int, value["line"])),
         confidence=str(value.get("confidence", "static")),
     )
 
@@ -407,7 +440,7 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         self._publication_transaction_active = False
 
     @contextmanager
-    def publication_transaction(self):
+    def publication_transaction(self) -> Generator[None, None, None]:
         """Own one atomic, cross-process CodeMap generation publication.
 
         BEGIN IMMEDIATE serializes writers while WAL keeps the previously
@@ -488,7 +521,7 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
     @contextmanager
     def bulk_file_writes(
         self, *, batch_size: int = 32, on_commit: Callable[[int], None] | None = None
-    ):
+    ) -> Generator[None, None, None]:
         """Batch file writes without weakening generation publication authority.
 
         Standalone callers retain bounded commits. During CodeMap sync, the
@@ -757,7 +790,7 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
             with sqlite_transaction(self._db, begin="BEGIN IMMEDIATE"):
                 return bump_locked()
 
-    def file_row(self, path: str):
+    def file_row(self, path: str) -> sqlite3.Row | None:
         self._count_read("file_row")
         with self._lock:
             return self._db.execute(
@@ -820,7 +853,7 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         module_name: str | None,
         visibility: EvidenceVisibility,
         index_surface: str = "other",
-    ) -> dict[str, object]:
+    ) -> dict[str, tuple[str, ...]]:
         new_nodes = derive_file_nodes(path, artifact)
         old_nodes = {row["kind"]: row for row in self.derived_nodes(path)}
         changed_kinds = tuple(
@@ -983,7 +1016,9 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                     delete_locked()
         return len(values)
 
-    def replace_native_file_edges(self, producer_prefix: str, edges) -> None:
+    def replace_native_file_edges(
+        self, producer_prefix: str, edges: Sequence[_NativeFileEdge]
+    ) -> None:
         def replace_locked() -> None:
             self._db.execute(
                 "DELETE FROM native_file_edge WHERE producer LIKE ?",
@@ -1026,7 +1061,12 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
             ).fetchall()
         return [dict(row) for row in rows]
 
-    def replace_native_occurrences(self, producer: str, definitions, edges) -> None:
+    def replace_native_occurrences(
+        self,
+        producer: str,
+        definitions: Sequence[Mapping[str, object]],
+        edges: Sequence[Mapping[str, object]],
+    ) -> None:
         def replace_locked() -> None:
             self._db.execute(
                 "DELETE FROM native_definition WHERE producer=?", (producer,)
@@ -1039,8 +1079,8 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                         row["path"],
                         row["symbol"],
                         row["display_name"],
-                        int(row["line"]),
-                        int(row["end_line"]),
+                        int(cast(int, row["line"])),
+                        int(cast(int, row["end_line"])),
                         producer,
                         row.get("relationships_json", "[]"),
                         int(bool(row.get("relationships_truncated", False))),
@@ -1056,7 +1096,7 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                         row.get("source"),
                         row["target_symbol"],
                         row["target_name"],
-                        int(row["line"]),
+                        int(cast(int, row["line"])),
                         producer,
                         json.dumps(
                             row["occurrence_metadata"],
@@ -1196,7 +1236,9 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                 ).fetchall()
         return [self._native_reference_value(row) for row in rows]
 
-    def replace_project_graph(self, producer: str, nodes, edges) -> None:
+    def replace_project_graph(
+        self, producer: str, nodes: Sequence[ProjectNode], edges: Sequence[ProjectEdge]
+    ) -> None:
         def replace_locked() -> None:
             self._db.execute("DELETE FROM project_edge WHERE producer=?", (producer,))
             self._db.execute("DELETE FROM project_node WHERE producer=?", (producer,))
@@ -1290,7 +1332,6 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         return seen
 
     def clear(self) -> dict[str, int]:
-        before = self.stats()
         tables = (
             "native_file_edge",
             "native_edge",
@@ -1302,10 +1343,17 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
             "symbol",
             "file_map",
         )
-        with self._lock, sqlite_transaction(self._db, begin="BEGIN IMMEDIATE"):
+        with self.publication_transaction():
+            before = self.stats()
+            # Disposal is a publication, not a new generation namespace. Keeping
+            # this counter prevents caches/read scopes from accepting an older
+            # authority after clear followed by a rebuild of the same store.
+            self.bump_generation()
             for table in tables:
                 self._db.execute(f"DELETE FROM {table}")
-            self._db.execute("DELETE FROM meta WHERE key != 'state.workspace'")
+            self._db.execute(
+                "DELETE FROM meta WHERE key NOT IN ('state.workspace', 'generation')"
+            )
         return before
 
     def stats(self) -> dict[str, int]:
@@ -1349,7 +1397,7 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                 ),
             }
 
-    def economics_counts_by_surface(self) -> dict[str, object]:
+    def economics_counts_by_surface(self) -> RepositoryIndexEconomics:
         """Return exact economics from compact per-file facts, not lexical scans."""
         with self._lock:
             rows = self._db.execute(

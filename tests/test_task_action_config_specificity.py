@@ -4,7 +4,9 @@ from collections import Counter
 from pathlib import Path
 
 from hashmarks.codemap.engine import CodeMap
-from hashmarks.codemap.task_action_evidence import TaskActionEvidenceMixin
+from hashmarks.codemap.ownership_candidate_evidence import (
+    OwnershipCandidateEvidenceMixin,
+)
 from hashmarks.codemap.task_action_types import _TaskActionConfigState
 
 
@@ -32,9 +34,14 @@ def test_config_specificity_reuses_positive_and_zero_scores() -> None:
         term_rows={"timeout": 1},
     )
 
-    assert TaskActionEvidenceMixin._task_action_config_anchor(rows, state) is rows[0]
     assert (
-        TaskActionEvidenceMixin._task_action_fallback_config_source_anchor(rows, state)
+        OwnershipCandidateEvidenceMixin._task_action_config_anchor(rows, state)
+        is rows[0]
+    )
+    assert (
+        OwnershipCandidateEvidenceMixin._task_action_fallback_config_source_anchor(
+            rows, state
+        )
         is rows[0]
     )
     assert reads == {id(row): 1 for row in rows}
@@ -48,7 +55,10 @@ def test_equal_config_specificity_preserves_nonunique_result() -> None:
         term_rows={"timeout": 2},
     )
 
-    assert TaskActionEvidenceMixin._unique_best_concrete_config(rows, state) is None
+    assert (
+        OwnershipCandidateEvidenceMixin._unique_best_concrete_config(rows, state)
+        is None
+    )
 
 
 def test_config_request_selects_config_edit_surface(tmp_path: Path) -> None:
@@ -56,8 +66,8 @@ def test_config_request_selects_config_edit_surface(tmp_path: Path) -> None:
     _write(tmp_path, "src/main.py", "DEFAULT_TIMEOUT = 30\n")
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        result = codemap.task_action_map("update timeout config")
+        codemap.index.sync()
+        result = codemap.tasks.action_map("update timeout config")
 
     edit, ambiguity = result["edit"], result["ambiguity"]
     assert isinstance(edit, dict)
@@ -73,8 +83,8 @@ def test_config_source_fallback_preserves_test_verification_role(
     _write(tmp_path, "tests/test_config.py", "def test_timeout(): pass\n")
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        result = codemap.task_action_map("change the timeout setting")
+        codemap.index.sync()
+        result = codemap.tasks.action_map("change the timeout setting")
 
     edit, verify = result["edit"], result["verify"]
     assert isinstance(edit, dict)
@@ -89,10 +99,11 @@ def test_locally_admitted_config_siblings_have_scoring_evidence(tmp_path: Path) 
     _write(tmp_path, "service/b.toml", "[opaque]\nvalue = 2\n")
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        result = codemap.task_action_map("update timeout config", limit=5)
+        codemap.index.sync()
+        result = codemap.tasks.action_map("update timeout config", limit=5)
 
     edit = result["edit"]
     assert isinstance(edit, dict)
     assert edit["path"] == "service/a.toml"
+    assert "locality_projection" in edit
     assert edit["locality_projection"] is True

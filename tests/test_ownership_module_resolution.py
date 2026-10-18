@@ -13,11 +13,11 @@ def test_python_module_identity_requires_package_chain(tmp_path: Path) -> None:
     package.mkdir()
     (package / "owner.py").write_text("cache = {}\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
-        assert codemap._python_module_for_path("pkg/owner.py") is None
+        assert codemap._imports.module_for_path("pkg/owner.py") is None
         (package / "__init__.py").write_text("", encoding="utf-8")
-        assert codemap._python_module_for_path("pkg/owner.py") == "pkg.owner"
-        assert codemap._python_module_for_path("pkg/__init__.py") == "pkg"
-        assert codemap._python_module_for_path("pkg/readme.txt") is None
+        assert codemap._imports.module_for_path("pkg/owner.py") == "pkg.owner"
+        assert codemap._imports.module_for_path("pkg/__init__.py") == "pkg"
+        assert codemap._imports.module_for_path("pkg/readme.txt") is None
 
 
 def test_cache_reader_requires_qualified_import_identity(tmp_path: Path) -> None:
@@ -33,12 +33,12 @@ def test_cache_reader_requires_qualified_import_identity(tmp_path: Path) -> None
         "from other.owner import cache\n", encoding="utf-8"
     )
     with CodeMap(tmp_path) as codemap:
-        assert codemap._reader_imports_cache_owner(
+        assert codemap.ownership._reader_imports_cache_owner(
             "from_reader.py", "pkg/owner.py", "cache"
         )
-        assert codemap._reader_imports_cache_owner(
+        assert codemap.ownership._reader_imports_cache_owner(
             "module_reader.py", "pkg/owner.py", "cache"
         )
-        assert not codemap._reader_imports_cache_owner(
+        assert not codemap.ownership._reader_imports_cache_owner(
             "unrelated.py", "pkg/owner.py", "cache"
         )

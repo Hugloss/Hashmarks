@@ -1,6 +1,8 @@
 from copy import deepcopy
 from pathlib import Path
 
+from contract_assertions import assert_array, assert_object, assert_records, assert_text
+
 from hashmarks.consumer_conformance import (
     _consumer_conformance_vectors_from_handoff,
     validate_native_consumer_bundle,
@@ -58,25 +60,29 @@ def test_consumer_bundle_rejects_same_version_cross_pair() -> None:
     result = validate_native_consumer_bundle(a, b_contract)
     assert result["valid"] is False
     assert any(
-        "producer-implementation-identity-mismatch" in reason
-        for reason in result["reasons"]
+        "producer-implementation-identity-mismatch" in assert_text(reason)
+        for reason in assert_array(result["reasons"])
     )
 
 
 def test_native_handoff_validator_rejects_tampering_and_keeps_authority_external(
-    repository_qualification_handoff,
+    repository_qualification_handoff: dict[str, object],
 ) -> None:
     handoff = repository_qualification_handoff
     assert validate_native_qualification_handoff(handoff)["valid"] is True
     tampered = deepcopy(handoff)
-    tampered["provenance"]["producer_implementation_identity"] = "sha256:" + "f" * 64
+    assert_object(tampered["provenance"])["producer_implementation_identity"] = (
+        "sha256:" + "f" * 64
+    )
     result = validate_native_qualification_handoff(tampered)
     assert result["valid"] is False
-    assert "provenance-producer_implementation_identity-mismatch" in result["reasons"]
+    assert "provenance-producer_implementation_identity-mismatch" in assert_array(
+        result["reasons"]
+    )
 
 
 def test_consumer_conformance_vectors_are_deterministic_and_self_describing(
-    repository_qualification_handoff,
+    repository_qualification_handoff: dict[str, object],
 ) -> None:
     first = _consumer_conformance_vectors_from_handoff(repository_qualification_handoff)
     second = _consumer_conformance_vectors_from_handoff(
@@ -95,18 +101,22 @@ def test_consumer_conformance_vectors_are_deterministic_and_self_describing(
         "overflow-codemap-generation",
         "overflow-identity-generation",
     ]
-    assert all(row["result"]["valid"] == row["expected_valid"] for row in first)
+    assert all(
+        assert_object(row["result"])["valid"] == row["expected_valid"] for row in first
+    )
     for row in first[4:]:
-        assert row["expected_reason"] in row["result"]["reasons"]
+        assert row["expected_reason"] in assert_array(
+            assert_object(row["result"])["reasons"]
+        )
         assert row["normalized_projection_allowed"] is False
-        assert row["result"]["normalized"] is None
+        assert assert_object(row["result"])["normalized"] is None
 
 
 def test_consumer_bundle_cross_binds_native_handoff_producer(
-    repository_qualification_handoff,
+    repository_qualification_handoff: dict[str, object],
 ) -> None:
     handoff = repository_qualification_handoff
-    identity = str(handoff["producer"]["implementation_identity"])
+    identity = str(assert_object(handoff["producer"])["implementation_identity"])
     envelope, contract = _bundle(identity)
     checked = validate_native_consumer_bundle(envelope, contract, handoff=handoff)
     assert checked["valid"] is True
@@ -120,17 +130,22 @@ def test_consumer_bundle_returns_small_normalized_repository_projection() -> Non
     envelope, contract = _bundle(identity)
     checked = validate_native_consumer_bundle(envelope, contract)
     assert checked["valid"] is True
+    assert "authority" in checked
     assert checked["authority"] == "repository-intelligence-only"
-    normalized = checked["normalized"]
-    assert normalized["producer"]["implementation_identity"] == identity
+    assert "normalized" in checked
+    normalized = assert_object(checked["normalized"])
+    assert assert_object(normalized["producer"])["implementation_identity"] == identity
     assert (
         normalized["repository_identity"]
-        == envelope["repository"]["repository_identity"]
+        == assert_object(envelope["repository"])["repository_identity"]
     )
-    assert normalized["source_identity"] == envelope["repository"]["source_identity"]
+    assert (
+        normalized["source_identity"]
+        == assert_object(envelope["repository"])["source_identity"]
+    )
     assert (
         normalized["membership_identity"]
-        == envelope["selection"]["membership_identity"]
+        == assert_object(envelope["selection"])["membership_identity"]
     )
     assert normalized["selection_identity"] == envelope["envelope_identity"]
     assert normalized["stale"] is False
@@ -158,7 +173,7 @@ def test_consumer_bundle_can_require_fresh_repository_evidence() -> None:
     assert validate_native_consumer_bundle(envelope, contract)["valid"] is True
     checked = validate_native_consumer_bundle(envelope, contract, require_fresh=True)
     assert checked["valid"] is False
-    assert "fresh-evidence-required" in checked["reasons"]
+    assert "fresh-evidence-required" in assert_array(checked["reasons"])
 
 
 def test_consumer_bundle_rejects_unknown_native_authority_fields_even_with_recomputed_identity() -> (
@@ -177,7 +192,9 @@ def test_consumer_bundle_rejects_unknown_native_authority_fields_even_with_recom
     # Contract construction itself must fail closed on the unsupported producer field.
     checked = validate_native_consumer_bundle(tampered, {})
     assert checked["valid"] is False
-    assert "envelope:unexpected-envelope-field:timeout" in checked["reasons"]
+    assert "envelope:unexpected-envelope-field:timeout" in assert_array(
+        checked["reasons"]
+    )
 
 
 def test_consumer_bundle_rejects_unknown_nested_native_fields() -> None:
@@ -186,14 +203,16 @@ def test_consumer_bundle_rejects_unknown_nested_native_fields() -> None:
     identity = "sha256:" + "a" * 64
     envelope, _contract = _bundle(identity)
     tampered = deepcopy(envelope)
-    tampered["repository"]["workers"] = 8
+    assert_object(tampered["repository"])["workers"] = 8
     payload = {
         key: value for key, value in tampered.items() if key != "envelope_identity"
     }
     tampered["envelope_identity"] = _identity(SELECTION_ENVELOPE_SCHEMA, payload)
     checked = validate_native_consumer_bundle(tampered, {})
     assert checked["valid"] is False
-    assert "envelope:unexpected-repository-field:workers" in checked["reasons"]
+    assert "envelope:unexpected-repository-field:workers" in assert_array(
+        checked["reasons"]
+    )
 
 
 def test_consumer_bundle_rejects_unknown_producer_and_member_fields() -> None:
@@ -216,20 +235,24 @@ def test_consumer_bundle_rejects_unknown_producer_and_member_fields() -> None:
         ),
     ):
         tampered = deepcopy(envelope)
-        tampered[section][key] = value
+        assert_object(tampered[section])[key] = value
         payload = {k: v for k, v in tampered.items() if k != "envelope_identity"}
         tampered["envelope_identity"] = _identity(SELECTION_ENVELOPE_SCHEMA, payload)
         checked = validate_native_consumer_bundle(tampered, {})
         assert checked["valid"] is False
-        assert expected_reason in checked["reasons"]
+        assert expected_reason in assert_array(checked["reasons"])
 
     tampered = deepcopy(envelope)
-    tampered["selection"]["members"][0]["isolated_process"] = True
+    assert_object(assert_records(assert_object(tampered["selection"])["members"])[0])[
+        "isolated_process"
+    ] = True
     payload = {k: v for k, v in tampered.items() if k != "envelope_identity"}
     tampered["envelope_identity"] = _identity(SELECTION_ENVELOPE_SCHEMA, payload)
     checked = validate_native_consumer_bundle(tampered, {})
     assert checked["valid"] is False
-    assert "envelope:unexpected-member-field:isolated_process" in checked["reasons"]
+    assert "envelope:unexpected-member-field:isolated_process" in assert_array(
+        checked["reasons"]
+    )
 
 
 def test_consumer_bundle_rejects_unsupported_native_schema_even_when_rehashed() -> None:
@@ -245,25 +268,26 @@ def test_consumer_bundle_rejects_unsupported_native_schema_even_when_rehashed() 
     tampered["envelope_identity"] = _identity(SELECTION_ENVELOPE_SCHEMA, payload)
     checked = validate_native_consumer_bundle(tampered, {})
     assert checked["valid"] is False
-    assert "envelope:unsupported-envelope-schema" in checked["reasons"]
+    assert "envelope:unsupported-envelope-schema" in assert_array(checked["reasons"])
 
 
 def test_invalid_bundle_never_emits_normalized_projection() -> None:
     identity = "sha256:" + "a" * 64
     envelope, contract = _bundle(identity)
-    envelope["repository"]["codemap_generation"] = True
+    assert_object(envelope["repository"])["codemap_generation"] = True
     checked = validate_native_consumer_bundle(envelope, contract)
     assert checked["valid"] is False
-    assert "envelope:invalid-codemap-generation" in checked["reasons"]
+    assert "envelope:invalid-codemap-generation" in assert_array(checked["reasons"])
+    assert "normalized" in checked
     assert checked["normalized"] is None
 
 
 def test_native_handoff_validator_fails_closed_for_nonportable_payload(
-    repository_qualification_handoff,
+    repository_qualification_handoff: dict[str, object],
 ) -> None:
     tampered = deepcopy(repository_qualification_handoff)
     tampered["nonportable"] = float("nan")
     result = validate_native_qualification_handoff(tampered)
     assert result["valid"] is False
-    assert "handoff-not-canonical-json" in result["reasons"]
+    assert "handoff-not-canonical-json" in assert_array(result["reasons"])
     assert result["handoff_identity"] is None

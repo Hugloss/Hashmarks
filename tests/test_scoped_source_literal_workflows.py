@@ -32,17 +32,17 @@ def test_literal_display_conserves_member_counts_and_original_locations(
     for path, source in sources.items():
         (tmp_path / path).write_bytes(source.encode("utf-8"))
     with CodeMap(tmp_path) as cm:
-        cm.sync()
-        packet: Any = cm.scoped_source_literals(
+        cm.index.sync()
+        packet: Any = cm.source.scoped_literals(
             ["c.py", "a.py", "b.py", "a.py"],
             ["missing", "ZipInfo", "Zip"],
             limit=limit,
             context_lines=1,
         )
-        reordered = cm.scoped_source_literals(
+        reordered = cm.source.scoped_literals(
             list(sources), ["Zip", "missing", "ZipInfo"], limit=limit, context_lines=1
         )
-        single: Any = cm.scoped_source_occurrences(
+        single: Any = cm.source.scoped_occurrences(
             list(sources), "ZipInfo", context_lines=1
         )
     assert packet == reordered
@@ -84,11 +84,11 @@ def test_manifest_literal_changes_reconcile_and_reopen_without_old_locations(
     paths = ["pyproject.toml", "uv.lock"] if producer == "uv" else ["pom.xml"]
     literals = ["dummy-dep", "1.0.0", "2.0.0"]
     with CodeMap(root, state_dir=state) as cm:
-        cm.sync()
-        before: Any = cm.scoped_source_literals(paths, literals)
+        cm.index.sync()
+        before: Any = cm.source.scoped_literals(paths, literals)
         saved = deepcopy(before)
         materialize_dependency(root, native_dependency_corpus / producer / "v2")
-        unsynced: Any = cm.scoped_source_literals(paths, literals)
+        unsynced: Any = cm.source.scoped_literals(paths, literals)
         # Unindexed manifests expose their freshly captured bytes directly;
         # source completeness does not prove repository freshness.
         assert unsynced["source_coverage"] == "complete"
@@ -99,8 +99,8 @@ def test_manifest_literal_changes_reconcile_and_reopen_without_old_locations(
             for row in unsynced["literal_observations"]
         )
         assert all(row["literal"] != "1.0.0" for row in unsynced["occurrences"])
-        cm.sync(paths)
-        after: Any = cm.scoped_source_literals(paths, literals)
+        cm.index.sync(paths)
+        after: Any = cm.source.scoped_literals(paths, literals)
         assert before == saved
     for packet, version in ((before, "1.0.0"), (after, "2.0.0")):
         facts = {row["literal"]: row for row in packet["literal_observations"]}
@@ -115,7 +115,7 @@ def test_manifest_literal_changes_reconcile_and_reopen_without_old_locations(
     assert old["member_revision"] != new["member_revision"]
     assert old["evidence_identity"] != new["evidence_identity"]
     with CodeMap(root, state_dir=state) as cm:
-        reopened: Any = cm.scoped_source_literals(paths, literals)
+        reopened: Any = cm.source.scoped_literals(paths, literals)
         assert reopened == after
 
 
@@ -129,20 +129,20 @@ def test_manifest_literal_rename_delete_and_reopen_preserve_missing_scope(
     renamed = "moved-" + target
     literals = ["dummy-dep", "1.0.0", "2.0.0"]
     with CodeMap(root, state_dir=state) as cm:
-        cm.sync()
+        cm.index.sync()
         (root / target).rename(root / renamed)
-        missing: Any = cm.scoped_source_literals([target], literals)
+        missing: Any = cm.source.scoped_literals([target], literals)
         assert missing["source_coverage"] == "unknown"
         assert missing["exact_match_count"] is None
         assert all(row["path"] != target for row in missing["occurrences"])
-        cm.sync([target, renamed])
-        renamed_packet: Any = cm.scoped_source_literals([renamed], literals)
+        cm.index.sync([target, renamed])
+        renamed_packet: Any = cm.source.scoped_literals([renamed], literals)
         assert all(row["path"] == renamed for row in renamed_packet["occurrences"])
         assert renamed_packet["exact_match_count"] == (4 if producer == "uv" else 2)
         (root / renamed).unlink()
-        cm.sync([renamed])
+        cm.index.sync([renamed])
     with CodeMap(root, state_dir=state) as cm:
-        deleted: Any = cm.scoped_source_literals([renamed], literals)
+        deleted: Any = cm.source.scoped_literals([renamed], literals)
     assert deleted["occurrences"] == []
     assert deleted["exact_match_count"] is None
     assert deleted["negative_evidence"] == "not-admissible"
@@ -166,8 +166,8 @@ def test_literal_partial_scope_preserves_positive_rows_without_absence(
     if content is not None:
         (tmp_path / path).write_bytes(content)
     with CodeMap(tmp_path) as cm:
-        cm.sync()
-        packet: Any = cm.scoped_source_literals(
+        cm.index.sync()
+        packet: Any = cm.source.scoped_literals(
             ["safe.py", path],
             ["needle", "absent"],
             max_member_bytes=32,
@@ -222,8 +222,8 @@ def test_real_identity_watcher_qualifies_absence_then_invalidates_immediate_edit
     try:
         client.input_root(["a.py"])
         with CodeMap(root, state_dir=state) as cm:
-            cm.sync()
-            before: Any = cm.scoped_source_literals(
+            cm.index.sync()
+            before: Any = cm.source.scoped_literals(
                 ["a.py"], ["left", "right", "absent"], limit=1
             )
             assert before["freshness"] == "current"
@@ -236,15 +236,15 @@ def test_real_identity_watcher_qualifies_absence_then_invalidates_immediate_edit
             )
             assert_literal_returned_counts(before)
             target.write_text("value = 'left right absent'\n", encoding="utf-8")
-            stale: Any = cm.scoped_source_literals(
+            stale: Any = cm.source.scoped_literals(
                 ["a.py"], ["left", "absent"], limit=1
             )
             assert stale["freshness"] == "stale"
             assert stale["source_coverage"] == "unknown"
             assert stale["exact_match_count"] is None
             assert stale["occurrences"] == []
-            cm.sync(["a.py"])
-            after: Any = cm.scoped_source_literals(
+            cm.index.sync(["a.py"])
+            after: Any = cm.source.scoped_literals(
                 ["a.py"], ["left", "absent"], limit=1
             )
             assert after["freshness"] == "current"
@@ -255,7 +255,7 @@ def test_real_identity_watcher_qualifies_absence_then_invalidates_immediate_edit
             )
             assert_literal_returned_counts(after)
         with CodeMap(root, state_dir=state) as cm:
-            reopened: Any = cm.scoped_source_literals(["a.py"], ["unseen"])
+            reopened: Any = cm.source.scoped_literals(["a.py"], ["unseen"])
         assert reopened["freshness"] == "current"
         assert reopened["exact_match_count"] == 0
         assert reopened["negative_evidence"] == (

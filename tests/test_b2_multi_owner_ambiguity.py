@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from contract_assertions import assert_object
+
 from hashmarks.codemap import CodeMap
 
 
@@ -42,11 +44,11 @@ def test_dual_live_task_local_owners_require_discrimination(tmp_path: Path) -> N
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        action = codemap.task_action_map(
+        codemap.index.sync()
+        action = codemap.tasks.action_map(
             "Fix quartz_dual transform behavior across both active product paths"
         )
-        packet = codemap.task_decision_packet(
+        packet = codemap.tasks.decision_packet(
             "Fix quartz_dual transform behavior across both active product paths"
         )
 
@@ -54,8 +56,8 @@ def test_dual_live_task_local_owners_require_discrimination(tmp_path: Path) -> N
     assert action["ambiguity"]["reason"] == "multiple-task-local-structural-owners"
     assert len(action["ambiguity"]["task_local_structural_owners"]) == 2
     assert action["ownership_authority"]["owner_resolved"] is False
-    assert packet["discrimination"]["needed"] is True
-    assert packet["discrimination"]["reason"] == "competing-action-roles"
+    assert assert_object(packet["discrimination"])["needed"] is True
+    assert assert_object(packet["discrimination"])["reason"] == "competing-action-roles"
 
 
 def test_multiple_task_local_tests_for_same_candidate_remain_unproven(
@@ -77,9 +79,9 @@ def test_multiple_task_local_tests_for_same_candidate_remain_unproven(
         )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        action = codemap.task_action_map("Fix quartz_single transform behavior")
-        packet = codemap.task_decision_packet("Fix quartz_single transform behavior")
+        codemap.index.sync()
+        action = codemap.tasks.action_map("Fix quartz_single transform behavior")
+        packet = codemap.tasks.decision_packet("Fix quartz_single transform behavior")
 
     assert action["ambiguity"]["ambiguous"] is False
     assert action["ambiguity"]["task_local_structural_owners"] == [
@@ -87,6 +89,6 @@ def test_multiple_task_local_tests_for_same_candidate_remain_unproven(
     ]
     assert action["ownership_authority"]["owner_resolved"] is False
     assert action["ownership_authority"]["candidate_owner"] == "src/feature/engine.py"
-    assert packet["edit"]["path"] == "src/feature/engine.py"
-    assert packet["discrimination"]["needed"] is True
-    assert packet["discrimination"]["reason"] == "ownership-unresolved"
+    assert assert_object(packet["edit"])["path"] == "src/feature/engine.py"
+    assert assert_object(packet["discrimination"])["needed"] is True
+    assert assert_object(packet["discrimination"])["reason"] == "ownership-unresolved"

@@ -20,14 +20,14 @@ def packet(
     workspace: Path, query: str, *, mode: str, limit: int = 20
 ) -> dict[str, object]:
     with CodeMap(workspace) as cm:
-        cm.sync()
-        entry = cm.task_entry_points(query, limit=limit)
-        rec = [r for r in entry.get("recommended", []) if isinstance(r, dict)]
-        ambiguity = (
-            entry.get("ambiguity", {})
-            if isinstance(entry.get("ambiguity"), dict)
-            else {}
-        )
+        cm.index.sync()
+        entry = cm.tasks.entry_points(query, limit=limit)
+        recommended = entry.get("recommended", [])
+        if not isinstance(recommended, list):
+            raise ValueError("recommended entries must be a list")
+        rec = [r for r in recommended if isinstance(r, dict)]
+        raw_ambiguity = entry.get("ambiguity", {})
+        ambiguity = raw_ambiguity if isinstance(raw_ambiguity, dict) else {}
         alternatives = [
             dict(r) for r in ambiguity.get("alternatives", []) if isinstance(r, dict)
         ]
@@ -40,7 +40,7 @@ def packet(
             if resolved.get("resolved") and resolved.get("target"):
                 chosen = str(resolved["target"])
                 resolution = "selective-scout-" + str(resolved.get("reason"))
-        verify_hits = cm.find_task(query + " test verification", limit=limit)
+        verify_hits = cm.search.find_task(query + " test verification", limit=limit)
         verify = next(
             (
                 h.path

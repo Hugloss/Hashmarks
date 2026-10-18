@@ -9,7 +9,7 @@ import time
 import tracemalloc
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import TypedDict, cast
 from unittest.mock import patch
 
 from hashmarks import CodeMap
@@ -105,13 +105,22 @@ def _adapt_material(
     )
 
 
+class _RealStateData(TypedDict):
+    snapshot: dict[str, object]
+    artifact_bytes: int
+    snapshot_bytes: int
+    adapter_semantics: str
+    adapter_latency: dict[str, int]
+    adapter_peak_tracemalloc_bytes: int
+
+
 def _real_state_data(
     fixture_root: Path,
     producer: str,
     state: str,
     *,
     iterations: int,
-) -> dict[str, object]:
+) -> _RealStateData:
     material = _producer_material(fixture_root, producer, state)
     expected = _adapt_material(producer, material)
     latency, peak, last = _measure_calls(
@@ -121,11 +130,14 @@ def _real_state_data(
     if last != expected:
         raise RuntimeError("real producer adapter output changed across repeated calls")
     producer_metadata = expected["producer"]
+    assert isinstance(producer_metadata, dict)
+    adapter_semantics = producer_metadata["adapter_semantics"]
+    assert isinstance(adapter_semantics, str)
     return {
         "snapshot": expected,
         "artifact_bytes": sum(len(value) for value in material.values()),
         "snapshot_bytes": _json_bytes(expected),
-        "adapter_semantics": producer_metadata["adapter_semantics"],
+        "adapter_semantics": adapter_semantics,
         "adapter_latency": latency,
         "adapter_peak_tracemalloc_bytes": peak,
     }
@@ -136,7 +148,7 @@ def _qualify_timed(
     snapshot: dict[str, object],
 ) -> tuple[dict[str, object], int]:
     started = time.perf_counter_ns()
-    packet = codemap.dependency_resolution_evidence(snapshot)
+    packet = codemap.dependencies.observe(snapshot)
     return packet, time.perf_counter_ns() - started
 
 
@@ -164,7 +176,7 @@ def _measure_real_transition(
     codemap: CodeMap,
     state_dir: Path,
     producer: str,
-    states: dict[str, dict[str, object]],
+    states: dict[str, _RealStateData],
     transition: tuple[str, str],
     iterations: int,
 ) -> dict[str, object]:
@@ -177,19 +189,19 @@ def _measure_real_transition(
         codemap,
         states[after_state]["snapshot"],
     )
-    explanation = codemap.dependency_resolution_explain(after)
-    delta = codemap.dependency_resolution_delta(before, after)
+    explanation = codemap.dependencies.explain(after)
+    delta = codemap.dependencies.delta(before, after)
     state_bytes_before = _directory_bytes(state_dir)
     operations = {
         "explain_after": _explicit_operation_metrics(
             codemap,
-            lambda: codemap.dependency_resolution_explain(after),
+            lambda: codemap.dependencies.explain(after),
             expected=explanation,
             iterations=iterations,
         ),
         "delta": _explicit_operation_metrics(
             codemap,
-            lambda: codemap.dependency_resolution_delta(before, after),
+            lambda: codemap.dependencies.delta(before, after),
             expected=delta,
             iterations=iterations,
         ),
@@ -216,7 +228,8 @@ def _measure_real_transition(
         ),
         "operations": operations,
         "repository_reobservation_calls": sum(
-            int(row["repository_reobservation_calls"]) for row in operations.values()
+            cast(int, row["repository_reobservation_calls"])
+            for row in operations.values()
         ),
         "persistent_state_growth_bytes": state_bytes_after - state_bytes_before,
         "producer": producer,
@@ -224,7 +237,7 @@ def _measure_real_transition(
 
 
 def _real_state_receipt(
-    states: dict[str, dict[str, object]],
+    states: dict[str, _RealStateData],
 ) -> dict[str, dict[str, object]]:
     return {
         state: {key: value for key, value in row.items() if key != "snapshot"}
@@ -251,7 +264,7 @@ def measure_real_producer_economics(
         state_dir = root / "state"
         workspace.mkdir()
         with CodeMap(workspace, state_dir=state_dir) as codemap:
-            codemap.sync()
+            codemap.index.sync()
             for producer, transitions in _REAL_TRANSITIONS.items():
                 state_names = sorted({state for pair in transitions for state in pair})
                 states = {
@@ -437,13 +450,13 @@ def _fixture(root: Path, scale: int) -> tuple[Path, Path]:
 
 def _qualify_packets(codemap: CodeMap, scale: int) -> dict[str, dict[str, object]]:
     return {
-        "dependency_before": codemap.dependency_resolution_evidence(
+        "dependency_before": codemap.dependencies.observe(
             _dependency_snapshot(scale, changed=False)
         ),
-        "dependency_after": codemap.dependency_resolution_evidence(
+        "dependency_after": codemap.dependencies.observe(
             _dependency_snapshot(scale, changed=True)
         ),
-        "declaration": codemap.repository_declarations(_declaration_groups(scale)),
+        "declaration": codemap.declarations.observe(_declaration_groups(scale)),
     }
 
 
@@ -455,9 +468,9 @@ def _baseline_outputs(
     after = packets["dependency_after"]
     declaration = packets["declaration"]
     return {
-        "dependency_explain": codemap.dependency_resolution_explain(before),
-        "dependency_delta": codemap.dependency_resolution_delta(before, after),
-        "declaration_explain": codemap.repository_declaration_explain(declaration),
+        "dependency_explain": codemap.dependencies.explain(before),
+        "dependency_delta": codemap.dependencies.delta(before, after),
+        "declaration_explain": codemap.declarations.explain(declaration),
     }
 
 
@@ -469,16 +482,16 @@ def _explicit_operation_metrics(
     iterations: int,
 ) -> dict[str, object]:
     repository_observation_calls = 0
-    original_observer = getattr(codemap, "_repository_member_observation")
+    original_observer = codemap.source.member
 
-    def counted_observer(*args: Any, **kwargs: Any):
+    def counted_observer(relpath: str, *, include_bytes: bool = False) -> object:
         nonlocal repository_observation_calls
         repository_observation_calls += 1
-        return original_observer(*args, **kwargs)
+        return original_observer(relpath, include_bytes=include_bytes)
 
     with patch.object(
-        codemap,
-        "_repository_member_observation",
+        codemap.source,
+        "member",
         side_effect=counted_observer,
     ):
         latency, peak, last = _measure_calls(operation, iterations=iterations)
@@ -540,7 +553,8 @@ def _receipt(
         "serialized_size": _storage_economics(packets, baselines),
         "operations": operations,
         "repository_reobservation_calls": sum(
-            int(row["repository_reobservation_calls"]) for row in operations.values()
+            cast(int, row["repository_reobservation_calls"])
+            for row in operations.values()
         ),
         "persistent_state_bytes": {
             "before": before_state_bytes,
@@ -578,22 +592,20 @@ def measure_derived_authority_economics(
     with tempfile.TemporaryDirectory(prefix="hashmarks-derived-authority-") as raw_root:
         workspace, state_dir = _fixture(Path(raw_root), scale)
         with CodeMap(workspace, state_dir=state_dir) as codemap:
-            codemap.sync()
+            codemap.index.sync()
             packets = _qualify_packets(codemap, scale)
             baselines = _baseline_outputs(codemap, packets)
             state_bytes_before = _directory_bytes(state_dir)
             operations = {
                 "dependency_explain": _explicit_operation_metrics(
                     codemap,
-                    lambda: codemap.dependency_resolution_explain(
-                        packets["dependency_before"]
-                    ),
+                    lambda: codemap.dependencies.explain(packets["dependency_before"]),
                     expected=baselines["dependency_explain"],
                     iterations=iterations,
                 ),
                 "dependency_delta": _explicit_operation_metrics(
                     codemap,
-                    lambda: codemap.dependency_resolution_delta(
+                    lambda: codemap.dependencies.delta(
                         packets["dependency_before"],
                         packets["dependency_after"],
                     ),
@@ -602,9 +614,7 @@ def measure_derived_authority_economics(
                 ),
                 "declaration_explain": _explicit_operation_metrics(
                     codemap,
-                    lambda: codemap.repository_declaration_explain(
-                        packets["declaration"]
-                    ),
+                    lambda: codemap.declarations.explain(packets["declaration"]),
                     expected=baselines["declaration_explain"],
                     iterations=iterations,
                 ),

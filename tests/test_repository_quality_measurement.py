@@ -138,7 +138,7 @@ def test_measurement_health_reports_ranking_retention_and_comparability() -> Non
         {"peak_memory_bytes": -1},
     ],
 )
-def test_negative_economics_fail_closed(economics) -> None:
+def test_negative_economics_fail_closed(economics: dict[str, int]) -> None:
     with pytest.raises(ValueError, match="non-negative"):
         _measurement(
             measurements=MeasurementInputs(

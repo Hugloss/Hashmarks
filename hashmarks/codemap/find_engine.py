@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, cast
 
@@ -11,11 +12,15 @@ from .model import EvidenceVisibility, SearchHit
 from .query_primitives import _WORD_RE, _query_terms
 from .query_router import QueryRoute, route_query
 from .repository_domains import RepositoryDomain, classify_repository_path
+from .retrieval_diagnostics import RetrievalDiagnosticsMixin
+from .singleflight import SingleFlight
+from .task_retrieval import TaskRetrievalMixin, _TaskRetrievalResult
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping, Sequence
 
-    from .engine import CodeMap
+    from .decision_session import DecisionScope
+    from .native_evidence import RepositoryNativeEvidence
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +48,7 @@ class _FindContext:
 class _FindEvidence:
     hits: tuple[SearchHit, ...]
     bound_reasons: tuple[str, ...]
+    route: QueryRoute
 
 
 @dataclass
@@ -57,7 +63,11 @@ def _optional_str(value: object) -> str | None:
 
 
 def _optional_int(value: object) -> int | None:
-    return None if value is None else int(value)
+    if value is None:
+        return None
+    if not isinstance(value, (int, float, str, bytes, bytearray)):
+        raise TypeError("indexed integer must be a scalar")
+    return int(value)
 
 
 def _find_claim_scope(intent: str) -> str:
@@ -140,7 +150,46 @@ def _find_claim_fields(
     }
 
 
-class FindEngineMixin:
+class RepositorySearch(TaskRetrievalMixin, RetrievalDiagnosticsMixin):
+    """Own candidate retrieval, deterministic ranking and retrieval reuse."""
+
+    def __init__(self, native: RepositoryNativeEvidence) -> None:
+        source = native.source
+        self.source = source
+        self.native = native
+        self.files = source.files
+        self.index = source.index
+        self.store = source.store
+        self.workspace = source.workspace
+        self._find_flight: SingleFlight[_FindEvidence] = SingleFlight()
+        self._task_result_cache: dict[tuple[int, str, int], _TaskRetrievalResult] = {}
+        self._task_recent_retrieval_paths: dict[tuple[str, int], tuple[str, ...]] = {}
+
+    @property
+    def reads(self) -> DecisionScope:
+        return self.source.reads
+
+    def retrieval_freshness_inputs(
+        self, task: str, limit: int
+    ) -> tuple[_TaskRetrievalResult | None, tuple[str, ...]]:
+        """Return cached contributors for reconciliation, without claiming currentness."""
+        key = (self.store.generation(), task, int(limit))
+        return self._task_result_cache.get(key), self._task_recent_retrieval_paths.get(
+            (task, int(limit)), ()
+        )
+
+    def _recent_changed_paths(self) -> set[str]:
+        raw = self.store.meta("recent_changed_paths", "[]") or "[]"
+        try:
+            value = json.loads(raw)
+        except json.JSONDecodeError:
+            return set()
+        return (
+            {str(item) for item in value if isinstance(item, str)}
+            if isinstance(value, list)
+            else set()
+        )
+
     def query_route(self, query: str) -> QueryRoute:
         """Return the deterministic retrieval route without executing search."""
         return route_query(query)
@@ -155,18 +204,16 @@ class FindEngineMixin:
         return self._find_evidence(query, limit=limit).hits
 
     @decision_scoped
-    def find_packet(
+    def packet(
         self,
         query: str,
         *,
         limit: int = FIND_DEFAULT_OPTIONS.limit,
     ) -> dict[str, object]:
         """Return the canonical repository find observation for every transport."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         evidence = self._find_evidence(query, limit=limit)
-        route = self.query_route(query)
-        generation, identity_generation, stale = self._generation_status()
+        route = evidence.route
+        generation, identity_generation, stale = self.reads.generation_status()
         freshness = freshness_state(stale)
         claims = _find_claim_fields(
             query,
@@ -189,16 +236,14 @@ class FindEngineMixin:
         return validate_operation_response("find", result)
 
     def _find_evidence(self, query: str, *, limit: int) -> _FindEvidence:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        self._ensure_map_ready()
+        self.reads.ready()
         if not query.strip():
             raise ValueError("query must not be empty")
         key = (
             "find.v1",
             self.store.meta("workspace_fingerprint", "") or "",
             self.store.generation(),
-            self.policy.fingerprint(),
+            self.files.policy_fingerprint(),
             query,
             int(limit),
         )
@@ -221,10 +266,8 @@ class FindEngineMixin:
     def _find_add_exact_candidates(
         self, ctx: _FindContext, candidates: dict[tuple[str, str, str], dict]
     ) -> None:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         bound = max(100, ctx.limit * 8)
-        rows = self._session_exact_symbol_candidates(ctx.terms, limit=bound)
+        rows = self.reads.exact_symbol_candidates(ctx.terms, limit=bound)
         if len(rows) >= bound:
             ctx.bound_reasons.add("find-exact-symbol-limit")
         for row in rows:
@@ -234,21 +277,17 @@ class FindEngineMixin:
     def _find_add_lexical_candidates(
         self, ctx: _FindContext, candidates: dict[tuple[str, str, str], dict]
     ) -> list[dict[str, object]]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         bound = max(80, ctx.limit * 6)
         if len(ctx.terms) > 16:
             ctx.bound_reasons.add("find-lexical-term-limit")
-        lexical_files = self._session_lexical_file_candidates(
-            ctx.terms[:16], limit=bound
-        )
+        lexical_files = self.reads.lexical_file_candidates(ctx.terms[:16], limit=bound)
         if len(lexical_files) >= bound:
             ctx.bound_reasons.add("find-lexical-file-limit")
         term_count = max(1, len(ctx.terms))
         match_by_path: dict[str, int] = {}
         for row in lexical_files:
             path = str(row["path"])
-            matches = int(row.get("matches", 0) or 0)
+            matches = int(cast(int, row.get("matches", 0) or 0))
             match_by_path[path] = matches
             coverage = min(1.0, float(matches) / float(term_count))
             candidates[(path, "", "file")] = {
@@ -267,13 +306,11 @@ class FindEngineMixin:
         lexical_files: Sequence[dict],
         match_by_path: Mapping[str, int],
     ) -> list[dict[str, object]]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         candidate_paths = [str(row["path"]) for row in lexical_files]
         bridge_rows: list[dict[str, object]] = []
         bridge_count: dict[str, int] = {}
         bound = max(1000, ctx.limit * 150)
-        symbol_rows = self._session_symbols_for_paths(candidate_paths, limit=bound)
+        symbol_rows = self.reads.symbols_for_paths(candidate_paths, limit=bound)
         if len(symbol_rows) >= bound:
             ctx.bound_reasons.add("find-lexical-symbol-limit")
         for raw_row in symbol_rows:
@@ -312,13 +349,11 @@ class FindEngineMixin:
     def _find_add_path_candidates(  # noqa: C901
         self, ctx: _FindContext, candidates: dict[tuple[str, str, str], dict]
     ) -> None:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         if ctx.route.path_lookup:
             bound = max(50, ctx.limit * 4)
             if len(ctx.terms) > 8:
                 ctx.bound_reasons.add("find-path-term-limit")
-            rows = self.store.path_candidates(ctx.terms[:8], limit=bound)
+            rows = self.store.path_candidates(list(ctx.terms[:8]), limit=bound)
             if len(rows) >= bound:
                 ctx.bound_reasons.add("find-path-candidate-limit")
             for row in rows:
@@ -338,13 +373,11 @@ class FindEngineMixin:
                 candidates[key] = row
 
     def _find_native_rows(self, ctx: _FindContext) -> list[dict]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         rows: list[dict] = []
         for term in (ctx.query, *ctx.raw_words):
             if term.strip():
                 bound = max(30, ctx.limit * 3)
-                selected = self._fresh_native_definitions(term, limit=bound)
+                selected = self.native._fresh_native_definitions(term, limit=bound)
                 if len(selected) >= bound:
                     ctx.bound_reasons.add("find-native-definition-limit")
                 rows.extend(selected)
@@ -379,12 +412,10 @@ class FindEngineMixin:
     def _find_add_native_candidates(
         self, ctx: _FindContext, candidates: dict[tuple[str, str, str], dict]
     ) -> None:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         if not ctx.route.native_definitions:
             return
         native_rows = self._find_native_rows(ctx)
-        file_rows = self._session_file_rows(str(row["path"]) for row in native_rows)
+        file_rows = self.reads.file_rows(str(row["path"]) for row in native_rows)
         for row in native_rows:
             mapped = file_rows.get(str(row["path"]))
             if mapped is None:
@@ -424,12 +455,12 @@ class FindEngineMixin:
         candidates: Mapping[tuple[str, str, str], dict],
         bridge_rows: Sequence[dict[str, object]],
     ) -> list[str]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         seed_rows = self._find_symbol_seed_rows(candidates, bridge_rows)
         seed_rows.sort(
             key=lambda row: (
-                -self._score(ctx.query, row, tokens=ctx.terms, raw_query=ctx.raw_query)
+                -self._score(
+                    ctx.query, row, tokens=list(ctx.terms), raw_query=ctx.raw_query
+                )
             )
         )
         seed_limit = 12 if ctx.route.intent.value == "relationship" else 8
@@ -454,15 +485,13 @@ class FindEngineMixin:
         candidates: dict[tuple[str, str, str], dict],
         bridge_rows: Sequence[dict[str, object]],
     ) -> None:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         if not ctx.route.caller_expansion:
             return
         seed_names = self._find_caller_seed_names(ctx, candidates, bridge_rows)
-        refs_by_seed = self._session_refs_many(seed_names, limit_per_target=30)
+        refs_by_seed = self.reads.refs_many(seed_names, limit_per_target=30)
         if any(len(rows) >= 30 for rows in refs_by_seed.values()):
             ctx.bound_reasons.add("find-caller-reference-limit")
-        caller_files = self._session_file_rows(self._find_caller_paths(refs_by_seed))
+        caller_files = self.reads.file_rows(self._find_caller_paths(refs_by_seed))
         for seed_name in seed_names:
             self._find_merge_caller_seed(
                 candidates, refs_by_seed.get(seed_name, ()), caller_files
@@ -516,12 +545,12 @@ class FindEngineMixin:
     def _find_semantic_seed_keys(
         self, ctx: _FindContext, candidates: Mapping[tuple[str, str, str], dict]
     ) -> list[tuple[str, str]]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         seeds = self._find_exact_semantic_seeds(candidates, set(ctx.terms))
         seeds.sort(
             key=lambda row: (
-                -self._score(ctx.query, row, tokens=ctx.terms, raw_query=ctx.raw_query)
+                -self._score(
+                    ctx.query, row, tokens=list(ctx.terms), raw_query=ctx.raw_query
+                )
             )
         )
         seed_limit = (
@@ -545,10 +574,8 @@ class FindEngineMixin:
         type_kinds: set[str],
         bound_reasons: set[str],
     ) -> set[str]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         targets: set[str] = set()
-        edges_by_seed = self._session_edges_from_many(seed_keys, limit_per_seed=24)
+        edges_by_seed = self.reads.edges_from_many(seed_keys, limit_per_seed=24)
         if any(len(rows) >= 24 for rows in edges_by_seed.values()):
             bound_reasons.add("find-semantic-edge-limit")
         for seed_key in seed_keys:
@@ -566,15 +593,11 @@ class FindEngineMixin:
         targets: set[str],
         bound_reasons: set[str],
     ) -> set[tuple[str, str]]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         protected: set[tuple[str, str]] = set()
         if not targets:
             return protected
         bound = max(24, len(targets) * 8)
-        related_rows = self._session_exact_symbol_candidates(
-            sorted(targets), limit=bound
-        )
+        related_rows = self.reads.exact_symbol_candidates(sorted(targets), limit=bound)
         if len(related_rows) >= bound:
             bound_reasons.add("find-semantic-target-limit")
         for related in related_rows:
@@ -598,14 +621,12 @@ class FindEngineMixin:
     def _find_search_hit(
         self, ctx: _FindContext, row: Mapping[str, object], recent: set[str]
     ) -> SearchHit | None:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         score = self._score(
             ctx.query,
-            row,
+            dict(row),
             ranks=None,
             recent=recent,
-            tokens=ctx.terms,
+            tokens=list(ctx.terms),
             raw_query=ctx.raw_query,
         )
         if score <= 0:
@@ -628,8 +649,6 @@ class FindEngineMixin:
     def _find_rank_candidates(
         self, ctx: _FindContext, candidates: Mapping[tuple[str, str, str], dict]
     ) -> list[SearchHit]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         domain_rows = self._apply_repository_domain_hints(
             tuple(candidates.values()), ctx.route
         )
@@ -678,12 +697,12 @@ class FindEngineMixin:
     def _find_control_hits(
         route: QueryRoute, ranked: Sequence[SearchHit], limit: int
     ) -> list[SearchHit]:
-        wanted = FindEngineMixin._find_control_domains(route)
+        wanted = RepositorySearch._find_control_domains(route)
         hits: list[SearchHit] = []
         covered: set[RepositoryDomain] = set()
         quota = min(4, max(1, limit // 5))
         for hit in ranked:
-            matches = FindEngineMixin._find_control_matches(hit, wanted, covered)
+            matches = RepositorySearch._find_control_matches(hit, wanted, covered)
             if not matches:
                 continue
             hits.append(hit)
@@ -802,4 +821,4 @@ class FindEngineMixin:
         hits = self._find_select_diverse(ctx, ranked, protected)
         if len(ranked) > limit:
             ctx.bound_reasons.add("find-result-limit")
-        return _FindEvidence(hits, tuple(sorted(ctx.bound_reasons)))
+        return _FindEvidence(hits, tuple(sorted(ctx.bound_reasons)), ctx.route)

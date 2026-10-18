@@ -37,3 +37,18 @@ def write_json(path: Path, value: object) -> None:
         json.dumps(value, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+
+
+def evaluator_implementation_identity() -> str:
+    """Bind durable evaluation work to the code interpreting its inputs."""
+    from pathlib import Path
+
+    root = Path(__file__).parent
+    inputs = {path.name: path.read_bytes().hex() for path in sorted(root.glob("*.py"))}
+    for relative in (
+        "scripts/native_evidence_capture.py",
+        "scripts/native_lsp_capture.py",
+        "benchmarks/research_receipts.py",
+    ):
+        inputs[relative] = (root.parents[1] / relative).read_bytes().hex()
+    return "sha256:" + canonical_sha256(inputs)

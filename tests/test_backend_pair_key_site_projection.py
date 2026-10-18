@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from contract_assertions import assert_object, assert_records
 
 from hashmarks import CodeMap
 from hashmarks.codemap.static_python_interface_declarations import (
@@ -48,8 +50,8 @@ def _provider(*, projected: bool) -> StaticPythonInterfaceDeclarations:
 
 def _observe(root: Path, *, projected: bool) -> dict:
     with CodeMap(root) as cm:
-        cm.sync()
-        return cm.discover_repository_declarations([_provider(projected=projected)])
+        cm.index.sync()
+        return cm.declarations.discover([_provider(projected=projected)])
 
 
 def _paired_group(packet: dict) -> dict:
@@ -175,18 +177,20 @@ def test_c08_explicit_opt_in_preserves_prior_pair_packet_and_identity(
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as cm:
-        cm.sync()
-        prior = cm.discover_repository_declarations(
+        cm.index.sync()
+        prior = cm.declarations.discover(
             [
                 StaticPythonInterfaceDeclarations(
                     paths=("api.py", "client.py"), consumer_pairs=PAIRS
                 )
             ]
         )
-        off = cm.discover_repository_declarations([_provider(projected=False)])
-        on = cm.discover_repository_declarations([_provider(projected=True)])
+        off = cm.declarations.discover([_provider(projected=False)])
+        on = cm.declarations.discover([_provider(projected=True)])
     assert prior == off
-    assert "pair_key_site_projection" not in prior["providers"][0]["provenance"]
+    assert "pair_key_site_projection" not in assert_object(
+        assert_records(prior["providers"])[0]["provenance"]
+    )
     assert prior["observation_identity"] != on["observation_identity"]
     assert "literal_key_site_projection" not in json.dumps(prior)
     assert _key_site_projection(on)["state"] == "bounded-direct-literal-site-projection"
@@ -195,10 +199,11 @@ def test_c08_explicit_opt_in_preserves_prior_pair_packet_and_identity(
 @pytest.mark.parametrize("invalid", [None, 1, "true", [], {}, 0])
 def test_c08_option_type_is_rejected_before_source_reads(invalid: object) -> None:
     with pytest.raises(ValueError, match="include_pair_key_site_projection"):
-        StaticPythonInterfaceDeclarations(
-            paths=("api.py", "client.py"),
-            consumer_pairs=PAIRS,
-            include_pair_key_site_projection=invalid,  # type: ignore[arg-type]
+        replace(
+            StaticPythonInterfaceDeclarations(
+                paths=("api.py", "client.py"), consumer_pairs=PAIRS
+            ),
+            include_pair_key_site_projection=invalid,
         )
 
 
@@ -234,8 +239,8 @@ def test_c08_named_receiver_scope_and_missing_candidate_are_unknown(
 def test_c08_mutation_rebinds_literal_sites_on_new_revision(tmp_path: Path) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as cm:
-        cm.sync()
-        original = cm.discover_repository_declarations([_provider(projected=True)])
+        cm.index.sync()
+        original = cm.declarations.discover([_provider(projected=True)])
         source = tmp_path / "client.py"
         source.write_text(
             source.read_text(encoding="utf-8").replace(
@@ -243,8 +248,8 @@ def test_c08_mutation_rebinds_literal_sites_on_new_revision(tmp_path: Path) -> N
             ),
             encoding="utf-8",
         )
-        cm.sync(["client.py"])
-        changed = cm.discover_repository_declarations(
+        cm.index.sync(["client.py"])
+        changed = cm.declarations.discover(
             [_provider(projected=True)],
             previous_observation=original,
         )

@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import importlib.util
+import json
 from pathlib import Path
-from typing import Any
 
 import pytest
+from contract_assertions import assert_object, assert_records, assert_text
 
+from hashmarks.codemap.diagnostic_observation import external_diagnostic_observation
 from hashmarks.codemap.repository_delta import (
-    RepositoryDeltaMixin,
     RepositoryGenerationBinding,
 )
 from hashmarks.evidence_presentation import (
@@ -35,7 +36,7 @@ def _repo(root: Path) -> Path:
 
 
 def _diagnostic(*, collection: str, rows: list[dict[str, object]]) -> dict[str, object]:
-    return RepositoryDeltaMixin.external_diagnostic_observation(
+    return external_diagnostic_observation(
         producer="pyright",
         binding=RepositoryGenerationBinding("repo-identity", 1),
         diagnostics=rows,
@@ -71,29 +72,31 @@ def test_structural_comparison_preserves_incomparability(
         assert result["incomparability_reasons"]
         projection = present_repository_evidence(result, format=format)
         assert projection["supported"] is True
-        assert projection["groups"][0]["family"] == "qualification"
-        assert projection["groups"][0]["findings"][0]["kind"] == (
-            "structural_endpoints_incomparable"
-        )
-        row = projection["groups"][0]["findings"][0]
+        assert assert_records(projection["groups"])[0]["family"] == "qualification"
+        assert assert_records(assert_records(projection["groups"])[0]["findings"])[0][
+            "kind"
+        ] == ("structural_endpoints_incomparable")
+        row = assert_records(assert_records(projection["groups"])[0]["findings"])[0]
         assert row["source_refs"] == ["/incomparability_reasons"]
         assert row["details"] == result["incomparability_reasons"]
-        context = projection["source_context"][0]["details"]
+        context = assert_object(
+            assert_records(projection["source_context"])[0]["details"]
+        )
         assert context["comparable"] is False
         assert context["incomparability_reasons"] == result["incomparability_reasons"]
         excluded = {
             section["source_ref"]: section
-            for section in projection["unprojected_sections"]
+            for section in assert_records(projection["unprojected_sections"])
         }
         for field in ("introduced_symbol_ids", "removed_symbol_ids", "dimension_delta"):
             assert excluded["/" + field]["native_item_count"] == 1
         if format == "text":
-            assert '"comparable":false' in projection["text"]
-            assert '"source_ref":"/dimension_delta"' in projection["text"]
+            assert '"comparable":false' in assert_text(projection["text"])
+            assert '"source_ref":"/dimension_delta"' in assert_text(projection["text"])
         assert all(
             row["assertion"] != "observed_change"
-            for group in projection["groups"]
-            for row in group["findings"]
+            for group in assert_records(projection["groups"])
+            for row in assert_records(group["findings"])
         )
     finally:
         surface.close()
@@ -120,11 +123,14 @@ def test_binding_comparison_reuses_current_repository_identity(tmp_path: Path) -
         )
         result = surface.evidence_comparison(current, current, result_mode="bindings")
         assert result["schema"] == operation_schema("evidence_comparison", "bindings")
-        assert result["bindings"]["preserved"] == ["consumer:scope"]
-        assert result["bindings"]["changed"] == []
+        assert assert_object(result["bindings"])["preserved"] == ["consumer:scope"]
+        assert assert_object(result["bindings"])["changed"] == []
         foreign = {
             **current,
-            "repository": {**current["repository"], "repository_identity": "foreign"},
+            "repository": {
+                **assert_object(current["repository"]),
+                "repository_identity": "foreign",
+            },
         }
         with pytest.raises(McpSurfaceError, match="mismatch"):
             surface.evidence_comparison(current, foreign, result_mode="bindings")
@@ -133,7 +139,7 @@ def test_binding_comparison_reuses_current_repository_identity(tmp_path: Path) -
 
 
 def test_incomplete_diagnostics_never_imply_resolution(tmp_path: Path) -> None:
-    original = {
+    original: dict[str, object] = {
         "tool": "pyright",
         "rule": "E1",
         "path": "src/owner.py",
@@ -153,18 +159,25 @@ def test_incomplete_diagnostics_never_imply_resolution(tmp_path: Path) -> None:
             changed_paths=["src/owner.py"],
         )
         assert delta["schema"] == operation_schema("evidence_comparison", "diagnostics")
-        qualification = delta["diagnostics"]["qualification"]
-        assert qualification["qualified_removed_identities"] == []
-        assert qualification["unqualified_removed_identities"] == [
-            before["diagnostics"][0]["identity"]
+        qualification = assert_object(delta["diagnostics"])["qualification"]
+        assert assert_object(qualification)["qualified_removed_identities"] == []
+        assert assert_object(qualification)["unqualified_removed_identities"] == [
+            assert_records(before["diagnostics"])[0]["identity"]
         ]
         projection = present_repository_evidence(delta, format="structured")
-        assert projection["groups"][0]["family"] == "diagnostic"
-        assert projection["groups"][0]["findings"][0]["assertion"] == "producer_claim"
+        assert assert_records(projection["groups"])[0]["family"] == "diagnostic"
+        assert (
+            assert_records(assert_records(projection["groups"])[0]["findings"])[0][
+                "assertion"
+            ]
+            == "producer_claim"
+        )
         with pytest.raises(McpSurfaceError, match="identity mismatch"):
             tampered = {
                 **before,
-                "diagnostics": [{**before["diagnostics"][0], "message": "tampered"}],
+                "diagnostics": [
+                    {**assert_records(before["diagnostics"])[0], "message": "tampered"}
+                ],
             }
             surface.evidence_comparison(tampered, after, result_mode="diagnostics")
     finally:
@@ -177,7 +190,7 @@ def test_diagnostic_comparison_transports_other_member_locality(
     scope = ["src/owner.py", "src/consumer.py"]
 
     def observation(rows: list[dict[str, object]]) -> dict[str, object]:
-        return RepositoryDeltaMixin.external_diagnostic_observation(
+        return external_diagnostic_observation(
             producer="pyright",
             binding=RepositoryGenerationBinding("repo-identity", 1),
             diagnostics=rows,
@@ -196,8 +209,8 @@ def test_diagnostic_comparison_transports_other_member_locality(
         delta = surface.evidence_comparison(
             before, after, result_mode="diagnostics", changed_paths=["src/owner.py"]
         )
-        locality = delta["diagnostics"]["path_locality"]
-        rows = locality["rows"]
+        locality = assert_object(delta["diagnostics"])["path_locality"]
+        rows = assert_records(assert_object(locality)["rows"])
         assert len(rows) == 2
         assert {(row["change_kind"], row["locality"]) for row in rows} == {
             ("removed", "on-reported-changed-path"),
@@ -208,8 +221,8 @@ def test_diagnostic_comparison_transports_other_member_locality(
         presentation = present_repository_evidence(delta, format="compact")
         assert any(
             finding["kind"] == "diagnostic_path_locality"
-            for group in presentation["groups"]
-            for finding in group["findings"]
+            for group in assert_records(presentation["groups"])
+            for finding in assert_records(group["findings"])
         )
     finally:
         surface.close()
@@ -224,18 +237,24 @@ def test_diagnostic_comparison_transports_revision_only_changes(tmp_path: Path) 
     )
     try:
         delta = surface.evidence_comparison(before, after, result_mode="diagnostics")
-        assert delta["source_revisions"]["changed"] is True
-        assert delta["source_revisions"]["before"] == before["source_revisions"]
-        assert delta["source_revisions"]["after"] == after["source_revisions"]
-        assert delta["diagnostics"]["added"] == []
-        assert delta["diagnostics"]["removed"] == []
+        assert assert_object(delta["source_revisions"])["changed"] is True
+        assert (
+            assert_object(delta["source_revisions"])["before"]
+            == before["source_revisions"]
+        )
+        assert (
+            assert_object(delta["source_revisions"])["after"]
+            == after["source_revisions"]
+        )
+        assert assert_object(delta["diagnostics"])["added"] == []
+        assert assert_object(delta["diagnostics"])["removed"] == []
         projection = present_repository_evidence(delta, format="compact")
         assert any(
             row["kind"] == "diagnostic_source_revisions"
             and row["details"] == delta["source_revisions"]
             and row["assertion"] == "producer_claim"
-            for group in projection["groups"]
-            for row in group["findings"]
+            for group in assert_records(projection["groups"])
+            for row in assert_records(group["findings"])
         )
         with pytest.raises(McpSurfaceError, match="source_revisions"):
             surface.evidence_comparison(
@@ -259,7 +278,7 @@ def test_comparison_rejects_unsupported_modes_and_irrelevant_scope(
         with pytest.raises(McpSurfaceError, match="only valid for diagnostics"):
             surface.evidence_comparison({}, {}, changed_paths=["src/owner.py"])
         with pytest.raises(McpSurfaceError, match="must be an object"):
-            surface.evidence_comparison([], {}, result_mode="structural")
+            surface.evidence_comparison(json.loads("[]"), {}, result_mode="structural")
         with pytest.raises(McpSurfaceError, match="exceeds"):
             surface.evidence_comparison({"large": "x" * 600000}, {})
     finally:
@@ -295,7 +314,11 @@ def test_comparable_structural_measurement_retains_exact_source_reference() -> N
         "dimension_delta": {"static_callers": 2},
     }
     projection = present_repository_evidence(packet, format="structured")
-    rows = [row for group in projection["groups"] for row in group["findings"]]
+    rows = [
+        row
+        for group in assert_records(projection["groups"])
+        for row in assert_records(group["findings"])
+    ]
     measurement = next(row for row in rows if row["kind"] == "dimension_delta")
     assert measurement["source_refs"] == ["/dimension_delta"]
     assert measurement["details"] == {"static_callers": 2}
@@ -305,9 +328,12 @@ def test_comparable_structural_measurement_retains_exact_source_reference() -> N
 @pytest.mark.host_mcp_sdk
 @pytest.mark.skipif(not _MCP_AVAILABLE, reason="MCP extra is not installed")
 def test_sdk_comparisons_preserve_real_endpoints_in_all_formats(tmp_path: Path) -> None:
+    from mcp.types import CallToolResult
+
     repo = _repo(tmp_path)
-    server: Any = build_server(repo, state_dir=tmp_path / "state")
-    surface = server._hashmarks_surface
+    server = build_server(repo, state_dir=tmp_path / "state")
+    surface = getattr(server, "_hashmarks_surface", None)
+    assert isinstance(surface, HashmarksMcpSurface)
 
     async def exercise() -> None:
         before = surface.structural_locality("src/owner.py::owner")
@@ -343,6 +369,7 @@ def test_sdk_comparisons_preserve_real_endpoints_in_all_formats(tmp_path: Path) 
             if mode == "diagnostics":
                 request.update(changed_paths=["src/owner.py"], change_set_complete=True)
             baseline = await server.call_tool("evidence_comparison", request)
+            assert isinstance(baseline, CallToolResult)
             assert baseline.is_error is not True
             native = baseline.structured_content
             assert isinstance(native, dict)
@@ -365,6 +392,7 @@ def test_sdk_comparisons_preserve_real_endpoints_in_all_formats(tmp_path: Path) 
                 result = await server.call_tool(
                     "evidence_comparison", {**request, "presentation": format}
                 )
+                assert isinstance(result, CallToolResult)
                 assert result.is_error is not True
                 assert result.structured_content == presentation_response(
                     "evidence_comparison", native, format=format, result_mode=mode

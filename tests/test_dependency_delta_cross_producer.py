@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from contract_assertions import assert_array, assert_records
+
 from hashmarks.adapters import (
     maven_dependency_observation,
     uv_lock_dependency_observation,
@@ -59,10 +61,10 @@ def _maven_inventory(version: str) -> bytes:
 
 def _delta(
     codemap: CodeMap, before_raw: dict[str, object], after_raw: dict[str, object]
-):
-    before = codemap.dependency_resolution_evidence(before_raw)
-    after = codemap.dependency_resolution_evidence(after_raw)
-    return before, after, codemap.dependency_resolution_delta(before, after)
+) -> tuple[dict[str, object], dict[str, object], dict[str, object]]:
+    before = codemap.dependencies.observe(before_raw)
+    after = codemap.dependencies.observe(after_raw)
+    return before, after, codemap.dependencies.delta(before, after)
 
 
 def test_uv_and_maven_version_changes_share_dependency_delta_semantics(
@@ -81,7 +83,7 @@ def test_uv_and_maven_version_changes_share_dependency_delta_semantics(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         uv_b, uv_a, uv_delta = _delta(codemap, uv_before, uv_after)
         mvn_b, mvn_a, mvn_delta = _delta(codemap, maven_before, maven_after)
 
@@ -95,25 +97,25 @@ def test_uv_and_maven_version_changes_share_dependency_delta_semantics(
         assert delta["components_removed"] == []
         assert delta["components_changed"] == []
         assert delta["selections_changed"] == []
-        assert len(delta["selections_added"]) == 1
-        assert len(delta["selections_removed"]) == 1
+        assert len(assert_array(delta["selections_added"])) == 1
+        assert len(assert_array(delta["selections_removed"])) == 1
         assert delta["causation"] == "not-inferred"
 
-    assert len(uv_delta["inventory_added"]) == 1
-    assert len(uv_delta["inventory_removed"]) == 1
-    assert len(uv_delta["relationships_added"]) == 1
-    assert len(uv_delta["relationships_removed"]) == 1
+    assert len(assert_array(uv_delta["inventory_added"])) == 1
+    assert len(assert_array(uv_delta["inventory_removed"])) == 1
+    assert len(assert_array(uv_delta["relationships_added"])) == 1
+    assert len(assert_array(uv_delta["relationships_removed"])) == 1
     assert uv_delta["module_ownership_added"] == []
     assert uv_delta["module_ownership_removed"] == []
     assert uv_delta["module_ownership_changed"] == []
 
-    assert len(mvn_delta["inventory_added"]) == 3
-    assert len(mvn_delta["inventory_removed"]) == 3
-    assert len(mvn_delta["relationships_added"]) == 3
-    assert len(mvn_delta["relationships_removed"]) == 3
+    assert len(assert_array(mvn_delta["inventory_added"])) == 3
+    assert len(assert_array(mvn_delta["inventory_removed"])) == 3
+    assert len(assert_array(mvn_delta["relationships_added"])) == 3
+    assert len(assert_array(mvn_delta["relationships_removed"])) == 3
     assert mvn_delta["module_ownership_added"] == []
     assert mvn_delta["module_ownership_removed"] == []
-    assert len(mvn_delta["module_ownership_changed"]) == 3
+    assert len(assert_array(mvn_delta["module_ownership_changed"])) == 3
 
 
 def _uv_lock_with_source(version: str, source: str, *, marker: str = "") -> bytes:
@@ -190,7 +192,7 @@ def test_uv_source_change_is_a_selection_change_without_component_change(
         )
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         _before, _after, delta = _delta(codemap, before_raw, after_raw)
 
     assert delta["comparability"] == "comparable"
@@ -198,17 +200,22 @@ def test_uv_source_change_is_a_selection_change_without_component_change(
     assert delta["components_removed"] == []
     assert delta["components_changed"] == []
     assert delta["selections_changed"] == []
-    assert len(delta["selections_added"]) == 1
-    assert len(delta["selections_removed"]) == 1
-    assert len(delta["inventory_added"]) == 1
-    assert len(delta["inventory_removed"]) == 1
-    assert len(delta["relationships_added"]) == 1
-    assert len(delta["relationships_removed"]) == 1
-    transition = delta["component_selection_transitions"][0]
+    assert len(assert_array(delta["selections_added"])) == 1
+    assert len(assert_array(delta["selections_removed"])) == 1
+    assert len(assert_array(delta["inventory_added"])) == 1
+    assert len(assert_array(delta["inventory_removed"])) == 1
+    assert len(assert_array(delta["relationships_added"])) == 1
+    assert len(assert_array(delta["relationships_removed"])) == 1
+    transition = assert_records(delta["component_selection_transitions"])[0]
     assert transition["component_id"] == "dummy-dep"
-    assert [row["version"] for row in transition["removed"]] == ["1.0.0"]
-    assert [row["version"] for row in transition["added"]] == ["1.0.0"]
-    assert transition["removed"][0]["source"] != transition["added"][0]["source"]
+    assert [row["version"] for row in assert_records(transition["removed"])] == [
+        "1.0.0"
+    ]
+    assert [row["version"] for row in assert_records(transition["added"])] == ["1.0.0"]
+    assert (
+        assert_records(transition["removed"])[0]["source"]
+        != assert_records(transition["added"])[0]["source"]
+    )
     assert transition["changed"] == []
 
 
@@ -224,7 +231,7 @@ def test_uv_marker_change_is_relationship_only_delta(tmp_path: Path) -> None:
         )
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         _before, _after, delta = _delta(codemap, before_raw, after_raw)
 
     assert delta["selections_added"] == []
@@ -232,8 +239,8 @@ def test_uv_marker_change_is_relationship_only_delta(tmp_path: Path) -> None:
     assert delta["selections_changed"] == []
     assert delta["inventory_added"] == []
     assert delta["inventory_removed"] == []
-    assert len(delta["relationships_added"]) == 1
-    assert len(delta["relationships_removed"]) == 1
+    assert len(assert_array(delta["relationships_added"])) == 1
+    assert len(assert_array(delta["relationships_removed"])) == 1
     assert delta["component_selection_transitions"] == []
 
 
@@ -249,19 +256,19 @@ def test_maven_classifier_change_is_selection_change_without_component_change(
         inventories={"compile": _maven_inventory_variant("1.0.0", classifier="tests")},
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         _before, _after, delta = _delta(codemap, before_raw, after_raw)
 
     assert delta["components_added"] == []
     assert delta["components_removed"] == []
     assert delta["components_changed"] == []
     assert delta["selections_changed"] == []
-    assert len(delta["selections_added"]) == 1
-    assert len(delta["selections_removed"]) == 1
-    assert len(delta["inventory_added"]) == 1
-    assert len(delta["inventory_removed"]) == 1
-    assert len(delta["relationships_added"]) == 1
-    assert len(delta["relationships_removed"]) == 1
+    assert len(assert_array(delta["selections_added"])) == 1
+    assert len(assert_array(delta["selections_removed"])) == 1
+    assert len(assert_array(delta["inventory_added"])) == 1
+    assert len(assert_array(delta["inventory_removed"])) == 1
+    assert len(assert_array(delta["relationships_added"])) == 1
+    assert len(assert_array(delta["relationships_removed"])) == 1
     assert delta["module_ownership_added"] == []
     assert delta["module_ownership_removed"] == []
     assert delta["module_ownership_changed"] == ["dummy.dep|compile"]
@@ -279,7 +286,7 @@ def test_maven_effective_scope_change_is_relationship_only_delta(
         inventories={"test": _maven_inventory_variant("1.0.0", scope="runtime")},
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         _before, _after, delta = _delta(codemap, before_raw, after_raw)
 
     assert delta["selections_added"] == []
@@ -287,8 +294,8 @@ def test_maven_effective_scope_change_is_relationship_only_delta(
     assert delta["selections_changed"] == []
     assert delta["inventory_added"] == []
     assert delta["inventory_removed"] == []
-    assert len(delta["relationships_added"]) == 1
-    assert len(delta["relationships_removed"]) == 1
+    assert len(assert_array(delta["relationships_added"])) == 1
+    assert len(assert_array(delta["relationships_removed"])) == 1
     assert delta["module_ownership_changed"] == []
 
 
@@ -310,10 +317,10 @@ def test_maven_context_membership_change_is_selection_and_inventory_delta(
         },
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        before = codemap.dependency_resolution_evidence(before_raw)
-        after = codemap.dependency_resolution_evidence(after_raw)
-        delta = codemap.dependency_resolution_delta(before, after)
+        codemap.index.sync()
+        before = codemap.dependencies.observe(before_raw)
+        after = codemap.dependencies.observe(after_raw)
+        delta = codemap.dependencies.delta(before, after)
 
     assert delta["comparability"] == "not-comparable"
     assert delta["reason"] == "definition-changed"
@@ -381,21 +388,21 @@ def test_uv_and_maven_dependency_addition_share_delta_semantics(tmp_path: Path) 
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         _uv_b, _uv_a, uv_delta = _delta(codemap, uv_before, uv_after)
         _mv_b, _mv_a, maven_delta = _delta(codemap, maven_before, maven_after)
 
     for delta in (uv_delta, maven_delta):
         assert delta["comparability"] == "comparable"
-        assert len(delta["components_added"]) == 1
+        assert len(assert_array(delta["components_added"])) == 1
         assert delta["components_removed"] == []
         assert delta["components_changed"] == []
-        assert len(delta["selections_added"]) == 1
+        assert len(assert_array(delta["selections_added"])) == 1
         assert delta["selections_removed"] == []
         assert delta["selections_changed"] == []
-        assert len(delta["inventory_added"]) == 1
+        assert len(assert_array(delta["inventory_added"])) == 1
         assert delta["inventory_removed"] == []
-        assert len(delta["relationships_added"]) == 1
+        assert len(assert_array(delta["relationships_added"])) == 1
         assert delta["relationships_removed"] == []
         assert delta["component_selection_transitions"] == []
 
@@ -417,22 +424,22 @@ def test_uv_and_maven_dependency_removal_share_delta_semantics(tmp_path: Path) -
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         _uv_b, _uv_a, uv_delta = _delta(codemap, uv_before, uv_after)
         _mv_b, _mv_a, maven_delta = _delta(codemap, maven_before, maven_after)
 
     for delta in (uv_delta, maven_delta):
         assert delta["comparability"] == "comparable"
         assert delta["components_added"] == []
-        assert len(delta["components_removed"]) == 1
+        assert len(assert_array(delta["components_removed"])) == 1
         assert delta["components_changed"] == []
         assert delta["selections_added"] == []
-        assert len(delta["selections_removed"]) == 1
+        assert len(assert_array(delta["selections_removed"])) == 1
         assert delta["selections_changed"] == []
         assert delta["inventory_added"] == []
-        assert len(delta["inventory_removed"]) == 1
+        assert len(assert_array(delta["inventory_removed"])) == 1
         assert delta["relationships_added"] == []
-        assert len(delta["relationships_removed"]) == 1
+        assert len(assert_array(delta["relationships_removed"])) == 1
         assert delta["component_selection_transitions"] == []
 
 
@@ -471,27 +478,35 @@ source = { registry = "https://example.invalid/simple" }
     after_raw = uv_lock_dependency_observation(lock=after_lock)
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before, after, delta = _delta(codemap, before_raw, after_raw)
 
     shared_before = [
-        row for row in before["selections"] if row["component_id"] == "shared"
+        row
+        for row in assert_records(before["selections"])
+        if row["component_id"] == "shared"
     ]
     shared_after = [
-        row for row in after["selections"] if row["component_id"] == "shared"
+        row
+        for row in assert_records(after["selections"])
+        if row["component_id"] == "shared"
     ]
     assert len(shared_before) == 2
     assert len(shared_after) == 2
     assert {row["version"] for row in shared_before} == {"1.0.0", "2.0.0"}
     assert {row["version"] for row in shared_after} == {"1.0.0", "3.0.0"}
-    assert len(delta["selections_added"]) == 1
-    assert len(delta["selections_removed"]) == 1
+    assert len(assert_array(delta["selections_added"])) == 1
+    assert len(assert_array(delta["selections_removed"])) == 1
     assert delta["selections_changed"] == []
-    transition = delta["component_selection_transitions"]
-    assert len(transition) == 1
+    transition = assert_records(delta["component_selection_transitions"])
+    assert len(assert_array(transition)) == 1
     assert transition[0]["component_id"] == "shared"
-    assert [row["version"] for row in transition[0]["removed"]] == ["2.0.0"]
-    assert [row["version"] for row in transition[0]["added"]] == ["3.0.0"]
+    assert [row["version"] for row in assert_records(transition[0]["removed"])] == [
+        "2.0.0"
+    ]
+    assert [row["version"] for row in assert_records(transition[0]["added"])] == [
+        "3.0.0"
+    ]
     assert transition[0]["changed"] == []
 
 
@@ -516,23 +531,28 @@ def test_maven_simultaneous_variants_preserve_independent_selection_delta(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before, after, delta = _delta(codemap, before_raw, after_raw)
 
-    assert len(before["selections"]) == 2
-    assert len(after["selections"]) == 2
-    assert len(delta["selections_added"]) == 1
-    assert len(delta["selections_removed"]) == 1
+    assert len(assert_array(before["selections"])) == 2
+    assert len(assert_array(after["selections"])) == 2
+    assert len(assert_array(delta["selections_added"])) == 1
+    assert len(assert_array(delta["selections_removed"])) == 1
     assert delta["selections_changed"] == []
     assert delta["module_ownership_added"] == ["dummy.windows|runtime"]
     assert delta["module_ownership_removed"] == ["dummy.osx|runtime"]
-    transition = delta["component_selection_transitions"]
-    assert len(transition) == 1
+    transition = assert_records(delta["component_selection_transitions"])
+    assert len(assert_array(transition)) == 1
     assert transition[0]["component_id"] == "example.fixture:dummy-dep"
-    assert [row["version"] for row in transition[0]["removed"]] == ["1.0.0"]
-    assert [row["version"] for row in transition[0]["added"]] == ["1.0.0"]
+    assert [row["version"] for row in assert_records(transition[0]["removed"])] == [
+        "1.0.0"
+    ]
+    assert [row["version"] for row in assert_records(transition[0]["added"])] == [
+        "1.0.0"
+    ]
     assert (
-        transition[0]["removed"][0]["node_id"] != transition[0]["added"][0]["node_id"]
+        assert_records(transition[0]["removed"])[0]["node_id"]
+        != assert_records(transition[0]["added"])[0]["node_id"]
     )
     assert transition[0]["changed"] == []
 
@@ -555,7 +575,7 @@ def test_uv_repository_input_change_preserves_resolution_delta(
     )
     with CodeMap(tmp_path) as codemap:
         (tmp_path / "uv.lock").write_bytes(lock)
-        codemap.sync()
+        codemap.index.sync()
         before, after, delta = _delta(codemap, before_raw, after_raw)
 
     assert before["resolution_identity"] == after["resolution_identity"]
@@ -596,7 +616,7 @@ def test_maven_module_ownership_change_does_not_change_resolution_identity(
         },
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before, after, delta = _delta(codemap, before_raw, after_raw)
 
     assert before["resolution_identity"] == after["resolution_identity"]
@@ -636,13 +656,13 @@ def test_maven_same_module_owner_change_is_observation_delta_only(
         },
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         before, after, delta = _delta(codemap, before_raw, after_raw)
 
     assert before["resolution_identity"] != after["resolution_identity"]
     assert before["observation_identity"] != after["observation_identity"]
-    assert len(delta["selections_added"]) == 1
-    assert len(delta["selections_removed"]) == 1
+    assert len(assert_array(delta["selections_added"])) == 1
+    assert len(assert_array(delta["selections_removed"])) == 1
     assert delta["module_ownership_added"] == []
     assert delta["module_ownership_removed"] == []
     assert delta["module_ownership_changed"] == ["dummy.dep|runtime"]

@@ -1,28 +1,31 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.freshness import freshness_state
+
 from .change_impact import ChangeImpactOptions
-from .decision_session import diagnostic_producer
-from .evidence_freshness import freshness_state
+from .decision_session import ReadScopeOwner, diagnostic_producer
+from .repository_observation import packet_digest
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from pathlib import Path
 
-    from .engine import CodeMap
+    from .repository_changes import RepositoryChanges
 
 
 CHANGE_INTELLIGENCE_SCHEMA = "hashmarks.change-intelligence-brief.v1"
 
 
-class ChangeIntelligenceMixin:
+class ChangeIntelligenceMixin(ReadScopeOwner):
     """Compact product projection over existing change/selection authority."""
 
     def _change_brief_rows(self, raw_changed: object) -> list[dict[str, object]]:
         """Enrich caller-reported changed paths from one indexed symbol batch."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryChanges", self)
         changed_rows = raw_changed if isinstance(raw_changed, list) else []
         paths = [
             str(row.get("path") or "")
@@ -35,7 +38,7 @@ class ChangeIntelligenceMixin:
             if not isinstance(row, dict):
                 continue
             path = str(row.get("path") or "")
-            file_row = self._session_file_row(path)
+            file_row = self.reads.file_row(path)
             revision = (
                 None
                 if file_row is None or not file_row["file_digest"]
@@ -54,7 +57,7 @@ class ChangeIntelligenceMixin:
         return changed
 
     @diagnostic_producer
-    def change_intelligence_brief(
+    def brief(
         self,
         task: str,
         changed_paths: Sequence[str | Path],
@@ -66,8 +69,8 @@ class ChangeIntelligenceMixin:
     ) -> dict[str, object]:
         """Return bounded repository intelligence for an explicit change set."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        impact = self.task_change_impact(
+            self = cast("RepositoryChanges", self)
+        impact = self.task_impact(
             task,
             changed_paths,
             limit=limit,
@@ -78,69 +81,72 @@ class ChangeIntelligenceMixin:
                 project_impact_encoding="compact",
             ),
         )
-        action = self.task_action_map(task, limit=limit, per_role=per_role)
-        verify = (
-            action.get("verify") if isinstance(action.get("verify"), dict) else None
-        )
-        verification_path = str(verify.get("path") or "") if verify else ""
-        explanation = self.explain_verification_selection(
-            task,
-            verification_path or None,
-            limit=limit,
-            candidate_limit=16,
-        )
-        generation, identity_generation, stale = self._generation_status()
-        ownership = action.get("ownership_resolution")
-        ownership_projection = None
-        if isinstance(ownership, dict):
-            ownership_projection = {
-                key: ownership[key]
-                for key in ("selected", "via", "owner_path")
-                if key in ownership
+        with self.reads.session(expected_generation=self._impact_generation(impact)):
+            action = self.tasks.action_map(task, limit=limit, per_role=per_role)
+            verify = (
+                action.get("verify") if isinstance(action.get("verify"), dict) else None
+            )
+            verification_path = str(verify.get("path") or "") if verify else ""
+            explanation = self.tasks.explain_verification_selection(
+                task,
+                verification_path or None,
+                limit=limit,
+                candidate_limit=16,
+            )
+            generation, identity_generation, stale = self.reads.generation_status()
+            ownership = action.get("ownership_resolution")
+            ownership_projection = None
+            if isinstance(ownership, dict):
+                ownership_projection = {
+                    key: ownership.get(key)
+                    for key in ("selected", "via", "owner_path")
+                    if key in ownership
+                }
+            changed = self._change_brief_rows(impact.get("changed"))
+            surfaces = (
+                impact.get("surfaces")
+                if isinstance(impact.get("surfaces"), dict)
+                else {}
+            )
+            payload: dict[str, object] = {
+                "schema": CHANGE_INTELLIGENCE_SCHEMA,
+                "repository": {
+                    "repository_identity": self.reads.repository_identity(),
+                    "source_identity": self.source.packet_identity(
+                        generation=generation,
+                        identity_generation=identity_generation,
+                        stale=stale,
+                    ),
+                    "codemap_generation": generation,
+                    "identity_generation": identity_generation,
+                    "stale": stale is not False,
+                },
+                "task_identity": packet_digest("hashmarks.task.v1", {"task": task}),
+                "changed": changed,
+                "affected": surfaces,
+                "ownership": ownership_projection,
+                "verification": {
+                    "member": verification_path or None,
+                    "test_symbol": verify.get("verification_test_symbol")
+                    if verify
+                    else None,
+                    "explanation_identity": explanation["explanation_identity"],
+                    "reason": explanation["reason"],
+                    "facts": explanation["facts"],
+                },
+                "freshness": {
+                    "state": freshness_state(stale),
+                    "generation_bound": True,
+                },
+                "bounds": dict(cast(Mapping[str, object], impact.get("bounds") or {})),
+                "completeness": "not-claimed",
+                "authority": "repository-intelligence-only",
+                "execution_effect": "none",
             }
-        changed = self._change_brief_rows(impact.get("changed"))
-        surfaces = (
-            impact.get("surfaces") if isinstance(impact.get("surfaces"), dict) else {}
-        )
-        payload: dict[str, object] = {
-            "schema": CHANGE_INTELLIGENCE_SCHEMA,
-            "repository": {
-                "repository_identity": self._repository_packet_identity(),
-                "source_identity": self._source_packet_identity(
-                    generation=generation,
-                    identity_generation=identity_generation,
-                    stale=stale,
-                ),
-                "codemap_generation": generation,
-                "identity_generation": identity_generation,
-                "stale": stale is not False,
-            },
-            "task_identity": self._packet_digest("hashmarks.task.v1", {"task": task}),
-            "changed": changed,
-            "affected": surfaces,
-            "ownership": ownership_projection,
-            "verification": {
-                "member": verification_path or None,
-                "test_symbol": verify.get("verification_test_symbol")
-                if verify
-                else None,
-                "explanation_identity": explanation["explanation_identity"],
-                "reason": explanation["reason"],
-                "facts": explanation["facts"],
-            },
-            "freshness": {
-                "state": freshness_state(stale),
-                "generation_bound": True,
-            },
-            "bounds": dict(impact.get("bounds") or {}),
-            "completeness": "not-claimed",
-            "authority": "repository-intelligence-only",
-            "execution_effect": "none",
-        }
-        if "project_impact" in impact:
-            payload["project_impact"] = impact["project_impact"]
-        payload["brief_identity"] = "sha256:" + self._packet_digest(
-            CHANGE_INTELLIGENCE_SCHEMA,
-            payload,
-        )
-        return payload
+            if "project_impact" in impact:
+                payload["project_impact"] = impact["project_impact"]
+            payload["brief_identity"] = "sha256:" + packet_digest(
+                CHANGE_INTELLIGENCE_SCHEMA,
+                payload,
+            )
+            return payload

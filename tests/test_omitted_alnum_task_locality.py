@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from contract_assertions import assert_object, assert_present
+
 from hashmarks.codemap import CodeMap
 
 
@@ -60,16 +62,16 @@ def test_omitted_lowercase_alnum_identifier_recovers_task_local_action(
     target = tasks[-1]
     query = _configuration_query(target["token"])
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        views = codemap.task_query_views(query)
-        action = codemap.task_action_map(query, limit=20, per_role=3)
+        codemap.index.sync()
+        views = codemap.search.task_query_views(query)
+        action = codemap.tasks.action_map(query, limit=20, per_role=3)
 
     assert all(
         target["token"] not in views[key].split()
         for key in ("base", "governance", "evidence")
     )
-    assert action["edit"]["path"] == target["edit"]
-    assert action["verify"]["path"] == target["verify"]
+    assert assert_present(action["edit"])["path"] == target["edit"]
+    assert assert_present(action["verify"])["path"] == target["verify"]
 
 
 def test_omitted_identifier_probe_survives_leading_version_protocol_tokens(
@@ -80,11 +82,11 @@ def test_omitted_identifier_probe_survives_leading_version_protocol_tokens(
     distractors = "python3 http2 sha256 ipv6 x86 utf8 tls13 utf16 http3 sha512 arm64 utf32 tls12 ipv4 python2 x64"
     query = _configuration_query(target["token"], prefix=distractors)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        action = codemap.task_action_map(query, limit=20, per_role=3)
+        codemap.index.sync()
+        action = codemap.tasks.action_map(query, limit=20, per_role=3)
 
-    assert action["edit"]["path"] == target["edit"]
-    assert action["verify"]["path"] == target["verify"]
+    assert assert_present(action["edit"])["path"] == target["edit"]
+    assert assert_present(action["verify"])["path"] == target["verify"]
 
 
 def test_omitted_identifiers_preserve_existing_multi_owner_ambiguity(
@@ -115,11 +117,11 @@ def test_omitted_identifiers_preserve_existing_multi_owner_ambiguity(
 
     task = "Fix behavior for flare001 and flare002 across all active product paths and verify each contract."
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        action = codemap.task_action_map(task, limit=20, per_role=3)
-        packet = codemap.task_decision_packet(task)
+        codemap.index.sync()
+        action = codemap.tasks.action_map(task, limit=20, per_role=3)
+        packet = codemap.tasks.decision_packet(task)
 
     assert action["ambiguity"]["ambiguous"] is True
     assert action["ambiguity"]["reason"] == "multiple-task-local-structural-owners"
-    assert packet["discrimination"]["needed"] is True
-    assert packet["discrimination"]["reason"] == "competing-action-roles"
+    assert assert_object(packet["discrimination"])["needed"] is True
+    assert assert_object(packet["discrimination"])["reason"] == "competing-action-roles"

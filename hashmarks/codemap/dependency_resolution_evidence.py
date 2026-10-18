@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, cast
 
 from hashmarks.operation_contract import (
@@ -21,7 +21,7 @@ from .dependency_resolution_correlation import DependencyResolutionCorrelationMi
 from .dependency_resolution_query import dependency_queries
 
 if TYPE_CHECKING:
-    from .engine import CodeMap
+    from .repository_dependencies import RepositoryDependencies
 
 _MAX_CONTEXTS = 64
 _MAX_INVENTORY = 16384
@@ -116,7 +116,7 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
     package manager, environment synchronizer, or dependency implementation scan.
     """
 
-    def dependency_resolution_evidence(
+    def observe(
         self,
         snapshot: Mapping[str, object],
     ) -> dict[str, object]:
@@ -138,6 +138,8 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
         snapshot: Mapping[str, object],
     ) -> dict[str, object]:
         """Qualify a multi-context dependency observation without executing its producer."""
+        if TYPE_CHECKING:
+            self = cast("RepositoryDependencies", self)
         producer_packet, scope_packet, contexts, context_set = (
             self._dependency_header_v3(snapshot)
         )
@@ -231,7 +233,7 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
             "relationships": relationships,
         }
         repository_binding = {
-            "repository_identity": self._repository_packet_identity(),
+            "repository_identity": self.reads.repository_identity(),
             "codemap_generation": int(self.store.generation()),
         }
         negative = self._dependency_negative_evidence_v3(coverage)
@@ -399,11 +401,13 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
     def _require_current_dependency_observation_v3(
         self, observation: Mapping[str, object]
     ) -> None:
+        if TYPE_CHECKING:
+            self = cast("RepositoryDependencies", self)
         self._require_qualified_dependency_observation_v3(observation)
         binding = cast("Mapping[str, object]", observation["repository_binding"])
         if binding[
             "repository_identity"
-        ] != self._repository_packet_identity() or binding["codemap_generation"] != int(
+        ] != self.reads.repository_identity() or binding["codemap_generation"] != int(
             self.store.generation()
         ):
             raise ValueError("dependency observation repository binding mismatch")
@@ -546,7 +550,8 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
         selections: Sequence[Mapping[str, object]],
     ) -> None:
         selection_contexts = {
-            str(row["node_id"]): set(row["contexts"]) for row in selections
+            str(row["node_id"]): set(cast(Iterable, row["contexts"]))
+            for row in selections
         }
         for row in roots:
             if row["context"] not in selection_contexts[str(row["node_id"])]:
@@ -583,7 +588,7 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
             ("relationship", relationships),
         ):
             for row in rows:
-                for ref in row["evidence_sources"]:
+                for ref in cast(Iterable, row["evidence_sources"]):
                     source_context = str(sources_by_id[str(ref)].get("context") or "")
                     if source_context and source_context != row["context"]:
                         owner = (
@@ -606,8 +611,11 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
     ) -> None:
         def supports(row: Mapping[str, object], authority: str) -> bool:
             return all(
-                authority in sources_by_id[str(ref)].get("authorities", ())
-                for ref in row["evidence_sources"]
+                authority
+                in cast(
+                    Sequence[object], sources_by_id[str(ref)].get("authorities", ())
+                )
+                for ref in cast(Iterable[object], row["evidence_sources"])
             )
 
         for row in roots:
@@ -632,23 +640,27 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
         sources_by_id: Mapping[str, Mapping[str, object]],
     ) -> None:
         selection_contexts = {
-            str(row["node_id"]): set(row["contexts"]) for row in selections
+            str(row["node_id"]): set(cast(Iterable, row["contexts"]))
+            for row in selections
         }
         for row in module_ownership:
             if not all(
-                "module-ownership" in sources_by_id[str(ref)].get("authorities", ())
-                for ref in row["evidence_sources"]
+                "module-ownership"
+                in cast(
+                    Sequence[object], sources_by_id[str(ref)].get("authorities", ())
+                )
+                for ref in cast(Iterable, row["evidence_sources"])
             ):
                 raise ValueError(
                     "module ownership requires module-ownership evidence authority"
                 )
-            for owner in row["owners"]:
+            for owner in cast(Iterable, row["owners"]):
                 if row["context"] not in selection_contexts[str(owner)]:
                     raise ValueError(
                         "module owner context not selected: "
                         f"{row['module']}:{owner}:{row['context']}"
                     )
-            for ref in row["evidence_sources"]:
+            for ref in cast(Iterable, row["evidence_sources"]):
                 source = sources_by_id[str(ref)]
                 source_context = str(source.get("context") or "")
                 if source_context and source_context != row["context"]:
@@ -672,16 +684,20 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
         sources_by_id: Mapping[str, Mapping[str, object]],
     ) -> None:
         for row in selections:
-            contexts_for_selection = set(row["contexts"])
-            sources = [sources_by_id[str(ref)] for ref in row["evidence_sources"]]
+            contexts_for_selection = set(cast(Iterable, row["contexts"]))
+            sources = [
+                sources_by_id[str(ref)]
+                for ref in cast(Iterable, row["evidence_sources"])
+            ]
             source_contexts = {str(source.get("context") or "") for source in sources}
             authority_contexts = {
                 str(source.get("context") or "")
                 for source in sources
-                if "selection" in source.get("authorities", ())
+                if "selection" in cast(Sequence[object], source.get("authorities", ()))
             }
             if any(
-                "selection" not in source.get("authorities", ()) for source in sources
+                "selection" not in cast(Sequence[object], source.get("authorities", ()))
+                for source in sources
             ):
                 raise ValueError("selection requires selection evidence authority")
             for source_context in source_contexts:
@@ -950,7 +966,7 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
                     f"duplicate dependency relationship: {source}->{target}:{context}"
                 )
             seen.add(key)
-            result.append(packet)
+            result.append(cast(dict[str, object], packet))
         return sorted(
             result,
             key=lambda row: (
@@ -1179,7 +1195,10 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
         kind: str,
         sources: Sequence[Mapping[str, object]],
     ) -> None:
-        if not all(kind in source.get("authorities", ()) for source in sources):
+        if not all(
+            kind in cast(Sequence[object], source.get("authorities", ()))
+            for source in sources
+        ):
             raise ValueError(f"{kind} coverage requires {kind} evidence authority")
 
     @staticmethod
@@ -1203,6 +1222,8 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
         ]
 
     def _dependency_repository_inputs(self, value: object) -> list[dict[str, object]]:
+        if TYPE_CHECKING:
+            self = cast("RepositoryDependencies", self)
         rows = _objects(value, label="repository_inputs", limit=_MAX_INPUTS)
         result: list[dict[str, object]] = []
         seen: set[str] = set()
@@ -1220,7 +1241,7 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
                 not isinstance(claimed, str) or not _MEMBER_REVISION.fullmatch(claimed)
             ):
                 raise ValueError("member_revision must be lowercase sha256 hex")
-            member, _raw = self._repository_member_observation(path)
+            member, _raw = self.source.member(path)
             observed = member.get("member_revision")
             if claimed is None or observed is None:
                 equivalence = "unknown"
@@ -1239,7 +1260,7 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
             )
         return sorted(result, key=lambda row: str(row["path"]))
 
-    def dependency_resolution_queries(
+    def queries(
         self,
         observation: Mapping[str, object],
         requests: Sequence[Mapping[str, object]],
@@ -1247,7 +1268,7 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
         self._require_current_dependency_observation_v3(observation)
         return dependency_queries(observation, requests)
 
-    def dependency_codemap(
+    def codemap(
         self,
         snapshot: Mapping[str, object],
         queries: Sequence[Mapping[str, object]] = (),
@@ -1256,6 +1277,8 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
         result_mode: str = operation_default_mode("dependency_codemap"),
     ) -> dict[str, object]:
         """Execute one canonical dependency operation independent of transport."""
+        if TYPE_CHECKING:
+            self = cast("RepositoryDependencies", self)
         mode = require_operation_mode("dependency_codemap", result_mode)
         if mode != "observation" and queries:
             raise ValueError("queries require result_mode=observation")
@@ -1266,12 +1289,12 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
                 "previous_observation is only valid for result_mode=compare"
             )
 
-        observation = self.dependency_resolution_evidence(snapshot)
+        observation = self.observe(snapshot)
         if mode == "explain":
-            result = self.dependency_resolution_explain(observation)
+            result = self.explain(observation)
         elif mode == "compare":
             assert previous_observation is not None
-            result = self.dependency_resolution_delta(previous_observation, observation)
+            result = self.delta(previous_observation, observation)
         else:
             result = {
                 "schema": operation_schema("dependency_codemap", mode),
@@ -1282,7 +1305,7 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
                 "causation": "not-inferred",
             }
             if queries:
-                result["queries"] = self.dependency_resolution_queries(
+                result["queries"] = self.queries(
                     observation,
                     queries,
                 )
@@ -1310,17 +1333,27 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
                 "producer_authority": "caller-claimed",
             }
 
-        def keyed(rows: object, field: str) -> dict[str, Mapping[str, object]]:
+        def keyed(
+            rows: Iterable[object], field: str
+        ) -> dict[str, Mapping[str, object]]:
             return {
                 str(row[field]): row
                 for row in rows
                 if isinstance(row, Mapping) and row.get(field)
             }
 
-        before_components = keyed(before.get("components", ()), "component_id")
-        after_components = keyed(after.get("components", ()), "component_id")
-        before_selections = keyed(before.get("selections", ()), "node_id")
-        after_selections = keyed(after.get("selections", ()), "node_id")
+        before_components = keyed(
+            cast(Iterable[object], before.get("components", ())), "component_id"
+        )
+        after_components = keyed(
+            cast(Iterable[object], after.get("components", ())), "component_id"
+        )
+        before_selections = keyed(
+            cast(Iterable[object], before.get("selections", ())), "node_id"
+        )
+        after_selections = keyed(
+            cast(Iterable[object], after.get("selections", ())), "node_id"
+        )
 
         def changed(
             left: Mapping[str, Mapping[str, object]],
@@ -1357,22 +1390,22 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
 
         before_inventory = {
             inventory_key(row)
-            for row in before.get("inventory", ())
+            for row in cast(Iterable, before.get("inventory", ()))
             if isinstance(row, Mapping)
         }
         after_inventory = {
             inventory_key(row)
-            for row in after.get("inventory", ())
+            for row in cast(Iterable, after.get("inventory", ()))
             if isinstance(row, Mapping)
         }
         before_relationships = {
             relationship_key(row)
-            for row in before.get("relationships", ())
+            for row in cast(Iterable, before.get("relationships", ()))
             if isinstance(row, Mapping)
         }
         after_relationships = {
             relationship_key(row)
-            for row in after.get("relationships", ())
+            for row in cast(Iterable, after.get("relationships", ()))
             if isinstance(row, Mapping)
         }
 
@@ -1381,12 +1414,12 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
 
         before_ownership = {
             ownership_key(row): row
-            for row in before.get("module_ownership", ())
+            for row in cast(Iterable, before.get("module_ownership", ()))
             if isinstance(row, Mapping) and row.get("module")
         }
         after_ownership = {
             ownership_key(row): row
-            for row in after.get("module_ownership", ())
+            for row in cast(Iterable, after.get("module_ownership", ()))
             if isinstance(row, Mapping) and row.get("module")
         }
         return {

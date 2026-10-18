@@ -5,14 +5,10 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from scripts.agent_evaluation import metrics_agent_regret as regret_metrics
+
 if TYPE_CHECKING:
     from pathlib import Path
-
-_MODULE = __import__("scripts.agent_evaluation.metrics_agent_regret", fromlist=["*"])
-
-
-def _load():
-    return _MODULE
 
 
 def _evidence(path: Path) -> None:
@@ -51,7 +47,6 @@ def _trace(path: Path, mode: str, events: list[dict]) -> None:
 def test_regret_measures_work_before_independent_required_evidence(
     tmp_path: Path,
 ) -> None:
-    module = _load()
     evidence = tmp_path / "evidence.json"
     trace = tmp_path / "trace.json"
     _evidence(evidence)
@@ -67,7 +62,7 @@ def test_regret_measures_work_before_independent_required_evidence(
             {"kind": "file_read", "path": "src/helper.py", "estimated_tokens": 200},
         ],
     )
-    report = module.analyze(trace, evidence)
+    report = regret_metrics.analyze(trace, evidence)
     s = report["summary"]
     assert s["tokens_before_first_required_evidence"] == 550
     assert s["searches_before_first_required_evidence"] == 2
@@ -91,7 +86,6 @@ def test_regret_measures_work_before_independent_required_evidence(
 def test_regret_uses_returned_paths_as_discovery_without_self_attested_usefulness(
     tmp_path: Path,
 ) -> None:
-    module = _load()
     evidence = tmp_path / "evidence.json"
     trace = tmp_path / "trace.json"
     _evidence(evidence)
@@ -112,7 +106,7 @@ def test_regret_uses_returned_paths_as_discovery_without_self_attested_usefulnes
             },
         ],
     )
-    report = module.analyze(trace, evidence)
+    report = regret_metrics.analyze(trace, evidence)
     assert report["summary"]["tokens_before_first_required_evidence"] == 0
     assert report["summary"]["required_evidence_complete"] is True
 
@@ -120,7 +114,6 @@ def test_regret_uses_returned_paths_as_discovery_without_self_attested_usefulnes
 def test_missing_required_evidence_is_explicit_not_treated_as_zero_regret(
     tmp_path: Path,
 ) -> None:
-    module = _load()
     evidence = tmp_path / "evidence.json"
     trace = tmp_path / "trace.json"
     _evidence(evidence)
@@ -129,7 +122,7 @@ def test_missing_required_evidence_is_explicit_not_treated_as_zero_regret(
         "baseline",
         [{"kind": "file_read", "path": "src/wrong.py", "estimated_tokens": 100}],
     )
-    report = module.analyze(trace, evidence)
+    report = regret_metrics.analyze(trace, evidence)
     assert report["summary"]["required_evidence_complete"] is False
     assert report["summary"]["tokens_before_first_required_evidence"] is None
     assert report["summary"]["missing_required_paths"] == [
@@ -139,7 +132,6 @@ def test_missing_required_evidence_is_explicit_not_treated_as_zero_regret(
 
 
 def test_trace_and_evidence_identity_must_match(tmp_path: Path) -> None:
-    module = _load()
     evidence = tmp_path / "evidence.json"
     trace = tmp_path / "trace.json"
     _evidence(evidence)
@@ -148,13 +140,12 @@ def test_trace_and_evidence_identity_must_match(tmp_path: Path) -> None:
     payload["repository_identity"] = "sha256:other"
     trace.write_text(json.dumps(payload))
     with pytest.raises(ValueError, match="repository_identity mismatch"):
-        module.analyze(trace, evidence)
+        regret_metrics.analyze(trace, evidence)
 
 
 def test_comparison_reports_regret_reduction_only_for_same_evidence(
     tmp_path: Path,
 ) -> None:
-    module = _load()
     evidence = tmp_path / "evidence.json"
     base = tmp_path / "base.json"
     hm = tmp_path / "hm.json"
@@ -180,8 +171,8 @@ def test_comparison_reports_regret_reduction_only_for_same_evidence(
             },
         ],
     )
-    comparison = module.compare(
-        module.analyze(base, evidence), module.analyze(hm, evidence)
+    comparison = regret_metrics.compare(
+        regret_metrics.analyze(base, evidence), regret_metrics.analyze(hm, evidence)
     )
     assert comparison["schema"] == "hashmarks.agent-retrieval-regret-comparison.v2"
     assert (
@@ -195,20 +186,18 @@ def test_comparison_reports_regret_reduction_only_for_same_evidence(
 
 
 def test_retrieval_evidence_rejects_parent_path_escape(tmp_path: Path) -> None:
-    module = _load()
     evidence = tmp_path / "evidence.json"
     _evidence(evidence)
     value = json.loads(evidence.read_text())
     value["required_paths"] = ["../secret.py"]
     evidence.write_text(json.dumps(value))
     with pytest.raises(ValueError, match="repository-relative"):
-        module.load_evidence(evidence)
+        regret_metrics.load_evidence(evidence)
 
 
 def test_regret_reports_navigation_time_when_runner_timing_exists(
     tmp_path: Path,
 ) -> None:
-    module = _load()
     evidence = tmp_path / "evidence.json"
     trace = tmp_path / "trace.json"
     _evidence(evidence)
@@ -239,7 +228,7 @@ def test_regret_reports_navigation_time_when_runner_timing_exists(
             },
         ],
     )
-    s = module.analyze(trace, evidence)["summary"]
+    s = regret_metrics.analyze(trace, evidence)["summary"]
     assert s["navigation_ms_before_first_required_evidence"] == 200.0
     assert s["navigation_ms_before_all_required_evidence"] == 500.0
     assert s["total_navigation_ms"] == 600.0

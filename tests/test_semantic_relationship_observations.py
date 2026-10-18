@@ -154,7 +154,7 @@ def _manifest(root: Path) -> dict[str, Any]:
 def _observe(
     cm: CodeMap, captures: list[dict[str, Any]] | None = None
 ) -> dict[str, Any]:
-    return cm.structural_locality(
+    return cm.structure.locality(
         "contract.py::Interface",
         result_mode="relationships",
         supplied_observations=captures,
@@ -175,8 +175,8 @@ def test_interface_query_preserves_explicit_incoming_scip_direction_and_source_b
 ) -> None:
     _repository(tmp_path)
     with CodeMap(tmp_path) as cm:
-        cm.sync()
-        cm.import_scip(_index(tmp_path), provenance=_manifest(tmp_path))
+        cm.index.sync()
+        cm.native.import_scip(_index(tmp_path), provenance=_manifest(tmp_path))
         packet = _observe(cm)
     claim = _claims(packet)[0]
     assert claim["source"]["key"]["symbol"] == _IMPLEMENTATION
@@ -202,21 +202,25 @@ def test_task_lsp_projection_preserves_owner_verifier_and_request_locality(
     _repository(tmp_path)
     task = "Change Interface in contract.py to document its behavior."
     with CodeMap(tmp_path) as cm:
-        cm.sync()
-        before: Any = cm.task_evidence(task)
-        captured: Any = cm.task_evidence(
+        cm.index.sync()
+        before: Any = cm.tasks.evidence(task)
+        captured: Any = cm.tasks.evidence(
             task, supplied_observations=[_capture(tmp_path)]
         )
-        delta: Any = cm.task_post_change_delta(
+        delta: Any = cm.changes.task_delta(
             task, ["contract.py"], previous_evidence=captured
         )
-        after: Any = cm.task_evidence(task)
+        after: Any = cm.tasks.evidence(task)
     assert captured["ownership"] == before["ownership"] == after["ownership"]
     assert captured["verification"] == before["verification"] == after["verification"]
     assert (
         "semantic_relationships" not in before and "semantic_relationships" not in after
     )
     relationships = captured["semantic_relationships"]
+    assert captured["ownership"]["owner"]["qualname"] is None
+    assert relationships["associated_observed_relationship_count_scope"] == (
+        "explicit-producer-claims-associated-with-owned-file-query"
+    )
     assert captured["supplied_observation_accounting"]["retained"] == 1
     assert relationships["evidence"]["claims"]
     assert delta["semantic_relationships"]["before"]["claims_omitted_from_summary"] == 1
@@ -234,8 +238,8 @@ def test_task_captures_without_an_admitted_owner_keep_exclusion_accounting(
 ) -> None:
     _repository(tmp_path)
     with CodeMap(tmp_path) as cm:
-        cm.sync()
-        packet: Any = cm.task_evidence(
+        cm.index.sync()
+        packet: Any = cm.tasks.evidence(
             "Investigate unknownxyz behavior",
             supplied_observations=[_capture(tmp_path)],
         )
@@ -257,7 +261,10 @@ def test_cli_relationship_capture_and_comparison_use_the_same_authority(
     captures = tmp_path.parent / f"{tmp_path.name}-captures.json"
     captures.write_text(json.dumps({"observations": [_capture(tmp_path)]}))
     printed = []
-    monkeypatch.setattr("hashmarks.repository_cli._print", printed.append)
+    monkeypatch.setattr(
+        "hashmarks.repository_cli._print",
+        lambda value, **_encoding: printed.append(value),
+    )
     monkeypatch.setenv("HASHMARKS_NO_UPDATE_CHECK", "1")
     assert (
         main(
@@ -325,7 +332,10 @@ def test_cli_task_and_post_change_present_request_local_evidence_without_replay(
     captures = tmp_path.parent / f"{tmp_path.name}-captures.json"
     captures.write_text(json.dumps({"observations": [_capture(tmp_path)]}))
     printed: list[Any] = []
-    monkeypatch.setattr("hashmarks.repository_cli._print", printed.append)
+    monkeypatch.setattr(
+        "hashmarks.repository_cli._print",
+        lambda value, **_encoding: printed.append(value),
+    )
     monkeypatch.setenv("HASHMARKS_NO_UPDATE_CHECK", "1")
     task = "Change Interface in contract.py to document its behavior."
     assert (
@@ -335,6 +345,8 @@ def test_cli_task_and_post_change_present_request_local_evidence_without_replay(
                 str(tmp_path),
                 "task-evidence",
                 task,
+                "--result-mode",
+                "default",
                 "--supplied-observations",
                 str(captures),
                 "--presentation",
@@ -377,6 +389,111 @@ def test_cli_task_and_post_change_present_request_local_evidence_without_replay(
     )
 
 
+def test_cli_initial_keeps_request_local_semantic_facts_without_replay(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from hashmarks.cli import main
+    from hashmarks.codemap.task_evidence_initial import decode_initial_packet
+
+    _repository(tmp_path)
+    task = "Change Interface in contract.py to document its behavior."
+    capture = _capture(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        full = codemap.tasks.evidence(task, supplied_observations=[capture])
+    captures = tmp_path.parent / f"{tmp_path.name}-captures.json"
+    captures.write_text(json.dumps({"observations": [capture]}))
+    printed: list[dict[str, Any]] = []
+    monkeypatch.setattr(
+        "hashmarks.repository_cli._print",
+        lambda value, **_encoding: printed.append(value),
+    )
+    monkeypatch.setenv("HASHMARKS_NO_UPDATE_CHECK", "1")
+    arguments = [
+        "--workspace",
+        str(tmp_path),
+        "task-evidence",
+        task,
+        "--result-mode",
+        "initial",
+        "--presentation",
+        "text",
+    ]
+    assert main([*arguments, "--supplied-observations", str(captures)]) == 0
+    response = printed.pop()
+    initial = decode_initial_packet(response["result"])
+    assert "semantic_relationships" in full
+    assert initial["semantic_relationships"] == full["semantic_relationships"]
+    assert initial["semantic_relationships"]["evidence"]["claims"]
+    assert "Semantic subject:" in response["presentation"]["text"]
+    assert main(arguments) == 0
+    without_capture = decode_initial_packet(printed.pop()["result"])
+    assert "semantic_relationships" not in without_capture
+
+
+@pytest.mark.parametrize("mutation", ["keyword", "body", "stale", "outside-owner"])
+def test_owned_file_query_does_not_promote_unqualified_native_subjects(
+    tmp_path: Path, mutation: str
+) -> None:
+    _repository(tmp_path)
+    capture = _capture(tmp_path)
+    position = capture["request"]["params"]["position"]
+    if mutation == "keyword":
+        position["character"] = 1
+    elif mutation == "body":
+        position.update(line=1, character=4)
+    elif mutation == "stale":
+        capture["documents"]["contract.py"]["revision"] = "0" * 64
+    else:
+        capture["request"]["params"]["textDocument"]["uri"] = (
+            tmp_path / "impl.py"
+        ).as_uri()
+        position.update(line=2, character=7)
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        packet = codemap.tasks.evidence(
+            "Change Interface in contract.py to document its behavior.",
+            supplied_observations=[capture],
+        )
+    assert "semantic_relationships" not in packet
+    assert "supplied_observation_accounting" in packet
+    accounting = packet["supplied_observation_accounting"]
+    ownership = packet["ownership"]
+    assert isinstance(accounting, dict)
+    assert isinstance(ownership, dict)
+    owner = ownership["owner"]
+    assert isinstance(owner, dict)
+    assert accounting["omitted"] == 1
+    assert "qualname" in owner
+    assert owner["qualname"] is None
+
+
+def test_owned_file_query_keeps_repeated_tokens_and_multiple_subjects_unresolved(
+    tmp_path: Path,
+) -> None:
+    _repository(tmp_path)
+    source = tmp_path / "contract.py"
+    source.write_text("class Interface(Interface):\n    pass\n")
+    task = "Change Interface in contract.py to document its behavior."
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        repeated = codemap.tasks.evidence(
+            task, supplied_observations=[_capture(tmp_path)]
+        )
+        assert "semantic_relationships" not in repeated
+        source.write_text("class Interface:\n    pass\n\nclass Other:\n    pass\n")
+        codemap.index.sync(["contract.py"])
+        first = _capture(tmp_path)
+        second = deepcopy(first)
+        second["request"]["params"]["position"] = {"line": 3, "character": 7}
+        multiple = codemap.tasks.evidence(task, supplied_observations=[first, second])
+    assert "semantic_relationships" not in multiple
+    assert "supplied_observation_accounting" in multiple
+    accounting = multiple["supplied_observation_accounting"]
+    assert isinstance(accounting, dict)
+    assert accounting["omitted"] == 2
+
+
 def test_warm_service_client_and_dispatch_preserve_supplied_capture(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -386,7 +503,7 @@ def test_warm_service_client_and_dispatch_preserve_supplied_capture(
     service = CodeMapService(tmp_path)
     client = CodeMapServiceClient(tmp_path)
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         monkeypatch.setattr(service, "_map", lambda: cm)
         monkeypatch.setattr(
             client,
@@ -397,7 +514,11 @@ def test_warm_service_client_and_dispatch_preserve_supplied_capture(
         )
         task = "Change Interface in contract.py to document its behavior."
         result = client.task_evidence(task, supplied_observations=[_capture(tmp_path)])
-    assert result["semantic_relationships"]["evidence"]["claims"]
+    assert "semantic_relationships" in result
+    relationships = result["semantic_relationships"]
+    evidence = relationships["evidence"]
+    assert isinstance(evidence, dict)
+    assert evidence["claims"]
 
 
 @pytest.mark.host_mcp_sdk
@@ -445,8 +566,8 @@ def test_orphan_scip_claim_is_retained_without_fabricating_a_definition(
 ) -> None:
     _repository(tmp_path)
     with CodeMap(tmp_path) as cm:
-        cm.sync()
-        imported = cm.import_scip(_index(tmp_path, orphan=True))
+        cm.index.sync()
+        imported = cm.native.import_scip(_index(tmp_path, orphan=True))
         packet = _observe(cm)
         assert (
             cm.store.native_definitions_for_symbol(
@@ -470,8 +591,8 @@ def test_import_time_current_revision_cannot_hide_an_older_scip_source(
         (tmp_path / "impl.py").read_text() + "# changed after indexing\n"
     )
     with CodeMap(tmp_path) as cm:
-        cm.sync()
-        cm.import_scip(index)
+        cm.index.sync()
+        cm.native.import_scip(index)
         packet = _observe(cm)
     binding = _claims(packet)[0]["source"]["source_binding"]
     assert binding["state"] == "different"
@@ -482,8 +603,8 @@ def test_import_time_current_revision_cannot_hide_an_older_scip_source(
 def test_scip_claims_and_qualifications_survive_reopen(tmp_path: Path) -> None:
     _repository(tmp_path)
     with CodeMap(tmp_path) as cm:
-        cm.sync()
-        cm.import_scip(_index(tmp_path), provenance=_manifest(tmp_path))
+        cm.index.sync()
+        cm.native.import_scip(_index(tmp_path), provenance=_manifest(tmp_path))
         before = _observe(cm)
     with CodeMap(tmp_path) as cm:
         after = _observe(cm)
@@ -496,7 +617,7 @@ def test_captured_lsp_response_is_request_local_and_preserves_both_snapshots(
     _repository(tmp_path)
     capture = _capture(tmp_path)
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         before = _observe(cm)
         packet = _observe(cm, [capture])
         after = _observe(cm)
@@ -518,7 +639,7 @@ def test_captured_lsp_response_is_request_local_and_preserves_both_snapshots(
 def test_lsp_query_to_result_relationship_kinds(tmp_path: Path, method: str) -> None:
     _repository(tmp_path)
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         packet = _observe(cm, [_capture(tmp_path, method=method)])
     assert _claims(packet)[0]["basis"]["direction"] == "query-to-result"
     assert _claims(packet)[0]["kind"] == (
@@ -537,7 +658,7 @@ def test_lsp_buffer_mismatch_is_preserved_and_blocks_repository_resolution(
         "provenance": _provenance(),
     }
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         packet = _observe(cm, [capture])
     claim = _claims(packet)[0]
     assert claim["source"]["source_binding"]["state"] == "different"
@@ -555,7 +676,7 @@ def test_lsp_unadmitted_document_snapshots_remain_explicitly_accounted(
         "provenance": _provenance(),
     }
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         packet = _observe(cm, [capture])
     observation = packet["observations"][0]
     assert observation["accounting"]["documents_received"] == 3
@@ -572,7 +693,7 @@ def test_lsp_document_version_changes_are_a_separate_delta_axis(tmp_path: Path) 
     _repository(tmp_path)
     capture = _capture(tmp_path)
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         before = _observe(cm, [capture])
         capture["documents"]["contract.py"]["provenance"]["document_version"] = 2
         after = _observe(cm, [capture])
@@ -598,7 +719,7 @@ def test_lsp_null_error_partial_duplicate_and_unobserved_target_snapshots_are_vi
     capture["collection_state"] = "fresh-partial"
     capture["documents"].pop("impl.py")
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         packet = _observe(cm, [capture])
         complete_capture = {**capture, "collection_state": "fresh-complete"}
         complete_packet = _observe(cm, [complete_capture])
@@ -649,12 +770,12 @@ def test_invalid_capture_fails_before_repository_sync(
         capture["response"]["result"][0]["range"]["start"]["character"] = -1
     with CodeMap(tmp_path) as cm:
         monkeypatch.setattr(
-            cm,
+            cm.index,
             "sync",
             lambda *args, **kwargs: pytest.fail("invalid input reached sync"),
         )
         with pytest.raises(ValueError):
-            cm.structural_locality(
+            cm.structure.locality(
                 "contract.py::Interface",
                 result_mode="relationships",
                 supplied_observations=[capture],
@@ -716,7 +837,7 @@ def test_relationship_tampering_is_rejected_and_delta_is_reproved(
 ) -> None:
     _repository(tmp_path)
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         packet = _observe(cm, [_capture(tmp_path)])
     tampered = deepcopy(packet)
     tampered["observations"][0]["claims"][0]["kind"] = "definition"
@@ -740,10 +861,10 @@ def test_incoming_query_does_not_expand_to_other_explicit_or_transitive_claims(
     )
     index.write_text(json.dumps(data))
     with CodeMap(tmp_path) as cm:
-        cm.sync()
-        cm.import_scip(index, provenance=_manifest(tmp_path))
+        cm.index.sync()
+        cm.native.import_scip(index, provenance=_manifest(tmp_path))
         incoming = _observe(cm)
-        direct = cm.structural_locality(
+        direct = cm.structure.locality(
             "impl.py::Implementation", result_mode="relationships", refresh=False
         )
     assert [claim["target"]["key"]["symbol"] for claim in _claims(incoming)] == [
@@ -762,10 +883,10 @@ def test_scip_local_symbols_never_resolve_across_documents(tmp_path: Path) -> No
     )
     index.write_text(json.dumps(data))
     with CodeMap(tmp_path) as cm:
-        cm.sync()
-        cm.import_scip(index, provenance=_manifest(tmp_path))
+        cm.index.sync()
+        cm.native.import_scip(index, provenance=_manifest(tmp_path))
         assert _claims(_observe(cm)) == []
-        packet = cm.structural_locality(
+        packet = cm.structure.locality(
             "impl.py::Implementation", result_mode="relationships", refresh=False
         )
     target = _claims(packet)[0]["target"]
@@ -776,17 +897,17 @@ def test_scip_local_symbols_never_resolve_across_documents(tmp_path: Path) -> No
 def test_scip_line_movement_changes_locators_not_fact_identity(tmp_path: Path) -> None:
     _repository(tmp_path)
     with CodeMap(tmp_path) as cm:
-        cm.sync()
-        cm.import_scip(_index(tmp_path), provenance=_manifest(tmp_path))
+        cm.index.sync()
+        cm.native.import_scip(_index(tmp_path), provenance=_manifest(tmp_path))
         before = _observe(cm)
         file = tmp_path / "impl.py"
         file.write_text("# moved declaration\n" + file.read_text())
-        cm.sync()
+        cm.index.sync()
         index = _index(tmp_path)
         data = json.loads(index.read_text())
         data["documents"][1]["occurrences"][0]["range"][0] += 1
         index.write_text(json.dumps(data))
-        cm.import_scip(index, provenance=_manifest(tmp_path))
+        cm.native.import_scip(index, provenance=_manifest(tmp_path))
         after = _observe(cm)
     delta = semantic_relationship_delta(before, after)
     assert delta["comparable"] is True
@@ -811,7 +932,7 @@ def test_incompatible_observations_preserve_delivered_changes_without_fact_remov
     _repository(tmp_path)
     capture = _capture(tmp_path)
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         before = _observe(cm, [capture])
         capture["response"]["result"] = None
         captures = [capture]
@@ -867,15 +988,15 @@ def test_relationship_qualification_reuses_one_stable_read_per_member(
         _capture(tmp_path, method="textDocument/definition"),
     ]
     with CodeMap(tmp_path) as cm:
-        cm.sync()
-        read = cm._bounded_source_observation
+        cm.index.sync()
+        read = cm.source._bounded_source_observation
         observed = []
 
-        def count(path: str, bound: int):
+        def count(path: str, bound: int) -> tuple[dict[str, object], bytes | None]:
             observed.append(path)
             return read(path, bound)
 
-        monkeypatch.setattr(cm, "_bounded_source_observation", count)
+        monkeypatch.setattr(cm.source, "_bounded_source_observation", count)
         packet = _observe(cm, captures)
     assert sorted(observed) == ["contract.py", "impl.py"]
     assert len(_claims(packet)) == 2
@@ -907,7 +1028,7 @@ def test_lsp_location_links_require_the_declaration_token_not_only_its_line(
     }
     capture["response"]["result"] = [link]
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         packet = _observe(cm, [capture])
     claim = _claims(packet)[0]
     assert claim["source"]["resolution"]["state"] == expected
@@ -937,7 +1058,7 @@ def test_compact_relationship_evidence_accounts_for_claim_and_byte_bounds(
         for index in range(140)
     ]
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         packet = _observe(cm, [capture])
     observation = packet["observations"][0]
     assert observation["accounting"]["received"] == 140

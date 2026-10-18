@@ -5,6 +5,7 @@ import fnmatch
 import hashlib
 import json
 import os
+import sqlite3
 import time
 import tomllib
 from bisect import bisect_left
@@ -12,17 +13,19 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from hashmarks.file_store import UnstableFileError
+from hashmarks.digest import Digest
+from hashmarks.file_store import FileDigestStore, UnstableFileError
 from hashmarks.paths import normalize_relative_path
 
 from . import repository_file_discovery
-from .decision_session import DecisionRefreshRequired, decision_scoped
 from .index_surfaces import index_surface_for_path
+from .index_watch import IndexWatchMixin
 from .model import EvidenceVisibility, ParsedArtifact, SyncResult
 from .parsers import artifact_key_for, parse_source
-from .policy import ContextPolicy
 from .repository_file_discovery import _AdmittedRepositoryFile
 from .repository_index_store import (
+    ArtifactStore,
+    WorkspaceMapStore,
     default_base_snapshot,
     git_base_identity,
     git_overlay_paths,
@@ -31,7 +34,6 @@ from .source_languages import SOURCE_LANGUAGES
 from .watch_continuity import (
     WATCH_CONTINUITY_META,
     WatchContinuityRecord,
-    watch_status_projection,
 )
 
 if TYPE_CHECKING:
@@ -39,7 +41,9 @@ if TYPE_CHECKING:
 
     from hashmarks.client import RepositoryObservation
 
-    from .engine import CodeMap
+    from .providers import SourceRangeProvider
+    from .repository_file_discovery import RepositoryFiles
+    from .repository_observation import RepositoryObservationSource
 
 _SOURCE_EXTENSIONS = SOURCE_LANGUAGES
 
@@ -100,16 +104,36 @@ def _language_for_path(path: Path) -> str | None:
     return None
 
 
+def _uv_workspace_member(
+    pyproject: Path,
+    workspace: Path,
+    members: Sequence[str],
+    excludes: Sequence[str],
+) -> bool:
+    """Apply one admitted workspace declaration to a candidate manifest."""
+    if pyproject == workspace / "pyproject.toml":
+        return True
+    try:
+        project = pyproject.parent.relative_to(workspace).as_posix()
+    except ValueError:
+        return False
+    return any(
+        fnmatch.fnmatchcase(project, pattern) for pattern in members
+    ) and not any(fnmatch.fnmatchcase(project, pattern) for pattern in excludes)
+
+
 def _uv_workspace_pyprojects(
     workspace: Path, pyprojects: Sequence[Path]
 ) -> tuple[Path, ...]:
     """Restrict nested project metadata to declared uv workspace members when configured."""
     root_manifest = workspace / "pyproject.toml"
+    if root_manifest not in pyprojects:
+        return tuple(pyprojects)
     try:
         data = tomllib.loads(root_manifest.read_text(encoding="utf-8"))
     except (OSError, tomllib.TOMLDecodeError):
         return tuple(pyprojects)
-    tool = data.get("tool") if isinstance(data, dict) else None
+    tool = data.get("tool")
     uv = tool.get("uv") if isinstance(tool, dict) else None
     workspace_cfg = uv.get("workspace") if isinstance(uv, dict) else None
     if not isinstance(workspace_cfg, dict):
@@ -133,22 +157,11 @@ def _uv_workspace_pyprojects(
         else ()
     )
 
-    def selected(pyproject: Path) -> bool:
-        if pyproject == root_manifest:
-            return True
-        try:
-            project = pyproject.parent.relative_to(workspace).as_posix()
-        except ValueError:
-            return False
-        if not any(
-            fnmatch.fnmatchcase(project, pattern) for pattern in member_patterns
-        ):
-            return False
-        return not any(
-            fnmatch.fnmatchcase(project, pattern) for pattern in exclude_patterns
-        )
-
-    return tuple(pyproject for pyproject in pyprojects if selected(pyproject))
+    return tuple(
+        pyproject
+        for pyproject in pyprojects
+        if _uv_workspace_member(pyproject, workspace, member_patterns, exclude_patterns)
+    )
 
 
 def _setuptools_source_roots(tool: dict[str, object]) -> set[str]:
@@ -225,13 +238,6 @@ def _python_source_roots_from_pyprojects(
             if combined:
                 roots.add(combined)
     return tuple(sorted(roots))
-
-
-def _python_source_roots(workspace: Path) -> tuple[str, ...]:
-    """Return explicitly configured Python import roots from root project metadata."""
-    return _python_source_roots_from_pyprojects(
-        workspace, (workspace / "pyproject.toml",)
-    )
 
 
 def _module_name(relpath: str, source_roots: Sequence[str] = ()) -> str | None:
@@ -338,36 +344,62 @@ def _sorted_paths_under(sorted_paths: Sequence[str], rel: str) -> set[str]:
     return current
 
 
-class IndexingLifecycleMixin:
-    def _refresh_context_policy(self) -> bool:
-        """Reload the repository context policy and report semantic change.
+class RepositoryIndex(IndexWatchMixin):
+    """Own stable ingestion, reconciliation and atomic derived-index publication.
 
-        Policy is repository authority, not ordinary indexed content. Query/sync
-        boundaries therefore re-read this one exact authority file rather than
-        trusting a process-lifetime snapshot. The semantic fingerprint avoids
-        generation churn for byte-only rewrites that preserve the same rules.
-        """
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        current = ContextPolicy.load(self.workspace, self._policy_config_path)
-        if current.fingerprint() == self.policy.fingerprint():
-            return False
-        self.policy = current
-        return True
+    Storage and producers are borrowed narrow dependencies. No read scope,
+    source observer, relationship cache or CodeMap is required to construct it.
+    """
+
+    def __init__(  # noqa: PLR0913 - explicit ingestion capabilities replace a facade dependency
+        self,
+        files: RepositoryFiles,
+        store: WorkspaceMapStore,
+        file_store: FileDigestStore,
+        artifacts: ArtifactStore,
+        *,
+        range_provider: SourceRangeProvider,
+        observation_source: RepositoryObservationSource,
+        max_index_bytes: int = _MAX_INDEX_BYTES,
+    ) -> None:
+        store.bind_workspace(files.workspace)
+        self.files = files
+        self.workspace = files.workspace
+        self.state_dir = store.db_path.parent
+        self.store = store
+        self.file_store = file_store
+        self.artifacts = artifacts
+        self.range_provider = range_provider
+        self._observation_source = observation_source
+        self._max_index_bytes = int(max_index_bytes)
+        root_manifest = files.visible_file("pyproject.toml")
+        self._python_import_roots = _python_source_roots_from_pyprojects(
+            self.workspace, () if root_manifest is None else (root_manifest.path,)
+        )
+
+    @property
+    def observation_source(self) -> RepositoryObservationSource:
+        return self._observation_source
+
+    @property
+    def max_index_bytes(self) -> int:
+        return self._max_index_bytes
+
+    @property
+    def python_import_roots(self) -> tuple[str, ...]:
+        return self._python_import_roots
 
     def _reconcile_context_policy_for_query(self) -> None:
         """Converge a semantic live-policy change before query evidence returns."""
-        if self._refresh_context_policy():
+        if self.files.refresh_policy():
             self.sync()
 
     def _analysis_scope_conformance_payload(self) -> dict[str, object]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         return {
             "schema": _ANALYSIS_SCOPE_CONFORMANCE_SCHEMA,
             "pruned_segments": sorted(repository_file_discovery._PRUNE_DIRS),
-            "policy_fingerprint": self.policy.fingerprint(),
-            "internal_state_path": self._state_rel or "",
+            "policy_fingerprint": self.files.policy_fingerprint(),
+            "internal_state_path": self.files.internal_state_path or "",
         }
 
     def _analysis_scope_conformance(self) -> _AnalysisScopeConformance:
@@ -384,14 +416,12 @@ class IndexingLifecycleMixin:
         self,
         conformance: _AnalysisScopeConformance,
     ) -> bool:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         persisted = self.store.meta("analysis_scope_conformance_identity", "")
         if not persisted or persisted == conformance.identity:
             return False
         try:
             previous = json.loads(
-                self.store.meta("analysis_scope_conformance_payload", "")
+                self.store.meta("analysis_scope_conformance_payload", "") or ""
             )
         except (TypeError, ValueError):
             return True
@@ -404,7 +434,7 @@ class IndexingLifecycleMixin:
         if persisted != "sha256:" + hashlib.sha256(previous_encoded).hexdigest():
             return True
         previous_pruned = previous.pop("pruned_segments", None)
-        current_pruned = current.pop("pruned_segments")
+        current_pruned = cast("list[str]", current.pop("pruned_segments"))
         return not (
             previous == current
             and isinstance(previous_pruned, list)
@@ -413,8 +443,6 @@ class IndexingLifecycleMixin:
         )
 
     def _workspace_fingerprint_from_store(self) -> str:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         fingerprint_blob = json.dumps(
             self.store.file_digests(), separators=(",", ":")
         ).encode("utf-8")
@@ -432,19 +460,13 @@ class IndexingLifecycleMixin:
         policy changes.  Stable queries reuse the persisted conformance identity
         and do not rescan the repository map.
         """
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         if (
             self.store.meta("analysis_scope_conformance_identity", "")
             == conformance.identity
         ):
             return 0
         rejected = tuple(
-            sorted(
-                rel
-                for rel in self.store.paths()
-                if not self._path_admitted_for_analysis(rel)
-            )
+            sorted(rel for rel in self.store.paths() if not self.files.is_admitted(rel))
         )
         rejected_rows = self.store.file_rows(rejected)
         for row in rejected_rows.values():
@@ -492,29 +514,34 @@ class IndexingLifecycleMixin:
         )
 
     def _discover(self) -> tuple[list[_DiscoveredFile], list[str]]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         result: list[_DiscoveredFile] = []
         warnings: list[str] = []
-        for admitted in self._iter_admitted_repository_files():
+        for admitted in self.files.iter_files():
             item = self._indexable_discovered_file(admitted, warnings=warnings)
             if item is not None:
                 result.append(item)
         return result, warnings
 
-    def _parse_or_reuse(self, rel: str, path: Path, language: str, digest_hash: str):
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+    def _parse_or_reuse(
+        self, rel: str, path: Path, language: str, digest_hash: str
+    ) -> tuple[ParsedArtifact, bool]:
         key = artifact_key_for(
             digest_hash, language, range_provider=self.range_provider
         )
         cached = self.artifacts.get(key)
         if cached is not None:
             return cached, True
-        source = path.read_text(encoding="utf-8", errors="replace")
+        raw, observed = self.file_store.read_bytes_stable(path)
+        if observed.hash != digest_hash:
+            key = artifact_key_for(
+                observed.hash, language, range_provider=self.range_provider
+            )
+            cached = self.artifacts.get(key)
+            if cached is not None:
+                return cached, True
         artifact = parse_source(
-            source,
-            file_digest=digest_hash,
+            raw.decode("utf-8", errors="replace"),
+            file_digest=observed.hash,
             language=language,
             range_provider=self.range_provider,
         )
@@ -522,9 +549,8 @@ class IndexingLifecycleMixin:
         return artifact, False
 
     def _discover_subtree(self, rel: str) -> list[_DiscoveredFile]:
-        self = cast("CodeMap", self)
         result: list[_DiscoveredFile] = []
-        for admitted in self._iter_admitted_repository_files(rel):
+        for admitted in self.files.iter_files(rel):
             item = self._indexable_discovered_file(admitted)
             if item is not None:
                 result.append(item)
@@ -589,10 +615,10 @@ class IndexingLifecycleMixin:
             },
             "estimated_lexical_rows": None,
             "estimated_lexical_rows_reason": "not guessed before parsing",
-            "observation_coverage": self._repository_discovery_coverage(count),
+            "observation_coverage": self.files.discovery_coverage(count),
         }
 
-    def index_preflight(self) -> dict[str, object]:
+    def preflight(self) -> dict[str, object]:
         """Cheap, read-only repository indexing cost evidence.
 
         This reports directly measurable repository shape.  It does not choose a
@@ -604,8 +630,6 @@ class IndexingLifecycleMixin:
         return result
 
     def _codemap_build_state(self) -> dict[str, object]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         state = self.store.meta("sync.build_state") or "NEVER_SYNCED"
         return {
             "state": state,
@@ -624,8 +648,6 @@ class IndexingLifecycleMixin:
         }
 
     def _workspace_map_bytes(self) -> int:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         total = 0
         for suffix in ("", "-wal"):
             path = Path(str(self.store.db_path) + suffix)
@@ -642,19 +664,14 @@ class IndexingLifecycleMixin:
         requested_paths: Sequence[str],
     ) -> int:
         """Remove rows no longer admitted by the current repository discovery."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         if full:
             to_remove = self.store.paths() - present
             for rel in to_remove:
-                if (self.workspace / rel).exists() and not self.policy.decide(
-                    rel
-                ).index:
+                if (self.workspace / rel).exists() and not self.files.decide(rel).index:
                     row = self.store.file_row(rel)
                     if row is not None:
                         self.artifacts.delete(str(row["artifact_key"]))
             return self.store.delete_paths(to_remove)
-
         discovered_paths = tuple(sorted({item.rel for item in discovered}))
         stale_rows: set[str] = set()
         for rel in _minimal_path_prefixes(requested_paths):
@@ -671,8 +688,6 @@ class IndexingLifecycleMixin:
         skipped: int,
     ) -> None:
         """Persist reusable base evidence only for a complete clean-base sync."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         if not (
             full
             and base_identity is not None
@@ -687,11 +702,12 @@ class IndexingLifecycleMixin:
             current = self.store.file_row(str(row["path"]))
             if current is None:
                 continue
+            cur = current
             files_payload[str(row["path"])] = {
-                "file_digest": str(current["file_digest"]),
-                "artifact_key": str(current["artifact_key"]),
-                "language": str(current["language"]),
-                "evidence_visibility": str(current["evidence_visibility"]),
+                "file_digest": str(cur["file_digest"]),
+                "artifact_key": str(cur["artifact_key"]),
+                "language": str(cur["language"]),
+                "evidence_visibility": str(cur["evidence_visibility"]),
             }
         payload = {
             "schema": "hashmarks.codemap-base-snapshot.v1",
@@ -715,8 +731,6 @@ class IndexingLifecycleMixin:
         persisted_file_writes: int,
     ) -> dict[str, object]:
         """Describe measured indexing economics without choosing execution policy."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         store_stats = self.store.economics_counts_by_surface()
         workspace_map_bytes = self._workspace_map_bytes()
         surface_economics = store_stats["surfaces"]
@@ -777,8 +791,6 @@ class IndexingLifecycleMixin:
         preflight: dict[str, object],
     ) -> str:
         """Publish build-in-progress evidence before repository rows can change."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         has_existing_files = self.store.has_files()
         cache_state = (
             "incremental" if not full else ("warm" if has_existing_files else "cold")
@@ -809,11 +821,9 @@ class IndexingLifecycleMixin:
 
     def _sync_base_snapshot(self, *, full: bool) -> _SyncBaseSnapshot:
         """Load reusable clean-base evidence without changing repository state."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         base_identity = git_base_identity(self.workspace) if full else None
         overlay_paths = (
-            git_overlay_paths(self.workspace, state_rel=self._state_rel)
+            git_overlay_paths(self.workspace, state_rel=self.files.internal_state_path)
             if full and base_identity is not None
             else None
         )
@@ -887,8 +897,6 @@ class IndexingLifecycleMixin:
         module_name: str,
     ) -> bool:
         """Reuse a base artifact only when every current semantic authority matches."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         artifact = self._sync_base_artifact(
             item,
             overlay_paths=overlay_paths,
@@ -928,12 +936,12 @@ class IndexingLifecycleMixin:
 
     def _sync_file_digest(
         self,
-        item: _DiscoveredFile,
         *,
+        item: _DiscoveredFile,
         warnings: list[str],
         state: _SyncIndexState,
-        digest=None,
-    ):
+        digest: Digest | None = None,
+    ) -> Digest | None:
         if digest is not None:
             return digest
         try:
@@ -947,7 +955,9 @@ class IndexingLifecycleMixin:
             state.skipped += 1
             return None
 
-    def _sync_reuse_state(self, rel: str, row) -> _FileReuseState:
+    def _sync_reuse_state(
+        self, rel: str, row: sqlite3.Row | tuple[str, str, str, str, bool] | None
+    ) -> _FileReuseState:
         if isinstance(row, tuple):
             digest, artifact, visibility, module, has_derived = row
             return _FileReuseState(
@@ -987,7 +997,7 @@ class IndexingLifecycleMixin:
     @staticmethod
     def _record_persisted_artifact(
         state: _SyncIndexState,
-        derived_update: dict[str, object],
+        derived_update: dict[str, tuple[str, ...]],
         *,
         was_reused: bool,
         parse_error: bool,
@@ -1008,15 +1018,13 @@ class IndexingLifecycleMixin:
         item: _DiscoveredFile,
         warnings: list[str],
         state: _SyncIndexState,
-        digest=None,
-        row=None,
+        digest: Digest | None = None,
+        row: sqlite3.Row | tuple[str, str, str, str, bool] | None = None,
         module_name: str,
     ) -> None:
         """Reuse or parse one already-discovered repository file and persist its evidence."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         digest = self._sync_file_digest(
-            item,
+            item=item,
             warnings=warnings,
             state=state,
             digest=digest,
@@ -1046,7 +1054,7 @@ class IndexingLifecycleMixin:
                 item.language,
                 digest.hash,
             )
-        except OSError as exc:
+        except (OSError, UnstableFileError) as exc:
             warnings.append(f"cannot read {item.rel}: {exc}")
             state.skipped += 1
             return
@@ -1073,7 +1081,6 @@ class IndexingLifecycleMixin:
         warnings: list[str],
     ) -> _SyncIndexState:
         """Persist repository evidence for the discovered surface in bounded batches."""
-        self = cast("CodeMap", self)
         state = _SyncIndexState()
 
         def publish_persisted(committed: int) -> None:
@@ -1102,7 +1109,7 @@ class IndexingLifecycleMixin:
         # bounded SQLite batches rather than issuing one lookup per file on warm
         # reconciliation.  A problematic batch falls back to the established
         # per-file path so one unstable/unreadable file cannot poison its peers.
-        digests: dict[str, object] = {}
+        digests: dict[str, Digest] = {}
         digest_batch_size = 500
         for start in range(0, len(candidates), digest_batch_size):
             batch = candidates[start : start + digest_batch_size]
@@ -1138,15 +1145,13 @@ class IndexingLifecycleMixin:
         warnings: list[str],
     ) -> _SyncIdentity:
         """Seal workspace and observation identities after repository rows are stable."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         fingerprint = self._workspace_fingerprint_from_store()
         if self.store.meta("workspace_fingerprint") != fingerprint:
             changed = True
         generation = (
             self.store.bump_generation() if changed else self.store.generation()
         )
-        observation_after = self._daemon_observation()
+        observation_after = self._observation_source.observe()
         identity_generation_after = (
             None if observation_after is None else observation_after.generation
         )
@@ -1181,8 +1186,6 @@ class IndexingLifecycleMixin:
         requested_paths: Sequence[str],
     ) -> None:
         """Refresh packaging-derived import roots from admitted visible manifests."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         if full:
             pyprojects = tuple(
                 item.path
@@ -1191,7 +1194,7 @@ class IndexingLifecycleMixin:
                 and item.visibility is not EvidenceVisibility.DENY
             )
         elif any(rel.endswith("pyproject.toml") for rel in requested_paths):
-            pyprojects = self._visible_repository_manifests("pyproject.toml")
+            pyprojects = self.files.visible_manifests("pyproject.toml")
         else:
             return
         self._python_import_roots = _python_source_roots_from_pyprojects(
@@ -1230,8 +1233,6 @@ class IndexingLifecycleMixin:
         requested_paths: Sequence[str],
     ) -> int:
         """Re-index persisted Python files whose import identity changed with packaging authority."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         previous_roots = self._python_import_roots
         self._sync_refresh_python_import_roots(
             discovered, full=full, requested_paths=requested_paths
@@ -1270,9 +1271,7 @@ class IndexingLifecycleMixin:
         # A semantic policy change changes both negative and positive admission.
         # Discover without a path bound so newly denied rows retire and
         # newly admitted paths are discovered from the same authority cut.
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        if self._refresh_context_policy():
+        if self.files.refresh_policy():
             paths = None
         conformance = self._analysis_scope_conformance()
         if paths is not None and self._persisted_analysis_scope_requires_full_discovery(
@@ -1287,7 +1286,7 @@ class IndexingLifecycleMixin:
         with self.store.publication_transaction():
             removed = self._reconcile_persisted_analysis_scope(conformance)
             identity_generation_before = getattr(
-                self._daemon_observation(), "generation", None
+                self._observation_source.observe(), "generation", None
             )
             discovery = self._sync_discovery(paths, warnings)
             removed += self._sync_refresh_python_projection(
@@ -1331,7 +1330,7 @@ class IndexingLifecycleMixin:
                 cache_state=cache_state,
                 elapsed=elapsed,
                 discovered_count=len(discovery.files),
-                source_bytes=int(preflight.get("source_bytes") or 0),
+                source_bytes=int(cast("int", preflight.get("source_bytes") or 0)),
                 persisted_file_writes=state.persisted_file_writes,
             )
             self.store.set_meta_many(
@@ -1344,7 +1343,6 @@ class IndexingLifecycleMixin:
                     ),
                 }
             )
-            self._reverse_file_graph_cache = None
             return SyncResult(
                 generation=identity.generation,
                 discovered=len(discovery.files),
@@ -1371,32 +1369,7 @@ class IndexingLifecycleMixin:
                 build_state="COMPLETE",
             )
 
-    @decision_scoped
-    def derived_graph(self, path: str | None = None) -> dict[str, object]:
-        """Expose dependency-tracked derived CodeMap surfaces for diagnostics.
-
-        Retrieval does not consume this graph yet; 0.10.8 records identities and
-        dependencies only so later invalidation work has a measured foundation.
-        """
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        self._ensure_map_ready()
-        normalized = (
-            None if path is None else normalize_relative_path(path, allow_root=False)
-        )
-        if normalized is not None:
-            self._ensure_path_current(normalized)
-        nodes = self.store.derived_nodes(normalized)
-        return {
-            "schema": "hashmarks.codemap-derived-graph.v1",
-            "generation": self.store.generation(),
-            "path": normalized,
-            "nodes": nodes,
-        }
-
     def clean(self, *, shared_artifacts: bool = False) -> dict[str, object]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         workspace_before = self.store.clear()
         artifacts_removed = self.artifacts.clear() if shared_artifacts else 0
         return {
@@ -1407,97 +1380,71 @@ class IndexingLifecycleMixin:
             "shared_artifact_db": str(self.artifacts.db_path),
         }
 
-    def _watch_continuity(self) -> WatchContinuityRecord | None:
+    @property
+    def artifact_db_path(self) -> Path:
+        return self.artifacts.db_path
+
+    def publication_binding(self) -> tuple[int, str | None]:
+        generation = self.store.generation()
+        fingerprint = self.store.meta("workspace_fingerprint")
+        if generation != self.store.generation():
+            raise RuntimeError(
+                "CodeMap generation changed during publication observation"
+            )
+        return generation, fingerprint
+
+    def status(self) -> dict[str, object]:
+        """Report index-owned publication/build facts without native qualification."""
+        generation = self.store.generation()
+        last_sync = self.store.meta("last_sync_unix")
+        economics = self.store.meta("sync.economics")
+        facts: dict[str, object] = {
+            "schema": "hashmarks.codemap-index-status.v1",
+            "workspace": str(self.workspace),
+            "state_dir": str(self.store.db_path.parent),
+            "generation": generation,
+            "workspace_fingerprint": self.store.meta("workspace_fingerprint"),
+            "last_sync_unix": None if last_sync is None else float(last_sync or 0),
+            "artifact_db": str(self.artifact_db_path),
+            "artifact_count": self.artifacts.count(),
+            "build": self._codemap_build_state(),
+            "last_index_economics": json.loads(economics) if economics else None,
+            **self.store.stats(),
+        }
+        if generation != self.store.generation():
+            raise RuntimeError(
+                "CodeMap generation changed during index status observation"
+            )
+        return facts
+
+    def derived_graph(self, path: str | None = None) -> dict[str, object]:
+        """Observe derived index nodes under one published generation."""
+        self.ensure_ready()
+        normalized = (
+            None if path is None else normalize_relative_path(path, allow_root=False)
+        )
+        if normalized is not None:
+            self.reconcile_path(normalized)
+        generation = self.store.generation()
+        nodes = self.store.derived_nodes(normalized)
+        if generation != self.store.generation():
+            raise RuntimeError(
+                "CodeMap generation changed during derived graph observation"
+            )
+        return {
+            "schema": "hashmarks.codemap-derived-graph.v1",
+            "generation": generation,
+            "path": normalized,
+            "nodes": nodes,
+        }
+
+    def watch_continuity(self) -> WatchContinuityRecord | None:
         return WatchContinuityRecord.from_json(
             self.store.meta(WATCH_CONTINUITY_META, "") or ""
         )
 
-    def _generation_status_with_watch(
-        self,
-        observation: RepositoryObservation | None,
-        watch_record: WatchContinuityRecord | None,
-    ) -> tuple[int, int | None, bool | None]:
-        generation = self.store.generation()
-        synced_raw = self.store.meta("identity_generation", "") or ""
-        synced = None if not synced_raw else int(synced_raw)
-        if observation is None:
-            if self._decision_session_depth > 0:
-                observation = self._decision_session_observation
-            else:
-                observation = self._daemon_observation()
-        if synced is not None and observation is not None:
-            return generation, synced, observation.generation != synced
-        stale = None if watch_record is None else watch_record.stale_for(generation)
-        return generation, synced, stale
-
-    def _generation_status(
-        self, observation: RepositoryObservation | None = None
-    ) -> tuple[int, int | None, bool | None]:
-        return self._generation_status_with_watch(observation, self._watch_continuity())
-
-    def _query_freshness_fields(self) -> dict[str, object]:
-        """Project existing CodeMap freshness authority into query responses."""
-        generation, identity_generation, stale = self._generation_status()
-        return {
-            "generation": generation,
-            "identity_generation": identity_generation,
-            "stale": stale,
-        }
-
-    def status(self) -> dict[str, object]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        watch_record = self._watch_continuity()
-        generation, identity_generation, stale = self._generation_status_with_watch(
-            None, watch_record
-        )
-        return {
-            "schema": "hashmarks.codemap-status.v1",
-            "workspace": str(self.workspace),
-            "state_dir": str(self.state_dir),
-            "generation": generation,
-            "identity_generation_at_sync": identity_generation,
-            "daemon_generation_changed": stale,
-            "workspace_fingerprint": self.store.meta("workspace_fingerprint"),
-            "last_sync_unix": None
-            if self.store.meta("last_sync_unix") is None
-            else float(self.store.meta("last_sync_unix") or 0),
-            "artifact_db": str(self.artifacts.db_path),
-            "artifact_count": self.artifacts.count(),
-            "build": self._codemap_build_state(),
-            "last_index_economics": (
-                json.loads(self.store.meta("sync.economics") or "null")
-                if self.store.meta("sync.economics")
-                else None
-            ),
-            "precision_providers": [
-                self.range_provider.status().as_dict(),
-                self.structural_search_provider.status().as_dict(),
-                {
-                    "name": self.typescript_resolver.name,
-                    "available": self.typescript_resolver.detect(self.workspace),
-                    "version": None,
-                    "detail": None,
-                },
-                *[
-                    {
-                        "name": provider.name,
-                        "available": provider.detect(self.workspace),
-                        "version": None,
-                        "detail": None,
-                    }
-                    for provider in self.project_graph_providers
-                ],
-            ],
-            "native_evidence": self._native_evidence_status(),
-            "watcher": watch_status_projection(watch_record),
-            **self.store.stats(),
-        }
-
-    def _indexed_path_current(self, relpath: str) -> bool:
+    def is_current(self, relpath: str) -> bool:
         """Return whether durable file evidence still matches current workspace bytes."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         rel = normalize_relative_path(relpath, allow_root=False)
         row = self.store.file_row(rel)
         path = self.workspace / rel
@@ -1513,12 +1460,10 @@ class IndexingLifecycleMixin:
 
     def _path_unavailable(self, rel: str, path: Path) -> bool:
         return (
-            not self._path_admitted_for_analysis(rel)
-            or path.is_symlink()
-            or not path.is_file()
+            not self.files.is_admitted(rel) or path.is_symlink() or not path.is_file()
         )
 
-    def _path_refresh_required(self, relpath: str) -> bool:
+    def needs_reconcile(self, relpath: str) -> bool:
         rel = normalize_relative_path(relpath, allow_root=False)
         row = self.store.file_row(rel)
         path = self.workspace / rel
@@ -1527,7 +1472,7 @@ class IndexingLifecycleMixin:
         language = _language_for_path(path)
         if language is None:
             return False
-        decision = self.policy.decide(rel)
+        decision = self.files.decide(rel)
         digest = self.file_store.digest(
             path,
             workspace=self.workspace,
@@ -1538,7 +1483,7 @@ class IndexingLifecycleMixin:
             language,
             range_provider=self.range_provider,
         )
-        module_name = _module_name(rel, getattr(self, "_python_import_roots", ())) or ""
+        module_name = _module_name(rel, self._python_import_roots) or ""
         return not (
             row is not None
             and self._sync_file_reusable(
@@ -1550,22 +1495,30 @@ class IndexingLifecycleMixin:
             )
         )
 
-    def _refresh_path_current(self, relpath: str) -> None:
+    def reconcile_path(
+        self, relpath: str, *, expected_generation: int | None = None
+    ) -> int:
         rel = normalize_relative_path(relpath, allow_root=False)
         with self.store.publication_transaction():
-            if not self._path_refresh_required(rel):
-                return
+            generation = self.store.generation()
+            if expected_generation is not None and generation != expected_generation:
+                raise RuntimeError(
+                    "CodeMap generation changed before expected decision session "
+                    f"({expected_generation} -> {generation})"
+                )
+            if not self.needs_reconcile(rel):
+                return generation
             row = self.store.file_row(rel)
             path = self.workspace / rel
             if self._path_unavailable(rel, path):
                 if row is None:
-                    return
+                    return generation
                 self.store.delete_paths((rel,))
             else:
                 language = _language_for_path(path)
                 if language is None:
-                    return
-                decision = self.policy.decide(rel)
+                    return generation
+                decision = self.files.decide(rel)
                 digest = self.file_store.digest(
                     path,
                     workspace=self.workspace,
@@ -1575,9 +1528,7 @@ class IndexingLifecycleMixin:
                 self.store.set_file(
                     rel,
                     artifact,
-                    module_name=_module_name(
-                        rel, getattr(self, "_python_import_roots", ())
-                    ),
+                    module_name=_module_name(rel, self._python_import_roots),
                     visibility=decision.evidence_visibility,
                     index_surface=self._index_surface_for_path(rel),
                 )
@@ -1585,10 +1536,55 @@ class IndexingLifecycleMixin:
             self.store.set_meta(
                 "workspace_fingerprint", self._workspace_fingerprint_from_store()
             )
+            return self.store.generation()
 
-    def _ensure_path_current(self, relpath: str) -> None:
-        rel = normalize_relative_path(relpath, allow_root=False)
-        if self._path_refresh_required(rel):
-            if self._decision_session_depth > 0:
-                raise DecisionRefreshRequired(rel)
-            self._refresh_path_current(rel)
+    def ensure_ready(
+        self, *, _allow_incomplete: bool = False
+    ) -> RepositoryObservation | None:
+        # A durable BUILDING marker means a prior sync did not finish. Query
+        # paths must not silently turn that incomplete generation into fresh
+        # authority by auto-rebuilding it; the caller/execution layer decides
+        # when another sync attempt is appropriate.
+        if self.store.meta("sync.build_state") == "BUILDING":
+            if _allow_incomplete:
+                return None
+            raise RuntimeError(
+                "CodeMap generation is incomplete (BUILDING); run sync() before querying repository intelligence"
+            )
+        # Context policy is live repository admission authority, not a
+        # construction-time snapshot. Stable policy checks are one exact-file
+        # read; semantic changes reconcile once before persisted evidence returns.
+        self._reconcile_context_policy_for_query()
+        conformance = self._analysis_scope_conformance()
+        if (
+            self.store.meta("analysis_scope_conformance_identity", "")
+            != conformance.identity
+        ):
+            self.sync()
+            return self._observation_source.observe()
+        self._reconcile_persisted_analysis_scope(conformance)
+        if not self.store.has_files():
+            self.sync()
+            return self._observation_source.observe()
+        synced_raw = self.store.meta("identity_generation", "") or ""
+        observation = self._observation_source.observe()
+        self._reconcile_daemon_generation(observation, synced_raw)
+        return observation
+
+    def _reconcile_daemon_generation(
+        self, observation: RepositoryObservation | None, synced_raw: str
+    ) -> None:
+        if observation is not None and not synced_raw:
+            # A daemon/barrier is now available but this map was built without
+            # generation-bound freshness evidence. Reconcile in the evidence lane.
+            self.sync()
+            return
+        if observation is None or not synced_raw:
+            return
+        synced = int(synced_raw)
+        if observation.generation == synced:
+            return
+        if observation.can_incrementally_reconcile:
+            self.sync(observation.dirty_paths)
+            return
+        self.sync()

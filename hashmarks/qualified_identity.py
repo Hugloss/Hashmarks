@@ -3,23 +3,25 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING
 
 from .producer_identity import native_producer_implementation_identity
 from .test_shards import repository_content_identity
+
+if TYPE_CHECKING:
+    from .codemap.import_resolution import RepositoryImports
+    from .codemap.native_evidence import RepositoryNativeEvidence
+    from .codemap.repository_source import RepositorySource
+
 
 QUALIFIED_IMPORT_SCHEMA = "hashmarks.qualified-import-identity.v1"
 QUALIFIED_SHARED_INPUT_SCHEMA = "hashmarks.qualified-shared-input-identity.v1"
 
 
-def _codemap_repository_identity(codemap: Any) -> str:
-    excluded = [codemap.state_dir]
-    artifact_path = getattr(getattr(codemap, "artifacts", None), "db_path", None)
-    if isinstance(artifact_path, Path):
-        excluded.append(artifact_path)
+def _repository_content_identity(source: RepositorySource) -> str:
     return repository_content_identity(
-        codemap.workspace, excluded_paths=tuple(excluded)
+        source.workspace,
+        excluded_paths=(source.index.state_dir, source.index.artifact_db_path),
     )
 
 
@@ -33,25 +35,25 @@ def _identity(domain: str, value: Mapping[str, object]) -> str:
 
 
 def qualified_import_identity(
-    codemap: Any, *, source_path: str, target: str
+    imports: RepositoryImports, *, source_path: str, target: str
 ) -> dict[str, object]:
     """Project exact import-owner identity from existing Hashmarks resolver evidence."""
     # Qualified identity is stronger than a best-effort query: every path that
     # contributes ownership authority must be reconciled against current bytes
     # before an identity can be issued. This is especially important without a
     # live watcher, where a deleted leaf can otherwise remain in the durable map.
-    codemap._ensure_map_ready()
-    codemap._ensure_path_current(source_path)
-    owners, ambiguous = codemap._resolve_import_owner_evidence(source_path, target)
+    imports.reads.ready()
+    imports.source.ensure_current(source_path)
+    owners, ambiguous = imports._resolve_import_owner_evidence(source_path, target)
     for owner in tuple(owners):
-        codemap._ensure_path_current(str(owner))
-    owners, ambiguous = codemap._resolve_import_owner_evidence(source_path, target)
+        imports.source.ensure_current(str(owner))
+    owners, ambiguous = imports._resolve_import_owner_evidence(source_path, target)
     owner_paths = sorted(dict.fromkeys(str(path) for path in owners))
     symbol = target.lstrip(".").rsplit(".", 1)[-1]
     status = "ambiguous" if ambiguous else "resolved" if owner_paths else "unresolved"
     payload: dict[str, object] = {
         "schema": QUALIFIED_IMPORT_SCHEMA,
-        "repository_identity": _codemap_repository_identity(codemap),
+        "repository_identity": _repository_content_identity(imports.source),
         "producer_implementation_identity": native_producer_implementation_identity(),
         "symbol": symbol,
         "owner_paths": owner_paths,
@@ -76,10 +78,12 @@ def _is_declared_shared_edge(row: Mapping[str, object], synthetic: str) -> bool:
     )
 
 
-def _shared_input_projects(codemap: Any, synthetic: str) -> list[dict[str, str]]:
+def _shared_input_projects(
+    native: RepositoryNativeEvidence, synthetic: str
+) -> list[dict[str, str]]:
     rows = [
         row
-        for row in codemap.store.project_edges()
+        for row in native.store.project_edges()
         if _is_declared_shared_edge(row, synthetic)
     ]
     rows.sort(
@@ -108,19 +112,22 @@ def _shared_input_status(node: object, fresh: bool) -> str:
 
 
 def _shared_input_payload(
-    codemap: Any, rel: str, projects: list[dict[str, str]]
+    native: RepositoryNativeEvidence, rel: str, projects: list[dict[str, str]]
 ) -> dict[str, object]:
+
     return {
         "schema": QUALIFIED_SHARED_INPUT_SCHEMA,
-        "repository_identity": _codemap_repository_identity(codemap),
+        "repository_identity": _repository_content_identity(native.source),
         "producer_implementation_identity": native_producer_implementation_identity(),
         "path": rel,
-        "content_sha256": codemap._manifest_digest(rel),
+        "content_sha256": native._manifest_digest(rel),
         "projects": projects,
     }
 
 
-def qualified_shared_input_identity(codemap: Any, *, relpath: str) -> dict[str, object]:
+def qualified_shared_input_identity(
+    native: RepositoryNativeEvidence, *, relpath: str
+) -> dict[str, object]:
     """Bind declared cross-repository shared-input provenance without execution semantics."""
     from .paths import normalize_relative_path
 
@@ -129,14 +136,14 @@ def qualified_shared_input_identity(codemap: Any, *, relpath: str) -> dict[str, 
     node = next(
         (
             row
-            for row in codemap.store.project_nodes()
+            for row in native.store.project_nodes()
             if _shared_input_node_matches(row, rel)
         ),
         None,
     )
-    projects = _shared_input_projects(codemap, synthetic) if node is not None else []
-    payload = _shared_input_payload(codemap, rel, projects)
-    fresh, stale_reason = codemap._evidence_fresh("project", "declared-project-links")
+    projects = _shared_input_projects(native, synthetic) if node is not None else []
+    payload = _shared_input_payload(native, rel, projects)
+    fresh, stale_reason = native._evidence_fresh("project", "declared-project-links")
     status = _shared_input_status(node, fresh)
     identity_available = (
         status == "resolved"

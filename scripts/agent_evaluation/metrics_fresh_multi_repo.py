@@ -5,18 +5,19 @@ import hashlib
 import json
 import logging
 import shutil
+import sys
 from pathlib import Path
 
 from hashmarks._command_output import log_command_output
 
 logger = logging.getLogger(__name__)
 
-try:
-    from scripts._module_loader import import_sibling
-except ModuleNotFoundError:  # direct script execution
-    from _module_loader import import_sibling
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-collect_suite = import_sibling("metrics_agent_suite", __package__).collect_suite
+from scripts.agent_evaluation.metrics_agent_suite import (  # noqa: E402 - direct CLI root setup precedes canonical import
+    collect_suite,
+)
 
 SCHEMA = "hashmarks.fresh-multi-repo-metrics.v1"
 FIXTURE_SCHEMA = "hashmarks.fresh-multi-repo-fixture.v1"
@@ -275,7 +276,10 @@ def main() -> None:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(rendered + "\n", encoding="utf-8")
     log_command_output(logger, rendered)
-    summary = payload["suite"]["summary"]  # type: ignore[index]
+    suite = payload["suite"]
+    assert isinstance(suite, dict)
+    summary = suite["summary"]
+    assert isinstance(summary, dict)
     if (
         float(summary["file_recall"]) < args.min_file_recall
         or float(summary["symbol_recall"]) < args.min_symbol_recall

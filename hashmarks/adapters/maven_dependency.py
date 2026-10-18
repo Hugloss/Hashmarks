@@ -5,6 +5,7 @@ import json
 import re
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
 
 _SCHEMA = "hashmarks.dependency-resolution.v3"
 _ADAPTER_SEMANTICS = "hashmarks.maven-dependency-adapter.v1"
@@ -19,6 +20,28 @@ _INCOMPLETE_RESOLUTION_WARNINGS = (
     "could not be resolved",
     "failed to read artifact descriptor",
 )
+
+
+@dataclass
+class _Selection:
+    node_id: str
+    component_id: str
+    version: str
+    source: str = "maven"
+    marker: str = ""
+    contexts: set[str] = field(default_factory=set)
+    evidence_sources: set[str] = field(default_factory=set)
+
+    def as_payload(self) -> dict[str, object]:
+        return {
+            "node_id": self.node_id,
+            "component_id": self.component_id,
+            "version": self.version,
+            "source": self.source,
+            "marker": self.marker,
+            "contexts": sorted(self.contexts),
+            "evidence_sources": sorted(self.evidence_sources),
+        }
 
 
 def _digest(data: bytes) -> str:
@@ -131,8 +154,8 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
         )
 
     components: dict[str, dict[str, object]] = {}
-    selections: dict[str, dict[str, object]] = {}
-    roots: list[dict[str, str]] = []
+    selections: dict[str, _Selection] = {}
+    roots: list[dict[str, object]] = []
     relationships: list[dict[str, object]] = []
     inventory: list[dict[str, object]] = []
     ownership: dict[tuple[str, str], set[str]] = defaultdict(set)
@@ -154,20 +177,46 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
         )
         row = selections.setdefault(
             node_id,
-            {
-                "node_id": node_id,
-                "component_id": component_id,
-                "version": version,
-                "source": "maven",
-                "marker": "",
-                "contexts": set(),
-                "evidence_sources": set(),
-            },
+            _Selection(node_id=node_id, component_id=component_id, version=version),
         )
-        if row["component_id"] != component_id or row["version"] != version:
+        if row.component_id != component_id or row.version != version:
             raise ValueError(f"conflicting Maven selection identity: {node_id}")
-        row["contexts"].add(context)
-        row["evidence_sources"].add(source_id)
+        row.contexts.add(context)
+        row.evidence_sources.add(source_id)
+
+    def visit(
+        raw: Mapping[str, object],
+        parent: str | None = None,
+        *,
+        _ctx: str,
+        _src: str,
+    ) -> str:
+        component, node, _group, artifact, version, scope = _tree_node(raw)
+        admit_selection(component, node, artifact, version, _ctx, _src)
+        if parent is not None:
+            relationships.append(
+                {
+                    "source": parent,
+                    "target": node,
+                    "kind": "dependency",
+                    "context": _ctx,
+                    "effective_scope": scope,
+                    "marker": "",
+                    "evidence_sources": [_src],
+                }
+            )
+        children = raw.get("children", ())
+        if children is None:
+            children = ()
+        if not isinstance(children, Sequence) or isinstance(
+            children, (str, bytes, bytearray)
+        ):
+            raise ValueError(f"Maven tree children must be a sequence: {node}")
+        for child in children:
+            if not isinstance(child, Mapping):
+                raise ValueError(f"Maven tree child must be an object: {node}")
+            visit(child, node, _ctx=_ctx, _src=_src)
+        return node
 
     for context in contexts:
         selection_sources: list[str] = []
@@ -208,39 +257,9 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 }
             )
 
-            def visit(raw: Mapping[str, object], parent: str | None = None) -> str:
-                component, node, _group, artifact, version, scope = _tree_node(raw)
-                admit_selection(
-                    component, node, artifact, version, context, tree_source
-                )
-                if parent is not None:
-                    relationships.append(
-                        {
-                            "source": parent,
-                            "target": node,
-                            "kind": "dependency",
-                            "context": context,
-                            "effective_scope": scope,
-                            "marker": "",
-                            "evidence_sources": [tree_source],
-                        }
-                    )
-                children = raw.get("children", ())
-                if children is None:
-                    children = ()
-                if not isinstance(children, Sequence) or isinstance(
-                    children, (str, bytes, bytearray)
-                ):
-                    raise ValueError(f"Maven tree children must be a sequence: {node}")
-                for child in children:
-                    if not isinstance(child, Mapping):
-                        raise ValueError(f"Maven tree child must be an object: {node}")
-                    visit(child, node)
-                return node
-
             roots.append(
                 {
-                    "node_id": visit(root_raw),
+                    "node_id": visit(root_raw, _ctx=context, _src=tree_source),
                     "context": context,
                     "evidence_sources": [tree_source],
                 }
@@ -403,15 +422,7 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
             }
         )
 
-    normalized_selections = []
-    for row in selections.values():
-        normalized_selections.append(
-            {
-                **row,
-                "contexts": sorted(row["contexts"]),
-                "evidence_sources": sorted(row["evidence_sources"]),
-            }
-        )
+    normalized_selections = [row.as_payload() for row in selections.values()]
 
     module_ownership = [
         {
@@ -434,9 +445,15 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
         "scope": {},
         "contexts": contexts,
         "roots": sorted(roots, key=lambda row: (row["context"], row["node_id"])),
-        "evidence_sources": sorted(evidence_sources, key=lambda row: row["source_id"]),
-        "components": sorted(components.values(), key=lambda row: row["component_id"]),
-        "selections": sorted(normalized_selections, key=lambda row: row["node_id"]),
+        "evidence_sources": sorted(
+            evidence_sources, key=lambda row: str(row["source_id"])
+        ),
+        "components": sorted(
+            components.values(), key=lambda row: str(row["component_id"])
+        ),
+        "selections": sorted(
+            normalized_selections, key=lambda row: str(row["node_id"])
+        ),
         "inventory": sorted(
             inventory, key=lambda row: (row["node_id"], row["context"])
         ),

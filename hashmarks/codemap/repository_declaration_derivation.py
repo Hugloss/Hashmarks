@@ -6,8 +6,10 @@ from typing import TYPE_CHECKING, cast
 
 from hashmarks.operation_contract import operation_schema
 
+from .repository_observation import packet_digest
+
 if TYPE_CHECKING:
-    from .engine import CodeMap
+    from .repository_declarations import RepositoryDeclarations
 
 _DERIVATION_SCHEMA = "hashmarks.repository-declaration-derivation.v1"
 _EXPLAIN_SCHEMA = operation_schema("repository_declarations", "explain")
@@ -16,12 +18,12 @@ _EXPLAIN_SCHEMA = operation_schema("repository_declarations", "explain")
 class RepositoryDeclarationDerivationMixin:
     """Explain declaration authority without reinterpreting provider semantics."""
 
-    def repository_declaration_derivation_authority(
+    def derivation_authority(
         self,
         observation: Mapping[str, object],
     ) -> dict[str, object]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryDeclarations", self)
         self._validate_declaration_observation(
             observation,
             name="declaration observation",
@@ -106,20 +108,20 @@ class RepositoryDeclarationDerivationMixin:
             "interpretation_authority": observation["interpretation_authority"],
             "observation_identity": observation["observation_identity"],
             "derivation_identity": "sha256:"
-            + self._packet_digest(_DERIVATION_SCHEMA, identity_payload),
+            + packet_digest(_DERIVATION_SCHEMA, identity_payload),
             "repository": deepcopy(observation["repository"]),
             "observer": deepcopy(observation["observer"]),
             "repository_evidence_identity": repository_evidence["bindings_identity"],
             "groups": group_authorities,
         }
 
-    def repository_declaration_explain(
+    def explain(
         self,
         observation: Mapping[str, object],
     ) -> dict[str, object]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        derivation = self.repository_declaration_derivation_authority(observation)
+            self = cast("RepositoryDeclarations", self)
+        derivation = self.derivation_authority(observation)
         groups = cast("list[Mapping[str, object]]", observation["groups"])
         declaration_count = sum(
             len(cast("list[object]", group["declarations"])) for group in groups

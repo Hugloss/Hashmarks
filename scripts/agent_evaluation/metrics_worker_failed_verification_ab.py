@@ -7,6 +7,7 @@ import logging
 import os
 import subprocess
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -65,12 +66,12 @@ def _inject_failures(
     packets: list[dict[str, object]] = []
     provenance: list[dict[str, object]] = []
     with CodeMap(workspace) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         for task in hidden_tasks:
             task_id = str(task.get("id") or task.get("query") or "")
             query = str(task.get("query") or "")
             expected = {str(value) for value in task.get("expected_files") or ()}
-            hits = list(codemap.find_task(query, limit=limit))
+            hits = list(codemap.search.find_task(query, limit=limit))
             injected = next(
                 (
                     (rank, hit.path)
@@ -137,7 +138,7 @@ def _guided_recovery(
 
     # Conservative fallback: re-run canonical retrieval and exclude only the path
     # that has direct negative verification evidence. No hidden answer is used.
-    hits = list(codemap.find_task(query, limit=limit))
+    hits = list(codemap.search.find_task(query, limit=limit))
     for rank, hit in enumerate(hits, 1):
         if hit.path != failed_target:
             return hit.path, "canonical-research-excluding-failed-target", rank
@@ -156,8 +157,8 @@ def _recovery_action(
         return failed_target, "repeat-prior-edit", 0
     if policy == "fresh-research":
         with CodeMap(workspace) as fresh:
-            fresh.sync()
-            hits = list(fresh.find_task(query, limit=limit))
+            fresh.index.sync()
+            hits = list(fresh.search.find_task(query, limit=limit))
         return (
             hits[0].path if hits else None,
             "fresh-canonical-top1",
@@ -186,7 +187,7 @@ def run_worker(
     }
     rows: list[dict[str, object]] = []
     with CodeMap(workspace) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         for row in tasks:
             if not isinstance(row, dict) or set(row) - allowed:
                 raise ValueError(
@@ -227,6 +228,22 @@ def run_worker(
     )
 
 
+def _integer_counter(value: object) -> int:
+    if not isinstance(value, (str, int, float)):
+        raise ValueError("worker counters must be numeric")
+    return int(value)
+
+
+def _reported_counter(report: Mapping[str, object], policy: str, key: str) -> int:
+    observation = report[policy]
+    if not isinstance(observation, Mapping):
+        raise ValueError("worker report must be an object")
+    summary = observation["summary"]
+    if not isinstance(summary, Mapping):
+        raise ValueError("worker summary must be an object")
+    return _integer_counter(summary[key])
+
+
 def _score(
     hidden_tasks: list[dict[str, Any]], output: dict[str, Any]
 ) -> dict[str, object]:
@@ -261,7 +278,7 @@ def _score(
             }
         )
     n = len(rows)
-    summary = {
+    summary: dict[str, int | float] = {
         "tasks": n,
         "correct_recoveries": sum(bool(row["correct_recovery"]) for row in rows),
         "repeated_failed_edits": sum(bool(row["repeated_failed_edit"]) for row in rows),
@@ -269,7 +286,7 @@ def _score(
             bool(row["changed_to_different_wrong_edit"]) for row in rows
         ),
         "recovery_candidates_examined": sum(
-            int(row["recovery_candidates_examined"] or 0) for row in rows
+            _integer_counter(row["recovery_candidates_examined"] or 0) for row in rows
         ),
     }
     summary["correct_recovery_rate"] = summary["correct_recoveries"] / n if n else 0.0
@@ -332,7 +349,7 @@ def collect(root: Path, *, limit: int = 20) -> dict[str, object]:
         reports.append(report)
 
     def total(policy: str, key: str) -> int:
-        return sum(int(repo[policy]["summary"][key]) for repo in reports)  # type: ignore[index]
+        return sum(_reported_counter(repo, policy, key) for repo in reports)
 
     protocol = {
         "schema": PROTOCOL_SCHEMA,

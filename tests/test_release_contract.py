@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from contract_assertions import assert_array, assert_object, assert_records
 
 import hashmarks
 import hashmarks_build
@@ -150,7 +151,7 @@ def test_release_manifest_binds_exact_distribution_bytes(tmp_path: Path) -> None
         "sha256": "sha256:"
         + hashlib.sha256((_root() / "uv.lock").read_bytes()).hexdigest(),
     }
-    rows = manifest["distributions"]
+    rows = assert_records(manifest["distributions"])
     assert [row["kind"] for row in rows] == ["wheel", "sdist"]
     assert all(str(row["sha256"]).startswith("sha256:") for row in rows)
     assert str(manifest["manifest_identity"]).startswith("sha256:")
@@ -246,28 +247,31 @@ def test_publication_manifest_binds_both_native_standalone_sets(
     assert manifest["source"] == {"commit_sha": "b" * 40}
     assert [
         (row["platform"], row["architecture"], row["filename"])
-        for row in manifest["standalones"]
+        for row in assert_records(manifest["standalones"])
     ] == [
         ("linux", "x86_64", "hashmarks-linux-x86_64"),
         ("windows", "x86_64", "hashmarks-windows-x86_64.exe"),
     ]
-    assert [row["filename"] for row in manifest["installer_checksums"]] == [
+    assert [
+        row["filename"] for row in assert_records(manifest["installer_checksums"])
+    ] == [
         "hashmarks-linux-x86_64.sha256",
         "hashmarks-windows-x86_64.exe.sha256",
     ]
     assert [
-        (row["platform"], row["filename"]) for row in manifest["bootstrap_installers"]
+        (row["platform"], row["filename"])
+        for row in assert_records(manifest["bootstrap_installers"])
     ] == [
         ("linux-wsl", "install.sh"),
         ("windows", "install.ps1"),
     ]
     assert all(
         str(row["sha256"]).startswith("sha256:")
-        for row in manifest["bootstrap_installers"]
+        for row in assert_records(manifest["bootstrap_installers"])
     )
     assert all(
         str(row["qualification_identity"]).startswith("sha256:")
-        for row in manifest["standalones"]
+        for row in assert_records(manifest["standalones"])
     )
     assert str(manifest["manifest_identity"]).startswith("sha256:")
 
@@ -309,7 +313,8 @@ def test_publication_asset_names_reject_duplicate_public_name(
         tag=f"v{hashmarks.__version__}",
         source_sha="8" * 40,
     )
-    manifest["standalones"].append(dict(manifest["standalones"][0]))
+    standalones = assert_array(manifest["standalones"])
+    standalones.append(dict(assert_object(standalones[0])))
     payload = {
         key: value for key, value in manifest.items() if key != "manifest_identity"
     }
@@ -332,7 +337,7 @@ def test_publication_asset_names_reject_tampered_manifest_identity(
         tag=f"v{hashmarks.__version__}",
         source_sha="3" * 40,
     )
-    manifest["source"]["commit_sha"] = "0" * 40
+    assert_object(manifest["source"])["commit_sha"] = "0" * 40
 
     with pytest.raises(ValueError, match="publication manifest identity mismatch"):
         release_contract.publication_asset_names(manifest)

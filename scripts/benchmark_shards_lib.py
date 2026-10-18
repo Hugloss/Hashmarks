@@ -42,7 +42,7 @@ def deterministic_shards(total: int, shard_size: int) -> tuple[Shard, ...]:
     )
 
 
-def _canonical_json_bytes(value: Any) -> bytes:
+def _canonical_json_bytes(value: object) -> bytes:
     return (json.dumps(value, indent=2, sort_keys=True) + "\n").encode()
 
 

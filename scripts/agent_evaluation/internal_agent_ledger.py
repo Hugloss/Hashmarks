@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 SCHEMA = "hashmarks.internal-agent-ledger.v1"
 
 
-def _sha(x):
+def _sha(x: object) -> str:
     return (
         "sha256:"
         + hashlib.sha256(
@@ -28,19 +28,22 @@ def _sha(x):
     )
 
 
-def _load(p: Path):
+def _load(p: Path) -> dict[str, object]:
     return json.loads(p.read_text()) if p.exists() else {"schema": SCHEMA, "events": []}
 
 
-def _save(p: Path, o):
+def _save(p: Path, o: object) -> None:
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(o, indent=2, sort_keys=True) + "\n")
 
 
-def _event(state, kind, **kw):
-    state["events"].append(
+def _event(state: dict[str, object], kind: str, **kw: object) -> None:
+    events = state["events"]
+    if not isinstance(events, list):
+        raise ValueError("ledger events must be a list")
+    events.append(
         {
-            "seq": len(state["events"]) + 1,
+            "seq": len(events) + 1,
             "kind": kind,
             "monotonic_ns": time.monotonic_ns(),
             **kw,
@@ -81,13 +84,13 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _record_packet(a: argparse.Namespace, state: dict, repo: Path) -> None:
-    method = "task_decision_packet" if a.cmd == "packet" else "task_decision_brief"
+    method = "decision_packet" if a.cmd == "packet" else "decision_brief"
     code = """import json,sys,time
 from pathlib import Path
 from hashmarks.codemap import CodeMap
 r=Path(sys.argv[1]); q=sys.argv[2]; b=int(sys.argv[3]); t=time.perf_counter()
 with CodeMap(r) as c:
- c.sync(); p=getattr(c,sys.argv[4])(q,token_budget=b)
+ c.index.sync(); p=getattr(c.tasks,sys.argv[4])(q,token_budget=b)
 print(json.dumps({'wall_ms':(time.perf_counter()-t)*1000,'packet':p},sort_keys=True))
 """
     env = dict(os.environ)
@@ -318,7 +321,7 @@ def _verify(a: argparse.Namespace, state: dict, repo: Path) -> None:
     raise SystemExit(result.returncode)
 
 
-def main():
+def main() -> None:
     a = _parse_args()
     st = _load(a.state)
     if a.cmd == "init":
@@ -334,7 +337,10 @@ def main():
         _event(st, "task_received")
         _save(a.state, st)
         return
-    repo = Path(st["repo"])
+    repository = st["repo"]
+    if not isinstance(repository, str):
+        raise ValueError("ledger repo must be a string")
+    repo = Path(repository)
     if a.cmd in {"packet", "brief"}:
         _record_packet(a, st, repo)
         return

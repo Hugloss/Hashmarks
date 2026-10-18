@@ -3,15 +3,17 @@ from __future__ import annotations
 import json
 import threading
 import time
-from typing import TYPE_CHECKING
+from collections.abc import Callable
+from pathlib import Path
+
+from contract_assertions import assert_object, assert_records
 
 from hashmarks.codemap import CodeMap, CodeMapService, CodeMapServiceClient
 
-if TYPE_CHECKING:
-    from pathlib import Path
 
-
-def _repo(root: Path, fake_maven_wrapper) -> tuple[str, str, str]:
+def _repo(
+    root: Path, fake_maven_wrapper: Callable[[Path], None]
+) -> tuple[str, str, str]:
     backend = "maven:com.example:api"
     web = "npm:@demo/web"
     mobile = "npm:@demo/mobile"
@@ -38,82 +40,83 @@ def _repo(root: Path, fake_maven_wrapper) -> tuple[str, str, str]:
 
 
 def _prepare(codemap: CodeMap) -> None:
-    codemap.sync()
-    codemap.enrich_projects(
+    codemap.index.sync()
+    codemap.native.enrich_projects(
         ("npm-package-graph", "maven-pom-graph", "declared-project-links")
     )
 
 
 def test_cross_repository_packet_preserves_provenance_and_freshness(
-    tmp_path: Path, fake_maven_wrapper
+    tmp_path: Path, fake_maven_wrapper: Callable[[Path], None]
 ) -> None:
     backend, web, mobile = _repo(tmp_path, fake_maven_wrapper)
     with CodeMap(tmp_path) as codemap:
         _prepare(codemap)
-        packet = codemap.cross_repository_evidence_packet(
+        packet = codemap.cross_repository.packet(
             "Update backend API implementation",
             ["backend/src/Api.java"],
         )
-        repeated = codemap.cross_repository_evidence_packet(
+        repeated = codemap.cross_repository.packet(
             "Update backend API implementation",
             ["backend/src/Api.java"],
         )
 
     assert packet == repeated
     assert packet["schema"] == "hashmarks.cross-repository-evidence-packet.v1"
-    assert packet["source"]["project_identities"] == [backend]
+    assert assert_object(packet["source"])["project_identities"] == [backend]
     assert packet["dependents"] == [
         {"project_identity": web, "depth": 1},
         {"project_identity": mobile, "depth": 2},
     ]
-    assert {row["producer"] for row in packet["relationships"]} == {
+    assert {row["producer"] for row in assert_records(packet["relationships"])} == {
         "declared-project-links"
     }
-    assert packet["freshness"]["state"] == "dependent"
-    assert packet["freshness"]["dependency_state"] == "current"
-    assert packet["freshness"]["dependencies"] == [
+    assert assert_object(packet["freshness"])["state"] == "dependent"
+    assert assert_object(packet["freshness"])["dependency_state"] == "current"
+    assert assert_object(packet["freshness"])["dependencies"] == [
         {"producer": "declared-project-links", "state": "current"}
     ]
-    unresolved_scopes = {row["scope"] for row in packet["unresolved"]}
+    unresolved_scopes = {row["scope"] for row in assert_records(packet["unresolved"])}
     assert unresolved_scopes == {"ownership", "verification"}
     assert packet["storage"] == "derived-not-persisted"
     assert packet["execution_effect"] == "none"
 
 
 def test_shared_input_packet_reports_all_affected_projects(
-    tmp_path: Path, fake_maven_wrapper
+    tmp_path: Path, fake_maven_wrapper: Callable[[Path], None]
 ) -> None:
     backend, web, mobile = _repo(tmp_path, fake_maven_wrapper)
     with CodeMap(tmp_path) as codemap:
         _prepare(codemap)
-        packet = codemap.cross_repository_evidence_packet(
+        packet = codemap.cross_repository.packet(
             "Update shared API contract",
             ["contracts/api.yaml"],
         )
 
-    projects = {row["project_identity"]: row["depth"] for row in packet["dependents"]}
+    projects = {
+        row["project_identity"]: row["depth"]
+        for row in assert_records(packet["dependents"])
+    }
     assert projects == {backend: 1, web: 1, mobile: 2}
-    assert packet["freshness"]["dependency_state"] == "current"
+    assert assert_object(packet["freshness"])["dependency_state"] == "current"
 
 
 def test_no_cross_repository_evidence_is_explicitly_unresolved(tmp_path: Path) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "src" / "owner.py").write_text("VALUE = 1\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        packet = codemap.cross_repository_evidence_packet(
-            "Update owner value", ["src/owner.py"]
-        )
+        codemap.index.sync()
+        packet = codemap.cross_repository.packet("Update owner value", ["src/owner.py"])
 
-    reasons = {row["reason"] for row in packet["unresolved"]}
+    reasons = {row["reason"] for row in assert_records(packet["unresolved"])}
     assert "no-cross-repository-impact-supported" in reasons
-    assert packet["source"]["project_identities"] == []
+    assert assert_object(packet["source"])["project_identities"] == []
     assert packet["dependents"] == []
-    assert packet["freshness"]["state"] == "unknown"
+    assert assert_object(packet["freshness"])["state"] == "unknown"
 
 
 def test_cross_repository_packet_service_roundtrip(
-    tmp_path: Path, fake_maven_wrapper
+    tmp_path: Path, fake_maven_wrapper: Callable[[Path], None]
 ) -> None:
     _repo(tmp_path, fake_maven_wrapper)
     socket_path = tmp_path / "cross-repo.sock"
@@ -132,7 +135,7 @@ def test_cross_repository_packet_service_roundtrip(
             time.sleep(0.01)
     try:
         client.sync()
-        service._map().enrich_projects(
+        service._map().native.enrich_projects(
             ("npm-package-graph", "maven-pom-graph", "declared-project-links")
         )
         packet = client.repository_intelligence_query(

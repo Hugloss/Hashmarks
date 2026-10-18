@@ -1,3 +1,5 @@
+from contract_assertions import assert_array, assert_object
+
 from scripts.agent_evaluation.decision_qa import (
     evaluate_decision_packet,
     packet_consistency,
@@ -6,8 +8,12 @@ from scripts.agent_evaluation.decision_qa import (
 
 
 def _packet(
-    *, safe=True, edit="src/owner.py", verify="tests/test_owner.py", shared=False
-):
+    *,
+    safe: bool = True,
+    edit: str = "src/owner.py",
+    verify: str = "tests/test_owner.py",
+    shared: bool = False,
+) -> dict[str, object]:
     items = [
         {
             "path": edit,
@@ -38,22 +44,26 @@ def _packet(
     }
 
 
-def test_consistency_accepts_shared_multi_role_evidence():
+def test_consistency_accepts_shared_multi_role_evidence() -> None:
     result = packet_consistency(_packet(shared=True))
     assert result["consistent"] is True
     assert result["missing_roles"] == []
     assert result["secret_knowledge_used"] is False
 
 
-def test_consistency_detects_false_role_safety_claim():
+def test_consistency_detects_false_role_safety_claim() -> None:
     packet = _packet(safe=True)
-    packet["work_context"]["items"] = packet["work_context"]["items"][:2]
+    assert_object(packet["work_context"])["items"] = assert_array(
+        assert_object(packet["work_context"])["items"]
+    )[:2]
     result = packet_consistency(packet)
     assert result["consistent"] is False
     assert "context-safety-role-coverage-mismatch" in result["issues"]
 
 
-def test_authority_grading_classifies_correct_safe_without_leaking_expected_paths():
+def test_authority_grading_classifies_correct_safe_without_leaking_expected_paths() -> (
+    None
+):
     result = evaluate_decision_packet(
         _packet(),
         expected_edit_path="src/owner.py",
@@ -67,7 +77,7 @@ def test_authority_grading_classifies_correct_safe_without_leaking_expected_path
     assert result["grading_scope"] == "authority-side-after-freeze"
 
 
-def test_authority_grading_classifies_false_safe():
+def test_authority_grading_classifies_false_safe() -> None:
     result = evaluate_decision_packet(
         _packet(safe=True),
         expected_edit_path="src/owner.py",
@@ -78,7 +88,7 @@ def test_authority_grading_classifies_false_safe():
     assert result["fully_correct"] is False
 
 
-def test_authority_grading_classifies_false_unsafe():
+def test_authority_grading_classifies_false_unsafe() -> None:
     result = evaluate_decision_packet(
         _packet(safe=False),
         expected_edit_path="src/owner.py",
@@ -89,7 +99,7 @@ def test_authority_grading_classifies_false_unsafe():
     assert result["fully_correct"] is False
 
 
-def test_authority_grading_marks_wrong_decision_even_when_safety_is_correct():
+def test_authority_grading_marks_wrong_decision_even_when_safety_is_correct() -> None:
     result = evaluate_decision_packet(
         _packet(edit="src/decoy.py"),
         expected_edit_path="src/owner.py",
@@ -101,7 +111,7 @@ def test_authority_grading_marks_wrong_decision_even_when_safety_is_correct():
     assert result["fully_correct"] is False
 
 
-def test_summary_reports_false_safe_and_false_unsafe_rates():
+def test_summary_reports_false_safe_and_false_unsafe_rates() -> None:
     rows = [
         {
             "safety_class": "correct-safe",

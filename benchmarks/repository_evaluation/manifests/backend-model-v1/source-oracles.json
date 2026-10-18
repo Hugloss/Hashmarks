@@ -1,0 +1,322 @@
+{
+  "schema": "hashmarks.backend-model-source-oracles.v1",
+  "qualification_scope": "Three reviewed genuine problems; source-provider API baseline only. This is not a capability rating or transport/release gate. Remaining acquired problems are not admitted by this file.",
+  "sources": {
+    "fastapi-dict-exclude-defaults-before": {
+      "repository": "fastapi",
+      "commit": "4ffd45172059cb32c3326cedde2c7ecf579c5db8",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/fastapi",
+      "content_identity": "sha256:2ce7cfa1a7a0340ea62a8a38237ef804b5092124e9fd3b0f9bff4f3272683ca9:3134"
+    },
+    "fastapi-dict-exclude-defaults-after": {
+      "repository": "fastapi",
+      "commit": "aadfcce76380ab169fe172d5cda21722e53c4924",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/fastapi",
+      "content_identity": "sha256:2f615ba2fb85aaf8b0b9ff1b3577150ebbf786798df49be2cb6481eb9c65dce5:3134"
+    },
+    "litestar-notrequired-field-schema-before": {
+      "repository": "litestar",
+      "commit": "7c9d0e0dd8c68c92d162ad65f39f44f3b75cbcd4",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar",
+      "content_identity": "sha256:e610dde327395441f4825327418c68a8b9010ccc5fd47b5ce7cbc2fa8c683e82:1445"
+    },
+    "litestar-notrequired-field-schema-after": {
+      "repository": "litestar",
+      "commit": "ce3ff9e6de8a3f69b45e8ab2c716908cb7c9b749",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar",
+      "content_identity": "sha256:ce20973c71352bb8bdae5bd6cf1f625629f34c0ba6a62c456d16941d11c1cb93:1445"
+    },
+    "sqlmodel-field-discriminator-before": {
+      "repository": "sqlmodel",
+      "commit": "43353a45817b30a51b7904d0b30e500bbbcef7ca",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/sqlmodel",
+      "content_identity": "sha256:aac1ee4905b23bbef428faf1cb80d87561a10fd0e02bff8534f929e054151cc2:508"
+    },
+    "sqlmodel-field-discriminator-after": {
+      "repository": "sqlmodel",
+      "commit": "073023d84546490bd5dce86ce94fe6e8914db7c2",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/sqlmodel",
+      "content_identity": "sha256:52c47becdd7c2af0a5795317b693725fa5a1b8005eeae2b48c00affe87ce7c79:508"
+    }
+  },
+  "cases": [
+    {
+      "id": "fastapi-dict-exclude-defaults",
+      "repository": "fastapi",
+      "problem_id": "aadfcce76380ab169fe172d5cda21722e53c4924",
+      "problem_source": "https://github.com/fastapi/fastapi/commit/aadfcce76380ab169fe172d5cda21722e53c4924",
+      "before": "fastapi-dict-exclude-defaults-before",
+      "after": "fastapi-dict-exclude-defaults-after",
+      "question": "Which directly declared defaults are involved when encoding models nested in dicts and lists?",
+      "path": "tests/test_jsonable_encoder.py",
+      "source_oracles": {
+        "before": [
+          {
+            "class_name_syntax": "ModelWithDefault",
+            "class_line": 69,
+            "fields": [
+              {
+                "name": "foo",
+                "line": 70,
+                "annotation_text": "str",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "other-literal"
+              },
+              {
+                "name": "bar",
+                "line": 71,
+                "annotation_text": "str",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "string"
+              },
+              {
+                "name": "bla",
+                "line": 72,
+                "annotation_text": "str",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "string"
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "tests/test_jsonable_encoder.py",
+                "start_line": 69,
+                "end_line": 72,
+                "sha256": "93ca3fefc43f16425e44e6c5b130e69c583b5aeba884ae9e284a4c92b42b8b12"
+              }
+            ]
+          }
+        ],
+        "after": [
+          {
+            "class_name_syntax": "ModelWithDefault",
+            "class_line": 69,
+            "fields": [
+              {
+                "name": "foo",
+                "line": 70,
+                "annotation_text": "str",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "other-literal"
+              },
+              {
+                "name": "bar",
+                "line": 71,
+                "annotation_text": "str",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "string"
+              },
+              {
+                "name": "bla",
+                "line": 72,
+                "annotation_text": "str",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "string"
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "tests/test_jsonable_encoder.py",
+                "start_line": 69,
+                "end_line": 72,
+                "sha256": "93ca3fefc43f16425e44e6c5b130e69c583b5aeba884ae9e284a4c92b42b8b12"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "litestar-notrequired-field-schema",
+      "repository": "litestar",
+      "problem_id": "ce3ff9e6de8a3f69b45e8ab2c716908cb7c9b749",
+      "problem_source": "https://github.com/litestar-org/litestar/commit/ce3ff9e6de8a3f69b45e8ab2c716908cb7c9b749",
+      "before": "litestar-notrequired-field-schema-before",
+      "after": "litestar-notrequired-field-schema-after",
+      "question": "Where is the factory initializer on the constrained string model declared? Does syntax establish requiredness?",
+      "path": "tests/unit/test_plugins/test_pydantic/test_schema_plugin.py",
+      "source_oracles": {
+        "before": [
+          {
+            "class_name_syntax": "Model",
+            "class_line": 137,
+            "fields": [
+              {
+                "name": "test_str",
+                "line": 138,
+                "annotation_text": "str",
+                "default_state": "direct-call-syntax",
+                "default_keyword_names": [
+                  "default_factory",
+                  "max_length"
+                ]
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "tests/unit/test_plugins/test_pydantic/test_schema_plugin.py",
+                "start_line": 137,
+                "end_line": 138,
+                "sha256": "44f1c77f96cba95da3d75485dfb9ea7ba722a8c9f88d540614c740157635ce80"
+              }
+            ]
+          }
+        ],
+        "after": [
+          {
+            "class_name_syntax": "Model",
+            "class_line": 137,
+            "fields": [
+              {
+                "name": "test_str",
+                "line": 138,
+                "annotation_text": "str",
+                "default_state": "direct-call-syntax",
+                "default_keyword_names": [
+                  "default_factory",
+                  "max_length"
+                ]
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "tests/unit/test_plugins/test_pydantic/test_schema_plugin.py",
+                "start_line": 137,
+                "end_line": 138,
+                "sha256": "44f1c77f96cba95da3d75485dfb9ea7ba722a8c9f88d540614c740157635ce80"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "sqlmodel-field-discriminator",
+      "repository": "sqlmodel",
+      "problem_id": "073023d84546490bd5dce86ce94fe6e8914db7c2",
+      "problem_source": "https://github.com/fastapi/sqlmodel/commit/073023d84546490bd5dce86ce94fe6e8914db7c2",
+      "before": "sqlmodel-field-discriminator-before",
+      "after": "sqlmodel-field-discriminator-after",
+      "question": "Which direct declarations and initializer syntax accompany the new callable discriminator? Do not infer inherited fields or runtime validation.",
+      "path": "tests/test_pydantic/test_field.py",
+      "source_oracles": {
+        "before": [
+          {
+            "class_name_syntax": "Model",
+            "class_line": 40,
+            "fields": [
+              {
+                "name": "pet",
+                "line": 41,
+                "annotation_text": "Cat | Dog | Lizard",
+                "default_state": "direct-call-syntax",
+                "default_keyword_names": [
+                  "discriminator"
+                ]
+              },
+              {
+                "name": "n",
+                "line": 42,
+                "annotation_text": "int",
+                "default_state": "not-supplied"
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "tests/test_pydantic/test_field.py",
+                "start_line": 40,
+                "end_line": 42,
+                "sha256": "7656aae5a392b08fe3153613d30206c596e13e0513b75548c48f81cd6eb5afa4"
+              }
+            ],
+            "base_expression_texts": [
+              "SQLModel"
+            ]
+          }
+        ],
+        "after": [
+          {
+            "class_name_syntax": "ApplePie",
+            "class_line": 57,
+            "fields": [
+              {
+                "name": "fruit",
+                "line": 58,
+                "annotation_text": "Literal['apple']",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "string"
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "tests/test_pydantic/test_field.py",
+                "start_line": 57,
+                "end_line": 58,
+                "sha256": "115df9108ec154121881fe20902d6f190b1b21fa93bc09d840af3a4098e2f840"
+              }
+            ],
+            "base_expression_texts": [
+              "Pie"
+            ]
+          },
+          {
+            "class_name_syntax": "PumpkinPie",
+            "class_line": 60,
+            "fields": [
+              {
+                "name": "filling",
+                "line": 61,
+                "annotation_text": "Literal['pumpkin']",
+                "default_state": "literal-kind-only",
+                "default_literal_kind": "string"
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "tests/test_pydantic/test_field.py",
+                "start_line": 60,
+                "end_line": 61,
+                "sha256": "e1f32eefa3746ac2c88fe4e31e33e43a3052fd8c93976a51c6a34ba4318adcb3"
+              }
+            ],
+            "base_expression_texts": [
+              "Pie"
+            ]
+          },
+          {
+            "class_name_syntax": "ThanksgivingDinner",
+            "class_line": 68,
+            "fields": [
+              {
+                "name": "dessert",
+                "line": 69,
+                "annotation_text": "Annotated[ApplePie, Tag('apple')] | Annotated[PumpkinPie, Tag('pumpkin')]",
+                "default_state": "direct-call-syntax",
+                "default_keyword_names": [
+                  "discriminator"
+                ]
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "tests/test_pydantic/test_field.py",
+                "start_line": 68,
+                "end_line": 73,
+                "sha256": "41bc67ce9b75852a44a892baea5f3e5aa7ff78ff56dd1cda5e6d832fdac69f12"
+              }
+            ],
+            "base_expression_texts": [
+              "SQLModel"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

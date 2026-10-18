@@ -5,7 +5,8 @@ import os
 import shutil
 import subprocess
 import tomllib
-from collections.abc import Callable
+from collections import Counter
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -125,13 +126,43 @@ class NpmProjectGraphProvider(ProjectGraphProvider):
         self, workspace: Path, rows: list[tuple[Path, dict[str, Any]]]
     ) -> tuple[list[ProjectNode], dict[str, str]]:
         nodes = [self._npm_node(workspace, manifest, value) for manifest, value in rows]
-        return nodes, {str(node.metadata["name"]): node.project_id for node in nodes}
+        counts = Counter(str(node.metadata["name"]) for node in nodes)
+        qualified = [
+            ProjectNode(
+                project_id="npm:declaration:"
+                + json.dumps(
+                    [node.metadata["name"], node.manifest],
+                    separators=(",", ":"),
+                    ensure_ascii=False,
+                ),
+                kind=node.kind,
+                root=node.root,
+                manifest=node.manifest,
+                producer=node.producer,
+                metadata={
+                    **node.metadata,
+                    "name_resolution": "ambiguous"
+                    if counts[str(node.metadata["name"])] > 1
+                    else "unique",
+                },
+            )
+            if counts[str(node.metadata["name"])] > 1
+            or str(node.metadata["name"]).startswith("declaration:")
+            else node
+            for node in nodes
+        ]
+        return qualified, {
+            str(node.metadata["name"]): node.project_id
+            for node in qualified
+            if counts[str(node.metadata["name"])] == 1
+        }
 
     def _npm_edges(
         self,
         workspace: Path,
         rows: list[tuple[Path, dict[str, Any]]],
         names: dict[str, str],
+        sources: dict[str, str],
     ) -> list[ProjectEdge]:
         edges: list[ProjectEdge] = []
         fields = (
@@ -141,7 +172,7 @@ class NpmProjectGraphProvider(ProjectGraphProvider):
             "optionalDependencies",
         )
         for manifest, value in rows:
-            source = f"npm:{self._npm_name(workspace, manifest, value)}"
+            source = sources[_rel(workspace, manifest)]
             for field_name in fields:
                 deps = value.get(field_name)
                 if not isinstance(deps, dict):
@@ -159,7 +190,20 @@ class NpmProjectGraphProvider(ProjectGraphProvider):
     def collect(self, workspace: Path) -> ProjectGraphEvidence:
         rows, warnings = self._package_rows(workspace)
         nodes, names = self._npm_nodes(workspace, rows)
-        edges = self._npm_edges(workspace, rows, names)
+        ambiguous = sorted(
+            {
+                str(node.metadata["name"])
+                for node in nodes
+                if node.metadata.get("name_resolution") == "ambiguous"
+            }
+        )
+        warnings.extend(
+            f"ambiguous npm package name: {name}; dependency target unresolved"
+            for name in ambiguous
+        )
+        edges = self._npm_edges(
+            workspace, rows, names, {node.manifest: node.project_id for node in nodes}
+        )
         return ProjectGraphEvidence(
             self.name, tuple(nodes), tuple(edges), tuple(warnings)
         )
@@ -289,7 +333,9 @@ class MavenProjectGraphProvider(ProjectGraphProvider):
         return bool(self._manifest_paths("pom.xml"))
 
     @staticmethod
-    def _module_indexes(modules):
+    def _module_indexes(
+        modules: Sequence[Any],
+    ) -> tuple[dict[str, str], dict[tuple[str, str], str], dict[str, list[str]]]:
         ids = {row.module_id: f"maven:{row.module_id}" for row in modules}
         by_ga = {(row.group_id, row.artifact_id): row.module_id for row in modules}
         by_artifact: dict[str, list[str]] = {}
@@ -297,7 +343,9 @@ class MavenProjectGraphProvider(ProjectGraphProvider):
             by_artifact.setdefault(row.artifact_id, []).append(row.module_id)
         return ids, by_ga, by_artifact
 
-    def _maven_nodes(self, modules, ids: dict[str, str]) -> tuple[ProjectNode, ...]:
+    def _maven_nodes(
+        self, modules: Sequence[Any], ids: dict[str, str]
+    ) -> tuple[ProjectNode, ...]:
         return tuple(
             ProjectNode(
                 project_id=ids[row.module_id],
@@ -316,7 +364,10 @@ class MavenProjectGraphProvider(ProjectGraphProvider):
 
     @staticmethod
     def _resolve_maven_target(
-        group_id: str, artifact_id: str, by_ga, by_artifact
+        group_id: str,
+        artifact_id: str,
+        by_ga: dict[tuple[str, str], str],
+        by_artifact: dict[str, list[str]],
     ) -> str | None:
         target_id = by_ga.get((group_id, artifact_id))
         if target_id is not None:
@@ -324,7 +375,13 @@ class MavenProjectGraphProvider(ProjectGraphProvider):
         candidates = by_artifact.get(artifact_id, ())
         return candidates[0] if not group_id and len(candidates) == 1 else None
 
-    def _maven_edges(self, modules, ids, by_ga, by_artifact) -> tuple[ProjectEdge, ...]:
+    def _maven_edges(
+        self,
+        modules: Sequence[Any],
+        ids: dict[str, str],
+        by_ga: dict[tuple[str, str], str],
+        by_artifact: dict[str, list[str]],
+    ) -> tuple[ProjectEdge, ...]:
         edges: list[ProjectEdge] = []
         for row in modules:
             for group_id, artifact_id in row.dependencies:
@@ -740,9 +797,12 @@ class DeclaredProjectLinksProvider(ProjectGraphProvider):
     def _shared_projects(
         index: int, projects: object, warnings: list[str]
     ) -> tuple[str, ...]:
-        valid_list = isinstance(projects, list) and all(
-            isinstance(item, str) and item.strip() for item in projects
-        )
+        if not isinstance(projects, list):
+            warnings.append(
+                f"shared_input[{index}] projects must be a non-empty string list"
+            )
+            return ()
+        valid_list = all(isinstance(item, str) and item.strip() for item in projects)
         if not valid_list:
             warnings.append(
                 f"shared_input[{index}] projects must be a non-empty string list"

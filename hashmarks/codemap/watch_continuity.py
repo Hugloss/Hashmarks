@@ -4,6 +4,7 @@ import json
 import os
 import time
 from dataclasses import dataclass
+from typing import TypeGuard
 
 from hashmarks.client import RepositoryObservation
 from hashmarks.observation import ChangeSnapshot, ObservationState
@@ -14,11 +15,11 @@ _MAX_DIRTY_PATHS = 1000
 _MAX_HEARTBEAT_AGE_SECONDS = 2.5
 
 
-def _plain_int(value: object) -> bool:
+def _plain_int(value: object) -> TypeGuard[int]:
     return isinstance(value, int) and not isinstance(value, bool)
 
 
-def _number(value: object) -> bool:
+def _number(value: object) -> TypeGuard[int | float]:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 

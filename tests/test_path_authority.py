@@ -18,7 +18,7 @@ def _make_dir_symlink(link: Path, target: Path) -> None:
         pytest.skip("directory symlinks unavailable")
 
 
-def test_symlinked_workspace_store_auto_exclusion_is_stable(tmp_path: Path):
+def test_symlinked_workspace_store_auto_exclusion_is_stable(tmp_path: Path) -> None:
     real = tmp_path / "real"
     repo = real / "repo"
     repo.mkdir(parents=True)
@@ -50,7 +50,9 @@ def test_symlinked_workspace_store_auto_exclusion_is_stable(tmp_path: Path):
     assert first == second
 
 
-def test_relative_store_roots_are_cwd_independent(tmp_path: Path, monkeypatch):
+def test_relative_store_roots_are_cwd_independent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     first_cwd = tmp_path / "first"
     second_cwd = tmp_path / "second"
     first_cwd.mkdir()
@@ -82,7 +84,9 @@ def test_relative_store_roots_are_cwd_independent(tmp_path: Path, monkeypatch):
     assert not (second_cwd / "state").exists()
 
 
-def test_watcher_event_alias_collapses_but_symlink_leaf_is_preserved(tmp_path: Path):
+def test_watcher_event_alias_collapses_but_symlink_leaf_is_preserved(
+    tmp_path: Path,
+) -> None:
     real = tmp_path / "real"
     repo = real / "repo"
     repo.mkdir(parents=True)
@@ -104,7 +108,7 @@ def test_watcher_event_alias_collapses_but_symlink_leaf_is_preserved(tmp_path: P
 
 def test_walk_ignored_directory_is_ignored_broadly_but_selectable_explicitly(
     tmp_path: Path,
-):
+) -> None:
     workspace = tmp_path / "repo"
     ignored = workspace / "__pycache__"
     ignored.mkdir(parents=True)
@@ -127,7 +131,7 @@ def test_walk_ignored_directory_is_ignored_broadly_but_selectable_explicitly(
 
 def test_mandatory_hashmarks_exclusion_cannot_be_disabled_by_legacy_ignore_names(
     tmp_path: Path,
-):
+) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     state = workspace / ".hashmarks"
@@ -167,7 +171,7 @@ def test_fastidentity_directory_is_identity_content_unless_selected_as_state(
         state_tree.digest_selected([".fastidentity/source.py"])
 
 
-def test_relative_explicit_exclusion_preserves_symlink_leaf(tmp_path: Path):
+def test_relative_explicit_exclusion_preserves_symlink_leaf(tmp_path: Path) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     outside = tmp_path / "outside"
@@ -184,7 +188,7 @@ def test_relative_explicit_exclusion_preserves_symlink_leaf(tmp_path: Path):
         tree.digest_selected(["state-link"])
 
 
-def test_package_has_no_absolute_path_authority_calls():
+def test_package_has_no_absolute_path_authority_calls() -> None:
     package = Path(__file__).resolve().parents[1] / "hashmarks"
     offenders = []
     for source in package.glob("*.py"):
@@ -195,7 +199,7 @@ def test_package_has_no_absolute_path_authority_calls():
 
 def test_real_symlink_and_dotdot_workspace_aliases_produce_same_identity(
     tmp_path: Path,
-):
+) -> None:
     real = tmp_path / "real"
     repo = real / "repo"
     (repo / "src").mkdir(parents=True)
@@ -215,7 +219,9 @@ def test_real_symlink_and_dotdot_workspace_aliases_produce_same_identity(
     assert roots[0] == roots[1] == roots[2]
 
 
-def test_direct_primitives_and_identity_engine_share_path_semantics(tmp_path: Path):
+def test_direct_primitives_and_identity_engine_share_path_semantics(
+    tmp_path: Path,
+) -> None:
     from hashmarks.engine import IdentityEngine
 
     real = tmp_path / "real"

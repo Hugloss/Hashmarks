@@ -1,86 +1,51 @@
 from __future__ import annotations
 
+from contextlib import ExitStack
+from dataclasses import dataclass
 from pathlib import Path
+from types import TracebackType
 
 from hashmarks.client import (
-    DaemonCompatibilityError,
-    DaemonProtocolError,
-    DaemonUnavailableError,
     IdentityClient,
-    RepositoryObservation,
-    default_state_dir,
     prepare_default_state_dir,
 )
 from hashmarks.file_store import FileDigestStore
-from hashmarks.native_vitest import (  # noqa: F401 - evidence_graph uses these engine module attributes
-    collect_vitest_vite_graph,
-    local_vitest,
-)
-from hashmarks.operation_contract import operation_response, operation_schema
-from hashmarks.paths import canonical_host_path, normalize_relative_path
+from hashmarks.paths import canonical_host_path
 
-from .change_intelligence import ChangeIntelligenceMixin
 from .context_cache import ContextCache
-from .cross_repository_evidence import CrossRepositoryEvidenceMixin
-from .decision_session import DecisionSessionMixin, decision_scoped
-from .dependency_resolution_delta import DependencyResolutionDeltaMixin
-from .dependency_resolution_derivation import DependencyResolutionDerivationMixin
-from .dependency_resolution_evidence import DependencyResolutionEvidenceMixin
-from .evidence_correlation import EvidenceCorrelationMixin
-from .evidence_freshness import EvidenceFreshnessMixin
-from .evidence_graph import EvidenceGraphMixin
-from .evidence_packet import TaskEvidencePacketMixin
-from .evidence_profiles import EvidenceProfilesMixin
-from .evidence_verification import VerificationMixin
-from .find_engine import FindEngineMixin, _FindEvidence
-from .freshness_map import EvidenceFreshnessMapMixin
-from .import_resolution import ImportResolutionMixin
-from .index_watch import IndexWatchMixin
+from .cross_repository_evidence import RepositoryCrossRepository
+from .decision_session import (
+    DecisionScope,
+)
+from .evidence_correlation import RepositoryCorrelation
+from .evidence_graph import RepositoryRelationships
+from .evidence_verification import RepositoryVerification
+from .find_engine import RepositorySearch
+from .import_resolution import RepositoryImports
 from .indexing_lifecycle import (
     _MAX_INDEX_BYTES,
-    IndexingLifecycleMixin,
-    _python_source_roots,
+    RepositoryIndex,
 )
-from .intelligence_economics import IntelligenceEconomicsMixin
-from .model import (
-    ContextPack,
-    EvidenceVisibility,
-    SearchHit,
-)
-from .ownership_analysis import OwnershipAnalysisMixin
-from .ownership_graph import OwnershipGraphMixin
-from .policy import ContextPolicy
-from .post_change import PostChangeMixin
-from .project_graph import default_project_graph_providers
-from .providers import TreeSitterRangeProvider
-from .pyright_type_server import PyrightTypeServerProvider
-from .python_ast import estimate_tokens
-from .query_surface import QuerySurfaceMixin
-from .relationships import RelationshipsMixin
-from .repository_context import ContextPlanningMixin
-from .repository_declaration_derivation import RepositoryDeclarationDerivationMixin
-from .repository_declaration_discovery import RepositoryDeclarationDiscoveryMixin
-from .repository_declarations import RepositoryDeclarationsMixin
-from .repository_delta import RepositoryDeltaMixin
-from .repository_evidence_binding_delta import RepositoryEvidenceBindingDeltaMixin
-from .repository_evidence_bindings import RepositoryEvidenceBindingsMixin
-from .repository_evidence_coverage import RepositoryEvidenceCoverageMixin
-from .repository_file_discovery import RepositoryFileDiscoveryMixin
+from .intelligence_economics import RepositoryEconomics
+from .native_evidence import RepositoryNativeEvidence
+from .ownership_graph import RepositoryOwnership
+from .providers import SourceRangeProvider, TreeSitterRangeProvider
+from .repository_changes import RepositoryChanges
+from .repository_context import RepositoryContext
+from .repository_declarations import RepositoryDeclarations
+from .repository_dependencies import RepositoryDependencies
+from .repository_evidence_bindings import RepositoryBindings
+from .repository_file_discovery import RepositoryFiles
 from .repository_index_store import (
     ArtifactStore,
     WorkspaceMapStore,
     default_artifact_db,
 )
-from .repository_intelligence_query import RepositoryIntelligenceQueryMixin
-from .repository_task_action import TaskActionMixin
-from .singleflight import SingleFlight
-from .structural_locality import StructuralLocalityMixin
-from .structural_search import AstGrepSearchProvider
-from .task_retrieval import TaskRetrievalMixin, _TaskRetrievalResult
-from .typescript_resolver import TypeScriptResolverProvider
-from .verification_explanation import VerificationExplanationMixin
-from .verification_plan import VerificationPlanMixin
-from .work_context import WorkContextMixin
+from .repository_intelligence_query import RepositoryViews
+from .repository_observation import RepositoryObservationSource
+from .repository_source import RepositorySource
+from .repository_tasks import RepositoryTasks
+from .structural_locality import RepositoryStructure
 
 # Generic repository evidence families. These are query-formulation hints only:
 # they never name project-specific files, never grant authority, and are emitted
@@ -90,47 +55,47 @@ from .work_context import WorkContextMixin
 # documentation.
 
 
-class CodeMap(
-    TaskEvidencePacketMixin,
-    DependencyResolutionDeltaMixin,
-    DependencyResolutionDerivationMixin,
-    DependencyResolutionEvidenceMixin,
-    ChangeIntelligenceMixin,
-    EvidenceFreshnessMapMixin,
-    RepositoryDeltaMixin,
-    EvidenceCorrelationMixin,
-    RepositoryEvidenceBindingsMixin,
-    RepositoryEvidenceBindingDeltaMixin,
-    RepositoryEvidenceCoverageMixin,
-    EvidenceProfilesMixin,
-    CrossRepositoryEvidenceMixin,
-    RepositoryIntelligenceQueryMixin,
-    RepositoryDeclarationDerivationMixin,
-    RepositoryDeclarationDiscoveryMixin,
-    RepositoryDeclarationsMixin,
-    IntelligenceEconomicsMixin,
-    VerificationExplanationMixin,
-    PostChangeMixin,
-    TaskActionMixin,
-    VerificationPlanMixin,
-    VerificationMixin,
-    RelationshipsMixin,
-    ImportResolutionMixin,
-    EvidenceFreshnessMixin,
-    EvidenceGraphMixin,
-    ContextPlanningMixin,
-    OwnershipAnalysisMixin,
-    StructuralLocalityMixin,
-    QuerySurfaceMixin,
-    WorkContextMixin,
-    IndexWatchMixin,
-    RepositoryFileDiscoveryMixin,
-    IndexingLifecycleMixin,
-    TaskRetrievalMixin,
-    OwnershipGraphMixin,
-    FindEngineMixin,
-    DecisionSessionMixin,
-):
+@dataclass(frozen=True)
+class _CodeMapPaths:
+    """Prepared control paths for the composition root, never repository identity."""
+
+    workspace: Path
+    state_dir: Path
+    artifact_db: Path
+    policy_path: Path | None
+    internal_state_path: str | None
+
+    @classmethod
+    def prepare(
+        cls,
+        workspace: str | Path,
+        state_dir: str | Path | None,
+        artifact_db: str | Path | None,
+        policy_path: str | Path | None,
+    ) -> _CodeMapPaths:
+        root = canonical_host_path(workspace)
+        state = (
+            prepare_default_state_dir(root)
+            if state_dir is None
+            else canonical_host_path(root / state_dir)
+        )
+        state.mkdir(parents=True, exist_ok=True)
+        try:
+            internal = state.relative_to(root).as_posix().strip("/")
+        except ValueError:
+            internal = None
+        artifacts = (
+            default_artifact_db(root)
+            if artifact_db is None
+            else canonical_host_path(artifact_db)
+        )
+        policy = (
+            None if policy_path is None else canonical_host_path(root / policy_path)
+        )
+        return cls(root, state, artifacts, policy, internal)
+
+
+class CodeMap:
     """Derived repository-intelligence map.
 
     This subsystem is intentionally outside the Identity import graph. It may
@@ -146,302 +111,185 @@ class CodeMap(
         artifact_db: str | Path | None = None,
         policy_path: str | Path | None = None,
         max_index_bytes: int = _MAX_INDEX_BYTES,
+        range_provider: SourceRangeProvider | None = None,
     ) -> None:
-        self.workspace = canonical_host_path(workspace)
-        self.state_dir = (
-            prepare_default_state_dir(self.workspace)
-            if state_dir is None
-            else self._resolve_state_dir(state_dir)
-        )
-        self.state_dir.mkdir(parents=True, exist_ok=True)
-        try:
-            self._state_rel = (
-                self.state_dir.relative_to(self.workspace).as_posix().strip("/")
-            )
-        except ValueError:
-            self._state_rel = None
-        store = WorkspaceMapStore(self.state_dir / "codemap.sqlite3")
-        store.bind_workspace(
+        paths = _CodeMapPaths.prepare(workspace, state_dir, artifact_db, policy_path)
+        with ExitStack() as resources:
+            self._open_resources(paths, resources)
+            self._compose_components(range_provider, max_index_bytes)
+            self._resources = resources.pop_all()
+
+    def _open_resources(self, paths: _CodeMapPaths, resources: ExitStack) -> None:
+        self.workspace = paths.workspace
+        self.state_dir = paths.state_dir
+        self.store = WorkspaceMapStore(self.state_dir / "codemap.sqlite3")
+        resources.callback(self.store.close)
+        self.store.bind_workspace(
             self.workspace,
-            allow_unbound_existing=self._state_rel is not None,
+            allow_unbound_existing=paths.internal_state_path is not None,
         )
-        self.store = store
         self.file_store = FileDigestStore(self.state_dir / "identity.sqlite3")
+        resources.callback(self.file_store.close)
         # Protocol v3 is the compatibility fence. Reuse one stateless IPC client
         # so repository observations validate daemon compatibility once rather
         # than spending an extra status round-trip on every freshness sample.
-        self._identity_client = IdentityClient(
-            self.workspace, state_dir=self.state_dir, timeout=0.1
+        self._observation_source = RepositoryObservationSource(
+            IdentityClient(self.workspace, state_dir=self.state_dir, timeout=0.1)
         )
-        artifact_path = (
-            default_artifact_db(self.workspace)
-            if artifact_db is None
-            else canonical_host_path(artifact_db)
+        self.artifacts = ArtifactStore(paths.artifact_db)
+        resources.callback(self.artifacts.close)
+        self._files = RepositoryFiles(
+            self.workspace,
+            internal_state_path=paths.internal_state_path,
+            policy_path=paths.policy_path,
         )
-        self.artifacts = ArtifactStore(artifact_path)
-        config = None
-        if policy_path is not None:
-            config = Path(policy_path)
-            if not config.is_absolute():
-                config = self.workspace / config
-            config = canonical_host_path(config)
-        self._policy_config_path, self.policy = (
-            config,
-            ContextPolicy.load(self.workspace, config),
-        )
-        self.context_cache = ContextCache(self.state_dir)
-        self._find_flight: SingleFlight[_FindEvidence] = SingleFlight()
-        self._context_flight: SingleFlight[ContextPack] = SingleFlight()
-        self.max_index_bytes = int(max_index_bytes)
-        self._python_import_roots = _python_source_roots(self.workspace)
+        self._context_cache = ContextCache(self.state_dir)
+        resources.callback(self._context_cache.close)
+
+    def _compose_components(
+        self, range_provider: SourceRangeProvider | None, max_index_bytes: int
+    ) -> None:
         # Optional structural precision lives entirely in the CodeMap lane.
         # Missing tree-sitter support is expected and never affects Identity.
-        self.range_provider = TreeSitterRangeProvider.auto()
-        self.structural_search_provider = AstGrepSearchProvider(self.workspace)
-        self.project_graph_providers = default_project_graph_providers(
-            self._visible_repository_manifests
+        range_producer = (
+            TreeSitterRangeProvider.auto() if range_provider is None else range_provider
         )
-        self.typescript_resolver = TypeScriptResolverProvider()
-        self.pyright_type_server = PyrightTypeServerProvider()
-        self._reverse_file_graph_cache: tuple[int, dict[str, set[str]]] | None = None
-        # Canonical task retrieval is composed by multiple additive CodeMap surfaces.
-        # Keep a small generation-bound result cache so those surfaces reuse the exact
-        # same selected evidence instead of replaying 2-3 query lanes each time.
-        self._task_result_cache: dict[tuple[int, str, int], _TaskRetrievalResult] = {}
-        # Structural ownership may select an authority path that is not present in
-        # the canonical retrieval rows. Remember those selected paths separately
-        # so an unsignaled byte change is reconciled before the next decision.
-        self._task_authority_paths_cache: dict[
-            tuple[int, str, int], tuple[str, ...]
-        ] = {}
-        # Retain a bounded task-local history of authority-contributing paths.
-        # This is freshness evidence only: it lets a later ABA restoration or
-        # path replacement be reconciled even after an intermediate decision
-        # became unsafe and no longer selected the old owner.
-        self._task_recent_authority_paths: dict[tuple[str, int], tuple[str, ...]] = {}
-        self._init_decision_session_state()
+        self._index = RepositoryIndex(
+            self.files,
+            self.store,
+            self.file_store,
+            self.artifacts,
+            range_provider=range_producer,
+            observation_source=self._observation_source,
+            max_index_bytes=max_index_bytes,
+        )
+        self._reads = DecisionScope(self.index)
+        self._source = RepositorySource(self.index, self.reads)
+        self._imports = RepositoryImports(self.source)
+        self._native = RepositoryNativeEvidence(self.source)
+        self._relationships = RepositoryRelationships(self._imports, self.native)
+        self._structure = RepositoryStructure(
+            self.source, self._imports, self.native, self.relationships
+        )
+        self._search = RepositorySearch(self.native)
+        self._context = RepositoryContext(
+            self.source, self.search, self.relationships, self._context_cache
+        )
+        self._ownership = RepositoryOwnership(
+            self.source, self._imports, self.structure, self.search
+        )
+        self._verification = RepositoryVerification(self._imports)
+        self._bindings = RepositoryBindings(self.source)
+        self._declarations = RepositoryDeclarations(self.bindings)
+        self._tasks = RepositoryTasks(
+            self.search,
+            self.ownership,
+            self.verification,
+            self.relationships,
+            self.context,
+            declarations=self.declarations,
+        )
+        self._correlation = RepositoryCorrelation(self.bindings)
+        self._dependencies = RepositoryDependencies(
+            self.source, self._imports, self.correlation
+        )
+        self._changes = RepositoryChanges(self.tasks, self.relationships)
+        self._cross_repository = RepositoryCrossRepository(self.changes)
+        self._economics = RepositoryEconomics(self.changes)
+        self._views = RepositoryViews(
+            self.changes, self.cross_repository, self.economics, self.structure
+        )
 
-    def _resolve_state_dir(self, state_dir: str | Path | None) -> Path:
-        if state_dir is None:
-            return default_state_dir(self.workspace)
-        raw_state = Path(state_dir)
-        if not raw_state.is_absolute():
-            raw_state = self.workspace / raw_state
-        return canonical_host_path(raw_state)
+    @property
+    def files(self) -> RepositoryFiles:
+        return self._files
 
-    def _init_decision_session_state(self) -> None:
-        # Read-only generation-bound decision-session caches. These cache only
-        # immutable evidence primitives, never final task decisions. Outside an
-        # explicit decision_session() they are bypassed.
-        self._decision_session_depth = 0
-        self._decision_session_generation: int | None = None
-        self._decision_session_observation: RepositoryObservation | None = None
-        self._decision_symbols_cache: dict[
-            tuple[int, str], list[dict[str, object]]
-        ] = {}
-        self._decision_file_row_cache: dict[
-            tuple[int, str], dict[str, object] | None
-        ] = {}
-        self._decision_module_paths_cache: dict[tuple[int, str], tuple[str, ...]] = {}
-        self._decision_exact_symbols_cache: dict[
-            tuple[int, tuple[str, ...]], tuple[int, tuple[dict[str, object], ...]]
-        ] = {}
-        # Reverse-reference semantics are keyed by target_short in the store;
-        # qualified aliases with the same short name therefore share one cache.
-        self._decision_refs_cache: dict[
-            tuple[int, str], tuple[int, tuple[dict[str, object], ...]]
-        ] = {}
-        self._decision_edges_from_cache: dict[
-            tuple[int, str, str], tuple[int, tuple[dict[str, object], ...]]
-        ] = {}
-        self._decision_edges_for_path_cache: dict[
-            tuple[int, str], tuple[int, tuple[dict[str, object], ...]]
-        ] = {}
-        self._decision_df_cache: dict[
-            tuple[int, tuple[str, ...]], tuple[int, dict[str, int]]
-        ] = {}
-        self._decision_candidates_cache: dict[
-            tuple[int, tuple[str, ...], int], list[dict[str, object]]
-        ] = {}
-        self._decision_repository_identity_cache: tuple[int, str] | None = None
-        # Complete repository-intelligence snapshots are expensive compositions of
-        # already generation-bound evidence. Reuse them only inside one explicit
-        # decision session and only for an exact request identity.
-        self._decision_snapshot_cache: dict[
-            tuple[int, str, tuple[str, ...], int, int, int, int], dict[str, object]
-        ] = {}
-        # Complete task-action projections are expensive compositions over already
-        # generation-bound retrieval/ownership evidence. Reuse only exact request
-        # identities inside one explicit decision session.
-        self._decision_task_action_cache: dict[
-            tuple[int, str, int, int], dict[str, object]
-        ] = {}
-        # Owner-chain reconstruction can traverse the bounded ownership relation
-        # graph repeatedly while several impact-derived surfaces share one task
-        # action projection. Reuse only the exact generation/task/action-bounds
-        # derivation inside one explicit decision session.
-        self._decision_change_impact_owner_chain_cache: dict[
-            tuple[int, str, int, int],
-            tuple[
-                str,
-                dict[str, object] | None,
-                str,
-                list[str],
-                dict[tuple[str, str], str],
-            ],
-        ] = {}
-        self._decision_ownership_import_paths_cache: dict[
-            tuple[int, str, str], tuple[str, ...]
-        ] = {}
-        self._decision_session_stats = {
-            "task_result_hit": 0,
-            "task_result_miss": 0,
-            "symbols_hit": 0,
-            "symbols_miss": 0,
-            "file_row_hit": 0,
-            "file_row_miss": 0,
-            "module_paths_hit": 0,
-            "module_paths_miss": 0,
-            "exact_symbols_hit": 0,
-            "exact_symbols_miss": 0,
-            "refs_hit": 0,
-            "refs_miss": 0,
-            "edges_from_hit": 0,
-            "edges_from_miss": 0,
-            "edges_for_path_hit": 0,
-            "edges_for_path_miss": 0,
-            "df_hit": 0,
-            "df_miss": 0,
-            "candidates_hit": 0,
-            "candidates_miss": 0,
-            "snapshot_hit": 0,
-            "snapshot_miss": 0,
-            "task_action_hit": 0,
-            "task_action_miss": 0,
-            "impact_owner_chain_hit": 0,
-            "impact_owner_chain_miss": 0,
-            "ownership_import_paths_hit": 0,
-            "ownership_import_paths_miss": 0,
-        }
-        self._decision_diagnostics_enabled = False
-        self._decision_diagnostics_started_ns = 0
-        self._decision_diagnostics_sequence = 0
-        self._decision_diagnostics_stack: list[dict[str, object]] = []
-        self._decision_diagnostics_spans: list[dict[str, object]] = []
-        self._decision_diagnostics_producers: dict[str, dict[str, object]] = {}
-        self._decision_diagnostics_last: dict[str, object] | None = None
+    @property
+    def index(self) -> RepositoryIndex:
+        return self._index
+
+    @property
+    def reads(self) -> DecisionScope:
+        return self._reads
+
+    @property
+    def source(self) -> RepositorySource:
+        return self._source
+
+    @property
+    def native(self) -> RepositoryNativeEvidence:
+        return self._native
+
+    @property
+    def relationships(self) -> RepositoryRelationships:
+        return self._relationships
+
+    @property
+    def structure(self) -> RepositoryStructure:
+        return self._structure
+
+    @property
+    def search(self) -> RepositorySearch:
+        return self._search
+
+    @property
+    def context(self) -> RepositoryContext:
+        return self._context
+
+    @property
+    def ownership(self) -> RepositoryOwnership:
+        return self._ownership
+
+    @property
+    def verification(self) -> RepositoryVerification:
+        return self._verification
+
+    @property
+    def tasks(self) -> RepositoryTasks:
+        return self._tasks
+
+    @property
+    def bindings(self) -> RepositoryBindings:
+        return self._bindings
+
+    @property
+    def correlation(self) -> RepositoryCorrelation:
+        return self._correlation
+
+    @property
+    def declarations(self) -> RepositoryDeclarations:
+        return self._declarations
+
+    @property
+    def dependencies(self) -> RepositoryDependencies:
+        return self._dependencies
+
+    @property
+    def changes(self) -> RepositoryChanges:
+        return self._changes
+
+    @property
+    def cross_repository(self) -> RepositoryCrossRepository:
+        return self._cross_repository
+
+    @property
+    def economics(self) -> RepositoryEconomics:
+        return self._economics
+
+    @property
+    def views(self) -> RepositoryViews:
+        return self._views
 
     def __enter__(self) -> CodeMap:
         return self
 
-    def __exit__(self, exc_type, exc, tb) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None:
         self.close()
 
     def close(self) -> None:
-        self.context_cache.close()
-        self.store.close()
-        self.artifacts.close()
-        self.file_store.close()
-
-    def _daemon_observation(self) -> RepositoryObservation | None:
-        try:
-            return self._identity_client.repository_observation()
-        except (
-            DaemonUnavailableError,
-            DaemonCompatibilityError,
-            DaemonProtocolError,
-            OSError,
-        ):
-            return None
-
-    def _internal_path(self, rel: str) -> bool:
-        clean = rel.strip("/")
-        state = self._state_rel
-        return bool(state and (clean == state or clean.startswith(state + "/")))
-
-    @operation_response("outline")
-    @decision_scoped
-    def outline(self, relpath: str) -> dict[str, object]:
-        self._ensure_map_ready()
-        rel = normalize_relative_path(relpath, allow_root=False)
-        self._ensure_path_current(rel)
-        row = self.store.outline(rel)
-        if row is None:
-            raise FileNotFoundError(f"not indexed: {rel}")
-        visibility = EvidenceVisibility(str(row["evidence_visibility"]))
-        if visibility is EvidenceVisibility.DENY:
-            raise PermissionError(
-                f"repository evidence denied by context policy: {rel}"
-            )
-        generation, identity_generation, stale = self._generation_status()
-        return {
-            "schema": operation_schema("outline"),
-            "path": rel,
-            "language": row["language"],
-            "file_digest": row["file_digest"],
-            "full_tokens": row["full_tokens"],
-            "outline_tokens": estimate_tokens(str(row["outline"])),
-            "outline": row["outline"],
-            "symbols": self._session_symbols_for_path(rel),
-            "parse_error": row["parse_error"],
-            "evidence_visibility": visibility.value,
-            "generation": generation,
-            "identity_generation": identity_generation,
-            "stale": stale,
-        }
-
-    def _ensure_map_ready(
-        self, *, _allow_incomplete: bool = False
-    ) -> RepositoryObservation | None:
-        # An active decision session already established repository readiness and
-        # is generation-bound. Nested retrieval surfaces must reuse that exact
-        # freshness sample rather than crossing the daemon boundary again.
-        if self._decision_session_depth > 0:
-            return self._decision_session_observation
-        # A durable BUILDING marker means a prior sync did not finish. Query
-        # paths must not silently turn that incomplete generation into fresh
-        # authority by auto-rebuilding it; the caller/execution layer decides
-        # when another sync attempt is appropriate.
-        if self.store.meta("sync.build_state") == "BUILDING":
-            if _allow_incomplete:
-                return None
-            raise RuntimeError(
-                "CodeMap generation is incomplete (BUILDING); run sync() before querying repository intelligence"
-            )
-        # Context policy is live repository admission authority, not a
-        # construction-time snapshot. Stable policy checks are one exact-file
-        # read; semantic changes reconcile once before persisted evidence returns.
-        self._reconcile_context_policy_for_query()
-        conformance = self._analysis_scope_conformance()
-        if (
-            self.store.meta("analysis_scope_conformance_identity", "")
-            != conformance.identity
-        ):
-            self.sync()
-            return self._daemon_observation()
-        self._reconcile_persisted_analysis_scope(conformance)
-        if not self.store.has_files():
-            self.sync()
-            return self._daemon_observation()
-        synced_raw = self.store.meta("identity_generation", "") or ""
-        observation = self._daemon_observation()
-        self._reconcile_daemon_generation(observation, synced_raw)
-        return observation
-
-    def _reconcile_daemon_generation(
-        self, observation: RepositoryObservation | None, synced_raw: str
-    ) -> None:
-        if observation is not None and not synced_raw:
-            # A daemon/barrier is now available but this map was built without
-            # generation-bound freshness evidence. Reconcile in the evidence lane.
-            self.sync()
-            return
-        if observation is None or not synced_raw:
-            return
-        synced = int(synced_raw)
-        if observation.generation == synced:
-            return
-        if observation.can_incrementally_reconcile:
-            self.sync(observation.dirty_paths)
-            return
-        self.sync()
+        self._resources.close()

@@ -143,6 +143,15 @@ def _publication_metadata_lines(project: dict[str, object]) -> list[str]:
     return lines
 
 
+def _metadata_string_array(project: dict[str, object], field: str) -> tuple[str, ...]:
+    values = project.get(field, [])
+    if not isinstance(values, list) or not all(
+        isinstance(value, str) for value in values
+    ):
+        raise RuntimeError(f"project.{field} must be an array of strings")
+    return tuple(values)
+
+
 def _metadata_bytes() -> bytes:
     name, version, requires_python, extras = _project()
     project = _project_metadata()
@@ -154,10 +163,13 @@ def _metadata_bytes() -> bytes:
         f"Requires-Python: {requires_python}",
         "Description-Content-Type: text/markdown",
     ]
-    keywords = tuple(str(value) for value in project.get("keywords", ()))
+    keywords = _metadata_string_array(project, "keywords")
     if keywords:
         lines.append(f"Keywords: {','.join(keywords)}")
-    lines.extend(f"Classifier: {value}" for value in project.get("classifiers", ()))
+    lines.extend(
+        f"Classifier: {value}"
+        for value in _metadata_string_array(project, "classifiers")
+    )
     lines.extend(f"Provides-Extra: {extra}" for extra in extras)
     optional = project.get("optional-dependencies", {})
     if not isinstance(optional, dict):
@@ -249,7 +261,7 @@ def _record_bytes(members: dict[str, bytes], dist_info: str) -> tuple[str, bytes
     return record_name, buffer.getvalue().encode("utf-8")
 
 
-def _write_wheel(wheel_directory: str, *, editable: bool) -> str:
+def _write_wheel(wheel_directory: str | Path, *, editable: bool) -> str:
     name, version, _, _ = _project()
     wheel_name = f"{name.replace('-', '_')}-{version}-py3-none-any.whl"
     target = Path(wheel_directory) / wheel_name
@@ -266,15 +278,17 @@ def _write_wheel(wheel_directory: str, *, editable: bool) -> str:
     return wheel_name
 
 
-def get_requires_for_build_wheel(config_settings=None):
+def get_requires_for_build_wheel(config_settings: object | None = None) -> list[str]:
     return []
 
 
-def get_requires_for_build_editable(config_settings=None):
+def get_requires_for_build_editable(config_settings: object | None = None) -> list[str]:
     return []
 
 
-def prepare_metadata_for_build_wheel(metadata_directory, config_settings=None):
+def prepare_metadata_for_build_wheel(
+    metadata_directory: str | Path, config_settings: object | None = None
+) -> str:
     dist_info = Path(metadata_directory) / _dist_info()
     dist_info.mkdir(parents=True, exist_ok=True)
     (dist_info / "METADATA").write_bytes(_metadata_bytes())
@@ -283,19 +297,29 @@ def prepare_metadata_for_build_wheel(metadata_directory, config_settings=None):
     return dist_info.name
 
 
-def prepare_metadata_for_build_editable(metadata_directory, config_settings=None):
+def prepare_metadata_for_build_editable(
+    metadata_directory: str | Path, config_settings: object | None = None
+) -> str:
     return prepare_metadata_for_build_wheel(metadata_directory, config_settings)
 
 
-def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
+def build_wheel(
+    wheel_directory: str | Path,
+    config_settings: object | None = None,
+    metadata_directory: str | Path | None = None,
+) -> str:
     return _write_wheel(wheel_directory, editable=False)
 
 
-def build_editable(wheel_directory, config_settings=None, metadata_directory=None):
+def build_editable(
+    wheel_directory: str | Path,
+    config_settings: object | None = None,
+    metadata_directory: str | Path | None = None,
+) -> str:
     return _write_wheel(wheel_directory, editable=True)
 
 
-def get_requires_for_build_sdist(config_settings=None):
+def get_requires_for_build_sdist(config_settings: object | None = None) -> list[str]:
     return []
 
 
@@ -377,7 +401,9 @@ def _deterministic_tar_info(info: tarfile.TarInfo) -> tarfile.TarInfo:
     return info
 
 
-def build_sdist(sdist_directory, config_settings=None):
+def build_sdist(
+    sdist_directory: str | Path, config_settings: object | None = None
+) -> str:
     name, version, _, _ = _project()
     normalized = name.replace("-", "_")
     root_name = f"{normalized}-{version}"

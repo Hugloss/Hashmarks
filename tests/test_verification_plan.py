@@ -17,10 +17,12 @@ def test_verification_plan_derives_pytest_argv_without_shell_guess(
         "[tool.pytest.ini_options]\ntestpaths=['tests']\n"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        plan = codemap.verification_plan("tests/test_widget.py", symbol="test_widget")
+        codemap.index.sync()
+        plan = codemap.verification.plan("tests/test_widget.py", symbol="test_widget")
     assert plan["available"] is True
+    assert "runner" in plan
     assert plan["runner"] == "pytest"
+    assert "argv" in plan
     assert plan["argv"] == [
         "python",
         "-m",
@@ -28,7 +30,9 @@ def test_verification_plan_derives_pytest_argv_without_shell_guess(
         "-q",
         "tests/test_widget.py::test_widget",
     ]
+    assert "scope" in plan
     assert plan["scope"] == "test-node"
+    assert "confidence" in plan
     assert plan["confidence"] == "high"
 
 
@@ -36,9 +40,10 @@ def test_verification_plan_refuses_non_test_source(tmp_path: Path) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "src" / "widget.py").write_text("def widget():\n    pass\n")
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        plan = codemap.verification_plan("src/widget.py")
+        codemap.index.sync()
+        plan = codemap.verification.plan("src/widget.py")
     assert plan["available"] is False
+    assert "reason" in plan
     assert plan["reason"] == "path-is-not-test-domain"
 
 
@@ -50,11 +55,14 @@ def test_verification_plan_derives_go_package_argv(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        plan = codemap.verification_plan("tests/widget_test.go")
+        codemap.index.sync()
+        plan = codemap.verification.plan("tests/widget_test.go")
     assert plan["available"] is True
+    assert "runner" in plan
     assert plan["runner"] == "go-test"
+    assert "argv" in plan
     assert plan["argv"] == ["go", "test", "./tests"]
+    assert "confidence" in plan
     assert plan["confidence"] == "high"
 
 
@@ -69,11 +77,14 @@ def test_verification_plan_derives_typescript_project_argv(tmp_path: Path) -> No
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        plan = codemap.verification_plan("tests/widget.test.ts")
+        codemap.index.sync()
+        plan = codemap.verification.plan("tests/widget.test.ts")
     assert plan["available"] is True
+    assert "runner" in plan
     assert plan["runner"] == "typescript-compiler"
+    assert "argv" in plan
     assert plan["argv"] == ["tsc", "--noEmit", "-p", "tsconfig.json"]
+    assert "scope" in plan
     assert plan["scope"] == "typescript-project"
 
 
@@ -84,9 +95,12 @@ def test_verification_plan_derives_native_node_test_argv(tmp_path: Path) -> None
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        plan = codemap.verification_plan("tests/widget.test.js")
+        codemap.index.sync()
+        plan = codemap.verification.plan("tests/widget.test.js")
     assert plan["available"] is True
+    assert "runner" in plan
     assert plan["runner"] == "node-test"
+    assert "argv" in plan
     assert plan["argv"] == ["node", "--test", "tests/widget.test.js"]
+    assert "scope" in plan
     assert plan["scope"] == "test-file"

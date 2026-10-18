@@ -1,0 +1,1259 @@
+{
+  "grader_file": "grader.json",
+  "pending_catalog_workflows": [],
+  "qualification_scope": "Twelve source-authored declaration/call/exact-line slices with additive source-reviewed guard and wiring facts. Full semantic/adversarial/test-relevance review remains incomplete; runtime/provider outcomes are unestablished.",
+  "schema": "hashmarks.backend-evidence-workflows.v2",
+  "sources": {
+    "fastapi-body-dependency-flattening-after": {
+      "commit": "23e4a10434cf61438c4508d94404680bdcd8bf59",
+      "content_identity": "sha256:81a185020a65044497f5d5ba9560543d11b1bbeebcad623d73c4fbb905f2a3aa:3131",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "fastapi-body-dependency-flattening-before": {
+      "commit": "7ac0f1b541b8df5921b45486a5c72a49965d00af",
+      "content_identity": "sha256:6ec3c2f38a3d25c2f9e1b57be537e40c60f11a100931e8dd9077080001a7518e:3131",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "fastapi-dependency-model-memory-after": {
+      "commit": "027082950068d6e3897b5422ab6cde3168f7d8b0",
+      "content_identity": "sha256:4ecb7b1b292928e20ef99d7aeb071a0b3e3b6703c086b633458da6140094ff1e:3130",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "fastapi-dependency-model-memory-before": {
+      "commit": "ae031be7b5a2df589f63f4d25389cf07b7b8fc86",
+      "content_identity": "sha256:50077ceea9aa3854771e882a97951618da4612b644e4037842f18695b7e04fb5:3129",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "fastapi-repeat-dependency-bookkeeping-after": {
+      "commit": "7134121a7113df50d18b186c586666733e8510f2",
+      "content_identity": "sha256:42017585e18ba0cd7e3aa8c4b587b1ba3bcca4d7c1c636992138c39943b86f01:3131",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "fastapi-repeat-dependency-bookkeeping-before": {
+      "commit": "415d37fa6f5cbd2b44dabb71a443d21ff21507b2",
+      "content_identity": "sha256:308ee093da2a56b36cf3566a28e829c66d8696aa1789d54caff470fb5c94cbc3:3131",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "fastapi-request-parameter-dependency-flattening-after": {
+      "commit": "cc96fd3a7cf74972b57a6439f22d858a2ae42c8f",
+      "content_identity": "sha256:47b72c06253a9f104581110f7106eb8d2ee332d1d4daee640dd58938c2a1b5ec:3131",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "fastapi-request-parameter-dependency-flattening-before": {
+      "commit": "ac068db630b6447a90d89ae43695fc8900a3c0e6",
+      "content_identity": "sha256:052a027a13065cadc21fb0538fb8ff106ba03e0c2e61adc5c18262354c59ff42:3131",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "faststream-composed-context-provider-after": {
+      "commit": "bee90b9b41748e04598c12230550de4ba72815f5",
+      "content_identity": "sha256:446a39cbd40ea8133a5ce36d2477d4ff47125a293788359eafc9fadb544c5f33:2131",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive"
+    },
+    "faststream-composed-context-provider-before": {
+      "commit": "acb80d35e7ef1be5a03e3af364b00406e032a43f",
+      "content_identity": "sha256:f2b28f7cfa2052f60e0a2f502fc6eb5d058a1948fb514890bc99aafd4a14b8aa:2129",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive"
+    },
+    "faststream-default-dependency-provider-after": {
+      "commit": "13cd19273849cb2cc7f675e80294df87183b799c",
+      "content_identity": "sha256:304dca377bccb9f0049721f3827c5e778ea8825fcd7f51a16141f9a582adb997:1805",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive"
+    },
+    "faststream-default-dependency-provider-before": {
+      "commit": "3f60f4aca96dc3864ebeee7e97161e19a8f6ab92",
+      "content_identity": "sha256:c4cb762edd886f95f8c113da3c3a28a6c2f3b0dbcde5160d87b69e1a6d95d315:1805",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive"
+    },
+    "faststream-dependant-constructor-metadata-after": {
+      "commit": "d9aa36f5697c5044a7598999754a07c6c23bd30d",
+      "content_identity": "sha256:22b54379dfbb33818bf606b46313ec9b50f7d1ace66a57d5e16d5b905a0e27f3:2110",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive"
+    },
+    "faststream-dependant-constructor-metadata-before": {
+      "commit": "74528d258ac840c653686ef1ef260cf8a0b8d4cb",
+      "content_identity": "sha256:9219915facfe9e62a28c0960c09a3c7b20a37e349117b215e463a193ea2a2eb8:2108",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive"
+    },
+    "faststream-non-init-dependant-fields-after": {
+      "commit": "3e13a0431db0bac071cbe6c11101f8c25b83946d",
+      "content_identity": "sha256:bbc1b057d83d7ec05b8b347d9febd79eaa53351d10963bc3ab156fcef446d12d:2122",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive"
+    },
+    "faststream-non-init-dependant-fields-before": {
+      "commit": "92696a021f4fe6e66e7147d2f86777019c242275",
+      "content_identity": "sha256:6c2ba2f0837458b224f75095046d7cb713cbd9759d813140c623fcbaa1c85cf0:2113",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive"
+    },
+    "litestar-bound-method-providers-after": {
+      "commit": "7670d49924379867b9a3e8ce721518a53bc210c7",
+      "content_identity": "sha256:edd889b011e42bd9e52a75c8ec9882f12ef3793a500e83580f1ad502d2d21974:1403",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive"
+    },
+    "litestar-bound-method-providers-before": {
+      "commit": "b379144aba7faae95a985e719ea3794510a2b364",
+      "content_identity": "sha256:66c7bca48ddeecdaf7986b96f5196023a1415aa81e3b7a298bde5d5df96a1d2c:1403",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive"
+    },
+    "litestar-cached-yield-provider-after": {
+      "commit": "2612798456dada20c15ae3c0d5676a62195abe7a",
+      "content_identity": "sha256:238218771c77647e5aac17437009817d637c1f0c45d3b8a67c6aaf8bb9fcb654:1228",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive"
+    },
+    "litestar-cached-yield-provider-before": {
+      "commit": "d304baf61c7f0a695a6badf355563a7a553fb01d",
+      "content_identity": "sha256:4cfa8c3260c34cebb0f9e772998f1946609f81a06888bfc1d674d251191f3be6:1228",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive"
+    },
+    "litestar-named-dependency-markers-after": {
+      "commit": "bea9a04b3131bafed498464ab7985e0acfea6db7",
+      "content_identity": "sha256:8f57e9100ea2a9540363ff1afd5f94ab6455577ec1f9a010f3fb638ccb8d5a52:1387",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive"
+    },
+    "litestar-named-dependency-markers-before": {
+      "commit": "409abb2b0e7b5fde20aa56ddc624a1c736999d8c",
+      "content_identity": "sha256:675f5936274fdf7313e73a80951aed10dc624de59c236cc2825173163a1fcdfb:1387",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive"
+    },
+    "litestar-stateful-callable-cleanup-after": {
+      "commit": "ce25bff4bb5956af8731ab51024bcdbe5ba5a3c3",
+      "content_identity": "sha256:28abe2f79328bb9b935d56a0c72f3fe973fc87918dd2c2d6a654c9d1825f5fa6:1400",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive"
+    },
+    "litestar-stateful-callable-cleanup-before": {
+      "commit": "7dc6b46236b69d277d296240c7297577b54108b6",
+      "content_identity": "sha256:b039ebe88f1910eaf21579358c16903163cc4e1b0d09adbf566429e2619cdbac:1400",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive"
+    }
+  },
+  "suite": "backend-configuration-source-v1",
+  "workflows": [
+    {
+      "after": "faststream-default-dependency-provider-after",
+      "before": "faststream-default-dependency-provider-before",
+      "capabilities": [
+        11
+      ],
+      "capability_proofs": {
+        "11": {
+          "reason": "selected class-field initializer syntax only; causal/provider/test/adversary breadth and runtime binding remain unqualified",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "faststream/_internal/di/config.py"
+      ],
+      "declaration_observations": {
+        "after": {
+          "groups": [],
+          "include_class_fields": true,
+          "python_backend_paths": [
+            "faststream/_internal/di/config.py"
+          ],
+          "result_mode": "discovery"
+        },
+        "before": {
+          "groups": [],
+          "include_class_fields": true,
+          "python_backend_paths": [
+            "faststream/_internal/di/config.py"
+          ],
+          "result_mode": "discovery"
+        }
+      },
+      "id": "faststream-default-dependency-provider",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "initial semantic sufficiency not independently reviewed"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "caller-nominated source path, no answer-blind owner recall oracle"
+        }
+      },
+      "native_required": false,
+      "problem_id": "13cd19273849cb2cc7f675e80294df87183b799c",
+      "repository": "faststream",
+      "source_observations": {
+        "after": {
+          "context_lines": {
+            "lines": [
+              6,
+              33
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "faststream/_internal/di/config.py"
+          ],
+          "result_mode": "member"
+        },
+        "before": {
+          "context_lines": {
+            "lines": [
+              6,
+              33
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "faststream/_internal/di/config.py"
+          ],
+          "result_mode": "member"
+        }
+      },
+      "task": "Default dependency configuration creates a separate provider instance. Inspect faststream/_internal/di/config.py.",
+      "transitions": [
+        {
+          "after_path": "faststream/_internal/di/config.py",
+          "before_path": "faststream/_internal/di/config.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "fastapi-request-parameter-dependency-flattening-after",
+      "before": "fastapi-request-parameter-dependency-flattening-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 257,
+              "path": "fastapi/dependencies/utils.py",
+              "start_line": 254
+            }
+          ],
+          "changed_paths": [
+            "fastapi/dependencies/utils.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 245,
+              "path": "fastapi/dependencies/utils.py",
+              "start_line": 245
+            }
+          ],
+          "changed_paths": [
+            "fastapi/dependencies/utils.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        11
+      ],
+      "capability_proofs": {
+        "11": {
+          "reason": "selected declared call/argument syntax only; full provider/configuration semantics and adversaries remain unqualified",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "fastapi/dependencies/utils.py"
+      ],
+      "id": "fastapi-request-parameter-dependency-flattening",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "initial semantic sufficiency not independently reviewed"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "explicit caller-nominated source path"
+        }
+      },
+      "native_required": false,
+      "problem_id": "cc96fd3a7cf74972b57a6439f22d858a2ae42c8f",
+      "repository": "fastapi",
+      "source_observations": {
+        "after": {
+          "context_lines": {
+            "lines": [
+              252,
+              258,
+              261,
+              265,
+              270
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "fastapi/dependencies/utils.py"
+          ],
+          "result_mode": "member"
+        },
+        "before": {
+          "context_lines": {
+            "lines": [
+              245,
+              250
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "fastapi/dependencies/utils.py"
+          ],
+          "result_mode": "member"
+        }
+      },
+      "task": "Request-parameter dependency inspection repeats flattening work. Inspect fastapi/dependencies/utils.py.",
+      "transitions": [
+        {
+          "after_path": "fastapi/dependencies/utils.py",
+          "before_path": "fastapi/dependencies/utils.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "litestar-bound-method-providers-after",
+      "before": "litestar-bound-method-providers-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 62,
+              "path": "litestar/di.py",
+              "start_line": 62
+            }
+          ],
+          "changed_paths": [
+            "litestar/di.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 61,
+              "path": "litestar/di.py",
+              "start_line": 61
+            }
+          ],
+          "changed_paths": [
+            "litestar/di.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        11
+      ],
+      "capability_proofs": {
+        "11": {
+          "reason": "selected declared call/argument syntax only; full provider/configuration semantics and adversaries remain unqualified",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "litestar/di.py"
+      ],
+      "id": "litestar-bound-method-providers",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "initial semantic sufficiency not independently reviewed"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "explicit caller-nominated source path"
+        }
+      },
+      "native_required": false,
+      "problem_id": "7670d49924379867b9a3e8ce721518a53bc210c7",
+      "repository": "litestar",
+      "source_observations": {
+        "after": {
+          "context_lines": {
+            "lines": [
+              62,
+              63,
+              65
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "litestar/di.py"
+          ],
+          "result_mode": "member"
+        },
+        "before": {
+          "context_lines": {
+            "lines": [
+              62,
+              64
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "litestar/di.py"
+          ],
+          "result_mode": "member"
+        }
+      },
+      "task": "Bound methods are classified as callable instances when inspecting dependency providers. Inspect litestar/di.py.",
+      "transitions": [
+        {
+          "after_path": "litestar/di.py",
+          "before_path": "litestar/di.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "litestar-stateful-callable-cleanup-after",
+      "before": "litestar-stateful-callable-cleanup-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 67,
+              "path": "litestar/di.py",
+              "start_line": 67
+            }
+          ],
+          "changed_paths": [
+            "litestar/di.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 63,
+              "path": "litestar/di.py",
+              "start_line": 61
+            }
+          ],
+          "changed_paths": [
+            "litestar/di.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        11
+      ],
+      "capability_proofs": {
+        "11": {
+          "reason": "selected declared call/argument syntax only; full provider/configuration semantics and adversaries remain unqualified",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "litestar/di.py"
+      ],
+      "id": "litestar-stateful-callable-cleanup",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "initial semantic sufficiency not independently reviewed"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "explicit caller-nominated source path"
+        }
+      },
+      "native_required": false,
+      "problem_id": "ce25bff4bb5956af8731ab51024bcdbe5ba5a3c3",
+      "repository": "litestar",
+      "source_observations": {
+        "after": {
+          "context_lines": {
+            "lines": [
+              62,
+              63,
+              64,
+              66
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "litestar/di.py"
+          ],
+          "result_mode": "member"
+        },
+        "before": {
+          "context_lines": {
+            "lines": [
+              62,
+              65
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "litestar/di.py"
+          ],
+          "result_mode": "member"
+        }
+      },
+      "task": "Stateful callable providers lose declared cleanup behavior. Inspect litestar/di.py.",
+      "transitions": [
+        {
+          "after_path": "litestar/di.py",
+          "before_path": "litestar/di.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "fastapi-body-dependency-flattening-after",
+      "before": "fastapi-body-dependency-flattening-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 1075,
+              "path": "fastapi/dependencies/utils.py",
+              "start_line": 1075
+            }
+          ],
+          "changed_paths": [
+            "fastapi/dependencies/utils.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 1067,
+              "path": "fastapi/dependencies/utils.py",
+              "start_line": 1065
+            }
+          ],
+          "changed_paths": [
+            "fastapi/dependencies/utils.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        11
+      ],
+      "capability_proofs": {
+        "11": {
+          "reason": "source-bound declared call/argument slice only; guard semantics, causal test relevance, provider wiring and adversaries remain unqualified",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "fastapi/dependencies/utils.py"
+      ],
+      "id": "fastapi-body-dependency-flattening",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "semantic sufficiency not independently reviewed"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "explicit caller-nominated production path"
+        }
+      },
+      "native_required": false,
+      "problem_id": "23e4a10434cf61438c4508d94404680bdcd8bf59",
+      "repository": "fastapi",
+      "source_observations": {
+        "after": {
+          "context_lines": {
+            "lines": [
+              227,
+              1075
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "fastapi/dependencies/utils.py"
+          ],
+          "result_mode": "member"
+        },
+        "before": {
+          "context_lines": {
+            "lines": [
+              1066
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "fastapi/dependencies/utils.py"
+          ],
+          "result_mode": "member"
+        }
+      },
+      "task": "Body-field dependency inspection repeats flattening work. Inspect fastapi/dependencies/utils.py.",
+      "transitions": [
+        {
+          "after_path": "fastapi/dependencies/utils.py",
+          "before_path": "fastapi/dependencies/utils.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "fastapi-repeat-dependency-bookkeeping-after",
+      "before": "fastapi-repeat-dependency-bookkeeping-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 167,
+              "path": "fastapi/dependencies/utils.py",
+              "start_line": 164
+            }
+          ],
+          "changed_paths": [
+            "fastapi/dependencies/utils.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 163,
+              "path": "fastapi/dependencies/utils.py",
+              "start_line": 160
+            }
+          ],
+          "changed_paths": [
+            "fastapi/dependencies/utils.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        11
+      ],
+      "capability_proofs": {
+        "11": {
+          "reason": "source-bound declared call/argument slice only; guard semantics, causal test relevance, provider wiring and adversaries remain unqualified",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "fastapi/dependencies/utils.py"
+      ],
+      "id": "fastapi-repeat-dependency-bookkeeping",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "semantic sufficiency not independently reviewed"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "explicit caller-nominated production path"
+        }
+      },
+      "native_required": false,
+      "problem_id": "7134121a7113df50d18b186c586666733e8510f2",
+      "repository": "fastapi",
+      "source_observations": {
+        "after": {
+          "context_lines": {
+            "lines": [
+              156,
+              158,
+              163,
+              194
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "fastapi/dependencies/utils.py"
+          ],
+          "result_mode": "member"
+        },
+        "before": {
+          "context_lines": {
+            "lines": [
+              155,
+              159
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "fastapi/dependencies/utils.py"
+          ],
+          "result_mode": "member"
+        }
+      },
+      "task": "Dependency traversal keeps repeat bookkeeping for already visited declarations. Inspect fastapi/dependencies/utils.py.",
+      "transitions": [
+        {
+          "after_path": "fastapi/dependencies/utils.py",
+          "before_path": "fastapi/dependencies/utils.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "fastapi-dependency-model-memory-after",
+      "before": "fastapi-dependency-model-memory-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 229,
+              "path": "fastapi/dependencies/models.py",
+              "start_line": 229
+            }
+          ],
+          "changed_paths": [
+            "fastapi/dependencies/models.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 161,
+              "path": "fastapi/dependencies/models.py",
+              "start_line": 161
+            }
+          ],
+          "changed_paths": [
+            "fastapi/dependencies/models.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        11
+      ],
+      "capability_proofs": {
+        "11": {
+          "reason": "source-bound declared call/argument slice only; guard semantics, causal test relevance, provider wiring and adversaries remain unqualified",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "fastapi/dependencies/models.py"
+      ],
+      "id": "fastapi-dependency-model-memory",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "semantic sufficiency not independently reviewed"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "explicit caller-nominated production path"
+        }
+      },
+      "native_required": false,
+      "problem_id": "027082950068d6e3897b5422ab6cde3168f7d8b0",
+      "repository": "fastapi",
+      "source_observations": {
+        "after": {
+          "context_lines": {
+            "lines": [
+              31,
+              200,
+              229
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "fastapi/dependencies/models.py"
+          ],
+          "result_mode": "member"
+        },
+        "before": {
+          "context_lines": {
+            "lines": [
+              31,
+              157,
+              158
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "fastapi/dependencies/models.py"
+          ],
+          "result_mode": "member"
+        }
+      },
+      "task": "Dependency declarations retain repeated derived metadata. Inspect fastapi/dependencies/models.py.",
+      "transitions": [
+        {
+          "after_path": "fastapi/dependencies/models.py",
+          "before_path": "fastapi/dependencies/models.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "litestar-cached-yield-provider-after",
+      "before": "litestar-cached-yield-provider-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 59,
+              "path": "litestar/di.py",
+              "start_line": 57
+            }
+          ],
+          "changed_paths": [
+            "litestar/di.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 59,
+              "path": "litestar/di.py",
+              "start_line": 59
+            }
+          ],
+          "changed_paths": [
+            "litestar/di.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        11
+      ],
+      "capability_proofs": {
+        "11": {
+          "reason": "source-bound declared call/argument slice only; guard semantics, causal test relevance, provider wiring and adversaries remain unqualified",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "litestar/di.py"
+      ],
+      "id": "litestar-cached-yield-provider",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "semantic sufficiency not independently reviewed"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "explicit caller-nominated production path"
+        }
+      },
+      "native_required": false,
+      "problem_id": "2612798456dada20c15ae3c0d5676a62195abe7a",
+      "repository": "litestar",
+      "source_observations": {
+        "after": {
+          "context_lines": {
+            "lines": [
+              63,
+              65,
+              66,
+              67,
+              88
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "litestar/di.py"
+          ],
+          "result_mode": "member"
+        },
+        "before": {
+          "context_lines": {
+            "lines": [
+              59,
+              74
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "litestar/di.py"
+          ],
+          "result_mode": "member"
+        }
+      },
+      "task": "A cached yield dependency accepts unsupported provider configuration. Inspect litestar/di.py.",
+      "transitions": [
+        {
+          "after_path": "litestar/di.py",
+          "before_path": "litestar/di.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "faststream-composed-context-provider-after",
+      "before": "faststream-composed-context-provider-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 68,
+              "path": "faststream/_internal/context/composition.py",
+              "start_line": 68
+            }
+          ],
+          "changed_paths": [
+            "faststream/_internal/context/composition.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 129,
+              "path": "faststream/_internal/context/repository.py",
+              "start_line": 129
+            }
+          ],
+          "changed_paths": [
+            "faststream/_internal/context/repository.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        11
+      ],
+      "capability_proofs": {
+        "11": {
+          "reason": "caller-nominated source call/argument slice; complete provider wiring, priority/guard semantics and causal test relevance remain unqualified",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "faststream/_internal/context/composition.py",
+        "faststream/_internal/context/repository.py"
+      ],
+      "id": "faststream-composed-context-provider",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "semantic sufficiency not independently reviewed"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "explicit caller-nominated source paths"
+        }
+      },
+      "native_required": false,
+      "problem_id": "bee90b9b41748e04598c12230550de4ba72815f5",
+      "repository": "faststream",
+      "source_observations": {
+        "after": {
+          "context_lines": {
+            "lines": [
+              24,
+              67,
+              68,
+              69,
+              70
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "faststream/_internal/context/composition.py"
+          ],
+          "result_mode": "member"
+        },
+        "before": {
+          "context_lines": {
+            "lines": [
+              129,
+              130
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "faststream/_internal/context/repository.py"
+          ],
+          "result_mode": "member"
+        }
+      },
+      "task": "Context providers need explicit composition across nominated context repositories. Inspect faststream/_internal/context/repository.py and faststream/_internal/context/composition.py.",
+      "transitions": [
+        {
+          "after_path": "faststream/_internal/context/repository.py",
+          "before_path": "faststream/_internal/context/repository.py",
+          "kind": "modify"
+        },
+        {
+          "after_path": "faststream/_internal/context/composition.py",
+          "before_path": null,
+          "kind": "add"
+        }
+      ]
+    },
+    {
+      "after": "faststream-dependant-constructor-metadata-after",
+      "before": "faststream-dependant-constructor-metadata-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 75,
+              "path": "faststream/_internal/fastapi/get_dependant.py",
+              "start_line": 75
+            }
+          ],
+          "changed_paths": [
+            "faststream/_internal/fastapi/get_dependant.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 133,
+              "path": "faststream/_internal/fastapi/get_dependant.py",
+              "start_line": 131
+            }
+          ],
+          "changed_paths": [
+            "faststream/_internal/fastapi/get_dependant.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        11
+      ],
+      "capability_proofs": {
+        "11": {
+          "reason": "caller-nominated source call/argument slice; complete provider wiring, priority/guard semantics and causal test relevance remain unqualified",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "faststream/_internal/fastapi/get_dependant.py"
+      ],
+      "id": "faststream-dependant-constructor-metadata",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "semantic sufficiency not independently reviewed"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "explicit caller-nominated source paths"
+        }
+      },
+      "native_required": false,
+      "problem_id": "d9aa36f5697c5044a7598999754a07c6c23bd30d",
+      "repository": "faststream",
+      "source_observations": {
+        "after": {
+          "context_lines": {
+            "lines": [
+              22,
+              25,
+              26,
+              27,
+              33,
+              75
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "faststream/_internal/fastapi/get_dependant.py"
+          ],
+          "result_mode": "member"
+        },
+        "before": {
+          "context_lines": {
+            "lines": [
+              131
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "faststream/_internal/fastapi/get_dependant.py"
+          ],
+          "result_mode": "member"
+        }
+      },
+      "task": "Dependency-declaration adaptation forwards incompatible constructor metadata. Inspect faststream/_internal/fastapi/get_dependant.py.",
+      "transitions": [
+        {
+          "after_path": "faststream/_internal/fastapi/get_dependant.py",
+          "before_path": "faststream/_internal/fastapi/get_dependant.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "litestar-named-dependency-markers-after",
+      "before": "litestar-named-dependency-markers-before",
+      "capabilities": [
+        11
+      ],
+      "capability_proofs": {
+        "11": {
+          "reason": "caller-selected exact source spelling; runtime marker/provider binding, constructor compatibility, causal test relevance and representative capability review remain unqualified",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "litestar/di.py"
+      ],
+      "id": "litestar-named-dependency-markers",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "semantic sufficiency not independently reviewed"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "caller-nominated exact source path"
+        }
+      },
+      "native_required": false,
+      "problem_id": "bea9a04b3131bafed498464ab7985e0acfea6db7",
+      "repository": "litestar",
+      "source_observations": {
+        "after": {
+          "context_lines": {
+            "lines": [
+              35,
+              36,
+              42
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "litestar/di.py"
+          ],
+          "result_mode": "member"
+        },
+        "before": {
+          "context_lines": {
+            "lines": [
+              26
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "litestar/di.py"
+          ],
+          "result_mode": "member"
+        }
+      },
+      "task": "Dependency-name and validation markers need explicit declarations. Inspect litestar/di.py.",
+      "transitions": [
+        {
+          "after_path": "litestar/di.py",
+          "before_path": "litestar/di.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "faststream-non-init-dependant-fields-after",
+      "before": "faststream-non-init-dependant-fields-before",
+      "capabilities": [
+        11
+      ],
+      "capability_proofs": {
+        "11": {
+          "reason": "caller-selected exact source spelling; runtime marker/provider binding, constructor compatibility, causal test relevance and representative capability review remain unqualified",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "faststream/_internal/fastapi/get_dependant.py"
+      ],
+      "id": "faststream-non-init-dependant-fields",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "semantic sufficiency not independently reviewed"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "caller-nominated exact source path"
+        }
+      },
+      "native_required": false,
+      "problem_id": "3e13a0431db0bac071cbe6c11101f8c25b83946d",
+      "repository": "faststream",
+      "source_observations": {
+        "after": {
+          "context_lines": {
+            "lines": [
+              33,
+              34,
+              35
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "faststream/_internal/fastapi/get_dependant.py"
+          ],
+          "result_mode": "member"
+        },
+        "before": {
+          "context_lines": {
+            "lines": [
+              33
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "faststream/_internal/fastapi/get_dependant.py"
+          ],
+          "result_mode": "member"
+        }
+      },
+      "task": "Copying dependency declarations forwards fields that their constructor does not accept. Inspect faststream/_internal/fastapi/get_dependant.py.",
+      "transitions": [
+        {
+          "after_path": "faststream/_internal/fastapi/get_dependant.py",
+          "before_path": "faststream/_internal/fastapi/get_dependant.py",
+          "kind": "modify"
+        }
+      ]
+    }
+  ]
+}

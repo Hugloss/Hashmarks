@@ -5,8 +5,9 @@ import json
 import logging
 import math
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import NotRequired, TypedDict, TypeVar
 
 from hashmarks._command_output import log_command_output
 from hashmarks.codemap import CodeMap
@@ -14,9 +15,52 @@ from hashmarks.codemap import CodeMap
 logger = logging.getLogger(__name__)
 
 SCHEMA = "hashmarks.agent-corpus-metrics.v1"
+_T = TypeVar("_T")
 
 
-def _load(path: Path) -> list[dict[str, Any]]:
+class TaskMetrics(TypedDict):
+    id: str
+    query: str
+    expected_files: list[str]
+    expected_symbols: list[str]
+    file_recall: float
+    symbol_recall: float
+    first_hit_file: str | None
+    first_query_hit: bool
+    fallback_search_required: bool
+    confidence: str
+    abstained: bool
+    find_seconds: float
+    context_seconds: float
+    context_tokens: int
+    context_files: int
+    candidate_files: int
+    repository_files: int
+    candidate_file_reduction: float
+    source_range_tokens: int
+    structural_tokens: int
+    source_range_fraction: float
+    selected_files_full_tokens: int
+    selected_full_to_context_ratio: float | None
+    selected_file_tokens_avoided: int
+    expected_full_file_tokens: int
+    expected_full_to_context_ratio: float | None
+
+
+class CorpusMetricsReport(TypedDict):
+    schema: str
+    workspace: str
+    corpus: str
+    parameters: dict[str, int]
+    repository: dict[str, int]
+    sync: dict[str, object]
+    index: dict[str, object]
+    summary: dict[str, int | float]
+    tasks: list[TaskMetrics]
+    name: NotRequired[str]
+
+
+def _load(path: Path) -> list[dict[str, object]]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if value.get("schema") != "hashmarks.agent-task-corpus.v1":
         raise ValueError("unsupported agent task corpus schema")
@@ -26,7 +70,7 @@ def _load(path: Path) -> list[dict[str, Any]]:
     return [row for row in tasks if isinstance(row, dict)]
 
 
-def _timed(fn):
+def _timed(fn: Callable[[], _T]) -> tuple[_T, float]:
     started = time.perf_counter()
     value = fn()
     return value, time.perf_counter() - started
@@ -42,20 +86,26 @@ def _percentile(values: list[float], fraction: float) -> float:
 
 def _task_metrics(
     codemap: CodeMap,
-    task: dict[str, Any],
+    task: dict[str, object],
     full_tokens: dict[str, int],
     repository_file_count: int,
     budget: int,
     limit: int,
-) -> dict[str, object]:
+) -> TaskMetrics:
     query = str(task.get("query") or "")
+    expected_files = task.get("expected_files") or ()
+    expected_symbols = task.get("expected_symbols") or ()
+    if not isinstance(expected_files, (list, tuple)) or not isinstance(
+        expected_symbols, (list, tuple)
+    ):
+        raise ValueError("expected task files and symbols must be arrays")
     expected = {
-        "files": {str(value) for value in task.get("expected_files") or ()},
-        "symbols": {str(value) for value in task.get("expected_symbols") or ()},
+        "files": {str(value) for value in expected_files},
+        "symbols": {str(value) for value in expected_symbols},
     }
-    hits, find_seconds = _timed(lambda: codemap.find(query, limit=limit))
+    hits, find_seconds = _timed(lambda: codemap.search.find(query, limit=limit))
     pack, context_seconds = _timed(
-        lambda: codemap.context(query, token_budget=budget, limit=limit)
+        lambda: codemap.context.build(query, token_budget=budget, limit=limit)
     )
     observed_files = {
         "hits": {hit.path for hit in hits},
@@ -126,13 +176,13 @@ def _task_metrics(
 
 def collect(
     workspace: Path, corpus: Path, *, budget: int = 1200, limit: int = 20
-) -> dict[str, object]:
+) -> CorpusMetricsReport:
     workspace = workspace.resolve(strict=False)
     tasks = _load(corpus)
     started = time.perf_counter()
-    rows = []
+    rows: list[TaskMetrics] = []
     with CodeMap(workspace) as codemap:
-        sync = codemap.sync()
+        sync = codemap.index.sync()
         full_tokens = {
             str(row["path"]): int(row["full_tokens"])
             for row in (codemap.store.outline(path) for path in codemap.store.paths())
@@ -151,7 +201,7 @@ def collect(
                     limit,
                 )
             )
-        status = codemap.status()
+        status = codemap.views.status()
     task_count = len(rows)
 
     find_values = [float(row["find_seconds"]) for row in rows]

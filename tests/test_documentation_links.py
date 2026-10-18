@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
@@ -11,6 +12,7 @@ _REFERENCE_LINK_RE = re.compile(r"^\s*\[[^\]]+\]:\s*(\S+)", re.MULTILINE)
 _HTML_HREF_RE = re.compile(r"""href=["']([^"']+)["']""", re.IGNORECASE)
 _SKIP_PARTS = {
     ".git",
+    ".hashmarks",
     ".mypy_cache",
     ".pytest_cache",
     ".ruff-venv",
@@ -23,11 +25,11 @@ _SKIP_PARTS = {
 
 
 def _markdown_files() -> list[Path]:
-    return sorted(
-        path
-        for path in ROOT.rglob("*.md")
-        if not any(part in _SKIP_PARTS for part in path.relative_to(ROOT).parts)
-    )
+    paths: list[Path] = []
+    for directory, children, files in os.walk(ROOT):
+        children[:] = [name for name in children if name not in _SKIP_PARTS]
+        paths.extend(Path(directory) / name for name in files if name.endswith(".md"))
+    return sorted(paths)
 
 
 def _link_target(raw: str) -> str | None:

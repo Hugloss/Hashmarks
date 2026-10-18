@@ -1,5 +1,6 @@
 import copy
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -108,7 +109,7 @@ def test_normalize_validates_and_projects_all_event_fields(tmp_path: Path) -> No
     ],
 )
 def test_normalize_rejects_invalid_authority_and_event_values(
-    tmp_path: Path, mutation, message: str
+    tmp_path: Path, mutation: Callable[[dict[str, object]], None], message: str
 ) -> None:
     value = copy.deepcopy(_raw())
     mutation(value)

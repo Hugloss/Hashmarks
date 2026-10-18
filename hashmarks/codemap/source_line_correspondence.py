@@ -215,6 +215,8 @@ def _candidate_diagnostic_reason(
     if prior.get("path") != path or later.get("path") != path:
         return "candidate-path-not-source-bound"
     column = prior.get("column")
+    if column is None and later.get("column") is None:
+        return None
     if type(column) is not int or column < 1 or later.get("column") != column:
         return "diagnostic-column-not-preserved"
     return None
@@ -286,7 +288,14 @@ def _candidate_correspondence(
         "before_member_revision": old_anchor["member_revision"],
         "after_member_revision": new_anchor["member_revision"],
         "source_line_sha256": old_anchor["line_sha256"],
-        "basis": "unique-exact-physical-line-bytes-and-same-column",
+        "basis": (
+            "unique-exact-physical-line-bytes-and-same-column"
+            if old[before_id].get("column") is not None
+            else "unique-exact-physical-line-bytes"
+        ),
+        "column_correspondence": "matching"
+        if old[before_id].get("column") is not None
+        else "not-supplied",
         "state": "source-line-correspondence",
         "diagnostic_identity_authority": False,
         "repository_freshness": {

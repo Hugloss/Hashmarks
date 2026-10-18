@@ -116,8 +116,8 @@ def handler_packet(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
     root = fixture / "repo"
     _materialize(root)
     with CodeMap(root, state_dir=fixture / "state") as cm:
-        cm.sync()
-        return cm.discover_repository_declarations([_provider()])
+        cm.index.sync()
+        return cm.declarations.discover([_provider()])
 
 
 def test_body_only_edit_has_exact_value_and_revision_deltas(
@@ -126,17 +126,15 @@ def test_body_only_edit_has_exact_value_and_revision_deltas(
     root, state = handler_repository
     source = root / "api.py"
     with CodeMap(root, state_dir=state) as cm:
-        cm.sync()
-        before: dict[str, Any] = cm.discover_repository_declarations([_provider()])
+        cm.index.sync()
+        before: dict[str, Any] = cm.declarations.discover([_provider()])
         snapshot = deepcopy(before)
         _assert_source_bound(before, "api.py", {(2, 5), (6, 9), (7, 7), (8, 8)})
         source.write_bytes(source.read_bytes().replace(b'"name":', b'"display_name":'))
         with pytest.raises(RepositoryDeclarationProviderError, match="input changed"):
-            cm.discover_repository_declarations(
-                [_provider()], previous_observation=before
-            )
-        cm.sync(["api.py"])
-        after: dict[str, Any] = cm.discover_repository_declarations(
+            cm.declarations.discover([_provider()], previous_observation=before)
+        cm.index.sync(["api.py"])
+        after: dict[str, Any] = cm.declarations.discover(
             [_provider()], previous_observation=before
         )
     old, new = _group(before, "api.py"), _group(after, "api.py")
@@ -186,8 +184,8 @@ def test_dynamic_return_cannot_reuse_previous_literal_keys(
 ) -> None:
     root, state = handler_repository
     with CodeMap(root, state_dir=state) as cm:
-        cm.sync()
-        before: dict[str, Any] = cm.discover_repository_declarations([_provider()])
+        cm.index.sync()
+        before: dict[str, Any] = cm.declarations.discover([_provider()])
         snapshot = deepcopy(before)
         (root / "api.py").write_text(
             _API_SOURCE.split("    return {")[0]
@@ -195,11 +193,9 @@ def test_dynamic_return_cannot_reuse_previous_literal_keys(
             encoding="utf-8",
         )
         with pytest.raises(RepositoryDeclarationProviderError, match="input changed"):
-            cm.discover_repository_declarations(
-                [_provider()], previous_observation=before
-            )
-        cm.sync(["api.py"])
-        after: dict[str, Any] = cm.discover_repository_declarations(
+            cm.declarations.discover([_provider()], previous_observation=before)
+        cm.index.sync(["api.py"])
+        after: dict[str, Any] = cm.declarations.discover(
             [_provider()], previous_observation=before
         )
     assert _body(_group(after, "api.py"))["literal_dictionary_returns"] == [
@@ -222,11 +218,11 @@ def test_rename_delete_reopen_and_opt_out_do_not_replay_handler_facts(
     root, state = handler_repository
     selected = _provider(paths=("routes.py", "tools.py"))
     with CodeMap(root, state_dir=state) as cm:
-        cm.sync()
-        before: dict[str, Any] = cm.discover_repository_declarations([_provider()])
+        cm.index.sync()
+        before: dict[str, Any] = cm.declarations.discover([_provider()])
         (root / "api.py").rename(root / "routes.py")
-        cm.sync(["api.py", "routes.py"])
-        renamed: dict[str, Any] = cm.discover_repository_declarations(
+        cm.index.sync(["api.py", "routes.py"])
+        renamed: dict[str, Any] = cm.declarations.discover(
             [_provider(paths=("api.py", "routes.py", "tools.py"))],
             previous_observation=before,
         )
@@ -239,18 +235,18 @@ def test_rename_delete_reopen_and_opt_out_do_not_replay_handler_facts(
         }
         _assert_source_bound(renamed, "routes.py", {(2, 5), (6, 9), (7, 7), (8, 8)})
     with CodeMap(root, state_dir=state) as cm:
-        reopened: dict[str, Any] = cm.discover_repository_declarations(
+        reopened: dict[str, Any] = cm.declarations.discover(
             [selected], previous_observation=before
         )
-        current: dict[str, Any] = cm.discover_repository_declarations([selected])
+        current: dict[str, Any] = cm.declarations.discover([selected])
         assert current["observation_identity"] == reopened["observation_identity"]
         assert _body(_group(current, "routes.py")) == _body(_group(before, "api.py"))
         _assert_unknown(current)
-        empty: dict[str, Any] = cm.discover_repository_declarations(
+        empty: dict[str, Any] = cm.declarations.discover(
             [], previous_observation=before
         )
         assert empty["declarations"]["groups"] == []
-        default: dict[str, Any] = cm.discover_repository_declarations(
+        default: dict[str, Any] = cm.declarations.discover(
             [_provider(paths=("routes.py", "tools.py"), include=False)],
             previous_observation=before,
         )
@@ -259,13 +255,13 @@ def test_rename_delete_reopen_and_opt_out_do_not_replay_handler_facts(
             for group in default["declarations"]["groups"]
         )
         assert (
-            cm.discover_repository_declarations([selected])["observation_identity"]
+            cm.declarations.discover([selected])["observation_identity"]
             == current["observation_identity"]
         )
         (root / "routes.py").unlink()
         (root / "tools.py").unlink()
-        cm.sync(["routes.py", "tools.py"])
-        deleted: dict[str, Any] = cm.discover_repository_declarations(
+        cm.index.sync(["routes.py", "tools.py"])
+        deleted: dict[str, Any] = cm.declarations.discover(
             [selected], previous_observation=before
         )
         assert deleted["declarations"]["groups"] == []
@@ -273,7 +269,7 @@ def test_rename_delete_reopen_and_opt_out_do_not_replay_handler_facts(
             row["state"] == "known-absent" for row in deleted["providers"][0]["inputs"]
         )
     with CodeMap(root, state_dir=state) as cm:
-        final: dict[str, Any] = cm.discover_repository_declarations([selected])
+        final: dict[str, Any] = cm.declarations.discover([selected])
         assert final["declarations"]["groups"] == []
 
 

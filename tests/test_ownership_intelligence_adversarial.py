@@ -1,15 +1,20 @@
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
+from contract_assertions import assert_records, assert_text
+
 from hashmarks.codemap import CodeMap
 
 
-def _sync(root):
+def _sync(root: Path) -> CodeMap:
     c = CodeMap(root)
-    c.sync()
+    c.index.sync()
     return c
 
 
-def test_import_alias_same_canonical_identity_is_not_duplicate(tmp_path):
+def test_import_alias_same_canonical_identity_is_not_duplicate(tmp_path: Path) -> None:
     (tmp_path / "pkg").mkdir()
     (tmp_path / "pkg" / "__init__.py").write_text("")
     (tmp_path / "pkg" / "helper.py").write_text("CACHE={}\n")
@@ -20,13 +25,13 @@ def test_import_alias_same_canonical_identity_is_not_duplicate(tmp_path):
         "spec.loader.exec_module(module)\n"
     )
     with _sync(tmp_path) as c:
-        fs = c.import_ownership_findings()["findings"]
+        fs = assert_records(c.ownership.import_findings()["findings"])
     assert len(fs) == 1
     assert fs[0]["module_identity_mismatch"] is False
     assert fs[0]["code"] == "python-dynamic-module-identity-bypass"
 
 
-def test_import_nonliteral_identity_does_not_invent_mismatch(tmp_path):
+def test_import_nonliteral_identity_does_not_invent_mismatch(tmp_path: Path) -> None:
     (tmp_path / "pkg").mkdir()
     (tmp_path / "pkg" / "__init__.py").write_text("")
     (tmp_path / "pkg" / "helper.py").write_text("CACHE={}\n")
@@ -37,84 +42,90 @@ def test_import_nonliteral_identity_does_not_invent_mismatch(tmp_path):
         "module=module_from_spec(spec)\nspec.loader.exec_module(module)\n"
     )
     with _sync(tmp_path) as c:
-        f = c.import_ownership_findings()["findings"][0]
+        f = assert_records(c.ownership.import_findings()["findings"])[0]
     assert f["requested_module"] is None
     assert f["module_identity_mismatch"] is False
 
 
-def test_cache_local_variable_named_cache_is_not_module_owner(tmp_path):
+def test_cache_local_variable_named_cache_is_not_module_owner(tmp_path: Path) -> None:
     (tmp_path / "x.py").write_text("def f():\n cache={}\n return cache\n")
     with _sync(tmp_path) as c:
-        r = c.cache_ownership_findings()
-    assert r["owners"] == []
+        r = c.ownership.cache_findings()
+    assert assert_records(r["owners"]) == []
 
 
-def test_cache_explicit_clear_is_invalidation_evidence(tmp_path):
+def test_cache_explicit_clear_is_invalidation_evidence(tmp_path: Path) -> None:
     (tmp_path / "x.py").write_text("CACHE={}\ndef reset():\n CACHE.clear()\n")
     with _sync(tmp_path) as c:
-        r = c.cache_ownership_findings()
-    o = next(x for x in r["owners"] if x["owner"] == "CACHE")
+        r = c.ownership.cache_findings()
+    o = next(x for x in assert_records(r["owners"]) if x["owner"] == "CACHE")
     assert o["invalidation"] == "explicit-local"
 
 
-def test_cache_unrelated_clear_does_not_clear_owner(tmp_path):
+def test_cache_unrelated_clear_does_not_clear_owner(tmp_path: Path) -> None:
     (tmp_path / "x.py").write_text("CACHE={}\ndef reset(other):\n other.clear()\n")
     with _sync(tmp_path) as c:
-        r = c.cache_ownership_findings()
+        r = c.ownership.cache_findings()
     assert (
-        next(x for x in r["owners"] if x["owner"] == "CACHE")["invalidation"]
+        next(x for x in assert_records(r["owners"]) if x["owner"] == "CACHE")[
+            "invalidation"
+        ]
         == "not-proven"
     )
 
 
-def test_authority_graph_does_not_claim_runtime_writer(tmp_path):
+def test_authority_graph_does_not_claim_runtime_writer(tmp_path: Path) -> None:
     (tmp_path / "state.py").write_text("CACHE={}\n")
     (tmp_path / "reader.py").write_text(
         "from state import CACHE\nVALUE=CACHE.get('x')\n"
     )
     with _sync(tmp_path) as c:
-        g = c.repository_ownership_graph()
-    assert all(n.get("role") != "writer" for n in g["nodes"])
-    assert "no execution/admission/certification authority" in g["boundary"]
+        g = c.ownership.repository_graph()
+    assert all(n.get("role") != "writer" for n in assert_records(g["nodes"]))
+    assert "no execution/admission/certification authority" in assert_text(
+        g["boundary"]
+    )
 
 
-def test_rmw_different_owners_is_not_nominated(tmp_path):
+def test_rmw_different_owners_is_not_nominated(tmp_path: Path) -> None:
     (tmp_path / "x.py").write_text("def f(a,b):\n x=a.get('x')\n b.set('x',x)\n")
     with _sync(tmp_path) as c:
-        r = c.concurrency_risk_findings(["x.py"])
-    assert r["findings"] == []
+        r = c.ownership.concurrency_findings(["x.py"])
+    assert assert_records(r["findings"]) == []
 
 
-def test_rmw_write_before_read_is_not_nominated(tmp_path):
+def test_rmw_write_before_read_is_not_nominated(tmp_path: Path) -> None:
     (tmp_path / "x.py").write_text("def f(a):\n a.set('x',1)\n return a.get('x')\n")
     with _sync(tmp_path) as c:
-        r = c.concurrency_risk_findings(["x.py"])
-    assert r["findings"] == []
+        r = c.ownership.concurrency_findings(["x.py"])
+    assert assert_records(r["findings"]) == []
 
 
-def test_rmw_nested_unrelated_lock_should_not_guard_sequence(tmp_path):
+def test_rmw_nested_unrelated_lock_should_not_guard_sequence(tmp_path: Path) -> None:
     (tmp_path / "x.py").write_text(
         "def f(store,other):\n"
         " with other.lock:\n  other.get('x')\n"
         " x=store.get('generation')\n store.set('generation',x+1)\n"
     )
     with _sync(tmp_path) as c:
-        r = c.concurrency_risk_findings(["x.py"])
-    f = r["findings"][0]
+        r = c.ownership.concurrency_findings(["x.py"])
+    f = assert_records(r["findings"])[0]
     assert f["guarded"] is False
 
 
-def test_rmw_guard_after_sequence_should_not_guard_sequence(tmp_path):
+def test_rmw_guard_after_sequence_should_not_guard_sequence(tmp_path: Path) -> None:
     (tmp_path / "x.py").write_text(
         "def f(store):\n x=store.get('generation')\n store.set('generation',x+1)\n"
         " with store.lock:\n  pass\n"
     )
     with _sync(tmp_path) as c:
-        r = c.concurrency_risk_findings(["x.py"])
-    assert r["findings"][0]["guarded"] is False
+        r = c.ownership.concurrency_findings(["x.py"])
+    assert assert_records(r["findings"])[0]["guarded"] is False
 
 
-def test_concurrency_risk_service_and_cli_surface(tmp_path, capsys):
+def test_concurrency_risk_service_and_cli_surface(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     from hashmarks.cli import main
 
     (tmp_path / "x.py").write_text(
@@ -131,7 +142,7 @@ def test_concurrency_risk_service_and_cli_surface(tmp_path, capsys):
     assert '"schema": "hashmarks.concurrency-risk.v1"' in capsys.readouterr().out
 
 
-def test_import_loader_aliases_are_not_invisible(tmp_path):
+def test_import_loader_aliases_are_not_invisible(tmp_path: Path) -> None:
     (tmp_path / "pkg").mkdir()
     (tmp_path / "pkg" / "__init__.py").write_text("")
     (tmp_path / "pkg" / "state.py").write_text("CACHE={}\n")
@@ -143,45 +154,54 @@ def test_import_loader_aliases_are_not_invisible(tmp_path):
         "spec.loader.exec_module(module)\n"
     )
     with _sync(tmp_path) as c:
-        result = c.import_ownership_findings()
-    assert len(result["findings"]) == 1
-    assert result["findings"][0]["target_module"] == "pkg.state"
-    assert result["findings"][0]["requested_module"] == "shadow.state"
-    assert result["findings"][0]["code"] == "python-duplicate-module-identity"
+        result = c.ownership.import_findings()
+    assert len(assert_records(result["findings"])) == 1
+    assert assert_records(result["findings"])[0]["target_module"] == "pkg.state"
+    assert assert_records(result["findings"])[0]["requested_module"] == "shadow.state"
+    assert (
+        assert_records(result["findings"])[0]["code"]
+        == "python-duplicate-module-identity"
+    )
 
 
-def test_cache_invalidation_through_simple_module_alias_is_proven(tmp_path):
+def test_cache_invalidation_through_simple_module_alias_is_proven(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "state.py").write_text(
         "CACHE={}\nALIAS=CACHE\n\ndef reset():\n ALIAS.clear()\n"
     )
     with _sync(tmp_path) as c:
-        result = c.cache_ownership_findings(["state.py"])
-    owner = next(x for x in result["owners"] if x["owner"] == "CACHE")
+        result = c.ownership.cache_findings(["state.py"])
+    owner = next(x for x in assert_records(result["owners"]) if x["owner"] == "CACHE")
     assert owner["invalidation"] == "explicit-local-alias"
 
 
-def test_cache_alias_to_unrelated_owner_does_not_prove_invalidation(tmp_path):
+def test_cache_alias_to_unrelated_owner_does_not_prove_invalidation(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "state.py").write_text(
         "CACHE={}\nOTHER={}\nALIAS=OTHER\n\ndef reset():\n ALIAS.clear()\n"
     )
     with _sync(tmp_path) as c:
-        result = c.cache_ownership_findings(["state.py"])
-    owner = next(x for x in result["owners"] if x["owner"] == "CACHE")
+        result = c.ownership.cache_findings(["state.py"])
+    owner = next(x for x in assert_records(result["owners"]) if x["owner"] == "CACHE")
     assert owner["invalidation"] == "not-proven"
 
 
-def test_rmw_mutually_exclusive_if_else_is_not_nominated(tmp_path):
+def test_rmw_mutually_exclusive_if_else_is_not_nominated(tmp_path: Path) -> None:
     (tmp_path / "x.py").write_text(
         "def f(store, flag):\n"
         " if flag:\n  value=store.get('x')\n"
         " else:\n  store.set('x',1)\n"
     )
     with _sync(tmp_path) as c:
-        result = c.concurrency_risk_findings(["x.py"])
-    assert result["findings"] == []
+        result = c.ownership.concurrency_findings(["x.py"])
+    assert assert_records(result["findings"]) == []
 
 
-def test_rmw_nested_function_calls_are_not_attributed_to_outer_function(tmp_path):
+def test_rmw_nested_function_calls_are_not_attributed_to_outer_function(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "x.py").write_text(
         "def outer(store):\n"
         " def inner():\n"
@@ -190,12 +210,14 @@ def test_rmw_nested_function_calls_are_not_attributed_to_outer_function(tmp_path
         " return inner\n"
     )
     with _sync(tmp_path) as c:
-        result = c.concurrency_risk_findings(["x.py"])
-    assert len(result["findings"]) == 1
-    assert result["findings"][0]["function"] == "inner"
+        result = c.ownership.concurrency_findings(["x.py"])
+    assert len(assert_records(result["findings"])) == 1
+    assert assert_records(result["findings"])[0]["function"] == "inner"
 
 
-def test_verification_decoy_name_does_not_displace_real_importing_test(tmp_path):
+def test_verification_decoy_name_does_not_displace_real_importing_test(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "pyproject.toml").write_text(
         "[tool.pytest.ini_options]\ntestpaths=['tests']\n"
     )
@@ -212,14 +234,16 @@ def test_verification_decoy_name_does_not_displace_real_importing_test(tmp_path)
         " assert text\n"
     )
     with _sync(tmp_path) as c:
-        graph = c.verification_ownership_graph(
+        graph = c.tasks.verification_ownership_graph(
             "change calculate_total behavior", limit=10, candidate_limit=8
         )
-    assert graph["verification_owners"]
-    assert graph["verification_owners"][0]["path"] == "tests/test_thing.py"
+    assert assert_records(graph["verification_owners"])
+    assert (
+        assert_records(graph["verification_owners"])[0]["path"] == "tests/test_thing.py"
+    )
 
 
-def test_import_sys_modules_alias_registration_is_recognized(tmp_path):
+def test_import_sys_modules_alias_registration_is_recognized(tmp_path: Path) -> None:
     (tmp_path / "pkg").mkdir()
     (tmp_path / "pkg" / "__init__.py").write_text("")
     (tmp_path / "pkg" / "state.py").write_text("CACHE={}\n")
@@ -234,32 +258,32 @@ def test_import_sys_modules_alias_registration_is_recognized(tmp_path):
         "spec.loader.exec_module(module)\n"
     )
     with _sync(tmp_path) as c:
-        f = c.import_ownership_findings()["findings"][0]
+        f = assert_records(c.ownership.import_findings()["findings"])[0]
     assert f["explicit_sys_modules_registration"] is True
     assert f["code"] == "python-custom-module-loader"
 
 
-def test_cache_transitive_simple_alias_invalidation_is_proven(tmp_path):
+def test_cache_transitive_simple_alias_invalidation_is_proven(tmp_path: Path) -> None:
     (tmp_path / "state.py").write_text(
         "CACHE={}\nFIRST=CACHE\nSECOND=FIRST\n\ndef reset():\n SECOND.clear()\n"
     )
     with _sync(tmp_path) as c:
-        result = c.cache_ownership_findings(["state.py"])
-    owner = next(x for x in result["owners"] if x["owner"] == "CACHE")
+        result = c.ownership.cache_findings(["state.py"])
+    owner = next(x for x in assert_records(result["owners"]) if x["owner"] == "CACHE")
     assert owner["invalidation"] == "explicit-local-alias"
 
 
 def test_authority_graph_does_not_attach_reader_to_same_named_cache_in_other_module(
-    tmp_path,
-):
+    tmp_path: Path,
+) -> None:
     (tmp_path / "a.py").write_text("CACHE={}\n")
     (tmp_path / "b.py").write_text("CACHE={}\n")
     (tmp_path / "reader.py").write_text("from a import CACHE\nVALUE=CACHE.get('x')\n")
     with _sync(tmp_path) as c:
-        graph = c.repository_ownership_graph()
+        graph = c.ownership.repository_graph()
     edges = [
         e
-        for e in graph["edges"]
+        for e in assert_records(graph["edges"])
         if e["relation"] == "references-cache-owner" and e["source"] == "file:reader.py"
     ]
     targets = {e["target"] for e in edges}
@@ -267,7 +291,7 @@ def test_authority_graph_does_not_attach_reader_to_same_named_cache_in_other_mod
     assert "cache:b.py:CACHE" not in targets
 
 
-def test_rmw_mutually_exclusive_match_cases_are_not_joined(tmp_path):
+def test_rmw_mutually_exclusive_match_cases_are_not_joined(tmp_path: Path) -> None:
     (tmp_path / "x.py").write_text(
         "def f(store, value):\n"
         " match value:\n"
@@ -275,22 +299,22 @@ def test_rmw_mutually_exclusive_match_cases_are_not_joined(tmp_path):
         "  case 2:\n   store.set('x',1)\n"
     )
     with _sync(tmp_path) as c:
-        result = c.concurrency_risk_findings(["x.py"])
-    assert result["findings"] == []
+        result = c.ownership.concurrency_findings(["x.py"])
+    assert assert_records(result["findings"]) == []
 
 
-def test_rmw_calls_inside_uninvoked_lambda_are_not_nominated(tmp_path):
+def test_rmw_calls_inside_uninvoked_lambda_are_not_nominated(tmp_path: Path) -> None:
     (tmp_path / "x.py").write_text(
         "def f(store):\n"
         " callback=lambda: (store.get('x'), store.set('x',1))\n"
         " return callback\n"
     )
     with _sync(tmp_path) as c:
-        result = c.concurrency_risk_findings(["x.py"])
-    assert result["findings"] == []
+        result = c.ownership.concurrency_findings(["x.py"])
+    assert assert_records(result["findings"]) == []
 
 
-def test_rmw_three_match_cases_remain_mutually_exclusive(tmp_path):
+def test_rmw_three_match_cases_remain_mutually_exclusive(tmp_path: Path) -> None:
     (tmp_path / "x.py").write_text(
         "def f(store, value):\n"
         " match value:\n"
@@ -299,13 +323,13 @@ def test_rmw_three_match_cases_remain_mutually_exclusive(tmp_path):
         "  case 3:\n   store.set('x',1)\n"
     )
     with _sync(tmp_path) as c:
-        result = c.concurrency_risk_findings(["x.py"])
-    assert result["findings"] == []
+        result = c.ownership.concurrency_findings(["x.py"])
+    assert assert_records(result["findings"]) == []
 
 
 def test_repository_wide_rmw_scan_excludes_test_fixture_mutation_but_explicit_path_can_inspect(
-    tmp_path,
-):
+    tmp_path: Path,
+) -> None:
     (tmp_path / "tests").mkdir()
     (tmp_path / "tests" / "test_fixture.py").write_text(
         "def test_mutate(tmp_path):\n"
@@ -314,7 +338,7 @@ def test_repository_wide_rmw_scan_excludes_test_fixture_mutation_but_explicit_pa
         " path.write_text(value+'x')\n"
     )
     with _sync(tmp_path) as c:
-        broad = c.concurrency_risk_findings()
-        explicit = c.concurrency_risk_findings(["tests/test_fixture.py"])
-    assert broad["findings"] == []
-    assert len(explicit["findings"]) == 1
+        broad = c.ownership.concurrency_findings()
+        explicit = c.ownership.concurrency_findings(["tests/test_fixture.py"])
+    assert assert_records(broad["findings"]) == []
+    assert len(assert_records(explicit["findings"])) == 1

@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -34,7 +35,7 @@ def thread_id_from_events(path: Path) -> str | None:
     return None
 
 
-def _walk(v: Any):
+def _walk(v: object) -> Iterator[dict[str, object]]:
     if isinstance(v, dict):
         yield v
         for x in v.values():
@@ -45,7 +46,7 @@ def _walk(v: Any):
 
 
 def usage_from_rollout(path: Path) -> dict[str, int | None]:
-    best = dict.fromkeys(FIELDS)
+    best: dict[str, int | None] = dict.fromkeys(FIELDS)
     for line in path.read_text(errors="replace").splitlines():
         try:
             o = json.loads(line)
@@ -54,7 +55,8 @@ def usage_from_rollout(path: Path) -> dict[str, int | None]:
         for d in _walk(o):
             for k in FIELDS:
                 v = d.get(k)
-                if isinstance(v, int) and v >= 0 and (best[k] is None or v > best[k]):
+                previous = best[k]
+                if isinstance(v, int) and v >= 0 and (previous is None or v > previous):
                     best[k] = v
     return best
 

@@ -10,10 +10,10 @@ from hashmarks.consumer_conformance import (
     validate_native_repository_evidence_bundle,
 )
 from hashmarks.evidence_context import validate_evidence_context
-from hashmarks.promotion_receipt import validate_external_promotion_receipt
 from hashmarks.qualification_units import (
     validate_external_qualification_coverage,
     validate_native_qualification_handoff,
+    validate_native_qualification_repository_binding,
 )
 from hashmarks.test_shards import (
     validate_test_shard_plan,
@@ -27,6 +27,7 @@ from hashmarks.verification_selection import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from pathlib import Path
 
 JSON_NON_OBJECT_ROOTS = (None, True, False, 0, -1, 1.5, "x", [], [1])
@@ -36,18 +37,17 @@ JSON_NON_OBJECT_ROOTS = (None, True, False, 0, -1, 1.5, "x", [], [1])
 def test_public_interchange_validators_fail_closed_on_non_object_roots(
     tmp_path: Path, value: object
 ) -> None:
-    checks = (
+    checks: tuple[tuple[Mapping[str, object], str], ...] = (
         (validate_verification_membership(value), "valid"),
         (validate_verification_selection_envelope(value), "valid"),
         (validate_downstream_consumption_contract(value, {}), "valid"),
         (validate_downstream_consumption_contract({}, value), "valid"),
         (validate_evidence_context(value, {}), "valid"),
         (validate_evidence_context({}, value), "valid"),
-        (validate_external_promotion_receipt(value, {}), "valid"),
-        (validate_external_promotion_receipt({}, value), "valid"),
         (validate_external_qualification_coverage(value, {}), "coverage_valid"),
         (validate_external_qualification_coverage({}, value), "coverage_valid"),
         (validate_native_qualification_handoff(value), "valid"),
+        (validate_native_qualification_repository_binding(tmp_path, value), "valid"),
         (validate_test_shard_plan(value), "valid"),
         (validate_work_selection_envelope(value), "valid"),
         (validate_work_selection_repository_binding(tmp_path, value), "valid"),
@@ -61,7 +61,7 @@ def test_public_interchange_validators_fail_closed_on_non_object_roots(
         (validate_native_repository_evidence_bundle({}, {}, {}, value), "valid"),
     )
     for result, key in checks:
-        assert result[key] is False
+        assert result.get(key) is False
 
 
 @pytest.mark.parametrize(

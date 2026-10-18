@@ -2,6 +2,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from contract_assertions import assert_text
 
 from hashmarks.codemap import CodeMap
 
@@ -27,7 +28,7 @@ def test_outline_rejects_pruned_dependency_before_digest_or_index(
     rel = dependency.relative_to(tmp_path).as_posix()
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         assert rel not in codemap.store.paths()
         with (
             patch.object(
@@ -37,7 +38,7 @@ def test_outline_rejects_pruned_dependency_before_digest_or_index(
             ),
             pytest.raises(FileNotFoundError, match="not indexed"),
         ):
-            codemap.outline(rel)
+            codemap.source.outline(rel)
         assert rel not in codemap.store.paths()
 
 
@@ -47,7 +48,7 @@ def test_explicit_source_cannot_resurrect_pruned_dependency(tmp_path: Path) -> N
     rel = dependency.relative_to(tmp_path).as_posix()
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with (
             patch.object(
                 codemap.file_store,
@@ -56,7 +57,7 @@ def test_explicit_source_cannot_resurrect_pruned_dependency(tmp_path: Path) -> N
             ),
             pytest.raises(KeyError, match="symbol not found"),
         ):
-            codemap.source(f"{rel}::dependency_impl")
+            codemap.source.read(f"{rel}::dependency_impl")
         assert rel not in codemap.store.paths()
 
 
@@ -72,7 +73,7 @@ def test_explicit_query_currentness_respects_context_index_denial(
     rel = hidden.relative_to(tmp_path).as_posix()
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         assert rel not in codemap.store.paths()
         with (
             patch.object(
@@ -82,7 +83,7 @@ def test_explicit_query_currentness_respects_context_index_denial(
             ),
             pytest.raises(FileNotFoundError, match="not indexed"),
         ):
-            codemap.outline(rel)
+            codemap.source.outline(rel)
         assert rel not in codemap.store.paths()
 
 
@@ -92,12 +93,12 @@ def test_explicit_query_scope_pruning_is_segment_aware(tmp_path: Path) -> None:
     rel = owner.relative_to(tmp_path).as_posix()
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
-        outline = codemap.outline(rel)
+        codemap.index.sync()
+        outline = codemap.source.outline(rel)
         assert outline["path"] == rel
-        source = codemap.source(f"{rel}::adapter")
+        source = codemap.source.read(f"{rel}::adapter")
         assert source["path"] == rel
-        assert "return 4" in source["content"]
+        assert "return 4" in assert_text(source["content"])
 
 
 def test_explicit_query_retires_historical_pruned_dependency_row(
@@ -108,15 +109,15 @@ def test_explicit_query_retires_historical_pruned_dependency_row(
     rel = dependency.relative_to(tmp_path).as_posix()
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        original = codemap._path_admitted_for_analysis
-        monkeypatch.setattr(codemap, "_path_admitted_for_analysis", lambda _rel: True)
-        historical = codemap.outline(rel)
+        original = codemap.files.is_admitted
+        monkeypatch.setattr(codemap.files, "is_admitted", lambda _rel: True)
+        historical = codemap.source.outline(rel)
         assert historical["path"] == rel
         assert rel in codemap.store.paths()
         generation_before = codemap.store.generation()
 
-        monkeypatch.setattr(codemap, "_path_admitted_for_analysis", original)
+        monkeypatch.setattr(codemap.files, "is_admitted", original)
         with pytest.raises(FileNotFoundError, match="not indexed"):
-            codemap.outline(rel)
+            codemap.source.outline(rel)
         assert rel not in codemap.store.paths()
         assert codemap.store.generation() > generation_before

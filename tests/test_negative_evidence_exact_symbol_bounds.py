@@ -2,11 +2,19 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from contract_assertions import assert_present
+
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.model import SearchHit
+from hashmarks.codemap.task_retrieval import _TaskRetrievalResult
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
     from pathlib import Path
+
+    import pytest
+
+    from hashmarks.codemap.task_action_types import _TaskActionExactIdentifierEvidence
 
 _INDEX_LIMIT = 1024
 
@@ -38,9 +46,9 @@ def _canonical_test_hit() -> SearchHit:
 
 
 def _install_bounded_exact_index(
-    codemap: CodeMap, monkeypatch, *, visible: bool
+    codemap: CodeMap, monkeypatch: pytest.MonkeyPatch, *, visible: bool
 ) -> None:
-    original = codemap._session_exact_symbol_candidates
+    original = codemap.reads.exact_symbol_candidates
     actual = list(original(["collision_owner"], limit=10))
     by_path = {str(row.get("path") or ""): dict(row) for row in actual}
     first = by_path["src/a.py"]
@@ -52,35 +60,45 @@ def _install_bounded_exact_index(
     probe = ([first] if visible else []) + stale + [hidden]
     assert len(probe) == _INDEX_LIMIT + 1
 
-    def exact_symbols(names, *, limit):
+    def exact_symbols(names: list[str], *, limit: int) -> list[dict[str, object]]:
         normalized = {str(name).lower() for name in names}
         if "collision_owner" in normalized and limit == _INDEX_LIMIT + 1:
             return probe[:limit]
         return original(names, limit=limit)
 
-    monkeypatch.setattr(codemap, "_session_exact_symbol_candidates", exact_symbols)
+    monkeypatch.setattr(codemap.reads, "exact_symbol_candidates", exact_symbols)
     monkeypatch.setattr(
-        codemap,
+        codemap.search,
         "find_task",
         lambda _task, *, limit=20: (_canonical_test_hit(),)[:limit],
+    )
+    monkeypatch.setattr(
+        codemap.search,
+        "observe_task",
+        lambda task, *, limit=20: _TaskRetrievalResult(
+            codemap.search.find_task(task, limit=limit), ()
+        ),
     )
 
 
 def test_exact_symbol_bound_cannot_manufacture_unique_owner(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _write_duplicate_owners(tmp_path)
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         _install_bounded_exact_index(codemap, monkeypatch, visible=True)
         task = "Refactor collision_owner without changing behavior"
-        context = codemap._task_action_map_context(task, 1)
-        evidence = codemap._task_action_exact_identifier_edit_candidates(
-            task, context.rows, context.failed
-        )
-        action = codemap.task_action_map(task, limit=1, per_role=1)
+        with codemap.reads.session() as _task_read_scope:
+            context = codemap.ownership.observe_candidates(
+                codemap.tasks._task_observation(task, 1), 1
+            )
+            evidence = codemap.ownership._task_action_exact_identifier_edit_candidates(
+                task, context.rows, context.failed
+            )
+            action = codemap.tasks.action_map(task, limit=1, per_role=1)
 
     assert [row["path"] for row in evidence.candidates] == ["src/a.py"]
     assert evidence.search_complete is False
@@ -101,7 +119,7 @@ def test_exact_symbol_bound_cannot_manufacture_unique_owner(
 
 def test_exact_symbol_bound_cannot_become_no_exact_owner_then_structural_fallback(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _write_duplicate_owners(tmp_path)
     (tmp_path / "tests" / "test_surface.py").write_text(
@@ -112,14 +130,17 @@ def test_exact_symbol_bound_cannot_become_no_exact_owner_then_structural_fallbac
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         _install_bounded_exact_index(codemap, monkeypatch, visible=False)
         task = "Refactor collision_owner without changing behavior"
-        context = codemap._task_action_map_context(task, 1)
-        evidence = codemap._task_action_exact_identifier_edit_candidates(
-            task, context.rows, context.failed
-        )
-        action = codemap.task_action_map(task, limit=1, per_role=1)
+        with codemap.reads.session() as _task_read_scope:
+            context = codemap.ownership.observe_candidates(
+                codemap.tasks._task_observation(task, 1), 1
+            )
+            evidence = codemap.ownership._task_action_exact_identifier_edit_candidates(
+                task, context.rows, context.failed
+            )
+            action = codemap.tasks.action_map(task, limit=1, per_role=1)
 
     assert evidence.candidates == []
     assert evidence.search_complete is False
@@ -147,14 +168,14 @@ def test_complete_exact_symbol_search_can_still_resolve_unique_owner(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        action = codemap.task_action_map(
+        codemap.index.sync()
+        action = codemap.tasks.action_map(
             "Refactor collision_owner without changing behavior",
             limit=1,
             per_role=1,
         )
 
-    assert action["edit"]["path"] == "src/a.py"
+    assert assert_present(action["edit"])["path"] == "src/a.py"
     assert action["owner_basis"] in {"exact-symbol", "unique-exact-symbol"}
     assert action["ambiguity"]["ambiguous"] is False
     assert action["ownership_authority"]["owner_resolved"] is True
@@ -170,20 +191,20 @@ def test_complete_exact_symbol_search_can_still_resolve_unique_owner(
 
 def test_literal_path_remains_independent_authority_when_symbol_index_is_bounded(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _write_duplicate_owners(tmp_path)
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         _install_bounded_exact_index(codemap, monkeypatch, visible=True)
-        action = codemap.task_action_map(
+        action = codemap.tasks.action_map(
             "Change src/a.py collision_owner behavior",
             limit=1,
             per_role=1,
         )
 
-    assert action["edit"]["path"] == "src/a.py"
+    assert assert_present(action["edit"])["path"] == "src/a.py"
     assert action["owner_basis"] == "literal-path"
     assert action["ambiguity"]["ambiguous"] is False
     assert action["ownership_authority"]["owner_resolved"] is True
@@ -195,7 +216,7 @@ def test_literal_path_remains_independent_authority_when_symbol_index_is_bounded
 
 
 def test_skipped_exact_identifier_search_cannot_claim_negative_or_unique_evidence(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "src" / "owner.py").write_text(
@@ -205,18 +226,20 @@ def test_skipped_exact_identifier_search_cannot_claim_negative_or_unique_evidenc
         '[project]\nname = "demo"\nversion = "0.1"\n', encoding="utf-8"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         calls = []
-        original = codemap._task_action_exact_identifier_edit_candidates
+        original = codemap.ownership._task_action_exact_identifier_edit_candidates
 
-        def tracked(*args, **kwargs):
+        def tracked(
+            task: str, rows: Sequence[dict[str, object]], failed: set[str]
+        ) -> _TaskActionExactIdentifierEvidence:
             calls.append(True)
-            return original(*args, **kwargs)
+            return original(task, rows, failed)
 
         monkeypatch.setattr(
-            codemap, "_task_action_exact_identifier_edit_candidates", tracked
+            codemap.ownership, "_task_action_exact_identifier_edit_candidates", tracked
         )
-        action = codemap.task_action_map("Change configuration for alpha_owner")
+        action = codemap.tasks.action_map("Change configuration for alpha_owner")
 
     assert not calls
     assert action["exact_identifier_search"] == {

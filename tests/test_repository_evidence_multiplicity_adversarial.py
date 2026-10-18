@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from contract_assertions import assert_object, assert_records
+
 from hashmarks.codemap.engine import CodeMap
 
 
@@ -28,8 +30,8 @@ def _delta_and_coverage(
     before: dict[str, object],
     after: dict[str, object],
 ) -> tuple[dict[str, object], dict[str, object]]:
-    delta = codemap.repository_evidence_binding_delta(before, after)
-    coverage = codemap.repository_evidence_coverage(
+    delta = codemap.bindings.delta(before, after)
+    coverage = codemap.bindings.coverage(
         after,
         changed_paths=[],
         change_set_complete=True,
@@ -43,15 +45,15 @@ def _assert_definition_only_transition(
     delta: dict[str, object],
     coverage: dict[str, object],
 ) -> None:
-    changed = delta["bindings"]["changed"]
+    changed = assert_records(assert_object(delta["bindings"])["changed"])
     assert len(changed) == 1
     row = changed[0]
     assert row["binding_id"] == "consumer"
-    assert row["definition"]["state"] == "changed"
-    assert row["direct_evidence"]["state"] == "preserved"
-    assert row["locator_evidence"]["state"] == "preserved"
-    assert row["member_evidence"]["state"] == "preserved"
-    assert row["declared_dependencies"]["state"] == "unaffected"
+    assert assert_object(row["definition"])["state"] == "changed"
+    assert assert_object(row["direct_evidence"])["state"] == "preserved"
+    assert assert_object(row["locator_evidence"])["state"] == "preserved"
+    assert assert_object(row["member_evidence"])["state"] == "preserved"
+    assert assert_object(row["declared_dependencies"])["state"] == "unaffected"
     assert coverage["binding_impacts"] == [
         {
             "binding_id": "consumer",
@@ -66,12 +68,12 @@ def test_duplicate_locator_multiplicity_is_definition_topology_not_content_chang
     (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        single = codemap.repository_evidence_bindings(
+        codemap.index.sync()
+        single = codemap.bindings.observe(
             _lines_binding(),
             include_relationships=False,
         )
-        duplicated = codemap.repository_evidence_bindings(
+        duplicated = codemap.bindings.observe(
             _lines_binding(duplicate=True),
             include_relationships=False,
         )
@@ -86,14 +88,14 @@ def test_duplicate_locator_multiplicity_is_definition_topology_not_content_chang
             single,
         )
 
-    single_row = single["bindings"][0]
-    duplicated_row = duplicated["bindings"][0]
-    assert len(single_row["evidence"]) == 1
-    assert len(duplicated_row["evidence"]) == 2
+    single_row = assert_records(single["bindings"])[0]
+    duplicated_row = assert_records(duplicated["bindings"])[0]
+    assert len(assert_records(single_row["evidence"])) == 1
+    assert len(assert_records(duplicated_row["evidence"])) == 2
     assert (
-        duplicated_row["evidence"][0]["span_identity"]
-        == duplicated_row["evidence"][1]["span_identity"]
-        == single_row["evidence"][0]["span_identity"]
+        assert_records(duplicated_row["evidence"])[0]["span_identity"]
+        == assert_records(duplicated_row["evidence"])[1]["span_identity"]
+        == assert_records(single_row["evidence"])[0]["span_identity"]
     )
     assert (
         single_row["binding_definition_identity"]
@@ -114,12 +116,12 @@ def test_lines_to_member_scope_switch_is_definition_not_repository_content_chang
     (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        lines = codemap.repository_evidence_bindings(
+        codemap.index.sync()
+        lines = codemap.bindings.observe(
             _lines_binding(),
             include_relationships=False,
         )
-        member = codemap.repository_evidence_bindings(
+        member = codemap.bindings.observe(
             _member_binding(),
             include_relationships=False,
         )
@@ -134,10 +136,10 @@ def test_lines_to_member_scope_switch_is_definition_not_repository_content_chang
             lines,
         )
 
-    lines_row = lines["bindings"][0]
-    member_row = member["bindings"][0]
-    lines_evidence = lines_row["evidence"][0]
-    member_evidence = member_row["evidence"][0]
+    lines_row = assert_records(lines["bindings"])[0]
+    member_row = assert_records(member["bindings"])[0]
+    lines_evidence = assert_records(lines_row["evidence"])[0]
+    member_evidence = assert_records(member_row["evidence"])[0]
 
     assert lines_evidence["scope"] == "lines"
     assert member_evidence["scope"] == "member"

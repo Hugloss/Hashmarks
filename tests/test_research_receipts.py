@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING
+
+import pytest
 
 from benchmarks.research_receipts import (
     durability_summary,
@@ -22,7 +25,7 @@ def test_research_receipt_reuses_exact_completed_work(tmp_path: Path) -> None:
     )
     calls = 0
 
-    def run():
+    def run() -> dict[str, object]:
         nonlocal calls
         calls += 1
         return {"value": 1}
@@ -62,3 +65,18 @@ def test_durability_summary_marks_resumed_timing_noncomparable() -> None:
     assert summary["complete"] is False
     assert summary["missing_items"] == ["b"]
     assert summary["timing_comparable"] is False
+
+
+def test_research_receipt_rejects_changed_result_bytes(tmp_path: Path) -> None:
+    path = tmp_path / "receipt.json"
+    identity = work_identity(protocol_identity="p", work_id="a", work_payload={})
+    evaluate_with_receipt(
+        receipt_path=path, identity=identity, evaluate=lambda: {"authority": False}
+    )
+    payload = json.loads(path.read_text())
+    payload["result"]["authority"] = True
+    path.write_text(json.dumps(payload))
+    with pytest.raises(ValueError, match="result integrity"):
+        evaluate_with_receipt(
+            receipt_path=path, identity=identity, evaluate=lambda: {"authority": True}
+        )

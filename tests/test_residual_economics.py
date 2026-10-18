@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from contract_assertions import assert_number, assert_object
+
 from hashmarks.residual_economics import (
     changed_impact_economics_receipt,
     residual_repository_economics_report,
@@ -25,8 +27,8 @@ def test_changed_impact_economics_is_measurement_only(tmp_path: Path) -> None:
         task="normalize_widget implementation test",
         changed_paths=("src/engine.py",),
     )
-    assert result["wall_time_ns"] >= 0
-    assert result["repository_scan_files"] >= 2
+    assert assert_number(result["wall_time_ns"]) >= 0
+    assert assert_number(result["repository_scan_files"]) >= 2
     assert result["authority"] == "repository-intelligence-economics-only"
     assert result["execution_layout"] == "external"
     forbidden = {"workers", "timeout", "retry", "subprocess", "certification"}
@@ -43,16 +45,19 @@ def test_residual_report_composes_reuse_candidates_scale_and_impact(
         changed_paths=("src/engine.py",),
         limit=10,
     )
-    assert result["scale"]["class"] == "tiny"
-    assert set(result["isolated_queries"]) == {
+    assert assert_object(result["scale"])["class"] == "tiny"
+    assert set(assert_object(result["isolated_queries"])) == {
         "find_task",
         "task_action_map",
         "task_decision_packet",
     }
-    assert result["isolated_query_totals"]["candidate_count"] >= 0
-    assert result["related_query_reuse"]["semantic_equivalent"] is True
-    assert result["bounded_top_n"]["all_bounds_respected"] is True
-    assert result["changed_impact"]["changed_paths"] == ["src/engine.py"]
+    assert (
+        assert_number(assert_object(result["isolated_query_totals"])["candidate_count"])
+        >= 0
+    )
+    assert assert_object(result["related_query_reuse"])["semantic_equivalent"] is True
+    assert assert_object(result["bounded_top_n"])["all_bounds_respected"] is True
+    assert assert_object(result["changed_impact"])["changed_paths"] == ["src/engine.py"]
     assert result["boundary"] == "repository-intelligence-economics-only"
     assert result["execution_authority"] == "external"
     assert result["result_authority"] == "external"
@@ -70,9 +75,9 @@ def test_residual_report_can_include_qualification_classification(
         qualification_root=root,
         limit=5,
     )
-    qualification = result["qualification_classification"]
+    qualification = assert_object(result["qualification_classification"])
     assert qualification["exact_total_membership_preserved"] is True
     assert qualification["ordinary_correctness_members_avoided"] == (
-        qualification["process_sensitive_members"]
-        + qualification["empirical_benchmark_members"]
+        assert_number(qualification["process_sensitive_members"])
+        + assert_number(qualification["empirical_benchmark_members"])
     )

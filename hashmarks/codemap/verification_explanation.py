@@ -5,19 +5,20 @@ from typing import TYPE_CHECKING, cast
 
 from hashmarks.paths import normalize_relative_path
 
-from .decision_session import diagnostic_producer
+from .decision_session import ReadScopeOwner
+from .repository_observation import packet_digest
 from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from .engine import CodeMap
+    from .evidence_verification import RepositoryVerification
 
 
 VERIFICATION_EXPLANATION_SCHEMA = "hashmarks.verification-selection-explanation.v1"
 
 
-class VerificationExplanationMixin:
+class VerificationExplanationMixin(ReadScopeOwner):
     """Bounded explanations over existing verification-selection semantics."""
 
     @staticmethod
@@ -64,7 +65,7 @@ class VerificationExplanationMixin:
         requested_row: Mapping[str, object],
     ) -> str:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryVerification", self)
         selected_score = (
             self._verification_candidate_score(selected_row)
             if selected_row is not None
@@ -77,10 +78,10 @@ class VerificationExplanationMixin:
             else "canonical-selection-retained"
         )
 
-    @diagnostic_producer
-    def explain_verification_selection(
+    def explain_relevance(
         self,
         task: str,
+        relevance: Mapping[str, object],
         member_path: str | Path | None = None,
         *,
         limit: int = VERIFICATION_RELEVANCE_DEFAULTS.limit,
@@ -88,12 +89,7 @@ class VerificationExplanationMixin:
     ) -> dict[str, object]:
         """Explain selection/non-selection without adding execution semantics."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        relevance = self.verification_relevance(
-            task,
-            limit=limit,
-            candidate_limit=candidate_limit,
-        )
+            self = cast("RepositoryVerification", self)
         selected = relevance.get("selected")
         selected_row = selected if isinstance(selected, Mapping) else None
         selected_path = str(selected_row.get("path") or "") if selected_row else ""
@@ -119,16 +115,16 @@ class VerificationExplanationMixin:
             reason = "not-in-bounded-candidate-set"
             facts = []
 
-        generation, identity_generation, stale = self._generation_status()
+        generation, identity_generation, stale = self.reads.generation_status()
         payload: dict[str, object] = {
             "schema": VERIFICATION_EXPLANATION_SCHEMA,
-            "repository_identity": self._repository_packet_identity(),
-            "source_identity": self._source_packet_identity(
+            "repository_identity": self.reads.repository_identity(),
+            "source_identity": self.source.packet_identity(
                 generation=generation,
                 identity_generation=identity_generation,
                 stale=stale,
             ),
-            "task_identity": self._packet_digest("hashmarks.task.v1", {"task": task}),
+            "task_identity": packet_digest("hashmarks.task.v1", {"task": task}),
             "member": requested or None,
             "selected_member": selected_path or None,
             "status": status,
@@ -138,7 +134,7 @@ class VerificationExplanationMixin:
             "authority": "repository-intelligence-only",
             "execution_effect": "none",
         }
-        payload["explanation_identity"] = "sha256:" + self._packet_digest(
+        payload["explanation_identity"] = "sha256:" + packet_digest(
             VERIFICATION_EXPLANATION_SCHEMA,
             payload,
         )

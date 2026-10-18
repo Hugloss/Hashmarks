@@ -19,7 +19,7 @@ from .semantic_relationship_model import (
 from .semantic_relationship_source import RelationshipSourceResolver
 
 if TYPE_CHECKING:
-    from .engine import CodeMap
+    from .native_evidence import RepositoryNativeEvidence
     from .scip_adapter import ScipOccurrence
 
 
@@ -116,10 +116,9 @@ def scip_source_snapshot(payload: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def qualify_scip_reference_rows(
-    codemap: CodeMap, rows: Sequence[dict[str, Any]]
+    resolver: RelationshipSourceResolver, rows: Sequence[dict[str, Any]]
 ) -> list[dict[str, Any]]:
     """Bind retained reference metadata through the existing source-equivalence owner."""
-    resolver = RelationshipSourceResolver(codemap)
     qualified = []
     for row in rows:
         metadata = row.get("occurrence_metadata")
@@ -170,7 +169,7 @@ def _source_endpoint(
 def _target_endpoint(
     producer: str, symbol: str, source_path: str, resolver: RelationshipSourceResolver
 ) -> dict[str, Any]:
-    rows = resolver.codemap.store.native_definitions_for_symbol(
+    rows = resolver.store.native_definitions_for_symbol(
         symbol,
         producer=producer,
         document_path=source_path if symbol.startswith("local ") else None,
@@ -206,7 +205,7 @@ def _target_endpoint(
 
 
 def _claim_rows(
-    codemap: CodeMap,
+    codemap: RepositoryNativeEvidence,
     target: Mapping[str, Any],
     producer: str,
     metadata: Mapping[str, Any],
@@ -261,7 +260,7 @@ def _claim_rows(
 
 
 def _producer_observation(
-    codemap: CodeMap,
+    codemap: RepositoryNativeEvidence,
     target: Mapping[str, Any],
     producer: str,
     resolver: RelationshipSourceResolver,
@@ -362,14 +361,12 @@ def _append_claims(
 
 
 def scip_relationship_observations(
-    codemap: CodeMap, target: Mapping[str, Any], resolver: RelationshipSourceResolver
+    codemap: RepositoryNativeEvidence,
+    target: Mapping[str, Any],
+    resolver: RelationshipSourceResolver,
 ) -> list[dict[str, Any]]:
     producers = sorted(
-        {
-            str(row["producer"])
-            for row in codemap._native_evidence_status()
-            if row["kind"] == "scip"
-        }
+        {str(row["producer"]) for row in codemap.status() if row["kind"] == "scip"}
     )
     return [
         _producer_observation(codemap, target, producer, resolver)

@@ -13,7 +13,7 @@ T = TypeVar("T")
 @dataclass
 class _Flight(Generic[T]):
     event: threading.Event
-    result: T | None = None
+    result: tuple[T] | None = None
     error: BaseException | None = None
 
 
@@ -41,7 +41,7 @@ class SingleFlight(Generic[T]):
 
         if leader:
             try:
-                flight.result = fn()
+                flight.result = (fn(),)
             except BaseException as exc:
                 flight.error = exc
             finally:
@@ -53,7 +53,9 @@ class SingleFlight(Generic[T]):
 
         if flight.error is not None:
             raise flight.error
-        return flight.result, not leader  # type: ignore[return-value]
+        result = flight.result
+        assert result is not None
+        return result[0], not leader
 
     def in_flight(self) -> int:
         with self._lock:

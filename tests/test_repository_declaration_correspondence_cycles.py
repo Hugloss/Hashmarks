@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from contract_assertions import assert_object, assert_records, assert_text
+
 from hashmarks.codemap import (
     RepositoryDeclarationProviderContext,
     RepositoryDeclarationProviderResult,
@@ -207,7 +209,10 @@ class _ExplicitSummaryProvider:
 
 
 def _groups(packet: dict[str, object]) -> dict[str, dict[str, object]]:
-    return {row["group_id"]: row for row in packet["declarations"]["groups"]}
+    return {
+        assert_text(row["group_id"]): row
+        for row in assert_records(assert_object(packet["declarations"])["groups"])
+    }
 
 
 def _cycle_packets(
@@ -254,19 +259,19 @@ def _cycle_packets(
     )
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
-        cycle = codemap.discover_repository_declarations(
+        codemap.index.sync()
+        cycle = codemap.declarations.discover(
             [provider_a, provider_b, provider_c, ab, bc, ca]
         )
 
         (repo / "owner-c.txt").write_text("owner: team-b\n", encoding="utf-8")
-        codemap.sync(["owner-c.txt"])
-        changed = codemap.discover_repository_declarations(
+        codemap.index.sync(["owner-c.txt"])
+        changed = codemap.declarations.discover(
             [provider_a, provider_b, provider_c, ab, bc, ca],
             previous_observation=cycle,
         )
 
-        explicit_summary = codemap.discover_repository_declarations(
+        explicit_summary = codemap.declarations.discover(
             [
                 provider_a,
                 provider_b,
@@ -298,7 +303,7 @@ def _assert_cycle_has_no_component_authority(packet: dict[str, object]) -> None:
             "state": "equivalent",
             "distinct_values": ["team-a"],
         }
-    assert packet["declarations"]["winner"] == "not-selected"
+    assert assert_object(packet["declarations"])["winner"] == "not-selected"
 
 
 def _assert_cycle_change_stays_pair_local(
@@ -330,21 +335,25 @@ def _assert_cycle_change_stays_pair_local(
             "distinct_values": ["team-a", "team-b"],
         }
 
-    assert after["delta_from_previous"]["providers"] == {
+    assert assert_object(after["delta_from_previous"])["providers"] == {
         "added": [],
         "removed": [],
         "changed": ["correlation-bc", "correlation-ca", "provider-c"],
     }
     changed_groups = {
         row["group_id"]
-        for row in after["delta_from_previous"]["declarations"]["changed_groups"]
+        for row in assert_records(
+            assert_object(assert_object(after["delta_from_previous"])["declarations"])[
+                "changed_groups"
+            ]
+        )
     }
     assert changed_groups == {
         "correspondence-bc",
         "correspondence-ca",
         "provider-c-owner",
     }
-    assert after["declarations"]["winner"] == "not-selected"
+    assert assert_object(after["declarations"])["winner"] == "not-selected"
 
 
 def _assert_summary_exists_only_when_explicitly_owned(
@@ -366,21 +375,23 @@ def _assert_summary_exists_only_when_explicitly_owned(
         "state": "differing",
         "distinct_values": ["team-a", "team-b"],
     }
-    assert after["declarations"]["winner"] == "not-selected"
-    assert after["delta_from_previous"]["providers"] == {
+    assert assert_object(after["declarations"])["winner"] == "not-selected"
+    assert assert_object(after["delta_from_previous"])["providers"] == {
         "added": ["correlation-abc-summary"],
         "removed": [],
         "changed": [],
     }
 
-    delta = after["delta_from_previous"]["declarations"]
+    delta = assert_object(assert_object(after["delta_from_previous"])["declarations"])
     assert delta["added_group_ids"] == ["explicit-abc-summary"]
     assert delta["removed_group_ids"] == []
     assert delta["changed_groups"] == []
-    assert delta["semantic_subjects"]["added"] == [summary["semantic_subject_identity"]]
-    assert delta["semantic_subjects"]["removed"] == []
-    assert delta["semantic_subjects"]["changed"] == []
-    assert delta["semantic_subjects"]["ambiguous"] == []
+    assert assert_object(delta["semantic_subjects"])["added"] == [
+        summary["semantic_subject_identity"]
+    ]
+    assert assert_object(delta["semantic_subjects"])["removed"] == []
+    assert assert_object(delta["semantic_subjects"])["changed"] == []
+    assert assert_object(delta["semantic_subjects"])["ambiguous"] == []
 
 
 def test_correspondence_cycle_never_creates_component_consensus(

@@ -1,0 +1,4157 @@
+{
+  "schema": "hashmarks.repository-evaluation-grader.v1",
+  "cases": {
+    "aiokafka-fetch-cancellation": {
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "aiokafka/consumer/fetcher.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 582,
+                  "path": "aiokafka/consumer/fetcher.py",
+                  "qualname": "Fetcher._fetch_requests_routine",
+                  "start_line": 476
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 582,
+                  "path": "aiokafka/consumer/fetcher.py",
+                  "qualname": "Fetcher._fetch_requests_routine",
+                  "start_line": 476
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 582,
+              "path": "aiokafka/consumer/fetcher.py",
+              "start_line": 476,
+              "symbol": "Fetcher._fetch_requests_routine"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_fetcher.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "aiokafka/consumer/fetcher.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 581,
+                  "path": "aiokafka/consumer/fetcher.py",
+                  "qualname": "Fetcher._fetch_requests_routine",
+                  "start_line": 476
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 581,
+                  "path": "aiokafka/consumer/fetcher.py",
+                  "qualname": "Fetcher._fetch_requests_routine",
+                  "start_line": 476
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 581,
+              "path": "aiokafka/consumer/fetcher.py",
+              "start_line": 476,
+              "symbol": "Fetcher._fetch_requests_routine"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_fetcher.py"
+          }
+        ]
+      },
+      "delta_checks": [
+        {
+          "id": "changed-path-bound",
+          "pointer": "/path_changes/0/path",
+          "predicate": "equals",
+          "value": "aiokafka/consumer/fetcher.py"
+        },
+        {
+          "id": "changed-state",
+          "pointer": "/path_changes/0/state",
+          "predicate": "equals",
+          "value": "changed"
+        },
+        {
+          "authority_check": true,
+          "id": "changed-revision",
+          "pointer": "/path_changes/0/revision",
+          "predicate": "equals",
+          "value": "50b12dbcebf127dc9a1d1e35680d89efa7729bcc405e56c8cea188b2d50ea231"
+        }
+      ],
+      "expected_owner_path": "aiokafka/consumer/fetcher.py",
+      "review_basis": "Exact upstream source transition and changed declaration range. Before/after verifier expectations are distinct when the repair adds a more relevant regression. This oracle asserts repository correspondence only; it does not certify runtime behavior or test sufficiency.",
+      "source_labels": {
+        "after": [
+          {
+            "declaration_line": 476,
+            "end_line": 582,
+            "path": "aiokafka/consumer/fetcher.py",
+            "sha256": "2a8ec5932644c9b04ff222ee7f27c9b0d6a0a7e89ce5a158ed340ceedc2ec7a9",
+            "start_line": 476,
+            "symbol": "Fetcher._fetch_requests_routine"
+          }
+        ],
+        "before": [
+          {
+            "declaration_line": 476,
+            "end_line": 581,
+            "path": "aiokafka/consumer/fetcher.py",
+            "sha256": "0d055beebcc194c74ba0dc8254f200f9f61d91939f076c983f2f7dc1fdda19b5",
+            "start_line": 476,
+            "symbol": "Fetcher._fetch_requests_routine"
+          }
+        ]
+      },
+      "function_boundary_oracles": {
+        "before": {
+          "source": "aiokafka-fetch-cancellation-before",
+          "source_label": {
+            "declaration_line": 476,
+            "end_line": 581,
+            "path": "aiokafka/consumer/fetcher.py",
+            "sha256": "0d055beebcc194c74ba0dc8254f200f9f61d91939f076c983f2f7dc1fdda19b5",
+            "start_line": 476,
+            "symbol": "Fetcher._fetch_requests_routine"
+          },
+          "reported_span": {
+            "path": "aiokafka/consumer/fetcher.py",
+            "start_line": 514,
+            "end_line": 514
+          },
+          "literal_source_line_sha256": "ea57344b75f3a3818685cfd16fd916d8324ad07913b61cef3d431dafa6d10e91",
+          "checks": [
+            {
+              "id": "current-member",
+              "pointer": "/changed_line_evidence/observations/0/member_revision",
+              "predicate": "equals",
+              "value": "4dd31fe8f199c13a651906e6b323a7432ce905663056ee308d7454864a2ad8b9",
+              "authority_check": true
+            },
+            {
+              "id": "exact-declaration",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_record",
+              "value": {
+                "subject": "aiokafka/consumer/fetcher.py::Fetcher._fetch_requests_routine",
+                "state": "source-index-bound",
+                "declaration_syntax": "async"
+              }
+            },
+            {
+              "id": "authority",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+              "predicate": "equals",
+              "value": "direct-static-syntax-only",
+              "authority_check": true
+            },
+            {
+              "id": "runtime_boundary_kind",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "task_ownership",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "execution_order",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "callee_resolution",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "negative_evidence_admissible",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+              "predicate": "equals",
+              "value": false,
+              "authority_check": true
+            },
+            {
+              "id": "literal-site",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "scope": {
+                  "subject": "aiokafka/consumer/fetcher.py::Fetcher._fetch_requests_routine"
+                },
+                "pointer": "/sites/*",
+                "record": {
+                  "line": 514,
+                  "syntax_kind": "call",
+                  "callee_identifier_syntax": "task.cancel"
+                }
+              }
+            }
+          ]
+        },
+        "after": {
+          "source": "aiokafka-fetch-cancellation-after",
+          "source_label": {
+            "declaration_line": 476,
+            "end_line": 582,
+            "path": "aiokafka/consumer/fetcher.py",
+            "sha256": "2a8ec5932644c9b04ff222ee7f27c9b0d6a0a7e89ce5a158ed340ceedc2ec7a9",
+            "start_line": 476,
+            "symbol": "Fetcher._fetch_requests_routine"
+          },
+          "reported_span": {
+            "path": "aiokafka/consumer/fetcher.py",
+            "start_line": 514,
+            "end_line": 514
+          },
+          "literal_source_line_sha256": "ea57344b75f3a3818685cfd16fd916d8324ad07913b61cef3d431dafa6d10e91",
+          "checks": [
+            {
+              "id": "current-member",
+              "pointer": "/changed_line_evidence/observations/0/member_revision",
+              "predicate": "equals",
+              "value": "50b12dbcebf127dc9a1d1e35680d89efa7729bcc405e56c8cea188b2d50ea231",
+              "authority_check": true
+            },
+            {
+              "id": "exact-declaration",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_record",
+              "value": {
+                "subject": "aiokafka/consumer/fetcher.py::Fetcher._fetch_requests_routine",
+                "state": "source-index-bound",
+                "declaration_syntax": "async"
+              }
+            },
+            {
+              "id": "authority",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+              "predicate": "equals",
+              "value": "direct-static-syntax-only",
+              "authority_check": true
+            },
+            {
+              "id": "runtime_boundary_kind",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "task_ownership",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "execution_order",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "callee_resolution",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "negative_evidence_admissible",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+              "predicate": "equals",
+              "value": false,
+              "authority_check": true
+            },
+            {
+              "id": "literal-site",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "scope": {
+                  "subject": "aiokafka/consumer/fetcher.py::Fetcher._fetch_requests_routine"
+                },
+                "pointer": "/sites/*",
+                "record": {
+                  "line": 514,
+                  "syntax_kind": "call",
+                  "callee_identifier_syntax": "task.cancel"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "aiokafka-sender-node-failure": {
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "aiokafka/producer/sender.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 269,
+                  "path": "aiokafka/producer/sender.py",
+                  "qualname": "Sender._find_coordinator",
+                  "start_line": 217
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 269,
+                  "path": "aiokafka/producer/sender.py",
+                  "qualname": "Sender._find_coordinator",
+                  "start_line": 217
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 269,
+              "path": "aiokafka/producer/sender.py",
+              "start_line": 217,
+              "symbol": "Sender._find_coordinator"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_sender.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "aiokafka/producer/sender.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 265,
+                  "path": "aiokafka/producer/sender.py",
+                  "qualname": "Sender._find_coordinator",
+                  "start_line": 217
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 265,
+                  "path": "aiokafka/producer/sender.py",
+                  "qualname": "Sender._find_coordinator",
+                  "start_line": 217
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 265,
+              "path": "aiokafka/producer/sender.py",
+              "start_line": 217,
+              "symbol": "Sender._find_coordinator"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_sender.py"
+          }
+        ]
+      },
+      "delta_checks": [
+        {
+          "id": "changed-path-bound",
+          "pointer": "/path_changes/0/path",
+          "predicate": "equals",
+          "value": "aiokafka/producer/sender.py"
+        },
+        {
+          "id": "changed-state",
+          "pointer": "/path_changes/0/state",
+          "predicate": "equals",
+          "value": "changed"
+        },
+        {
+          "authority_check": true,
+          "id": "changed-revision",
+          "pointer": "/path_changes/0/revision",
+          "predicate": "equals",
+          "value": "59345da12744cc3a0004041b4b7a8be95f85517c19476931823a142029b23dd0"
+        }
+      ],
+      "expected_owner_path": "aiokafka/producer/sender.py",
+      "review_basis": "Exact upstream source transition and changed declaration range. Before/after verifier expectations are distinct when the repair adds a more relevant regression. This oracle asserts repository correspondence only; it does not certify runtime behavior or test sufficiency.",
+      "source_labels": {
+        "after": [
+          {
+            "declaration_line": 217,
+            "end_line": 269,
+            "path": "aiokafka/producer/sender.py",
+            "sha256": "33001a36bf6a0ae06058568aada62aa046fce14e4897466e72faf87bf42aa368",
+            "start_line": 217,
+            "symbol": "Sender._find_coordinator"
+          }
+        ],
+        "before": [
+          {
+            "declaration_line": 217,
+            "end_line": 265,
+            "path": "aiokafka/producer/sender.py",
+            "sha256": "2c1e273c8cd3707675b5faac49bdc6cd407dbf9f65f9635328ff3417bbb6721d",
+            "start_line": 217,
+            "symbol": "Sender._find_coordinator"
+          }
+        ]
+      },
+      "function_boundary_oracles": {
+        "before": {
+          "source": "aiokafka-sender-node-failure-before",
+          "source_label": {
+            "declaration_line": 217,
+            "end_line": 265,
+            "path": "aiokafka/producer/sender.py",
+            "sha256": "2c1e273c8cd3707675b5faac49bdc6cd407dbf9f65f9635328ff3417bbb6721d",
+            "start_line": 217,
+            "symbol": "Sender._find_coordinator"
+          },
+          "reported_span": {
+            "path": "aiokafka/producer/sender.py",
+            "start_line": 235,
+            "end_line": 235
+          },
+          "literal_source_line_sha256": "0c2bc746bcf58539be0d9486cbc4f29a7298cd926fa381e0e269a61f3a581d3c",
+          "checks": [
+            {
+              "id": "current-member",
+              "pointer": "/changed_line_evidence/observations/0/member_revision",
+              "predicate": "equals",
+              "value": "b0f4725927411e509bd5545fdc966abdeb3e24ffca48ff55df06f5e7c0109b11",
+              "authority_check": true
+            },
+            {
+              "id": "exact-declaration",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_record",
+              "value": {
+                "subject": "aiokafka/producer/sender.py::Sender._find_coordinator",
+                "state": "source-index-bound",
+                "declaration_syntax": "async"
+              }
+            },
+            {
+              "id": "authority",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+              "predicate": "equals",
+              "value": "direct-static-syntax-only",
+              "authority_check": true
+            },
+            {
+              "id": "runtime_boundary_kind",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "task_ownership",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "execution_order",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "callee_resolution",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "negative_evidence_admissible",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+              "predicate": "equals",
+              "value": false,
+              "authority_check": true
+            },
+            {
+              "id": "literal-site",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "scope": {
+                  "subject": "aiokafka/producer/sender.py::Sender._find_coordinator"
+                },
+                "pointer": "/sites/*",
+                "record": {
+                  "line": 235,
+                  "syntax_kind": "await",
+                  "callee_identifier_syntax": "self.client.force_metadata_update"
+                }
+              }
+            }
+          ]
+        },
+        "after": {
+          "source": "aiokafka-sender-node-failure-after",
+          "source_label": {
+            "declaration_line": 217,
+            "end_line": 269,
+            "path": "aiokafka/producer/sender.py",
+            "sha256": "33001a36bf6a0ae06058568aada62aa046fce14e4897466e72faf87bf42aa368",
+            "start_line": 217,
+            "symbol": "Sender._find_coordinator"
+          },
+          "reported_span": {
+            "path": "aiokafka/producer/sender.py",
+            "start_line": 239,
+            "end_line": 239
+          },
+          "literal_source_line_sha256": "0c2bc746bcf58539be0d9486cbc4f29a7298cd926fa381e0e269a61f3a581d3c",
+          "checks": [
+            {
+              "id": "current-member",
+              "pointer": "/changed_line_evidence/observations/0/member_revision",
+              "predicate": "equals",
+              "value": "59345da12744cc3a0004041b4b7a8be95f85517c19476931823a142029b23dd0",
+              "authority_check": true
+            },
+            {
+              "id": "exact-declaration",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_record",
+              "value": {
+                "subject": "aiokafka/producer/sender.py::Sender._find_coordinator",
+                "state": "source-index-bound",
+                "declaration_syntax": "async"
+              }
+            },
+            {
+              "id": "authority",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+              "predicate": "equals",
+              "value": "direct-static-syntax-only",
+              "authority_check": true
+            },
+            {
+              "id": "runtime_boundary_kind",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "task_ownership",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "execution_order",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "callee_resolution",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "negative_evidence_admissible",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+              "predicate": "equals",
+              "value": false,
+              "authority_check": true
+            },
+            {
+              "id": "literal-site",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "scope": {
+                  "subject": "aiokafka/producer/sender.py::Sender._find_coordinator"
+                },
+                "pointer": "/sites/*",
+                "record": {
+                  "line": 239,
+                  "syntax_kind": "await",
+                  "callee_identifier_syntax": "self.client.force_metadata_update"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "aiokafka-metadata-future": {
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "aiokafka/cluster.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 213,
+                  "path": "aiokafka/cluster.py",
+                  "qualname": "ClusterMetadata.failed_update",
+                  "start_line": 204
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 213,
+                  "path": "aiokafka/cluster.py",
+                  "qualname": "ClusterMetadata.failed_update",
+                  "start_line": 204
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 213,
+              "path": "aiokafka/cluster.py",
+              "start_line": 204,
+              "symbol": "ClusterMetadata.failed_update"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_cluster.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "aiokafka/cluster.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 213,
+                  "path": "aiokafka/cluster.py",
+                  "qualname": "ClusterMetadata.failed_update",
+                  "start_line": 204
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 213,
+                  "path": "aiokafka/cluster.py",
+                  "qualname": "ClusterMetadata.failed_update",
+                  "start_line": 204
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 213,
+              "path": "aiokafka/cluster.py",
+              "start_line": 204,
+              "symbol": "ClusterMetadata.failed_update"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_client.py"
+          }
+        ]
+      },
+      "delta_checks": [
+        {
+          "id": "changed-path-bound",
+          "pointer": "/path_changes/0/path",
+          "predicate": "equals",
+          "value": "aiokafka/cluster.py"
+        },
+        {
+          "id": "changed-state",
+          "pointer": "/path_changes/0/state",
+          "predicate": "equals",
+          "value": "changed"
+        },
+        {
+          "authority_check": true,
+          "id": "changed-revision",
+          "pointer": "/path_changes/0/revision",
+          "predicate": "equals",
+          "value": "04d25de7aadff509a7b803fb43e13550f6f73e1a57ea94a9044019e7a5b81656"
+        }
+      ],
+      "expected_owner_path": "aiokafka/cluster.py",
+      "review_basis": "Exact upstream source transition and changed declaration range. Before/after verifier expectations are distinct when the repair adds a more relevant regression. This oracle asserts repository correspondence only; it does not certify runtime behavior or test sufficiency.",
+      "source_labels": {
+        "after": [
+          {
+            "declaration_line": 204,
+            "end_line": 213,
+            "path": "aiokafka/cluster.py",
+            "sha256": "7eb3371ae526b1275ff9210acb4066e558cead1c7b2b5618dfad781a8ae7ceaa",
+            "start_line": 204,
+            "symbol": "ClusterMetadata.failed_update"
+          }
+        ],
+        "before": [
+          {
+            "declaration_line": 204,
+            "end_line": 213,
+            "path": "aiokafka/cluster.py",
+            "sha256": "e392c1d1d0f3615b92830b114dbd7388fd15efe8e52a553c8d9a08737e6e98c9",
+            "start_line": 204,
+            "symbol": "ClusterMetadata.failed_update"
+          }
+        ]
+      },
+      "function_boundary_oracles": {
+        "before": {
+          "source": "aiokafka-metadata-future-before",
+          "source_label": {
+            "declaration_line": 204,
+            "end_line": 213,
+            "path": "aiokafka/cluster.py",
+            "sha256": "e392c1d1d0f3615b92830b114dbd7388fd15efe8e52a553c8d9a08737e6e98c9",
+            "start_line": 204,
+            "symbol": "ClusterMetadata.failed_update"
+          },
+          "reported_span": {
+            "path": "aiokafka/cluster.py",
+            "start_line": 204,
+            "end_line": 204
+          },
+          "literal_source_line_sha256": "d6ffd83c899921c45a460ac891ba1dc032227a2f088b6047528df8231fd171d7",
+          "checks": [
+            {
+              "id": "current-member",
+              "pointer": "/changed_line_evidence/observations/0/member_revision",
+              "predicate": "equals",
+              "value": "5b35147961e532a33aa6671bf88bbdbfba8cb95cfdf92b00ed1a2fb7267b9484",
+              "authority_check": true
+            },
+            {
+              "id": "exact-declaration",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_record",
+              "value": {
+                "subject": "aiokafka/cluster.py::ClusterMetadata.failed_update",
+                "state": "source-index-bound",
+                "declaration_syntax": "sync"
+              }
+            },
+            {
+              "id": "authority",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+              "predicate": "equals",
+              "value": "direct-static-syntax-only",
+              "authority_check": true
+            },
+            {
+              "id": "runtime_boundary_kind",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "task_ownership",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "execution_order",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "callee_resolution",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "negative_evidence_admissible",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+              "predicate": "equals",
+              "value": false,
+              "authority_check": true
+            }
+          ]
+        },
+        "after": {
+          "source": "aiokafka-metadata-future-after",
+          "source_label": {
+            "declaration_line": 204,
+            "end_line": 213,
+            "path": "aiokafka/cluster.py",
+            "sha256": "7eb3371ae526b1275ff9210acb4066e558cead1c7b2b5618dfad781a8ae7ceaa",
+            "start_line": 204,
+            "symbol": "ClusterMetadata.failed_update"
+          },
+          "reported_span": {
+            "path": "aiokafka/cluster.py",
+            "start_line": 212,
+            "end_line": 212
+          },
+          "literal_source_line_sha256": "9ed57d4af73208162c4846a22de5920e58faa9bfc5f985483c682ccc90178f03",
+          "checks": [
+            {
+              "id": "current-member",
+              "pointer": "/changed_line_evidence/observations/0/member_revision",
+              "predicate": "equals",
+              "value": "04d25de7aadff509a7b803fb43e13550f6f73e1a57ea94a9044019e7a5b81656",
+              "authority_check": true
+            },
+            {
+              "id": "exact-declaration",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_record",
+              "value": {
+                "subject": "aiokafka/cluster.py::ClusterMetadata.failed_update",
+                "state": "source-index-bound",
+                "declaration_syntax": "sync"
+              }
+            },
+            {
+              "id": "authority",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+              "predicate": "equals",
+              "value": "direct-static-syntax-only",
+              "authority_check": true
+            },
+            {
+              "id": "runtime_boundary_kind",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "task_ownership",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "execution_order",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "callee_resolution",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "negative_evidence_admissible",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+              "predicate": "equals",
+              "value": false,
+              "authority_check": true
+            },
+            {
+              "id": "literal-site",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "scope": {
+                  "subject": "aiokafka/cluster.py::ClusterMetadata.failed_update"
+                },
+                "pointer": "/sites/*",
+                "record": {
+                  "line": 212,
+                  "syntax_kind": "call",
+                  "callee_identifier_syntax": "f.set_exception"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "aiokafka-stable-offset": {
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "aiokafka/consumer/fetcher.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 914,
+                  "path": "aiokafka/consumer/fetcher.py",
+                  "qualname": "Fetcher._proc_fetch_request",
+                  "start_line": 744
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 914,
+                  "path": "aiokafka/consumer/fetcher.py",
+                  "qualname": "Fetcher._proc_fetch_request",
+                  "start_line": 744
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 914,
+              "path": "aiokafka/consumer/fetcher.py",
+              "start_line": 744,
+              "symbol": "Fetcher._proc_fetch_request"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_transactional_consumer.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "aiokafka/consumer/fetcher.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 908,
+                  "path": "aiokafka/consumer/fetcher.py",
+                  "qualname": "Fetcher._proc_fetch_request",
+                  "start_line": 744
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 908,
+                  "path": "aiokafka/consumer/fetcher.py",
+                  "qualname": "Fetcher._proc_fetch_request",
+                  "start_line": 744
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 908,
+              "path": "aiokafka/consumer/fetcher.py",
+              "start_line": 744,
+              "symbol": "Fetcher._proc_fetch_request"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/test_fetcher.py"
+          }
+        ]
+      },
+      "delta_checks": [
+        {
+          "id": "changed-path-bound",
+          "pointer": "/path_changes/0/path",
+          "predicate": "equals",
+          "value": "aiokafka/consumer/fetcher.py"
+        },
+        {
+          "id": "changed-state",
+          "pointer": "/path_changes/0/state",
+          "predicate": "equals",
+          "value": "changed"
+        },
+        {
+          "authority_check": true,
+          "id": "changed-revision",
+          "pointer": "/path_changes/0/revision",
+          "predicate": "equals",
+          "value": "a5e0cada3c6edd8cc5dab91279440a6721cb8f5971e2db6e2fd37f6df5137089"
+        }
+      ],
+      "expected_owner_path": "aiokafka/consumer/fetcher.py",
+      "review_basis": "Exact upstream source transition and changed declaration range. Before/after verifier expectations are distinct when the repair adds a more relevant regression. This oracle asserts repository correspondence only; it does not certify runtime behavior or test sufficiency.",
+      "source_labels": {
+        "after": [
+          {
+            "declaration_line": 744,
+            "end_line": 914,
+            "path": "aiokafka/consumer/fetcher.py",
+            "sha256": "59bf948fff47eed580671971252454daa614df479733f3bedfefe95bc4d8ad30",
+            "start_line": 744,
+            "symbol": "Fetcher._proc_fetch_request"
+          }
+        ],
+        "before": [
+          {
+            "declaration_line": 744,
+            "end_line": 908,
+            "path": "aiokafka/consumer/fetcher.py",
+            "sha256": "a70e682fa558181aaa81e30aa0dfe6298ee0c5d63f8cfec87b7c3613966699eb",
+            "start_line": 744,
+            "symbol": "Fetcher._proc_fetch_request"
+          }
+        ]
+      },
+      "function_boundary_oracles": {
+        "before": {
+          "source": "aiokafka-stable-offset-before",
+          "source_label": {
+            "declaration_line": 744,
+            "end_line": 908,
+            "path": "aiokafka/consumer/fetcher.py",
+            "sha256": "a70e682fa558181aaa81e30aa0dfe6298ee0c5d63f8cfec87b7c3613966699eb",
+            "start_line": 744,
+            "symbol": "Fetcher._proc_fetch_request"
+          },
+          "reported_span": {
+            "path": "aiokafka/consumer/fetcher.py",
+            "start_line": 747,
+            "end_line": 747
+          },
+          "literal_source_line_sha256": "84828763e13efe32432a220b5b99371713c167cca07310c88f74bba9530eea54",
+          "checks": [
+            {
+              "id": "current-member",
+              "pointer": "/changed_line_evidence/observations/0/member_revision",
+              "predicate": "equals",
+              "value": "056d07d868c886616c2b524d78e146f0c2a2c9b3ff1166287c26693e8092600a",
+              "authority_check": true
+            },
+            {
+              "id": "exact-declaration",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_record",
+              "value": {
+                "subject": "aiokafka/consumer/fetcher.py::Fetcher._proc_fetch_request",
+                "state": "source-index-bound",
+                "declaration_syntax": "async"
+              }
+            },
+            {
+              "id": "authority",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+              "predicate": "equals",
+              "value": "direct-static-syntax-only",
+              "authority_check": true
+            },
+            {
+              "id": "runtime_boundary_kind",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "task_ownership",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "execution_order",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "callee_resolution",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "negative_evidence_admissible",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+              "predicate": "equals",
+              "value": false,
+              "authority_check": true
+            },
+            {
+              "id": "literal-site",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "scope": {
+                  "subject": "aiokafka/consumer/fetcher.py::Fetcher._proc_fetch_request"
+                },
+                "pointer": "/sites/*",
+                "record": {
+                  "line": 747,
+                  "syntax_kind": "await",
+                  "callee_identifier_syntax": "self._client.send"
+                }
+              }
+            }
+          ]
+        },
+        "after": {
+          "source": "aiokafka-stable-offset-after",
+          "source_label": {
+            "declaration_line": 744,
+            "end_line": 914,
+            "path": "aiokafka/consumer/fetcher.py",
+            "sha256": "59bf948fff47eed580671971252454daa614df479733f3bedfefe95bc4d8ad30",
+            "start_line": 744,
+            "symbol": "Fetcher._proc_fetch_request"
+          },
+          "reported_span": {
+            "path": "aiokafka/consumer/fetcher.py",
+            "start_line": 747,
+            "end_line": 747
+          },
+          "literal_source_line_sha256": "84828763e13efe32432a220b5b99371713c167cca07310c88f74bba9530eea54",
+          "checks": [
+            {
+              "id": "current-member",
+              "pointer": "/changed_line_evidence/observations/0/member_revision",
+              "predicate": "equals",
+              "value": "a5e0cada3c6edd8cc5dab91279440a6721cb8f5971e2db6e2fd37f6df5137089",
+              "authority_check": true
+            },
+            {
+              "id": "exact-declaration",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_record",
+              "value": {
+                "subject": "aiokafka/consumer/fetcher.py::Fetcher._proc_fetch_request",
+                "state": "source-index-bound",
+                "declaration_syntax": "async"
+              }
+            },
+            {
+              "id": "authority",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+              "predicate": "equals",
+              "value": "direct-static-syntax-only",
+              "authority_check": true
+            },
+            {
+              "id": "runtime_boundary_kind",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "task_ownership",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "execution_order",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "callee_resolution",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "negative_evidence_admissible",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+              "predicate": "equals",
+              "value": false,
+              "authority_check": true
+            },
+            {
+              "id": "literal-site",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "scope": {
+                  "subject": "aiokafka/consumer/fetcher.py::Fetcher._proc_fetch_request"
+                },
+                "pointer": "/sites/*",
+                "record": {
+                  "line": 747,
+                  "syntax_kind": "await",
+                  "callee_identifier_syntax": "self._client.send"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "sqlalchemy-failed-begin": {
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "lib/sqlalchemy/dialects/postgresql/asyncpg.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 900,
+                  "path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+                  "qualname": "AsyncAdapt_asyncpg_connection._start_transaction",
+                  "start_line": 883
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 900,
+                  "path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+                  "qualname": "AsyncAdapt_asyncpg_connection._start_transaction",
+                  "start_line": 883
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 900,
+              "path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+              "start_line": 883,
+              "symbol": "AsyncAdapt_asyncpg_connection._start_transaction"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "test/dialect/postgresql/test_async_pg.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "lib/sqlalchemy/dialects/postgresql/asyncpg.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 896,
+                  "path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+                  "qualname": "AsyncAdapt_asyncpg_connection._start_transaction",
+                  "start_line": 883
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 896,
+                  "path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+                  "qualname": "AsyncAdapt_asyncpg_connection._start_transaction",
+                  "start_line": 883
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 896,
+              "path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+              "start_line": 883,
+              "symbol": "AsyncAdapt_asyncpg_connection._start_transaction"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "test/dialect/postgresql/test_async_pg.py"
+          }
+        ]
+      },
+      "delta_checks": [
+        {
+          "id": "changed-path-bound",
+          "pointer": "/path_changes/0/path",
+          "predicate": "equals",
+          "value": "lib/sqlalchemy/dialects/postgresql/asyncpg.py"
+        },
+        {
+          "id": "changed-state",
+          "pointer": "/path_changes/0/state",
+          "predicate": "equals",
+          "value": "changed"
+        },
+        {
+          "authority_check": true,
+          "id": "changed-revision",
+          "pointer": "/path_changes/0/revision",
+          "predicate": "equals",
+          "value": "9fb92f4ccb74b1990370b570ec2dfb8dcbc24974029542cf8bc6296e81844325"
+        }
+      ],
+      "expected_owner_path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+      "review_basis": "Exact upstream source transition and changed declaration range. Before/after verifier expectations are distinct when the repair adds a more relevant regression. This oracle asserts repository correspondence only; it does not certify runtime behavior or test sufficiency.",
+      "source_labels": {
+        "after": [
+          {
+            "declaration_line": 883,
+            "end_line": 900,
+            "path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+            "sha256": "9d879eca5f9578a6a79f7231fc3082c3750538de47ccce60e3dd20b112165426",
+            "start_line": 883,
+            "symbol": "AsyncAdapt_asyncpg_connection._start_transaction"
+          }
+        ],
+        "before": [
+          {
+            "declaration_line": 883,
+            "end_line": 896,
+            "path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+            "sha256": "3f0ed2fed9d4c330936df231595003a442f6cb05c646e5bb512e35d244ccc9f1",
+            "start_line": 883,
+            "symbol": "AsyncAdapt_asyncpg_connection._start_transaction"
+          }
+        ]
+      },
+      "function_boundary_oracles": {
+        "before": {
+          "source": "sqlalchemy-failed-begin-before",
+          "source_label": {
+            "declaration_line": 883,
+            "end_line": 896,
+            "path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+            "sha256": "3f0ed2fed9d4c330936df231595003a442f6cb05c646e5bb512e35d244ccc9f1",
+            "start_line": 883,
+            "symbol": "AsyncAdapt_asyncpg_connection._start_transaction"
+          },
+          "reported_span": {
+            "path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+            "start_line": 894,
+            "end_line": 894
+          },
+          "literal_source_line_sha256": "98f1acb1c424bfa84ee92bee0762a9186b814734732c5fe437f48deb374cd642",
+          "checks": [
+            {
+              "id": "current-member",
+              "pointer": "/changed_line_evidence/observations/0/member_revision",
+              "predicate": "equals",
+              "value": "a0eb9afd22ed058e72b60e22e5fbb5a13c66246656fbe2f69095a7b2e4855ea1",
+              "authority_check": true
+            },
+            {
+              "id": "exact-declaration",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_record",
+              "value": {
+                "subject": "lib/sqlalchemy/dialects/postgresql/asyncpg.py::AsyncAdapt_asyncpg_connection._start_transaction",
+                "state": "source-index-bound",
+                "declaration_syntax": "async"
+              }
+            },
+            {
+              "id": "authority",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+              "predicate": "equals",
+              "value": "direct-static-syntax-only",
+              "authority_check": true
+            },
+            {
+              "id": "runtime_boundary_kind",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "task_ownership",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "execution_order",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "callee_resolution",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "negative_evidence_admissible",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+              "predicate": "equals",
+              "value": false,
+              "authority_check": true
+            },
+            {
+              "id": "literal-site",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "scope": {
+                  "subject": "lib/sqlalchemy/dialects/postgresql/asyncpg.py::AsyncAdapt_asyncpg_connection._start_transaction"
+                },
+                "pointer": "/sites/*",
+                "record": {
+                  "line": 894,
+                  "syntax_kind": "await",
+                  "callee_identifier_syntax": "self._transaction.start"
+                }
+              }
+            }
+          ]
+        },
+        "after": {
+          "source": "sqlalchemy-failed-begin-after",
+          "source_label": {
+            "declaration_line": 883,
+            "end_line": 900,
+            "path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+            "sha256": "9d879eca5f9578a6a79f7231fc3082c3750538de47ccce60e3dd20b112165426",
+            "start_line": 883,
+            "symbol": "AsyncAdapt_asyncpg_connection._start_transaction"
+          },
+          "reported_span": {
+            "path": "lib/sqlalchemy/dialects/postgresql/asyncpg.py",
+            "start_line": 894,
+            "end_line": 894
+          },
+          "literal_source_line_sha256": "02358ead4672c8f40b343eeb98e855125504d1d317fcd58e5fc7379b833df108",
+          "checks": [
+            {
+              "id": "current-member",
+              "pointer": "/changed_line_evidence/observations/0/member_revision",
+              "predicate": "equals",
+              "value": "9fb92f4ccb74b1990370b570ec2dfb8dcbc24974029542cf8bc6296e81844325",
+              "authority_check": true
+            },
+            {
+              "id": "exact-declaration",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_record",
+              "value": {
+                "subject": "lib/sqlalchemy/dialects/postgresql/asyncpg.py::AsyncAdapt_asyncpg_connection._start_transaction",
+                "state": "source-index-bound",
+                "declaration_syntax": "async"
+              }
+            },
+            {
+              "id": "authority",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+              "predicate": "equals",
+              "value": "direct-static-syntax-only",
+              "authority_check": true
+            },
+            {
+              "id": "runtime_boundary_kind",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "task_ownership",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "execution_order",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "callee_resolution",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "negative_evidence_admissible",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+              "predicate": "equals",
+              "value": false,
+              "authority_check": true
+            },
+            {
+              "id": "literal-site",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "scope": {
+                  "subject": "lib/sqlalchemy/dialects/postgresql/asyncpg.py::AsyncAdapt_asyncpg_connection._start_transaction"
+                },
+                "pointer": "/sites/*",
+                "record": {
+                  "line": 894,
+                  "syntax_kind": "await",
+                  "callee_identifier_syntax": "transaction.start"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "faststream-middleware-enter-error": {
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "faststream/_internal/endpoint/subscriber/usecase.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 440,
+                  "path": "faststream/_internal/endpoint/subscriber/usecase.py",
+                  "qualname": "SubscriberUsecase.process_message",
+                  "start_line": 354
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 440,
+                  "path": "faststream/_internal/endpoint/subscriber/usecase.py",
+                  "qualname": "SubscriberUsecase.process_message",
+                  "start_line": 354
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 440,
+              "path": "faststream/_internal/endpoint/subscriber/usecase.py",
+              "start_line": 354,
+              "symbol": "SubscriberUsecase.process_message"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/brokers/base/middlewares.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "faststream/_internal/endpoint/subscriber/usecase.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 443,
+                  "path": "faststream/_internal/endpoint/subscriber/usecase.py",
+                  "qualname": "SubscriberUsecase.process_message",
+                  "start_line": 354
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 443,
+                  "path": "faststream/_internal/endpoint/subscriber/usecase.py",
+                  "qualname": "SubscriberUsecase.process_message",
+                  "start_line": 354
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 443,
+              "path": "faststream/_internal/endpoint/subscriber/usecase.py",
+              "start_line": 354,
+              "symbol": "SubscriberUsecase.process_message"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/brokers/base/middlewares.py"
+          }
+        ]
+      },
+      "delta_checks": [
+        {
+          "id": "changed-path-bound",
+          "pointer": "/path_changes/0/path",
+          "predicate": "equals",
+          "value": "faststream/_internal/endpoint/subscriber/usecase.py"
+        },
+        {
+          "id": "changed-state",
+          "pointer": "/path_changes/0/state",
+          "predicate": "equals",
+          "value": "changed"
+        },
+        {
+          "authority_check": true,
+          "id": "changed-revision",
+          "pointer": "/path_changes/0/revision",
+          "predicate": "equals",
+          "value": "b95491daeef8a2af3090bbbefe691a60c927994a5bf2e89de9406089d4fe6d0f"
+        }
+      ],
+      "expected_owner_path": "faststream/_internal/endpoint/subscriber/usecase.py",
+      "review_basis": "Exact upstream source transition and changed declaration range. Before/after verifier expectations are distinct when the repair adds a more relevant regression. This oracle asserts repository correspondence only; it does not certify runtime behavior or test sufficiency.",
+      "source_labels": {
+        "after": [
+          {
+            "declaration_line": 354,
+            "end_line": 440,
+            "path": "faststream/_internal/endpoint/subscriber/usecase.py",
+            "sha256": "aa3ed06c328d92abd126e0362beabee5b63400468cc02914f46992752d103350",
+            "start_line": 354,
+            "symbol": "SubscriberUsecase.process_message"
+          }
+        ],
+        "before": [
+          {
+            "declaration_line": 354,
+            "end_line": 443,
+            "path": "faststream/_internal/endpoint/subscriber/usecase.py",
+            "sha256": "52ebf78e8615ada8ac52a51044d9363f8bfd96417d4906ae451005e4e97ed4b0",
+            "start_line": 354,
+            "symbol": "SubscriberUsecase.process_message"
+          }
+        ]
+      },
+      "function_boundary_oracles": {
+        "before": {
+          "source": "faststream-middleware-enter-error-before",
+          "source_label": {
+            "declaration_line": 354,
+            "end_line": 443,
+            "path": "faststream/_internal/endpoint/subscriber/usecase.py",
+            "sha256": "52ebf78e8615ada8ac52a51044d9363f8bfd96417d4906ae451005e4e97ed4b0",
+            "start_line": 354,
+            "symbol": "SubscriberUsecase.process_message"
+          },
+          "reported_span": {
+            "path": "faststream/_internal/endpoint/subscriber/usecase.py",
+            "start_line": 378,
+            "end_line": 378
+          },
+          "literal_source_line_sha256": "5cc1ee0f0ad59921a6b1d10cd4b7eb170beb43cb222c074487918668d90affbe",
+          "checks": [
+            {
+              "id": "current-member",
+              "pointer": "/changed_line_evidence/observations/0/member_revision",
+              "predicate": "equals",
+              "value": "9b08b8c39e350c6655c973ebe857531c71f98fe79b481dcf4f757a165f5e24ff",
+              "authority_check": true
+            },
+            {
+              "id": "exact-declaration",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_record",
+              "value": {
+                "subject": "faststream/_internal/endpoint/subscriber/usecase.py::SubscriberUsecase.process_message",
+                "state": "source-index-bound",
+                "declaration_syntax": "async"
+              }
+            },
+            {
+              "id": "authority",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+              "predicate": "equals",
+              "value": "direct-static-syntax-only",
+              "authority_check": true
+            },
+            {
+              "id": "runtime_boundary_kind",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "task_ownership",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "execution_order",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "callee_resolution",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "negative_evidence_admissible",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+              "predicate": "equals",
+              "value": false,
+              "authority_check": true
+            },
+            {
+              "id": "literal-site",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "scope": {
+                  "subject": "faststream/_internal/endpoint/subscriber/usecase.py::SubscriberUsecase.process_message"
+                },
+                "pointer": "/sites/*",
+                "record": {
+                  "line": 378,
+                  "syntax_kind": "await",
+                  "callee_identifier_syntax": "middleware.__aenter__"
+                }
+              }
+            }
+          ]
+        },
+        "after": {
+          "source": "faststream-middleware-enter-error-after",
+          "source_label": {
+            "declaration_line": 354,
+            "end_line": 440,
+            "path": "faststream/_internal/endpoint/subscriber/usecase.py",
+            "sha256": "aa3ed06c328d92abd126e0362beabee5b63400468cc02914f46992752d103350",
+            "start_line": 354,
+            "symbol": "SubscriberUsecase.process_message"
+          },
+          "reported_span": {
+            "path": "faststream/_internal/endpoint/subscriber/usecase.py",
+            "start_line": 382,
+            "end_line": 382
+          },
+          "literal_source_line_sha256": "734e859eb9e0ff2c6d9021ade705a1fb7abf26badedbeb97049a815cf5140647",
+          "checks": [
+            {
+              "id": "current-member",
+              "pointer": "/changed_line_evidence/observations/0/member_revision",
+              "predicate": "equals",
+              "value": "b95491daeef8a2af3090bbbefe691a60c927994a5bf2e89de9406089d4fe6d0f",
+              "authority_check": true
+            },
+            {
+              "id": "exact-declaration",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_record",
+              "value": {
+                "subject": "faststream/_internal/endpoint/subscriber/usecase.py::SubscriberUsecase.process_message",
+                "state": "source-index-bound",
+                "declaration_syntax": "async"
+              }
+            },
+            {
+              "id": "authority",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+              "predicate": "equals",
+              "value": "direct-static-syntax-only",
+              "authority_check": true
+            },
+            {
+              "id": "runtime_boundary_kind",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "task_ownership",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "execution_order",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "callee_resolution",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "negative_evidence_admissible",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+              "predicate": "equals",
+              "value": false,
+              "authority_check": true
+            },
+            {
+              "id": "literal-site",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "scope": {
+                  "subject": "faststream/_internal/endpoint/subscriber/usecase.py::SubscriberUsecase.process_message"
+                },
+                "pointer": "/sites/*",
+                "record": {
+                  "line": 382,
+                  "syntax_kind": "await",
+                  "callee_identifier_syntax": "stack.enter_async_context"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "faststream-subscriber-stop": {
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "faststream/_internal/broker/broker.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 149,
+                  "path": "faststream/_internal/broker/broker.py",
+                  "qualname": "BrokerUsecase.stop",
+                  "start_line": 126
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 149,
+                  "path": "faststream/_internal/broker/broker.py",
+                  "qualname": "BrokerUsecase.stop",
+                  "start_line": 126
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 149,
+              "path": "faststream/_internal/broker/broker.py",
+              "start_line": 126,
+              "symbol": "BrokerUsecase.stop"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/brokers/test_stop.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "faststream/_internal/broker/broker.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 133,
+                  "path": "faststream/_internal/broker/broker.py",
+                  "qualname": "BrokerUsecase.stop",
+                  "start_line": 123
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 133,
+                  "path": "faststream/_internal/broker/broker.py",
+                  "qualname": "BrokerUsecase.stop",
+                  "start_line": 123
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 133,
+              "path": "faststream/_internal/broker/broker.py",
+              "start_line": 123,
+              "symbol": "BrokerUsecase.stop"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/brokers/base/connection.py"
+          }
+        ]
+      },
+      "delta_checks": [
+        {
+          "id": "changed-path-bound",
+          "pointer": "/path_changes/0/path",
+          "predicate": "equals",
+          "value": "faststream/_internal/broker/broker.py"
+        },
+        {
+          "id": "changed-state",
+          "pointer": "/path_changes/0/state",
+          "predicate": "equals",
+          "value": "changed"
+        },
+        {
+          "authority_check": true,
+          "id": "changed-revision",
+          "pointer": "/path_changes/0/revision",
+          "predicate": "equals",
+          "value": "08986062c5945caf644cb5b14e716b1b1bd1a43b4885d419a707e974d9bd8a7f"
+        }
+      ],
+      "expected_owner_path": "faststream/_internal/broker/broker.py",
+      "review_basis": "Exact upstream source transition and changed declaration range. Before/after verifier expectations are distinct when the repair adds a more relevant regression. This oracle asserts repository correspondence only; it does not certify runtime behavior or test sufficiency.",
+      "source_labels": {
+        "after": [
+          {
+            "declaration_line": 126,
+            "end_line": 149,
+            "path": "faststream/_internal/broker/broker.py",
+            "sha256": "dfab2da33ed7e26c910782b608c80f94bd8e497bcfe39f5f07e9bcfe4230eb3d",
+            "start_line": 126,
+            "symbol": "BrokerUsecase.stop"
+          }
+        ],
+        "before": [
+          {
+            "declaration_line": 123,
+            "end_line": 133,
+            "path": "faststream/_internal/broker/broker.py",
+            "sha256": "6663830e7a1b1f3ecf831cd66614b6f7f7f3fc31a167583e2e91db303dc6896f",
+            "start_line": 123,
+            "symbol": "BrokerUsecase.stop"
+          }
+        ]
+      },
+      "function_boundary_oracles": {
+        "before": {
+          "source": "faststream-subscriber-stop-before",
+          "source_label": {
+            "declaration_line": 123,
+            "end_line": 133,
+            "path": "faststream/_internal/broker/broker.py",
+            "sha256": "6663830e7a1b1f3ecf831cd66614b6f7f7f3fc31a167583e2e91db303dc6896f",
+            "start_line": 123,
+            "symbol": "BrokerUsecase.stop"
+          },
+          "reported_span": {
+            "path": "faststream/_internal/broker/broker.py",
+            "start_line": 131,
+            "end_line": 131
+          },
+          "literal_source_line_sha256": "bc7ac045181d276c2ed650b76f235f5777df6f933d7ad24a0a4c4ffec2aafbc6",
+          "checks": [
+            {
+              "id": "current-member",
+              "pointer": "/changed_line_evidence/observations/0/member_revision",
+              "predicate": "equals",
+              "value": "bb5f929de52f3fa91dbda438f1d8a4ffdc51b31418dc8ac175445d10ece9ae5f",
+              "authority_check": true
+            },
+            {
+              "id": "exact-declaration",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_record",
+              "value": {
+                "subject": "faststream/_internal/broker/broker.py::BrokerUsecase.stop",
+                "state": "source-index-bound",
+                "declaration_syntax": "async"
+              }
+            },
+            {
+              "id": "authority",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+              "predicate": "equals",
+              "value": "direct-static-syntax-only",
+              "authority_check": true
+            },
+            {
+              "id": "runtime_boundary_kind",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "task_ownership",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "execution_order",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "callee_resolution",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "negative_evidence_admissible",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+              "predicate": "equals",
+              "value": false,
+              "authority_check": true
+            },
+            {
+              "id": "literal-site",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "scope": {
+                  "subject": "faststream/_internal/broker/broker.py::BrokerUsecase.stop"
+                },
+                "pointer": "/sites/*",
+                "record": {
+                  "line": 131,
+                  "syntax_kind": "await",
+                  "callee_identifier_syntax": "sub.stop"
+                }
+              }
+            }
+          ]
+        },
+        "after": {
+          "source": "faststream-subscriber-stop-after",
+          "source_label": {
+            "declaration_line": 126,
+            "end_line": 149,
+            "path": "faststream/_internal/broker/broker.py",
+            "sha256": "dfab2da33ed7e26c910782b608c80f94bd8e497bcfe39f5f07e9bcfe4230eb3d",
+            "start_line": 126,
+            "symbol": "BrokerUsecase.stop"
+          },
+          "reported_span": {
+            "path": "faststream/_internal/broker/broker.py",
+            "start_line": 137,
+            "end_line": 137
+          },
+          "literal_source_line_sha256": "a2aa5eb2719858d10f4abcbdf5e56ce87b6ef1b57a4a61410120f24e90ab38a4",
+          "checks": [
+            {
+              "id": "current-member",
+              "pointer": "/changed_line_evidence/observations/0/member_revision",
+              "predicate": "equals",
+              "value": "08986062c5945caf644cb5b14e716b1b1bd1a43b4885d419a707e974d9bd8a7f",
+              "authority_check": true
+            },
+            {
+              "id": "exact-declaration",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_record",
+              "value": {
+                "subject": "faststream/_internal/broker/broker.py::BrokerUsecase.stop",
+                "state": "source-index-bound",
+                "declaration_syntax": "async"
+              }
+            },
+            {
+              "id": "authority",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+              "predicate": "equals",
+              "value": "direct-static-syntax-only",
+              "authority_check": true
+            },
+            {
+              "id": "runtime_boundary_kind",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "task_ownership",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "execution_order",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "callee_resolution",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "negative_evidence_admissible",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+              "predicate": "equals",
+              "value": false,
+              "authority_check": true
+            },
+            {
+              "id": "literal-site",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "scope": {
+                  "subject": "faststream/_internal/broker/broker.py::BrokerUsecase.stop.stop_subscriber"
+                },
+                "pointer": "/sites/*",
+                "record": {
+                  "line": 137,
+                  "syntax_kind": "await",
+                  "callee_identifier_syntax": "sub.stop"
+                }
+              }
+            }
+          ],
+          "site_source_label": {
+            "path": "faststream/_internal/broker/broker.py",
+            "symbol": "BrokerUsecase.stop.stop_subscriber",
+            "start_line": 135,
+            "end_line": 139,
+            "declaration_line": 135,
+            "sha256": "97e5eaed650473c9100fc8af18dd7b885ab9d31f682cbf6ea7b44cadb9610d24"
+          }
+        }
+      }
+    },
+    "faststream-concurrent-queue-lifetime": {
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "faststream/_internal/endpoint/subscriber/mixins.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 69,
+                  "path": "faststream/_internal/endpoint/subscriber/mixins.py",
+                  "qualname": "ConcurrentMixin.__init__",
+                  "start_line": 58
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 69,
+                  "path": "faststream/_internal/endpoint/subscriber/mixins.py",
+                  "qualname": "ConcurrentMixin.__init__",
+                  "start_line": 58
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 69,
+              "path": "faststream/_internal/endpoint/subscriber/mixins.py",
+              "start_line": 58,
+              "symbol": "ConcurrentMixin.__init__"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/brokers/nats/test_consume.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "faststream/_internal/endpoint/subscriber/mixins.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 70,
+                  "path": "faststream/_internal/endpoint/subscriber/mixins.py",
+                  "qualname": "ConcurrentMixin.__init__",
+                  "start_line": 57
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 70,
+                  "path": "faststream/_internal/endpoint/subscriber/mixins.py",
+                  "qualname": "ConcurrentMixin.__init__",
+                  "start_line": 57
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 70,
+              "path": "faststream/_internal/endpoint/subscriber/mixins.py",
+              "start_line": 57,
+              "symbol": "ConcurrentMixin.__init__"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/brokers/nats/test_consume.py"
+          }
+        ]
+      },
+      "delta_checks": [
+        {
+          "id": "changed-path-bound",
+          "pointer": "/path_changes/0/path",
+          "predicate": "equals",
+          "value": "faststream/_internal/endpoint/subscriber/mixins.py"
+        },
+        {
+          "id": "changed-state",
+          "pointer": "/path_changes/0/state",
+          "predicate": "equals",
+          "value": "changed"
+        },
+        {
+          "authority_check": true,
+          "id": "changed-revision",
+          "pointer": "/path_changes/0/revision",
+          "predicate": "equals",
+          "value": "7e342f72d545b0eabfab13d00a39c4c8ce8d4d992b798047be6fe0344f25f4b6"
+        }
+      ],
+      "expected_owner_path": "faststream/_internal/endpoint/subscriber/mixins.py",
+      "review_basis": "Exact upstream source transition and changed declaration range. Before/after verifier expectations are distinct when the repair adds a more relevant regression. This oracle asserts repository correspondence only; it does not certify runtime behavior or test sufficiency.",
+      "source_labels": {
+        "after": [
+          {
+            "declaration_line": 58,
+            "end_line": 69,
+            "path": "faststream/_internal/endpoint/subscriber/mixins.py",
+            "sha256": "f8a94c6ddacbc352749f2c33cc07c1cdb67456574cc388110153023f33356077",
+            "start_line": 58,
+            "symbol": "ConcurrentMixin.__init__"
+          }
+        ],
+        "before": [
+          {
+            "declaration_line": 57,
+            "end_line": 70,
+            "path": "faststream/_internal/endpoint/subscriber/mixins.py",
+            "sha256": "57888f8b6a2003e99d83a6c338a1e1dc828515d35981acb6ef5d680b8f62d220",
+            "start_line": 57,
+            "symbol": "ConcurrentMixin.__init__"
+          }
+        ]
+      },
+      "function_boundary_oracles": {
+        "before": {
+          "source": "faststream-concurrent-queue-lifetime-before",
+          "source_label": {
+            "declaration_line": 57,
+            "end_line": 70,
+            "path": "faststream/_internal/endpoint/subscriber/mixins.py",
+            "sha256": "57888f8b6a2003e99d83a6c338a1e1dc828515d35981acb6ef5d680b8f62d220",
+            "start_line": 57,
+            "symbol": "ConcurrentMixin.__init__"
+          },
+          "reported_span": {
+            "path": "faststream/_internal/endpoint/subscriber/mixins.py",
+            "start_line": 65,
+            "end_line": 65
+          },
+          "literal_source_line_sha256": "3bb911be00effbf80cdc72978c24e26beaa62b446ea745d5d881d27548393787",
+          "checks": [
+            {
+              "id": "current-member",
+              "pointer": "/changed_line_evidence/observations/0/member_revision",
+              "predicate": "equals",
+              "value": "c66d54ade60f4dccf8972f38ef944aadb5c00a62280636bdf87f8d8f9e75665c",
+              "authority_check": true
+            },
+            {
+              "id": "exact-declaration",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_record",
+              "value": {
+                "subject": "faststream/_internal/endpoint/subscriber/mixins.py::ConcurrentMixin.__init__",
+                "state": "source-index-bound",
+                "declaration_syntax": "sync"
+              }
+            },
+            {
+              "id": "authority",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+              "predicate": "equals",
+              "value": "direct-static-syntax-only",
+              "authority_check": true
+            },
+            {
+              "id": "runtime_boundary_kind",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "task_ownership",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "execution_order",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "callee_resolution",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "negative_evidence_admissible",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+              "predicate": "equals",
+              "value": false,
+              "authority_check": true
+            },
+            {
+              "id": "literal-site",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "scope": {
+                  "subject": "faststream/_internal/endpoint/subscriber/mixins.py::ConcurrentMixin.__init__"
+                },
+                "pointer": "/sites/*",
+                "record": {
+                  "line": 65,
+                  "syntax_kind": "call",
+                  "callee_identifier_syntax": "anyio.create_memory_object_stream"
+                }
+              }
+            }
+          ]
+        },
+        "after": {
+          "source": "faststream-concurrent-queue-lifetime-after",
+          "source_label": {
+            "declaration_line": 58,
+            "end_line": 69,
+            "path": "faststream/_internal/endpoint/subscriber/mixins.py",
+            "sha256": "f8a94c6ddacbc352749f2c33cc07c1cdb67456574cc388110153023f33356077",
+            "start_line": 58,
+            "symbol": "ConcurrentMixin.__init__"
+          },
+          "reported_span": {
+            "path": "faststream/_internal/endpoint/subscriber/mixins.py",
+            "start_line": 67,
+            "end_line": 67
+          },
+          "literal_source_line_sha256": "391f76ab253f51067634f5bc7d8a74f6b2ec06b1bfe368bc0598d6ee5879a07a",
+          "checks": [
+            {
+              "id": "current-member",
+              "pointer": "/changed_line_evidence/observations/0/member_revision",
+              "predicate": "equals",
+              "value": "7e342f72d545b0eabfab13d00a39c4c8ce8d4d992b798047be6fe0344f25f4b6",
+              "authority_check": true
+            },
+            {
+              "id": "exact-declaration",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_record",
+              "value": {
+                "subject": "faststream/_internal/endpoint/subscriber/mixins.py::ConcurrentMixin.__init__",
+                "state": "source-index-bound",
+                "declaration_syntax": "sync"
+              }
+            },
+            {
+              "id": "authority",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+              "predicate": "equals",
+              "value": "direct-static-syntax-only",
+              "authority_check": true
+            },
+            {
+              "id": "runtime_boundary_kind",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "task_ownership",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "execution_order",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "callee_resolution",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "negative_evidence_admissible",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+              "predicate": "equals",
+              "value": false,
+              "authority_check": true
+            },
+            {
+              "id": "literal-site",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "scope": {
+                  "subject": "faststream/_internal/endpoint/subscriber/mixins.py::ConcurrentMixin.__init__"
+                },
+                "pointer": "/sites/*",
+                "record": {
+                  "line": 67,
+                  "syntax_kind": "call",
+                  "callee_identifier_syntax": "_closed_queue"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "faststream-partial-pull-batch": {
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 264,
+                  "path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+                  "qualname": "BatchPullStreamSubscriber._consume_pull",
+                  "start_line": 230
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 264,
+                  "path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+                  "qualname": "BatchPullStreamSubscriber._consume_pull",
+                  "start_line": 230
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 264,
+              "path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+              "start_line": 230,
+              "symbol": "BatchPullStreamSubscriber._consume_pull"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/brokers/nats/test_pull_batch.py"
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py"
+          },
+          {
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "end_line": 241,
+                  "path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+                  "qualname": "BatchPullStreamSubscriber._consume_pull",
+                  "start_line": 229
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "end_line": 241,
+                  "path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+                  "qualname": "BatchPullStreamSubscriber._consume_pull",
+                  "start_line": 229
+                }
+              }
+            ],
+            "id": "changed-symbol-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "end_line": 241,
+              "path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+              "start_line": 229,
+              "symbol": "BatchPullStreamSubscriber._consume_pull"
+            }
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/brokers/nats/test_consume.py"
+          }
+        ]
+      },
+      "delta_checks": [
+        {
+          "id": "changed-path-bound",
+          "pointer": "/path_changes/0/path",
+          "predicate": "equals",
+          "value": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py"
+        },
+        {
+          "id": "changed-state",
+          "pointer": "/path_changes/0/state",
+          "predicate": "equals",
+          "value": "changed"
+        },
+        {
+          "authority_check": true,
+          "id": "changed-revision",
+          "pointer": "/path_changes/0/revision",
+          "predicate": "equals",
+          "value": "685232069e2388eccd124ae295b46d0b1901fe52dae38d2fcdeb29871837fa3b"
+        }
+      ],
+      "expected_owner_path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+      "review_basis": "Exact upstream source transition and changed declaration range. Before/after verifier expectations are distinct when the repair adds a more relevant regression. This oracle asserts repository correspondence only; it does not certify runtime behavior or test sufficiency.",
+      "source_labels": {
+        "after": [
+          {
+            "declaration_line": 230,
+            "end_line": 264,
+            "path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+            "sha256": "0495395a1f6d736ff9262faf4a85779a7f70d24a419688587eefeabbcc4c866b",
+            "start_line": 230,
+            "symbol": "BatchPullStreamSubscriber._consume_pull"
+          }
+        ],
+        "before": [
+          {
+            "declaration_line": 229,
+            "end_line": 241,
+            "path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+            "sha256": "e2b6dcacf877d2e799ff93c1c88ec0f81887fcad3b2aea046cbd079cb438d5d2",
+            "start_line": 229,
+            "symbol": "BatchPullStreamSubscriber._consume_pull"
+          }
+        ]
+      },
+      "function_boundary_oracles": {
+        "before": {
+          "source": "faststream-partial-pull-batch-before",
+          "source_label": {
+            "declaration_line": 229,
+            "end_line": 241,
+            "path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+            "sha256": "e2b6dcacf877d2e799ff93c1c88ec0f81887fcad3b2aea046cbd079cb438d5d2",
+            "start_line": 229,
+            "symbol": "BatchPullStreamSubscriber._consume_pull"
+          },
+          "reported_span": {
+            "path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+            "start_line": 235,
+            "end_line": 235
+          },
+          "literal_source_line_sha256": "4adbdf6bca4cecd5dfc3202dab0e35fd46e13265b2c660fa1a13180eb6fd634e",
+          "checks": [
+            {
+              "id": "current-member",
+              "pointer": "/changed_line_evidence/observations/0/member_revision",
+              "predicate": "equals",
+              "value": "b947d36ce3bae2feb0077da193f00fd89328b28ca4f11eb51f92c94b33e3072e",
+              "authority_check": true
+            },
+            {
+              "id": "exact-declaration",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_record",
+              "value": {
+                "subject": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py::BatchPullStreamSubscriber._consume_pull",
+                "state": "source-index-bound",
+                "declaration_syntax": "async"
+              }
+            },
+            {
+              "id": "authority",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+              "predicate": "equals",
+              "value": "direct-static-syntax-only",
+              "authority_check": true
+            },
+            {
+              "id": "runtime_boundary_kind",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "task_ownership",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "execution_order",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "callee_resolution",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "negative_evidence_admissible",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+              "predicate": "equals",
+              "value": false,
+              "authority_check": true
+            },
+            {
+              "id": "literal-site",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "scope": {
+                  "subject": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py::BatchPullStreamSubscriber._consume_pull"
+                },
+                "pointer": "/sites/*",
+                "record": {
+                  "line": 235,
+                  "syntax_kind": "await",
+                  "callee_identifier_syntax": "self.subscription.fetch"
+                }
+              }
+            }
+          ]
+        },
+        "after": {
+          "source": "faststream-partial-pull-batch-after",
+          "source_label": {
+            "declaration_line": 230,
+            "end_line": 264,
+            "path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+            "sha256": "0495395a1f6d736ff9262faf4a85779a7f70d24a419688587eefeabbcc4c866b",
+            "start_line": 230,
+            "symbol": "BatchPullStreamSubscriber._consume_pull"
+          },
+          "reported_span": {
+            "path": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py",
+            "start_line": 250,
+            "end_line": 250
+          },
+          "literal_source_line_sha256": "d6bd7eae6bfe1554b206ac8827b8806187a78b1c7d312211f44bb5d996bbf9f6",
+          "checks": [
+            {
+              "id": "current-member",
+              "pointer": "/changed_line_evidence/observations/0/member_revision",
+              "predicate": "equals",
+              "value": "685232069e2388eccd124ae295b46d0b1901fe52dae38d2fcdeb29871837fa3b",
+              "authority_check": true
+            },
+            {
+              "id": "exact-declaration",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_record",
+              "value": {
+                "subject": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py::BatchPullStreamSubscriber._consume_pull",
+                "state": "source-index-bound",
+                "declaration_syntax": "async"
+              }
+            },
+            {
+              "id": "authority",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+              "predicate": "equals",
+              "value": "direct-static-syntax-only",
+              "authority_check": true
+            },
+            {
+              "id": "runtime_boundary_kind",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "task_ownership",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "execution_order",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "callee_resolution",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "negative_evidence_admissible",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+              "predicate": "equals",
+              "value": false,
+              "authority_check": true
+            },
+            {
+              "id": "literal-site",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "scope": {
+                  "subject": "faststream/nats/subscriber/usecases/stream_pull_subscriber.py::BatchPullStreamSubscriber._consume_pull"
+                },
+                "pointer": "/sites/*",
+                "record": {
+                  "line": 250,
+                  "syntax_kind": "await",
+                  "callee_identifier_syntax": "self.subscription.fetch"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "litestar-redis-close": {
+      "expected_owner_path": "litestar/channels/backends/redis.py",
+      "source_labels": {
+        "before": [
+          {
+            "path": "litestar/channels/backends/redis.py",
+            "symbol": "RedisChannelsPubSubBackend.on_shutdown",
+            "start_line": 101,
+            "end_line": 107,
+            "declaration_line": 101,
+            "sha256": "e19e5836d7fb48e952e4eb73af182c0e83895f1eccc08aa7051b4622cb963716"
+          }
+        ],
+        "after": [
+          {
+            "path": "litestar/channels/backends/redis.py",
+            "symbol": "RedisChannelsPubSubBackend.on_shutdown",
+            "start_line": 101,
+            "end_line": 113,
+            "declaration_line": 101,
+            "sha256": "e8164c9a5852800a22772429e4a93f764aedc262e0b6b8ea9ce178b11b319c28"
+          }
+        ]
+      },
+      "function_boundary_oracles": {
+        "before": {
+          "source": "litestar-redis-close-before",
+          "source_label": {
+            "path": "litestar/channels/backends/redis.py",
+            "symbol": "RedisChannelsPubSubBackend.on_shutdown",
+            "start_line": 101,
+            "end_line": 107,
+            "declaration_line": 101,
+            "sha256": "e19e5836d7fb48e952e4eb73af182c0e83895f1eccc08aa7051b4622cb963716"
+          },
+          "reported_span": {
+            "path": "litestar/channels/backends/redis.py",
+            "start_line": 102,
+            "end_line": 102
+          },
+          "literal_source_line_sha256": "b06fcc5a4d6674c461666c5e4a80a87a504e7fd4e63872d90e40ac5848f79368",
+          "checks": [
+            {
+              "id": "current-member",
+              "pointer": "/changed_line_evidence/observations/0/member_revision",
+              "predicate": "equals",
+              "value": "f804724f2efbbac486c98d1a812a89ffe5d8ad4ba21497a1c9c4e219a275fec1",
+              "authority_check": true
+            },
+            {
+              "id": "exact-declaration",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_record",
+              "value": {
+                "subject": "litestar/channels/backends/redis.py::RedisChannelsPubSubBackend.on_shutdown",
+                "state": "source-index-bound",
+                "declaration_syntax": "async"
+              }
+            },
+            {
+              "id": "authority",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+              "predicate": "equals",
+              "value": "direct-static-syntax-only",
+              "authority_check": true
+            },
+            {
+              "id": "runtime_boundary_kind",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "task_ownership",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "execution_order",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "callee_resolution",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "negative_evidence_admissible",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+              "predicate": "equals",
+              "value": false,
+              "authority_check": true
+            },
+            {
+              "id": "literal-site",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "scope": {
+                  "subject": "litestar/channels/backends/redis.py::RedisChannelsPubSubBackend.on_shutdown"
+                },
+                "pointer": "/sites/*",
+                "record": {
+                  "line": 102,
+                  "syntax_kind": "await",
+                  "callee_identifier_syntax": "self._pub_sub.reset"
+                }
+              }
+            }
+          ]
+        },
+        "after": {
+          "source": "litestar-redis-close-after",
+          "source_label": {
+            "path": "litestar/channels/backends/redis.py",
+            "symbol": "RedisChannelsPubSubBackend.on_shutdown",
+            "start_line": 101,
+            "end_line": 113,
+            "declaration_line": 101,
+            "sha256": "e8164c9a5852800a22772429e4a93f764aedc262e0b6b8ea9ce178b11b319c28"
+          },
+          "reported_span": {
+            "path": "litestar/channels/backends/redis.py",
+            "start_line": 106,
+            "end_line": 106
+          },
+          "literal_source_line_sha256": "51b87390099285a707de40509cabc20e7091b71b4b45f9a920c1c942613164ee",
+          "checks": [
+            {
+              "id": "current-member",
+              "pointer": "/changed_line_evidence/observations/0/member_revision",
+              "predicate": "equals",
+              "value": "b335768dc0f274af310fca96f23304d715887eacd797bb142ad9fa69eaaf40b1",
+              "authority_check": true
+            },
+            {
+              "id": "exact-declaration",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_record",
+              "value": {
+                "subject": "litestar/channels/backends/redis.py::RedisChannelsPubSubBackend.on_shutdown",
+                "state": "source-index-bound",
+                "declaration_syntax": "async"
+              }
+            },
+            {
+              "id": "authority",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+              "predicate": "equals",
+              "value": "direct-static-syntax-only",
+              "authority_check": true
+            },
+            {
+              "id": "runtime_boundary_kind",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "task_ownership",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "execution_order",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "callee_resolution",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "negative_evidence_admissible",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+              "predicate": "equals",
+              "value": false,
+              "authority_check": true
+            },
+            {
+              "id": "literal-site",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "scope": {
+                  "subject": "litestar/channels/backends/redis.py::RedisChannelsPubSubBackend.on_shutdown"
+                },
+                "pointer": "/sites/*",
+                "record": {
+                  "line": 106,
+                  "syntax_kind": "await",
+                  "callee_identifier_syntax": "aclose"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "litestar/channels/backends/redis.py"
+          },
+          {
+            "id": "changed-declaration-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "litestar/channels/backends/redis.py",
+              "start_line": 101,
+              "end_line": 107,
+              "symbol": "RedisChannelsPubSubBackend.on_shutdown"
+            },
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "path": "litestar/channels/backends/redis.py",
+                  "start_line": 101,
+                  "end_line": 107,
+                  "qualname": "RedisChannelsPubSubBackend.on_shutdown"
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "path": "litestar/channels/backends/redis.py",
+                  "start_line": 101,
+                  "end_line": 107,
+                  "qualname": "RedisChannelsPubSubBackend.on_shutdown"
+                }
+              },
+              {
+                "pointer": "/retrieval/results/*/class_declarations/declarations/*",
+                "value": {
+                  "path": "litestar/channels/backends/redis.py",
+                  "start_line": 101,
+                  "end_line": 107,
+                  "symbol": "RedisChannelsPubSubBackend.on_shutdown"
+                }
+              }
+            ]
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/unit/test_channels/test_backends.py"
+          },
+          {
+            "id": "class-declaration-authority",
+            "pointer": "/retrieval/results/*/class_declarations/authority",
+            "predicate": "equals",
+            "value": "indexed-lexical-declarations-only",
+            "authority_check": true
+          },
+          {
+            "id": "class-declaration-ownership_authority",
+            "pointer": "/retrieval/results/*/class_declarations/ownership_authority",
+            "predicate": "equals",
+            "value": false,
+            "authority_check": true
+          },
+          {
+            "id": "class-declaration-runtime_members",
+            "pointer": "/retrieval/results/*/class_declarations/runtime_members",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "class-declaration-negative_evidence_admissible",
+            "pointer": "/retrieval/results/*/class_declarations/negative_evidence_admissible",
+            "predicate": "equals",
+            "value": false,
+            "authority_check": true
+          },
+          {
+            "id": "class-declaration-source_revision",
+            "pointer": "/retrieval/results/*/class_declarations/source_revision",
+            "predicate": "equals",
+            "value": "f804724f2efbbac486c98d1a812a89ffe5d8ad4ba21497a1c9c4e219a275fec1",
+            "authority_check": true
+          }
+        ]
+      },
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "litestar/channels/backends/redis.py"
+          },
+          {
+            "id": "changed-declaration-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "litestar/channels/backends/redis.py",
+              "start_line": 101,
+              "end_line": 113,
+              "symbol": "RedisChannelsPubSubBackend.on_shutdown"
+            },
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "path": "litestar/channels/backends/redis.py",
+                  "start_line": 101,
+                  "end_line": 113,
+                  "qualname": "RedisChannelsPubSubBackend.on_shutdown"
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "path": "litestar/channels/backends/redis.py",
+                  "start_line": 101,
+                  "end_line": 113,
+                  "qualname": "RedisChannelsPubSubBackend.on_shutdown"
+                }
+              },
+              {
+                "pointer": "/retrieval/results/*/class_declarations/declarations/*",
+                "value": {
+                  "path": "litestar/channels/backends/redis.py",
+                  "start_line": 101,
+                  "end_line": 113,
+                  "symbol": "RedisChannelsPubSubBackend.on_shutdown"
+                }
+              }
+            ]
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/unit/test_channels/test_backends.py"
+          },
+          {
+            "id": "class-declaration-authority",
+            "pointer": "/retrieval/results/*/class_declarations/authority",
+            "predicate": "equals",
+            "value": "indexed-lexical-declarations-only",
+            "authority_check": true
+          },
+          {
+            "id": "class-declaration-ownership_authority",
+            "pointer": "/retrieval/results/*/class_declarations/ownership_authority",
+            "predicate": "equals",
+            "value": false,
+            "authority_check": true
+          },
+          {
+            "id": "class-declaration-runtime_members",
+            "pointer": "/retrieval/results/*/class_declarations/runtime_members",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "class-declaration-negative_evidence_admissible",
+            "pointer": "/retrieval/results/*/class_declarations/negative_evidence_admissible",
+            "predicate": "equals",
+            "value": false,
+            "authority_check": true
+          },
+          {
+            "id": "class-declaration-source_revision",
+            "pointer": "/retrieval/results/*/class_declarations/source_revision",
+            "predicate": "equals",
+            "value": "b335768dc0f274af310fca96f23304d715887eacd797bb142ad9fa69eaaf40b1",
+            "authority_check": true
+          }
+        ]
+      },
+      "delta_checks": [
+        {
+          "id": "changed-path",
+          "pointer": "/path_changes/0/path",
+          "predicate": "equals",
+          "value": "litestar/channels/backends/redis.py"
+        },
+        {
+          "id": "current-changed-revision",
+          "pointer": "/path_changes/0/revision",
+          "predicate": "equals",
+          "value": "b335768dc0f274af310fca96f23304d715887eacd797bb142ad9fa69eaaf40b1",
+          "authority_check": true
+        }
+      ]
+    },
+    "litestar-psycopg-listener-stop": {
+      "expected_owner_path": "litestar/channels/backends/psycopg.py",
+      "source_labels": {
+        "before": [
+          {
+            "path": "litestar/channels/backends/psycopg.py",
+            "symbol": "PsycoPgChannelsBackend._stop_listener",
+            "start_line": 93,
+            "end_line": 99,
+            "declaration_line": 93,
+            "sha256": "239e7dd21749033c8f98be3d3e2bbc7a31444a9a423a182288e7695c052cd3d8"
+          }
+        ],
+        "after": [
+          {
+            "path": "litestar/channels/backends/psycopg.py",
+            "symbol": "PsycoPgChannelsBackend._stop_listener",
+            "start_line": 101,
+            "end_line": 113,
+            "declaration_line": 101,
+            "sha256": "8f457e02771511be8277cc6ff93ad457de0a1ba1d77f002a4600b3ebe569013e"
+          }
+        ]
+      },
+      "function_boundary_oracles": {
+        "before": {
+          "source": "litestar-psycopg-listener-stop-before",
+          "source_label": {
+            "path": "litestar/channels/backends/psycopg.py",
+            "symbol": "PsycoPgChannelsBackend._stop_listener",
+            "start_line": 93,
+            "end_line": 99,
+            "declaration_line": 93,
+            "sha256": "239e7dd21749033c8f98be3d3e2bbc7a31444a9a423a182288e7695c052cd3d8"
+          },
+          "reported_span": {
+            "path": "litestar/channels/backends/psycopg.py",
+            "start_line": 98,
+            "end_line": 98
+          },
+          "literal_source_line_sha256": "fc5aad985465e3d66f2e8e6690eda5f2c1e0eacb614e43c74287123e2c049b3e",
+          "checks": [
+            {
+              "id": "current-member",
+              "pointer": "/changed_line_evidence/observations/0/member_revision",
+              "predicate": "equals",
+              "value": "2d32bbe438a533cceaa0c62a28a3e927fe5ecda601f0344a254bdf15b5387425",
+              "authority_check": true
+            },
+            {
+              "id": "exact-declaration",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_record",
+              "value": {
+                "subject": "litestar/channels/backends/psycopg.py::PsycoPgChannelsBackend._stop_listener",
+                "state": "source-index-bound",
+                "declaration_syntax": "async"
+              }
+            },
+            {
+              "id": "authority",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+              "predicate": "equals",
+              "value": "direct-static-syntax-only",
+              "authority_check": true
+            },
+            {
+              "id": "runtime_boundary_kind",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "task_ownership",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "execution_order",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "callee_resolution",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "negative_evidence_admissible",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+              "predicate": "equals",
+              "value": false,
+              "authority_check": true
+            },
+            {
+              "id": "literal-site",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "scope": {
+                  "subject": "litestar/channels/backends/psycopg.py::PsycoPgChannelsBackend._stop_listener"
+                },
+                "pointer": "/sites/*",
+                "record": {
+                  "line": 98,
+                  "syntax_kind": "await",
+                  "callee_identifier_syntax": null,
+                  "awaited_identifier_syntax": "self._listener_task"
+                }
+              }
+            }
+          ]
+        },
+        "after": {
+          "source": "litestar-psycopg-listener-stop-after",
+          "source_label": {
+            "path": "litestar/channels/backends/psycopg.py",
+            "symbol": "PsycoPgChannelsBackend._stop_listener",
+            "start_line": 101,
+            "end_line": 113,
+            "declaration_line": 101,
+            "sha256": "8f457e02771511be8277cc6ff93ad457de0a1ba1d77f002a4600b3ebe569013e"
+          },
+          "reported_span": {
+            "path": "litestar/channels/backends/psycopg.py",
+            "start_line": 107,
+            "end_line": 107
+          },
+          "literal_source_line_sha256": "630036f43bc3657daef494efeb37030dea6d5fa80b64d7dc893765694528bd97",
+          "checks": [
+            {
+              "id": "current-member",
+              "pointer": "/changed_line_evidence/observations/0/member_revision",
+              "predicate": "equals",
+              "value": "68b28a1d7e3bddb43e33d771575ac1fae52fe645a7ee76dc59273e2db58e1336",
+              "authority_check": true
+            },
+            {
+              "id": "exact-declaration",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_record",
+              "value": {
+                "subject": "litestar/channels/backends/psycopg.py::PsycoPgChannelsBackend._stop_listener",
+                "state": "source-index-bound",
+                "declaration_syntax": "async"
+              }
+            },
+            {
+              "id": "authority",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+              "predicate": "equals",
+              "value": "direct-static-syntax-only",
+              "authority_check": true
+            },
+            {
+              "id": "runtime_boundary_kind",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "task_ownership",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "execution_order",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "callee_resolution",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "negative_evidence_admissible",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+              "predicate": "equals",
+              "value": false,
+              "authority_check": true
+            },
+            {
+              "id": "literal-site",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "scope": {
+                  "subject": "litestar/channels/backends/psycopg.py::PsycoPgChannelsBackend._stop_listener"
+                },
+                "pointer": "/sites/*",
+                "record": {
+                  "line": 107,
+                  "syntax_kind": "await",
+                  "callee_identifier_syntax": null,
+                  "awaited_identifier_syntax": "self._listener_task"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "litestar/channels/backends/psycopg.py"
+          },
+          {
+            "id": "changed-declaration-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "litestar/channels/backends/psycopg.py",
+              "start_line": 93,
+              "end_line": 99,
+              "symbol": "PsycoPgChannelsBackend._stop_listener"
+            },
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "path": "litestar/channels/backends/psycopg.py",
+                  "start_line": 93,
+                  "end_line": 99,
+                  "qualname": "PsycoPgChannelsBackend._stop_listener"
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "path": "litestar/channels/backends/psycopg.py",
+                  "start_line": 93,
+                  "end_line": 99,
+                  "qualname": "PsycoPgChannelsBackend._stop_listener"
+                }
+              }
+            ]
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/unit/test_channels/test_psycopg_backend.py"
+          }
+        ]
+      },
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "litestar/channels/backends/psycopg.py"
+          },
+          {
+            "id": "changed-declaration-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "litestar/channels/backends/psycopg.py",
+              "start_line": 101,
+              "end_line": 113,
+              "symbol": "PsycoPgChannelsBackend._stop_listener"
+            },
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "path": "litestar/channels/backends/psycopg.py",
+                  "start_line": 101,
+                  "end_line": 113,
+                  "qualname": "PsycoPgChannelsBackend._stop_listener"
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "path": "litestar/channels/backends/psycopg.py",
+                  "start_line": 101,
+                  "end_line": 113,
+                  "qualname": "PsycoPgChannelsBackend._stop_listener"
+                }
+              }
+            ]
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/unit/test_channels/test_psycopg_backend.py"
+          }
+        ]
+      },
+      "delta_checks": [
+        {
+          "id": "changed-path",
+          "pointer": "/path_changes/0/path",
+          "predicate": "equals",
+          "value": "litestar/channels/backends/psycopg.py"
+        },
+        {
+          "id": "current-changed-revision",
+          "pointer": "/path_changes/0/revision",
+          "predicate": "equals",
+          "value": "68b28a1d7e3bddb43e33d771575ac1fae52fe645a7ee76dc59273e2db58e1336",
+          "authority_check": true
+        }
+      ]
+    },
+    "litestar-asyncpg-listener-lock": {
+      "expected_owner_path": "litestar/channels/backends/asyncpg.py",
+      "source_labels": {
+        "before": [
+          {
+            "path": "litestar/channels/backends/asyncpg.py",
+            "symbol": "AsyncPgChannelsBackend.subscribe",
+            "start_line": 65,
+            "end_line": 68,
+            "declaration_line": 65,
+            "sha256": "7b62fc7c7d2564651cadee2f3484f40875ac727948fe600a252452ac59d78498"
+          },
+          {
+            "path": "tests/unit/test_channels/test_backends.py",
+            "symbol": "test_pub_sub",
+            "declaration_line": 63,
+            "start_line": 63,
+            "end_line": 71,
+            "sha256": "39f5b840b8cc388221e1ce79d6d721622d456c0c61861592ab4e6cdfffa886ba"
+          }
+        ],
+        "after": [
+          {
+            "path": "litestar/channels/backends/asyncpg.py",
+            "symbol": "AsyncPgChannelsBackend.subscribe",
+            "start_line": 69,
+            "end_line": 74,
+            "declaration_line": 69,
+            "sha256": "13ef06b75450cef3df0f923f1ff9c2c1f08d0480e0b426d430361730c8d686c3"
+          }
+        ]
+      },
+      "function_boundary_oracles": {
+        "before": {
+          "source": "litestar-asyncpg-listener-lock-before",
+          "source_label": {
+            "path": "litestar/channels/backends/asyncpg.py",
+            "symbol": "AsyncPgChannelsBackend.subscribe",
+            "start_line": 65,
+            "end_line": 68,
+            "declaration_line": 65,
+            "sha256": "7b62fc7c7d2564651cadee2f3484f40875ac727948fe600a252452ac59d78498"
+          },
+          "reported_span": {
+            "path": "litestar/channels/backends/asyncpg.py",
+            "start_line": 67,
+            "end_line": 67
+          },
+          "literal_source_line_sha256": "253dcae73c0fc096538f7e0dc9605dae80fc7e98941e84eedebe52d64868ac0e",
+          "checks": [
+            {
+              "id": "current-member",
+              "pointer": "/changed_line_evidence/observations/0/member_revision",
+              "predicate": "equals",
+              "value": "484f62f249f86926ff62af971a1ebf2a9928eb23abfa9259eeb4ff2c31bbcd5c",
+              "authority_check": true
+            },
+            {
+              "id": "exact-declaration",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_record",
+              "value": {
+                "subject": "litestar/channels/backends/asyncpg.py::AsyncPgChannelsBackend.subscribe",
+                "state": "source-index-bound",
+                "declaration_syntax": "async"
+              }
+            },
+            {
+              "id": "authority",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+              "predicate": "equals",
+              "value": "direct-static-syntax-only",
+              "authority_check": true
+            },
+            {
+              "id": "runtime_boundary_kind",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "task_ownership",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "execution_order",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "callee_resolution",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "negative_evidence_admissible",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+              "predicate": "equals",
+              "value": false,
+              "authority_check": true
+            },
+            {
+              "id": "literal-site",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "scope": {
+                  "subject": "litestar/channels/backends/asyncpg.py::AsyncPgChannelsBackend.subscribe"
+                },
+                "pointer": "/sites/*",
+                "record": {
+                  "line": 67,
+                  "syntax_kind": "await",
+                  "callee_identifier_syntax": "self._listener_conn.add_listener"
+                }
+              }
+            }
+          ]
+        },
+        "after": {
+          "source": "litestar-asyncpg-listener-lock-after",
+          "source_label": {
+            "path": "litestar/channels/backends/asyncpg.py",
+            "symbol": "AsyncPgChannelsBackend.subscribe",
+            "start_line": 69,
+            "end_line": 74,
+            "declaration_line": 69,
+            "sha256": "13ef06b75450cef3df0f923f1ff9c2c1f08d0480e0b426d430361730c8d686c3"
+          },
+          "reported_span": {
+            "path": "litestar/channels/backends/asyncpg.py",
+            "start_line": 73,
+            "end_line": 73
+          },
+          "literal_source_line_sha256": "8cf77f344a80c2ee50fcf16d83d9d78cb08a71267780510531dc4f58d89fd56a",
+          "checks": [
+            {
+              "id": "current-member",
+              "pointer": "/changed_line_evidence/observations/0/member_revision",
+              "predicate": "equals",
+              "value": "a18ed6cf0e386f2a00f700c371f39e59334c3f9c9f9776c38d6c6c3d7a4d8b4b",
+              "authority_check": true
+            },
+            {
+              "id": "exact-declaration",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_record",
+              "value": {
+                "subject": "litestar/channels/backends/asyncpg.py::AsyncPgChannelsBackend.subscribe",
+                "state": "source-index-bound",
+                "declaration_syntax": "async"
+              }
+            },
+            {
+              "id": "authority",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/authority",
+              "predicate": "equals",
+              "value": "direct-static-syntax-only",
+              "authority_check": true
+            },
+            {
+              "id": "runtime_boundary_kind",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "task_ownership",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/task_ownership",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "execution_order",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/execution_order",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "callee_resolution",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/callee_resolution",
+              "predicate": "equals",
+              "value": "not-established",
+              "authority_check": true
+            },
+            {
+              "id": "negative_evidence_admissible",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/negative_evidence_admissible",
+              "predicate": "equals",
+              "value": false,
+              "authority_check": true
+            },
+            {
+              "id": "literal-site",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "scope": {
+                  "subject": "litestar/channels/backends/asyncpg.py::AsyncPgChannelsBackend.subscribe"
+                },
+                "pointer": "/sites/*",
+                "record": {
+                  "line": 73,
+                  "syntax_kind": "await",
+                  "callee_identifier_syntax": "self._listener_conn.add_listener"
+                }
+              }
+            },
+            {
+              "id": "declared-context",
+              "pointer": "/changed_line_evidence/observations/0/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "scope": {
+                  "subject": "litestar/channels/backends/asyncpg.py::AsyncPgChannelsBackend.subscribe"
+                },
+                "pointer": "/sites/*",
+                "record": {
+                  "line": 71,
+                  "syntax_kind": "async-with",
+                  "context_expressions": [
+                    {
+                      "expression_kind": "Attribute",
+                      "callee_identifier_syntax": null,
+                      "context_identifier_syntax": "self._listener_lock",
+                      "binding_identifier_syntax": null
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "litestar/channels/backends/asyncpg.py"
+          },
+          {
+            "id": "changed-declaration-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "litestar/channels/backends/asyncpg.py",
+              "start_line": 65,
+              "end_line": 68,
+              "symbol": "AsyncPgChannelsBackend.subscribe"
+            },
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "path": "litestar/channels/backends/asyncpg.py",
+                  "start_line": 65,
+                  "end_line": 68,
+                  "qualname": "AsyncPgChannelsBackend.subscribe"
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "path": "litestar/channels/backends/asyncpg.py",
+                  "start_line": 65,
+                  "end_line": 68,
+                  "qualname": "AsyncPgChannelsBackend.subscribe"
+                }
+              },
+              {
+                "pointer": "/retrieval/results/*/class_declarations/declarations/*",
+                "value": {
+                  "path": "litestar/channels/backends/asyncpg.py",
+                  "start_line": 65,
+                  "end_line": 68,
+                  "symbol": "AsyncPgChannelsBackend.subscribe"
+                }
+              }
+            ]
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/unit/test_channels/test_backends.py"
+          },
+          {
+            "id": "class-declaration-authority",
+            "pointer": "/retrieval/results/*/class_declarations/authority",
+            "predicate": "equals",
+            "value": "indexed-lexical-declarations-only",
+            "authority_check": true
+          },
+          {
+            "id": "class-declaration-ownership_authority",
+            "pointer": "/retrieval/results/*/class_declarations/ownership_authority",
+            "predicate": "equals",
+            "value": false,
+            "authority_check": true
+          },
+          {
+            "id": "class-declaration-runtime_members",
+            "pointer": "/retrieval/results/*/class_declarations/runtime_members",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "class-declaration-negative_evidence_admissible",
+            "pointer": "/retrieval/results/*/class_declarations/negative_evidence_admissible",
+            "predicate": "equals",
+            "value": false,
+            "authority_check": true
+          },
+          {
+            "id": "class-declaration-source_revision",
+            "pointer": "/retrieval/results/*/class_declarations/source_revision",
+            "predicate": "equals",
+            "value": "484f62f249f86926ff62af971a1ebf2a9928eb23abfa9259eeb4ff2c31bbcd5c",
+            "authority_check": true
+          }
+        ]
+      },
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*/path",
+            "predicate": "includes",
+            "value": "litestar/channels/backends/asyncpg.py"
+          },
+          {
+            "id": "changed-declaration-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "litestar/channels/backends/asyncpg.py",
+              "start_line": 69,
+              "end_line": 74,
+              "symbol": "AsyncPgChannelsBackend.subscribe"
+            },
+            "alternative_records": [
+              {
+                "pointer": "/ownership/candidate",
+                "value": {
+                  "path": "litestar/channels/backends/asyncpg.py",
+                  "start_line": 69,
+                  "end_line": 74,
+                  "qualname": "AsyncPgChannelsBackend.subscribe"
+                }
+              },
+              {
+                "pointer": "/ownership/owner",
+                "value": {
+                  "path": "litestar/channels/backends/asyncpg.py",
+                  "start_line": 69,
+                  "end_line": 74,
+                  "qualname": "AsyncPgChannelsBackend.subscribe"
+                }
+              },
+              {
+                "pointer": "/retrieval/results/*/class_declarations/declarations/*",
+                "value": {
+                  "path": "litestar/channels/backends/asyncpg.py",
+                  "start_line": 69,
+                  "end_line": 74,
+                  "symbol": "AsyncPgChannelsBackend.subscribe"
+                }
+              }
+            ]
+          },
+          {
+            "id": "existing-verifier-visible",
+            "pointer": "/verification/relevance/candidates/*/path",
+            "predicate": "includes",
+            "value": "tests/unit/test_channels/test_asyncpg_backend.py"
+          },
+          {
+            "id": "class-declaration-authority",
+            "pointer": "/retrieval/results/*/class_declarations/authority",
+            "predicate": "equals",
+            "value": "indexed-lexical-declarations-only",
+            "authority_check": true
+          },
+          {
+            "id": "class-declaration-ownership_authority",
+            "pointer": "/retrieval/results/*/class_declarations/ownership_authority",
+            "predicate": "equals",
+            "value": false,
+            "authority_check": true
+          },
+          {
+            "id": "class-declaration-runtime_members",
+            "pointer": "/retrieval/results/*/class_declarations/runtime_members",
+            "predicate": "equals",
+            "value": "not-established",
+            "authority_check": true
+          },
+          {
+            "id": "class-declaration-negative_evidence_admissible",
+            "pointer": "/retrieval/results/*/class_declarations/negative_evidence_admissible",
+            "predicate": "equals",
+            "value": false,
+            "authority_check": true
+          },
+          {
+            "id": "class-declaration-source_revision",
+            "pointer": "/retrieval/results/*/class_declarations/source_revision",
+            "predicate": "equals",
+            "value": "a18ed6cf0e386f2a00f700c371f39e59334c3f9c9f9776c38d6c6c3d7a4d8b4b",
+            "authority_check": true
+          }
+        ]
+      },
+      "delta_checks": [
+        {
+          "id": "changed-path",
+          "pointer": "/path_changes/0/path",
+          "predicate": "equals",
+          "value": "litestar/channels/backends/asyncpg.py"
+        },
+        {
+          "id": "current-changed-revision",
+          "pointer": "/path_changes/0/revision",
+          "predicate": "equals",
+          "value": "a18ed6cf0e386f2a00f700c371f39e59334c3f9c9f9776c38d6c6c3d7a4d8b4b",
+          "authority_check": true
+        }
+      ]
+    }
+  }
+}

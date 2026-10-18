@@ -4,6 +4,7 @@ import copy
 from pathlib import Path
 
 import pytest
+from contract_assertions import assert_object
 
 from hashmarks.codemap.engine import CodeMap
 
@@ -78,15 +79,15 @@ def _snapshot() -> dict[str, object]:
 
 def test_dependency_explain_projects_semantics_and_derivation(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        observation = codemap.dependency_resolution_evidence(_snapshot())
-        explanation = codemap.dependency_resolution_explain(observation)
+        codemap.index.sync()
+        observation = codemap.dependencies.observe(_snapshot())
+        explanation = codemap.dependencies.explain(observation)
 
     assert explanation["schema"] == "hashmarks.dependency-resolution-explain.v1"
     assert explanation["authority"] == "qualified-external-observation"
     assert explanation["producer_authority"] == "caller-claimed"
 
-    semantic = explanation["semantic_result"]
+    semantic = assert_object(explanation["semantic_result"])
     assert semantic["definition_identity"] == observation["definition_identity"]
     assert semantic["resolution_identity"] == observation["resolution_identity"]
     assert semantic["observation_identity"] == observation["observation_identity"]
@@ -100,7 +101,7 @@ def test_dependency_explain_projects_semantics_and_derivation(tmp_path: Path) ->
         "module_ownership": 0,
     }
 
-    derivation = explanation["derivation"]
+    derivation = assert_object(explanation["derivation"])
     assert derivation["schema"] == "hashmarks.dependency-resolution-derivation.v1"
     assert derivation["observation_identity"] == observation["observation_identity"]
     assert derivation["adapter_semantics"] == "fixture.dependency-adapter.v1"
@@ -111,28 +112,28 @@ def test_dependency_explain_remains_endpoint_local_after_repository_advances(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        observation = codemap.dependency_resolution_evidence(_snapshot())
+        codemap.index.sync()
+        observation = codemap.dependencies.observe(_snapshot())
         original_binding = copy.deepcopy(observation["repository_binding"])
 
         (tmp_path / "later.py").write_text("VALUE = 1\n", encoding="utf-8")
-        codemap.sync(["later.py"])
-        explanation = codemap.dependency_resolution_explain(observation)
+        codemap.index.sync(["later.py"])
+        explanation = codemap.dependencies.explain(observation)
 
-    derivation = explanation["derivation"]
+    derivation = assert_object(explanation["derivation"])
     assert derivation["repository_binding"] == original_binding
     assert (
-        explanation["semantic_result"]["observation_identity"]
+        assert_object(explanation["semantic_result"])["observation_identity"]
         == observation["observation_identity"]
     )
 
 
 def test_dependency_explain_revalidates_before_projecting(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        observation = codemap.dependency_resolution_evidence(_snapshot())
+        codemap.index.sync()
+        observation = codemap.dependencies.observe(_snapshot())
         tampered = copy.deepcopy(observation)
-        tampered["producer"]["adapter_semantics"] = "fixture.forged.v2"
+        assert_object(tampered["producer"])["adapter_semantics"] = "fixture.forged.v2"
 
         with pytest.raises(ValueError, match="content identity mismatch"):
-            codemap.dependency_resolution_explain(tampered)
+            codemap.dependencies.explain(tampered)

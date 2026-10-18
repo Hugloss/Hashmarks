@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from contract_assertions import assert_number, assert_records
+
 from scripts.metrics_codemap_concurrency import probe
 
 
@@ -17,6 +19,16 @@ def test_shared_service_pressure_keeps_one_generation_and_one_sync(
     assert result["one_time_sync"] is True
     assert result["all_generations_consistent"] is True
     assert result["all_deterministic"] is True
-    assert [row["concurrency"] for row in result["rows"]] == [1, 2, 4, 8]
-    assert all(row["requests"] == row["concurrency"] for row in result["rows"])
-    assert all(row["p99_ms"] >= row["p50_ms"] >= 0 for row in result["rows"])
+    assert [row["concurrency"] for row in assert_records(result["rows"])] == [
+        1,
+        2,
+        4,
+        8,
+    ]
+    assert all(
+        row["requests"] == row["concurrency"] for row in assert_records(result["rows"])
+    )
+    assert all(
+        assert_number(row["p99_ms"]) >= assert_number(row["p50_ms"]) >= 0
+        for row in assert_records(result["rows"])
+    )

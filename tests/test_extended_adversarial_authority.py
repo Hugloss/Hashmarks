@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import copy
 import json
+from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 import pytest
+from contract_assertions import assert_array, assert_object, assert_text
 
 from hashmarks.codemap import ChangeImpactOptions, CodeMap
 from scripts.agent_evaluation.generate_hard_agent_corpus import generate
@@ -13,7 +15,9 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def _hard_repo(root: Path, *, cases_per_category: int = 4):
+def _hard_repo(
+    root: Path, *, cases_per_category: int = 4
+) -> tuple[Path, list[dict[str, object]]]:
     repo = root / "repo"
     public = root / "public.json"
     secret = root / "secret.json"
@@ -22,7 +26,7 @@ def _hard_repo(root: Path, *, cases_per_category: int = 4):
     return repo, tasks
 
 
-def _candidate_path(packet: dict[str, object]) -> str:
+def _candidate_path(packet: Mapping[str, object]) -> str:
     ownership = packet.get("ownership")
     assert isinstance(ownership, dict)
     candidate = ownership.get("candidate")
@@ -30,7 +34,7 @@ def _candidate_path(packet: dict[str, object]) -> str:
     return str(candidate.get("path") or "")
 
 
-def _verification_path(packet: dict[str, object]) -> str:
+def _verification_path(packet: Mapping[str, object]) -> str:
     verification = packet.get("verification")
     assert isinstance(verification, dict)
     selected = verification.get("selected")
@@ -38,7 +42,7 @@ def _verification_path(packet: dict[str, object]) -> str:
     return str(selected.get("path") or "")
 
 
-def _freshness_state(packet: dict[str, object]) -> str:
+def _freshness_state(packet: Mapping[str, object]) -> str:
     freshness = packet.get("freshness")
     assert isinstance(freshness, dict)
     return str(freshness.get("state") or "")
@@ -47,29 +51,31 @@ def _freshness_state(packet: dict[str, object]) -> str:
 def test_cross_task_previous_evidence_never_launders_authority(tmp_path: Path) -> None:
     repo, tasks = _hard_repo(tmp_path)
     with CodeMap(repo) as codemap:
-        codemap.sync()
-        starts = [codemap.task_evidence(row["query"]) for row in tasks]
+        codemap.index.sync()
+        starts = [codemap.tasks.evidence(assert_text(row["query"])) for row in tasks]
         assert all(_candidate_path(start) for start in starts)
         for index, row in enumerate(tasks):
             foreign = starts[(index + 1) % len(starts)]
             changed = [_candidate_path(foreign)]
             with pytest.raises(ValueError, match="task-mismatch"):
-                codemap.task_post_change_delta(
-                    row["query"], changed, previous_evidence=foreign
+                codemap.changes.task_delta(
+                    assert_text(row["query"]), changed, previous_evidence=foreign
                 )
 
 
 def test_context_identity_mutation_matrix_fails_closed(tmp_path: Path) -> None:
     repo, tasks = _hard_repo(tmp_path)
     with CodeMap(repo) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         for row in tasks:
-            start = codemap.task_evidence(row["query"])
+            start = codemap.tasks.evidence(assert_text(row["query"]))
             tampered = copy.deepcopy(start)
             tampered["provenance"]["context_identity"] = "sha256:" + "0" * 64
             with pytest.raises(ValueError, match="context-identity-mismatch"):
-                codemap.task_post_change_delta(
-                    row["query"], [_candidate_path(start)], previous_evidence=tampered
+                codemap.changes.task_delta(
+                    assert_text(row["query"]),
+                    [_candidate_path(start)],
+                    previous_evidence=tampered,
                 )
 
 
@@ -78,17 +84,18 @@ def test_selected_verification_mutation_is_never_safe_fresh_across_hard_corpus(
 ) -> None:
     repo, tasks = _hard_repo(tmp_path)
     with CodeMap(repo) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         for row in tasks:
-            start = codemap.task_evidence(row["query"])
+            start = codemap.tasks.evidence(assert_text(row["query"]))
             verify_path = repo / _verification_path(start)
             original = verify_path.read_text(encoding="utf-8")
             verify_path.write_text(
                 original + "\n# adversarial verification mutation\n", encoding="utf-8"
             )
-            stale = codemap.task_evidence(row["query"])
+            stale = codemap.tasks.evidence(assert_text(row["query"]))
             assert _freshness_state(stale) == "stale"
             assert stale["provenance"]["freshness"] == "stale"
+            assert "freshness_reason" in stale["provenance"]
             assert (
                 stale["provenance"]["freshness_reason"]
                 == "verification-changed-since-selection"
@@ -116,15 +123,15 @@ def test_bounded_fanout_never_claims_exhaustive(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        impact = codemap.task_change_impact(
+        codemap.index.sync()
+        impact = codemap.changes.task_impact(
             "change shared implementation",
             ["src/core.py"],
             options=ChangeImpactOptions(impact_limit_per_surface=limit, max_depth=3),
         )
-    implementations = impact["surfaces"]["implementation"]
+    implementations = assert_array(assert_object(impact["surfaces"])["implementation"])
     assert len(implementations) <= limit
-    assert impact["bounds"]["per_surface"] == limit
+    assert assert_object(impact["bounds"])["per_surface"] == limit
     assert impact["completeness"] == "not-claimed"
     if fanout > limit:
         assert len(implementations) == limit

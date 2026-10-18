@@ -1,19 +1,19 @@
 {
-  "captures_sha256": "2bee9dce1cd601cd66ef5448a8d7836984a4bb6664ecf9cb672b9f5a8466ec4c",
+  "captures_sha256": "2539243c481ea316270669c58e3218dfdcaf99293c94c463f87f04ccb3b6dac3",
   "configuration": {
     "pyrightconfig.json": "{\n  \"include\": [\n    \"src\"\n  ],\n  \"extraPaths\": [\n    \"src\"\n  ],\n  \"typeCheckingMode\": \"basic\"\n}\n"
   },
-  "original_root_uri": "file:///tmp/hashmarks-lsp-captured/python/before",
+  "original_root_uri": "file:///tmp/hashmarks-lsp-repair-8orshh6c/before",
   "producer": "pyright-langserver",
   "producer_version": "pyright 1.1.414",
   "qualification_authority": "external-capture-caller-claim",
   "source_revisions": {
-    "src/callee.py": "b5f029f5beee615e35332fba24c3542ca8b8be012b6e03566a15bcf7936a4f6b",
-    "src/caller.py": "8b8b03e7cf8b25b0a23e32dac91f67b4f54f360e7a10223a2696543481d3bfc2",
-    "src/duplicate.py": "668e2faefb1fb839119c590db7cad73bdfcb3dc26d36f1e659a87d5117d03d4c",
-    "src/other.py": "f63a27724791ca6e6af36ef4754e371f44f1693bf0d05c11bc983a41ceddfc59"
+    "src/callee.py": "7feb5050b83676439409cbacb547e4a8aa374796b29c5fb8c0439f8192dc1816",
+    "src/caller.py": "a8d4cf972ef321d1bc6d43e57c734b84f66a17b52fda9ffb6919e1e1a720c3ec",
+    "src/duplicate.py": "70a8ac30d63aad539d7c18601b0a1a08074f848bbdd4f63dec49e72de113b6e3",
+    "src/other.py": "d563f696c60921d23f7b7bbbe9b9d1e50113cd6e6773ff422c9dae32645bad9d"
   },
-  "transcript_sha256": "55a9c8c2f0d232c333bdc25cc47845f29ddb835fe1d7b388ebb45848b99ec872",
+  "transcript_sha256": "32ed93a2312cb2ea02bbdd75f9593a281e649648274e47d0e26de91cdffa25f6",
   "typescript_runtime": null,
   "typescript_runtime_sha256": null
 }

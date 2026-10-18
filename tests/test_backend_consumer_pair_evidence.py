@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from contract_assertions import assert_object, assert_records
 
 from hashmarks import CodeMap
 from hashmarks.codemap.repository_declaration_provider import (
@@ -50,15 +51,16 @@ def _provider(
 
 def _observe(root: Path, provider: StaticPythonInterfaceDeclarations) -> dict:
     with CodeMap(root) as codemap:
-        codemap.sync()
-        return codemap.discover_repository_declarations([provider])
+        codemap.index.sync()
+        return codemap.declarations.discover([provider])
 
 
 def _pair(packet: dict) -> dict:
     (group,) = [
         row
         for row in packet["declarations"]["groups"]
-        if row["concept"]["kind"] == "nominated-python-interface-syntax-pair"
+        if assert_object(row["concept"])["kind"]
+        == "nominated-python-interface-syntax-pair"
     ]
     return group
 
@@ -176,13 +178,15 @@ def test_opt_out_preserves_existing_declaration_evidence(
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as cm:
-        cm.sync()
-        default = cm.discover_repository_declarations(
+        cm.index.sync()
+        default = cm.declarations.discover(
             [StaticPythonInterfaceDeclarations(paths=("api.py", "client.py"))]
         )
-        explicitly_empty = cm.discover_repository_declarations([_provider(())])
+        explicitly_empty = cm.declarations.discover([_provider(())])
     assert default == explicitly_empty
-    assert "consumer_pairs" not in default["providers"][0]["provenance"]
+    assert "consumer_pairs" not in assert_object(
+        assert_records(default["providers"])[0]["provenance"]
+    )
 
 
 def test_order_does_not_change_pair_identity_and_mutation_changes_observation(
@@ -194,32 +198,36 @@ def test_order_does_not_change_pair_identity_and_mutation_changes_observation(
         ("api.py", "serve", "client.py", "render", "payload"),
     )
     with CodeMap(tmp_path) as cm:
-        cm.sync()
-        first = cm.discover_repository_declarations([_provider(pairs)])
-        second = cm.discover_repository_declarations(
-            [_provider(tuple(reversed(pairs)))]
-        )
+        cm.index.sync()
+        first = cm.declarations.discover([_provider(pairs)])
+        second = cm.declarations.discover([_provider(tuple(reversed(pairs)))])
         assert first["observation_identity"] == second["observation_identity"]
         source = tmp_path / "client.py"
         source.write_text(
             source.read_text().replace('response["name"]', 'response["age"]')
         )
-        cm.sync(["client.py"])
-        changed = cm.discover_repository_declarations(
+        cm.index.sync(["client.py"])
+        changed = cm.declarations.discover(
             [_provider(pairs)], previous_observation=first
         )
     assert changed["observation_identity"] != first["observation_identity"]
     groups = [
         row
-        for row in changed["declarations"]["groups"]
-        if row["concept"]["kind"] == "nominated-python-interface-syntax-pair"
+        for row in assert_records(assert_object(changed["declarations"])["groups"])
+        if assert_object(row["concept"])["kind"]
+        == "nominated-python-interface-syntax-pair"
     ]
     consumer = next(
         row
-        for row in groups[1]["declarations"]
+        for row in assert_records(groups[1]["declarations"])
         if row["declaration_id"] == "consumer-subscript-read-syntax"
     )
-    assert consumer["value"]["literal_subscript_reads"][0]["literal_key"] == "age"
+    assert (
+        assert_records(assert_object(consumer["value"])["literal_subscript_reads"])[0][
+            "literal_key"
+        ]
+        == "age"
+    )
 
 
 @pytest.mark.parametrize(
@@ -238,9 +246,9 @@ def test_order_does_not_change_pair_identity_and_mutation_changes_observation(
 )
 def test_invalid_nominations_fail_before_provider_reads(pairs: object) -> None:
     with pytest.raises(ValueError, match="consumer_pairs"):
-        StaticPythonInterfaceDeclarations(
-            paths=("api.py", "client.py"),
-            consumer_pairs=pairs,  # type: ignore[arg-type]
+        replace(
+            StaticPythonInterfaceDeclarations(paths=("api.py", "client.py")),
+            consumer_pairs=pairs,
         )
 
 
@@ -254,9 +262,9 @@ def test_bounded_consumer_syntax_fails_closed_instead_of_false_empty(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         with pytest.raises(RepositoryDeclarationProviderError, match="bound"):
-            cm.discover_repository_declarations([_provider()])
+            cm.declarations.discover([_provider()])
 
 
 def test_consumer_source_visibility_denial_never_leaks_literal_keys(
@@ -281,9 +289,9 @@ def test_mutated_consumer_without_resync_refuses_old_repository_evidence(
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as cm:
-        cm.sync()
+        cm.index.sync()
         provider = _provider()
-        original = cm.discover_repository_declarations([provider])
+        original = cm.declarations.discover([provider])
         (tmp_path / "client.py").write_text(
             'def render(response):\n    return response["changed"]\n',
             encoding="utf-8",
@@ -291,6 +299,4 @@ def test_mutated_consumer_without_resync_refuses_old_repository_evidence(
         with pytest.raises(
             RepositoryDeclarationProviderError, match="input changed while reading"
         ):
-            cm.discover_repository_declarations(
-                [provider], previous_observation=original
-            )
+            cm.declarations.discover([provider], previous_observation=original)

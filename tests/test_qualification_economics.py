@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from contract_assertions import assert_number
+
 from hashmarks.qualification_classification import classify_nodeids
 from hashmarks.qualification_economics import qualification_classification_economics
 from hashmarks.test_shards import _nodeids
@@ -23,10 +25,11 @@ def test_classification_economics_preserves_exact_membership_and_separates_work(
         == result["release_correctness_members"]
     )
     assert result["ordinary_correctness_members_avoided"] == (
-        result["process_sensitive_members"] + result["empirical_benchmark_members"]
+        assert_number(result["process_sensitive_members"])
+        + assert_number(result["empirical_benchmark_members"])
     )
-    assert result["owner_unit_count"] > 0
-    assert result["singleton_unit_count"] >= 7
+    assert assert_number(result["owner_unit_count"]) > 0
+    assert assert_number(result["singleton_unit_count"]) >= 7
     assert result["authority"] == "repository-intelligence-economics-only"
 
 

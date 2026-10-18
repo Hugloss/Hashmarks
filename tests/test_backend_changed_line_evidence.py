@@ -3,9 +3,18 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Never
 
 import pytest
+from contract_assertions import (
+    assert_array,
+    assert_integer,
+    assert_object,
+    assert_records,
+    assert_text,
+)
 
 from hashmarks.codemap import ChangeImpactOptions, CodeMap
 from hashmarks.codemap.change_line_evidence import (
@@ -40,6 +49,21 @@ def _repo(tmp_path: Path) -> None:
     )
 
 
+def _changed_observation(packet: Mapping[str, object]) -> dict[str, object]:
+    return assert_records(
+        assert_object(packet["changed_line_evidence"])["observations"]
+    )[0]
+
+
+def _decorator_context(packet: Mapping[str, object]) -> dict[str, object]:
+    associations = assert_records(
+        assert_object(_changed_observation(packet)["decorator_associations"])[
+            "associations"
+        ]
+    )
+    return assert_object(associations[0]["decorator_context"])
+
+
 def _options(
     *,
     start: int = 2,
@@ -56,24 +80,24 @@ def test_direct_changed_lines_preserve_owner_and_verifier_surfaces(
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as cm:
-        cm.sync()
-        plain = cm.task_change_impact(TASK, [PATH])
-        augmented = cm.task_change_impact(TASK, [PATH], options=_options())
+        cm.index.sync()
+        plain = cm.changes.task_impact(TASK, [PATH])
+        augmented = cm.changes.task_impact(TASK, [PATH], options=_options())
     assert "changed_line_evidence" not in plain
     assert augmented["changed"] == plain["changed"]
     assert augmented["surfaces"] == plain["surfaces"]
     assert augmented["authority"] == "advisory"
-    evidence = augmented["changed_line_evidence"]
+    evidence = assert_object(augmented["changed_line_evidence"])
     assert evidence["input_authority"] == "caller-reported-line-spans"
     assert evidence["runtime_impact"] == "not-asserted"
     assert evidence["verification_coverage"] == "not-asserted"
-    row = evidence["observations"][0]
+    row = assert_records(evidence["observations"])[0]
     assert row["state"] == "source-index-correspondence-observed"
     assert row["member_state"] == "known-present"
     assert row["symbol_coverage"] == "complete-index-range-query"
     assert row["member_revision"]
     assert row["negative_evidence_admissible"] is False
-    symbols = row["symbols"]
+    symbols = assert_records(row["symbols"])
     assert len(symbols) == 1
     assert symbols[0]["subject"] == "src/backend.py::process_widget"
     assert symbols[0]["overlap"] == {"start_line": 2, "end_line": 3}
@@ -90,9 +114,9 @@ def test_direct_changed_lines_preserve_owner_and_verifier_surfaces(
 def test_changed_lines_are_not_implicit_at_file_scope(tmp_path: Path) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as cm:
-        cm.sync()
-        impact = cm.task_change_impact(TASK, [PATH], options=_options(start=4, end=4))
-    row = impact["changed_line_evidence"]["observations"][0]
+        cm.index.sync()
+        impact = cm.changes.task_impact(TASK, [PATH], options=_options(start=4, end=4))
+    row = _changed_observation(impact)
     assert row["state"] == "source-index-correspondence-observed"
     assert row["symbols"] == []
     assert row["symbol_coverage"] == "complete-index-range-query"
@@ -104,9 +128,11 @@ def test_changed_lines_outside_source_never_claim_missing_symbol(
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as cm:
-        cm.sync()
-        impact = cm.task_change_impact(TASK, [PATH], options=_options(start=20, end=20))
-    row = impact["changed_line_evidence"]["observations"][0]
+        cm.index.sync()
+        impact = cm.changes.task_impact(
+            TASK, [PATH], options=_options(start=20, end=20)
+        )
+    row = _changed_observation(impact)
     assert row["state"] == "unresolved"
     assert row["reason"] == "span-outside-current-source"
     assert row["symbols"] == []
@@ -132,19 +158,23 @@ def test_changed_lines_outside_source_never_claim_missing_symbol(
         ],
     ],
 )
-def test_bad_spans_fail_before_sync(tmp_path: Path, spans: object) -> None:
+def test_bad_spans_fail_before_sync(
+    tmp_path: Path, spans: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as cm:
 
-        def forbidden_sync(*args, **kwargs):
+        def forbidden_sync(*args: object, **kwargs: object) -> Never:
             raise AssertionError("work before range admission")
 
-        cm.sync = forbidden_sync  # type: ignore[method-assign]
+        monkeypatch.setattr(cm.index, "sync", forbidden_sync)
         with pytest.raises(ValueError):
-            cm.task_change_impact(
+            cm.changes.task_impact(
                 TASK,
                 [PATH],
-                options=ChangeImpactOptions(changed_line_spans=spans),  # type: ignore[arg-type]
+                options=ChangeImpactOptions(
+                    changed_line_spans=json.loads(json.dumps(spans))
+                ),
             )
 
 
@@ -165,9 +195,9 @@ def test_source_denial_does_not_expose_symbol_names(tmp_path: Path) -> None:
         '[[rule]]\npattern = "src/backend.py"\nvisibility = "deny"\n'
     )
     with CodeMap(tmp_path) as cm:
-        cm.sync()
-        impact = cm.task_change_impact(TASK, [PATH], options=_options())
-    row = impact["changed_line_evidence"]["observations"][0]
+        cm.index.sync()
+        impact = cm.changes.task_impact(TASK, [PATH], options=_options())
+    row = _changed_observation(impact)
     assert row["state"] == "unresolved"
     assert row["symbols"] == []
 
@@ -176,13 +206,13 @@ def test_sparse_source_or_unsupported_file_has_unknown_coverage(tmp_path: Path) 
     _repo(tmp_path)
     (tmp_path / "src/other.txt").write_bytes(b"\xff\x80")
     with CodeMap(tmp_path) as cm:
-        cm.sync()
-        impact = cm.task_change_impact(
+        cm.index.sync()
+        impact = cm.changes.task_impact(
             TASK,
             [PATH, "src/other.txt"],
             options=_options(path="src/other.txt", start=1, end=1),
         )
-    row = impact["changed_line_evidence"]["observations"][0]
+    row = _changed_observation(impact)
     assert row["state"] == "unresolved"
     assert row["symbols"] == []
 
@@ -194,14 +224,14 @@ def test_overlap_is_bounded_with_excess_reported(tmp_path: Path) -> None:
         nested.extend([f"def fn_{index}():", "    return 1"])
     (tmp_path / PATH).write_text("\n".join(nested) + "\n")
     with CodeMap(tmp_path) as cm:
-        cm.sync()
-        impact = cm.task_change_impact(
+        cm.index.sync()
+        impact = cm.changes.task_impact(
             TASK,
             [PATH],
             options=_options(start=1, end=80),
         )
-    row = impact["changed_line_evidence"]["observations"][0]
-    assert row["symbol_retained_count"] <= 32
+    row = _changed_observation(impact)
+    assert assert_integer(row["symbol_retained_count"]) <= 32
     assert row["negative_evidence_admissible"] is False
 
 
@@ -217,7 +247,7 @@ def test_mcp_native_and_compact_reuse_same_source_owner(tmp_path: Path) -> None:
     finally:
         surface.close()
     assert (
-        value["changed_line_evidence"]["observations"][0]["symbols"][0]["subject"]
+        assert_records(_changed_observation(value)["symbols"])[0]["subject"]
         == "src/backend.py::process_widget"
     )
 
@@ -255,21 +285,21 @@ def test_backend_route_decorator_maps_to_handler_without_false_symbol_overlap(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as cm:
-        cm.sync()
-        impact = cm.task_change_impact(TASK, [PATH], options=_options(start=2, end=2))
-    row = impact["changed_line_evidence"]["observations"][0]
+        cm.index.sync()
+        impact = cm.changes.task_impact(TASK, [PATH], options=_options(start=2, end=2))
+    row = _changed_observation(impact)
     assert row["state"] == "source-index-correspondence-observed"
     assert row["symbols"] == []  # Def starts after the edited decorator.
-    evidence = row["decorator_associations"]
+    evidence = assert_object(row["decorator_associations"])
     assert evidence["state"] == "bounded-python-decorator-syntax"
     assert evidence["negative_evidence_admissible"] is False
     assert evidence["unresolved_count"] == 0
     assert evidence["omitted_count"] == 0
-    assert len(evidence["associations"]) == 1
-    observed = evidence["associations"][0]
+    assert len(assert_array(evidence["associations"])) == 1
+    observed = assert_records(evidence["associations"])[0]
     assert observed["subject"] == "src/backend.py::process_widget"
     assert observed["declaration_line"] == 5
-    assert observed["indexed_symbol_range"]["start_line"] == 5
+    assert assert_object(observed["indexed_symbol_range"])["start_line"] == 5
     assert observed["overlapping_decorator_ranges"] == [
         {"start_line": 1, "end_line": 3}
     ]
@@ -291,13 +321,15 @@ def test_backend_nested_method_decorator_is_not_confused_with_enclosing_class(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as cm:
-        cm.sync()
-        impact = cm.task_change_impact(TASK, [PATH], options=_options(start=2, end=2))
-    row = impact["changed_line_evidence"]["observations"][0]
+        cm.index.sync()
+        impact = cm.changes.task_impact(TASK, [PATH], options=_options(start=2, end=2))
+    row = _changed_observation(impact)
     # The enclosing class overlaps the edited line; the method declaration
     # starts later. The separate syntax association must bind exactly.
-    assert [s["qualname"] for s in row["symbols"]] == ["WidgetView"]
-    associations = row["decorator_associations"]["associations"]
+    assert [s["qualname"] for s in assert_records(row["symbols"])] == ["WidgetView"]
+    associations = assert_records(
+        assert_object(row["decorator_associations"])["associations"]
+    )
     assert len(associations) == 1
     assert associations[0]["subject"] == "src/backend.py::WidgetView.process_widget"
     assert associations[0]["declaration_line"] == 3
@@ -318,18 +350,16 @@ def test_backend_decorator_association_is_bounded_and_never_negative(
         )
     (tmp_path / PATH).write_text("\n".join(lines) + "\n", encoding="utf-8")
     with CodeMap(tmp_path) as cm:
-        cm.sync()
-        impact = cm.task_change_impact(
+        cm.index.sync()
+        impact = cm.changes.task_impact(
             TASK, [PATH], options=_options(start=1, end=len(lines))
         )
-    evidence = impact["changed_line_evidence"]["observations"][0][
-        "decorator_associations"
-    ]
+    evidence = assert_object(_changed_observation(impact)["decorator_associations"])
     assert evidence["matched_declaration_count"] == 20
     assert evidence["retained_count"] == 16
     assert evidence["omitted_count"] == 4
     assert evidence["negative_evidence_admissible"] is False
-    assert [x["name"] for x in evidence["associations"]] == [
+    assert [x["name"] for x in assert_records(evidence["associations"])] == [
         f"handler_{number}" for number in range(16)
     ]
 
@@ -346,9 +376,9 @@ def test_backend_decorator_evidence_absent_when_source_is_denied(
         '[[rule]]\npattern = "src/backend.py"\nvisibility = "deny"\n'
     )
     with CodeMap(tmp_path) as cm:
-        cm.sync()
-        impact = cm.task_change_impact(TASK, [PATH], options=_options(start=1, end=1))
-    row = impact["changed_line_evidence"]["observations"][0]
+        cm.index.sync()
+        impact = cm.changes.task_impact(TASK, [PATH], options=_options(start=1, end=1))
+    row = _changed_observation(impact)
     assert row["state"] == "unresolved"
     assert row["symbols"] == []
     assert "decorator_associations" not in row
@@ -361,7 +391,7 @@ def test_backend_python_decorator_parse_bound_is_explicit() -> None:
     )
 
     class _NoIndex:
-        def symbols_overlapping_lines(self, *args, **kwargs):
+        def symbols_overlapping_lines(self, *args: object, **kwargs: object) -> Never:
             raise AssertionError("index work before input-size admission")
 
     evidence = observe_python_decorator_associations(
@@ -390,18 +420,20 @@ def test_backend_changed_auth_decorator_shows_adjacent_route_syntax(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as cm:
-        cm.sync()
-        result = cm.task_change_impact(TASK, [PATH], options=_options(start=1, end=1))
-    row = result["changed_line_evidence"]["observations"][0]
+        cm.index.sync()
+        result = cm.changes.task_impact(TASK, [PATH], options=_options(start=1, end=1))
+    row = _changed_observation(result)
     assert row["symbols"] == []
-    (association,) = row["decorator_associations"]["associations"]
-    context = association["decorator_context"]
+    (association,) = assert_records(
+        assert_object(row["decorator_associations"])["associations"]
+    )
+    context = assert_object(association["decorator_context"])
     assert context["state"] == "bounded-current-python-ast-decorator-syntax"
     assert context["runtime_registration"] == "not-asserted"
     assert context["negative_evidence_admissible"] is False
     assert context["omitted_count"] == 0
-    assert len(context["observations"]) == 2
-    auth, route = context["observations"]
+    assert len(assert_array(context["observations"])) == 2
+    auth, route = assert_records(context["observations"])
     assert auth["intersects_reported_span"] is True
     assert auth["callee_syntax"] == {
         "state": "simple-member",
@@ -416,12 +448,14 @@ def test_backend_changed_auth_decorator_shows_adjacent_route_syntax(
         "receiver_syntax": "router",
         "member_syntax": "get",
     }
-    assert route["arguments"]["first_positional_string"] == {
+    assert assert_object(route["arguments"])["first_positional_string"] == {
         "state": "literal",
         "value": "/widgets",
     }
-    assert route["arguments"]["path_keyword_string"] == {"state": "not-supplied"}
-    assert route["arguments"]["has_argument_expansion"] is False
+    assert assert_object(route["arguments"])["path_keyword_string"] == {
+        "state": "not-supplied"
+    }
+    assert assert_object(route["arguments"])["has_argument_expansion"] is False
     presentation = present_repository_evidence(result, format="compact")
     assert validate_evidence_presentation(result, presentation)["valid"] is True
 
@@ -437,18 +471,18 @@ def test_backend_decorator_call_arguments_preserve_dynamic_and_unpacking(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as cm:
-        cm.sync()
-        result = cm.task_change_impact(TASK, [PATH], options=_options(start=1, end=1))
-    ctx = result["changed_line_evidence"]["observations"][0]["decorator_associations"][
-        "associations"
-    ][0]["decorator_context"]
-    (site,) = ctx["observations"]
-    assert site["callee_syntax"]["member_syntax"] == "get"
-    assert site["arguments"]["first_positional_string"] == {
+        cm.index.sync()
+        result = cm.changes.task_impact(TASK, [PATH], options=_options(start=1, end=1))
+    ctx = _decorator_context(result)
+    (site,) = assert_records(ctx["observations"])
+    assert assert_object(site["callee_syntax"])["member_syntax"] == "get"
+    assert assert_object(site["arguments"])["first_positional_string"] == {
         "state": "dynamic-or-unsupported"
     }
-    assert site["arguments"]["path_keyword_string"] == {"state": "not-supplied"}
-    assert site["arguments"]["has_argument_expansion"] is True
+    assert assert_object(site["arguments"])["path_keyword_string"] == {
+        "state": "not-supplied"
+    }
+    assert assert_object(site["arguments"])["has_argument_expansion"] is True
 
 
 def test_backend_decorator_context_prioritizes_edited_under_bound(
@@ -463,18 +497,24 @@ def test_backend_decorator_context_prioritizes_edited_under_bound(
     ]
     (tmp_path / PATH).write_text("\n".join(lines) + "\n", encoding="utf-8")
     with CodeMap(tmp_path) as cm:
-        cm.sync()
-        result = cm.task_change_impact(TASK, [PATH], options=_options(start=10, end=10))
-    context = result["changed_line_evidence"]["observations"][0][
-        "decorator_associations"
-    ]["associations"][0]["decorator_context"]
+        cm.index.sync()
+        result = cm.changes.task_impact(
+            TASK, [PATH], options=_options(start=10, end=10)
+        )
+    context = _decorator_context(result)
     assert context["declaration_decorator_count"] == 10
     assert context["retained_count"] == 6
     assert context["omitted_count"] == 4
-    edited = [s for s in context["observations"] if s["intersects_reported_span"]]
+    edited = [
+        s
+        for s in assert_records(context["observations"])
+        if s["intersects_reported_span"]
+    ]
     assert len(edited) == 1
     assert edited[0]["start_line"] == 10
-    assert edited[0]["arguments"]["first_positional_string"] == {"state": "over-bound"}
+    assert assert_object(edited[0]["arguments"])["first_positional_string"] == {
+        "state": "over-bound"
+    }
     assert context["negative_evidence_admissible"] is False
 
 
@@ -490,14 +530,17 @@ def test_backend_decorator_context_does_not_expose_literals_in_outline(
         '[[rule]]\npattern = "src/backend.py"\nvisibility = "outline"\n'
     )
     with CodeMap(tmp_path) as cm:
-        cm.sync()
-        result = cm.task_change_impact(TASK, [PATH], options=_options(start=1, end=1))
-    row = result["changed_line_evidence"]["observations"][0]
+        cm.index.sync()
+        result = cm.changes.task_impact(TASK, [PATH], options=_options(start=1, end=1))
+    row = _changed_observation(result)
     if row["state"] == "source-index-correspondence-observed":
         assert all(
-            a["decorator_context"]["state"] == "source-visibility-required"
-            and a["decorator_context"]["observations"] == []
-            for a in row["decorator_associations"]["associations"]
+            assert_object(a["decorator_context"])["state"]
+            == "source-visibility-required"
+            and assert_object(a["decorator_context"])["observations"] == []
+            for a in assert_records(
+                assert_object(row["decorator_associations"])["associations"]
+            )
         )
     else:
         assert row["state"] == "unresolved"
@@ -515,7 +558,9 @@ def test_mcp_backend_decorator_context_tracks_current_source_after_edit(
     )
     surface = HashmarksMcpSurface(str(tmp_path))
     try:
-        request = [{"path": PATH, "start_line": 1, "end_line": 1}]
+        request: list[dict[str, object]] = [
+            {"path": PATH, "start_line": 1, "end_line": 1}
+        ]
         before = surface.change_impact(TASK, [PATH], changed_line_spans=request)
         repeated = surface.change_impact(TASK, [PATH], changed_line_spans=request)
         source.write_text(
@@ -527,19 +572,18 @@ def test_mcp_backend_decorator_context_tracks_current_source_after_edit(
         surface.close()
 
     def first_literal(packet: dict[str, object]) -> str:
-        observations = packet["changed_line_evidence"]["observations"]
-        context = observations[0]["decorator_associations"]["associations"][0][
-            "decorator_context"
-        ]
-        return context["observations"][0]["arguments"]["first_positional_string"][
-            "value"
-        ]
+        context = _decorator_context(packet)
+        site = assert_records(context["observations"])[0]
+        literal = assert_object(
+            assert_object(site["arguments"])["first_positional_string"]
+        )
+        return assert_text(literal["value"])
 
     assert first_literal(before) == "/before"
     assert first_literal(repeated) == "/before"
     assert first_literal(after) == "/after"
     assert before["changed_line_evidence"] == repeated["changed_line_evidence"]
     assert (
-        before["changed_line_evidence"]["observations"][0]["member_revision"]
-        != after["changed_line_evidence"]["observations"][0]["member_revision"]
+        _changed_observation(before)["member_revision"]
+        != _changed_observation(after)["member_revision"]
     )

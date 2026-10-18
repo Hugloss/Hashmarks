@@ -6,7 +6,7 @@ import hashlib
 import json
 import sys
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from .evidence_presentation import (
     FORMATS,
@@ -22,6 +22,11 @@ from .operation_contract import (
     require_registered_operation,
     validate_operation_response,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from .mcp_surface import HashmarksMcpSurface
 
 MCP_CONTRACT_SCHEMA = "hashmarks.mcp-contract.v1"
 MCP_PROJECTION_SCHEMA = "hashmarks.mcp-projection.v1"
@@ -208,9 +213,9 @@ MCP_TOOL_CONTRACTS = (
     McpToolContract(
         "task_evidence",
         (
-            "Semantic first choice for unknown-path behavior before exploratory "
-            "grep/read. Separates retrieval from ownership; resolves owner/ambiguity, "
-            "returns source/next-read, verification, freshness and bounded SCIP evidence."
+            "Unknown paths: retrieval, ownership/ambiguity, source/next-read, verification "
+            "and freshness. Initial: lossless packet in structuredContent plus readable text. "
+            "Default: JSON mirror. No editing or tests."
         ),
         "task_evidence",
     ),
@@ -242,8 +247,9 @@ MCP_TOOL_CONTRACTS = (
     McpToolContract(
         "repository_declarations",
         (
-            "Project correlated repository declarations as observation or explanation "
-            "while preserving provenance, ambiguity, coverage, and freshness."
+            "Project repository declarations as observation or explanation, or discover "
+            "source syntax from selected Python model or interface paths. Preserve "
+            "provenance, ambiguity, coverage, and freshness."
         ),
         "repository_declarations",
     ),
@@ -284,7 +290,7 @@ MCP_TOOL_CONTRACTS = (
     McpToolContract(
         "repository_findings",
         (
-            "Read existing repository import, cache-ownership, and concurrency "
+            "Read repository import, cache-ownership, concurrency and qualified filesystem check/use "
             "findings without starting analysis tools or choosing repairs."
         ),
         "repository_findings",
@@ -538,7 +544,9 @@ def _canonical_tool_input_schema(
         raise ValueError(
             f"Hashmarks MCP {expected.name} input properties are unavailable"
         )
-    selectors = {"presentation": (FORMATS, expected.default_presentation)}
+    selectors: dict[str, tuple[tuple[str, ...], str | None]] = {
+        "presentation": (FORMATS, expected.default_presentation)
+    }
     if len(expected.response_modes) > 1:
         selectors["result_mode"] = (
             expected.response_modes,
@@ -680,7 +688,7 @@ def qualify_mcp_observation(observation: dict[str, Any]) -> dict[str, object]:
 
 def contract_from_tool_models(
     version: str,
-    tools: list[object] | tuple[object, ...],
+    tools: Sequence[object],
 ) -> dict[str, object]:
     catalog: list[dict[str, object | None]] = []
     for tool in tools:
@@ -728,6 +736,10 @@ def contract_summary(manifest: dict[str, object]) -> dict[str, object]:
     }
     if identity != _contract_identity(identity_payload):
         raise ValueError("Hashmarks MCP contract identity mismatch")
+    server = cast("dict[str, object]", server)
+    tools = cast("list[object]", tools)
+    operation_contract = cast("dict[str, object]", operation_contract)
+    errors = cast("dict[str, object]", errors)
     return {
         "schema": MCP_CONTRACT_SCHEMA,
         "contract_identity": identity,
@@ -746,6 +758,7 @@ async def _current_contract_summary(
     state_dir: str | None = None,
 ) -> dict[str, object]:
     from ._version import __version__
+    from .mcp_sdk_server import close_sdk_server
     from .mcp_server import build_server
 
     server = build_server(workspace, state_dir=state_dir)
@@ -753,7 +766,7 @@ async def _current_contract_summary(
         tools = await server.list_tools()
         return contract_summary(contract_from_tool_models(__version__, tools))
     finally:
-        server._hashmarks_surface.close()
+        close_sdk_server(server)
 
 
 def current_contract_summary(

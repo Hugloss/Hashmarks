@@ -4,9 +4,77 @@ import hashlib
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, NotRequired, TypedDict, cast
+
+if TYPE_CHECKING:
+    from hashmarks.codemap.ownership_relation_types import (
+        OwnershipTraceStructuralEvidence,
+    )
 
 TRACE_SCHEMA = "hashmarks.ownership-decision-trace.v1"
 AUTHORITY_SCHEMA = "hashmarks.ownership-authority.v1"
+
+
+class OwnershipAuthority(TypedDict):
+    schema: str
+    status: str
+    owner_resolved: bool
+    resolved_owner: str | None
+    candidate_owner: str | None
+    reason: str
+    authority: str
+    consumer_action: str
+    proof_complete: bool
+    authority_proof_identity: str
+    proof_scope: str | None
+    proof_scope_complete: bool
+    evidence_state: OwnershipEvidenceState
+
+
+class OwnershipEvidenceState(TypedDict):
+    retrieved: bool
+    inferred: bool
+    structural: bool
+    structural_resolution: bool
+    explicit_basis: bool
+    canonical_selection: bool
+    owner_eligible: bool
+    proof_scope_complete: bool
+    ambiguity_cleared: bool
+    admissible: bool
+    proven: bool
+
+
+class OwnershipCandidateIdentity(TypedDict):
+    path: str
+    name: object
+    qualname: object
+    canonical_rank: int
+    roles: list[str]
+
+
+class OwnershipTraceCandidate(OwnershipCandidateIdentity):
+    disposition: str
+    rejection_reason: str | None
+
+
+class OwnershipTraceAmbiguity(TypedDict):
+    ambiguous: bool
+    reason: str
+
+
+class OwnershipDecisionTrace(TypedDict):
+    schema: str
+    status: str
+    confidence: str
+    selected: OwnershipCandidateIdentity | None
+    candidates: list[OwnershipTraceCandidate]
+    structural_evidence: OwnershipTraceStructuralEvidence
+    ambiguity: OwnershipTraceAmbiguity
+    authority_basis: str | None
+    proof_scope: str | None
+    proof_scope_complete: bool
+    evidence_state: OwnershipEvidenceState
 
 
 @dataclass(frozen=True)
@@ -22,13 +90,13 @@ class OwnershipDecisionState:
     proof_scope_complete: bool = False
 
 
-def _candidate_identity(row: Mapping[str, object]) -> dict[str, object]:
+def _candidate_identity(row: Mapping[str, object]) -> OwnershipCandidateIdentity:
     return {
         "path": str(row.get("path") or ""),
         "name": row.get("name"),
         "qualname": row.get("qualname"),
-        "canonical_rank": int(row.get("canonical_rank") or 0),
-        "roles": list(row.get("roles") or []),
+        "canonical_rank": int(cast("int | str", row.get("canonical_rank") or 0)),
+        "roles": list(cast("Sequence[str]", row.get("roles") or [])),
     }
 
 
@@ -66,7 +134,7 @@ def _rejection_reason(
     *,
     ambiguous: bool,
 ) -> str:
-    roles = set(row.get("roles") or [])
+    roles = set(cast("Sequence[str]", row.get("roles") or []))
     if ambiguous:
         return "not-authoritative-while-ambiguity-remains"
     if "verify" in roles:
@@ -76,7 +144,9 @@ def _rejection_reason(
     return "lower-ranked-alternative"
 
 
-def _evidence_state(state: OwnershipDecisionState, status: str) -> dict[str, bool]:
+def _evidence_state(
+    state: OwnershipDecisionState, status: str
+) -> OwnershipEvidenceState:
     retrieved = state.edit is not None
     inferred = bool(state.edit and state.edit.get("structural_projection"))
     structural = state.structural_owner is not None
@@ -116,10 +186,10 @@ def _evidence_state(state: OwnershipDecisionState, status: str) -> dict[str, boo
 
 def ownership_decision_trace(
     state: OwnershipDecisionState,
-) -> dict[str, object]:
+) -> OwnershipDecisionTrace:
     status = _decision_status(state)
     selected = _candidate_identity(state.edit) if state.edit is not None else None
-    candidates: list[dict[str, object]] = []
+    candidates: list[OwnershipTraceCandidate] = []
     if selected is not None:
         candidates.append(
             {
@@ -277,18 +347,22 @@ def bounded_presentation_contract(
 
 
 def ownership_authority_contract(
-    trace: Mapping[str, object],
-) -> dict[str, object]:
+    trace: OwnershipDecisionTrace,
+) -> OwnershipAuthority:
     status = str(trace.get("status") or "unresolved")
     selected_path = _trace_selected_path(trace)
-    evidence_state = trace.get("evidence_state")
-    evidence_state = evidence_state if isinstance(evidence_state, Mapping) else {}
+    evidence_state = trace["evidence_state"]
     safe = (
         status == "resolved"
         and bool(selected_path)
         and bool(evidence_state.get("proven"))
     )
     reason = "unique-owner-established" if safe else _trace_unresolved_reason(trace)
+    # A resolved retrieval selection is not necessarily proven ownership.
+    # Keep its trace intact while qualifying this authority projection.
+    if status == "resolved" and not safe:
+        status = "unresolved"
+        reason = "ownership-unresolved"
     proof_identity = authority_proof_identity(trace)
     return {
         "schema": AUTHORITY_SCHEMA,
@@ -300,10 +374,10 @@ def ownership_authority_contract(
         "authority": "repository-ownership-only",
         "consumer_action": "external",
         "proof_complete": safe,
-        "proof_scope": trace.get("proof_scope"),
+        "proof_scope": trace["proof_scope"],
         "proof_scope_complete": bool(trace.get("proof_scope_complete")),
         "authority_proof_identity": proof_identity,
-        "evidence_state": trace.get("evidence_state"),
+        "evidence_state": evidence_state,
     }
 
 

@@ -4,9 +4,13 @@ import json
 import tempfile
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from .python_ast_cache import clear_ast_cache
+
+if TYPE_CHECKING:
+    from .codemap.repository_tasks import RepositoryTasks
+
 
 QueryKind = Literal["find_task", "task_action_map", "task_decision_packet"]
 
@@ -63,13 +67,15 @@ def _canonical_json(value: object) -> str:
     )
 
 
-def _run_query(codemap, query: QueryKind, task: str, limit: int) -> object:
+def _run_query(
+    tasks: RepositoryTasks, query: QueryKind, task: str, limit: int
+) -> object:
     if query == "find_task":
-        return codemap.find_task(task, limit=limit)
+        return tasks.search.find_task(task, limit=limit)
     if query == "task_action_map":
-        return codemap.task_action_map(task, limit=limit)
+        return tasks.action_map(task, limit=limit)
     if query == "task_decision_packet":
-        return codemap.task_decision_packet(task, limit=limit)
+        return tasks.decision_packet(task, limit=limit)
     raise ValueError(f"unsupported semantic-equivalence query: {query}")
 
 
@@ -104,10 +110,10 @@ def verify_cold_warm_semantic_equivalence(
             state_dir=state_dir,
             artifact_db=artifact_db,
         ) as codemap:
-            codemap.sync()
+            codemap.index.sync()
             clear_ast_cache()
-            cold = _run_query(codemap, query, task, limit)
-            warm = _run_query(codemap, query, task, limit)
+            cold = _run_query(codemap.tasks, query, task, limit)
+            warm = _run_query(codemap.tasks, query, task, limit)
 
     cold_semantic = _semantic_projection(cold, diagnostic_keys)
     warm_semantic = _semantic_projection(warm, diagnostic_keys)

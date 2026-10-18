@@ -10,6 +10,7 @@ from hashmarks.codemap.evidence_decision_packet import (
     TASK_DECISION_DEFAULT_OPTIONS,
     TaskDecisionOptions,
 )
+from hashmarks.codemap.repository_tasks import RepositoryTasks
 from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
 
 if TYPE_CHECKING:
@@ -21,8 +22,8 @@ def test_task_decision_packet_and_brief_defaults_have_one_owner(
 ) -> None:
     defaults = TASK_DECISION_DEFAULT_OPTIONS
     for owner in (
-        CodeMap.task_decision_packet,
-        CodeMap.task_decision_brief,
+        RepositoryTasks.decision_packet,
+        RepositoryTasks.decision_brief,
         CodeMapServiceClient.task_decision_packet,
         CodeMapServiceClient.task_decision_brief,
     ):
@@ -33,8 +34,8 @@ def test_task_decision_packet_and_brief_defaults_have_one_owner(
 
     captured: list[TaskDecisionOptions] = []
 
-    class _Map:
-        def task_decision_packet(
+    class _TaskViews:
+        def decision_packet(
             self,
             task: str,
             *,
@@ -52,7 +53,7 @@ def test_task_decision_packet_and_brief_defaults_have_one_owner(
             )
             return {"schema": "hashmarks.task-decision-packet.v2"}
 
-        def task_decision_brief(
+        def decision_brief(
             self,
             task: str,
             *,
@@ -70,6 +71,10 @@ def test_task_decision_packet_and_brief_defaults_have_one_owner(
             )
             return {"schema": "hashmarks.task-decision-brief.v1"}
 
+    class _Map:
+        def __init__(self) -> None:
+            self.tasks = _TaskViews()
+
     service = CodeMapService(tmp_path, socket_path=tmp_path / "service.sock")
     monkeypatch.setattr(service, "_map", lambda: _Map())
 
@@ -84,7 +89,7 @@ def test_task_decision_budget_sweep_defaults_have_one_owner(
 ) -> None:
     defaults = TASK_DECISION_DEFAULT_OPTIONS
     for owner in (
-        CodeMap.task_decision_brief_budget_sweep,
+        RepositoryTasks.decision_brief_budget_sweep,
         CodeMapServiceClient.task_decision_brief_budget_sweep,
     ):
         parameters = inspect.signature(owner).parameters
@@ -93,8 +98,8 @@ def test_task_decision_budget_sweep_defaults_have_one_owner(
 
     captured: list[tuple[int, int]] = []
 
-    class _Map:
-        def task_decision_brief_budget_sweep(
+    class _TaskViews:
+        def decision_brief_budget_sweep(
             self,
             task: str,
             *,
@@ -108,6 +113,10 @@ def test_task_decision_budget_sweep_defaults_have_one_owner(
                 "schema": "hashmarks.task-decision-brief-budget-sweep.v1",
                 "rows": [],
             }
+
+    class _Map:
+        def __init__(self) -> None:
+            self.tasks = _TaskViews()
 
     service = CodeMapService(tmp_path, socket_path=tmp_path / "service.sock")
     monkeypatch.setattr(service, "_map", lambda: _Map())

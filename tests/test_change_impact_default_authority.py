@@ -6,11 +6,11 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hashmarks.codemap import CodeMap
 from hashmarks.codemap.change_impact import (
     CHANGE_IMPACT_DEFAULT_REQUEST,
     ChangeImpactOptions,
 )
+from hashmarks.codemap.repository_changes import RepositoryChanges
 from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
 from hashmarks.repository_cli import add_repository_cli
 
@@ -22,7 +22,10 @@ def test_change_impact_defaults_have_one_owner(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     defaults = CHANGE_IMPACT_DEFAULT_REQUEST
-    for owner in (CodeMap.task_change_impact, CodeMapServiceClient.task_change_impact):
+    for owner in (
+        RepositoryChanges.task_impact,
+        CodeMapServiceClient.task_change_impact,
+    ):
         parameters = inspect.signature(owner).parameters
         assert parameters["limit"].default == defaults.limit
         assert parameters["per_role"].default == defaults.per_role
@@ -46,8 +49,8 @@ def test_change_impact_defaults_have_one_owner(
 
     captured: dict[str, object] = {}
 
-    class _Map:
-        def task_change_impact(
+    class _Changes:
+        def task_impact(
             self,
             task: str,
             changed_paths: list[str],
@@ -64,6 +67,9 @@ def test_change_impact_defaults_have_one_owner(
                 options=options,
             )
             return {"schema": "hashmarks.task-change-impact.v1"}
+
+    class _Map:
+        changes = _Changes()
 
     service = CodeMapService(tmp_path, socket_path=tmp_path / "service.sock")
     monkeypatch.setattr(service, "_map", lambda: _Map())

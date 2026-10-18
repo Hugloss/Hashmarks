@@ -9,6 +9,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import TypedDict
 
 from hashmarks._command_output import log_command_output
 from hashmarks.codemap import CodeMapService, CodeMapServiceClient
@@ -16,6 +17,16 @@ from hashmarks.codemap import CodeMapService, CodeMapServiceClient
 logger = logging.getLogger(__name__)
 
 SCHEMA = "hashmarks.codemap-concurrency.v1"
+
+
+class _WorkerSample(TypedDict):
+    worker: int
+    request: int
+    elapsed_ms: float
+    generation: int
+    decision_generation: str
+    edit_path: str | None
+    verify_path: str | None
 
 
 def _percentile(values: list[float], percentile: float) -> float:
@@ -53,12 +64,14 @@ def probe(
         for concurrency in concurrencies:
             barrier = threading.Barrier(concurrency)
 
-            def worker(worker_id: int, barrier=barrier) -> list[dict[str, object]]:
+            def worker(
+                worker_id: int, barrier: threading.Barrier = barrier
+            ) -> list[_WorkerSample]:
                 client = CodeMapServiceClient(
                     workspace, socket_path=socket_path, timeout=30.0
                 )
                 barrier.wait(timeout=10)
-                output = []
+                output: list[_WorkerSample] = []
                 for request_id in range(requests_per_worker):
                     started = time.perf_counter()
                     packet = client.task_decision_packet(

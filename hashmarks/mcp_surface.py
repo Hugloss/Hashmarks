@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import json
 from threading import RLock
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, overload
+
+from hashmarks.codemap.diagnostic_observation import diagnostic_observation_delta
 
 from . import repository_retry
 from .codemap import ChangeImpactOptions, CodeMap
 from .codemap.change_impact import CHANGE_IMPACT_DEFAULT_REQUEST
+from .codemap.diagnostic_observation import DIAGNOSTIC_ENDPOINT_MAX_BYTES
 from .codemap.evidence_correlation import (
     CORRELATION_PACKET_MAX_BYTES,
     CORRELATION_REQUEST_MAX_BYTES,
@@ -17,14 +20,22 @@ from .codemap.repository_declaration_contract import (
     MAX_PACKET_BYTES,
     MAX_REQUEST_BYTES,
 )
+from .codemap.repository_declaration_provider import MAX_DISCOVERY_PACKET_BYTES
+from .codemap.repository_declaration_selection import source_declaration_providers
 from .codemap.repository_intelligence_query import RepositoryIntelligenceQueryOptions
+from .codemap.task_evidence_types import (
+    InitialTaskEvidenceEnvelope,
+    PreviousTaskEvidence,
+    TaskEvidencePacket,
+    TaskPostChangeDelta,
+)
 from .file_store import UnstableFileError
 from .mcp_contract import (
     MCP_ERROR_REASONS,
     MCP_ERROR_RECOVERY_AUTHORITY,
     MCP_ERROR_SCHEMA,
 )
-from .operation_contract import operation_default_mode
+from .operation_contract import operation_default_mode, operation_modes
 from .repository_retry import retry_transient_repository_race
 
 if TYPE_CHECKING:
@@ -140,7 +151,7 @@ def _source_context_request(
     return 0, sorted(requested), 1
 
 
-def _previous_evidence(value: dict[str, Any]) -> dict[str, Any]:
+def _previous_evidence(value: PreviousTaskEvidence) -> PreviousTaskEvidence:
     if not isinstance(value, dict):
         raise McpSurfaceError("previous_evidence must be an object")
     try:
@@ -158,7 +169,7 @@ def _previous_evidence(value: dict[str, Any]) -> dict[str, Any]:
     return value
 
 
-def _bounded_json(value: Any, *, name: str, maximum: int, expected_type: type) -> Any:
+def _bounded_json(value: _T, *, name: str, maximum: int, expected_type: type) -> _T:
     if not isinstance(value, expected_type):
         kind = "an object" if expected_type is dict else "a list"
         raise McpSurfaceError(f"{name} must be {kind}")
@@ -171,6 +182,30 @@ def _bounded_json(value: Any, *, name: str, maximum: int, expected_type: type) -
     if len(encoded) > maximum:
         raise McpSurfaceError(f"{name} exceeds {maximum} encoded bytes")
     return value
+
+
+def _diagnostic_source_options(
+    result_mode: str,
+    before_source: dict[str, Any] | None,
+    after_source: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if before_source is None and after_source is None:
+        return {}
+    if result_mode != "diagnostics":
+        raise McpSurfaceError("source observations require diagnostics mode")
+    if before_source is None or after_source is None:
+        raise McpSurfaceError(
+            "source correspondence requires both endpoint observations"
+        )
+    return {
+        name: _bounded_json(
+            value, name=name, maximum=DIAGNOSTIC_ENDPOINT_MAX_BYTES, expected_type=dict
+        )
+        for name, value in (
+            ("before_source", before_source),
+            ("after_source", after_source),
+        )
+    }
 
 
 def _dependency_codemap_request(
@@ -252,7 +287,7 @@ class HashmarksMcpSurface:
 
     def repository_context(self, *, max_areas: int = 12) -> dict[str, object]:
         max_areas = _bounded_int(max_areas, name="max_areas", minimum=1, maximum=32)
-        return self._read(lambda: self._map.orient(max_areas=max_areas))
+        return self._read(lambda: self._map.context.orient(max_areas=max_areas))
 
     def find(
         self,
@@ -262,7 +297,43 @@ class HashmarksMcpSurface:
     ) -> dict[str, object]:
         query = _bounded_text(query, name="query", maximum=_MAX_QUERY_CHARS)
         limit = _bounded_int(limit, name="limit", minimum=1, maximum=_MAX_LIMIT)
-        return self._read(lambda: self._map.find_packet(query, limit=limit))
+        return self._read(lambda: self._map.search.packet(query, limit=limit))
+
+    @overload
+    def task_evidence(
+        self,
+        task: str,
+        *,
+        limit: int = TASK_EVIDENCE_DEFAULT_OPTIONS.limit,
+        per_role: int = TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
+        token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
+        supplied_observations: list[dict[str, Any]] | None = None,
+        result_mode: Literal["default"] = "default",
+    ) -> TaskEvidencePacket: ...
+
+    @overload
+    def task_evidence(
+        self,
+        task: str,
+        *,
+        limit: int = TASK_EVIDENCE_DEFAULT_OPTIONS.limit,
+        per_role: int = TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
+        token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
+        supplied_observations: list[dict[str, Any]] | None = None,
+        result_mode: Literal["initial"],
+    ) -> InitialTaskEvidenceEnvelope: ...
+
+    @overload
+    def task_evidence(
+        self,
+        task: str,
+        *,
+        limit: int = TASK_EVIDENCE_DEFAULT_OPTIONS.limit,
+        per_role: int = TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
+        token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
+        supplied_observations: list[dict[str, Any]] | None = None,
+        result_mode: str,
+    ) -> TaskEvidencePacket | InitialTaskEvidenceEnvelope: ...
 
     def task_evidence(
         self,
@@ -272,7 +343,12 @@ class HashmarksMcpSurface:
         per_role: int = TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
         token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
         supplied_observations: list[dict[str, Any]] | None = None,
-    ) -> dict[str, object]:
+        result_mode: str = "default",
+    ) -> TaskEvidencePacket | InitialTaskEvidenceEnvelope:
+        if not isinstance(result_mode, str) or result_mode not in operation_modes(
+            "task_evidence"
+        ):
+            raise McpSurfaceError("unsupported task evidence result_mode")
         task = _bounded_text(task, name="task", maximum=_MAX_TASK_CHARS)
         limit = _bounded_int(limit, name="limit", minimum=1, maximum=_MAX_LIMIT)
         per_role = _bounded_int(per_role, name="per_role", minimum=1, maximum=8)
@@ -280,12 +356,13 @@ class HashmarksMcpSurface:
             token_budget, name="token_budget", minimum=1, maximum=_MAX_TOKEN_BUDGET
         )
         return self._read(
-            lambda: self._map.task_evidence(
+            lambda: self._map.tasks.evidence(
                 task,
                 limit=limit,
                 per_role=per_role,
                 token_budget=token_budget,
                 supplied_observations=supplied_observations,
+                result_mode=result_mode,
             )
         )
 
@@ -303,7 +380,7 @@ class HashmarksMcpSurface:
         defaults = CHANGE_IMPACT_DEFAULT_REQUEST
         options = defaults.options
         return self._read(
-            lambda: self._map.task_change_impact(
+            lambda: self._map.changes.task_impact(
                 task,
                 paths,
                 limit=defaults.limit,
@@ -364,7 +441,7 @@ class HashmarksMcpSurface:
 
         def correlate() -> dict[str, object]:
             try:
-                return self._map.correlate_evidence(
+                return self._map.correlation.observe(
                     bundles,
                     path_mappings=mappings,
                     previous_correlation=previous,
@@ -394,7 +471,7 @@ class HashmarksMcpSurface:
 
         def project() -> dict[str, object]:
             try:
-                return self._map.dependency_codemap(
+                return self._map.dependencies.codemap(
                     raw_snapshot,
                     bounded_queries,
                     previous_observation=previous,
@@ -411,6 +488,7 @@ class HashmarksMcpSurface:
         *,
         previous_observation: dict[str, Any] | None = None,
         result_mode: str = operation_default_mode("repository_declarations"),
+        source_selection: dict[str, object] | None = None,
     ) -> dict[str, object]:
         """Project one core-owned declaration operation without changing semantics."""
         bounded_groups = _bounded_json(
@@ -419,24 +497,39 @@ class HashmarksMcpSurface:
             maximum=MAX_REQUEST_BYTES,
             expected_type=list,
         )
+        mode = _bounded_text(result_mode, name="result_mode", maximum=32)
+        selection = _bounded_json(
+            {} if source_selection is None else source_selection,
+            name="source_selection",
+            maximum=MAX_REQUEST_BYTES,
+            expected_type=dict,
+        )
+        try:
+            providers = source_declaration_providers(mode, selection)
+        except ValueError as exc:
+            raise _surface_value_error(exc) from exc
         previous = (
             None
             if previous_observation is None
             else _bounded_json(
                 previous_observation,
                 name="previous_observation",
-                maximum=MAX_PACKET_BYTES,
+                maximum=(
+                    MAX_DISCOVERY_PACKET_BYTES
+                    if mode == "discovery"
+                    else MAX_PACKET_BYTES
+                ),
                 expected_type=dict,
             )
         )
-        mode = _bounded_text(result_mode, name="result_mode", maximum=32)
 
         def project() -> dict[str, object]:
             try:
-                return self._map.repository_declarations_operation(
+                return self._map.declarations.operation(
                     bounded_groups,
                     previous_observation=previous,
                     result_mode=mode,
+                    **({"providers": providers} if mode == "discovery" else {}),
                 )
             except ValueError as exc:
                 raise _surface_value_error(exc) from exc
@@ -471,7 +564,7 @@ class HashmarksMcpSurface:
 
         def project() -> dict[str, object]:
             try:
-                return self._map.repository_intelligence_query(
+                return self._map.views.query(
                     surface,
                     task,
                     paths,
@@ -569,9 +662,9 @@ class HashmarksMcpSurface:
 
         def project() -> dict[str, object]:
             try:
-                self._map.sync(paths)
+                self._map.index.sync(paths)
                 if result_mode == "member":
-                    return self._map.source_observation(
+                    return self._map.source.observe(
                         paths[0],
                         literal=literal,
                         limit=limit,
@@ -581,11 +674,11 @@ class HashmarksMcpSurface:
                     )
                 if result_mode == "literals":
                     assert literals is not None
-                    return self._map.scoped_source_literals(
+                    return self._map.source.scoped_literals(
                         paths, literals, limit=limit, context_lines=literal_context
                     )
                 assert literal is not None
-                return self._map.scoped_source_occurrences(
+                return self._map.source.scoped_occurrences(
                     paths, literal, limit=limit, context_lines=literal_context
                 )
             except ValueError as exc:
@@ -602,7 +695,7 @@ class HashmarksMcpSurface:
         bindings = request.get("bindings")
         if not isinstance(bindings, list):
             raise ValueError("bindings must be a list")
-        return self._map.repository_evidence_bindings(
+        return self._map.bindings.observe(
             bindings,
             dependency_paths=request.get("dependency_paths"),
             include_relationships=request.get("include_relationships", True),
@@ -617,7 +710,7 @@ class HashmarksMcpSurface:
         packet = request.get("bindings_packet")
         if not isinstance(packet, dict):
             raise ValueError("bindings_packet must be an object")
-        return self._map.repository_evidence_coverage(
+        return self._map.bindings.coverage(
             packet,
             changed_paths=request.get("changed_paths"),
             change_set_complete=request.get("change_set_complete"),
@@ -637,7 +730,7 @@ class HashmarksMcpSurface:
 
         def project() -> dict[str, object]:
             try:
-                self._map.sync()
+                self._map.index.sync()
                 producers = {
                     "observation": self._repository_binding_observation,
                     "coverage": self._repository_binding_coverage,
@@ -652,8 +745,8 @@ class HashmarksMcpSurface:
         bounded = _changed_paths(paths) if paths else None
 
         def project() -> dict[str, object]:
-            self._map.sync()
-            return self._map.repository_findings(bounded)
+            self._map.index.sync()
+            return self._map.ownership.findings(bounded)
 
         return self._read(project)
 
@@ -667,7 +760,7 @@ class HashmarksMcpSurface:
         diagnostic_options: dict[str, Any],
     ) -> dict[str, object]:
         if result_mode == "structural":
-            from .codemap.structural_locality import structural_locality_delta
+            from .codemap.structural_locality_delta import structural_locality_delta
 
             return structural_locality_delta(before, after)
         if result_mode == "relationships":
@@ -675,9 +768,9 @@ class HashmarksMcpSurface:
 
             return semantic_relationship_delta(before, after)
         if result_mode == "bindings":
-            self._map.sync()
-            return self._map.repository_evidence_binding_delta(before, after)
-        return self._map.diagnostic_observation_delta(
+            self._map.index.sync()
+            return self._map.bindings.delta(before, after)
+        return diagnostic_observation_delta(
             before, after, changed_paths=changed_paths, **diagnostic_options
         )
 
@@ -690,6 +783,8 @@ class HashmarksMcpSurface:
         changed_paths: list[str] | None = None,
         change_set_complete: bool = False,
         relationship_evidence: dict[str, Any] | None = None,
+        before_source: dict[str, Any] | None = None,
+        after_source: dict[str, Any] | None = None,
     ) -> dict[str, object]:
         """Transport two explicit packets to their existing native comparison owner."""
         if result_mode not in (
@@ -702,9 +797,20 @@ class HashmarksMcpSurface:
                 "result_mode must be one of: structural, bindings, diagnostics, relationships"
             )
         before = _bounded_json(
-            before, name="before", maximum=524_288, expected_type=dict
+            before,
+            name="before",
+            maximum=DIAGNOSTIC_ENDPOINT_MAX_BYTES,
+            expected_type=dict,
         )
-        after = _bounded_json(after, name="after", maximum=524_288, expected_type=dict)
+        after = _bounded_json(
+            after,
+            name="after",
+            maximum=DIAGNOSTIC_ENDPOINT_MAX_BYTES,
+            expected_type=dict,
+        )
+        source_options = _diagnostic_source_options(
+            result_mode, before_source, after_source
+        )
         if result_mode != "diagnostics" and changed_paths:
             raise McpSurfaceError("changed_paths is only valid for diagnostics mode")
         if type(change_set_complete) is not bool:
@@ -734,6 +840,7 @@ class HashmarksMcpSurface:
                     result_mode=result_mode,
                     changed_paths=paths,
                     diagnostic_options={
+                        **source_options,
                         "change_set_complete": change_set_complete,
                         "relationship_evidence": relationship_evidence,
                     },
@@ -756,7 +863,7 @@ class HashmarksMcpSurface:
 
         def project() -> dict[str, object]:
             try:
-                return self._map.structural_locality(
+                return self._map.structure.locality(
                     target,
                     max_depth=max_depth,
                     result_mode=result_mode,
@@ -771,10 +878,10 @@ class HashmarksMcpSurface:
         self,
         task: str,
         changed_paths: list[str],
-        previous_evidence: dict[str, Any],
+        previous_evidence: PreviousTaskEvidence,
         *,
         token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
-    ) -> dict[str, object]:
+    ) -> TaskPostChangeDelta:
         task = _bounded_text(task, name="task", maximum=_MAX_TASK_CHARS)
         paths = _changed_paths(changed_paths)
         previous_evidence = _previous_evidence(previous_evidence)
@@ -782,9 +889,9 @@ class HashmarksMcpSurface:
             token_budget, name="token_budget", minimum=1, maximum=_MAX_TOKEN_BUDGET
         )
 
-        def project() -> dict[str, object]:
+        def project() -> TaskPostChangeDelta:
             try:
-                return self._map.task_post_change_delta(
+                return self._map.changes.task_delta(
                     task,
                     paths,
                     previous_evidence=previous_evidence,

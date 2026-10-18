@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from hashmarks.codemap import CodeMap
@@ -10,6 +11,7 @@ from hashmarks.codemap.watch_continuity import (
 )
 
 if TYPE_CHECKING:
+    import types
     from pathlib import Path
 
     import pytest
@@ -32,8 +34,8 @@ class _FakeWatcher:
         self._events.append("watcher-stop")
 
 
-def _watch_owner(codemap: CodeMap):
-    return importlib.import_module(codemap.watch_forever.__module__)
+def _watch_owner(codemap: CodeMap) -> types.ModuleType:
+    return importlib.import_module(codemap.index.watch_forever.__module__)
 
 
 def _watch_record(codemap: CodeMap) -> WatchContinuityRecord:
@@ -53,13 +55,14 @@ def test_watch_forever_starts_observer_before_initial_sync_and_stops_cleanly(
         owner = _watch_owner(codemap)
 
         def fake_factory(
-            root,
-            callback,
+            root: Path,
+            callback: Callable[..., object],
             *,
-            debounce_seconds,
-            change_tracker,
-            exclude_relative_paths,
-        ):
+            debounce_seconds: float,
+            change_tracker: ChangeTracker,
+            exclude_relative_paths: list[str],
+        ) -> _FakeWatcher:
+
             del root, callback, debounce_seconds, change_tracker
             excluded = set(exclude_relative_paths)
             assert ".codemap-state" in excluded
@@ -68,7 +71,7 @@ def test_watch_forever_starts_observer_before_initial_sync_and_stops_cleanly(
             events.append("watcher-factory")
             return _FakeWatcher(events)
 
-        def fake_sync(paths=None):
+        def fake_sync(paths: list[str] | None = None) -> dict[str, object]:
             events.append("sync-full" if paths is None else f"sync:{paths}")
             return {"paths": paths}
 
@@ -77,9 +80,9 @@ def test_watch_forever_starts_observer_before_initial_sync_and_stops_cleanly(
 
         monkeypatch.setattr(owner, "create_default_watcher", fake_factory)
         monkeypatch.setattr(owner.time, "sleep", stop_after_initial)
-        monkeypatch.setattr(codemap, "sync", fake_sync)
+        monkeypatch.setattr(codemap.index, "sync", fake_sync)
 
-        codemap.watch_forever(
+        codemap.index.watch_forever(
             debounce_seconds=0.01,
             on_update=lambda result, paths: updates.append((result, list(paths))),
         )
@@ -112,21 +115,21 @@ def test_watch_forever_unknown_observation_forces_full_reconciliation(
         owner = _watch_owner(codemap)
 
         def fake_factory(
-            root,
-            callback,
+            root: Path,
+            update_callback: Callable[..., object],
             *,
-            debounce_seconds,
-            change_tracker,
-            exclude_relative_paths,
-        ):
+            debounce_seconds: float,
+            change_tracker: ChangeTracker,
+            exclude_relative_paths: list[str],
+        ) -> _FakeWatcher:
             nonlocal tracker
-            del root, callback, debounce_seconds, exclude_relative_paths
+            del root, update_callback, debounce_seconds, exclude_relative_paths
             tracker = change_tracker
             return _FakeWatcher(events)
 
         sync_calls: list[object] = []
 
-        def fake_sync(paths=None):
+        def fake_sync(paths: list[str] | None = None) -> dict[str, object]:
             sync_calls.append(paths)
             return {"call": len(sync_calls), "paths": paths}
 
@@ -143,9 +146,9 @@ def test_watch_forever_unknown_observation_forces_full_reconciliation(
 
         monkeypatch.setattr(owner, "create_default_watcher", fake_factory)
         monkeypatch.setattr(owner.time, "sleep", drive_unknown_then_stop)
-        monkeypatch.setattr(codemap, "sync", fake_sync)
+        monkeypatch.setattr(codemap.index, "sync", fake_sync)
 
-        codemap.watch_forever(
+        codemap.index.watch_forever(
             debounce_seconds=0.01,
             on_update=lambda result, paths: updates.append((result, list(paths))),
         )
@@ -166,44 +169,45 @@ def test_watch_forever_incremental_callback_reconciles_observed_paths(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     updates: list[tuple[object, list[str]]] = []
-    callback = None
+    captured_callback = None
     external_state = tmp_path.parent / f"{tmp_path.name}-state"
 
     with CodeMap(tmp_path, state_dir=external_state) as codemap:
         owner = _watch_owner(codemap)
 
         def fake_factory(
-            root,
-            update_callback,
+            root: Path,
+            update_callback: Callable[..., object],
             *,
-            debounce_seconds,
-            change_tracker,
-            exclude_relative_paths,
-        ):
-            nonlocal callback
+            debounce_seconds: float,
+            change_tracker: ChangeTracker,
+            exclude_relative_paths: list[str],
+        ) -> _FakeWatcher:
+
+            nonlocal captured_callback
             del root, debounce_seconds, change_tracker
-            callback = update_callback
+            captured_callback = update_callback
             assert set(exclude_relative_paths) == {".git"}
             return _FakeWatcher([])
 
         sync_calls: list[object] = []
 
-        def fake_sync(paths=None):
+        def fake_sync(paths: list[str] | None = None) -> dict[str, object]:
             sync_calls.append(paths)
             return {"paths": paths}
 
         def drive_update_then_stop(_seconds: float) -> None:
             if len(sync_calls) == 1:
-                assert callback is not None
-                callback(["src/owner.py"])
+                assert captured_callback is not None
+                captured_callback(["src/owner.py"])
                 return
             raise KeyboardInterrupt
 
         monkeypatch.setattr(owner, "create_default_watcher", fake_factory)
         monkeypatch.setattr(owner.time, "sleep", drive_update_then_stop)
-        monkeypatch.setattr(codemap, "sync", fake_sync)
+        monkeypatch.setattr(codemap.index, "sync", fake_sync)
 
-        codemap.watch_forever(
+        codemap.index.watch_forever(
             on_update=lambda result, paths: updates.append((result, list(paths)))
         )
 

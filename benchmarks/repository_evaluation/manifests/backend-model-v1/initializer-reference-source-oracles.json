@@ -1,0 +1,272 @@
+{
+  "all_original_expectations_preserved": true,
+  "authority": "source-oracle-extension-only",
+  "candidate_grader_sha256": "3a2f9b4e9d121c41d1a921bde531ae68fda6e760bf9e283b9777d9cf65dced75",
+  "changes": [
+    {
+      "added_expectations": {
+        "keyword_reference_scope": "returned-direct-keyword-values",
+        "keyword_references": [
+          {
+            "keyword": "default_factory",
+            "reference": {
+              "name": "str",
+              "state": "name-syntax"
+            }
+          },
+          {
+            "keyword": "max_length",
+            "reference": {
+              "state": "dynamic-or-unsupported"
+            }
+          }
+        ]
+      },
+      "check_id": "Model-137-test_str",
+      "class_line": 137,
+      "class_name": "Model",
+      "field": "test_str",
+      "line": 138,
+      "original_default_expectations": {
+        "callee": {
+          "name": "Field",
+          "receiver": "pydantic_v1",
+          "state": "member-syntax"
+        },
+        "first_argument_reference": {
+          "state": "not-supplied"
+        },
+        "has_argument_expansion": false,
+        "keyword_names": [
+          "default_factory",
+          "max_length"
+        ],
+        "keyword_names_omitted": 0,
+        "positional_count": 0,
+        "runtime_binding": "not-established",
+        "state": "direct-call-syntax"
+      },
+      "path": "tests/unit/test_plugins/test_pydantic/test_schema_plugin.py",
+      "source_file_sha256": "57771a4ae6495ced6c29782c7dd2b454debcb959d7b1f56e2b46c74641455937",
+      "source_line_sha256": "75e7756a213c500a1fcff99647509144308a3966f835be01eada0f377bef0173",
+      "stage": "after",
+      "workflow": "litestar-notrequired-field-schema"
+    },
+    {
+      "added_expectations": {
+        "keyword_reference_scope": "returned-direct-keyword-values",
+        "keyword_references": [
+          {
+            "keyword": "default_factory",
+            "reference": {
+              "name": "str",
+              "state": "name-syntax"
+            }
+          },
+          {
+            "keyword": "max_length",
+            "reference": {
+              "state": "dynamic-or-unsupported"
+            }
+          }
+        ]
+      },
+      "check_id": "Model-137-test_str",
+      "class_line": 137,
+      "class_name": "Model",
+      "field": "test_str",
+      "line": 138,
+      "original_default_expectations": {
+        "callee": {
+          "name": "Field",
+          "receiver": "pydantic_v1",
+          "state": "member-syntax"
+        },
+        "first_argument_reference": {
+          "state": "not-supplied"
+        },
+        "has_argument_expansion": false,
+        "keyword_names": [
+          "default_factory",
+          "max_length"
+        ],
+        "keyword_names_omitted": 0,
+        "positional_count": 0,
+        "runtime_binding": "not-established",
+        "state": "direct-call-syntax"
+      },
+      "path": "tests/unit/test_plugins/test_pydantic/test_schema_plugin.py",
+      "source_file_sha256": "90b5463e3af1dd81260a3c631ffb2b315dfd51d4561c25e979b796f32f45476c",
+      "source_line_sha256": "75e7756a213c500a1fcff99647509144308a3966f835be01eada0f377bef0173",
+      "stage": "before",
+      "workflow": "litestar-notrequired-field-schema"
+    },
+    {
+      "added_expectations": {
+        "keyword_reference_scope": "returned-direct-keyword-values",
+        "keyword_references": [
+          {
+            "keyword": "default_factory",
+            "reference": {
+              "name": "int_factory",
+              "state": "name-syntax"
+            }
+          }
+        ]
+      },
+      "check_id": "TestModel-123-e",
+      "class_line": 123,
+      "class_name": "TestModel",
+      "field": "e",
+      "line": 128,
+      "original_default_expectations": {
+        "callee": {
+          "name": "Field",
+          "receiver": "pydantic_v2",
+          "state": "member-syntax"
+        },
+        "first_argument_reference": {
+          "state": "not-supplied"
+        },
+        "has_argument_expansion": false,
+        "keyword_names": [
+          "default_factory"
+        ],
+        "keyword_names_omitted": 0,
+        "positional_count": 0,
+        "runtime_binding": "not-established",
+        "state": "direct-call-syntax"
+      },
+      "path": "tests/unit/test_plugins/test_pydantic/test_pydantic_dto_factory.py",
+      "source_file_sha256": "2fb6a6d185fe0afbac1f5d07af1997aa846945ab22983022e578974b4b5f21cb",
+      "source_line_sha256": "a32d020f3a81b3b48962843d7a611cc96420d54bc456ee4d4b82643bcb5dc994",
+      "stage": "before",
+      "workflow": "litestar-optional-computed-field"
+    },
+    {
+      "added_expectations": {
+        "keyword_reference_scope": "returned-direct-keyword-values",
+        "keyword_references": [
+          {
+            "keyword": "primary_key",
+            "reference": {
+              "state": "dynamic-or-unsupported"
+            }
+          },
+          {
+            "keyword": "sa_type",
+            "reference": {
+              "name": "Integer",
+              "state": "name-syntax"
+            }
+          }
+        ]
+      },
+      "check_id": "Item-8-id",
+      "class_line": 8,
+      "class_name": "Item",
+      "field": "id",
+      "line": 9,
+      "original_default_expectations": {
+        "callee": {
+          "name": "Field",
+          "state": "name-syntax"
+        },
+        "first_argument_reference": {
+          "state": "not-supplied"
+        },
+        "has_argument_expansion": false,
+        "keyword_names": [
+          "primary_key",
+          "sa_type"
+        ],
+        "keyword_names_omitted": 0,
+        "positional_count": 0,
+        "runtime_binding": "not-established",
+        "state": "direct-call-syntax"
+      },
+      "path": "tests/test_field_sa_type.py",
+      "source_file_sha256": "2054f64c4e691577ccc8da24746879740dacc01f31482cbd0665e3787eeea6f8",
+      "source_line_sha256": "f7a19f044907d6baaf7c235daf1e7c6818fbf8869ff9a32360b35b4d51c7c908",
+      "stage": "after",
+      "workflow": "sqlmodel-field-sa-type"
+    }
+  ],
+  "current_original_oracle_failures": [
+    "cr20-model-regression-api/summary.json",
+    "cr20-computed-regression-api/summary.json"
+  ],
+  "negative_controls": [
+    {
+      "field": "test_str",
+      "mutation": "old-runtime-claim",
+      "rejected": true,
+      "stage": "after",
+      "workflow": "litestar-notrequired-field-schema"
+    },
+    {
+      "field": "test_str",
+      "mutation": "new-reference-name",
+      "rejected": true,
+      "stage": "after",
+      "workflow": "litestar-notrequired-field-schema"
+    },
+    {
+      "field": "test_str",
+      "mutation": "old-runtime-claim",
+      "rejected": true,
+      "stage": "before",
+      "workflow": "litestar-notrequired-field-schema"
+    },
+    {
+      "field": "test_str",
+      "mutation": "new-reference-name",
+      "rejected": true,
+      "stage": "before",
+      "workflow": "litestar-notrequired-field-schema"
+    },
+    {
+      "field": "id",
+      "mutation": "old-runtime-claim",
+      "rejected": true,
+      "stage": "after",
+      "workflow": "sqlmodel-field-sa-type"
+    },
+    {
+      "field": "id",
+      "mutation": "new-reference-name",
+      "rejected": true,
+      "stage": "after",
+      "workflow": "sqlmodel-field-sa-type"
+    },
+    {
+      "field": "e",
+      "mutation": "old-runtime-claim",
+      "rejected": true,
+      "stage": "before",
+      "workflow": "litestar-optional-computed-field"
+    },
+    {
+      "field": "e",
+      "mutation": "new-reference-name",
+      "rejected": true,
+      "stage": "before",
+      "workflow": "litestar-optional-computed-field"
+    }
+  ],
+  "original_grader_sha256": "3eb3ebc50502a74471a42f25b1b533f322788034919862cf7bc3813cb1730150",
+  "original_oracle_evidence": [
+    "cr20-model-parent-api/summary.json",
+    "cr20-computed-parent-declarations/summary.json"
+  ],
+  "qualification_effect": "none; all existing membership, review flags, tasks, source labels, unknowns, thresholds and expected tests retained",
+  "remaining_proof": [
+    "current CLI/official MCP acquisition under the augmented source expectations",
+    "complete capability semantic/adversarial/witness review remains outstanding"
+  ],
+  "schema": "hashmarks.backend-initializer-reference-source-oracles.v1",
+  "scope": "additional source identifier facts within the existing returned keyword prefix; no changes to thresholds, tasks, owners, tests, membership, review flags, unknowns or negative authority",
+  "source_expectation_extension_validated": true,
+  "source_only": true,
+  "status": "INCOMPLETE"
+}

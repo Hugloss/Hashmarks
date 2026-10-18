@@ -1,0 +1,160 @@
+{
+  "schema": "hashmarks.backend-model-source-oracles.v1",
+  "qualification_scope": "One independently source-reviewed genuine optional computed-field problem; not capability qualification.",
+  "sources": {
+    "litestar-optional-computed-field-before": {
+      "repository": "litestar",
+      "commit": "e44964c2ba2ed0f43e45e7e454d6119835f3db78",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar",
+      "content_identity": "sha256:f3bcc38a20b499e5577c684fa5097ce72edd4cc2d4368077e9113850d37aa8ad:1399"
+    },
+    "litestar-optional-computed-field-after": {
+      "repository": "litestar",
+      "commit": "6e432d0d6b4ae2a7f794641eef6eae4d89d2e92e",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar",
+      "content_identity": "sha256:5fe150c8e06cad6e557c11df18351ed135fadb99bb97b4de26d65b3e8266b7ff:1400"
+    }
+  },
+  "cases": [
+    {
+      "id": "litestar-optional-computed-field",
+      "repository": "litestar",
+      "problem_id": "6e432d0d6b4ae2a7f794641eef6eae4d89d2e92e",
+      "problem_source": "https://github.com/litestar-org/litestar/commit/6e432d0d6b4ae2a7f794641eef6eae4d89d2e92e",
+      "before": "litestar-optional-computed-field-before",
+      "after": "litestar-optional-computed-field-after",
+      "question": "Expose the direct decorated method and optional return annotation implicated in computed-field DTO handling; runtime computed-field behavior remains unknown.",
+      "paths": {
+        "before": "tests/unit/test_plugins/test_pydantic/test_pydantic_dto_factory.py",
+        "after": "tests/unit/test_plugins/test_pydantic/test_computed_optional_field.py"
+      },
+      "source_oracles": {
+        "before": [
+          {
+            "class_name_syntax": "TestModel",
+            "class_line": 123,
+            "fields": [
+              {
+                "name": "a",
+                "line": 124,
+                "annotation_text": "int",
+                "default_state": "not-supplied"
+              },
+              {
+                "name": "b",
+                "line": 125,
+                "annotation_text": "Annotated[int, DTOField('read-only')]",
+                "default_state": "not-supplied"
+              },
+              {
+                "name": "c",
+                "line": 126,
+                "annotation_text": "Annotated[int, pydantic_v2.Field(gt=1)]",
+                "default_state": "not-supplied"
+              },
+              {
+                "name": "d",
+                "line": 127,
+                "annotation_text": "int",
+                "default_state": "direct-call-syntax",
+                "default_keyword_names": [
+                  "default"
+                ]
+              },
+              {
+                "name": "e",
+                "line": 128,
+                "annotation_text": "int",
+                "default_state": "direct-call-syntax",
+                "default_keyword_names": [
+                  "default_factory"
+                ]
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "tests/unit/test_plugins/test_pydantic/test_pydantic_dto_factory.py",
+                "start_line": 123,
+                "end_line": 128,
+                "sha256": "d3160f1dc20a057b49f5772446ccf55f8d692c761a244264d3fca14e5ed71bc4"
+              }
+            ],
+            "class_qualname": "test_field_definition_generation_v2.TestModel"
+          }
+        ],
+        "after": [
+          {
+            "class_name_syntax": "Status",
+            "class_line": 11,
+            "fields": [
+              {
+                "name": "a",
+                "line": 12,
+                "annotation_text": "str",
+                "default_state": "not-supplied"
+              },
+              {
+                "name": "b",
+                "line": 13,
+                "annotation_text": "str",
+                "default_state": "not-supplied"
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "tests/unit/test_plugins/test_pydantic/test_computed_optional_field.py",
+                "start_line": 11,
+                "end_line": 13,
+                "sha256": "b06282ae9ff92fe1e246ee0ac066a0cfc6f7d5ab7a893e27eab261c55ab8d738"
+              }
+            ]
+          },
+          {
+            "class_name_syntax": "Result",
+            "class_line": 16,
+            "fields": [],
+            "methods": [
+              {
+                "name": "status",
+                "line": 18,
+                "end_line": 19,
+                "return_annotation_text": "Optional[Status]",
+                "decorators": [
+                  {
+                    "line": 17,
+                    "callee": {
+                      "state": "member-syntax",
+                      "receiver": "pydantic_v2",
+                      "name": "computed_field"
+                    }
+                  }
+                ],
+                "source_labels": [
+                  {
+                    "path": "tests/unit/test_plugins/test_pydantic/test_computed_optional_field.py",
+                    "symbol": "Result.status",
+                    "start_line": 17,
+                    "end_line": 19,
+                    "declaration_line": 18,
+                    "sha256": "bae467335b3bf30bf649f4a23de5363ebd865598c78c31abefc16a640f2221c1"
+                  }
+                ]
+              }
+            ],
+            "source_labels": [
+              {
+                "path": "tests/unit/test_plugins/test_pydantic/test_computed_optional_field.py",
+                "start_line": 16,
+                "end_line": 19,
+                "sha256": "bb85d162acb63c10a09700739357c9d7331cf646563309d03ff476e1b06845a3"
+              }
+            ]
+          }
+        ]
+      },
+      "baseline_scope": "Existing model field declaration fixture before the change; the new optional computed-field fixture exists only after the upstream change. No pre-change computed-field claim or absence is established."
+    }
+  ]
+}

@@ -8,9 +8,10 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
+from contract_assertions import assert_array, assert_object, assert_records, assert_text
 from native_evidence_support import (
     TASK,
     assert_hover_capture,
@@ -29,6 +30,10 @@ from scripts.agent_evaluation.agent_evidence_format_study import (
     emit_trials,
     summarize_grades,
 )
+
+if TYPE_CHECKING:
+    from mcp import ClientSession
+    from mcp.types import Tool
 
 
 def _cli_stdout(root: Path, state: Path, *command: str) -> bytes:
@@ -52,11 +57,11 @@ def _cli_stdout(root: Path, state: Path, *command: str) -> bytes:
     return result.stdout
 
 
-def _cli(root: Path, state: Path, *command: str) -> Any:
-    return json.loads(_cli_stdout(root, state, *command))
+def _cli(root: Path, state: Path, *command: str) -> dict[str, object]:
+    return assert_object(json.loads(_cli_stdout(root, state, *command)))
 
 
-def _transport_capture(trial: Any, text: str) -> dict[str, Any]:
+def _transport_capture(trial: dict[str, object], text: str) -> dict[str, object]:
     return {
         "case_id": trial["case_id"],
         "model": "transport-fixture",
@@ -108,11 +113,24 @@ def test_native_scip_cli_change_roundtrips_exact_packets(
         "--presentation",
         "text",
     )
-    delta = response["result"]
+    delta = assert_object(response["result"])
     assert delta["comparable"] is True
-    assert len(delta["producer_deltas"][0]["facts"]["removed"]) == 1
-    assert "- qualified producer claim:" in response["presentation"]["text"]
-    assert response["presentation"]["text"].startswith("Subject:")
+    assert (
+        len(
+            assert_array(
+                assert_object(
+                    assert_object(assert_records(delta["producer_deltas"])[0])["facts"]
+                )["removed"]
+            )
+        )
+        == 1
+    )
+    assert "- qualified producer claim:" in assert_text(
+        assert_object(response["presentation"])["text"]
+    )
+    assert assert_text(assert_object(response["presentation"])["text"]).startswith(
+        "Subject:"
+    )
 
 
 def test_native_scip_cli_refs_preserve_each_same_line_occurrence(
@@ -132,14 +150,18 @@ def test_native_scip_cli_refs_preserve_each_same_line_occurrence(
         "--provenance",
         str(source / "provenance.json"),
     )
-    (reference,) = _cli(root, state, "refs", "value")["native_references"]
-    metadata = reference["occurrence_metadata"]
+    (reference,) = assert_records(
+        _cli(root, state, "refs", "value")["native_references"]
+    )
+    metadata = assert_object(reference["occurrence_metadata"])
     assert metadata["received"] == metadata["retained"] == 2
     assert [
-        row["occurrence_roles"]["producer_role_bits"] for row in metadata["occurrences"]
+        assert_object(row["occurrence_roles"])["producer_role_bits"]
+        for row in assert_records(metadata["occurrences"])
     ] == [8, 8]
     assert [
-        row["locator"]["start"]["character"] for row in metadata["occurrences"]
+        assert_object(assert_object(row["locator"])["start"])["character"]
+        for row in assert_records(metadata["occurrences"])
     ] == [11, 19]
 
 
@@ -165,7 +187,7 @@ def test_real_cli_unicode_delta_has_independently_measured_export_and_host_bytes
         str(previous),
     )
     packet = json.loads(stdout)
-    manifest = {
+    manifest: dict[str, object] = {
         "cases": [
             {
                 "id": "unicode-source-edit",
@@ -181,7 +203,9 @@ def test_real_cli_unicode_delta_has_independently_measured_export_and_host_bytes
     report: Any = summarize_grades(
         [], trials=trials, models=["transport-fixture"], captures=[capture]
     )
-    (measurement,) = report["capture_audit"]["capture_digests"]
+    (measurement,) = assert_records(
+        assert_object(report["capture_audit"])["capture_digests"]
+    )
     expected_export = json.dumps(
         packet, sort_keys=True, ensure_ascii=False, separators=(",", ":")
     ).encode("utf-8")
@@ -190,14 +214,14 @@ def test_real_cli_unicode_delta_has_independently_measured_export_and_host_bytes
     assert measurement["model_visible_utf8_bytes"] == len(stdout)
     assert measurement["exported_response_utf8_bytes"] == len(expected_export)
     assert measurement["content_equivalent"] is True
-    assert report["capture_audit"]["host_authenticity_proven"] is False
+    assert assert_object(report["capture_audit"])["host_authenticity_proven"] is False
     assert report["complete_pairs"] == 0
     _assert_consumer_encodings(packet, trials, expected_export)
     _assert_study_encodings(manifest)
 
 
 def _assert_consumer_encodings(
-    packet: Any, trials: Any, expected_export: bytes
+    packet: dict[str, object], trials: list[dict[str, object]], expected_export: bytes
 ) -> None:
     for escaped in (False, True):
         text = json.dumps(packet, ensure_ascii=escaped, indent=2) + "\n"
@@ -205,7 +229,9 @@ def _assert_consumer_encodings(
         encoded_report: Any = summarize_grades(
             [], trials=trials, models=["transport-fixture"], captures=[encoded_capture]
         )
-        (observed,) = encoded_report["capture_audit"]["capture_digests"]
+        (observed,) = assert_records(
+            assert_object(encoded_report["capture_audit"])["capture_digests"]
+        )
         assert observed["model_visible_utf8_bytes"] == len(text.encode("utf-8"))
         assert observed["content_equivalent"] is True
         assert observed["exported_response_utf8_bytes"] == len(expected_export)
@@ -215,14 +241,14 @@ def _assert_consumer_encodings(
     altered: Any = summarize_grades(
         [], trials=trials, models=["transport-fixture"], captures=[changed_capture]
     )
-    assert altered["capture_audit"]["content_equivalent_captures"] == 0
+    assert assert_object(altered["capture_audit"])["content_equivalent_captures"] == 0
     missing: Any = summarize_grades(
         [], trials=trials, models=["transport-fixture"], captures=[]
     )
-    assert missing["capture_audit"]["observed_captures"] == 0
+    assert assert_object(missing["capture_audit"])["observed_captures"] == 0
 
 
-def _assert_study_encodings(manifest: Any) -> None:
+def _assert_study_encodings(manifest: dict[str, object]) -> None:
     for axis in ("production-response", "encoding-only"):
         for trial in emit_trials(manifest, axis=axis):
             response = trial["tool_response"]
@@ -268,10 +294,14 @@ def test_native_python_cli_post_change_does_not_replay_index(
         "--presentation",
         "text",
     )
-    assert response["result"]["semantic_relationships"]["after"] is None
     assert (
-        "after: unavailable in task projection (unknown)"
-        in response["presentation"]["text"]
+        assert_object(assert_object(response["result"])["semantic_relationships"])[
+            "after"
+        ]
+        is None
+    )
+    assert "after: unavailable in task projection (unknown)" in assert_text(
+        assert_object(response["presentation"])["text"]
     )
     assert "semantic_relationships" not in _cli(root, state, "task-evidence", TASK)
 
@@ -287,8 +317,8 @@ def test_native_dependency_mcp_comparison_formats_keep_version_change(
     source = native_dependency_corpus / "uv" / "v1"
     paths = materialize_dependency(root, source)
     with CodeMap(root, state_dir=state) as cm:
-        cm.sync()
-        before = cm.dependency_resolution_evidence(
+        cm.index.sync()
+        before = cm.dependencies.observe(
             dependency_capture("uv", source, input_revisions(root, paths))
         )
     source = native_dependency_corpus / "uv" / "v2"
@@ -308,17 +338,25 @@ def test_native_dependency_mcp_comparison_formats_keep_version_change(
                 },
             )
             assert reply.is_error is not True
-            response = reply.structured_content
-            native = response if format == "none" else response["result"]
+            response = assert_object(reply.structured_content)
+            native = response if format == "none" else assert_object(response["result"])
             assert native["comparability"] == "comparable"
-            transition = native["component_selection_transitions"][0]
-            assert transition["removed"][0]["version"] == "1.0.0"
-            assert transition["added"][0]["version"] == "2.0.0"
+            transition = assert_records(native["component_selection_transitions"])[0]
+            assert (
+                assert_object(assert_records(transition["removed"])[0])["version"]
+                == "1.0.0"
+            )
+            assert (
+                assert_object(assert_records(transition["added"])[0])["version"]
+                == "2.0.0"
+            )
             if format == "text":
-                assert response["presentation"]["text"].startswith(
-                    "Dependency comparison: comparable\n"
+                assert assert_text(
+                    assert_object(response["presentation"])["text"]
+                ).startswith("Dependency comparison: comparable\n")
+                assert '"version":"2.0.0"' in assert_text(
+                    assert_object(response["presentation"])["text"]
                 )
-                assert '"version":"2.0.0"' in response["presentation"]["text"]
 
     try:
         asyncio.run(exercise())
@@ -352,43 +390,83 @@ def test_native_lsp_cli_stdout_keeps_unproven_body_query(
             "--presentation",
             format,
         )
-        native = response if format == "none" else response["result"]
-        (claim,) = native["observations"][0]["claims"]
-        assert claim["source"]["resolution"]["state"] == "unresolved"
+        native = response if format == "none" else assert_object(response["result"])
+        (claim,) = assert_records(
+            assert_object(assert_records(native["observations"])[0])["claims"]
+        )
         assert (
-            claim["target"]["resolution"]["candidates"][0]["symbol_id"]
+            assert_object(assert_object(claim["source"])["resolution"])["state"]
+            == "unresolved"
+        )
+        assert (
+            assert_object(
+                assert_records(
+                    assert_object(assert_object(claim["target"])["resolution"])[
+                        "candidates"
+                    ]
+                )[0]
+            )["symbol_id"]
             == "src/callee.py::target"
         )
-        assert native["producer_correspondence"]["unresolved_claims"] == 1
+        assert (
+            assert_object(native["producer_correspondence"])["unresolved_claims"] == 1
+        )
 
 
-def _assert_hover_response(response: Any, capture: Any, format: str) -> Any:
-    native = response if format == "none" else response["result"]
+def _assert_hover_response(
+    response: dict[str, object], capture: dict[str, object], format: str
+) -> dict[str, object]:
+    native = response if format == "none" else assert_object(response["result"])
     assert assert_hover_capture(native, capture)["freshness"] == "current"
     if format != "none":
-        assert_hover_presentation(native, response["presentation"], capture)
+        assert_hover_presentation(
+            native, assert_object(response["presentation"]), capture
+        )
     return native
 
 
-def _assert_hover_delta(response: Any, before: Any, after: Any, format: str) -> None:
-    delta = response if format == "none" else response["result"]
+def _assert_hover_delta(
+    response: dict[str, object],
+    before: dict[str, object],
+    after: dict[str, object],
+    format: str,
+) -> None:
+    delta = response if format == "none" else assert_object(response["result"])
     assert delta["before"] == before
     assert delta["after"] == after
     assert delta["comparable"] is True
-    (change,) = delta["producer_deltas"]
-    assert change["facts"]["added"] == change["facts"]["removed"] == []
-    assert change["capability"]["changed"] is True
+    (change,) = assert_records(delta["producer_deltas"])
     assert (
-        change["capability"]["before"]["hover_observation"]
-        == (before["observations"][0]["capability"]["hover_observation"])
+        assert_object(change["facts"])["added"]
+        == assert_object(change["facts"])["removed"]
+        == []
+    )
+    assert assert_object(change["capability"])["changed"] is True
+    assert (
+        assert_object(assert_object(change["capability"])["before"])[
+            "hover_observation"
+        ]
+        == (
+            assert_object(
+                assert_object(assert_records(before["observations"])[0])["capability"]
+            )["hover_observation"]
+        )
     )
     assert (
-        change["capability"]["after"]["hover_observation"]
-        == (after["observations"][0]["capability"]["hover_observation"])
+        assert_object(assert_object(change["capability"])["after"])["hover_observation"]
+        == (
+            assert_object(
+                assert_object(assert_records(after["observations"])[0])["capability"]
+            )["hover_observation"]
+        )
     )
     if format == "text":
-        assert response["presentation"]["text"].startswith("Subject:")
-        assert "~ capability: before=" in response["presentation"]["text"]
+        assert assert_text(assert_object(response["presentation"])["text"]).startswith(
+            "Subject:"
+        )
+        assert "~ capability: before=" in assert_text(
+            assert_object(response["presentation"])["text"]
+        )
 
 
 def test_native_hover_cli_formats_and_saved_change_roundtrip(
@@ -403,7 +481,12 @@ def test_native_hover_cli_formats_and_saved_change_roundtrip(
         raw = lsp_capture(root, source, name)
         if name == "hover-buffer":
             (root / "src/source.py").write_text(
-                raw["documents"]["src/source.py"]["text"], encoding="utf-8"
+                assert_text(
+                    assert_object(assert_object(raw["documents"])["src/source.py"])[
+                        "text"
+                    ]
+                ),
+                encoding="utf-8",
             )
         capture_file.write_text(json.dumps({"observations": [raw]}))
         native = None
@@ -475,7 +558,12 @@ def test_native_hover_mcp_stdio_formats_save_delta_and_request_locality(
                     raw = lsp_capture(root, source, name)
                     if name == "hover-buffer":
                         (root / "src/source.py").write_text(
-                            raw["documents"]["src/source.py"]["text"], encoding="utf-8"
+                            assert_text(
+                                assert_object(
+                                    assert_object(raw["documents"])["src/source.py"]
+                                )["text"]
+                            ),
+                            encoding="utf-8",
                         )
                     native = None
                     for format in FORMATS:
@@ -492,9 +580,11 @@ def test_native_hover_mcp_stdio_formats_save_delta_and_request_locality(
                         (text,) = [
                             part.text for part in reply.content if part.type == "text"
                         ]
-                        assert json.loads(text) == reply.structured_content
+                        assert json.loads(text) == assert_object(
+                            reply.structured_content
+                        )
                         native = _assert_hover_response(
-                            reply.structured_content, raw, format
+                            assert_object(reply.structured_content), raw, format
                         )
                     assert native is not None
                     endpoints.append(native)
@@ -510,14 +600,17 @@ def test_native_hover_mcp_stdio_formats_save_delta_and_request_locality(
                     )
                     assert reply.is_error is not True
                     _assert_hover_delta(
-                        reply.structured_content, endpoints[0], endpoints[1], format
+                        assert_object(reply.structured_content),
+                        endpoints[0],
+                        endpoints[1],
+                        format,
                     )
                 reply = await session.call_tool(
                     "structural_locality",
                     {"target": "src/source.py::target", "result_mode": "relationships"},
                 )
                 assert reply.is_error is not True
-                assert reply.structured_content["observations"] == []
+                assert assert_object(reply.structured_content)["observations"] == []
 
     asyncio.run(exercise())
 
@@ -550,8 +643,8 @@ def test_native_mcp_stdio_lsp_and_dependency_comparison_keep_semantic_facts(
     # Dependency files are additional inputs; preserve the LSP fixture's files.
     inputs = _copy_dependency_inputs(root, source)
     with CodeMap(root, state_dir=state) as cm:
-        cm.sync()
-        before = cm.dependency_resolution_evidence(
+        cm.index.sync()
+        before = cm.dependencies.observe(
             dependency_capture("uv", source, input_revisions(root, inputs))
         )
     source = native_dependency_corpus / "uv" / "v2"
@@ -586,16 +679,38 @@ def test_native_mcp_stdio_lsp_and_dependency_comparison_keep_semantic_facts(
                         },
                     )
                     assert reply.is_error is not True
-                    response: Any = reply.structured_content
-                    native = response if format == "none" else response["result"]
-                    (claim,) = native["observations"][0]["claims"]
-                    assert claim["basis"]["direction"] == "result-to-query"
+                    response: Any = assert_object(reply.structured_content)
+                    native = (
+                        response
+                        if format == "none"
+                        else assert_object(response["result"])
+                    )
+                    (claim,) = assert_records(
+                        assert_object(assert_records(native["observations"])[0])[
+                            "claims"
+                        ]
+                    )
                     assert (
-                        claim["source"]["resolution"]["candidates"][0]["symbol_id"]
+                        assert_object(claim["basis"])["direction"] == "result-to-query"
+                    )
+                    assert (
+                        assert_object(
+                            assert_records(
+                                assert_object(
+                                    assert_object(claim["source"])["resolution"]
+                                )["candidates"]
+                            )[0]
+                        )["symbol_id"]
                         == "src/caller.py::caller"
                     )
                     assert (
-                        claim["target"]["resolution"]["candidates"][0]["symbol_id"]
+                        assert_object(
+                            assert_records(
+                                assert_object(
+                                    assert_object(claim["target"])["resolution"]
+                                )["candidates"]
+                            )[0]
+                        )["symbol_id"]
                         == "src/callee.py::target"
                     )
                     reply = await session.call_tool(
@@ -608,74 +723,117 @@ def test_native_mcp_stdio_lsp_and_dependency_comparison_keep_semantic_facts(
                         },
                     )
                     assert reply.is_error is not True
-                    response = reply.structured_content
-                    native = response if format == "none" else response["result"]
-                    (transition,) = native["component_selection_transitions"]
+                    response = assert_object(reply.structured_content)
+                    native = (
+                        response
+                        if format == "none"
+                        else assert_object(response["result"])
+                    )
+                    (transition,) = assert_records(
+                        native["component_selection_transitions"]
+                    )
                     assert transition["component_id"] == "dummy-dep"
-                    assert transition["removed"][0]["version"] == "1.0.0"
-                    assert transition["added"][0]["version"] == "2.0.0"
+                    assert (
+                        assert_object(assert_records(transition["removed"])[0])[
+                            "version"
+                        ]
+                        == "1.0.0"
+                    )
+                    assert (
+                        assert_object(assert_records(transition["added"])[0])["version"]
+                        == "2.0.0"
+                    )
                     if format != "none":
                         group = next(
                             group
-                            for group in response["presentation"]["groups"]
+                            for group in assert_records(
+                                assert_object(response["presentation"])["groups"]
+                            )
                             if group["family"] == "dependency"
                         )
-                        assert group["findings"][1]["details"] == transition
+                        assert (
+                            assert_object(assert_records(group["findings"])[1])[
+                                "details"
+                            ]
+                            == transition
+                        )
 
     asyncio.run(exercise())
 
 
-async def _literal_wire_reply(session: Any, arguments: dict[str, Any]) -> Any:
+async def _literal_wire_reply(
+    session: ClientSession, arguments: dict[str, object]
+) -> dict[str, object]:
     reply = await session.call_tool("source_observation", arguments)
     assert reply.is_error is not True
     (text,) = [part.text for part in reply.content if part.type == "text"]
-    assert json.loads(text) == reply.structured_content
-    return reply.structured_content
+    assert json.loads(text) == assert_object(reply.structured_content)
+    return assert_object(reply.structured_content)
 
 
-def _assert_literal_wire_schema(tool: Any) -> None:
-    properties = tool.input_schema["properties"]
+def _assert_literal_wire_schema(tool: Tool) -> None:
+    properties = assert_object(tool.input_schema["properties"])
     assert len(properties) == 6
-    assert properties["result_mode"]["enum"] == ["member", "scope", "literals"]
-    assert {row["type"] for row in properties["literal"]["anyOf"]} == {
+    assert assert_object(properties["result_mode"])["enum"] == [
+        "member",
+        "scope",
+        "literals",
+    ]
+    assert {
+        row["type"]
+        for row in assert_records(assert_object(properties["literal"])["anyOf"])
+    } == {
         "string",
         "array",
         "null",
     }
     assert (
-        next(row for row in properties["literal"]["anyOf"] if row["type"] == "array")[
-            "items"
-        ]["type"]
+        assert_object(
+            next(
+                row
+                for row in assert_records(assert_object(properties["literal"])["anyOf"])
+                if row["type"] == "array"
+            )["items"]
+        )["type"]
         == "string"
     )
-    assert len(tool.description) < 220
-    assert "repository-wide absence" in tool.description
+    assert len(assert_text(tool.description)) < 220
+    assert "repository-wide absence" in assert_text(tool.description)
 
 
-def _assert_literal_wire_packet(response: Any, format: str) -> Any:
-    native = response if format == "none" else response["result"]
+def _assert_literal_wire_packet(
+    response: dict[str, object], format: str
+) -> dict[str, object]:
+    native = response if format == "none" else assert_object(response["result"])
     assert native["exact_match_count"] == 4
-    assert len(native["occurrences"]) == 2
+    assert len(assert_array(native["occurrences"])) == 2
     assert native["truncation"] == "truncated"
     assert_literal_returned_counts(native)
-    assert native["member_observations"][1]["returned_occurrence_count"] == 0
+    assert (
+        assert_object(assert_records(native["member_observations"])[1])[
+            "returned_occurrence_count"
+        ]
+        == 0
+    )
     assert any(
-        "café" in line["text"]
-        for row in native["occurrences"]
-        for line in row["context_excerpt"]
+        "café" in assert_text(line["text"])
+        for row in assert_records(native["occurrences"])
+        for line in assert_records(row["context_excerpt"])
     )
     if format != "none":
         qualifications = next(
             group
-            for group in response["presentation"]["groups"]
+            for group in assert_records(
+                assert_object(response["presentation"])["groups"]
+            )
             if group["family"] == "qualification"
         )
-        assert [row["details"] for row in qualifications["findings"]] == (
-            native["literal_observations"]
-        )
-        assert [row["source_refs"] for row in qualifications["findings"]] == [
-            [f"/literal_observations/{index}"] for index in range(3)
-        ]
+        assert [
+            row["details"] for row in assert_records(qualifications["findings"])
+        ] == (native["literal_observations"])
+        assert [
+            row["source_refs"] for row in assert_records(qualifications["findings"])
+        ] == [[f"/literal_observations/{index}"] for index in range(3)]
     return native
 
 
@@ -701,7 +859,7 @@ def test_real_mcp_literal_set_wire_preserves_counts_context_and_edits(
         "from src.archive import archive\ndef test_archive():\n    assert archive()\n",
         encoding="utf-8",
     )
-    arguments = {
+    arguments: dict[str, object] = {
         "paths": ["tests/test_archive.py", "src/archive.py"],
         "literal": ["ZipInfo", "ZIP_DEFLATED", "missing"],
         "result_mode": "literals",
@@ -759,14 +917,27 @@ def test_real_mcp_literal_set_wire_preserves_counts_context_and_edits(
                 )
                 edited = await _literal_wire_reply(session, arguments)
                 assert edited["exact_match_count"] == 1
-                assert edited["occurrences"][0]["occurrence_kind"] == "string-literal"
+                assert (
+                    assert_object(assert_records(edited["occurrences"])[0])[
+                        "occurrence_kind"
+                    ]
+                    == "string-literal"
+                )
                 assert any(
-                    "café" in row["text"]
-                    for row in edited["occurrences"][0]["context_excerpt"]
+                    "café" in assert_text(row["text"])
+                    for row in assert_records(
+                        assert_object(assert_records(edited["occurrences"])[0])[
+                            "context_excerpt"
+                        ]
+                    )
                 )
                 assert (
-                    edited["occurrences"][0]["member_revision"]
-                    != baseline["occurrences"][0]["member_revision"]
+                    assert_object(assert_records(edited["occurrences"])[0])[
+                        "member_revision"
+                    ]
+                    != assert_object(assert_records(baseline["occurrences"])[0])[
+                        "member_revision"
+                    ]
                 )
                 assert_literal_returned_counts(edited)
                 source.rename(root / "src" / "moved.py")
@@ -797,11 +968,11 @@ def test_real_mcp_unicode_delta_text_content_matches_frozen_format_trials(
     source.write_text('def räkna():\n    return "före😀"\n', encoding="utf-8")
     task = "Change räkna in räknare.py to return efter😀."
     with CodeMap(root, state_dir=state) as cm:
-        cm.sync()
-        before = cm.repository_intelligence_snapshot(task, ["räknare.py"])
+        cm.index.sync()
+        before = cm.changes.snapshot(task, ["räknare.py"])
         source.write_text('def räkna():\n    return "efter😀"\n', encoding="utf-8")
-        cm.sync(["räknare.py"])
-        packet = cm.repository_intelligence_query(
+        cm.index.sync(["räknare.py"])
+        packet = cm.views.query(
             "delta",
             task,
             ["räknare.py"],
@@ -849,7 +1020,10 @@ def test_real_mcp_unicode_delta_text_content_matches_frozen_format_trials(
                         },
                     )
                     assert reply.is_error is not True
-                    assert reply.structured_content == trial["tool_response"]
+                    assert (
+                        assert_object(reply.structured_content)
+                        == trial["tool_response"]
+                    )
                     (text,) = [
                         part.text for part in reply.content if part.type == "text"
                     ]
@@ -858,17 +1032,23 @@ def test_real_mcp_unicode_delta_text_content_matches_frozen_format_trials(
         report: Any = summarize_grades(
             [], trials=trials, models=["transport-fixture"], captures=captures
         )
-        assert report["capture_audit"]["content_equivalent_captures"] == 4
         assert (
-            report["capture_audit"]["authority"]
+            assert_object(report["capture_audit"])["content_equivalent_captures"] == 4
+        )
+        assert (
+            assert_object(report["capture_audit"])["authority"]
             == "consumer-supplied-capture-content-only"
         )
-        assert report["capture_audit"]["host_authenticity_proven"] is False
+        assert (
+            assert_object(report["capture_audit"])["host_authenticity_proven"] is False
+        )
         for capture, measurement in zip(
-            captures, report["capture_audit"]["capture_digests"], strict=True
+            captures,
+            assert_records(assert_object(report["capture_audit"])["capture_digests"]),
+            strict=True,
         ):
             assert measurement["model_visible_utf8_bytes"] == len(
-                capture["model_visible_response"].encode("utf-8")
+                assert_text(capture["model_visible_response"]).encode("utf-8")
             )
 
     asyncio.run(exercise())

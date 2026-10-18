@@ -27,6 +27,7 @@ from hashmarks.codemap.decision_contract import (
 from hashmarks.codemap.engine import (
     CodeMap,
 )
+from hashmarks.codemap.indexing_lifecycle import RepositoryIndex
 
 logger = logging.getLogger(__name__)
 
@@ -262,7 +263,11 @@ def _surface_paths(db_path: Path, surfaces: set[str]) -> list[str]:
         ]
     finally:
         db.close()
-    return [path for path in paths if CodeMap._index_surface_for_path(path) in surfaces]
+    return [
+        path
+        for path in paths
+        if RepositoryIndex._index_surface_for_path(path) in surfaces
+    ]
 
 
 def apply_variant(
@@ -365,7 +370,7 @@ def _decision_phase_seconds(packet: dict[str, Any]) -> dict[str, Any]:
 
 def _evaluate_task(codemap: CodeMap, item: dict[str, Any]) -> _TaskEvaluation:
     started = time.perf_counter()
-    packet = codemap.task_decision_packet(str(item["task"]))
+    packet = codemap.tasks.decision_packet(str(item["task"]))
     contract = DecisionPacketContract.parse(packet)
     elapsed = time.perf_counter() - started
     edit, verify = contract.edit.path, contract.verify.path
@@ -470,10 +475,10 @@ def evaluate(
         "candidates_miss": 0,
     }
     for offset in range(0, len(corpus), session_batch_size):
-        with codemap.decision_session():
+        with codemap.reads.session():
             for item in corpus[offset : offset + session_batch_size]:
                 state.add(_evaluate_task(codemap, item))
-            session_stats = codemap.decision_session_stats()
+            session_stats = codemap.reads.stats()
             for key, value in session_stats.items():
                 session_totals[key] = session_totals.get(key, 0) + int(value)
     return _evaluation_result(state, len(corpus), session_batch_size, session_totals)
@@ -597,14 +602,15 @@ def evaluate_existing_group(
     corpus_path: Path,
     state_dir: Path,
     artifact_db: Path,
-    options: ExistingGroupOptions = ExistingGroupOptions(),
+    options: ExistingGroupOptions | None = None,
 ) -> dict[str, Any]:
+    options = options or ExistingGroupOptions()
     corpus = json.loads(corpus_path.read_text(encoding="utf-8"))
     if not isinstance(corpus, list):
         raise ValueError("corpus must be a JSON list")
     with CodeMap(workspace, state_dir=state_dir, artifact_db=artifact_db) as codemap:
         generation = codemap.store.generation()
-        repository_identity = codemap._repository_packet_identity()
+        repository_identity = codemap.reads.repository_identity()
         manifest = build_manifest(
             corpus,
             repository_identity=repository_identity,
@@ -737,8 +743,8 @@ def _build_baseline(
     shutil.rmtree(state_dir, ignore_errors=True)
     started = time.perf_counter()
     with CodeMap(workspace, state_dir=state_dir, artifact_db=artifact_db) as codemap:
-        preflight = codemap.index_preflight()
-        sync = codemap.sync()
+        preflight = codemap.index.preflight()
+        sync = codemap.index.sync()
         decision = evaluate(codemap, corpus)
     cold_seconds = time.perf_counter() - started
     database = state_dir / "codemap.sqlite3"

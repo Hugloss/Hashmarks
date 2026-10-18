@@ -15,10 +15,8 @@ import hashmarks.codemap.find_engine as find_engine_module
 import hashmarks.codemap.post_change as post_change_module
 import hashmarks.codemap.repository_context as repository_context_module
 from hashmarks.codemap import CodeMap
-from hashmarks.codemap.dependency_resolution_evidence import (
-    DependencyResolutionEvidenceMixin,
-)
-from hashmarks.codemap.repository_declarations import RepositoryDeclarationsMixin
+from hashmarks.codemap.repository_declarations import RepositoryDeclarations
+from hashmarks.codemap.repository_dependencies import RepositoryDependencies
 from hashmarks.mcp_contract import McpToolContract, tool_contract
 from hashmarks.mcp_server import (
     _DependencyCodemapResultMode,
@@ -37,6 +35,7 @@ from hashmarks.operation_contract import (
     require_registered_operation,
     validate_operation_response,
 )
+from hashmarks.python_ast_cache import read_python_ast
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -47,7 +46,10 @@ _EXPECTED = {
     },
     "repository_context": {"default": "hashmarks.repository-capsule.v1"},
     "find": {"default": "hashmarks.find.v2"},
-    "task_evidence": {"default": "hashmarks.task-evidence.v5"},
+    "task_evidence": {
+        "default": "hashmarks.task-evidence.v5",
+        "initial": "hashmarks.task-evidence-initial.v2",
+    },
     "change_impact": {"default": "hashmarks.task-change-impact.v1"},
     "correlate_evidence": {"default": "hashmarks.evidence-correlation.v2"},
     "dependency_codemap": {
@@ -58,6 +60,7 @@ _EXPECTED = {
     "repository_declarations": {
         "observation": "hashmarks.repository-declarations.v1",
         "explain": "hashmarks.repository-declaration-explain.v1",
+        "discovery": "hashmarks.repository-declaration-discovery.v1",
     },
     "post_change": {"default": "hashmarks.task-post-change-delta.v2"},
     "source_observation": {
@@ -181,8 +184,8 @@ def test_transports_do_not_own_semantic_find_or_dependency_schema() -> None:
     mcp_source = (ROOT / "hashmarks" / "mcp_surface.py").read_text(encoding="utf-8")
     cli_source = (ROOT / "hashmarks" / "repository_cli.py").read_text(encoding="utf-8")
 
-    assert "self._map.find_packet(" in mcp_source
-    assert "codemap.find_packet(" in cli_source
+    assert "self._map.search.packet(" in mcp_source
+    assert "codemap.search.packet(" in cli_source
     assert "hashmarks.mcp-find.v1" not in mcp_source
     assert "hashmarks.find.v1" not in cli_source
     assert "hashmarks.mcp-dependency-codemap.v1" not in mcp_source
@@ -219,8 +222,7 @@ def test_public_surfaces_do_not_mint_versioned_semantic_schemas() -> None:
 
 
 def test_cli_operation_projection_names_are_registered_literals() -> None:
-    source = (ROOT / "hashmarks" / "repository_cli.py").read_text(encoding="utf-8")
-    tree = ast.parse(source)
+    tree = read_python_ast(ROOT / "hashmarks" / "repository_cli.py").tree
     projected: list[str] = []
     for node in ast.walk(tree):
         if not (
@@ -283,10 +285,31 @@ def test_cli_codemap_exposure_is_exhaustively_classified() -> None:
             isinstance(node.func, ast.Name) and node.func.id == "_print_operation"
             for node in printers
         )
-        if not semantic:
+        if not semantic and not _cli_prints_validated_operation(function, printers):
             non_semantic.add(function.name)
 
     assert non_semantic == _CLI_NON_SEMANTIC_CODEMAP_HANDLERS
+
+
+def _cli_prints_validated_operation(
+    function: ast.FunctionDef, printers: list[ast.Call]
+) -> bool:
+    """Canonical query envelopes are already projected before serialization."""
+    validated = {
+        target.id
+        for node in ast.walk(function)
+        if isinstance(node, ast.Assign)
+        and isinstance(node.value, ast.Call)
+        and isinstance(node.value.func, ast.Name)
+        and node.value.func.id == "validate_operation_response"
+        for target in node.targets
+        if isinstance(target, ast.Name)
+    }
+    return any(
+        isinstance(argument, ast.Name) and argument.id in validated
+        for printer in printers
+        for argument in printer.args[:1]
+    )
 
 
 def test_mcp_mode_types_derive_from_operation_contract() -> None:
@@ -307,14 +330,12 @@ def test_multimode_public_defaults_consume_canonical_operation_authority() -> No
         operation: operation_default_mode(operation) for operation in expected
     } == expected
 
-    assert inspect.signature(
-        DependencyResolutionEvidenceMixin.dependency_codemap
-    ).parameters["result_mode"].default == operation_default_mode("dependency_codemap")
-    assert inspect.signature(
-        RepositoryDeclarationsMixin.repository_declarations_operation
-    ).parameters["result_mode"].default == operation_default_mode(
-        "repository_declarations"
-    )
+    assert inspect.signature(RepositoryDependencies.codemap).parameters[
+        "result_mode"
+    ].default == operation_default_mode("dependency_codemap")
+    assert inspect.signature(RepositoryDeclarations.operation).parameters[
+        "result_mode"
+    ].default == operation_default_mode("repository_declarations")
     assert inspect.signature(HashmarksMcpSurface.dependency_codemap).parameters[
         "result_mode"
     ].default == operation_default_mode("dependency_codemap")
@@ -355,94 +376,93 @@ def test_operation_modes_fail_closed() -> None:
 
 _FIXED_MODE_CORE_BOUNDARIES = {
     "repository_context": ("hashmarks/codemap/repository_context.py", "orient"),
-    "find": ("hashmarks/codemap/find_engine.py", "find_packet"),
-    "task_evidence": ("hashmarks/codemap/evidence_packet.py", "task_evidence"),
-    "change_impact": ("hashmarks/codemap/change_impact.py", "task_change_impact"),
+    "find": ("hashmarks/codemap/find_engine.py", "packet"),
+    "change_impact": ("hashmarks/codemap/change_impact.py", "task_impact"),
     "correlate_evidence": (
         "hashmarks/codemap/evidence_correlation.py",
-        "correlate_evidence",
+        "observe",
     ),
-    "post_change": ("hashmarks/codemap/post_change.py", "task_post_change_delta"),
-    "projects": ("hashmarks/codemap/query_surface.py", "projects"),
-    "outline": ("hashmarks/codemap/engine.py", "outline"),
-    "grep": ("hashmarks/codemap/query_surface.py", "grep"),
-    "structural": ("hashmarks/codemap/query_surface.py", "structural"),
-    "symbol": ("hashmarks/codemap/query_surface.py", "symbol"),
-    "source": ("hashmarks/codemap/query_surface.py", "source"),
-    "affected": ("hashmarks/codemap/query_surface.py", "affected"),
-    "tests": ("hashmarks/codemap/query_surface.py", "tests"),
+    "post_change": ("hashmarks/codemap/post_change.py", "task_delta"),
+    "projects": ("hashmarks/codemap/evidence_graph.py", "projects"),
+    "outline": ("hashmarks/codemap/repository_source.py", "outline"),
+    "grep": ("hashmarks/codemap/repository_source.py", "grep"),
+    "structural": ("hashmarks/codemap/structural_locality.py", "search"),
+    "symbol": ("hashmarks/codemap/repository_source.py", "symbol"),
+    "source": ("hashmarks/codemap/repository_source.py", "read"),
+    "affected": ("hashmarks/codemap/evidence_graph.py", "affected"),
+    "tests": ("hashmarks/codemap/evidence_graph.py", "tests"),
     "context": ("hashmarks/codemap/model.py", "ContextPack.as_dict"),
     "repository_findings": (
         "hashmarks/codemap/ownership_analysis.py",
-        "repository_findings",
+        "findings",
     ),
     "import_ownership": (
         "hashmarks/codemap/ownership_analysis.py",
-        "import_ownership_findings",
+        "import_findings",
     ),
     "concurrency_risk": (
         "hashmarks/codemap/ownership_analysis.py",
-        "concurrency_risk_findings",
+        "concurrency_findings",
     ),
     "verification_ownership": (
-        "hashmarks/codemap/evidence_verification.py",
-        "verification_ownership_graph",
+        "hashmarks/codemap/verification_ownership.py",
+        "ownership_relationships",
     ),
     "repository_ownership": (
         "hashmarks/codemap/ownership_analysis.py",
-        "repository_ownership_graph",
+        "repository_graph",
     ),
     "cache_ownership": (
         "hashmarks/codemap/ownership_analysis.py",
-        "cache_ownership_findings",
+        "cache_findings",
     ),
     "cache_invalidation_ownership": (
         "hashmarks/codemap/ownership_analysis.py",
-        "cache_invalidation_ownership_graph",
+        "cache_invalidation_graph",
     ),
     "task_action_map": (
         "hashmarks/codemap/task_action_projection.py",
-        "task_action_map",
+        "action_map",
     ),
     "verification_relevance": (
         "hashmarks/codemap/evidence_verification.py",
-        "verification_relevance",
+        "for_owner",
     ),
     "ownership_relation_graph": (
         "hashmarks/codemap/ownership_graph.py",
-        "ownership_relation_graph",
+        "relations",
     ),
     "task_decision_packet": (
         "hashmarks/codemap/evidence_decision_packet.py",
-        "task_decision_packet",
+        "decision_packet",
     ),
     "task_decision_brief": (
         "hashmarks/codemap/evidence_packet.py",
-        "task_decision_brief",
+        "decision_brief",
     ),
     "task_action_brief": (
         "hashmarks/codemap/evidence_packet.py",
-        "task_action_brief",
+        "action_brief",
     ),
     "task_decision_brief_budget_sweep": (
         "hashmarks/codemap/evidence_packet.py",
-        "task_decision_brief_budget_sweep",
+        "decision_brief_budget_sweep",
     ),
     "repository_intelligence_query": (
         "hashmarks/codemap/repository_intelligence_query.py",
-        "repository_intelligence_query",
+        "query",
     ),
     "refresh_after_change_delta": (
         "hashmarks/codemap/post_change.py",
-        "refresh_after_change_delta",
+        "refresh_delta",
     ),
     "refresh_after_change_brief": (
         "hashmarks/codemap/post_change.py",
-        "refresh_after_change_brief",
+        "refresh_brief",
     ),
     "refresh_after_change": (
         "hashmarks/codemap/post_change.py",
-        "refresh_after_change",
+        "refresh",
     ),
 }
 
@@ -535,9 +555,9 @@ def test_core_repository_context_rejects_its_own_schema_drift(
         lambda _operation: "hashmarks.wrong.v1",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(RuntimeError, match="operation response schema drift"):
-            codemap.orient()
+            codemap.context.orient()
 
 
 def test_core_find_rejects_its_own_schema_drift(
@@ -551,9 +571,9 @@ def test_core_find_rejects_its_own_schema_drift(
         lambda _operation: "hashmarks.wrong.v1",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(RuntimeError, match="operation response schema drift"):
-            codemap.find_packet("widget")
+            codemap.search.packet("widget")
 
 
 def test_core_task_evidence_rejects_its_own_schema_drift(
@@ -567,9 +587,9 @@ def test_core_task_evidence_rejects_its_own_schema_drift(
         lambda _operation: "hashmarks.wrong.v1",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(RuntimeError, match="operation response schema drift"):
-            codemap.task_evidence(task)
+            codemap.tasks.evidence(task)
 
 
 def test_core_change_impact_rejects_its_own_schema_drift(
@@ -583,9 +603,9 @@ def test_core_change_impact_rejects_its_own_schema_drift(
         lambda _operation: "hashmarks.wrong.v1",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(RuntimeError, match="operation response schema drift"):
-            codemap.task_change_impact(task, ["src/owner.py"])
+            codemap.changes.task_impact(task, ["src/owner.py"])
 
 
 def test_core_correlation_rejects_its_own_schema_drift(
@@ -617,9 +637,9 @@ def test_core_correlation_rejects_its_own_schema_drift(
         }
     ]
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(RuntimeError, match="operation response schema drift"):
-            codemap.correlate_evidence(
+            codemap.correlation.observe(
                 bundles,
                 path_mappings=[{"external_prefix": "/app", "repository_prefix": ""}],
             )
@@ -631,8 +651,8 @@ def test_core_post_change_rejects_its_own_schema_drift(
 ) -> None:
     source, task = _fixed_mode_repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        previous = codemap.task_evidence(task)
+        codemap.index.sync()
+        previous = codemap.tasks.evidence(task)
         source.write_text("def widget(): return 'new'\n", encoding="utf-8")
 
         def drifted_schema(operation: str, mode: str | None = None) -> str:
@@ -642,7 +662,7 @@ def test_core_post_change_rejects_its_own_schema_drift(
 
         monkeypatch.setattr(post_change_module, "operation_schema", drifted_schema)
         with pytest.raises(RuntimeError, match="operation response schema drift"):
-            codemap.task_post_change_delta(
+            codemap.changes.task_delta(
                 task,
                 ["src/owner.py"],
                 previous_evidence=previous,
@@ -668,38 +688,37 @@ def test_core_operation_dispatchers_consume_canonical_mode_admission() -> None:
     assert 'allowed = ("observation", "explain")' not in declarations_source
 
 
-class _DependencyOperationHarness(DependencyResolutionEvidenceMixin):
-    def dependency_resolution_evidence(self, _snapshot):
-        return {"schema": "fixture"}
-
-    def dependency_resolution_explain(self, _observation):
-        return {"schema": "hashmarks.wrong.v1"}
-
-    def dependency_resolution_delta(self, _before, _after):
-        return {"schema": operation_schema("dependency_codemap", "compare")}
-
-
-class _DeclarationOperationHarness(RepositoryDeclarationsMixin):
-    def repository_declarations(self, _groups, *, previous_observation=None):
-        del previous_observation
-        return {
-            "schema": operation_schema(
-                "repository_declarations",
-                "observation",
-            )
-        }
-
-    def repository_declaration_explain(self, _packet):
-        return {"schema": "hashmarks.wrong.v1"}
+def test_core_dependency_operation_rejects_producer_schema_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with CodeMap(tmp_path) as repository:
+        monkeypatch.setattr(
+            repository.dependencies, "observe", lambda _snapshot: {"schema": "fixture"}
+        )
+        monkeypatch.setattr(
+            repository.dependencies,
+            "explain",
+            lambda _observation: {"schema": "hashmarks.wrong.v1"},
+        )
+        with pytest.raises(RuntimeError, match="operation response schema drift"):
+            repository.dependencies.codemap({}, result_mode="explain")
 
 
-def test_core_dependency_operation_rejects_producer_schema_drift() -> None:
-    harness = _DependencyOperationHarness()
-    with pytest.raises(RuntimeError, match="operation response schema drift"):
-        harness.dependency_codemap({}, result_mode="explain")
-
-
-def test_core_declaration_operation_rejects_producer_schema_drift() -> None:
-    harness = _DeclarationOperationHarness()
-    with pytest.raises(RuntimeError, match="operation response schema drift"):
-        harness.repository_declarations_operation([], result_mode="explain")
+def test_core_declaration_operation_rejects_producer_schema_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with CodeMap(tmp_path) as repository:
+        monkeypatch.setattr(
+            repository.declarations,
+            "observe",
+            lambda _groups, **_options: {
+                "schema": operation_schema("repository_declarations", "observation")
+            },
+        )
+        monkeypatch.setattr(
+            repository.declarations,
+            "explain",
+            lambda _packet: {"schema": "hashmarks.wrong.v1"},
+        )
+        with pytest.raises(RuntimeError, match="operation response schema drift"):
+            repository.declarations.operation([], result_mode="explain")

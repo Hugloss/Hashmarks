@@ -1,10 +1,19 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Never
+
+import pytest
+from contract_assertions import assert_object
 
 from hashmarks import CodeMap
+from hashmarks.codemap.model import SyncResult
+from hashmarks.codemap.ownership_relation_defaults import (
+    OWNERSHIP_RELATION_DEFAULT_OPTIONS,
+)
+from hashmarks.codemap.ownership_relation_types import OwnershipRelationGraph
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
     from pathlib import Path
 
 
@@ -35,72 +44,86 @@ def _go_repo(root: Path) -> tuple[str, list[str]]:
     ]
 
 
-def test_owner_chain_reuse_keeps_sync_currentness_check(tmp_path: Path) -> None:
+def test_owner_chain_reuse_keeps_sync_currentness_check(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     task, paths = _go_repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         relation_calls = 0
         sync_calls = 0
-        original_relation = codemap.ownership_relation_graph
-        original_sync = codemap.sync
+        original_relation = codemap.ownership.relations
+        original_sync = codemap.index.sync
 
-        def counted_relation(*args, **kwargs):
+        def counted_relation(
+            task: str,
+            start_path: str,
+            *,
+            max_depth: int = OWNERSHIP_RELATION_DEFAULT_OPTIONS.max_depth,
+        ) -> OwnershipRelationGraph:
             nonlocal relation_calls
             relation_calls += 1
-            return original_relation(*args, **kwargs)
+            return original_relation(task, start_path, max_depth=max_depth)
 
-        def counted_sync(*args, **kwargs):
+        def counted_sync(paths: Iterable[str | Path] | None = None) -> SyncResult:
             nonlocal sync_calls
             sync_calls += 1
-            return original_sync(*args, **kwargs)
+            return original_sync(paths)
 
-        codemap.ownership_relation_graph = counted_relation
-        codemap.sync = counted_sync
-        with codemap.decision_session(diagnostics=True):
-            first = codemap.task_change_impact(task, paths)
-            second = codemap.task_change_impact(task, paths)
-        receipt = codemap.decision_session_diagnostics()
+        monkeypatch.setattr(codemap.ownership, "relations", counted_relation)
+        monkeypatch.setattr(codemap.index, "sync", counted_sync)
+        with codemap.reads.session(diagnostics=True):
+            first = codemap.changes.task_impact(task, paths)
+            second = codemap.changes.task_impact(task, paths)
+        receipt = codemap.reads.diagnostics()
 
     assert first == second
     assert sync_calls == 2
     assert relation_calls == 2
     assert receipt is not None
-    assert receipt["reuse"]["impact_owner_chain_miss"] == 1
-    assert receipt["reuse"]["impact_owner_chain_hit"] == 1
+    assert assert_object(receipt["reuse"])["impact_owner_chain_miss"] == 1
+    assert assert_object(receipt["reuse"])["impact_owner_chain_hit"] == 1
 
 
 def test_owner_chain_reuse_key_includes_task_action_bounds(tmp_path: Path) -> None:
     task, paths = _go_repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        with codemap.decision_session():
-            codemap.task_change_impact(task, paths, limit=20, per_role=3)
-            codemap.task_change_impact(task, paths, limit=21, per_role=3)
-            codemap.task_change_impact(task, paths, limit=21, per_role=4)
-            stats = codemap.decision_session_stats()
+        codemap.index.sync()
+        with codemap.reads.session():
+            codemap.changes.task_impact(task, paths, limit=20, per_role=3)
+            codemap.changes.task_impact(task, paths, limit=21, per_role=3)
+            codemap.changes.task_impact(task, paths, limit=21, per_role=4)
+            stats = codemap.reads.stats()
 
     assert stats["impact_owner_chain_miss"] == 3
     assert stats["impact_owner_chain_hit"] == 0
 
 
-def test_owner_chain_reuse_does_not_cross_decision_sessions(tmp_path: Path) -> None:
+def test_owner_chain_reuse_does_not_cross_decision_sessions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     task, paths = _go_repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         relation_calls = 0
-        original_relation = codemap.ownership_relation_graph
+        original_relation = codemap.ownership.relations
 
-        def counted_relation(*args, **kwargs):
+        def counted_relation(
+            task: str,
+            start_path: str,
+            *,
+            max_depth: int = OWNERSHIP_RELATION_DEFAULT_OPTIONS.max_depth,
+        ) -> OwnershipRelationGraph:
             nonlocal relation_calls
             relation_calls += 1
-            return original_relation(*args, **kwargs)
+            return original_relation(task, start_path, max_depth=max_depth)
 
-        codemap.ownership_relation_graph = counted_relation
-        with codemap.decision_session():
-            codemap.task_change_impact(task, paths)
-            codemap.task_change_impact(task, paths)
-        with codemap.decision_session():
-            codemap.task_change_impact(task, paths)
+        monkeypatch.setattr(codemap.ownership, "relations", counted_relation)
+        with codemap.reads.session():
+            codemap.changes.task_impact(task, paths)
+            codemap.changes.task_impact(task, paths)
+        with codemap.reads.session():
+            codemap.changes.task_impact(task, paths)
 
     assert relation_calls == 4
 
@@ -108,39 +131,43 @@ def test_owner_chain_reuse_does_not_cross_decision_sessions(tmp_path: Path) -> N
 def test_owner_chain_cached_result_is_detached(tmp_path: Path) -> None:
     task, paths = _go_repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        with codemap.decision_session():
-            action = codemap.task_action_map(task)
-            state = codemap._change_impact_surface_state(
+        codemap.index.sync()
+        with codemap.reads.session():
+            action = codemap.tasks.action_map(task)
+            state = codemap.changes._change_impact_surface_state(
                 tuple(paths),
                 max_depth=4,
                 impact_limit_per_surface=6,
                 effective_project_impact_limit=6,
             )
-            first = codemap._change_impact_owner_chain(task, action, state.visible)
+            first = codemap.changes._change_impact_owner_chain(
+                task, action, state.visible
+            )
             first[3].append("mutated.py")
-            second = codemap._change_impact_owner_chain(task, action, state.visible)
+            second = codemap.changes._change_impact_owner_chain(
+                task, action, state.visible
+            )
 
     assert "mutated.py" not in second[3]
 
 
 def test_owner_chain_reconstruction_failure_keeps_selected_paths(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     task, paths = _go_repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
 
-        def unavailable(*_args, **_kwargs):
+        def unavailable(*_args: object, **_kwargs: object) -> Never:
             raise ValueError("owner evidence unavailable")
 
-        monkeypatch.setattr(codemap, "ownership_relation_graph", unavailable)
+        monkeypatch.setattr(codemap.ownership, "relations", unavailable)
         action = {
             "edit": {"path": paths[0]},
             "verify": {"path": "route/cobaltridgealpha_test.go"},
         }
         edit, verify, verify_path, chain, relations = (
-            codemap._change_impact_owner_chain(task, action, lambda _: True)
+            codemap.changes._change_impact_owner_chain(task, action, lambda _: True)
         )
 
     assert edit == "engine/engine.go"

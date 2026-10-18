@@ -3,10 +3,12 @@ from __future__ import annotations
 import asyncio
 import importlib.util
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from unittest import mock
 
 import pytest
+from contract_assertions import assert_object
 
 from hashmarks.codemap.evidence_profiles import PROFILE_NAMES
 from hashmarks.codemap.repository_intelligence_query import QUERY_SURFACES
@@ -124,7 +126,7 @@ def test_handoff_rejects_cli_mcp_version_split_brain(tmp_path: Path) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     observation = _observation()
-    observation["server"]["version"] = "0.25.0"
+    assert_object(observation["server"])["version"] = "0.25.0"
     with pytest.raises(HostGateError, match="CLI/MCP version authority differs"):
         build_handoff(
             executable=executable,
@@ -240,7 +242,7 @@ def test_handoff_rejects_implementation_generation_change(
     ],
 )
 def test_handoff_rejects_unqualified_catalog(
-    mutation,
+    mutation: Callable[[dict[str, object]], object],
     message: str,
 ) -> None:
     value = _observation()

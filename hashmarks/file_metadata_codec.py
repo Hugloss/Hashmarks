@@ -7,6 +7,10 @@ integers; integer columns keep only bind-safe placeholders for those rows.
 
 from __future__ import annotations
 
+from typing import TypeGuard
+
+MetadataFields = tuple[int, int, int, int, int]
+
 _METADATA_FIELD_COUNT = 5
 _METADATA_INTEGER_MAX_CHARS = 128
 _METADATA_OVERFLOW_MAX_BYTES = (_METADATA_INTEGER_MAX_CHARS * _METADATA_FIELD_COUNT) + (
@@ -24,23 +28,33 @@ def _is_sqlite_integer(value: int) -> bool:
     return _SQLITE_INTEGER_MIN <= value <= _SQLITE_INTEGER_MAX
 
 
-def _require_metadata_integers(values: tuple[int, int, int, int, int]) -> None:
-    if any(not isinstance(value, int) or isinstance(value, bool) for value in values):
+def _metadata_fields_valid(values: tuple[object, ...]) -> TypeGuard[MetadataFields]:
+    return len(values) == _METADATA_FIELD_COUNT and all(
+        type(value) is int for value in values
+    )
+
+
+def validate_metadata_fields(values: tuple[object, ...]) -> MetadataFields:
+    if not _metadata_fields_valid(values):
         raise MetadataCodecError("filesystem metadata must contain integers")
+    return values
 
 
 def encode_metadata_fields(
     values: tuple[int, int, int, int, int],
 ) -> tuple[tuple[int, int, int, int, int], bytes | None]:
-    _require_metadata_integers(values)
+    validate_metadata_fields(values)
     is_sqlite = tuple(_is_sqlite_integer(v) for v in values)
     if all(is_sqlite):
         return values, None
     encoded = ",".join(str(value) for value in values).encode("ascii")
     if len(encoded) > _METADATA_OVERFLOW_MAX_BYTES:
         raise MetadataCodecError("filesystem metadata overflow payload is too large")
-    stored = tuple(value if ok else 0 for value, ok in zip(values, is_sqlite))
-    return stored, encoded  # type: ignore[return-value]
+    stored = tuple(
+        value if ok else 0 for value, ok in zip(values, is_sqlite, strict=True)
+    )
+    device, inode, size, mtime_ns, ctime_ns = stored
+    return (device, inode, size, mtime_ns, ctime_ns), encoded
 
 
 def _overflow_parts(value: object) -> list[str]:
@@ -87,4 +101,5 @@ def decode_overflow_metadata(value: object) -> tuple[int, int, int, int, int]:
         raise MetadataCodecError(
             "overflow payload must contain an out-of-range integer"
         )
-    return decoded  # type: ignore[return-value]
+    device, inode, size, mtime_ns, ctime_ns = decoded
+    return device, inode, size, mtime_ns, ctime_ns

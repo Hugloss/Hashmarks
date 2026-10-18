@@ -11,6 +11,16 @@ from collections.abc import Mapping
 from copy import deepcopy
 from typing import Any, Literal, TypedDict, Unpack, cast, get_args
 
+from hashmarks.evidence_presentation_task import (
+    compact_initial_declarations,
+    compact_initial_groups,
+    compact_initial_record_contexts,
+    compact_initial_source_qualifiers,
+    compact_initial_verification_qualifiers,
+    initial_evidence_text,
+    project_initial_task,
+    project_task,
+)
 from hashmarks.evidence_presentation_text import evidence_projection_text
 from hashmarks.operation_contract import (
     operation_default_mode,
@@ -185,6 +195,14 @@ class _Projection:
         self.contexts: list[dict[str, object]] = []
         self.used: set[str] = set()
 
+    def record_context(
+        self, ref: tuple[object, ...], context: Mapping[str, object]
+    ) -> None:
+        """Account for a section whose qualification is projected separately."""
+        pointer = _pointer(ref)
+        self.contexts.append({"source_ref": pointer, "details": context})
+        self.used.add(pointer)
+
     def add(
         self,
         family: str,
@@ -317,8 +335,19 @@ class _Projection:
         ref: tuple[object, ...] = (),
         inherited: Mapping[str, object] | None = None,
     ) -> bool:
-        context = {**(inherited or {}), **_context(packet)}
         schema = packet.get("schema")
+        if schema == operation_schema("task_evidence", "initial"):
+            _require_fields(packet, str(schema))
+            project_initial_task(self, packet, ref)
+            self.unprojected.append(
+                {
+                    "source_ref": _pointer(ref),
+                    "reason": "native-packet-details-not-displayed",
+                    "native_item_count": len(packet),
+                }
+            )
+            return True
+        context = {**(inherited or {}), **_context(packet)}
         projector = _projectors().get(str(schema))
         self.contexts.append(
             {
@@ -560,6 +589,7 @@ def _diagnostic(
     for key, kind in (
         ("added", "diagnostic_added"),
         ("removed", "diagnostic_missing_after"),
+        ("changed_claims", "diagnostic_claim_metadata_changed"),
     ):
         p.field(
             value,
@@ -681,6 +711,9 @@ def _source(
     ref: tuple[object, ...],
     ctx: Mapping[str, object],
 ) -> None:
+    if packet.get("requested_lines"):
+        # Explicit line targets precede separately bounded literal matches.
+        p.field(packet, "line_anchors", "source", ref, ctx)
     _fields(
         p,
         packet,
@@ -689,7 +722,16 @@ def _source(
         (
             ("occurrences", "source", "records"),
             ("literal_observations", "qualification", "records"),
-            ("line_anchors", "source", "records"),
+        ),
+    )
+    if not packet.get("requested_lines"):
+        p.field(packet, "line_anchors", "source", ref, ctx)
+    _fields(
+        p,
+        packet,
+        ref,
+        ctx,
+        (
             ("member", "source", "record"),
             ("member_observations", "source", "records"),
             ("source_shape", "evidence_measurement", "record"),
@@ -703,6 +745,7 @@ def _locality(
     ref: tuple[object, ...],
     ctx: Mapping[str, object],
 ) -> None:
+    _lifecycle(p, packet, ref, ctx)
     p.field(
         packet,
         "native_semantic_relationships",
@@ -712,6 +755,21 @@ def _locality(
         shape="record",
         assertion="producer_claim",
     )
+    # The observer already bounds these collections. Project each collection
+    # once so a second per-finding limit cannot hide admitted segments or gaps.
+    for key, family in (
+        ("nodes", "repository_structure"),
+        ("edges", "relationship"),
+        ("unresolved_calls", "relationship"),
+        ("external_or_unindexed_calls", "relationship"),
+    ):
+        if key not in packet:
+            continue
+        field_ref = (*ref, key)
+        rows = _collection_rows(packet[key], "records", field_ref)
+        finding = p.add(family, key, packet[key], field_ref, ctx)
+        if finding:
+            finding["native_item_count"] = len(rows)
     supplied = packet.get("supplied_relationship_observation")
     if isinstance(supplied, Mapping):
         p.project(supplied, (*ref, "supplied_relationship_observation"), ctx)
@@ -721,10 +779,6 @@ def _locality(
         ref,
         ctx,
         (
-            ("nodes", "repository_structure", "records"),
-            ("edges", "relationship", "records"),
-            ("unresolved_calls", "relationship", "records"),
-            ("external_or_unindexed_calls", "relationship", "records"),
             ("verification_paths", "verification", "values"),
             ("dimensions", "evidence_measurement", "record"),
         ),
@@ -996,6 +1050,17 @@ def _declarations(
     p.nested(packet, "repository_evidence", ref, ctx)
 
 
+def _declaration_discovery(
+    p: _Projection,
+    packet: Mapping[str, object],
+    ref: tuple[object, ...],
+    ctx: Mapping[str, object],
+) -> None:
+    p.field(packet, "providers", "repository_structure", ref, ctx)
+    p.field(packet, "delta_from_previous", "correspondence", ref, ctx)
+    p.nested(packet, "declarations", ref, ctx)
+
+
 def _context_packet(
     p: _Projection,
     packet: Mapping[str, object],
@@ -1024,167 +1089,6 @@ def _find(
     ctx: Mapping[str, object],
 ) -> None:
     p.field(packet, "results", "retrieval_evidence", ref, ctx)
-
-
-def _task_owner_display_qualified(
-    ownership: Mapping[str, object],
-    owner_path: object,
-    freshness: object,
-) -> bool:
-    """Respect existing producer-owned proof/freshness, without redeciding owner."""
-    return (
-        ownership.get("status") == "resolved"
-        and ownership.get("proof_scope_complete") is True
-        and ownership.get("authority") == "repository-ownership-only"
-        and isinstance(owner_path, str)
-        and bool(owner_path)
-        and isinstance(freshness, Mapping)
-        and freshness.get("state") == "current"
-    )
-
-
-def _task_ownership(
-    p: _Projection,
-    packet: Mapping[str, object],
-    ref: tuple[object, ...],
-    ctx: Mapping[str, object],
-) -> None:
-    """Project owner claims without promoting incomplete or stale evidence."""
-    ownership = packet.get("ownership")
-    if not isinstance(ownership, Mapping):
-        return
-    owner = ownership.get("owner")
-    owner_path = owner.get("path") if isinstance(owner, Mapping) else None
-    freshness = packet.get("freshness")
-    freshness_state = (
-        freshness.get("state") if isinstance(freshness, Mapping) else "unknown"
-    )
-    qualified = _task_owner_display_qualified(ownership, owner_path, freshness)
-    ownership_context = {
-        **ctx,
-        "task_ownership": {
-            "status": ownership.get("status"),
-            "authority": ownership.get("authority"),
-            "authority_proof_identity": ownership.get("authority_proof_identity"),
-            "proof_scope_complete": ownership.get("proof_scope_complete"),
-            "owner_path": owner_path,
-            "freshness_state": freshness_state,
-            "display_qualification": (
-                "producer-claimed-qualified" if qualified else "unqualified"
-            ),
-        },
-    }
-    for key, family, kind, assertion in (
-        (
-            "owner",
-            "ownership_evidence",
-            "qualified_owner" if qualified else "unqualified_owner",
-            "observed_fact" if qualified else "producer_claim",
-        ),
-        ("candidate", "ownership_evidence", "owner_candidate", "producer_claim"),
-        (
-            "source_evidence",
-            "source",
-            "owner_source_evidence" if qualified else "unqualified_owner_source",
-            "observed_fact" if qualified else "producer_claim",
-        ),
-        ("next_read", "ownership_evidence", "discrimination_read", "producer_claim"),
-    ):
-        if isinstance(ownership.get(key), Mapping):
-            p.field(
-                ownership,
-                key,
-                family,
-                (*ref, "ownership"),
-                ownership_context,
-                kind=kind,
-                shape="record",
-                assertion=assertion,
-            )
-
-
-def _task_verification(
-    p: _Projection,
-    packet: Mapping[str, object],
-    ref: tuple[object, ...],
-    ctx: Mapping[str, object],
-) -> None:
-    """Show producer-owned verification choices without executing them."""
-    verification = packet.get("verification")
-    if isinstance(verification, Mapping):
-        verification_context = {
-            **ctx,
-            "verification_authority": verification.get("authority"),
-        }
-        for key, kind in (
-            ("selected", "selected_verifier"),
-            ("plan", "verification_plan"),
-        ):
-            if isinstance(verification.get(key), Mapping):
-                p.field(
-                    verification,
-                    key,
-                    "verification",
-                    (*ref, "verification"),
-                    verification_context,
-                    kind=kind,
-                    shape="record",
-                    assertion="producer_claim",
-                )
-
-
-def _task(
-    p: _Projection,
-    packet: Mapping[str, object],
-    ref: tuple[object, ...],
-    ctx: Mapping[str, object],
-) -> None:
-    retrieval = packet.get("retrieval")
-    if retrieval is not None:
-        if not isinstance(retrieval, Mapping):
-            raise ValueError("malformed task retrieval")
-        retrieval_ref = (*ref, "retrieval")
-        retrieval_context = {
-            **ctx,
-            "retrieval": {
-                key: deepcopy(value)
-                for key, value in retrieval.items()
-                if key != "results"
-            },
-        }
-        p.contexts.append(
-            {"source_ref": _pointer(retrieval_ref), "details": retrieval_context}
-        )
-        p.field(
-            retrieval, "results", "retrieval_evidence", retrieval_ref, retrieval_context
-        )
-        p.used.add(_pointer(retrieval_ref))
-    _task_ownership(p, packet, ref, ctx)
-    _task_verification(p, packet, ref, ctx)
-    p.field(
-        packet,
-        "semantic_relationships",
-        "relationship",
-        ref,
-        ctx,
-        kind="scip_semantic_discovery",
-        shape="record",
-        assertion="producer_claim",
-    )
-    _fields(
-        p,
-        packet,
-        ref,
-        ctx,
-        (
-            ("ownership", "ownership_evidence", "record"),
-            ("supplied_observation_accounting", "qualification", "record"),
-            ("verification", "verification", "record"),
-            ("explicit_target", "ownership_evidence", "record"),
-            ("evidence_receipt", "qualification", "record"),
-            ("related", "relationship", "record"),
-        ),
-    )
 
 
 def _impact(
@@ -1310,6 +1214,34 @@ def _findings(
     ctx: Mapping[str, object],
 ) -> None:
     p.field(packet, "findings", "diagnostic", ref, ctx, assertion="producer_claim")
+    _lifecycle(p, packet, ref, ctx)
+
+
+def _lifecycle(
+    p: _Projection,
+    packet: Mapping[str, object],
+    ref: tuple[object, ...],
+    ctx: Mapping[str, object],
+) -> None:
+    p.nested(packet, "resource_lifecycle", ref, ctx)
+
+
+def _lifecycle_packet(
+    p: _Projection,
+    packet: Mapping[str, object],
+    ref: tuple[object, ...],
+    ctx: Mapping[str, object],
+) -> None:
+    from .codemap.filesystem_lifecycle_contract import validate_lifecycle_observation
+
+    validate_lifecycle_observation(packet)
+    p.field(packet, "coverage", "qualification", ref, ctx, shape="record")
+    p.field(packet, "accounting", "evidence_measurement", ref, ctx, shape="record")
+    p.field(packet, "unresolved", "qualification", ref, ctx, assertion="producer_claim")
+    p.field(
+        packet, "observations", "relationship", ref, ctx, assertion="producer_claim"
+    )
+    p.field(packet, "operations", "source", ref, ctx, assertion="producer_claim")
 
 
 def _structural_comparison(
@@ -1408,7 +1340,10 @@ def _projectors() -> dict[str, Any]:
         VERIFICATION_EXPLANATION_SCHEMA,
     )
 
+    from .codemap.filesystem_lifecycle_contract import SCHEMA as LIFECYCLE_SCHEMA
+
     return {
+        LIFECYCLE_SCHEMA: _lifecycle_packet,
         REPOSITORY_SNAPSHOT_SCHEMA: _snapshot,
         REPOSITORY_DELTA_SCHEMA: _delta,
         DIAGNOSTIC_DELTA_SCHEMA: _diagnostic,
@@ -1430,7 +1365,7 @@ def _projectors() -> dict[str, Any]:
         ): _direct_relationship_delta,
         operation_schema("repository_context"): _context_packet,
         operation_schema("find"): _find,
-        operation_schema("task_evidence"): _task,
+        operation_schema("task_evidence"): project_task,
         operation_schema("change_impact"): _impact,
         operation_schema("post_change"): _impact,
         operation_schema("structural_locality"): _locality,
@@ -1446,6 +1381,9 @@ def _projectors() -> dict[str, Any]:
         operation_schema("correlate_evidence"): _correlation,
         operation_schema("repository_declarations", "observation"): _declarations,
         operation_schema("repository_declarations", "explain"): _declarations,
+        operation_schema(
+            "repository_declarations", "discovery"
+        ): _declaration_discovery,
     }
 
 
@@ -1454,6 +1392,12 @@ def _require_fields(packet: Mapping[str, object], schema: str) -> None:
         operation_schema("find"): ("results",),
         operation_schema("repository_context"): ("areas",),
         operation_schema("task_evidence"): ("retrieval", "ownership", "verification"),
+        operation_schema("task_evidence", "initial"): (
+            "retrieval",
+            "ownership",
+            "verification",
+            "initial_projection",
+        ),
         operation_schema("source_observation", "member"): ("member", "occurrences"),
         operation_schema("source_observation", "scope"): (
             "member_observations",
@@ -1478,6 +1422,10 @@ def _require_fields(packet: Mapping[str, object], schema: str) -> None:
         ),
         operation_schema("dependency_codemap", "compare"): ("comparability",),
         operation_schema("repository_declarations", "observation"): ("groups",),
+        operation_schema("repository_declarations", "discovery"): (
+            "providers",
+            "declarations",
+        ),
         operation_schema("repository_declarations", "explain"): (
             "semantic_result",
             "derivation",
@@ -1530,7 +1478,21 @@ def present_repository_evidence(
     """Render an already observed packet; bounds apply only to displayed records."""
     if validate_presentation(format) == "none":
         raise ValueError("presentation must be one of: structured, compact, text")
-    limit = _MAX_PRESENTED_ROWS if format == "structured" else 5
+    initial = packet.get("schema") == operation_schema("task_evidence", "initial")
+    if initial:
+        from hashmarks.codemap.task_evidence_initial import decode_initial_packet
+
+        packet = decode_initial_packet(dict(packet))
+    # Initial collections are already bounded by their producer. A second cap
+    # must not hide the relevant verifier or an admitted owner alternative.
+    explicit_source_lines = packet.get("schema") == operation_schema(
+        "source_observation", "member"
+    ) and bool(packet.get("requested_lines"))
+    limit = (
+        _MAX_PRESENTED_ROWS
+        if initial or explicit_source_lines or format == "structured"
+        else 5
+    )
     projection = _Projection(limit)
     supported = projection.project(packet)
     groups = [
@@ -1561,21 +1523,42 @@ def present_repository_evidence(
         "authority": "descriptive-only",
         "execution_effect": "none",
     }
+    if initial:
+        result["reference_space"] = "decoded-initial-data"
+        compact_initial_groups(groups)
+        compact_initial_record_contexts(result)
+        if format == "compact":
+            compact_initial_source_qualifiers(groups)
+            compact_initial_declarations(groups)
+            compact_initial_verification_qualifiers(groups)
     if format == "text":
-        result["text"] = evidence_projection_text(result)
+        if packet.get("schema") == operation_schema("task_evidence", "initial"):
+            result["text"] = initial_evidence_text(packet)
+            result["groups"] = []
+            result["unprojected_sections"] = [
+                *projection.unprojected,
+                {
+                    "source_ref": "",
+                    "reason": "initial-locators-rendered-in-text",
+                    "native_item_count": sum(projection.counts.values()),
+                },
+            ]
+        else:
+            result["text"] = evidence_projection_text(result)
     return result
 
 
 def presentation_response(
     operation: str,
-    result: dict[str, object],
+    result: Mapping[str, object],
     *,
     format: str = "none",
     result_mode: str | None = None,
 ) -> dict[str, object]:
     """Keep the validated native response alongside an optional projection."""
     validate_presentation(format)
-    validate_operation_response(operation, result, mode=result_mode)
+    native = result if isinstance(result, dict) else dict(result)
+    result = validate_operation_response(operation, native, mode=result_mode)
     if format == "none":
         return result
     if operation == "repository_intelligence_query":

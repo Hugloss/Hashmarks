@@ -1,0 +1,910 @@
+{
+  "cases": [
+    {
+      "after": "fastapi-recursive-default-serialization-after",
+      "before": "fastapi-recursive-default-serialization-before",
+      "candidate_test_path": "tests/test_jsonable_encoder.py",
+      "capability_reviewed": false,
+      "id": "fastapi-recursive-default-serialization",
+      "nominated_component_paths": [
+        "fastapi/encoders.py"
+      ],
+      "pair_relationship": "caller/source nomination only; exact producer/consumer correspondence pending",
+      "problem_distinctness_reviewed": false,
+      "problem_id": "aadfcce76380ab169fe172d5cda21722e53c4924",
+      "problem_source": "https://github.com/fastapi/fastapi/commit/aadfcce76380ab169fe172d5cda21722e53c4924",
+      "repository": "fastapi",
+      "runtime_validation": "not-established",
+      "semantic_reviewed": false,
+      "source_inputs": {
+        "after": [
+          {
+            "bytes": 11713,
+            "path": "fastapi/encoders.py",
+            "sha256": "4cc09230eca6435892f6bc25a2185e214dbedfe994d5103feb63ad269137caad",
+            "state": "source-present"
+          },
+          {
+            "bytes": 10602,
+            "path": "tests/test_jsonable_encoder.py",
+            "sha256": "cea093a4d8b99f5e2728b05b172378582f8add4b7199390bb47058dfe532b8a5",
+            "state": "source-present"
+          }
+        ],
+        "before": [
+          {
+            "bytes": 11603,
+            "path": "fastapi/encoders.py",
+            "sha256": "9b63869eaf64f7802571de9440cf2bee2c27f9c8ef25da4e291549b9047af13f",
+            "state": "source-present"
+          },
+          {
+            "bytes": 10081,
+            "path": "tests/test_jsonable_encoder.py",
+            "sha256": "20c0ecf8b721f7eb3b56e557e45f02510074146fa430c0f2b6009563da221129",
+            "state": "source-present"
+          }
+        ]
+      },
+      "task": "Recursive dictionary serialization does not carry the requested default-field filter to nested values.",
+      "upstream_subject": "\ud83d\udc1b Fix `exclude_defaults` not propagated to dict keys and values in `jsonable_encoder` (#16043)"
+    },
+    {
+      "after": "fastapi-iterable-serialization-options-after",
+      "before": "fastapi-iterable-serialization-options-before",
+      "candidate_test_path": "tests/test_skip_defaults.py",
+      "capability_reviewed": false,
+      "id": "fastapi-iterable-serialization-options",
+      "nominated_component_paths": [
+        "fastapi/routing.py"
+      ],
+      "pair_relationship": "caller/source nomination only; exact producer/consumer correspondence pending",
+      "problem_distinctness_reviewed": false,
+      "problem_id": "d6537f774b0e80e376e2cf4e0fa998a38c6d0c09",
+      "problem_source": "https://github.com/fastapi/fastapi/commit/d6537f774b0e80e376e2cf4e0fa998a38c6d0c09",
+      "repository": "fastapi",
+      "runtime_validation": "not-established",
+      "semantic_reviewed": false,
+      "source_inputs": {
+        "after": [
+          {
+            "bytes": 253843,
+            "path": "fastapi/routing.py",
+            "sha256": "5dbd393970fb29ee95629574dbc5f186d3330b8587735d7e694f55e754a99729",
+            "state": "source-present"
+          },
+          {
+            "bytes": 3073,
+            "path": "tests/test_skip_defaults.py",
+            "sha256": "52dd45cd3d327da99634da3c711ca5a77205f512d93e8775b43fbb7a680887dc",
+            "state": "source-present"
+          }
+        ],
+        "before": [
+          {
+            "bytes": 253802,
+            "path": "fastapi/routing.py",
+            "sha256": "e8e5b1c239c33e798f338b0bf207b0b2e6e7d0d6b0ebd3d7769fc8e438011b40",
+            "state": "source-present"
+          },
+          {
+            "bytes": 2064,
+            "path": "tests/test_skip_defaults.py",
+            "sha256": "39187e7615f8ecc64702b558e8b5e17aed6ccbb70a912f0c083f99a6974149f3",
+            "state": "source-present"
+          }
+        ]
+      },
+      "task": "A non-generator iterable response loses declared serialization options between route construction and response serialization.",
+      "upstream_subject": "\ud83d\udc1b Fix `response_model_*` params ignored for non-generator endpoints with `Iterable[..]` return type (#15093)"
+    },
+    {
+      "after": "fastapi-stream-response-arguments-after",
+      "before": "fastapi-stream-response-arguments-before",
+      "candidate_test_path": "tests/test_stream_status_code.py",
+      "capability_reviewed": false,
+      "id": "fastapi-stream-response-arguments",
+      "nominated_component_paths": [
+        "fastapi/routing.py"
+      ],
+      "pair_relationship": "caller/source nomination only; exact producer/consumer correspondence pending",
+      "problem_distinctness_reviewed": false,
+      "problem_id": "e92a0dc3ce5ecbebb8655dbe5465cb61d48f9fc0",
+      "problem_source": "https://github.com/fastapi/fastapi/commit/e92a0dc3ce5ecbebb8655dbe5465cb61d48f9fc0",
+      "repository": "fastapi",
+      "runtime_validation": "not-established",
+      "semantic_reviewed": false,
+      "source_inputs": {
+        "after": [
+          {
+            "bytes": 254081,
+            "path": "fastapi/routing.py",
+            "sha256": "f473e9bfc0198408297a80fd5c70f1983e8103b5174d117cb6122c7a178f43ef",
+            "state": "source-present"
+          },
+          {
+            "bytes": 19770,
+            "path": "tests/test_stream_status_code.py",
+            "sha256": "651e64ab219e9eb1154a6754ba768446bdf10208233c15220da539e95bb8266b",
+            "state": "source-present"
+          }
+        ],
+        "before": [
+          {
+            "bytes": 253843,
+            "path": "fastapi/routing.py",
+            "sha256": "5dbd393970fb29ee95629574dbc5f186d3330b8587735d7e694f55e754a99729",
+            "state": "source-present"
+          },
+          {
+            "path": "tests/test_stream_status_code.py",
+            "semantic_absence": "not-established",
+            "state": "known-absent-in-exact-source-tree"
+          }
+        ]
+      },
+      "task": "Streaming response branches do not preserve the declared response status and dependency background metadata.",
+      "upstream_subject": "\ud83d\udc1b Fix `status_code` being ignored for SSE and JSONL streaming endpoints (#15937)"
+    },
+    {
+      "after": "fastapi-frontend-dependency-metadata-after",
+      "before": "fastapi-frontend-dependency-metadata-before",
+      "candidate_test_path": "tests/test_frontend.py",
+      "capability_reviewed": false,
+      "id": "fastapi-frontend-dependency-metadata",
+      "nominated_component_paths": [
+        "fastapi/dependencies/utils.py",
+        "fastapi/routing.py"
+      ],
+      "pair_relationship": "caller/source nomination only; exact producer/consumer correspondence pending",
+      "problem_distinctness_reviewed": false,
+      "problem_id": "d62354434b2e508fe89024213b220ca8e67dea5e",
+      "problem_source": "https://github.com/fastapi/fastapi/commit/d62354434b2e508fe89024213b220ca8e67dea5e",
+      "repository": "fastapi",
+      "runtime_validation": "not-established",
+      "semantic_reviewed": false,
+      "source_inputs": {
+        "after": [
+          {
+            "bytes": 39180,
+            "path": "fastapi/dependencies/utils.py",
+            "sha256": "13693375ab95e32424e5434c21f928463634af5ee1261cf3e04031381bdf47d9",
+            "state": "source-present"
+          },
+          {
+            "bytes": 255632,
+            "path": "fastapi/routing.py",
+            "sha256": "7b1ef65fb6b209445dc43be070a23324b7879aef9c6b9f63e6968234b7723b55",
+            "state": "source-present"
+          },
+          {
+            "bytes": 42460,
+            "path": "tests/test_frontend.py",
+            "sha256": "6f6f33ac5cb85ca17e70c6651408c927527099f7eb5ff1b8712d3fea13a272d0",
+            "state": "source-present"
+          }
+        ],
+        "before": [
+          {
+            "bytes": 39180,
+            "path": "fastapi/dependencies/utils.py",
+            "sha256": "13693375ab95e32424e5434c21f928463634af5ee1261cf3e04031381bdf47d9",
+            "state": "source-present"
+          },
+          {
+            "bytes": 254981,
+            "path": "fastapi/routing.py",
+            "sha256": "7c34cefb6c3e2790d2537c0d9964cf8bd66c54fa7ae606d9d464f9fba46a17dc",
+            "state": "source-present"
+          },
+          {
+            "bytes": 41567,
+            "path": "tests/test_frontend.py",
+            "sha256": "3734c0db818e60761cbdb05ee2b8914e89d9229f64357b07a5e3e5ef3bd519bb",
+            "state": "source-present"
+          }
+        ]
+      },
+      "task": "Frontend responses lose headers and background tasks supplied through dependency results.",
+      "upstream_subject": "\ud83d\udc1b Fix support for background tasks and headers from dependencies in `app.frontend()` (#16105)"
+    },
+    {
+      "after": "litestar-serializer-keyerror-boundary-after",
+      "before": "litestar-serializer-keyerror-boundary-before",
+      "candidate_test_path": "tests/unit/test_response/test_serialization.py",
+      "capability_reviewed": false,
+      "id": "litestar-serializer-keyerror-boundary",
+      "nominated_component_paths": [
+        "litestar/serialization/msgspec_hooks.py"
+      ],
+      "pair_relationship": "caller/source nomination only; exact producer/consumer correspondence pending",
+      "problem_distinctness_reviewed": false,
+      "problem_id": "673c1e93f9fe467f4839976c51d072668ecd98e1",
+      "problem_source": "https://github.com/litestar-org/litestar/commit/673c1e93f9fe467f4839976c51d072668ecd98e1",
+      "repository": "litestar",
+      "runtime_validation": "not-established",
+      "semantic_reviewed": false,
+      "source_inputs": {
+        "after": [
+          {
+            "bytes": 9553,
+            "path": "litestar/serialization/msgspec_hooks.py",
+            "sha256": "94b165d0bb9836aebc9bc69869bc8777f3c32ddb2b0c6059df6c8d11ee764e1e",
+            "state": "source-present"
+          },
+          {
+            "bytes": 3485,
+            "path": "tests/unit/test_response/test_serialization.py",
+            "sha256": "6b09fecb29cb4728a4365818df0946be79975b6986393e4a3e693b4279ca5763",
+            "state": "source-present"
+          }
+        ],
+        "before": [
+          {
+            "bytes": 9539,
+            "path": "litestar/serialization/msgspec_hooks.py",
+            "sha256": "47b7c429bc954ef65926b0c723a7fb7898675db182bc3fc9209906864342c31f",
+            "state": "source-present"
+          },
+          {
+            "bytes": 3485,
+            "path": "tests/unit/test_response/test_serialization.py",
+            "sha256": "6b09fecb29cb4728a4365818df0946be79975b6986393e4a3e693b4279ca5763",
+            "state": "source-present"
+          }
+        ]
+      },
+      "task": "A serializer dispatch branch consumes an encoder KeyError as though its type entry were missing.",
+      "upstream_subject": "fix: `KeyError` swallowing in `default_serializer` (#4420)"
+    },
+    {
+      "after": "litestar-nested-field-renaming-after",
+      "before": "litestar-nested-field-renaming-before",
+      "candidate_test_path": "tests/unit/test_dto/test_factory/test_integration.py",
+      "capability_reviewed": false,
+      "id": "litestar-nested-field-renaming",
+      "nominated_component_paths": [
+        "litestar/dto/_backend.py"
+      ],
+      "pair_relationship": "caller/source nomination only; exact producer/consumer correspondence pending",
+      "problem_distinctness_reviewed": false,
+      "problem_id": "dfe872c6379142d6c5a266a6e5a19fa48dacddb8",
+      "problem_source": "https://github.com/litestar-org/litestar/commit/dfe872c6379142d6c5a266a6e5a19fa48dacddb8",
+      "repository": "litestar",
+      "runtime_validation": "not-established",
+      "semantic_reviewed": false,
+      "source_inputs": {
+        "after": [
+          {
+            "bytes": 34500,
+            "path": "litestar/dto/_backend.py",
+            "sha256": "dfb07a71c0a8e2842f7d20b163aeaa493b0cb36b536962960eb6421ab8558dfa",
+            "state": "source-present"
+          },
+          {
+            "bytes": 27134,
+            "path": "tests/unit/test_dto/test_factory/test_integration.py",
+            "sha256": "4aa8f0b5d051b229735b01014e45216f7b3ef41e48a548abb47557802364e419",
+            "state": "source-present"
+          }
+        ],
+        "before": [
+          {
+            "bytes": 32956,
+            "path": "litestar/dto/_backend.py",
+            "sha256": "9ee66601f8b31c0faa2362a8358269daa46c0816b09654c26e5f3662f4603508",
+            "state": "source-present"
+          },
+          {
+            "bytes": 26021,
+            "path": "tests/unit/test_dto/test_factory/test_integration.py",
+            "sha256": "7c17363824712efe7bbb77b2dc34eee7046dccd51440044f5a73b8e860bc0a72",
+            "state": "source-present"
+          }
+        ]
+      },
+      "task": "Nested transfer metadata does not carry field renaming through the declared producer and consumer stages.",
+      "upstream_subject": "fix(dto): nested field renaming (#2721) (#2764)"
+    },
+    {
+      "after": "litestar-dtodata-renamed-instance-after",
+      "before": "litestar-dtodata-renamed-instance-before",
+      "candidate_test_path": "tests/unit/test_dto/test_factory/test_integration.py",
+      "capability_reviewed": false,
+      "id": "litestar-dtodata-renamed-instance",
+      "nominated_component_paths": [
+        "litestar/dto/data_structures.py",
+        "litestar/dto/_backend.py"
+      ],
+      "pair_relationship": "caller/source nomination only; exact producer/consumer correspondence pending",
+      "problem_distinctness_reviewed": false,
+      "problem_id": "031df7f45e69200624779356074f6f9470d2c1b3",
+      "problem_source": "https://github.com/litestar-org/litestar/commit/031df7f45e69200624779356074f6f9470d2c1b3",
+      "repository": "litestar",
+      "runtime_validation": "not-established",
+      "semantic_reviewed": false,
+      "source_inputs": {
+        "after": [
+          {
+            "bytes": 3961,
+            "path": "litestar/dto/data_structures.py",
+            "sha256": "f6be5d47560857ae9fe5bcfb10bc428b6e7bca694fb7c33197b5c9bf4ac48ab4",
+            "state": "source-present"
+          },
+          {
+            "bytes": 32883,
+            "path": "litestar/dto/_backend.py",
+            "sha256": "05e331f3e123665a5a509513288b88fb3197c0ccf2d480b78c64f590223f5f79",
+            "state": "source-present"
+          },
+          {
+            "bytes": 23954,
+            "path": "tests/unit/test_dto/test_factory/test_integration.py",
+            "sha256": "f94bd97704be151b81810aeb1c55055d5941e2a3046871f975872502cc2e0994",
+            "state": "source-present"
+          }
+        ],
+        "before": [
+          {
+            "bytes": 3905,
+            "path": "litestar/dto/data_structures.py",
+            "sha256": "c1aa0cb1fc75b9f5fb0d5b2370acf9612abf594ce1f44ab788391d4fa884aa55",
+            "state": "source-present"
+          },
+          {
+            "bytes": 32023,
+            "path": "litestar/dto/_backend.py",
+            "sha256": "b085933d61a5ace9fb583158cab4a5d96da07f1008085dec9fc25fee7cfc3eff",
+            "state": "source-present"
+          },
+          {
+            "bytes": 23589,
+            "path": "tests/unit/test_dto/test_factory/test_integration.py",
+            "sha256": "097edd5b05919f338ddaa142c44ffac9c4641aa50067050b275b6cd94186a502",
+            "state": "source-present"
+          }
+        ]
+      },
+      "task": "Creating an instance from DTOData confuses original field names with serialization names.",
+      "upstream_subject": "fix: DTOData bug with renamed fields (#2144)"
+    },
+    {
+      "after": "litestar-url-encoded-string-values-after",
+      "before": "litestar-url-encoded-string-values-before",
+      "candidate_test_path": "tests/unit/test_kwargs/test_url_encoded_data.py",
+      "capability_reviewed": false,
+      "id": "litestar-url-encoded-string-values",
+      "nominated_component_paths": [
+        "litestar/_parsers.py",
+        "litestar/dto/_backend.py"
+      ],
+      "pair_relationship": "caller/source nomination only; exact producer/consumer correspondence pending",
+      "problem_distinctness_reviewed": false,
+      "problem_id": "e50ffb978c6e34588d7ed4cec71a2bec18d19a92",
+      "problem_source": "https://github.com/litestar-org/litestar/commit/e50ffb978c6e34588d7ed4cec71a2bec18d19a92",
+      "repository": "litestar",
+      "runtime_validation": "not-established",
+      "semantic_reviewed": false,
+      "source_inputs": {
+        "after": [
+          {
+            "bytes": 2396,
+            "path": "litestar/_parsers.py",
+            "sha256": "091ac8669a91ac3de3883c55409461c8a758f15cd938d116074fa41632a8fe4a",
+            "state": "source-present"
+          },
+          {
+            "bytes": 21671,
+            "path": "litestar/dto/_backend.py",
+            "sha256": "e0a2c62708f34b14d7fd3a2c08bb9857363a1ffe43a2a41c4fc4def1064e0916",
+            "state": "source-present"
+          },
+          {
+            "bytes": 1129,
+            "path": "tests/unit/test_kwargs/test_url_encoded_data.py",
+            "sha256": "70097d4c1d5ea038ea47712d8433c68ba1e395f0e1c0158365f922b8a7092185",
+            "state": "source-present"
+          }
+        ],
+        "before": [
+          {
+            "bytes": 2372,
+            "path": "litestar/_parsers.py",
+            "sha256": "bb71798dfbeeca51f78bf58db86c9a5dd72231513a37e79972a7fecaf5a2ce3e",
+            "state": "source-present"
+          },
+          {
+            "bytes": 21563,
+            "path": "litestar/dto/_backend.py",
+            "sha256": "af76b3ffb6d74de41148b9cad4bb0f305f1fdb17ee449318e5e3518c8e25bff0",
+            "state": "source-present"
+          },
+          {
+            "bytes": 1094,
+            "path": "tests/unit/test_kwargs/test_url_encoded_data.py",
+            "sha256": "3cfd5249a2b138881660353a04a999d468ae9552c9a1a7c9e5c6ea3206a3231e",
+            "state": "source-present"
+          }
+        ]
+      },
+      "task": "URL-encoded input changes scalar representation before DTO transfer consumes it.",
+      "upstream_subject": "fix(serialization): fixed url encoded serialization (#2001)"
+    },
+    {
+      "after": "faststream-keyed-none-tombstone-after",
+      "before": "faststream-keyed-none-tombstone-before",
+      "candidate_test_path": "tests/brokers/kafka/test_publish.py",
+      "capability_reviewed": false,
+      "id": "faststream-keyed-none-tombstone",
+      "nominated_component_paths": [
+        "faststream/confluent/publisher/producer.py",
+        "faststream/kafka/publisher/producer.py"
+      ],
+      "pair_relationship": "caller/source nomination only; exact producer/consumer correspondence pending",
+      "problem_distinctness_reviewed": false,
+      "problem_id": "5b98b87c433c28dabbb21d092fc854e4ecb0bcbd",
+      "problem_source": "https://github.com/ag2ai/faststream/commit/5b98b87c433c28dabbb21d092fc854e4ecb0bcbd",
+      "repository": "faststream",
+      "runtime_validation": "not-established",
+      "semantic_reviewed": false,
+      "source_inputs": {
+        "after": [
+          {
+            "bytes": 6308,
+            "path": "faststream/confluent/publisher/producer.py",
+            "sha256": "6e05a57131f5c99e0615a06805cdaa73dcd34da222256c986fea400360d46fca",
+            "state": "source-present"
+          },
+          {
+            "bytes": 6997,
+            "path": "faststream/kafka/publisher/producer.py",
+            "sha256": "1c94e4a719263d740d807101a67bddf9477dcd1343c3488295e28df6978d29ec",
+            "state": "source-present"
+          },
+          {
+            "bytes": 11987,
+            "path": "tests/brokers/kafka/test_publish.py",
+            "sha256": "ed57c060c2a0e74bbbeecc70e84190f18eeebef8768735c8070de33367df85a0",
+            "state": "source-present"
+          }
+        ],
+        "before": [
+          {
+            "bytes": 6214,
+            "path": "faststream/confluent/publisher/producer.py",
+            "sha256": "e3b0477b3f94ac1784b8f461afb82efc7ea5f0250f742838ad2f02f9441545c3",
+            "state": "source-present"
+          },
+          {
+            "bytes": 6729,
+            "path": "faststream/kafka/publisher/producer.py",
+            "sha256": "851808b8d0299cf8a66a01245b12196574d55313fe9a6edbf956a11eb65faf32",
+            "state": "source-present"
+          },
+          {
+            "bytes": 11343,
+            "path": "tests/brokers/kafka/test_publish.py",
+            "sha256": "5cbc088f76e8d1029f289a76aa86e4a7e546792adeb11063ffbf0addc334ec21",
+            "state": "source-present"
+          }
+        ]
+      },
+      "task": "Publishing a keyed None body loses tombstone identity while passing through the message codec.",
+      "upstream_subject": "fix(confluent): publish(None) should send a real Kafka tombstone (#2932)"
+    },
+    {
+      "after": "faststream-decoded-none-cache-after",
+      "before": "faststream-decoded-none-cache-before",
+      "candidate_test_path": "tests/message/test_message.py",
+      "capability_reviewed": false,
+      "id": "faststream-decoded-none-cache",
+      "nominated_component_paths": [
+        "faststream/message/message.py",
+        "faststream/_internal/endpoint/call_wrapper.py"
+      ],
+      "pair_relationship": "caller/source nomination only; exact producer/consumer correspondence pending",
+      "problem_distinctness_reviewed": false,
+      "problem_id": "0876b55ab9dea96a7533bcf6171d79febd37a2e2",
+      "problem_source": "https://github.com/ag2ai/faststream/commit/0876b55ab9dea96a7533bcf6171d79febd37a2e2",
+      "repository": "faststream",
+      "runtime_validation": "not-established",
+      "semantic_reviewed": false,
+      "source_inputs": {
+        "after": [
+          {
+            "bytes": 3475,
+            "path": "faststream/message/message.py",
+            "sha256": "e22e5bf5b030430e569e777c004f05bf2ebdecbac1457be62bd85d4c77075b84",
+            "state": "source-present"
+          },
+          {
+            "bytes": 4380,
+            "path": "faststream/_internal/endpoint/call_wrapper.py",
+            "sha256": "73fb00d7d7c6a51d5f442f0c743d9e169f1c362a1e7b38e8ea8ed416cdb5bb51",
+            "state": "source-present"
+          },
+          {
+            "bytes": 1639,
+            "path": "tests/message/test_message.py",
+            "sha256": "e60456eb9793107556a07e503aef1f16bc68a3a8976b9e0c8203760de4774ef8",
+            "state": "source-present"
+          }
+        ],
+        "before": [
+          {
+            "bytes": 3409,
+            "path": "faststream/message/message.py",
+            "sha256": "33061823d03c9e2fc3145008302867fea14daa38a1eb5a161f1fd10c79d26c8d",
+            "state": "source-present"
+          },
+          {
+            "bytes": 4380,
+            "path": "faststream/_internal/endpoint/call_wrapper.py",
+            "sha256": "73fb00d7d7c6a51d5f442f0c743d9e169f1c362a1e7b38e8ea8ed416cdb5bb51",
+            "state": "source-present"
+          },
+          {
+            "path": "tests/message/test_message.py",
+            "semantic_absence": "not-established",
+            "state": "known-absent-in-exact-source-tree"
+          }
+        ]
+      },
+      "task": "A valid decoded None value is mistaken for an unobserved decoder result.",
+      "upstream_subject": "fix: use sentinel in StreamMessage.decode() to cache None results (#2784)"
+    },
+    {
+      "after": "faststream-parser-decoder-precedence-after",
+      "before": "faststream-parser-decoder-precedence-before",
+      "candidate_test_path": "tests/brokers/base/parser.py",
+      "capability_reviewed": false,
+      "id": "faststream-parser-decoder-precedence",
+      "nominated_component_paths": [
+        "faststream/_internal/endpoint/subscriber/usecase.py",
+        "faststream/redis/parser/binary.py"
+      ],
+      "pair_relationship": "caller/source nomination only; exact producer/consumer correspondence pending",
+      "problem_distinctness_reviewed": false,
+      "problem_id": "254b0a83d4d493573eb06f2f1f6390b5ffb1969d",
+      "problem_source": "https://github.com/ag2ai/faststream/commit/254b0a83d4d493573eb06f2f1f6390b5ffb1969d",
+      "repository": "faststream",
+      "runtime_validation": "not-established",
+      "semantic_reviewed": false,
+      "source_inputs": {
+        "after": [
+          {
+            "bytes": 15757,
+            "path": "faststream/_internal/endpoint/subscriber/usecase.py",
+            "sha256": "1c739b2ad16401c7f12b9e21987f1788f265f873a9d6bb7bf87005f6f8e6d81e",
+            "state": "source-present"
+          },
+          {
+            "bytes": 4874,
+            "path": "faststream/redis/parser/binary.py",
+            "sha256": "5d05453f0c07af20a4d26a1e770126636b90d3203d98ebc2249f14979b8db0b3",
+            "state": "source-present"
+          },
+          {
+            "bytes": 8888,
+            "path": "tests/brokers/base/parser.py",
+            "sha256": "9ac4f09f3d8b15247708c6dd6aa5fca0965367440c1672f4f61d0d0ba4d7d75a",
+            "state": "source-present"
+          }
+        ],
+        "before": [
+          {
+            "bytes": 14825,
+            "path": "faststream/_internal/endpoint/subscriber/usecase.py",
+            "sha256": "4c343ed398cb0ed9de3aac05985624924f75ee60634948f6674fd366c4bf4542",
+            "state": "source-present"
+          },
+          {
+            "bytes": 4771,
+            "path": "faststream/redis/parser/binary.py",
+            "sha256": "947bd0074d8e2a6a1a8e9e74e0a05c345ec88ce455bc35d91a962e5901e23cba",
+            "state": "source-present"
+          },
+          {
+            "bytes": 6420,
+            "path": "tests/brokers/base/parser.py",
+            "sha256": "3f975ebf999acac130882e1eec277437a6cb778ef09e5cb5b00fe0c38aebf990",
+            "state": "source-present"
+          }
+        ]
+      },
+      "task": "Configured parser and decoder values are not carried consistently through subscriber setup and Redis fallback parsing.",
+      "upstream_subject": "fix: #2554 respect parser & decoder in all API"
+    },
+    {
+      "after": "faststream-address-escape-correspondence-after",
+      "before": "faststream-address-escape-correspondence-before",
+      "candidate_test_path": "tests/brokers/base/address.py",
+      "capability_reviewed": false,
+      "id": "faststream-address-escape-correspondence",
+      "nominated_component_paths": [
+        "faststream/_internal/utils/path.py",
+        "faststream/rabbit/publisher/factory.py",
+        "faststream/rabbit/publisher/config.py"
+      ],
+      "pair_relationship": "caller/source nomination only; exact producer/consumer correspondence pending",
+      "problem_distinctness_reviewed": false,
+      "problem_id": "425e08861e24290adce8ec9a8de21e7d48f5e757",
+      "problem_source": "https://github.com/ag2ai/faststream/commit/425e08861e24290adce8ec9a8de21e7d48f5e757",
+      "repository": "faststream",
+      "runtime_validation": "not-established",
+      "semantic_reviewed": false,
+      "source_inputs": {
+        "after": [
+          {
+            "bytes": 6438,
+            "path": "faststream/_internal/utils/path.py",
+            "sha256": "c7177e2a6824150fc964f3a0c30d9c30835363d0d868ccf86989dd1bd485c46f",
+            "state": "source-present"
+          },
+          {
+            "bytes": 1921,
+            "path": "faststream/rabbit/publisher/factory.py",
+            "sha256": "a5ffc86e039f9a5c900bcecd846d97b0047e11aa3aae37c16e1324247a2b56d7",
+            "state": "source-present"
+          },
+          {
+            "bytes": 796,
+            "path": "faststream/rabbit/publisher/config.py",
+            "sha256": "c313fdb5b2f247c397b8c96c077348f2155d921301f7528f025c90212ac139cd",
+            "state": "source-present"
+          },
+          {
+            "bytes": 4206,
+            "path": "tests/brokers/base/address.py",
+            "sha256": "ec6153eb00399bb82ba46e01326261b2fe99b2b0705cdc1be41777d4683effc2",
+            "state": "source-present"
+          }
+        ],
+        "before": [
+          {
+            "bytes": 5359,
+            "path": "faststream/_internal/utils/path.py",
+            "sha256": "f053b457fc41dd4886c0257d8aa34c019197fe902b9de70f40c9d8c2d0930793",
+            "state": "source-present"
+          },
+          {
+            "bytes": 1558,
+            "path": "faststream/rabbit/publisher/factory.py",
+            "sha256": "83680ec122e401f74983556998a0259e677776eedb7fe037620e1608baf33d29",
+            "state": "source-present"
+          },
+          {
+            "bytes": 728,
+            "path": "faststream/rabbit/publisher/config.py",
+            "sha256": "46484874a41f20208eeb9fb899e79e4fd9e2fc94133e4b8b14209e4c85b158e8",
+            "state": "source-present"
+          },
+          {
+            "bytes": 1997,
+            "path": "tests/brokers/base/address.py",
+            "sha256": "a9e4e1117e23b9a829db04455f80b5efca25ce139ef234c935d80e3d9e651d69",
+            "state": "source-present"
+          }
+        ]
+      },
+      "task": "Address declaration escapes leak into values consumed by publisher configuration and schema readers.",
+      "upstream_subject": "fix: a declaration's brace escaping never reaches anything that reads it (#3072)"
+    }
+  ],
+  "current_observer_limitations": [
+    "consumer-pair declarations accept exact top-level functions only",
+    "literal dictionary returns and direct Name subscript syntax only",
+    "methods, nested handlers, attribute propagation, encoder exceptions and dynamic fields need source evidence with explicit unknown runtime meaning",
+    "source intake does not prove causal test relevance or representative semantic breadth"
+  ],
+  "problem_count": 12,
+  "qualification_effect": "none; no active campaign membership, no capability or eligibility promotion",
+  "repository_count": 3,
+  "required_remaining": [
+    "independent problem-distinctness and exact producer/consumer semantic review",
+    "source-derived oracle/eligibility/unknowns/adversaries and heldout independence",
+    "executable before/after workflow admission on existing public surfaces",
+    "artifact-bound witness closure, transport/revision/freshness qualification",
+    "full same-candidate capability review and final qualification"
+  ],
+  "reserved_sources_inspected": false,
+  "reused_existing_problems_add_no_new_campaign_distinctness": true,
+  "schema": "hashmarks.backend-data-source-catalog.v1",
+  "scope": "capability9 source intake only, twelve genuine changes over three explicitly admitted repositories; selected component/test paths are nominations, not runtime compatibility or pair authority",
+  "source_identity_authority": "exact Git tree plus repository_content_identity, archive SHA256 and selected-file SHA256",
+  "sources": {
+    "fastapi-frontend-dependency-metadata-after": {
+      "archive_sha256": "dee874271cd5a602adf9b42f41cacf30acff3c179b29825306e5c6dfd97edba3",
+      "commit": "d62354434b2e508fe89024213b220ca8e67dea5e",
+      "content_identity": "sha256:ee55ff2c006c3d9384ac2c2324a294980aa77e044749f0fed690917501b4f9e2:3137",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/fastapi"
+    },
+    "fastapi-frontend-dependency-metadata-before": {
+      "archive_sha256": "344f153946badedccc579ead4bd7fe1d61db2bd72a58156a0867684946ba9b77",
+      "commit": "1d211b9c1009d577f39fa2b19b10d9a93a72a0ed",
+      "content_identity": "sha256:ee07c0ecb11869c82f3e9c5bdc287e4862cbacdddae764e218af7aa8f2580dcb:3137",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/fastapi"
+    },
+    "fastapi-iterable-serialization-options-after": {
+      "archive_sha256": "89b448e59fd9b94900eff6ed81a03ecc3218e2c3ff93cff5f489c12aa64b8f3a",
+      "commit": "d6537f774b0e80e376e2cf4e0fa998a38c6d0c09",
+      "content_identity": "sha256:df4f016032a76da5d2cf29af9f1495356b42c1c79b493145b23db0ad61d03e32:3135",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/fastapi"
+    },
+    "fastapi-iterable-serialization-options-before": {
+      "archive_sha256": "2dabae756afc810069b2af612eef67ac46fa3788df0254c84b218aeff45b56d1",
+      "commit": "0f3d3b2f9f09f04fe612d4b7db32485170c9f1dd",
+      "content_identity": "sha256:ccf6682ec80563d9b74bfd2cc89c8a31afda4a96c35f00d7340a037661fda23a:3135",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/fastapi"
+    },
+    "fastapi-recursive-default-serialization-after": {
+      "archive_sha256": "b6430d179e35d13ad989c73d43f0fbbbdffa06241c7104b8a62d2e2f06ed1458",
+      "commit": "aadfcce76380ab169fe172d5cda21722e53c4924",
+      "content_identity": "sha256:2f615ba2fb85aaf8b0b9ff1b3577150ebbf786798df49be2cb6481eb9c65dce5:3134",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/fastapi"
+    },
+    "fastapi-recursive-default-serialization-before": {
+      "archive_sha256": "604b92628cefcff681d79500e1dd20695d11c8247948eb8eec26026c41c253b5",
+      "commit": "4ffd45172059cb32c3326cedde2c7ecf579c5db8",
+      "content_identity": "sha256:2ce7cfa1a7a0340ea62a8a38237ef804b5092124e9fd3b0f9bff4f3272683ca9:3134",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/fastapi"
+    },
+    "fastapi-stream-response-arguments-after": {
+      "archive_sha256": "7b94decf6e07ecbc4b8452cc6d1faa59853f874673a39f510c0387bfa5047c6d",
+      "commit": "e92a0dc3ce5ecbebb8655dbe5465cb61d48f9fc0",
+      "content_identity": "sha256:1fe24849ff6f86a3a96dda19b6d7e90bcf34611c1ebb3444daf16fb5e2bb2c51:3137",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/fastapi"
+    },
+    "fastapi-stream-response-arguments-before": {
+      "archive_sha256": "6067456f4dd42a4efe379c77c1276cea734780a3cbb308439849e113a26fdf56",
+      "commit": "6215d8a6f3fed4eef63fe9d1ae600c12f62bd881",
+      "content_identity": "sha256:096d9f50ec265f730b8f1b20693bc6f60abed94c990a469e28e5fae39efeaa9e:3136",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/fastapi/fastapi"
+    },
+    "faststream-address-escape-correspondence-after": {
+      "archive_sha256": "2c7d014e25a4bcfd6eee3046ab4df6f75b58b02433fffd3fb2bf715957a69354",
+      "commit": "425e08861e24290adce8ec9a8de21e7d48f5e757",
+      "content_identity": "sha256:2c7754bc2725279b28c7d6790bfd79b31b52e6341edd71737c5fcd5b84aac285:2156",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/ag2ai/faststream"
+    },
+    "faststream-address-escape-correspondence-before": {
+      "archive_sha256": "1584f1f197f5e6d048d1237a197d33f4b9ded6638668dea8870fd86e1d5a4aea",
+      "commit": "d7fb7c9b9ae20e3c922fb501c3a190a3859b6b26",
+      "content_identity": "sha256:77da7af07f2ee0d3622efd8b74059a3cbe629d7068b94e62f0b8ed864d2f7e7b:2160",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/ag2ai/faststream"
+    },
+    "faststream-decoded-none-cache-after": {
+      "archive_sha256": "64cc17dfd6821bf8a25a94ae67fe1422e44cf963101d991d5583d3393881aa02",
+      "commit": "0876b55ab9dea96a7533bcf6171d79febd37a2e2",
+      "content_identity": "sha256:98fc366596deeb2f813bbdc5789c8106e27ee712fc24e2e78856356ac6328eb5:1865",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/ag2ai/faststream"
+    },
+    "faststream-decoded-none-cache-before": {
+      "archive_sha256": "2be190eb20c88c2a306b4ef0ee9f23d2443a0c6efe414462ca554dd030ef759d",
+      "commit": "8148f2de21dfc5e922421bdf1e1f5d5b86b36501",
+      "content_identity": "sha256:83f54975edf42f1f6ab882e08f422549a4c4415f4f0ee455f645a483dd914ae3:1864",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/ag2ai/faststream"
+    },
+    "faststream-keyed-none-tombstone-after": {
+      "archive_sha256": "7d75866775696ca62139c724be54a0fa42856d67a532db6517aec03023bfb455",
+      "commit": "5b98b87c433c28dabbb21d092fc854e4ecb0bcbd",
+      "content_identity": "sha256:cc26fbd852862bc1f5f07eab02dcfbe54d95add539b2b227b44c89a007461f01:2104",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/ag2ai/faststream"
+    },
+    "faststream-keyed-none-tombstone-before": {
+      "archive_sha256": "44477e85a105d64c361700a6e712494b9ff181320de481ee335a169ff556912a",
+      "commit": "5c392e2b9e4dfb9b546e22c0dc8aa7af9e020231",
+      "content_identity": "sha256:76dbae6a9c7629a697e81a152325b0c89d7548a47990b3932715c0fb474e14ef:2104",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/ag2ai/faststream"
+    },
+    "faststream-parser-decoder-precedence-after": {
+      "archive_sha256": "b8f151238de318e6d45a900639cf0aa67578793351e3f1a7a23130c9aa464485",
+      "commit": "254b0a83d4d493573eb06f2f1f6390b5ffb1969d",
+      "content_identity": "sha256:095559d5ddcca5bacc560147b653875000a7245ca352d34f1a229073e1dd21d7:1820",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/ag2ai/faststream"
+    },
+    "faststream-parser-decoder-precedence-before": {
+      "archive_sha256": "fe00fe5a3b6907f705a2d9148714cd6fb749036f633123ba57fa2726b78b55c8",
+      "commit": "943a1cb5db4b5ef10e4b4c2af8d995962518ca03",
+      "content_identity": "sha256:4f415d874e2267a2f868195f437d58d55afb74a693ca7613943c0f86e89344fd:1820",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/ag2ai/faststream"
+    },
+    "litestar-dtodata-renamed-instance-after": {
+      "archive_sha256": "fbbde50029c2963690399ea239c146f093b8d8878fab3cc8f6a72795b83c664e",
+      "commit": "031df7f45e69200624779356074f6f9470d2c1b3",
+      "content_identity": "sha256:71ce3223abcbcf76856234874f8d83e6734e4aee8fbd777368a2bd23b492d579:1175",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar"
+    },
+    "litestar-dtodata-renamed-instance-before": {
+      "archive_sha256": "2803becc599f533d46028f2d97441bf6d868293606d9e489cf57d8b737516f59",
+      "commit": "89bb310aa9fe1246bc65c97eb22d9ca4c6cfbbbc",
+      "content_identity": "sha256:91536580a4011ac8018598794e41706c6d3995b5b5b3bf32f6a7d66f63f93530:1175",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar"
+    },
+    "litestar-nested-field-renaming-after": {
+      "archive_sha256": "1d8c8ba20ce67147f48590612b9fefa76461ecc3b227c070b8d3e7ce0dd6d098",
+      "commit": "dfe872c6379142d6c5a266a6e5a19fa48dacddb8",
+      "content_identity": "sha256:428904513705e72d9890326af2cf952d5b987fda459fe2d5ceb0f2b440865347:1226",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar"
+    },
+    "litestar-nested-field-renaming-before": {
+      "archive_sha256": "0ba8a31d957a958f90a05d75306077dc1fbbb624f4f5f3c1286ec0e5a2280e85",
+      "commit": "7414f7fd7d4782223502895e6a23b77ed635cd2d",
+      "content_identity": "sha256:6cebbf6639f31b217dbf1ba9b1cf6b3d8627f68575e6dbd1f7b0762a1646c49a:1226",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar"
+    },
+    "litestar-serializer-keyerror-boundary-after": {
+      "archive_sha256": "7f45249229424a55c8f997feacc6a686329a1114633e5bc80ecd8bb910f045b7",
+      "commit": "673c1e93f9fe467f4839976c51d072668ecd98e1",
+      "content_identity": "sha256:23940180141205ac3d2d633f117337521ba42e68586a9fadb9c8fc2cc9e6c0c2:1402",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar"
+    },
+    "litestar-serializer-keyerror-boundary-before": {
+      "archive_sha256": "d42736c153dc1d088357a3206618ba0d93f31068900aea5ff329356020bc4bbd",
+      "commit": "e09e7b083f1b9bbb3324c66fd660748ef0b25cf8",
+      "content_identity": "sha256:d0f35bd3e4b7295088f06a749a26bbfdd43dabbf24eb69cfdc082ee73fad2545:1402",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar"
+    },
+    "litestar-url-encoded-string-values-after": {
+      "archive_sha256": "55f1cd00a7fadb1051aa2980a40222e6335d5e26287df72bdc786bc7d87e9a6d",
+      "commit": "e50ffb978c6e34588d7ed4cec71a2bec18d19a92",
+      "content_identity": "sha256:f720f2256fd9fe338faf3741a09dbf530257403b503ecd4e151f176743c4b0ec:1178",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar"
+    },
+    "litestar-url-encoded-string-values-before": {
+      "archive_sha256": "94d18488e717540dda3069fd192732f4ed03bcc86f4405f711c6e0af7dd96eb9",
+      "commit": "d0a52c453008b4e5c34774dc1507b4ebb2b09da4",
+      "content_identity": "sha256:ad2ba4dbfda9dbd172a00005bebf0d69d4d941284d3cc83cb01584b6b589f2bd:1178",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive",
+      "upstream": "https://github.com/litestar-org/litestar"
+    }
+  },
+  "status": "INCOMPLETE"
+}

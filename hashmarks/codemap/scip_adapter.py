@@ -5,6 +5,7 @@ import os
 import re
 import shutil
 import subprocess
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -40,8 +41,11 @@ class ScipOccurrence:
 
 
 def _field(
-    value: dict[str, Any], camel: str, snake: str | None = None, default=None
-) -> Any:
+    value: Mapping[str, object],
+    camel: str,
+    snake: str | None = None,
+    default: object | None = None,
+) -> object:
     if camel in value:
         return value[camel]
     if snake and snake in value:
@@ -49,20 +53,26 @@ def _field(
     return default
 
 
+def _integer(value: object) -> int:
+    if not isinstance(value, (str, bytes, bytearray, int, float)):
+        raise TypeError("SCIP numeric field must contain an integer value")
+    return int(value)
+
+
 def _range_lines(occurrence: dict[str, Any]) -> tuple[int, int]:
     single = _field(occurrence, "singleLineRange", "single_line_range")
     if isinstance(single, dict):
-        line = int(_field(single, "line", default=0)) + 1
+        line = _integer(_field(single, "line", default=0)) + 1
         return line, line
     multi = _field(occurrence, "multiLineRange", "multi_line_range")
     if isinstance(multi, dict):
-        return int(_field(multi, "startLine", "start_line", 0)) + 1, int(
+        return _integer(_field(multi, "startLine", "start_line", 0)) + 1, _integer(
             _field(multi, "endLine", "end_line", 0)
         ) + 1
     packed = occurrence.get("range")
     if isinstance(packed, list) and len(packed) in {3, 4}:
-        start = int(packed[0]) + 1
-        end = start if len(packed) == 3 else int(packed[2]) + 1
+        start = _integer(packed[0]) + 1
+        end = start if len(packed) == 3 else _integer(packed[2]) + 1
         return start, end
     return 1, 1
 
@@ -98,7 +108,7 @@ _SCIP_RELATION_FLAGS = (
 )
 
 
-def _scip_relation_rows(info: dict[str, Any]):
+def _scip_relation_rows(info: dict[str, Any]) -> Iterator[ScipRelationship]:
     """Yield only flags explicitly asserted by this SCIP SymbolInformation."""
     for relation in info.get("relationships") or ():
         if not isinstance(relation, dict):
@@ -203,7 +213,7 @@ def _scip_occurrence(
     document_metadata: dict[str, Any],
 ) -> ScipOccurrence:
     symbol = str(occurrence["symbol"])
-    roles = int(_field(occurrence, "symbolRoles", "symbol_roles", 0) or 0)
+    roles = _integer(_field(occurrence, "symbolRoles", "symbol_roles", 0) or 0)
     start, end = _range_lines(occurrence)
     is_definition = bool(roles & 0x1)
     direct = relationships.get(symbol, ()) if is_definition else ()
@@ -231,22 +241,26 @@ def _scip_locator(occurrence: dict[str, Any], encoding: str) -> dict[str, Any]:
         end_line = packed[0] if len(packed) == 3 else packed[2]
         end_character = packed[2] if len(packed) == 3 else packed[3]
         return {
-            "start": {"line": int(packed[0]), "character": int(packed[1])},
-            "end": {"line": int(end_line), "character": int(end_character)},
+            "start": {"line": _integer(packed[0]), "character": _integer(packed[1])},
+            "end": {"line": _integer(end_line), "character": _integer(end_character)},
             "position_encoding": encoding,
         }
     start, end = _range_lines(occurrence)
     single = _field(occurrence, "singleLineRange", "single_line_range", {})
     multi = _field(occurrence, "multiLineRange", "multi_line_range", {})
     detail = single if single else multi
+    if not isinstance(detail, Mapping):
+        raise ValueError("SCIP range details must be an object")
     return {
         "start": {
             "line": start - 1,
-            "character": int(_field(detail, "startCharacter", "start_character", 0)),
+            "character": _integer(
+                _field(detail, "startCharacter", "start_character", 0)
+            ),
         },
         "end": {
             "line": end - 1,
-            "character": int(_field(detail, "endCharacter", "end_character", 0)),
+            "character": _integer(_field(detail, "endCharacter", "end_character", 0)),
         },
         "position_encoding": encoding,
     }

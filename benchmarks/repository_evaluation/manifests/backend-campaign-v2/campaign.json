@@ -1,0 +1,181 @@
+{
+  "capabilities": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20
+  ],
+  "matrix_schema": "hashmarks.backend-evidence-matrix.v5",
+  "schema": "hashmarks.backend-evidence-campaign.v4",
+  "suites": [
+    {
+      "grader_sha256": "e4feac778aca1f11b8d5e7add91b551e97f66dcd8d94513ffda1ac40fd3e49ab",
+      "id": "backend-core-v2",
+      "suite_file": "suites/core/suite.json",
+      "suite_sha256": "d78641f946f1ea8ab70792e065c630df5d32b19759d39456b5808df3c46b8399",
+      "workflow_ids": [
+        "aiokafka-fetch-cancellation",
+        "aiokafka-sender-node-failure",
+        "aiokafka-metadata-future",
+        "aiokafka-stable-offset",
+        "sqlalchemy-failed-begin",
+        "sqlalchemy-logging-token-reset",
+        "sqlalchemy-pickle-extra-criteria",
+        "sqlalchemy-aggregate-strings",
+        "faststream-middleware-enter-error",
+        "faststream-subscriber-stop",
+        "faststream-concurrent-queue-lifetime",
+        "faststream-partial-pull-batch"
+      ]
+    },
+    {
+      "grader_sha256": "6e320e462a5d3e74badb5fdf497ca5412d82b706148afd70f42f8749f96f08cc",
+      "id": "backend-async-v2",
+      "suite_file": "suites/async/suite.json",
+      "suite_sha256": "6ec16e6257e018058bae1c62fe3890f5ed852219f60e54a1ae24b80551b5abe7",
+      "workflow_ids": [
+        "aiokafka-fetch-cancellation",
+        "aiokafka-sender-node-failure",
+        "aiokafka-metadata-future",
+        "aiokafka-stable-offset",
+        "sqlalchemy-failed-begin",
+        "faststream-middleware-enter-error",
+        "faststream-subscriber-stop",
+        "faststream-concurrent-queue-lifetime",
+        "faststream-partial-pull-batch",
+        "litestar-redis-close",
+        "litestar-psycopg-listener-stop",
+        "litestar-asyncpg-listener-lock"
+      ]
+    },
+    {
+      "grader_sha256": "9953cff9fe48c6d5a400dcdf61eaa7b8a0e10f3c80f7036a1386f49ca180c225",
+      "id": "backend-model-v2",
+      "suite_file": "suites/model/suite.json",
+      "suite_sha256": "12d8d84f32a79c29ade5516d2b68416c97af01bde9ddc79896342745253ee238",
+      "workflow_ids": [
+        "fastapi-dict-exclude-defaults",
+        "litestar-notrequired-field-schema",
+        "sqlmodel-field-discriminator",
+        "fastapi-iterable-response-options",
+        "litestar-nullable-required-fields",
+        "sqlmodel-utc-timedelta",
+        "sqlmodel-relationship-declaration-type",
+        "litestar-optional-computed-field",
+        "litestar-optional-nested-dto",
+        "litestar-root-schema-name",
+        "sqlmodel-field-sa-type",
+        "sqlmodel-field-item-bounds"
+      ]
+    },
+    {
+      "grader_sha256": "22b0de55dfb86b323152fb789dd8414b1dc6be39c13b7b9baacfc24af79d9188",
+      "id": "backend-messaging-v2",
+      "suite_file": "suites/messaging/suite.json",
+      "suite_sha256": "a0b8f4b1d1df18b425a6dc9d5c612bf6741a91fc65e822c0472e81f3b066c421",
+      "workflow_ids": [
+        "aiokafka-commit-unknown-member",
+        "aiokafka-commit-timeout",
+        "aiokafka-commit-refresh-order",
+        "aiokafka-join-autocommit-error",
+        "aio-pika-processing-channel-close",
+        "aio-pika-iterator-cleanup-timeout",
+        "aio-pika-iterator-nack-scope",
+        "aio-pika-iterator-channel-close",
+        "faststream-ack-cancellation",
+        "faststream-batch-nack",
+        "faststream-ack-error",
+        "faststream-consumer-commit-failure",
+        "faststream-empty-batch-publisher"
+      ]
+    },
+    {
+      "grader_sha256": "ce9e9cddd2491067dba46e0bf93ce3cba1623a40140e2961d63110718a7f50b9",
+      "id": "backend-transaction-v2",
+      "suite_file": "suites/transaction/suite.json",
+      "suite_sha256": "fc609593bc6cc4728679e3042962358f7c1581f48cccbc2c1a43d0f6848f107c",
+      "workflow_ids": [
+        "sqlalchemy-failed-begin-state",
+        "sqlalchemy-bulk-begin-flushing",
+        "sqlalchemy-prepare-failure-rollback",
+        "sqlalchemy-prepared-commit-xid",
+        "databases-transaction-context-isolation",
+        "databases-commit-clears-backend",
+        "databases-acquire-cancellation-counter",
+        "databases-disconnect-local-state",
+        "litestar-update-session-merge",
+        "litestar-update-fetched-values",
+        "litestar-repository-auto-commit",
+        "litestar-delete-many-chunking"
+      ]
+    },
+    {
+      "grader_sha256": "27982182fe9d89a51196d5eb3a0c05cb78963b8cfc49289734351d30cf14be77",
+      "id": "backend-language-v2",
+      "suite_file": "suites/language/suite.json",
+      "suite_sha256": "c1cd54d9b27f914007bb067c61e8a1ba18a11e88190a4d9828ac57e17cd7d65f",
+      "workflow_ids": [
+        "aiokafka-commit-timeout",
+        "aiokafka-commit-refresh-order",
+        "faststream-ack-cancellation",
+        "faststream-batch-nack",
+        "sqlalchemy-logging-token-reset",
+        "sqlalchemy-aggregate-strings",
+        "fastify-route-hook-this",
+        "fastify-http2-false",
+        "hono-some-response",
+        "hono-cached-body-media-type",
+        "nest-param-promise",
+        "nest-redirect-result"
+      ]
+    },
+    {
+      "grader_sha256": "99bc23fd8fb9cb6bc651771387395fe580b55faa379f7475d2936ce012a25cf5",
+      "id": "backend-debug-v2",
+      "suite_file": "suites/debug/suite.json",
+      "suite_sha256": "20514dee46005e0cb3ca64862f01ae528bab6263a80f815ca954fd86a1c5bb31",
+      "workflow_ids": [
+        "sqlalchemy-logging-token-reset",
+        "sqlalchemy-aggregate-strings",
+        "sqlalchemy-custom-metadata-warning",
+        "sqlalchemy-forwardref-diagnostic"
+      ]
+    },
+    {
+      "grader_sha256": "d7500354f915e59759960361e475d497770c14585880b88922634afb6077713c",
+      "id": "backend-path-v2",
+      "suite_file": "suites/path/suite.json",
+      "suite_sha256": "77955acc5b3bf5215dd9f1872b2667036af87332b67b7897137a7cba19402d1d",
+      "workflow_ids": [
+        "sqlalchemy-failed-begin",
+        "sqlalchemy-pickle-extra-criteria",
+        "faststream-middleware-enter-error",
+        "aiokafka-commit-unknown-member",
+        "aiokafka-commit-timeout",
+        "aiokafka-commit-refresh-order",
+        "aiokafka-join-autocommit-error",
+        "faststream-ack-cancellation",
+        "faststream-ack-error",
+        "faststream-empty-batch-publisher",
+        "sqlalchemy-bulk-begin-flushing",
+        "sqlalchemy-prepare-failure-rollback"
+      ]
+    }
+  ]
+}

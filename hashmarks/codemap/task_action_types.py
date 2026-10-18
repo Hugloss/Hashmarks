@@ -6,8 +6,37 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
+    from .decision_session import ReadScope
     from .model import SearchHit
+    from .ownership_relation_types import StructuralOwnerResolution, StructuralStarts
+    from .query_router import NormalizedTaskQuery
     from .repository_domains import RepositoryDomain
+    from .task_evidence_types import TaskActionMap, VerificationRelevance
+    from .task_retrieval import _TaskRetrievalResult
+
+
+@dataclass
+class _TaskActionReuse:
+    """Disposable task action reuse bound to one read scope."""
+
+    scope: ReadScope | None = None
+    entries: dict[tuple[int, str, int, int], TaskActionMap] = field(
+        default_factory=dict
+    )
+
+
+@dataclass(frozen=True)
+class TaskObservation:
+    query: NormalizedTaskQuery
+    retrieval: _TaskRetrievalResult
+    scope: ReadScope
+
+
+@dataclass
+class _TaskObservationReuse:
+    scope: ReadScope | None = None
+    entries: dict[tuple[str, int], TaskObservation] = field(default_factory=dict)
+    queries: dict[str, NormalizedTaskQuery] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -33,7 +62,7 @@ class _TaskActionProjectionState:
     terms: list[str]
     document_frequency: dict[str, int]
     candidates: list[dict[str, object]]
-    file_rows: dict[str, object]
+    file_rows: dict[str, dict[str, object]]
     text_cache: dict[str, str | None]
     rows: list[dict[str, object]]
     limit: int
@@ -69,6 +98,7 @@ class _TaskActionConfigState:
 
 @dataclass
 class _TaskActionMapContext:
+    observation: TaskObservation
     hits: Sequence[SearchHit]
     rows: list[dict[str, object]]
     canonical_rows: tuple[dict[str, object], ...]
@@ -89,7 +119,7 @@ class _TaskActionInitialSurfaceState:
     explicit_surface_ambiguity: bool
     explicit_edit_surface_selected: bool
     verification_anchor_tokens: Sequence[str]
-    literal_reference_owner: dict[str, object] | None
+    literal_reference_owner: StructuralOwnerResolution | None
     localized_config_edit: bool
     explicit_config_surface_request: bool
 
@@ -105,11 +135,11 @@ class _TaskActionExactIdentifierEvidence:
 class _TaskActionOwnerResolutionState:
     edit: dict[str, object] | None
     basis: str | None
-    structural_owner: dict[str, object] | None
+    structural_owner: StructuralOwnerResolution | None
     exact_identifier_paths: tuple[str, ...]
     exact_identifier_search_complete: bool | None
     exact_identifier_search_bound_reasons: tuple[str, ...]
-    structural_starts: dict[str, object]
+    structural_starts: StructuralStarts
 
 
 @dataclass(frozen=True)
@@ -125,7 +155,7 @@ class _TaskActionOwnerResolutionRequest:
 class _TaskActionOwnerCandidateState:
     edit: dict[str, object] | None
     basis: str | None
-    structural_owner: dict[str, object] | None
+    structural_owner: StructuralOwnerResolution | None
     exact_identifier_edits: list[dict[str, object]]
     exact_identifier_paths: tuple[str, ...]
     exact_identifier_search_complete: bool | None
@@ -133,7 +163,7 @@ class _TaskActionOwnerCandidateState:
     literal_task_path: str
 
 
-@dataclass
+@dataclass(frozen=True)
 class _TaskActionSelectionState:
     edit: dict[str, object] | None
     verify: dict[str, object] | None
@@ -145,30 +175,30 @@ class _TaskActionSelectionState:
     localized_config_edit: bool
     explicit_config_surface_request: bool
     owner_basis: str | None
-    structural_owner: dict[str, object] | None
+    structural_owner: StructuralOwnerResolution | None
     exact_identifier_paths: tuple[str, ...]
     exact_identifier_search_complete: bool | None
     exact_identifier_search_bound_reasons: tuple[str, ...]
-    structural_starts: dict[str, object]
+    structural_starts: StructuralStarts
     inspect_rows: list[dict[str, object]]
     related_rows: list[dict[str, object]]
 
 
-@dataclass
+@dataclass(frozen=True)
 class _TaskActionProjectionChoices:
     edit: dict[str, object] | None
     verify: dict[str, object] | None
     contract: dict[str, object] | None
-    verification_relevance: Mapping[str, object]
+    verification_relevance: VerificationRelevance
 
 
-@dataclass
+@dataclass(frozen=True)
 class _TaskActionFinalState:
     edit: dict[str, object] | None
     verify: dict[str, object] | None
     contract: dict[str, object] | None
-    structural_owner: dict[str, object] | None
-    verification_relevance: Mapping[str, object]
+    structural_owner: StructuralOwnerResolution | None
+    verification_relevance: VerificationRelevance
     ambiguity_state: Mapping[str, object]
     competing: list[dict[str, object]]
     ambiguous: bool

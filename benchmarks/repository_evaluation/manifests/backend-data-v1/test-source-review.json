@@ -1,0 +1,911 @@
+{
+  "active_campaign_changed": false,
+  "cases": [
+    {
+      "candidate_test_path": "tests/test_jsonable_encoder.py",
+      "capability_reviewed": false,
+      "causal_sensitivity": "not-executed",
+      "id": "fastapi-recursive-default-serialization",
+      "review_note": "New nested dict/list assertions pass exclude_defaults=True and retain a control without that option; prior scalar default test is present, nested sensitivity not execution-proven.",
+      "runtime_result": "not-established",
+      "stages": {
+        "after": {
+          "declarations": [
+            {
+              "declaration_line": 187,
+              "direct_assertions": [
+                {
+                  "end_line": 189,
+                  "line": 189,
+                  "sha256": "396927c6aedb28242c794d0a0f362cef05406a9490fcd2713bdd1161cfc7da07",
+                  "syntax": "assert jsonable_encoder(model) == {'foo': 'foo', 'bar': 'bar', 'bla': 'bla'}"
+                },
+                {
+                  "end_line": 190,
+                  "line": 190,
+                  "sha256": "7da60f35c145020127e46d05beeeb9307aac5a7fb45bb382cbc190cb81cb94f2",
+                  "syntax": "assert jsonable_encoder(model, exclude_unset=True) == {'foo': 'foo', 'bar': 'bar'}"
+                },
+                {
+                  "end_line": 191,
+                  "line": 191,
+                  "sha256": "8d1df726ad4f7ab5858ce7a8f0046b517d3ab72fdea0fb8769af441398301847",
+                  "syntax": "assert jsonable_encoder(model, exclude_defaults=True) == {'foo': 'foo'}"
+                },
+                {
+                  "end_line": 194,
+                  "line": 192,
+                  "sha256": "aeb2e7dafd46b4c0892aa5c146fdc8509912e11a1c755644ac606888d176c82d",
+                  "syntax": "assert jsonable_encoder(model, exclude_unset=True, exclude_defaults=True) == {'foo': 'foo'}"
+                },
+                {
+                  "end_line": 195,
+                  "line": 195,
+                  "sha256": "a31f228ab63d5b1be365ed3192e077e3f7d3f8617f959486b63097aa387994e3",
+                  "syntax": "assert jsonable_encoder(model, include={'foo'}) == {'foo': 'foo'}"
+                },
+                {
+                  "end_line": 196,
+                  "line": 196,
+                  "sha256": "909bda418249d8d11f60eadb3812358dceafccb04061ff939465ff446fcc9ef4",
+                  "syntax": "assert jsonable_encoder(model, exclude={'bla'}) == {'foo': 'foo', 'bar': 'bar'}"
+                },
+                {
+                  "end_line": 197,
+                  "line": 197,
+                  "sha256": "8edc235dac3b97db2dce741e5c1ae85bfc7d102a2cc9bc225b03205c1982f18c",
+                  "syntax": "assert jsonable_encoder(model, include={}) == {}"
+                },
+                {
+                  "end_line": 202,
+                  "line": 198,
+                  "sha256": "d568dc181e70470a8af6b915a35ceb682d950a5d141bf117e9d4dc02ea6cd814",
+                  "syntax": "assert jsonable_encoder(model, exclude={}) == {'foo': 'foo', 'bar': 'bar', 'bla': 'bla'}"
+                }
+              ],
+              "end_line": 202,
+              "nested_scope_assertions_excluded": true,
+              "path": "tests/test_jsonable_encoder.py",
+              "sha256": "65e79a2ccdcaf53348b2a0b003feaf2b0bcb6a36100906c68dee3e9f2681fcce",
+              "start_line": 187,
+              "state": "source-declared",
+              "symbol": "test_encode_model_with_default"
+            },
+            {
+              "declaration_line": 205,
+              "direct_assertions": [
+                {
+                  "end_line": 207,
+                  "line": 207,
+                  "sha256": "485611a7c27475e177746dd54b45ca016e38c4ebfc87fdd03035b6922b60f32d",
+                  "syntax": "assert jsonable_encoder([model], exclude_defaults=True) == [{'foo': 'foo'}]"
+                },
+                {
+                  "end_line": 210,
+                  "line": 208,
+                  "sha256": "eef4aa2bdb8cfe6c23f21c224c1457443c938053ad48fb784f8e601a6ee6bb13",
+                  "syntax": "assert jsonable_encoder({'key': model}, exclude_defaults=True) == {'key': {'foo': 'foo'}}"
+                },
+                {
+                  "end_line": 213,
+                  "line": 211,
+                  "sha256": "238b7fe744af01e6a7204c077a7a49f7347926f28e6543f395f666a56dbd295e",
+                  "syntax": "assert jsonable_encoder({'key': [model]}, exclude_defaults=True) == {'key': [{'foo': 'foo'}]}"
+                },
+                {
+                  "end_line": 216,
+                  "line": 214,
+                  "sha256": "ea3fbb4dd322256939e870f4f95e0336f56d50154ec7ea045a24710221fc7e08",
+                  "syntax": "assert jsonable_encoder({'key': model}) == {'key': {'foo': 'foo', 'bar': 'bar', 'bla': 'bla'}}"
+                }
+              ],
+              "end_line": 216,
+              "nested_scope_assertions_excluded": true,
+              "path": "tests/test_jsonable_encoder.py",
+              "sha256": "37783f093ccb12bfba3bbcc6384651c3e382c8c2209f8fca1f22565b676edf34",
+              "start_line": 205,
+              "state": "source-declared",
+              "symbol": "test_encode_model_with_default_in_dict_and_list"
+            }
+          ],
+          "file_sha256": "cea093a4d8b99f5e2728b05b172378582f8add4b7199390bb47058dfe532b8a5",
+          "file_state": "present",
+          "source": "fastapi-recursive-default-serialization-after"
+        },
+        "before": {
+          "declarations": [
+            {
+              "declaration_line": 187,
+              "direct_assertions": [
+                {
+                  "end_line": 189,
+                  "line": 189,
+                  "sha256": "396927c6aedb28242c794d0a0f362cef05406a9490fcd2713bdd1161cfc7da07",
+                  "syntax": "assert jsonable_encoder(model) == {'foo': 'foo', 'bar': 'bar', 'bla': 'bla'}"
+                },
+                {
+                  "end_line": 190,
+                  "line": 190,
+                  "sha256": "7da60f35c145020127e46d05beeeb9307aac5a7fb45bb382cbc190cb81cb94f2",
+                  "syntax": "assert jsonable_encoder(model, exclude_unset=True) == {'foo': 'foo', 'bar': 'bar'}"
+                },
+                {
+                  "end_line": 191,
+                  "line": 191,
+                  "sha256": "8d1df726ad4f7ab5858ce7a8f0046b517d3ab72fdea0fb8769af441398301847",
+                  "syntax": "assert jsonable_encoder(model, exclude_defaults=True) == {'foo': 'foo'}"
+                },
+                {
+                  "end_line": 194,
+                  "line": 192,
+                  "sha256": "aeb2e7dafd46b4c0892aa5c146fdc8509912e11a1c755644ac606888d176c82d",
+                  "syntax": "assert jsonable_encoder(model, exclude_unset=True, exclude_defaults=True) == {'foo': 'foo'}"
+                },
+                {
+                  "end_line": 195,
+                  "line": 195,
+                  "sha256": "a31f228ab63d5b1be365ed3192e077e3f7d3f8617f959486b63097aa387994e3",
+                  "syntax": "assert jsonable_encoder(model, include={'foo'}) == {'foo': 'foo'}"
+                },
+                {
+                  "end_line": 196,
+                  "line": 196,
+                  "sha256": "909bda418249d8d11f60eadb3812358dceafccb04061ff939465ff446fcc9ef4",
+                  "syntax": "assert jsonable_encoder(model, exclude={'bla'}) == {'foo': 'foo', 'bar': 'bar'}"
+                },
+                {
+                  "end_line": 197,
+                  "line": 197,
+                  "sha256": "8edc235dac3b97db2dce741e5c1ae85bfc7d102a2cc9bc225b03205c1982f18c",
+                  "syntax": "assert jsonable_encoder(model, include={}) == {}"
+                },
+                {
+                  "end_line": 202,
+                  "line": 198,
+                  "sha256": "d568dc181e70470a8af6b915a35ceb682d950a5d141bf117e9d4dc02ea6cd814",
+                  "syntax": "assert jsonable_encoder(model, exclude={}) == {'foo': 'foo', 'bar': 'bar', 'bla': 'bla'}"
+                }
+              ],
+              "end_line": 202,
+              "nested_scope_assertions_excluded": true,
+              "path": "tests/test_jsonable_encoder.py",
+              "sha256": "65e79a2ccdcaf53348b2a0b003feaf2b0bcb6a36100906c68dee3e9f2681fcce",
+              "start_line": 187,
+              "state": "source-declared",
+              "symbol": "test_encode_model_with_default"
+            },
+            {
+              "semantic_absence": "not-established",
+              "state": "not-declared-in-selected-file",
+              "symbol": "test_encode_model_with_default_in_dict_and_list"
+            }
+          ],
+          "file_sha256": "20c0ecf8b721f7eb3b56e557e45f02510074146fa430c0f2b6009563da221129",
+          "file_state": "present",
+          "source": "fastapi-recursive-default-serialization-before"
+        }
+      }
+    },
+    {
+      "candidate_test_path": "tests/test_skip_defaults.py",
+      "capability_reviewed": false,
+      "causal_sensitivity": "not-executed",
+      "id": "fastapi-iterable-serialization-options",
+      "review_note": "New route tests inspect three distinct JSON shapes under serialization options; runtime endpoint identity and sensitivity not executed.",
+      "runtime_result": "not-established",
+      "stages": {
+        "after": {
+          "declarations": [
+            {
+              "declaration_line": 113,
+              "direct_assertions": [
+                {
+                  "end_line": 115,
+                  "line": 115,
+                  "sha256": "0894fde250500475b43e03e68c3a6d3c6ff0010d09a21d24e1d28213e72a9573",
+                  "syntax": "assert response.json() == [{'x': None, 'y': 'y'}]"
+                }
+              ],
+              "end_line": 115,
+              "nested_scope_assertions_excluded": true,
+              "path": "tests/test_skip_defaults.py",
+              "sha256": "d079fa976960a1912cdc8caaeca613c2d310016a3adf367984413b5d6b037f9e",
+              "start_line": 113,
+              "state": "source-declared",
+              "symbol": "test_return_iterable_exclude_unset"
+            },
+            {
+              "declaration_line": 118,
+              "direct_assertions": [
+                {
+                  "end_line": 120,
+                  "line": 120,
+                  "sha256": "17282dc9ebe71de65b2f09af669513b777e1bbaba21c46c58b29dda1152231be",
+                  "syntax": "assert response.json() == [{}]"
+                }
+              ],
+              "end_line": 120,
+              "nested_scope_assertions_excluded": true,
+              "path": "tests/test_skip_defaults.py",
+              "sha256": "a156e1ca6c25ecb91251293e837ad7fb259df7190cd990d4f4893b4038a99a48",
+              "start_line": 118,
+              "state": "source-declared",
+              "symbol": "test_return_iterable_exclude_defaults"
+            },
+            {
+              "declaration_line": 123,
+              "direct_assertions": [
+                {
+                  "end_line": 125,
+                  "line": 125,
+                  "sha256": "3bce31c473ba6c3fba3d7748b9b4e0a2f3dd559605d6d6376449b801a52f7198",
+                  "syntax": "assert response.json() == [{'y': 'y', 'z': 'z'}]"
+                }
+              ],
+              "end_line": 125,
+              "nested_scope_assertions_excluded": true,
+              "path": "tests/test_skip_defaults.py",
+              "sha256": "d71022af409fe482e68988bde334e304377122d159bbd5cd765cdd55a85fafcf",
+              "start_line": 123,
+              "state": "source-declared",
+              "symbol": "test_return_iterable_exclude_none"
+            }
+          ],
+          "file_sha256": "52dd45cd3d327da99634da3c711ca5a77205f512d93e8775b43fbb7a680887dc",
+          "file_state": "present",
+          "source": "fastapi-iterable-serialization-options-after"
+        },
+        "before": {
+          "declarations": [
+            {
+              "semantic_absence": "not-established",
+              "state": "not-declared-in-selected-file",
+              "symbol": "test_return_iterable_exclude_unset"
+            },
+            {
+              "semantic_absence": "not-established",
+              "state": "not-declared-in-selected-file",
+              "symbol": "test_return_iterable_exclude_defaults"
+            },
+            {
+              "semantic_absence": "not-established",
+              "state": "not-declared-in-selected-file",
+              "symbol": "test_return_iterable_exclude_none"
+            }
+          ],
+          "file_sha256": "39187e7615f8ecc64702b558e8b5e17aed6ccbb70a912f0c083f99a6974149f3",
+          "file_state": "present",
+          "source": "fastapi-iterable-serialization-options-before"
+        }
+      }
+    },
+    {
+      "candidate_test_path": "tests/test_stream_status_code.py",
+      "capability_reviewed": false,
+      "causal_sensitivity": "not-executed",
+      "id": "fastapi-stream-response-arguments",
+      "review_note": "Parametrized stream route test asserts expected status code; before test file is not present in exact tree.",
+      "runtime_result": "not-established",
+      "stages": {
+        "after": {
+          "declarations": [
+            {
+              "declaration_line": 152,
+              "direct_assertions": [
+                {
+                  "end_line": 154,
+                  "line": 154,
+                  "sha256": "4585d1766ccb02d9b70be2d5f21923f85bdbc76b6063fddc0a844ffd8aec0649",
+                  "syntax": "assert response.status_code == expected_status_code"
+                }
+              ],
+              "end_line": 154,
+              "nested_scope_assertions_excluded": true,
+              "path": "tests/test_stream_status_code.py",
+              "sha256": "c0be798b2d842f523dea64828a67da8ffb33090522f3ad23d259d938b9299468",
+              "start_line": 138,
+              "state": "source-declared",
+              "symbol": "test_status_code"
+            }
+          ],
+          "file_sha256": "651e64ab219e9eb1154a6754ba768446bdf10208233c15220da539e95bb8266b",
+          "file_state": "present",
+          "source": "fastapi-stream-response-arguments-after"
+        },
+        "before": {
+          "declarations": [],
+          "file_state": "not-present-in-exact-tree",
+          "semantic_absence": "not-established",
+          "source": "fastapi-stream-response-arguments-before"
+        }
+      }
+    },
+    {
+      "candidate_test_path": "tests/test_frontend.py",
+      "capability_reviewed": false,
+      "causal_sensitivity": "not-executed",
+      "id": "fastapi-frontend-dependency-metadata",
+      "review_note": "New frontend dependency test asserts header, cookie and background-call values; source relevance supports a candidate, runtime causal sensitivity unexecuted.",
+      "runtime_result": "not-established",
+      "stages": {
+        "after": {
+          "declarations": [
+            {
+              "declaration_line": 502,
+              "direct_assertions": [
+                {
+                  "end_line": 519,
+                  "line": 519,
+                  "sha256": "22951490d8739762e41daa4a09ddbdd815b01e4b5c21b8a39fe7d866b9e239a1",
+                  "syntax": "assert response.status_code == 200"
+                },
+                {
+                  "end_line": 520,
+                  "line": 520,
+                  "sha256": "d10ce40b6871f7b197541c2d162aeb22f51404e293798b02de1b97b2916c17b0",
+                  "syntax": "assert response.text == 'app'"
+                },
+                {
+                  "end_line": 521,
+                  "line": 521,
+                  "sha256": "b096509627081923c6ed651ad16838fc54e0d90e5196ac41ca316aab3f4f8ba7",
+                  "syntax": "assert response.headers['X-Frontend-Dependency'] == 'applied'"
+                },
+                {
+                  "end_line": 522,
+                  "line": 522,
+                  "sha256": "44b342bb1e890ca806b07455d1de5d9d028f0afac9096eb8a8960476543b464c",
+                  "syntax": "assert response.cookies['frontend'] == 'dependency'"
+                },
+                {
+                  "end_line": 523,
+                  "line": 523,
+                  "sha256": "938b1bf3e3a2982f7c04819b7da02c7cbf7271e1a0cfa8756329480cfc20d996",
+                  "syntax": "assert calls == ['background']"
+                }
+              ],
+              "end_line": 523,
+              "nested_scope_assertions_excluded": true,
+              "path": "tests/test_frontend.py",
+              "sha256": "6ddce5a83f69b3234428f891fcbfa5a89a239a3b0a56b58649b2b87be6c3d9a3",
+              "start_line": 502,
+              "state": "source-declared",
+              "symbol": "test_frontend_dependency_response_headers_and_background_tasks"
+            }
+          ],
+          "file_sha256": "6f6f33ac5cb85ca17e70c6651408c927527099f7eb5ff1b8712d3fea13a272d0",
+          "file_state": "present",
+          "source": "fastapi-frontend-dependency-metadata-after"
+        },
+        "before": {
+          "declarations": [
+            {
+              "semantic_absence": "not-established",
+              "state": "not-declared-in-selected-file",
+              "symbol": "test_frontend_dependency_response_headers_and_background_tasks"
+            }
+          ],
+          "file_sha256": "3734c0db818e60761cbdb05ee2b8914e89d9229f64357b07a5e3e5ef3bd519bb",
+          "file_state": "present",
+          "source": "fastapi-frontend-dependency-metadata-before"
+        }
+      }
+    },
+    {
+      "candidate_test_path": "tests/unit/test_response/test_serialization.py",
+      "capability_reviewed": false,
+      "causal_sensitivity": "not-executed",
+      "id": "litestar-serializer-keyerror-boundary",
+      "review_note": "Commit changes only the production serializer and no test. The catalog test is a broad nomination; exact KeyError-swallowing regression test not established.",
+      "runtime_result": "not-established",
+      "stages": {
+        "after": {
+          "declarations": [],
+          "file_sha256": "6b09fecb29cb4728a4365818df0946be79975b6986393e4a3e693b4279ca5763",
+          "file_state": "present",
+          "source": "litestar-serializer-keyerror-boundary-after"
+        },
+        "before": {
+          "declarations": [],
+          "file_sha256": "6b09fecb29cb4728a4365818df0946be79975b6986393e4a3e693b4279ca5763",
+          "file_state": "present",
+          "source": "litestar-serializer-keyerror-boundary-before"
+        }
+      }
+    },
+    {
+      "candidate_test_path": "tests/unit/test_dto/test_factory/test_integration.py",
+      "capability_reviewed": false,
+      "causal_sensitivity": "not-executed",
+      "id": "litestar-nested-field-renaming",
+      "review_note": "New nested DTO test posts and asserts per-level renamed keys. Runtime class/provider and causal sensitivity unexecuted.",
+      "runtime_result": "not-established",
+      "stages": {
+        "after": {
+          "declarations": [
+            {
+              "declaration_line": 77,
+              "direct_assertions": [
+                {
+                  "end_line": 92,
+                  "line": 92,
+                  "sha256": "2e72124eca6ba3ad76d1f7a8413fbd4fe7abe16bb338e42f7b5511d46ae52d28",
+                  "syntax": "assert response.json() == {'baz': 'hello'}"
+                }
+              ],
+              "end_line": 92,
+              "nested_scope_assertions_excluded": true,
+              "path": "tests/unit/test_dto/test_factory/test_integration.py",
+              "sha256": "830ed48d04d578e3e31da781144a775a397abd888628d770803683670fb0d52e",
+              "start_line": 77,
+              "state": "source-declared",
+              "symbol": "test_renamed_field"
+            },
+            {
+              "declaration_line": 95,
+              "direct_assertions": [
+                {
+                  "end_line": 128,
+                  "line": 128,
+                  "sha256": "fb721dc4aabaa0825052ff7790568016d72fc6cfb6738ac6540f080fd4191cce",
+                  "syntax": "assert response.json() == {'foo_id': '1', 'bar': {'bar_id': '2'}, 'bars': [{'bars_id': '3'}]}"
+                }
+              ],
+              "end_line": 128,
+              "nested_scope_assertions_excluded": true,
+              "path": "tests/unit/test_dto/test_factory/test_integration.py",
+              "sha256": "8ea24fe0117bd4d0b7474085b31e0378e8b7c926b6129239aaca96a76066864a",
+              "start_line": 95,
+              "state": "source-declared",
+              "symbol": "test_renamed_field_nested"
+            }
+          ],
+          "file_sha256": "4aa8f0b5d051b229735b01014e45216f7b3ef41e48a548abb47557802364e419",
+          "file_state": "present",
+          "source": "litestar-nested-field-renaming-after"
+        },
+        "before": {
+          "declarations": [
+            {
+              "declaration_line": 76,
+              "direct_assertions": [
+                {
+                  "end_line": 91,
+                  "line": 91,
+                  "sha256": "2e72124eca6ba3ad76d1f7a8413fbd4fe7abe16bb338e42f7b5511d46ae52d28",
+                  "syntax": "assert response.json() == {'baz': 'hello'}"
+                }
+              ],
+              "end_line": 91,
+              "nested_scope_assertions_excluded": true,
+              "path": "tests/unit/test_dto/test_factory/test_integration.py",
+              "sha256": "830ed48d04d578e3e31da781144a775a397abd888628d770803683670fb0d52e",
+              "start_line": 76,
+              "state": "source-declared",
+              "symbol": "test_renamed_field"
+            },
+            {
+              "semantic_absence": "not-established",
+              "state": "not-declared-in-selected-file",
+              "symbol": "test_renamed_field_nested"
+            }
+          ],
+          "file_sha256": "7c17363824712efe7bbb77b2dc34eee7046dccd51440044f5a73b8e860bc0a72",
+          "file_state": "present",
+          "source": "litestar-nested-field-renaming-before"
+        }
+      }
+    },
+    {
+      "candidate_test_path": "tests/unit/test_dto/test_factory/test_integration.py",
+      "capability_reviewed": false,
+      "causal_sensitivity": "not-executed",
+      "id": "litestar-dtodata-renamed-instance",
+      "review_note": "Existing test expands a DTOData create_instance call to nested renamed input and checks nested greeting plus response keys; sensitivity unexecuted.",
+      "runtime_result": "not-established",
+      "stages": {
+        "after": {
+          "declarations": [
+            {
+              "declaration_line": 237,
+              "direct_assertions": [
+                {
+                  "end_line": 253,
+                  "line": 253,
+                  "sha256": "bf2de67ddd16332b3ac881e28ea3af19f9625b59dce3528587512c436af64b4a",
+                  "syntax": "assert response.status_code == 201"
+                },
+                {
+                  "end_line": 254,
+                  "line": 254,
+                  "sha256": "ba0ec48729e90b138d2be923d35da0d0bf419a36e657f353c5b28da05799fd6a",
+                  "syntax": "assert response.json() == {'bar': 'hello', 'fooFoo': 'world', 'spamBar': {'bestGreeting': 'hello world'}}"
+                }
+              ],
+              "end_line": 254,
+              "nested_scope_assertions_excluded": true,
+              "path": "tests/unit/test_dto/test_factory/test_integration.py",
+              "sha256": "ad74f90e885fd3cb1a8659481a0be51511135a719da035ea829428d0c812d628",
+              "start_line": 237,
+              "state": "source-declared",
+              "symbol": "test_dto_data_create_instance_renamed_fields"
+            }
+          ],
+          "file_sha256": "f94bd97704be151b81810aeb1c55055d5941e2a3046871f975872502cc2e0994",
+          "file_state": "present",
+          "source": "litestar-dtodata-renamed-instance-after"
+        },
+        "before": {
+          "declarations": [
+            {
+              "declaration_line": 223,
+              "direct_assertions": [
+                {
+                  "end_line": 238,
+                  "line": 238,
+                  "sha256": "bf2de67ddd16332b3ac881e28ea3af19f9625b59dce3528587512c436af64b4a",
+                  "syntax": "assert response.status_code == 201"
+                },
+                {
+                  "end_line": 239,
+                  "line": 239,
+                  "sha256": "21cd83f00d3798e40419cb98791dc82f5e424d8fd140f2b83d73cec51ef39255",
+                  "syntax": "assert response.json() == {'bar': 'hello', 'fooFoo': 'world'}"
+                }
+              ],
+              "end_line": 239,
+              "nested_scope_assertions_excluded": true,
+              "path": "tests/unit/test_dto/test_factory/test_integration.py",
+              "sha256": "56307afb523f98bd28599506ad42c026a7ac24bb77cbc6f1ea5864b90bf79167",
+              "start_line": 223,
+              "state": "source-declared",
+              "symbol": "test_dto_data_create_instance_renamed_fields"
+            }
+          ],
+          "file_sha256": "097edd5b05919f338ddaa142c44ffac9c4641aa50067050b275b6cd94186a502",
+          "file_state": "present",
+          "source": "litestar-dtodata-renamed-instance-before"
+        }
+      }
+    },
+    {
+      "candidate_test_path": "tests/unit/test_kwargs/test_url_encoded_data.py",
+      "capability_reviewed": false,
+      "causal_sensitivity": "not-executed",
+      "id": "litestar-url-encoded-string-values",
+      "review_note": "Changed request adds value=\"100\" and still checks status. Exact field-preservation assertion is not established from that status assertion alone.",
+      "runtime_result": "not-established",
+      "stages": {
+        "after": {
+          "declarations": [
+            {
+              "declaration_line": 13,
+              "direct_assertions": [
+                {
+                  "end_line": 22,
+                  "line": 22,
+                  "sha256": "0d54326eca942f87b494f7fd6387d1465a9514737d932a99ea974be152b1a925",
+                  "syntax": "assert response.status_code == HTTP_201_CREATED"
+                }
+              ],
+              "end_line": 22,
+              "nested_scope_assertions_excluded": true,
+              "path": "tests/unit/test_kwargs/test_url_encoded_data.py",
+              "sha256": "56d5dcaebfa459f063c43b3e369e47c7d68260e694464898c0cf43819d61b726",
+              "start_line": 13,
+              "state": "source-declared",
+              "symbol": "test_request_body_url_encoded"
+            }
+          ],
+          "file_sha256": "70097d4c1d5ea038ea47712d8433c68ba1e395f0e1c0158365f922b8a7092185",
+          "file_state": "present",
+          "source": "litestar-url-encoded-string-values-after"
+        },
+        "before": {
+          "declarations": [
+            {
+              "declaration_line": 13,
+              "direct_assertions": [
+                {
+                  "end_line": 20,
+                  "line": 20,
+                  "sha256": "0d54326eca942f87b494f7fd6387d1465a9514737d932a99ea974be152b1a925",
+                  "syntax": "assert response.status_code == HTTP_201_CREATED"
+                }
+              ],
+              "end_line": 20,
+              "nested_scope_assertions_excluded": true,
+              "path": "tests/unit/test_kwargs/test_url_encoded_data.py",
+              "sha256": "467e861826cb576f6cadb4ba486dbcf9d3cf583177a401b8a8561f8670e62d10",
+              "start_line": 13,
+              "state": "source-declared",
+              "symbol": "test_request_body_url_encoded"
+            }
+          ],
+          "file_sha256": "3cfd5249a2b138881660353a04a999d468ae9552c9a1a7c9e5c6ea3206a3231e",
+          "file_state": "present",
+          "source": "litestar-url-encoded-string-values-before"
+        }
+      }
+    },
+    {
+      "candidate_test_path": "tests/brokers/kafka/test_publish.py",
+      "capability_reviewed": false,
+      "causal_sensitivity": "not-executed",
+      "id": "faststream-keyed-none-tombstone",
+      "review_note": "New test publishes None with a nonempty key and asserts consumed raw value is None. Backend harness/broker behavior not run and no Kafka process launched.",
+      "runtime_result": "not-established",
+      "stages": {
+        "after": {
+          "declarations": [
+            {
+              "declaration_line": 356,
+              "direct_assertions": [
+                {
+                  "end_line": 370,
+                  "line": 370,
+                  "sha256": "69e0bdcd0a8dc347b73964d4aa20eb4af431b15813f1701bf1e6105db5fb2406",
+                  "syntax": "assert value is None"
+                }
+              ],
+              "end_line": 370,
+              "nested_scope_assertions_excluded": true,
+              "path": "tests/brokers/kafka/test_publish.py",
+              "sha256": "1f099ea9f8a60c92816205bb530f491e441fd3525a140e5b2cbc922a9cc8d42d",
+              "start_line": 355,
+              "state": "source-declared",
+              "symbol": "TestPublish.test_publish_none_sends_a_real_tombstone"
+            }
+          ],
+          "file_sha256": "ed57c060c2a0e74bbbeecc70e84190f18eeebef8768735c8070de33367df85a0",
+          "file_state": "present",
+          "source": "faststream-keyed-none-tombstone-after"
+        },
+        "before": {
+          "declarations": [
+            {
+              "semantic_absence": "not-established",
+              "state": "not-declared-in-selected-file",
+              "symbol": "TestPublish.test_publish_none_sends_a_real_tombstone"
+            }
+          ],
+          "file_sha256": "5cbc088f76e8d1029f289a76aa86e4a7e546792adeb11063ffbf0addc334ec21",
+          "file_state": "present",
+          "source": "faststream-keyed-none-tombstone-before"
+        }
+      }
+    },
+    {
+      "candidate_test_path": "tests/message/test_message.py",
+      "capability_reviewed": false,
+      "causal_sensitivity": "not-executed",
+      "id": "faststream-decoded-none-cache",
+      "review_note": "New tests decode twice and assert one decoder invocation for None and non-None values; before file missing, no invented earlier test.",
+      "runtime_result": "not-established",
+      "stages": {
+        "after": {
+          "declarations": [
+            {
+              "declaration_line": 7,
+              "direct_assertions": [
+                {
+                  "end_line": 27,
+                  "line": 27,
+                  "sha256": "e7c095771bc9d201a4a392b437d2d9c0e14fa5c6e4fad5c1e0f1e3d015952b21",
+                  "syntax": "assert first is None"
+                },
+                {
+                  "end_line": 28,
+                  "line": 28,
+                  "sha256": "5aa9b1267b27cc7bfe8e069aef5352feb3de5e3d295df045f3d8a7573ea36925",
+                  "syntax": "assert second is None"
+                },
+                {
+                  "end_line": 31,
+                  "line": 29,
+                  "sha256": "135147dea3df11edf1db65f7c715f1abfbba8f9cc12489edf3c62aaacc158a80",
+                  "syntax": "assert call_count == 1, f'Decoder was called {call_count} times; expected exactly 1 (cached None)'"
+                }
+              ],
+              "end_line": 31,
+              "nested_scope_assertions_excluded": true,
+              "path": "tests/message/test_message.py",
+              "sha256": "1f327cc4d83e5d8422e56443217b2a68f2b219c230000f447999ac0b066a6d76",
+              "start_line": 6,
+              "state": "source-declared",
+              "symbol": "test_decode_caches_none_result"
+            },
+            {
+              "declaration_line": 35,
+              "direct_assertions": [
+                {
+                  "end_line": 51,
+                  "line": 51,
+                  "sha256": "e272d86249cf34265f0e2bbb9216c29bfc172b071c96f0b3e8532e48ef0b9d38",
+                  "syntax": "assert first is sentinel"
+                },
+                {
+                  "end_line": 52,
+                  "line": 52,
+                  "sha256": "4141a27a039bcfc29dc7fd14ea6466340b90d7a4da0f00d08b4a6ea5a39bfa98",
+                  "syntax": "assert second is sentinel"
+                },
+                {
+                  "end_line": 53,
+                  "line": 53,
+                  "sha256": "d0f328a29ec2bdcb45773cc2b01882f3123bf44c63eac982e791012b9d7b1deb",
+                  "syntax": "assert call_count == 1, f'Decoder was called {call_count} times; expected exactly 1'"
+                }
+              ],
+              "end_line": 53,
+              "nested_scope_assertions_excluded": true,
+              "path": "tests/message/test_message.py",
+              "sha256": "7a9d2d28528400df1e150227208f62a664119fc3fe9598bfa5be8432e3000dd9",
+              "start_line": 34,
+              "state": "source-declared",
+              "symbol": "test_decode_caches_non_none_result"
+            }
+          ],
+          "file_sha256": "e60456eb9793107556a07e503aef1f16bc68a3a8976b9e0c8203760de4774ef8",
+          "file_state": "present",
+          "source": "faststream-decoded-none-cache-after"
+        },
+        "before": {
+          "declarations": [],
+          "file_state": "not-present-in-exact-tree",
+          "semantic_absence": "not-established",
+          "source": "faststream-decoded-none-cache-before"
+        }
+      }
+    },
+    {
+      "candidate_test_path": "tests/brokers/base/parser.py",
+      "capability_reviewed": false,
+      "causal_sensitivity": "not-executed",
+      "id": "faststream-parser-decoder-precedence",
+      "review_note": "New inherited testcase methods exercise iterator/get_one decoder variants; concrete broker parametrization and runtime sensitivity not qualified.",
+      "runtime_result": "not-established",
+      "stages": {
+        "after": {
+          "declarations": [
+            {
+              "declaration_line": 195,
+              "direct_assertions": [
+                {
+                  "end_line": 241,
+                  "line": 241,
+                  "sha256": "1bba3b1ff8620b3027bb12dd863818b7d89ca9778794d3f2410797e021959593",
+                  "syntax": "assert data == b'hello', data"
+                }
+              ],
+              "end_line": 241,
+              "nested_scope_assertions_excluded": true,
+              "path": "tests/brokers/base/parser.py",
+              "sha256": "bbc5f832a3c37e53c7b6a2f6618239e3557993db3263824473d597a68eeb51f5",
+              "start_line": 194,
+              "state": "source-declared",
+              "symbol": "LocalCustomParserTestcase.test_iterator_respect_decoder"
+            },
+            {
+              "declaration_line": 244,
+              "direct_assertions": [
+                {
+                  "end_line": 276,
+                  "line": 276,
+                  "sha256": "fdc024a87a7edd58a7b8fe92cee23120db5ee9c3df325cb8f1e84785b0953ca2",
+                  "syntax": "assert not mock.called, mock.call_count"
+                }
+              ],
+              "end_line": 278,
+              "nested_scope_assertions_excluded": true,
+              "path": "tests/brokers/base/parser.py",
+              "sha256": "4ef1cc56ea6ba2172877cf0c3f9257f355cb62e5bcea64b7338c74df09160302",
+              "start_line": 243,
+              "state": "source-declared",
+              "symbol": "LocalCustomParserTestcase.test_get_one_respect_decoder"
+            }
+          ],
+          "file_sha256": "9ac4f09f3d8b15247708c6dd6aa5fca0965367440c1672f4f61d0d0ba4d7d75a",
+          "file_state": "present",
+          "source": "faststream-parser-decoder-precedence-after"
+        },
+        "before": {
+          "declarations": [
+            {
+              "semantic_absence": "not-established",
+              "state": "not-declared-in-selected-file",
+              "symbol": "LocalCustomParserTestcase.test_iterator_respect_decoder"
+            },
+            {
+              "semantic_absence": "not-established",
+              "state": "not-declared-in-selected-file",
+              "symbol": "LocalCustomParserTestcase.test_get_one_respect_decoder"
+            }
+          ],
+          "file_sha256": "3f975ebf999acac130882e1eec277437a6cb778ef09e5cb5b00fe0c38aebf990",
+          "file_state": "present",
+          "source": "faststream-parser-decoder-precedence-before"
+        }
+      }
+    },
+    {
+      "candidate_test_path": "tests/brokers/base/address.py",
+      "capability_reviewed": false,
+      "causal_sensitivity": "not-executed",
+      "id": "faststream-address-escape-correspondence",
+      "review_note": "New inherited testcase methods nominate literal brace/router prefix/publisher delivery checks; concrete broker admission and causal execution unqualified.",
+      "runtime_result": "not-established",
+      "stages": {
+        "after": {
+          "declarations": [
+            {
+              "declaration_line": 30,
+              "direct_assertions": [],
+              "end_line": 64,
+              "nested_scope_assertions_excluded": true,
+              "path": "tests/brokers/base/address.py",
+              "sha256": "d6679910fada4b0d99257e209e0680d1ca7ee6cc3a7390803ddbb5ff054eacd4",
+              "start_line": 30,
+              "state": "source-declared",
+              "symbol": "AddressDeliveryTestcase.test_a_literal_brace_beside_a_parameter_is_not_regex_syntax"
+            },
+            {
+              "declaration_line": 66,
+              "direct_assertions": [],
+              "end_line": 100,
+              "nested_scope_assertions_excluded": true,
+              "path": "tests/brokers/base/address.py",
+              "sha256": "f6ac4fde52da2f9f52c203df7721ac616646d1f135fac2695babd252e4855ce9",
+              "start_line": 66,
+              "state": "source-declared",
+              "symbol": "AddressDeliveryTestcase.test_a_router_prefix_reaches_the_wire"
+            },
+            {
+              "declaration_line": 104,
+              "direct_assertions": [],
+              "end_line": 130,
+              "nested_scope_assertions_excluded": true,
+              "path": "tests/brokers/base/address.py",
+              "sha256": "8e1916839e27e927ae33ddbf76e9585fe30c60f7d303f56d1cdbf1496d315c46",
+              "start_line": 104,
+              "state": "source-declared",
+              "symbol": "AddressPublisherDeliveryTestcase.test_a_publisher_reaches_a_subscriber_declared_the_same_way"
+            }
+          ],
+          "file_sha256": "ec6153eb00399bb82ba46e01326261b2fe99b2b0705cdc1be41777d4683effc2",
+          "file_state": "present",
+          "source": "faststream-address-escape-correspondence-after"
+        },
+        "before": {
+          "declarations": [
+            {
+              "semantic_absence": "not-established",
+              "state": "not-declared-in-selected-file",
+              "symbol": "AddressDeliveryTestcase.test_a_literal_brace_beside_a_parameter_is_not_regex_syntax"
+            },
+            {
+              "semantic_absence": "not-established",
+              "state": "not-declared-in-selected-file",
+              "symbol": "AddressDeliveryTestcase.test_a_router_prefix_reaches_the_wire"
+            },
+            {
+              "semantic_absence": "not-established",
+              "state": "not-declared-in-selected-file",
+              "symbol": "AddressPublisherDeliveryTestcase.test_a_publisher_reaches_a_subscriber_declared_the_same_way"
+            }
+          ],
+          "file_sha256": "a9e4e1117e23b9a829db04455f80b5efca25ce139ef234c935d80e3d9e651d69",
+          "file_state": "present",
+          "source": "faststream-address-escape-correspondence-before"
+        }
+      }
+    }
+  ],
+  "executable_oracles_changed": false,
+  "observer_construction_forbidden": true,
+  "observer_outputs_used": false,
+  "process_launch_forbidden": true,
+  "schema": "hashmarks.data-test-source-review.v1",
+  "scope": "source-only existing test nominations and exact assertion spelling; not runtime sensitivity, sufficiency or selected verification authority",
+  "status": "INCOMPLETE"
+}

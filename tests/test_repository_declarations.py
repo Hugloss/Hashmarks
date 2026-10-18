@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
+from contract_assertions import assert_array, assert_object, assert_records, assert_text
 
 from hashmarks import CodeMap
 
@@ -44,7 +46,7 @@ def _declaration(
     value: object,
     *,
     line: int = 1,
-    semantic_role: dict[str, object] | None = None,
+    semantic_role: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     declaration: dict[str, object] = {
         "declaration_id": declaration_id,
@@ -79,31 +81,44 @@ def test_cross_file_declarations_preserve_exact_evidence_and_equivalence(
     ]
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
-        packet = codemap.repository_declarations([_group(declarations)])
+        codemap.index.sync()
+        packet = codemap.declarations.observe([_group(declarations)])
 
-    group = packet["groups"][0]
+    group = assert_array(packet["groups"])[0]
     assert packet["schema"] == "hashmarks.repository-declarations.v1"
     assert packet["winner"] == "not-selected"
     assert packet["correspondence_authority"] == "provider-claimed"
-    assert group["comparison"] == {
+    assert assert_object(group)["comparison"] == {
         "state": "equivalent",
         "distinct_values": [">=3.12"],
     }
-    assert group["absence"]["state"] == "known-present"
+    assert assert_object(assert_object(group)["absence"])["state"] == "known-present"
     bindings = {
-        row["binding_id"]: row for row in packet["repository_evidence"]["bindings"]
+        assert_object(row)["binding_id"]: row
+        for row in assert_array(
+            assert_object(packet["repository_evidence"])["bindings"]
+        )
     }
     paths = {
-        bindings[row["binding_id"]]["evidence"][0]["path"]
-        for row in group["declarations"]
+        assert_object(
+            assert_array(
+                assert_object(bindings[assert_object(row)["binding_id"]])["evidence"]
+            )[0]
+        )["path"]
+        for row in assert_array(assert_object(group)["declarations"])
     }
     assert paths == {"pyproject.toml", "Dockerfile"}
     assert all(
-        bindings[row["binding_id"]]["evidence"][0]["span_identity"].startswith(
-            "sha256:"
-        )
-        for row in group["declarations"]
+        assert_text(
+            assert_object(
+                assert_array(
+                    assert_object(bindings[assert_object(row)["binding_id"]])[
+                        "evidence"
+                    ]
+                )[0]
+            )["span_identity"]
+        ).startswith("sha256:")
+        for row in assert_array(assert_object(group)["declarations"])
     )
 
 
@@ -120,15 +135,15 @@ def test_differing_declarations_are_reported_without_precedence(
     ]
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
-        packet = codemap.repository_declarations([_group(declarations)])
+        codemap.index.sync()
+        packet = codemap.declarations.observe([_group(declarations)])
 
-    comparison = packet["groups"][0]["comparison"]
-    assert comparison["state"] == "differing"
-    assert comparison["distinct_values"] == ["3.12", "3.13"]
+    comparison = assert_object(assert_array(packet["groups"])[0])["comparison"]
+    assert assert_object(comparison)["state"] == "differing"
+    assert assert_object(comparison)["distinct_values"] == ["3.12", "3.13"]
     assert packet["winner"] == "not-selected"
-    assert "preferred" not in comparison
-    assert "authoritative_value" not in comparison
+    assert "preferred" not in assert_object(comparison)
+    assert "authoritative_value" not in assert_object(comparison)
 
 
 def test_absence_requires_complete_untruncated_semantic_coverage(
@@ -141,8 +156,8 @@ def test_absence_requires_complete_untruncated_semantic_coverage(
     expected = ["owner-a", "owner-b"]
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
-        unknown = codemap.repository_declarations(
+        codemap.index.sync()
+        unknown = codemap.declarations.observe(
             [
                 _group(
                     declarations,
@@ -151,18 +166,16 @@ def test_absence_requires_complete_untruncated_semantic_coverage(
                 )
             ]
         )
-        absent = codemap.repository_declarations(
-            [_group(declarations, expected=expected)]
-        )
+        absent = codemap.declarations.observe([_group(declarations, expected=expected)])
 
-    assert unknown["groups"][0]["absence"] == {
+    assert assert_object(assert_array(unknown["groups"])[0])["absence"] == {
         "state": "unknown",
         "missing_declaration_ids": [],
         "unseen_expected_declaration_ids": ["owner-b"],
         "unexpected_declaration_ids": [],
         "reason": "coverage-does-not-authorize-negative-evidence",
     }
-    assert absent["groups"][0]["absence"] == {
+    assert assert_object(assert_array(absent["groups"])[0])["absence"] == {
         "state": "known-absent",
         "missing_declaration_ids": ["owner-b"],
         "unseen_expected_declaration_ids": [],
@@ -185,15 +198,20 @@ def test_semantic_role_does_not_create_expected_membership_or_absence(
     group = _group([declaration], expected=[])
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
-        packet = codemap.repository_declarations([group])
+        codemap.index.sync()
+        packet = codemap.declarations.observe([group])
 
-    projected = packet["groups"][0]
-    assert projected["coverage"]["expected_declaration_ids"] == []
-    assert projected["declarations"][0]["semantic_declaration_identity"].startswith(
-        "sha256:"
+    projected = assert_array(packet["groups"])[0]
+    assert (
+        assert_object(assert_object(projected)["coverage"])["expected_declaration_ids"]
+        == []
     )
-    assert projected["absence"] == {
+    assert assert_text(
+        assert_object(assert_array(assert_object(projected)["declarations"])[0])[
+            "semantic_declaration_identity"
+        ]
+    ).startswith("sha256:")
+    assert assert_object(projected)["absence"] == {
         "state": "unknown",
         "missing_declaration_ids": [],
         "unseen_expected_declaration_ids": [],
@@ -215,12 +233,12 @@ def test_ambiguous_correspondence_never_becomes_a_conflict_or_equivalence(
     ]
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
-        packet = codemap.repository_declarations(
+        codemap.index.sync()
+        packet = codemap.declarations.observe(
             [_group(declarations, correspondence_state="ambiguous")]
         )
 
-    assert packet["groups"][0]["comparison"] == {
+    assert assert_object(assert_array(packet["groups"])[0])["comparison"] == {
         "state": "ambiguous",
         "reason": "correspondence-not-uniquely-declared",
         "distinct_values": [],
@@ -238,19 +256,19 @@ def test_semantic_namespace_is_required_and_prevents_cross_namespace_collision(
     missing_namespace.pop("semantic_namespace")
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(ValueError, match="semantic_namespace"):
-            codemap.repository_declarations([missing_namespace])
+            codemap.declarations.observe([missing_namespace])
         first_group = _group(declaration)
         first_group["semantic_namespace"] = "provider-a"
         second_group = _group(declaration)
         second_group["semantic_namespace"] = "provider-b"
-        first = codemap.repository_declarations([first_group])
-        second = codemap.repository_declarations([second_group])
+        first = codemap.declarations.observe([first_group])
+        second = codemap.declarations.observe([second_group])
 
     assert (
-        first["groups"][0]["semantic_subject_identity"]
-        != second["groups"][0]["semantic_subject_identity"]
+        assert_object(assert_array(first["groups"])[0])["semantic_subject_identity"]
+        != assert_object(assert_array(second["groups"])[0])["semantic_subject_identity"]
     )
 
 
@@ -271,33 +289,37 @@ def test_semantic_subject_identity_is_independent_of_group_label_and_locator(
     )
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
-        first = codemap.repository_declarations([first_group])
-        second = codemap.repository_declarations([second_group])
+        codemap.index.sync()
+        first = codemap.declarations.observe([first_group])
+        second = codemap.declarations.observe([second_group])
 
-    first_group_result = first["groups"][0]
-    second_group_result = second["groups"][0]
+    first_group_result = assert_array(first["groups"])[0]
+    second_group_result = assert_array(second["groups"])[0]
     assert (
-        first_group_result["semantic_subject_identity"]
-        == second_group_result["semantic_subject_identity"]
+        assert_object(first_group_result)["semantic_subject_identity"]
+        == assert_object(second_group_result)["semantic_subject_identity"]
     )
     assert (
-        first_group_result["group_definition_identity"]
-        != second_group_result["group_definition_identity"]
+        assert_object(first_group_result)["group_definition_identity"]
+        != assert_object(second_group_result)["group_definition_identity"]
     )
-    first_declaration = first_group_result["declarations"][0]
-    second_declaration = second_group_result["declarations"][0]
+    first_declaration = assert_array(assert_object(first_group_result)["declarations"])[
+        0
+    ]
+    second_declaration = assert_array(
+        assert_object(second_group_result)["declarations"]
+    )[0]
     assert (
-        first_declaration["semantic_subject_identity"]
-        == first_group_result["semantic_subject_identity"]
+        assert_object(first_declaration)["semantic_subject_identity"]
+        == assert_object(first_group_result)["semantic_subject_identity"]
     )
     assert (
-        second_declaration["semantic_subject_identity"]
-        == second_group_result["semantic_subject_identity"]
+        assert_object(second_declaration)["semantic_subject_identity"]
+        == assert_object(second_group_result)["semantic_subject_identity"]
     )
     assert (
-        first_declaration["declaration_definition_identity"]
-        != second_declaration["declaration_definition_identity"]
+        assert_object(first_declaration)["declaration_definition_identity"]
+        != assert_object(second_declaration)["declaration_definition_identity"]
     )
 
 
@@ -310,24 +332,38 @@ def test_scope_is_part_of_definition_identity_and_prevents_cross_context_merging
     declaration = [_declaration("runtime", "runtime.yaml", "3.12")]
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
-        linux = codemap.repository_declarations(
+        codemap.index.sync()
+        linux = codemap.declarations.observe(
             [_group(declaration, scope={"platform": "linux"})]
         )
-        windows = codemap.repository_declarations(
+        windows = codemap.declarations.observe(
             [_group(declaration, scope={"platform": "windows"})]
         )
 
     assert (
-        linux["groups"][0]["group_definition_identity"]
-        != windows["groups"][0]["group_definition_identity"]
+        assert_object(assert_array(linux["groups"])[0])["group_definition_identity"]
+        != assert_object(assert_array(windows["groups"])[0])[
+            "group_definition_identity"
+        ]
     )
     assert (
-        linux["groups"][0]["semantic_subject_identity"]
-        != windows["groups"][0]["semantic_subject_identity"]
+        assert_object(assert_array(linux["groups"])[0])["semantic_subject_identity"]
+        != assert_object(assert_array(windows["groups"])[0])[
+            "semantic_subject_identity"
+        ]
     )
-    assert linux["groups"][0]["comparison"]["state"] == "insufficient"
-    assert windows["groups"][0]["comparison"]["state"] == "insufficient"
+    assert (
+        assert_object(assert_object(assert_array(linux["groups"])[0])["comparison"])[
+            "state"
+        ]
+        == "insufficient"
+    )
+    assert (
+        assert_object(assert_object(assert_array(windows["groups"])[0])["comparison"])[
+            "state"
+        ]
+        == "insufficient"
+    )
 
 
 def test_declaration_delta_separates_value_change_from_group_definition(
@@ -347,25 +383,48 @@ def test_declaration_delta_separates_value_change_from_group_definition(
     ]
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
-        before = codemap.repository_declarations([_group(before_declarations)])
-        after = codemap.repository_declarations(
+        codemap.index.sync()
+        before = codemap.declarations.observe([_group(before_declarations)])
+        after = codemap.declarations.observe(
             [_group(after_declarations)],
             previous_observation=before,
         )
 
     delta = after["delta_from_previous"]
-    assert delta["schema"] == "hashmarks.repository-declarations-delta.v1"
-    assert len(delta["changed_groups"]) == 1
-    changed = delta["changed_groups"][0]
-    assert changed["definition_changed"] is False
-    assert changed["value_changed_declaration_ids"] == ["b"]
-    assert changed["comparison_changed"] is True
-    subject_change = delta["semantic_subjects"]["changed"][0]
-    assert subject_change["value_changed_declaration_ids"] == ["b"]
-    assert subject_change["comparison_transition"]["before"]["state"] == "equivalent"
-    assert subject_change["comparison_transition"]["after"]["state"] == "differing"
-    assert delta["repository_evidence"]["bindings"]["changed"] == []
+    assert (
+        assert_object(delta)["schema"] == "hashmarks.repository-declarations-delta.v1"
+    )
+    assert len(assert_array(assert_object(delta)["changed_groups"])) == 1
+    changed = assert_array(assert_object(delta)["changed_groups"])[0]
+    assert assert_object(changed)["definition_changed"] is False
+    assert assert_object(changed)["value_changed_declaration_ids"] == ["b"]
+    assert assert_object(changed)["comparison_changed"] is True
+    subject_change = assert_array(
+        assert_object(assert_object(delta)["semantic_subjects"])["changed"]
+    )[0]
+    assert assert_object(subject_change)["value_changed_declaration_ids"] == ["b"]
+    assert (
+        assert_object(
+            assert_object(assert_object(subject_change)["comparison_transition"])[
+                "before"
+            ]
+        )["state"]
+        == "equivalent"
+    )
+    assert (
+        assert_object(
+            assert_object(assert_object(subject_change)["comparison_transition"])[
+                "after"
+            ]
+        )["state"]
+        == "differing"
+    )
+    assert (
+        assert_object(
+            assert_object(assert_object(delta)["repository_evidence"])["bindings"]
+        )["changed"]
+        == []
+    )
 
 
 @pytest.mark.parametrize("before_value,after_value", [(True, 1), (1, 1.0)])
@@ -376,8 +435,8 @@ def test_declaration_delta_uses_canonical_json_value_identity(
     source.write_text("value = 1\n", encoding="utf-8")
     role = {"kind": "project-intent", "identity": "value"}
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        before = codemap.repository_declarations(
+        codemap.index.sync()
+        before = codemap.declarations.observe(
             [
                 _group(
                     [
@@ -388,7 +447,7 @@ def test_declaration_delta_uses_canonical_json_value_identity(
                 )
             ]
         )
-        after = codemap.repository_declarations(
+        after = codemap.declarations.observe(
             [
                 _group(
                     [
@@ -402,19 +461,37 @@ def test_declaration_delta_uses_canonical_json_value_identity(
         )
 
     assert (
-        before["groups"][0]["group_observation_identity"]
-        != (after["groups"][0]["group_observation_identity"])
+        assert_object(assert_array(before["groups"])[0])["group_observation_identity"]
+        != (
+            assert_object(assert_array(after["groups"])[0])[
+                "group_observation_identity"
+            ]
+        )
     )
     delta = after["delta_from_previous"]
-    group_change = delta["changed_groups"][0]
-    assert group_change["value_changed_declaration_ids"] == ["value"]
-    assert group_change["observation_changed_declaration_ids"] == []
-    assert group_change["comparison_changed"] is True
-    subject_change = delta["semantic_subjects"]["changed"][0]
-    assert subject_change["value_changed_declaration_ids"] == ["value"]
-    role_change = subject_change["semantic_declarations"]["changed"][0]
-    assert role_change["value_transition"]["before"]["value"] == before_value
-    assert role_change["value_transition"]["after"]["value"] == after_value
+    group_change = assert_array(assert_object(delta)["changed_groups"])[0]
+    assert assert_object(group_change)["value_changed_declaration_ids"] == ["value"]
+    assert assert_object(group_change)["observation_changed_declaration_ids"] == []
+    assert assert_object(group_change)["comparison_changed"] is True
+    subject_change = assert_array(
+        assert_object(assert_object(delta)["semantic_subjects"])["changed"]
+    )[0]
+    assert assert_object(subject_change)["value_changed_declaration_ids"] == ["value"]
+    role_change = assert_array(
+        assert_object(assert_object(subject_change)["semantic_declarations"])["changed"]
+    )[0]
+    assert (
+        assert_object(
+            assert_object(assert_object(role_change)["value_transition"])["before"]
+        )["value"]
+        == before_value
+    )
+    assert (
+        assert_object(
+            assert_object(assert_object(role_change)["value_transition"])["after"]
+        )["value"]
+        == after_value
+    )
 
 
 def test_previous_declaration_packet_is_revalidated_before_delta(
@@ -426,13 +503,15 @@ def test_previous_declaration_packet_is_revalidated_before_delta(
     declarations = [_declaration("a", "a.toml", "1")]
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
-        before = codemap.repository_declarations([_group(declarations)])
-        before["groups"][0]["concept"]["identity"] = "tampered"
+        codemap.index.sync()
+        before = codemap.declarations.observe([_group(declarations)])
+        assert_object(assert_object(assert_array(before["groups"])[0])["concept"])[
+            "identity"
+        ] = "tampered"
         with pytest.raises(
             ValueError, match="previous declaration observation identity mismatch"
         ):
-            codemap.repository_declarations(
+            codemap.declarations.observe(
                 [_group(declarations)],
                 previous_observation=before,
             )
@@ -447,14 +526,22 @@ def test_previous_declaration_rejects_resigned_nested_repository_evidence_tamper
     declarations = [_declaration("a", "a.toml", "1")]
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
-        before = codemap.repository_declarations([_group(declarations)])
+        codemap.index.sync()
+        before = codemap.declarations.observe([_group(declarations)])
         evidence = before["repository_evidence"]
-        evidence["bindings"][0]["evidence"][0]["state"] = "known-absent"
-        before["observation_identity"] = codemap._declaration_packet_identity(before)
+        assert_object(
+            assert_array(
+                assert_object(assert_array(assert_object(evidence)["bindings"])[0])[
+                    "evidence"
+                ]
+            )[0]
+        )["state"] = "known-absent"
+        before["observation_identity"] = (
+            codemap.declarations._declaration_packet_identity(before)
+        )
 
         with pytest.raises(ValueError, match="bindings identity mismatch"):
-            codemap.repository_declarations(
+            codemap.declarations.observe(
                 [_group(declarations)],
                 previous_observation=before,
             )
@@ -471,11 +558,11 @@ def test_fail_closed_unknown_fields_and_invalid_complete_coverage(
     bad["invented_policy"] = "prefer-first"
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(ValueError, match="unknown fields"):
-            codemap.repository_declarations([bad])
+            codemap.declarations.observe([bad])
         with pytest.raises(ValueError, match="complete declaration coverage requires"):
-            codemap.repository_declarations(
+            codemap.declarations.observe(
                 [
                     _group(
                         [declaration],
@@ -493,23 +580,29 @@ def test_definition_identity_binds_exact_evidence_definition(tmp_path: Path) -> 
     after_group = _group([_declaration("runtime", "runtime.txt", "3.12", line=2)])
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
-        before = codemap.repository_declarations([before_group])
-        after = codemap.repository_declarations(
+        codemap.index.sync()
+        before = codemap.declarations.observe([before_group])
+        after = codemap.declarations.observe(
             [after_group],
             previous_observation=before,
         )
 
-    previous = before["groups"][0]["declarations"][0]
-    current = after["groups"][0]["declarations"][0]
+    previous = assert_array(
+        assert_object(assert_array(before["groups"])[0])["declarations"]
+    )[0]
+    current = assert_array(
+        assert_object(assert_array(after["groups"])[0])["declarations"]
+    )[0]
     assert (
-        previous["declaration_definition_identity"]
-        != current["declaration_definition_identity"]
+        assert_object(previous)["declaration_definition_identity"]
+        != assert_object(current)["declaration_definition_identity"]
     )
-    changed = after["delta_from_previous"]["changed_groups"][0]
-    assert changed["semantic_subject_changed"] is False
-    assert changed["definition_changed"] is True
-    assert changed["definition_changed_declaration_ids"] == ["runtime"]
+    changed = assert_array(
+        assert_object(after["delta_from_previous"])["changed_groups"]
+    )[0]
+    assert assert_object(changed)["semantic_subject_changed"] is False
+    assert assert_object(changed)["definition_changed"] is True
+    assert assert_object(changed)["definition_changed_declaration_ids"] == ["runtime"]
 
 
 def test_semantic_subject_delta_correlates_group_label_change_without_history(
@@ -523,33 +616,33 @@ def test_semantic_subject_delta_correlates_group_label_change_without_history(
     after_group = _group(declaration, group_id="request-b")
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
-        before = codemap.repository_declarations([before_group])
-        after = codemap.repository_declarations(
+        codemap.index.sync()
+        before = codemap.declarations.observe([before_group])
+        after = codemap.declarations.observe(
             [after_group],
             previous_observation=before,
         )
 
     delta = after["delta_from_previous"]
-    assert delta["added_group_ids"] == ["request-b"]
-    assert delta["removed_group_ids"] == ["request-a"]
-    subjects = delta["semantic_subjects"]
-    assert subjects["added"] == []
-    assert subjects["removed"] == []
-    assert subjects["ambiguous"] == []
-    assert len(subjects["changed"]) == 1
-    change = subjects["changed"][0]
-    assert change["group_id_changed"] is True
-    assert change["previous_group_id"] == "request-a"
-    assert change["current_group_id"] == "request-b"
-    assert "value_changed_declaration_ids" not in change
-    assert "producer_changed_declaration_ids" not in change
-    assert "evidence_state_changed_declaration_ids" not in change
-    assert "added_declaration_ids" not in change
-    assert "removed_declaration_ids" not in change
-    assert "semantic_declarations" not in change
-    assert "comparison_transition" not in change
-    assert "absence_transition" not in change
+    assert assert_object(delta)["added_group_ids"] == ["request-b"]
+    assert assert_object(delta)["removed_group_ids"] == ["request-a"]
+    subjects = assert_object(delta)["semantic_subjects"]
+    assert assert_object(subjects)["added"] == []
+    assert assert_object(subjects)["removed"] == []
+    assert assert_object(subjects)["ambiguous"] == []
+    assert len(assert_array(assert_object(subjects)["changed"])) == 1
+    change = assert_array(assert_object(subjects)["changed"])[0]
+    assert assert_object(change)["group_id_changed"] is True
+    assert assert_object(change)["previous_group_id"] == "request-a"
+    assert assert_object(change)["current_group_id"] == "request-b"
+    assert "value_changed_declaration_ids" not in assert_object(change)
+    assert "producer_changed_declaration_ids" not in assert_object(change)
+    assert "evidence_state_changed_declaration_ids" not in assert_object(change)
+    assert "added_declaration_ids" not in assert_object(change)
+    assert "removed_declaration_ids" not in assert_object(change)
+    assert "semantic_declarations" not in assert_object(change)
+    assert "comparison_transition" not in assert_object(change)
+    assert "absence_transition" not in assert_object(change)
 
 
 def test_semantic_role_correlates_child_change_across_request_label_renames(
@@ -578,13 +671,13 @@ def test_semantic_role_correlates_child_change_across_request_label_renames(
     )
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
-        before = codemap.repository_declarations([before_group])
+        codemap.index.sync()
+        before = codemap.declarations.observe([before_group])
         moved = repo / "container" / "Dockerfile"
         moved.parent.mkdir()
         (repo / "Dockerfile").replace(moved)
         moved.write_text("python = 3.13\n", encoding="utf-8")
-        codemap.sync(["Dockerfile", "container/Dockerfile"])
+        codemap.index.sync(["Dockerfile", "container/Dockerfile"])
         after_group = _group(
             [
                 _declaration(
@@ -602,54 +695,87 @@ def test_semantic_role_correlates_child_change_across_request_label_renames(
             ],
             group_id="request-after",
         )
-        after = codemap.repository_declarations(
+        after = codemap.declarations.observe(
             [after_group],
             previous_observation=before,
         )
 
     before_by_role = {
-        row["semantic_role"]["kind"]: row for row in before["groups"][0]["declarations"]
+        assert_object(assert_object(row)["semantic_role"])["kind"]: row
+        for row in assert_array(
+            assert_object(assert_array(before["groups"])[0])["declarations"]
+        )
     }
     after_by_role = {
-        row["semantic_role"]["kind"]: row for row in after["groups"][0]["declarations"]
+        assert_object(assert_object(row)["semantic_role"])["kind"]: row
+        for row in assert_array(
+            assert_object(assert_array(after["groups"])[0])["declarations"]
+        )
     }
     assert (
-        before_by_role["project-intent"]["semantic_declaration_identity"]
-        == after_by_role["project-intent"]["semantic_declaration_identity"]
+        assert_object(before_by_role["project-intent"])["semantic_declaration_identity"]
+        == assert_object(after_by_role["project-intent"])[
+            "semantic_declaration_identity"
+        ]
     )
     assert (
-        before_by_role["container-runtime"]["semantic_declaration_identity"]
-        == after_by_role["container-runtime"]["semantic_declaration_identity"]
+        assert_object(before_by_role["container-runtime"])[
+            "semantic_declaration_identity"
+        ]
+        == assert_object(after_by_role["container-runtime"])[
+            "semantic_declaration_identity"
+        ]
     )
 
-    subject = after["delta_from_previous"]["semantic_subjects"]["changed"][0]
-    assert subject["group_id_changed"] is True
-    assert "value_changed_declaration_ids" not in subject
-    roles = subject["semantic_declarations"]
-    assert roles["added"] == []
-    assert roles["removed"] == []
-    assert roles["ambiguous"] == []
-    changed_by_role = {row["semantic_role"]["kind"]: row for row in roles["changed"]}
+    subject = assert_array(
+        assert_object(assert_object(after["delta_from_previous"])["semantic_subjects"])[
+            "changed"
+        ]
+    )[0]
+    assert assert_object(subject)["group_id_changed"] is True
+    assert "value_changed_declaration_ids" not in assert_object(subject)
+    roles = assert_object(subject)["semantic_declarations"]
+    assert assert_object(roles)["added"] == []
+    assert assert_object(roles)["removed"] == []
+    assert assert_object(roles)["ambiguous"] == []
+    changed_by_role = {
+        assert_object(assert_object(row)["semantic_role"])["kind"]: row
+        for row in assert_array(assert_object(roles)["changed"])
+    }
     intent = changed_by_role["project-intent"]
-    assert intent["declaration_id_changed"] is True
-    assert intent["previous_declaration_id"] == "intent-before"
-    assert intent["current_declaration_id"] == "intent-after"
-    assert "value_transition" not in intent
+    assert assert_object(intent)["declaration_id_changed"] is True
+    assert assert_object(intent)["previous_declaration_id"] == "intent-before"
+    assert assert_object(intent)["current_declaration_id"] == "intent-after"
+    assert "value_transition" not in assert_object(intent)
 
     runtime = changed_by_role["container-runtime"]
-    assert runtime["declaration_id_changed"] is True
-    assert runtime["previous_declaration_id"] == "runtime-before"
-    assert runtime["current_declaration_id"] == "runtime-after"
-    assert runtime["value_transition"] == {
+    assert assert_object(runtime)["declaration_id_changed"] is True
+    assert assert_object(runtime)["previous_declaration_id"] == "runtime-before"
+    assert assert_object(runtime)["current_declaration_id"] == "runtime-after"
+    assert assert_object(runtime)["value_transition"] == {
         "before": {"value_state": "resolved", "value": "3.12"},
         "after": {"value_state": "resolved", "value": "3.13"},
     }
     assert (
-        before_by_role["container-runtime"]["declaration_definition_identity"]
-        != after_by_role["container-runtime"]["declaration_definition_identity"]
+        assert_object(before_by_role["container-runtime"])[
+            "declaration_definition_identity"
+        ]
+        != assert_object(after_by_role["container-runtime"])[
+            "declaration_definition_identity"
+        ]
     )
-    assert subject["comparison_transition"]["before"]["state"] == "equivalent"
-    assert subject["comparison_transition"]["after"]["state"] == "differing"
+    assert (
+        assert_object(
+            assert_object(assert_object(subject)["comparison_transition"])["before"]
+        )["state"]
+        == "equivalent"
+    )
+    assert (
+        assert_object(
+            assert_object(assert_object(subject)["comparison_transition"])["after"]
+        )["state"]
+        == "differing"
+    )
 
 
 def test_semantic_role_identity_is_scoped_by_semantic_subject(
@@ -671,16 +797,23 @@ def test_semantic_role_identity_is_scoped_by_semantic_subject(
     }
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
-        first = codemap.repository_declarations([first_group])
-        second = codemap.repository_declarations([second_group])
+        codemap.index.sync()
+        first = codemap.declarations.observe([first_group])
+        second = codemap.declarations.observe([second_group])
 
-    first_row = first["groups"][0]["declarations"][0]
-    second_row = second["groups"][0]["declarations"][0]
-    assert first_row["semantic_role"] == second_row["semantic_role"]
+    first_row = assert_array(
+        assert_object(assert_array(first["groups"])[0])["declarations"]
+    )[0]
+    second_row = assert_array(
+        assert_object(assert_array(second["groups"])[0])["declarations"]
+    )[0]
     assert (
-        first_row["semantic_declaration_identity"]
-        != second_row["semantic_declaration_identity"]
+        assert_object(first_row)["semantic_role"]
+        == assert_object(second_row)["semantic_role"]
+    )
+    assert (
+        assert_object(first_row)["semantic_declaration_identity"]
+        != assert_object(second_row)["semantic_declaration_identity"]
     )
 
 
@@ -712,26 +845,38 @@ def test_semantic_role_change_is_remove_add_not_guessed_rename(
     )
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
-        before = codemap.repository_declarations([before_group])
-        after = codemap.repository_declarations(
+        codemap.index.sync()
+        before = codemap.declarations.observe([before_group])
+        after = codemap.declarations.observe(
             [after_group],
             previous_observation=before,
         )
 
-    before_declaration = before["groups"][0]["declarations"][0]
-    after_declaration = after["groups"][0]["declarations"][0]
+    before_declaration = assert_array(
+        assert_object(assert_array(before["groups"])[0])["declarations"]
+    )[0]
+    after_declaration = assert_array(
+        assert_object(assert_array(after["groups"])[0])["declarations"]
+    )[0]
     assert (
-        before_declaration["semantic_declaration_identity"]
-        != after_declaration["semantic_declaration_identity"]
+        assert_object(before_declaration)["semantic_declaration_identity"]
+        != assert_object(after_declaration)["semantic_declaration_identity"]
     )
-    roles = after["delta_from_previous"]["semantic_subjects"]["changed"][0][
-        "semantic_declarations"
+    roles = assert_object(
+        assert_array(
+            assert_object(
+                assert_object(after["delta_from_previous"])["semantic_subjects"]
+            )["changed"]
+        )[0]
+    )["semantic_declarations"]
+    assert assert_object(roles)["removed"] == [
+        assert_object(before_declaration)["semantic_declaration_identity"]
     ]
-    assert roles["removed"] == [before_declaration["semantic_declaration_identity"]]
-    assert roles["added"] == [after_declaration["semantic_declaration_identity"]]
-    assert roles["ambiguous"] == []
-    assert roles["changed"] == []
+    assert assert_object(roles)["added"] == [
+        assert_object(after_declaration)["semantic_declaration_identity"]
+    ]
+    assert assert_object(roles)["ambiguous"] == []
+    assert assert_object(roles)["changed"] == []
 
 
 def test_unchanged_duplicate_semantic_roles_do_not_manufacture_delta(
@@ -750,17 +895,17 @@ def test_unchanged_duplicate_semantic_roles_do_not_manufacture_delta(
     )
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
-        before = codemap.repository_declarations([group])
-        after = codemap.repository_declarations(
+        codemap.index.sync()
+        before = codemap.declarations.observe([group])
+        after = codemap.declarations.observe(
             [group],
             previous_observation=before,
         )
 
     delta = after["delta_from_previous"]
-    assert delta["changed_groups"] == []
-    assert delta["semantic_subjects"]["changed"] == []
-    assert delta["semantic_subjects"]["ambiguous"] == []
+    assert assert_object(delta)["changed_groups"] == []
+    assert assert_object(assert_object(delta)["semantic_subjects"])["changed"] == []
+    assert assert_object(assert_object(delta)["semantic_subjects"])["ambiguous"] == []
 
 
 def test_semantic_role_delta_preserves_duplicate_role_ambiguity(
@@ -784,21 +929,29 @@ def test_semantic_role_delta_preserves_duplicate_role_ambiguity(
     )
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
-        before = codemap.repository_declarations([before_group])
-        after = codemap.repository_declarations(
+        codemap.index.sync()
+        before = codemap.declarations.observe([before_group])
+        after = codemap.declarations.observe(
             [after_group],
             previous_observation=before,
         )
 
-    identity = before["groups"][0]["declarations"][0]["semantic_declaration_identity"]
-    roles = after["delta_from_previous"]["semantic_subjects"]["changed"][0][
-        "semantic_declarations"
-    ]
-    assert roles["added"] == []
-    assert roles["removed"] == []
-    assert roles["changed"] == []
-    assert roles["ambiguous"] == [
+    identity = assert_object(
+        assert_array(assert_object(assert_array(before["groups"])[0])["declarations"])[
+            0
+        ]
+    )["semantic_declaration_identity"]
+    roles = assert_object(
+        assert_array(
+            assert_object(
+                assert_object(after["delta_from_previous"])["semantic_subjects"]
+            )["changed"]
+        )[0]
+    )["semantic_declarations"]
+    assert assert_object(roles)["added"] == []
+    assert assert_object(roles)["removed"] == []
+    assert assert_object(roles)["changed"] == []
+    assert assert_object(roles)["ambiguous"] == [
         {
             "semantic_declaration_identity": identity,
             "previous_declaration_ids": ["a", "b"],
@@ -819,31 +972,39 @@ def test_one_sided_duplicate_semantic_roles_remain_ambiguous(
     )
     duplicates = _group(
         [
-            *base["declarations"],
+            *assert_records(base["declarations"]),
             _declaration("a", "runtime.yaml", "3.12", semantic_role={"kind": "extra"}),
             _declaration("b", "runtime.yaml", "3.12", semantic_role={"kind": "extra"}),
         ]
     )
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
-        before = codemap.repository_declarations([base])
-        added = codemap.repository_declarations(
-            [duplicates], previous_observation=before
-        )
-        removed = codemap.repository_declarations([base], previous_observation=added)
+        codemap.index.sync()
+        before = codemap.declarations.observe([base])
+        added = codemap.declarations.observe([duplicates], previous_observation=before)
+        removed = codemap.declarations.observe([base], previous_observation=added)
 
     identity = next(
-        row["semantic_declaration_identity"]
-        for row in added["groups"][0]["declarations"]
-        if row["declaration_id"] == "a"
+        assert_object(row)["semantic_declaration_identity"]
+        for row in assert_array(
+            assert_object(assert_array(added["groups"])[0])["declarations"]
+        )
+        if assert_object(row)["declaration_id"] == "a"
     )
-    added_roles = added["delta_from_previous"]["semantic_subjects"]["changed"][0][
-        "semantic_declarations"
-    ]
-    removed_roles = removed["delta_from_previous"]["semantic_subjects"]["changed"][0][
-        "semantic_declarations"
-    ]
+    added_roles = assert_object(
+        assert_array(
+            assert_object(
+                assert_object(added["delta_from_previous"])["semantic_subjects"]
+            )["changed"]
+        )[0]
+    )["semantic_declarations"]
+    removed_roles = assert_object(
+        assert_array(
+            assert_object(
+                assert_object(removed["delta_from_previous"])["semantic_subjects"]
+            )["changed"]
+        )[0]
+    )["semantic_declarations"]
     assert added_roles == {
         "added": [identity],
         "removed": [],
@@ -884,12 +1045,12 @@ def test_semantic_role_requires_non_empty_object(
     declaration["semantic_role"] = semantic_role
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(
             ValueError,
             match="semantic_role must be a non-empty object",
         ):
-            codemap.repository_declarations([_group([declaration])])
+            codemap.declarations.observe([_group([declaration])])
 
 
 def test_semantic_subject_delta_preserves_duplicate_subject_ambiguity(
@@ -906,22 +1067,22 @@ def test_semantic_subject_delta_preserves_duplicate_subject_ambiguity(
     ]
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
-        before = codemap.repository_declarations([before_group])
-        after = codemap.repository_declarations(
+        codemap.index.sync()
+        before = codemap.declarations.observe([before_group])
+        after = codemap.declarations.observe(
             after_groups,
             previous_observation=before,
         )
 
-    subjects = after["delta_from_previous"]["semantic_subjects"]
-    assert subjects["added"] == []
-    assert subjects["removed"] == []
-    assert subjects["changed"] == []
-    assert subjects["ambiguous"] == [
+    subjects = assert_object(after["delta_from_previous"])["semantic_subjects"]
+    assert assert_object(subjects)["added"] == []
+    assert assert_object(subjects)["removed"] == []
+    assert assert_object(subjects)["changed"] == []
+    assert assert_object(subjects)["ambiguous"] == [
         {
-            "semantic_subject_identity": before["groups"][0][
-                "semantic_subject_identity"
-            ],
+            "semantic_subject_identity": assert_object(
+                assert_array(before["groups"])[0]
+            )["semantic_subject_identity"],
             "previous_group_ids": ["single"],
             "current_group_ids": ["first", "second"],
             "reason": "semantic-subject-not-unique",
@@ -942,15 +1103,17 @@ def test_one_sided_duplicate_semantic_subjects_remain_ambiguous(
     ]
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
-        empty = codemap.repository_declarations([])
-        added = codemap.repository_declarations(
+        codemap.index.sync()
+        empty = codemap.declarations.observe([])
+        added = codemap.declarations.observe(
             duplicate_groups, previous_observation=empty
         )
-        removed = codemap.repository_declarations([], previous_observation=added)
+        removed = codemap.declarations.observe([], previous_observation=added)
 
-    identity = added["groups"][0]["semantic_subject_identity"]
-    assert added["delta_from_previous"]["semantic_subjects"] == {
+    identity = assert_object(assert_array(added["groups"])[0])[
+        "semantic_subject_identity"
+    ]
+    assert assert_object(added["delta_from_previous"])["semantic_subjects"] == {
         "added": [identity],
         "removed": [],
         "ambiguous": [
@@ -963,7 +1126,7 @@ def test_one_sided_duplicate_semantic_subjects_remain_ambiguous(
         ],
         "changed": [],
     }
-    assert removed["delta_from_previous"]["semantic_subjects"] == {
+    assert assert_object(removed["delta_from_previous"])["semantic_subjects"] == {
         "added": [],
         "removed": [identity],
         "ambiguous": [
@@ -988,27 +1151,35 @@ def test_semantic_subject_change_is_explicit_in_delta(tmp_path: Path) -> None:
     after_group["concept"] = {"kind": "runtime-compatibility", "identity": "pypy"}
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
-        before = codemap.repository_declarations([before_group])
-        after = codemap.repository_declarations(
+        codemap.index.sync()
+        before = codemap.declarations.observe([before_group])
+        after = codemap.declarations.observe(
             [after_group],
             previous_observation=before,
         )
 
     assert (
-        before["groups"][0]["semantic_subject_identity"]
-        != after["groups"][0]["semantic_subject_identity"]
+        assert_object(assert_array(before["groups"])[0])["semantic_subject_identity"]
+        != assert_object(assert_array(after["groups"])[0])["semantic_subject_identity"]
     )
     delta = after["delta_from_previous"]
-    changed = delta["changed_groups"][0]
-    assert changed["semantic_subject_changed"] is True
-    assert changed["definition_changed"] is True
-    before_subject = before["groups"][0]["semantic_subject_identity"]
-    after_subject = after["groups"][0]["semantic_subject_identity"]
-    assert delta["semantic_subjects"]["removed"] == [before_subject]
-    assert delta["semantic_subjects"]["added"] == [after_subject]
-    assert delta["semantic_subjects"]["changed"] == []
-    assert delta["semantic_subjects"]["ambiguous"] == []
+    changed = assert_array(assert_object(delta)["changed_groups"])[0]
+    assert assert_object(changed)["semantic_subject_changed"] is True
+    assert assert_object(changed)["definition_changed"] is True
+    before_subject = assert_object(assert_array(before["groups"])[0])[
+        "semantic_subject_identity"
+    ]
+    after_subject = assert_object(assert_array(after["groups"])[0])[
+        "semantic_subject_identity"
+    ]
+    assert assert_object(assert_object(delta)["semantic_subjects"])["removed"] == [
+        before_subject
+    ]
+    assert assert_object(assert_object(delta)["semantic_subjects"])["added"] == [
+        after_subject
+    ]
+    assert assert_object(assert_object(delta)["semantic_subjects"])["changed"] == []
+    assert assert_object(assert_object(delta)["semantic_subjects"])["ambiguous"] == []
 
 
 def test_group_definition_identity_binds_coverage_scope(tmp_path: Path) -> None:
@@ -1018,17 +1189,19 @@ def test_group_definition_identity_binds_coverage_scope(tmp_path: Path) -> None:
     declaration = [_declaration("owner", "owner.yaml", "team-a")]
     team_scope = _group(declaration)
     org_scope = _group(declaration)
-    team_scope["coverage"]["scope"] = {"registry": "team"}
-    org_scope["coverage"]["scope"] = {"registry": "organization"}
+    assert_object(team_scope["coverage"])["scope"] = {"registry": "team"}
+    assert_object(org_scope["coverage"])["scope"] = {"registry": "organization"}
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
-        team = codemap.repository_declarations([team_scope])
-        organization = codemap.repository_declarations([org_scope])
+        codemap.index.sync()
+        team = codemap.declarations.observe([team_scope])
+        organization = codemap.declarations.observe([org_scope])
 
     assert (
-        team["groups"][0]["group_definition_identity"]
-        != organization["groups"][0]["group_definition_identity"]
+        assert_object(assert_array(team["groups"])[0])["group_definition_identity"]
+        != assert_object(assert_array(organization["groups"])[0])[
+            "group_definition_identity"
+        ]
     )
 
 
@@ -1070,11 +1243,16 @@ def test_contract_is_format_and_concept_neutral(
     group["concept"] = concept
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
-        packet = codemap.repository_declarations([group])
+        codemap.index.sync()
+        packet = codemap.declarations.observe([group])
 
-    assert packet["groups"][0]["concept"] == concept
-    assert packet["groups"][0]["comparison"]["state"] == "equivalent"
+    assert assert_object(assert_array(packet["groups"])[0])["concept"] == concept
+    assert (
+        assert_object(assert_object(assert_array(packet["groups"])[0])["comparison"])[
+            "state"
+        ]
+        == "equivalent"
+    )
 
 
 def test_encoded_request_budget_fails_closed_before_repository_projection(
@@ -1087,9 +1265,9 @@ def test_encoded_request_budget_fails_closed_before_repository_projection(
     group["concept"] = {"opaque": "x" * 1_048_576}
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(ValueError, match="groups exceeds .* encoded bytes"):
-            codemap.repository_declarations([group])
+            codemap.declarations.observe([group])
 
 
 def test_resolved_provider_value_with_missing_evidence_cannot_create_conflict(
@@ -1104,20 +1282,23 @@ def test_resolved_provider_value_with_missing_evidence_cannot_create_conflict(
     ]
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
-        packet = codemap.repository_declarations([_group(declarations)])
+        codemap.index.sync()
+        packet = codemap.declarations.observe([_group(declarations)])
 
-    group = packet["groups"][0]
-    by_id = {row["declaration_id"]: row for row in group["declarations"]}
-    assert by_id["current"]["evidence_state"] == "known-present"
-    assert by_id["missing"]["evidence_state"] == "known-absent"
-    assert group["comparison"] == {
+    group = assert_array(packet["groups"])[0]
+    by_id = {
+        assert_object(row)["declaration_id"]: row
+        for row in assert_array(assert_object(group)["declarations"])
+    }
+    assert assert_object(by_id["current"])["evidence_state"] == "known-present"
+    assert assert_object(by_id["missing"])["evidence_state"] == "known-absent"
+    assert assert_object(group)["comparison"] == {
         "state": "ambiguous",
         "reason": "repository-evidence-not-qualified",
         "unqualified_declaration_ids": ["missing"],
         "distinct_values": [],
     }
-    assert group["absence"] == {
+    assert assert_object(group)["absence"] == {
         "state": "known-absent",
         "missing_declaration_ids": ["missing"],
         "unseen_expected_declaration_ids": [],
@@ -1138,15 +1319,23 @@ def test_unsupported_declaration_evidence_cannot_create_equivalence(
     ]
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
-        packet = codemap.repository_declarations([_group(declarations)])
+        codemap.index.sync()
+        packet = codemap.declarations.observe([_group(declarations)])
 
-    group = packet["groups"][0]
-    by_id = {row["declaration_id"]: row for row in group["declarations"]}
-    assert by_id["binary"]["evidence_state"] == "unsupported"
-    assert group["comparison"]["state"] == "ambiguous"
-    assert group["comparison"]["reason"] == "repository-evidence-not-qualified"
-    assert group["comparison"]["unqualified_declaration_ids"] == ["binary"]
+    group = assert_array(packet["groups"])[0]
+    by_id = {
+        assert_object(row)["declaration_id"]: row
+        for row in assert_array(assert_object(group)["declarations"])
+    }
+    assert assert_object(by_id["binary"])["evidence_state"] == "unsupported"
+    assert assert_object(assert_object(group)["comparison"])["state"] == "ambiguous"
+    assert (
+        assert_object(assert_object(group)["comparison"])["reason"]
+        == "repository-evidence-not-qualified"
+    )
+    assert assert_object(assert_object(group)["comparison"])[
+        "unqualified_declaration_ids"
+    ] == ["binary"]
 
 
 def test_declaration_claims_require_provenance_and_distinct_ambiguity(
@@ -1158,35 +1347,35 @@ def test_declaration_claims_require_provenance_and_distinct_ambiguity(
     base = _group([_declaration("a", "a.yaml", "a")])
 
     missing_basis = _group([_declaration("a", "a.yaml", "a")])
-    missing_basis["correspondence"]["basis"] = {}
+    assert_object(missing_basis["correspondence"])["basis"] = {}
 
     missing_coverage_provenance = _group([_declaration("a", "a.yaml", "a")])
-    missing_coverage_provenance["coverage"]["provenance"] = {}
+    assert_object(missing_coverage_provenance["coverage"])["provenance"] = {}
 
     missing_producer = _group([_declaration("a", "a.yaml", "a")])
-    missing_producer["declarations"][0]["producer"] = {}
+    assert_object(assert_array(missing_producer["declarations"])[0])["producer"] = {}
 
     duplicate_candidates = _group([_declaration("a", "a.yaml", "a")])
-    ambiguous = duplicate_candidates["declarations"][0]
-    ambiguous["value_state"] = "ambiguous"
-    ambiguous.pop("value")
-    ambiguous["candidate_values"] = ["same", "same"]
+    ambiguous = assert_array(duplicate_candidates["declarations"])[0]
+    assert_object(ambiguous)["value_state"] = "ambiguous"
+    assert_object(ambiguous).pop("value")
+    assert_object(ambiguous)["candidate_values"] = ["same", "same"]
 
     empty_concept = dict(base)
     empty_concept["concept"] = {}
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(ValueError, match="correspondence.basis"):
-            codemap.repository_declarations([missing_basis])
+            codemap.declarations.observe([missing_basis])
         with pytest.raises(ValueError, match="coverage.provenance"):
-            codemap.repository_declarations([missing_coverage_provenance])
+            codemap.declarations.observe([missing_coverage_provenance])
         with pytest.raises(ValueError, match="producer must be"):
-            codemap.repository_declarations([missing_producer])
+            codemap.declarations.observe([missing_producer])
         with pytest.raises(ValueError, match="distinct candidate values"):
-            codemap.repository_declarations([duplicate_candidates])
+            codemap.declarations.observe([duplicate_candidates])
         with pytest.raises(ValueError, match="concept must be"):
-            codemap.repository_declarations([empty_concept])
+            codemap.declarations.observe([empty_concept])
 
 
 def test_ambiguous_candidate_order_does_not_change_observation_identity(
@@ -1204,12 +1393,14 @@ def test_ambiguous_candidate_order_does_not_change_observation_identity(
         return _group([declaration])
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
-        first = codemap.repository_declarations([ambiguous(["b", "a"])])
-        second = codemap.repository_declarations([ambiguous(["a", "b"])])
+        codemap.index.sync()
+        first = codemap.declarations.observe([ambiguous(["b", "a"])])
+        second = codemap.declarations.observe([ambiguous(["a", "b"])])
 
     assert first["observation_identity"] == second["observation_identity"]
-    assert first["groups"][0]["declarations"][0]["candidate_values"] == ["a", "b"]
+    assert assert_object(
+        assert_array(assert_object(assert_array(first["groups"])[0])["declarations"])[0]
+    )["candidate_values"] == ["a", "b"]
 
 
 def test_expected_membership_exposes_unexpected_current_declaration(
@@ -1225,10 +1416,10 @@ def test_expected_membership_exposes_unexpected_current_declaration(
     ]
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
-        codemap.sync()
-        packet = codemap.repository_declarations([_group(declarations, expected=["a"])])
+        codemap.index.sync()
+        packet = codemap.declarations.observe([_group(declarations, expected=["a"])])
 
-    assert packet["groups"][0]["absence"] == {
+    assert assert_object(assert_array(packet["groups"])[0])["absence"] == {
         "state": "known-present",
         "missing_declaration_ids": [],
         "unseen_expected_declaration_ids": [],
@@ -1248,13 +1439,13 @@ def test_previous_declaration_packet_from_foreign_repository_fails_closed(
     group = _group([_declaration("owner", "owner.yaml", "team-a")])
 
     with CodeMap(left, state_dir=tmp_path / "left-state") as codemap:
-        codemap.sync()
-        previous = codemap.repository_declarations([group])
+        codemap.index.sync()
+        previous = codemap.declarations.observe([group])
 
     with CodeMap(right, state_dir=tmp_path / "right-state") as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(
             ValueError,
             match="previous declaration observation repository-mismatch",
         ):
-            codemap.repository_declarations([group], previous_observation=previous)
+            codemap.declarations.observe([group], previous_observation=previous)

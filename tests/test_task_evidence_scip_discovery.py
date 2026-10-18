@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from contract_assertions import assert_records
+
 from hashmarks.codemap import CodeMap
 from hashmarks.evidence_presentation import present_repository_evidence
 
@@ -71,13 +73,13 @@ def test_task_evidence_discovers_existing_scip_facts_without_reselecting_owner(
     _repository(tmp_path)
     index = _index(tmp_path)
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
-        before: Any = codemap.task_evidence(_TASK, token_budget=256)
+        codemap.index.sync()
+        before: Any = codemap.tasks.evidence(_TASK, token_budget=256)
         assert before["ownership"]["status"] == "resolved"
         assert "semantic_relationships" not in before
 
-        codemap.import_scip(index)
-        after: Any = codemap.task_evidence(_TASK, token_budget=256)
+        codemap.native.import_scip(index)
+        after: Any = codemap.tasks.evidence(_TASK, token_budget=256)
 
     assert after["ownership"]["status"] == "resolved"
     assert after["ownership"]["owner"]["path"] == "src/engine.py"
@@ -136,9 +138,9 @@ def test_compact_locality_surfaces_scip_claims_before_call_edges(
     code += "".join(f"\ndef helper{i}():\n    return {i}\n" for i in range(6))
     (tmp_path / "src" / "engine.py").write_text(code, encoding="utf-8")
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
-        codemap.import_scip(_index(tmp_path))
-        packet = codemap.structural_locality("src/engine.py::normalize_widget")
+        codemap.index.sync()
+        codemap.native.import_scip(_index(tmp_path))
+        packet = codemap.structure.locality("src/engine.py::normalize_widget")
     for format in ("structured", "compact", "text"):
         projection: Any = present_repository_evidence(packet, format=format)
         group = next(g for g in projection["groups"] if g["family"] == "relationship")
@@ -158,10 +160,10 @@ def test_post_change_reports_semantic_freshness_without_comparing_claim_sets(
 ) -> None:
     _repository(tmp_path)
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
-        codemap.import_scip(_index(tmp_path))
-        previous = codemap.task_evidence(_TASK)
-        noop: Any = codemap.task_post_change_delta(
+        codemap.index.sync()
+        codemap.native.import_scip(_index(tmp_path))
+        previous = codemap.tasks.evidence(_TASK)
+        noop: Any = codemap.changes.task_delta(
             _TASK, ["src/engine.py"], previous_evidence=previous
         )
         assert noop["semantic_relationships"]["changed"] is False
@@ -170,7 +172,7 @@ def test_post_change_reports_semantic_freshness_without_comparing_claim_sets(
             "def normalize_widget(value: str) -> str:\n    return value.strip().lower()\n",
             encoding="utf-8",
         )
-        delta: Any = codemap.task_post_change_delta(
+        delta: Any = codemap.changes.task_delta(
             _TASK, ["src/engine.py"], previous_evidence=previous
         )
     evidence: Any = delta["semantic_relationships"]
@@ -201,16 +203,17 @@ def test_post_change_zero_scip_observation_becomes_unavailable_not_absent(
 ) -> None:
     _repository(tmp_path)
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
-        codemap.import_scip(_index(tmp_path, count=0))
-        previous = codemap.task_evidence(_TASK)
+        codemap.index.sync()
+        codemap.native.import_scip(_index(tmp_path, count=0))
+        previous = codemap.tasks.evidence(_TASK)
         (tmp_path / "src" / "engine.py").write_text(
             "def normalize_widget(value: str) -> str:\n    return value.strip().lower()\n",
             encoding="utf-8",
         )
-        delta = codemap.task_post_change_delta(
+        delta = codemap.changes.task_delta(
             _TASK, ["src/engine.py"], previous_evidence=previous
         )
+    assert "semantic_relationships" in delta
     evidence: Any = delta["semantic_relationships"]
     assert (
         evidence["before"]["observation_state"]
@@ -228,9 +231,9 @@ def test_task_evidence_scip_discovery_is_bounded_and_stale_fails_closed(
     _repository(tmp_path)
     index = _index(tmp_path, count=65)
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
-        codemap.import_scip(index)
-        observed: Any = codemap.task_evidence(_TASK)
+        codemap.index.sync()
+        codemap.native.import_scip(index)
+        observed: Any = codemap.tasks.evidence(_TASK)
         assert observed["semantic_relationships"]["observed_relationship_count"] == 64
         assert observed["semantic_relationships"]["truncated"] is True
         assert (
@@ -242,8 +245,8 @@ def test_task_evidence_scip_discovery_is_bounded_and_stale_fails_closed(
             "    return value.strip().lower()\n",
             encoding="utf-8",
         )
-        codemap.sync(["src/engine.py"])
-        stale: Any = codemap.task_evidence(_TASK)
+        codemap.index.sync(["src/engine.py"])
+        stale: Any = codemap.tasks.evidence(_TASK)
         assert all(
             row["freshness"] == "stale"
             for row in stale["semantic_relationships"]["evidence"]["qualifications"]
@@ -261,9 +264,9 @@ def test_scip_discovery_does_not_promote_unresolved_or_denied_owners(
         encoding="utf-8",
     )
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
-        codemap.import_scip(index)
-        packet = codemap.task_evidence(_TASK)
+        codemap.index.sync()
+        codemap.native.import_scip(index)
+        packet = codemap.tasks.evidence(_TASK)
         assert "semantic_relationships" not in packet
 
 
@@ -273,12 +276,12 @@ def test_scip_observed_zero_claims_is_not_missing_provider_evidence(
     _repository(tmp_path)
     index = _index(tmp_path, count=0)
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
-        missing = codemap.task_evidence(_TASK, token_budget=256)
+        codemap.index.sync()
+        missing = codemap.tasks.evidence(_TASK, token_budget=256)
         assert "semantic_relationships" not in missing
 
-        codemap.import_scip(index)
-        observed = codemap.task_evidence(_TASK, token_budget=256)
+        codemap.native.import_scip(index)
+        observed = codemap.tasks.evidence(_TASK, token_budget=256)
 
     # SCIP import advances the repository generation, so proof identities
     # may legitimately change; the admitted owner and verifier must not.
@@ -287,6 +290,7 @@ def test_scip_observed_zero_claims_is_not_missing_provider_evidence(
     assert observed["ownership"]["basis"] == missing["ownership"]["basis"]
     assert observed["verification"]["selected"] == missing["verification"]["selected"]
     assert observed["verification"]["plan"] == missing["verification"]["plan"]
+    assert "semantic_relationships" in observed
     discovery = observed["semantic_relationships"]
     assert discovery["observation_state"] == "definition-observed-no-direct-claims"
     assert discovery["observed_relationship_count"] == 0
@@ -304,8 +308,8 @@ def test_scip_observed_zero_claims_is_not_missing_provider_evidence(
     rendered = present_repository_evidence(observed, format="structured")
     rows = [
         row
-        for group in rendered["groups"]
-        for row in group["findings"]
+        for group in assert_records(rendered["groups"])
+        for row in assert_records(group["findings"])
         if row["kind"] == "scip_semantic_discovery"
     ]
     assert len(rows) == 1
@@ -319,10 +323,12 @@ def test_scip_empty_observation_invalidated_after_source_edit(
     _repository(tmp_path)
     index = _index(tmp_path, count=0)
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
-        codemap.import_scip(index)
+        codemap.index.sync()
+        codemap.native.import_scip(index)
+        observed = codemap.tasks.evidence(_TASK)
+        assert "semantic_relationships" in observed
         assert (
-            codemap.task_evidence(_TASK)["semantic_relationships"]["observation_state"]
+            observed["semantic_relationships"]["observation_state"]
             == "definition-observed-no-direct-claims"
         )
 
@@ -331,8 +337,8 @@ def test_scip_empty_observation_invalidated_after_source_edit(
             "    return value.strip().lower()\n",
             encoding="utf-8",
         )
-        codemap.sync(["src/engine.py"])
-        assert "semantic_relationships" not in codemap.task_evidence(_TASK)
+        codemap.index.sync(["src/engine.py"])
+        assert "semantic_relationships" not in codemap.tasks.evidence(_TASK)
 
 
 def test_incoming_only_scip_claim_is_not_misreported_as_outgoing(
@@ -362,9 +368,9 @@ def test_incoming_only_scip_claim_is_not_misreported_as_outgoing(
     index.write_text(json.dumps(native), encoding="utf-8")
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
-        codemap.sync()
-        codemap.import_scip(index)
-        packet: Any = codemap.task_evidence(_TASK, token_budget=256)
+        codemap.index.sync()
+        codemap.native.import_scip(index)
+        packet: Any = codemap.tasks.evidence(_TASK, token_budget=256)
 
     discovery = packet["semantic_relationships"]
     assert packet["ownership"]["owner"]["path"] == "src/engine.py"

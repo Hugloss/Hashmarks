@@ -2,6 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from contract_assertions import (
+    assert_integer,
+    assert_object,
+    assert_records,
+    assert_text,
+)
+
 from hashmarks.repository_diagnostics import (
     bounded_top_n_candidate_profile,
     related_query_reuse_receipt,
@@ -28,7 +35,7 @@ def test_shared_ast_propagation_audit_passes_current_repository() -> None:
     result = shared_python_ast_propagation_audit(root)
 
     assert result["valid"] is True
-    assert result["violations"] == []
+    assert assert_records(result["violations"]) == []
     assert result["cache_authority"] == "hashmarks.python_ast_cache.read_python_ast"
 
 
@@ -51,9 +58,11 @@ def test_shared_ast_propagation_audit_detects_direct_file_backed_parse(
     result = shared_python_ast_propagation_audit(tmp_path)
 
     assert result["valid"] is False
-    assert len(result["violations"]) == 1
-    assert result["violations"][0]["path"].endswith("hashmarks/bad.py")
-    assert result["violations"][0]["reason"] == (
+    assert len(assert_records(result["violations"])) == 1
+    assert assert_text(assert_records(result["violations"])[0]["path"]).endswith(
+        "hashmarks/bad.py"
+    )
+    assert assert_records(result["violations"])[0]["reason"] == (
         "file-backed-ast-parse-bypasses-shared-cache"
     )
 
@@ -70,16 +79,16 @@ def test_repository_query_runtime_diagnostics_reports_exact_available_metrics(
     )
 
     assert result["schema"] == "hashmarks.repository-query-runtime-diagnostics.v1"
-    assert result["repository_scan"]["files"] >= 2
-    assert result["repository_scan"]["source_bytes"] > 0
-    assert result["query_work"]["wall_time_ns"] > 0
-    assert result["query_work"]["candidate_count"] > 0
-    assert result["query_work"]["evidence_files"] > 0
-    assert result["query_work"]["evidence_bytes"] > 0
-    assert result["query_work"]["ast_parses"] >= 0
-    assert result["query_work"]["ast_cache_hits"] >= 0
-    assert result["query_work"]["graph_nodes_traversed"] is None
-    assert result["availability"]["graph_nodes_traversed"] is False
+    assert assert_integer(assert_object(result["repository_scan"])["files"]) >= 2
+    assert assert_integer(assert_object(result["repository_scan"])["source_bytes"]) > 0
+    assert assert_integer(assert_object(result["query_work"])["wall_time_ns"]) > 0
+    assert assert_integer(assert_object(result["query_work"])["candidate_count"]) > 0
+    assert assert_integer(assert_object(result["query_work"])["evidence_files"]) > 0
+    assert assert_integer(assert_object(result["query_work"])["evidence_bytes"]) > 0
+    assert assert_integer(assert_object(result["query_work"])["ast_parses"]) >= 0
+    assert assert_integer(assert_object(result["query_work"])["ast_cache_hits"]) >= 0
+    assert assert_object(result["query_work"])["graph_nodes_traversed"] is None
+    assert assert_object(result["availability"])["graph_nodes_traversed"] is False
     assert result["boundary"] == "repository-intelligence-only"
 
 
@@ -95,8 +104,22 @@ def test_related_query_reuse_is_generation_bound_and_semantically_stable(
 
     assert result["repository_generation_bound"] is True
     assert result["reuse_observed"] is True
-    assert result["stage_deltas"]["task_action_map"]["task_result_hit"] >= 1
-    assert result["stage_deltas"]["task_decision_packet"]["task_action_hit"] >= 1
+    assert (
+        assert_integer(
+            assert_object(assert_object(result["stage_deltas"])["task_action_map"])[
+                "task_result_hit"
+            ]
+        )
+        >= 1
+    )
+    assert (
+        assert_integer(
+            assert_object(
+                assert_object(result["stage_deltas"])["task_decision_packet"]
+            )["task_action_hit"]
+        )
+        >= 1
+    )
     assert result["boundary"] == "repository-intelligence-only"
 
 
@@ -115,9 +138,12 @@ def test_bounded_top_n_profile_preserves_prefix_semantics(tmp_path: Path) -> Non
 
     assert result["all_bounds_respected"] is True
     assert result["prefix_semantics_equivalent"] is True
-    assert [row["limit"] for row in result["profiles"]] == [3, 7, 12]
-    assert all(row["result_count"] <= row["limit"] for row in result["profiles"])
-    assert result["availability"]["sort_operations"] is False
+    assert [row["limit"] for row in assert_records(result["profiles"])] == [3, 7, 12]
+    assert all(
+        assert_integer(row["result_count"]) <= assert_integer(row["limit"])
+        for row in assert_records(result["profiles"])
+    )
+    assert assert_object(result["availability"])["sort_operations"] is False
 
 
 def test_ownership_graph_economics_uses_authoritative_projection(
@@ -143,9 +169,9 @@ def test_ownership_graph_economics_uses_authoritative_projection(
         max_depth=2,
     )
 
-    assert result["graph_nodes_traversed"] >= 1
-    assert result["graph_edges_observed"] >= 0
-    assert result["availability"]["graph_nodes_traversed"] is True
+    assert assert_integer(result["graph_nodes_traversed"]) >= 1
+    assert assert_integer(result["graph_edges_observed"]) >= 0
+    assert assert_object(result["availability"])["graph_nodes_traversed"] is True
     assert result["measurement_basis"] == "authoritative-ownership-graph-projection"
     assert result["boundary"] == "repository-intelligence-only"
 
@@ -155,9 +181,9 @@ def test_low_level_operation_counter_decision_is_explicit() -> None:
 
     result = low_level_operation_counter_decision()
     assert result["decision"] == "do-not-instrument"
-    assert result["metrics"]["sort_operations"] is False
-    assert result["metrics"]["set_constructions"] is False
-    assert result["metrics"]["string_normalizations"] is False
+    assert assert_object(result["metrics"])["sort_operations"] is False
+    assert assert_object(result["metrics"])["set_constructions"] is False
+    assert assert_object(result["metrics"])["string_normalizations"] is False
 
 
 def test_find_task_prefix_is_stable_through_agent_surface(tmp_path: Path) -> None:
@@ -183,9 +209,9 @@ def test_find_task_prefix_is_stable_through_agent_surface(tmp_path: Path) -> Non
     with CodeMap(
         root, state_dir=state, artifact_db=state / "artifacts.sqlite3"
     ) as codemap:
-        codemap.sync()
-        five = [hit.path for hit in codemap.find_task(task, limit=5)]
-        ten = [hit.path for hit in codemap.find_task(task, limit=10)]
-        twenty = [hit.path for hit in codemap.find_task(task, limit=20)]
+        codemap.index.sync()
+        five = [hit.path for hit in codemap.search.find_task(task, limit=5)]
+        ten = [hit.path for hit in codemap.search.find_task(task, limit=10)]
+        twenty = [hit.path for hit in codemap.search.find_task(task, limit=20)]
     assert five == twenty[:5]
     assert ten == twenty[:10]

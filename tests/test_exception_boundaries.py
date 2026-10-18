@@ -1,18 +1,26 @@
 from __future__ import annotations
 
 import ast
+from argparse import ArgumentParser, Namespace
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from hashmarks import cli, repository_cli, repository_retry
+from hashmarks.codemap import CodeMap
 from hashmarks.errors import RepositoryCliError
+from hashmarks.python_ast_cache import read_python_ast
+
+if TYPE_CHECKING:
+    import types
+    from argparse import _SubParsersAction
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def _try_functions(path: Path) -> dict[str, list[int]]:
-    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    tree = read_python_ast(path).tree
     result: dict[str, list[int]] = {}
     for node in tree.body:
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -42,20 +50,44 @@ def test_repository_cli_boundary_translates_only_expected_request_errors(
         def __enter__(self):
             return self
 
-        def __exit__(self, exc_type, exc, tb):
+        def __exit__(
+            self,
+            exc_type: type[BaseException] | None,
+            exc: BaseException | None,
+            tb: types.TracebackType | None,
+        ) -> bool | None:
             return False
 
     monkeypatch.setattr(repository_cli, "_codemap", lambda args: FakeCodeMap())
 
     with pytest.raises(RepositoryCliError, match="bad query"):
         repository_cli._call_codemap(
-            object(), lambda codemap: (_ for _ in ()).throw(ValueError("bad query"))
+            Namespace(), lambda codemap: (_ for _ in ()).throw(ValueError("bad query"))
         )
 
     with pytest.raises(RuntimeError, match="implementation bug"):
         repository_cli._call_codemap(
-            object(),
+            Namespace(),
             lambda codemap: (_ for _ in ()).throw(RuntimeError("implementation bug")),
+        )
+
+
+def test_declaration_source_request_uses_the_shared_cli_error_boundary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("HASHMARKS_NO_UPDATE_CHECK", "1")
+    request = tmp_path / "interface.json"
+    request.write_text('{"paths": ["source.py"], "unsupported": true}')
+    with pytest.raises(SystemExit, match="only supported source options"):
+        cli.main(
+            [
+                "repository-declarations",
+                "--workspace",
+                str(tmp_path),
+                "--python-interface-json",
+                str(request),
+            ]
         )
 
 
@@ -66,14 +98,19 @@ def test_repository_cli_boundary_retries_known_transient_races_once_centrally(
         def __enter__(self):
             return self
 
-        def __exit__(self, exc_type, exc, tb):
+        def __exit__(
+            self,
+            exc_type: type[BaseException] | None,
+            exc: BaseException | None,
+            tb: types.TracebackType | None,
+        ) -> bool | None:
             return False
 
     monkeypatch.setattr(repository_cli, "_codemap", lambda args: FakeCodeMap())
     monkeypatch.setattr(repository_retry.time, "sleep", lambda _delay: None)
     calls = 0
 
-    def operation(codemap):
+    def operation(codemap: CodeMap) -> str:
         nonlocal calls
         calls += 1
         if calls < 3:
@@ -82,7 +119,7 @@ def test_repository_cli_boundary_retries_known_transient_races_once_centrally(
             )
         return "ready"
 
-    assert repository_cli._call_codemap(object(), operation) == "ready"
+    assert repository_cli._call_codemap(Namespace(), operation) == "ready"
     assert calls == 3
 
 
@@ -93,7 +130,12 @@ def test_repository_cli_boundary_translates_exhausted_transient_race(
         def __enter__(self):
             return self
 
-        def __exit__(self, exc_type, exc, tb):
+        def __exit__(
+            self,
+            exc_type: type[BaseException] | None,
+            exc: BaseException | None,
+            tb: types.TracebackType | None,
+        ) -> bool | None:
             return False
 
     monkeypatch.setattr(repository_cli, "_codemap", lambda args: FakeCodeMap())
@@ -101,7 +143,7 @@ def test_repository_cli_boundary_translates_exhausted_transient_race(
 
     with pytest.raises(RepositoryCliError, match="generation is incomplete"):
         repository_cli._call_codemap(
-            object(),
+            Namespace(),
             lambda codemap: (_ for _ in ()).throw(
                 RuntimeError(
                     "CodeMap generation is incomplete (BUILDING); run sync() before querying repository intelligence"
@@ -122,12 +164,12 @@ def test_mcp_and_cli_share_one_repository_retry_owner() -> None:
 def test_top_level_cli_translates_user_facing_error_once(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fail(args) -> int:
+    def fail(args: Namespace) -> int:
         raise RepositoryCliError("caller-visible failure")
 
     original = cli._add_daemon_cli
 
-    def add_one(sub) -> None:
+    def add_one(sub: _SubParsersAction[ArgumentParser]) -> None:
         parser = sub.add_parser("boundary-test")
         parser.set_defaults(func=fail)
 
@@ -147,7 +189,7 @@ def test_top_level_cli_translates_user_facing_error_once(
 def test_no_catch_and_immediate_reraise_noise_in_product_python() -> None:
     violations: list[str] = []
     for path in sorted((ROOT / "hashmarks").rglob("*.py")):
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        tree = read_python_ast(path).tree
         for node in ast.walk(tree):
             if not isinstance(node, ast.ExceptHandler):
                 continue
@@ -201,7 +243,7 @@ def test_broad_exception_handlers_are_restricted_to_explicit_failure_boundaries(
     found: set[tuple[str, str]] = set()
 
     for path in sorted((ROOT / "hashmarks").rglob("*.py")):
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        tree = read_python_ast(path).tree
         parents: dict[ast.AST, ast.AST] = {}
         for parent in ast.walk(tree):
             for child in ast.iter_child_nodes(parent):

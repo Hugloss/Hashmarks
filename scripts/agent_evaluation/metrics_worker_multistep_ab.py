@@ -9,7 +9,7 @@ import subprocess
 import sys
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any, Literal, TypedDict
 
 from hashmarks._command_output import log_command_output
 from hashmarks.codemap import (
@@ -43,6 +43,48 @@ class _EditDecision(TypedDict):
     reason: str | None
 
 
+class _VerificationState(TypedDict):
+    target: str | None
+    candidates_examined: int
+    candidates: list[str]
+
+
+class _ReadCost(TypedDict):
+    paths: list[str]
+    files: int
+    bytes: int
+    approx_tokens: int
+
+
+class _ScoredTask(TypedDict):
+    id: str
+    expected_files: list[str]
+    expected_verification: str
+    first_hypothesis: object
+    edit_target: object
+    correct_edit: bool
+    unsafe_wrong_edit: bool
+    deferred_edit: bool
+    verification_target: object
+    correct_verification: bool
+    recovered_from_wrong_first_hypothesis: bool
+    evidence_read: Mapping[str, object]
+    verification_candidates_examined: object
+
+
+class _Score(TypedDict):
+    summary: dict[str, int]
+    tasks: list[_ScoredTask]
+
+
+class _RepositoryScore(TypedDict):
+    name: str
+    public_task_sha256: str
+    hidden_corpus_sha256: str
+    direct_sequence: _Score
+    uncertainty_aware_sequence: _Score
+
+
 def _identity(value: object) -> str:
     data = json.dumps(
         value, sort_keys=True, separators=(",", ":"), ensure_ascii=True
@@ -63,13 +105,13 @@ def _is_test_path(path: str) -> bool:
 
 def _verification_state(
     source: Path | CodeMap, query: str, *, limit: int
-) -> dict[str, object]:
+) -> _VerificationState:
     if isinstance(source, CodeMap):
-        hits = source.find_task(query + " test verification", limit=limit)
+        hits = source.search.find_task(query + " test verification", limit=limit)
     else:
         with CodeMap(source) as codemap:
-            codemap.sync()
-            hits = codemap.find_task(query + " test verification", limit=limit)
+            codemap.index.sync()
+            hits = codemap.search.find_task(query + " test verification", limit=limit)
     candidates = [hit.path for hit in hits]
     target = next((path for path in candidates if _is_test_path(path)), None)
     examined = candidates.index(target) + 1 if target in candidates else len(candidates)
@@ -80,7 +122,7 @@ def _verification_state(
     }
 
 
-def _read_cost(workspace: Path, paths: list[str]) -> dict[str, object]:
+def _read_cost(workspace: Path, paths: list[str]) -> _ReadCost:
     unique: list[str] = []
     seen: set[str] = set()
     total_bytes = 0
@@ -123,12 +165,13 @@ def _edit_decision(policy: str, state: Mapping[str, Any], query: str) -> _EditDe
     ]
     resolution = _resolve_after_inspection(query, list(state["alternatives"]))
     target = str(resolution["target"]) if resolution["resolved"] else None
-    return {
+    decision: _EditDecision = {
         "target": target,
         "inspection_paths": inspection_paths,
         "recovered": target is not None and target != first,
         "reason": resolution["reason"],
     }
+    return decision
 
 
 def run_worker(
@@ -139,7 +182,7 @@ def run_worker(
         raise ValueError("unsupported public task input")
     rows = []
     with CodeMap(workspace) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         for row in payload.get("tasks", []):
             if not isinstance(row, dict) or set(row) - {"id", "query"}:
                 raise ValueError("worker input may contain only id and query")
@@ -195,15 +238,21 @@ def _expected_verification(repo_name: str) -> str:
     }[repo_name]
 
 
+def _integer(value: object) -> int:
+    if not isinstance(value, (int, float, str)):
+        raise ValueError("worker measurement counter must be numeric")
+    return int(value)
+
+
 def _score(
     repo_name: str, tasks: list[dict[str, Any]], output: dict[str, Any]
-) -> dict[str, object]:
+) -> _Score:
     by_id = {
         str(r.get("id") or ""): r
         for r in output.get("tasks", [])
         if isinstance(r, dict)
     }
-    rows = []
+    rows: list[_ScoredTask] = []
     expected_verification = _expected_verification(repo_name)
     for task in tasks:
         tid = str(task.get("id") or task.get("query") or "")
@@ -214,6 +263,9 @@ def _score(
             observed.get("verification_target") if isinstance(observed, dict) else None
         )
         correct_edit = str(edit) in expected
+        evidence_read = observed.get("evidence_read", {})
+        if not isinstance(evidence_read, Mapping):
+            raise ValueError("worker evidence_read must be an object")
         rows.append(
             {
                 "id": tid,
@@ -230,7 +282,7 @@ def _score(
                     observed.get("recovered_from_first_hypothesis")
                 )
                 and correct_edit,
-                "evidence_read": observed.get("evidence_read", {}),
+                "evidence_read": evidence_read,
                 "verification_candidates_examined": observed.get(
                     "verification_candidates_examined"
                 ),
@@ -248,16 +300,16 @@ def _score(
                 r["recovered_from_wrong_first_hypothesis"] for r in rows
             ),
             "evidence_files_read": sum(
-                int(r["evidence_read"].get("files", 0)) for r in rows
+                _integer(r["evidence_read"].get("files", 0)) for r in rows
             ),
             "evidence_bytes_read": sum(
-                int(r["evidence_read"].get("bytes", 0)) for r in rows
+                _integer(r["evidence_read"].get("bytes", 0)) for r in rows
             ),
             "evidence_approx_tokens": sum(
-                int(r["evidence_read"].get("approx_tokens", 0)) for r in rows
+                _integer(r["evidence_read"].get("approx_tokens", 0)) for r in rows
             ),
             "verification_candidates_examined": sum(
-                int(r["verification_candidates_examined"] or 0) for r in rows
+                _integer(r["verification_candidates_examined"] or 0) for r in rows
             ),
         },
         "tasks": rows,
@@ -265,7 +317,7 @@ def _score(
 
 
 def collect(root: Path, *, limit: int = 20) -> dict[str, object]:
-    reports = []
+    reports: list[_RepositoryScore] = []
     for name, workspace, corpus, public_path in materialize_challenge(
         root / "challenge"
     ):
@@ -314,8 +366,10 @@ def collect(root: Path, *, limit: int = 20) -> dict[str, object]:
             }
         )
 
-    def total(policy, key):
-        return sum(int(r[policy]["summary"][key]) for r in reports)
+    def total(
+        policy: Literal["direct_sequence", "uncertainty_aware_sequence"], key: str
+    ) -> int:
+        return sum(r[policy]["summary"][key] for r in reports)
 
     tasks = total("direct_sequence", "tasks")
     direct_wrong = total("direct_sequence", "unsafe_wrong_edits")

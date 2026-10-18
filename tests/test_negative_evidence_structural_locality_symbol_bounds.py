@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+from contract_assertions import assert_object, assert_records
+
 from hashmarks.codemap import CodeMap
 
 _SYMBOL_LIMIT = 64
@@ -21,7 +24,9 @@ def _codemap(root: Path) -> CodeMap:
     )
 
 
-def _install_hidden_same_name_candidate(codemap: CodeMap, monkeypatch) -> None:
+def _install_hidden_same_name_candidate(
+    codemap: CodeMap, monkeypatch: pytest.MonkeyPatch
+) -> None:
     original = codemap.store.visible_symbol_candidates
     actual = [dict(row) for row in original("helper", limit=10)]
     assert len(actual) >= 2
@@ -37,7 +42,7 @@ def _install_hidden_same_name_candidate(codemap: CodeMap, monkeypatch) -> None:
     probe = [first, *noise, hidden]
     assert len(probe) == _SYMBOL_LIMIT + 1
 
-    def symbols_named(name: str, *, limit: int):
+    def symbols_named(name: str, *, limit: int) -> list[dict[str, object]]:
         if name == "helper" and limit == _SYMBOL_LIMIT + 1:
             return probe[:limit]
         return original(name, limit=limit)
@@ -47,7 +52,7 @@ def _install_hidden_same_name_candidate(codemap: CodeMap, monkeypatch) -> None:
 
 def test_structural_locality_bound_cannot_manufacture_unique_call_target(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _write(tmp_path, "pkg/__init__.py", "")
     _write(
@@ -69,22 +74,24 @@ def authority(value):
     )
 
     with _codemap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         _install_hidden_same_name_candidate(codemap, monkeypatch)
-        packet = codemap.structural_locality(
+        packet = codemap.structure.locality(
             "pkg/core.py::authority",
             max_depth=2,
             refresh=False,
         )
-        helper = codemap.structural_locality(
+        helper = codemap.structure.locality(
             "pkg/core.py::helper",
             max_depth=0,
             refresh=False,
         )
 
-    assert [row["symbol_id"] for row in packet["nodes"]] == ["pkg/core.py::authority"]
-    assert packet["dimensions"]["unresolved_call_count"] == 1
-    unresolved = packet["unresolved_calls"][0]
+    assert [row["symbol_id"] for row in assert_records(packet["nodes"])] == [
+        "pkg/core.py::authority"
+    ]
+    assert assert_object(packet["dimensions"])["unresolved_call_count"] == 1
+    unresolved = assert_records(packet["unresolved_calls"])[0]
     assert unresolved["target_text"] == "helper"
     assert unresolved["resolved_symbol_id"] is None
     assert unresolved["candidate_search"] == {
@@ -93,9 +100,11 @@ def authority(value):
         "negative_evidence_admissible": False,
         "uniqueness_admissible": False,
     }
-    target = helper["nodes"][0]
+    target = assert_records(helper["nodes"])[0]
     assert target["exact_caller_count"] == 0
-    assert target["unresolved_caller_candidates"][0]["candidate_search"] == {
+    assert assert_records(target["unresolved_caller_candidates"])[0][
+        "candidate_search"
+    ] == {
         "completeness": "incomplete",
         "truncation": "truncated",
         "negative_evidence_admissible": False,
@@ -121,16 +130,18 @@ def authority(value):
     )
 
     with _codemap(tmp_path) as codemap:
-        packet = codemap.structural_locality(
+        packet = codemap.structure.locality(
             "pkg/core.py::authority",
             max_depth=2,
         )
 
-    assert {row["symbol_id"] for row in packet["nodes"]} == {
+    assert {row["symbol_id"] for row in assert_records(packet["nodes"])} == {
         "pkg/core.py::authority",
         "pkg/core.py::helper",
     }
-    helper_edge = next(row for row in packet["edges"] if row["target_text"] == "helper")
+    helper_edge = next(
+        row for row in assert_records(packet["edges"]) if row["target_text"] == "helper"
+    )
     assert helper_edge["resolved_symbol_id"] == "pkg/core.py::helper"
     assert helper_edge["candidate_search"] == {
         "completeness": "complete",
@@ -142,7 +153,7 @@ def authority(value):
 
 def test_structural_locality_bound_cannot_prove_qualified_root_absence(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _write(tmp_path, "pkg/__init__.py", "")
     _write(
@@ -153,6 +164,10 @@ class Worker:
     @staticmethod
     def helper(value):
         return value + 1
+
+# There is no unique declaration binding for the import to qualify first.
+if runtime_flag:
+    Worker = unknown
 """.lstrip(),
     )
     _write(
@@ -168,7 +183,7 @@ def authority(value):
     )
 
     with _codemap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         original = codemap.store.visible_symbol_candidates
         worker_rows = [dict(row) for row in original("Worker", limit=10)]
         assert len(worker_rows) == 1
@@ -184,22 +199,27 @@ def authority(value):
         probe = [*noise, worker]
         assert len(probe) == _SYMBOL_LIMIT + 1
 
-        def symbols_named(name: str, *, limit: int):
+        def symbols_named(name: str, *, limit: int) -> list[dict[str, object]]:
             if name == "Worker" and limit == _SYMBOL_LIMIT + 1:
                 return probe[:limit]
             return original(name, limit=limit)
 
         monkeypatch.setattr(codemap.store, "visible_symbol_candidates", symbols_named)
-        packet = codemap.structural_locality(
+        packet = codemap.structure.locality(
             "pkg/core.py::authority",
             max_depth=2,
             refresh=False,
         )
 
-    assert [row["symbol_id"] for row in packet["nodes"]] == ["pkg/core.py::authority"]
-    assert packet["dimensions"]["unresolved_call_count"] == 1
-    assert packet["dimensions"]["external_or_unindexed_call_count"] == 0
-    unresolved = packet["unresolved_calls"][0]
+    assert [row["symbol_id"] for row in assert_records(packet["nodes"])] == [
+        "pkg/core.py::authority"
+    ]
+    assert assert_object(packet["dimensions"])["unresolved_call_count"] == 1
+    assert assert_object(packet["dimensions"])["external_or_unindexed_call_count"] == 0
+    unresolved = assert_records(packet["unresolved_calls"])[0]
     assert unresolved["target_text"] == "W.helper"
-    assert unresolved["candidate_search"]["completeness"] == "incomplete"
-    assert unresolved["candidate_search"]["negative_evidence_admissible"] is False
+    assert assert_object(unresolved["candidate_search"])["completeness"] == "incomplete"
+    assert (
+        assert_object(unresolved["candidate_search"])["negative_evidence_admissible"]
+        is False
+    )

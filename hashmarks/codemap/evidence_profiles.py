@@ -1,25 +1,24 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from copy import deepcopy
-from typing import TYPE_CHECKING, Literal, cast, get_args
+from typing import Literal, get_args
 
 from .change_impact import ChangeImpactOptions
-from .decision_session import diagnostic_producer
-
-if TYPE_CHECKING:
-    from pathlib import Path
-
-    from .engine import CodeMap
+from .repository_observation import packet_digest
 
 ProfileName = Literal["compact", "standard", "audit"]
 PROFILE_NAMES = get_args(ProfileName)
 
 
 EVIDENCE_PROFILE_SCHEMA = "hashmarks.evidence-profile.v1"
+EVIDENCE_PROFILE_DEFAULT_OPTIONS = ChangeImpactOptions(
+    impact_limit_per_surface=4,
+    max_depth=3,
+)
 
 
-class EvidenceProfilesMixin:
+class EvidenceProfileProjection:
     """Density projections over one authoritative repository-intelligence snapshot.
 
     Profiles never persist or independently own repository facts.  Each projection
@@ -60,12 +59,12 @@ class EvidenceProfilesMixin:
         verification = cls._profile_mapping(snapshot.get("verification"))
         freshness = {
             str(key): {
-                field: deepcopy(row[field])
+                field: deepcopy(freshness_row[field])
                 for field in ("state", "evidence_identity")
-                if field in row
+                if field in freshness_row
             }
             for key, raw in cls._profile_mapping(snapshot.get("freshness")).items()
-            if (row := cls._profile_mapping(raw))
+            if (freshness_row := cls._profile_mapping(raw))
         }
         payload: dict[str, object] = {
             "repository": {
@@ -124,14 +123,13 @@ class EvidenceProfilesMixin:
     def _audit_profile_evidence(snapshot: Mapping[str, object]) -> dict[str, object]:
         return {"snapshot": deepcopy(dict(snapshot))}
 
-    def _profile_from_snapshot(
-        self,
+    @classmethod
+    def from_snapshot(
+        cls,
         snapshot: Mapping[str, object],
         *,
         profile: str,
     ) -> dict[str, object]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         profile_name = str(profile).strip().lower()
         if profile_name not in PROFILE_NAMES:
             raise ValueError("profile must be one of: audit, compact, standard")
@@ -144,11 +142,11 @@ class EvidenceProfilesMixin:
             raise ValueError("snapshot is missing snapshot_identity")
 
         if profile_name == "compact":
-            evidence = self._compact_profile_evidence(snapshot)
+            evidence = cls._compact_profile_evidence(snapshot)
         elif profile_name == "standard":
-            evidence = self._standard_profile_evidence(snapshot)
+            evidence = cls._standard_profile_evidence(snapshot)
         else:
-            evidence = self._audit_profile_evidence(snapshot)
+            evidence = cls._audit_profile_evidence(snapshot)
 
         payload: dict[str, object] = {
             "schema": EVIDENCE_PROFILE_SCHEMA,
@@ -159,35 +157,8 @@ class EvidenceProfilesMixin:
             "execution_effect": "none",
             "evidence": evidence,
         }
-        payload["profile_identity"] = "sha256:" + self._packet_digest(
+        payload["profile_identity"] = "sha256:" + packet_digest(
             EVIDENCE_PROFILE_SCHEMA,
             payload,
         )
         return payload
-
-    @diagnostic_producer
-    def repository_intelligence_profile(
-        self,
-        task: str,
-        changed_paths: Sequence[str | Path],
-        *,
-        profile: str = "compact",
-        limit: int = 20,
-        per_role: int = 3,
-        options: ChangeImpactOptions = ChangeImpactOptions(
-            impact_limit_per_surface=4,
-            max_depth=3,
-        ),
-    ) -> dict[str, object]:
-        """Project one bounded F3 snapshot at compact, standard, or audit density."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        snapshot = self.repository_intelligence_snapshot(
-            task,
-            changed_paths,
-            limit=limit,
-            per_role=per_role,
-            impact_limit_per_surface=options.impact_limit_per_surface,
-            max_depth=options.max_depth,
-        )
-        return self._profile_from_snapshot(snapshot, profile=profile)

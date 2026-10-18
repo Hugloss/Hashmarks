@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from copy import deepcopy
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NotRequired, TypedDict
 
 from .evidence_context import validate_evidence_context
 from .qualification_units import (
@@ -27,6 +27,20 @@ CONSUMER_CONFORMANCE_SCHEMA = "hashmarks.consumer-conformance.v1"
 CONSUMER_VECTOR_SCHEMA = "hashmarks.consumer-conformance-vector.v1"
 
 
+class NativeConsumerValidation(TypedDict):
+    schema: str
+    valid: bool
+    reasons: list[str]
+    producer_implementation_identity: NotRequired[object]
+    identity_semantics: str
+    normalized: NotRequired[dict[str, object] | None]
+    context_identity: NotRequired[str | None]
+    authority: NotRequired[str]
+    execution_authority: str
+    result_authority: str
+    certification_authority: str
+
+
 def _bundle_producer_identity(envelope: Mapping[str, object]) -> object:
     producer = envelope.get("producer")
     return (
@@ -37,7 +51,7 @@ def _bundle_producer_identity(envelope: Mapping[str, object]) -> object:
 
 
 def _bundle_handoff_reasons(
-    handoff: Mapping[str, object] | None,
+    handoff: object,
     producer_identity: object,
 ) -> list[str]:
     if handoff is None:
@@ -88,13 +102,13 @@ def _normalized_bundle(
 
 
 def validate_native_consumer_bundle(
-    envelope: Mapping[str, object],
-    contract: Mapping[str, object],
+    envelope: object,
+    contract: object,
     *,
-    handoff: Mapping[str, object] | None = None,
+    handoff: object = None,
     expected_producer_implementation_identity: str | None = None,
     require_fresh: bool = False,
-) -> dict[str, object]:
+) -> NativeConsumerValidation:
     """Validate Hashmarks-issued evidence without reproducing producer identity generation."""
     envelope, envelope_root_reasons = require_mapping_for_validation(
         envelope, reason="invalid-envelope"
@@ -136,11 +150,11 @@ def validate_native_consumer_bundle(
 
 
 def validate_native_evidence_context_bundle(
-    evidence_receipt: Mapping[str, object],
-    provenance: Mapping[str, object],
+    evidence_receipt: object,
+    provenance: object,
     *,
     expected_producer_implementation_identity: str | None = None,
-) -> dict[str, object]:
+) -> NativeConsumerValidation:
     """Validate producer-owned evidence context without reproducing its hash semantics.
 
     Downstream consumers supply the producer identity they admitted. Hashmarks owns
@@ -203,7 +217,9 @@ def _consumer_conformance_vectors_from_handoff(
     envelope_b = _synthetic_envelope(b_identity)
     contract_a = downstream_consumption_contract(envelope_a)
     contract_b = downstream_consumption_contract(envelope_b)
-    native_identity = str(handoff["producer"]["implementation_identity"])
+    producer = handoff["producer"]
+    assert isinstance(producer, Mapping)
+    native_identity = str(producer["implementation_identity"])
     native_envelope = _synthetic_envelope(native_identity)
     native_contract = downstream_consumption_contract(native_envelope)
 
@@ -308,10 +324,10 @@ def consumer_conformance_vectors(root: Path) -> tuple[dict[str, object], ...]:
 
 
 def validate_native_repository_evidence_bundle(
-    envelope: Mapping[str, object],
-    contract: Mapping[str, object],
-    evidence_receipt: Mapping[str, object],
-    provenance: Mapping[str, object],
+    envelope: object,
+    contract: object,
+    evidence_receipt: object,
+    provenance: object,
     *,
     expected_producer_implementation_identity: str | None = None,
 ) -> dict[str, object]:
@@ -366,14 +382,15 @@ def validate_native_repository_evidence_bundle(
         "codemap_generation"
     ):
         reasons.append("cross-contract-codemap-generation-mismatch")
+    selection_binding = envelope.get("selection")
     return {
         "schema": "hashmarks.repository-evidence-consumer-conformance.v1",
         "valid": not reasons,
         "reasons": list(dict.fromkeys(str(reason) for reason in reasons)),
         "producer_implementation_identity": producer_identity,
         "verification_membership_identity": (
-            envelope.get("selection", {}).get("membership_identity")
-            if isinstance(envelope.get("selection"), Mapping)
+            selection_binding.get("membership_identity")
+            if isinstance(selection_binding, Mapping)
             else None
         ),
         "context_identity": context.get("context_identity"),

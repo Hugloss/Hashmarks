@@ -5,7 +5,7 @@ import json
 import re
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 from ._version import __version__
 from .producer_identity import native_producer_implementation_identity
@@ -18,6 +18,14 @@ from .test_shards import (
     node_membership_identity,
 )
 from .validation_inputs import require_mapping_for_validation
+
+
+class NativeHandoffValidation(TypedDict):
+    valid: bool
+    reasons: list[str]
+    handoff_identity: str | None
+    authority: str
+
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -206,7 +214,11 @@ def qualification_owner_plan(root: Path) -> dict[str, object]:
     all_nodes = tuple(nodeid for nodeid, _weight in _nodeids(root))
     classification = classify_nodeids(root, all_nodes)
     units = _qualification_owner_units_from_classification(all_nodes, classification)
-    nodeids = [nodeid for unit in units for nodeid in unit["nodeids"]]
+    nodeids: list[str] = []
+    for unit in units:
+        members = unit["nodeids"]
+        assert isinstance(members, list)
+        nodeids.extend(str(nodeid) for nodeid in members)
     payload: dict[str, object] = {
         "schema": PLAN_SCHEMA,
         "producer": {
@@ -688,8 +700,8 @@ def qualification_coverage_provenance_identity(
 
 
 def validate_external_qualification_coverage(
-    plan: Mapping[str, object],
-    coverage: Mapping[str, object],
+    plan: object,
+    coverage: object,
 ) -> dict[str, object]:
     """Validate linkage and exact coverage only; never validate external PASS truth."""
     plan, plan_root_reasons = require_mapping_for_validation(
@@ -880,8 +892,8 @@ def _handoff_unit_reasons(
 
 
 def validate_native_qualification_handoff(
-    handoff: Mapping[str, object],
-) -> dict[str, object]:
+    handoff: object,
+) -> NativeHandoffValidation:
     handoff, root_reasons = require_mapping_for_validation(
         handoff, reason="invalid-qualification-handoff"
     )
@@ -905,6 +917,8 @@ def _native_qualification_handoff_from_plan(
     plan: Mapping[str, object],
 ) -> dict[str, object]:
     """Project one immutable qualification plan into the native handoff contract."""
+    producer = plan["producer"]
+    assert isinstance(producer, Mapping)
     payload: dict[str, object] = {
         "schema": HANDOFF_SCHEMA,
         "producer": plan["producer"],
@@ -915,9 +929,7 @@ def _native_qualification_handoff_from_plan(
         "plan_identity": plan["plan_identity"],
         "units": plan["units"],
         "provenance": {
-            "producer_implementation_identity": plan["producer"][
-                "implementation_identity"
-            ],
+            "producer_implementation_identity": producer["implementation_identity"],
             "repository_identity": plan["repository_identity"],
             "membership_identity": plan["membership_identity"],
             "classification_identity": plan["classification_identity"],
@@ -936,3 +948,29 @@ def _native_qualification_handoff_from_plan(
 def native_qualification_handoff(root: Path) -> dict[str, object]:
     root = root.resolve()
     return _native_qualification_handoff_from_plan(qualification_owner_plan(root))
+
+
+def validate_native_qualification_repository_binding(
+    root: Path, handoff: object
+) -> NativeHandoffValidation:
+    """Re-prove repository selection/provenance, without execution-result authority."""
+    checked = validate_native_qualification_handoff(handoff)
+    if not checked["valid"]:
+        return checked
+    assert isinstance(handoff, Mapping)
+    expected = native_qualification_handoff(root)
+    fields = (
+        "repository_identity",
+        "membership_identity",
+        "classification_identity",
+        "classification_policy_identity",
+        "plan_identity",
+        "handoff_identity",
+        "producer",
+    )
+    reasons = [
+        f"qualification-{field.replace('_', '-')}-mismatch"
+        for field in fields
+        if handoff[field] != expected[field]
+    ]
+    return {**checked, "valid": not reasons, "reasons": reasons}

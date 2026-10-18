@@ -12,13 +12,13 @@ from hashmarks.watcher import NativeLinuxBatchWatcher, create_default_watcher
 
 
 @pytest.mark.skipif(not sys.platform.startswith("linux"), reason="Linux inotify test")
-def test_default_linux_watcher_has_no_third_party_dependency(tmp_path: Path):
+def test_default_linux_watcher_has_no_third_party_dependency(tmp_path: Path) -> None:
     watcher = create_default_watcher(tmp_path, lambda _paths: None)
     assert isinstance(watcher, NativeLinuxBatchWatcher)
 
 
 @pytest.mark.skipif(not sys.platform.startswith("linux"), reason="Linux inotify test")
-def test_native_linux_watcher_observes_file_edit(tmp_path: Path):
+def test_native_linux_watcher_observes_file_edit(tmp_path: Path) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     target = workspace / "a.txt"
@@ -47,7 +47,7 @@ def test_native_linux_watcher_observes_file_edit(tmp_path: Path):
 
 
 @pytest.mark.skipif(not sys.platform.startswith("linux"), reason="Linux inotify test")
-def test_native_linux_watcher_excludes_engine_state(tmp_path: Path):
+def test_native_linux_watcher_excludes_engine_state(tmp_path: Path) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     engine = IdentityEngine(workspace)
@@ -63,7 +63,7 @@ def test_native_linux_watcher_excludes_engine_state(tmp_path: Path):
         engine.close()
 
 
-def test_cli_does_not_import_watchdog_as_daemon_gate():
+def test_cli_does_not_import_watchdog_as_daemon_gate() -> None:
     import hashmarks.cli as cli
 
     source = Path(cli.__file__).read_text()
@@ -71,18 +71,7 @@ def test_cli_does_not_import_watchdog_as_daemon_gate():
     assert "_require_watcher" not in source
 
 
-def test_project_core_and_daemon_metadata_are_registry_free():
-    import tomllib
-
-    project_root = Path(__file__).resolve().parents[1]
-    data = tomllib.loads((project_root / "pyproject.toml").read_text())
-    assert data["build-system"]["requires"] == []
-    assert data["build-system"]["build-backend"] == "hashmarks_build"
-    assert data["project"]["dependencies"] == []
-    assert data["project"]["optional-dependencies"] == {"mcp": ["mcp>=2.2.0"]}
-
-
-def test_daemon_request_barrier_observes_immediate_write(tmp_path: Path):
+def test_daemon_request_barrier_observes_immediate_write(tmp_path: Path) -> None:
     if not sys.platform.startswith("linux"):
         pytest.skip("native inotify barrier is Linux-specific")
     import threading

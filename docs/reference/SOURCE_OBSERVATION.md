@@ -12,8 +12,8 @@ Python API:
 from hashmarks import CodeMap
 
 with CodeMap(".") as codemap:
-    codemap.sync()
-    observation = codemap.source_observation(
+    codemap.index.sync()
+    observation = codemap.source.observe(
         "src/example.py",
         literal="example",
         limit=50,
@@ -68,10 +68,8 @@ Use **the existing** source observer, not another search engine:
 
 ```python
 with CodeMap(".") as codemap:
-    codemap.sync()
-    packet = codemap.source_observation(
-        "src/example.py", literal="target", context_lines=1
-    )
+    codemap.index.sync()
+    packet = codemap.source.observe("src/example.py", literal="target", context_lines=1)
     hit = packet["occurrences"][0]
     excerpt = hit["context_excerpt"]
 ```
@@ -121,8 +119,8 @@ asserting that the external diagnostic is correct:
 
 ```python
 with CodeMap(".") as codemap:
-    codemap.sync()
-    packet = codemap.source_observation(
+    codemap.index.sync()
+    packet = codemap.source.observe(
         "src/example.py", lines=(12,), anchor_context_lines=1
     )
     rows = packet["line_anchors"][0]["context_excerpt"]
@@ -159,8 +157,10 @@ line/start-column and explicit left/right truncation. Its center
 neighbors have `role: "context"`. CRLF trailing carriage returns are
 omitted from displayed text, not from the original byte-line digest.
 
-Agent-native source presentation places explicit `line_anchors` after
-literal `occurrences`, before member inventories. All details and exact
+Agent-native source presentation places explicitly requested `line_anchors`
+before literal `occurrences` and member inventories, using the existing 48-row
+bound in every format so the supported requested anchors remain visible.
+Without explicit line requests, the normal display caps and order apply. All details and exact
 `/line_anchors/N` pointers survive compact rendering; omitted row counts
 remain projection-only. The native packet remains the sole source authority,
 and line excerpt display does not imply that the diagnostic producer observed
@@ -170,8 +170,8 @@ these bytes, passed verification, or reached a complete diagnostic collection.
 
 ```python
 with CodeMap(".") as codemap:
-    codemap.sync()
-    packet = codemap.scoped_source_occurrences(
+    codemap.index.sync()
+    packet = codemap.source.scoped_occurrences(
         ["src/core.py", "tests/test_core.py"],
         "example",
         limit=100,
@@ -277,7 +277,7 @@ from hashmarks.codemap.repository_delta import (
     RepositoryGenerationBinding,
 )
 
-before = RepositoryDeltaMixin.external_diagnostic_observation(
+before = external_diagnostic_observation(
     producer="pyright",
     binding=RepositoryGenerationBinding("repository-id", 7),
     diagnostics=[
@@ -319,7 +319,7 @@ external producer claims to have observed**, independently of message, line,
 column, diagnostic identity, and collection completeness:
 
 ```python
-diagnostic = RepositoryDeltaMixin.external_diagnostic_observation(
+diagnostic = external_diagnostic_observation(
     producer="pyright",
     binding=RepositoryGenerationBinding("repo-id", 7),
     outcome="fail",
@@ -350,15 +350,13 @@ outside the collection's declared path scope fail before rows are published.
 Omitting a claim means **unknown**, not unchanged source. The supplied scope
 and collection-state claims remain external producer authority.
 
-After obtaining explicit up-to-date `CodeMap.source_observation` member
+After obtaining explicit up-to-date `CodeMap.source.observe` member
 packets, the consumer may compare them **without launching** a diagnostic
 producer or letting Hashmarks track agent reads:
 
 ```python
-source = codemap.source_observation("src/example.py")
-evidence = RepositoryDeltaMixin.diagnostic_source_revision_evidence(
-    diagnostic, [source]
-)
+source = codemap.source.observe("src/example.py")
+evidence = diagnostic_source_revision_evidence(diagnostic, [source])
 ```
 
 Schema: `hashmarks.diagnostic-source-revision-evidence.v1`. For each declared
@@ -414,7 +412,7 @@ from hashmarks.digest import FILE_DOMAIN, hash_bytes
 # rather than reading whichever bytes happen to exist when diagnostics arrive.
 captured_text = "print(missing)\r\n"
 revision = hash_bytes(captured_text.encode("utf-8"), domain=FILE_DOMAIN).hash
-diagnostic = RepositoryDeltaMixin.external_diagnostic_observation(
+diagnostic = external_diagnostic_observation(
     producer="pyright",
     binding=RepositoryGenerationBinding("repo-id", 7),
     environment_identity="producer-config-id",
@@ -491,7 +489,7 @@ report. A complete empty report remains distinct from an unavailable, partial,
 or missing report.
 
 ```python
-delta = RepositoryDeltaMixin.diagnostic_observation_delta(
+delta = diagnostic_observation_delta(
     diagnostic_before,
     diagnostic_after,
     changed_paths=["src/example.py"],
@@ -562,7 +560,7 @@ Regression and handoff fixtures: `tests/test_diagnostic_member_evidence.py`.
 
 ### Source-backed diagnostic line correspondence
 
-The canonical `CodeMap.source_observation(path, lines=[N])` can now include up to
+The canonical `CodeMap.source.observe(path, lines=[N])` can now include up to
 32 explicitly requested **physical-line anchors**. Anchors are derived from the
 same stable, visibility-checked source bytes and carry the canonical member
 revision, exact byte-line SHA-256 digest, number of identical nonblank lines in
@@ -574,7 +572,7 @@ A caller retains the before and after source observations and supplies them
 together with the corresponding external diagnostic observations:
 
 ```python
-delta = RepositoryDeltaMixin.diagnostic_observation_delta(
+delta = diagnostic_observation_delta(
     diagnostic_before,
     diagnostic_after,
     before_source=source_before,
@@ -667,3 +665,62 @@ Unicode/CRLF source shape, shifted diagnostics, ambiguous same-message diagnosti
 and invalid collection states.
 
 Runtime/benchmark scores are separate from the repository evidence contract.
+
+## Diagnostic envelope admission and comparison bounds (HM-OBS)
+
+The existing `external_diagnostic_observation` constructor, endpoint comparison,
+source-revision comparison and public validation share the diagnostic endpoint
+validator. Diagnostic input remains producer-claimed, observation-only, with
+`execution_effect="none"`. Admission is bounded to 256 diagnostic occurrences,
+32 declared scope paths and 524,288 UTF-8 JSON bytes per endpoint. Known diagnostic
+text fields and scope paths have an 8,192-character ceiling. Generation is an
+exact nonnegative integer; supplied line/column coordinates are positive integers
+and booleans are not coordinates. JSON must be finite and serializable.
+
+Scope paths use canonical repository-relative normalization. An invalid or absent
+location on a diagnostic remains an unlocated producer claim; it does not acquire
+a repository path or become evidence of absence. Unknown producer fields remain
+bounded JSON claims, not repository authority. Constructor output owns a deep
+copy of caller input. Serialized endpoints use a JSON diagnostics array.
+
+Exact duplicate rows are permitted: fact comparison remains a set comparison by
+canonical diagnostic identity. Two differing rows claiming the same fact identity
+within one endpoint are rejected rather than silently choosing an order-dependent
+winner. Additive `diagnostics.occurrence_counts` preserves before/after occurrence
+counts separately from unique fact counts. Additive `diagnostics.changed_claims`
+preserves changed metadata for unchanged fact identities, with original before
+and after rows explicitly producer-claimed. These changes do not imply repository
+edits, external causation, or resolution. Public normalization preserves both
+fields; older v1 delta packets without them remain accepted.
+
+Diagnostic comparison accepts `before_source` and `after_source` together or
+neither. Each source packet has the same 524,288-byte transport ceiling and is
+qualified by the existing source correspondence owner. Unique exact physical
+line bytes may prove a moved line without columns when both claims omit columns;
+a single missing column or conflicting columns remains unresolved. This does not
+prove symbol equivalence or producer execution.
+
+Repository freshness is explicitly scoped as `repository-correspondence-only`;
+`producer_freshness` remains `unknown`. A current CodeMap generation, matching
+member digest, exact line, or complete repository scope cannot upgrade producer
+capture time, runtime freshness, authenticity, completeness or health.
+
+
+### Shared JSON value semantics
+
+Diagnostic rows and repository declaration values use the internal immutable
+`CanonicalJsonValue` representation. Every construction validates input and
+stores canonical JSON bytes; equality/hash never compare raw Python containers.
+Boolean `true`, integer `1` and float `1.0` are distinct, including inside nested
+metadata. Object key ordering is insignificant and array ordering is significant.
+Python tuples normalize to arrays, so JSON transport cannot invent a claim change.
+Decoded values are detached from both the caller's input and the stored value.
+
+Only string object keys are accepted. Numeric/boolean keys, key-coercion
+collisions, unsupported objects, cycles and non-finite numbers reject with
+`ValueError`. Existing evidence owners retain their payload and cardinality bounds;
+the shared value representation introduces no repository or policy authority.
+Valid JSON v1 payloads and diagnostic fact identities retain their meaning.
+Conflicting same-fact rows reject even when their metadata is Python-equal
+(`true` versus `1`); a change between those values is preserved in `changed_claims`.
+Retained delta endpoint headers must satisfy the original scalar/header contract.

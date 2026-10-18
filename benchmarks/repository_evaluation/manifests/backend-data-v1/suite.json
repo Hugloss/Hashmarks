@@ -1,0 +1,1437 @@
+{
+  "grader_file": "grader.json",
+  "qualification_scope": "Twelve pinned source spelling/call/argument slices across three repositories. Pair semantics, runtime compatibility, causal test relevance, adversaries and independent capability review remain unqualified.",
+  "schema": "hashmarks.backend-evidence-workflows.v2",
+  "sources": {
+    "fastapi-frontend-dependency-metadata-after": {
+      "commit": "d62354434b2e508fe89024213b220ca8e67dea5e",
+      "content_identity": "sha256:ee55ff2c006c3d9384ac2c2324a294980aa77e044749f0fed690917501b4f9e2:3137",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "fastapi-frontend-dependency-metadata-before": {
+      "commit": "1d211b9c1009d577f39fa2b19b10d9a93a72a0ed",
+      "content_identity": "sha256:ee07c0ecb11869c82f3e9c5bdc287e4862cbacdddae764e218af7aa8f2580dcb:3137",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "fastapi-iterable-serialization-options-after": {
+      "commit": "d6537f774b0e80e376e2cf4e0fa998a38c6d0c09",
+      "content_identity": "sha256:df4f016032a76da5d2cf29af9f1495356b42c1c79b493145b23db0ad61d03e32:3135",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "fastapi-iterable-serialization-options-before": {
+      "commit": "0f3d3b2f9f09f04fe612d4b7db32485170c9f1dd",
+      "content_identity": "sha256:ccf6682ec80563d9b74bfd2cc89c8a31afda4a96c35f00d7340a037661fda23a:3135",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "fastapi-recursive-default-serialization-after": {
+      "commit": "aadfcce76380ab169fe172d5cda21722e53c4924",
+      "content_identity": "sha256:2f615ba2fb85aaf8b0b9ff1b3577150ebbf786798df49be2cb6481eb9c65dce5:3134",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "fastapi-recursive-default-serialization-before": {
+      "commit": "4ffd45172059cb32c3326cedde2c7ecf579c5db8",
+      "content_identity": "sha256:2ce7cfa1a7a0340ea62a8a38237ef804b5092124e9fd3b0f9bff4f3272683ca9:3134",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "fastapi-stream-response-arguments-after": {
+      "commit": "e92a0dc3ce5ecbebb8655dbe5465cb61d48f9fc0",
+      "content_identity": "sha256:1fe24849ff6f86a3a96dda19b6d7e90bcf34611c1ebb3444daf16fb5e2bb2c51:3137",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "fastapi-stream-response-arguments-before": {
+      "commit": "6215d8a6f3fed4eef63fe9d1ae600c12f62bd881",
+      "content_identity": "sha256:096d9f50ec265f730b8f1b20693bc6f60abed94c990a469e28e5fae39efeaa9e:3136",
+      "repository": "fastapi",
+      "source_kind": "exact-git-archive"
+    },
+    "faststream-address-escape-correspondence-after": {
+      "commit": "425e08861e24290adce8ec9a8de21e7d48f5e757",
+      "content_identity": "sha256:2c7754bc2725279b28c7d6790bfd79b31b52e6341edd71737c5fcd5b84aac285:2156",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive"
+    },
+    "faststream-address-escape-correspondence-before": {
+      "commit": "d7fb7c9b9ae20e3c922fb501c3a190a3859b6b26",
+      "content_identity": "sha256:77da7af07f2ee0d3622efd8b74059a3cbe629d7068b94e62f0b8ed864d2f7e7b:2160",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive"
+    },
+    "faststream-decoded-none-cache-after": {
+      "commit": "0876b55ab9dea96a7533bcf6171d79febd37a2e2",
+      "content_identity": "sha256:98fc366596deeb2f813bbdc5789c8106e27ee712fc24e2e78856356ac6328eb5:1865",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive"
+    },
+    "faststream-decoded-none-cache-before": {
+      "commit": "8148f2de21dfc5e922421bdf1e1f5d5b86b36501",
+      "content_identity": "sha256:83f54975edf42f1f6ab882e08f422549a4c4415f4f0ee455f645a483dd914ae3:1864",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive"
+    },
+    "faststream-keyed-none-tombstone-after": {
+      "commit": "5b98b87c433c28dabbb21d092fc854e4ecb0bcbd",
+      "content_identity": "sha256:cc26fbd852862bc1f5f07eab02dcfbe54d95add539b2b227b44c89a007461f01:2104",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive"
+    },
+    "faststream-keyed-none-tombstone-before": {
+      "commit": "5c392e2b9e4dfb9b546e22c0dc8aa7af9e020231",
+      "content_identity": "sha256:76dbae6a9c7629a697e81a152325b0c89d7548a47990b3932715c0fb474e14ef:2104",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive"
+    },
+    "faststream-parser-decoder-precedence-after": {
+      "commit": "254b0a83d4d493573eb06f2f1f6390b5ffb1969d",
+      "content_identity": "sha256:095559d5ddcca5bacc560147b653875000a7245ca352d34f1a229073e1dd21d7:1820",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive"
+    },
+    "faststream-parser-decoder-precedence-before": {
+      "commit": "943a1cb5db4b5ef10e4b4c2af8d995962518ca03",
+      "content_identity": "sha256:4f415d874e2267a2f868195f437d58d55afb74a693ca7613943c0f86e89344fd:1820",
+      "repository": "faststream",
+      "source_kind": "exact-git-archive"
+    },
+    "litestar-dtodata-renamed-instance-after": {
+      "commit": "031df7f45e69200624779356074f6f9470d2c1b3",
+      "content_identity": "sha256:71ce3223abcbcf76856234874f8d83e6734e4aee8fbd777368a2bd23b492d579:1175",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive"
+    },
+    "litestar-dtodata-renamed-instance-before": {
+      "commit": "89bb310aa9fe1246bc65c97eb22d9ca4c6cfbbbc",
+      "content_identity": "sha256:91536580a4011ac8018598794e41706c6d3995b5b5b3bf32f6a7d66f63f93530:1175",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive"
+    },
+    "litestar-nested-field-renaming-after": {
+      "commit": "dfe872c6379142d6c5a266a6e5a19fa48dacddb8",
+      "content_identity": "sha256:428904513705e72d9890326af2cf952d5b987fda459fe2d5ceb0f2b440865347:1226",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive"
+    },
+    "litestar-nested-field-renaming-before": {
+      "commit": "7414f7fd7d4782223502895e6a23b77ed635cd2d",
+      "content_identity": "sha256:6cebbf6639f31b217dbf1ba9b1cf6b3d8627f68575e6dbd1f7b0762a1646c49a:1226",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive"
+    },
+    "litestar-serializer-keyerror-boundary-after": {
+      "commit": "673c1e93f9fe467f4839976c51d072668ecd98e1",
+      "content_identity": "sha256:23940180141205ac3d2d633f117337521ba42e68586a9fadb9c8fc2cc9e6c0c2:1402",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive"
+    },
+    "litestar-serializer-keyerror-boundary-before": {
+      "commit": "e09e7b083f1b9bbb3324c66fd660748ef0b25cf8",
+      "content_identity": "sha256:d0f35bd3e4b7295088f06a749a26bbfdd43dabbf24eb69cfdc082ee73fad2545:1402",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive"
+    },
+    "litestar-url-encoded-string-values-after": {
+      "commit": "e50ffb978c6e34588d7ed4cec71a2bec18d19a92",
+      "content_identity": "sha256:f720f2256fd9fe338faf3741a09dbf530257403b503ecd4e151f176743c4b0ec:1178",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive"
+    },
+    "litestar-url-encoded-string-values-before": {
+      "commit": "d0a52c453008b4e5c34774dc1507b4ebb2b09da4",
+      "content_identity": "sha256:ad2ba4dbfda9dbd172a00005bebf0d69d4d941284d3cc83cb01584b6b589f2bd:1178",
+      "repository": "litestar",
+      "source_kind": "exact-git-archive"
+    }
+  },
+  "suite": "backend-data-source-v1",
+  "workflows": [
+    {
+      "after": "fastapi-recursive-default-serialization-after",
+      "before": "fastapi-recursive-default-serialization-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 306,
+              "path": "fastapi/encoders.py",
+              "start_line": 298
+            }
+          ],
+          "changed_paths": [
+            "fastapi/encoders.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 305,
+              "path": "fastapi/encoders.py",
+              "start_line": 298
+            }
+          ],
+          "changed_paths": [
+            "fastapi/encoders.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        9
+      ],
+      "capability_proofs": {
+        "9": {
+          "reason": "Positive exact source-line and direct argument syntax only; pair/data-flow semantics, runtime compatibility and causal verification remain unqualified.",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "fastapi/encoders.py"
+      ],
+      "id": "fastapi-recursive-default-serialization",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "semantic answer sufficiency and test relevance not independently reviewed"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "caller-nominated explicit source paths"
+        }
+      },
+      "native_required": false,
+      "problem_id": "aadfcce76380ab169fe172d5cda21722e53c4924",
+      "repository": "fastapi",
+      "source_observations": {
+        "after": {
+          "context_lines": {
+            "lines": [
+              298,
+              302,
+              307,
+              311,
+              316,
+              317
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "fastapi/encoders.py"
+          ],
+          "result_mode": "member"
+        },
+        "before": {
+          "context_lines": {
+            "lines": [
+              298,
+              301,
+              306,
+              309,
+              314,
+              315
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "fastapi/encoders.py"
+          ],
+          "result_mode": "member"
+        }
+      },
+      "task": "Recursive dictionary serialization does not carry the requested default-field filter to nested values. Inspect fastapi/encoders.py.",
+      "transitions": [
+        {
+          "after_path": "fastapi/encoders.py",
+          "before_path": "fastapi/encoders.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "fastapi-iterable-serialization-options-after",
+      "before": "fastapi-iterable-serialization-options-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 1104,
+              "path": "fastapi/routing.py",
+              "start_line": 1100
+            }
+          ],
+          "changed_paths": [
+            "fastapi/routing.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 1056,
+              "path": "fastapi/routing.py",
+              "start_line": 1052
+            }
+          ],
+          "changed_paths": [
+            "fastapi/routing.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        9
+      ],
+      "capability_proofs": {
+        "9": {
+          "reason": "Positive exact source-line and direct argument syntax only; pair/data-flow semantics, runtime compatibility and causal verification remain unqualified.",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "fastapi/routing.py"
+      ],
+      "id": "fastapi-iterable-serialization-options",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "semantic answer sufficiency and test relevance not independently reviewed"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "caller-nominated explicit source paths"
+        }
+      },
+      "native_required": false,
+      "problem_id": "d6537f774b0e80e376e2cf4e0fa998a38c6d0c09",
+      "repository": "fastapi",
+      "source_observations": {
+        "after": {
+          "context_lines": {
+            "lines": [
+              1079,
+              1094,
+              1095,
+              1100,
+              1102,
+              1103
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "fastapi/routing.py"
+          ],
+          "result_mode": "member"
+        },
+        "before": {
+          "context_lines": {
+            "lines": [
+              996,
+              1011,
+              1047,
+              1052,
+              1054,
+              1055
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "fastapi/routing.py"
+          ],
+          "result_mode": "member"
+        }
+      },
+      "task": "A non-generator iterable response loses declared serialization options between route construction and response serialization. Inspect fastapi/routing.py.",
+      "transitions": [
+        {
+          "after_path": "fastapi/routing.py",
+          "before_path": "fastapi/routing.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "fastapi-stream-response-arguments-after",
+      "before": "fastapi-stream-response-arguments-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 640,
+              "path": "fastapi/routing.py",
+              "start_line": 636
+            }
+          ],
+          "changed_paths": [
+            "fastapi/routing.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 637,
+              "path": "fastapi/routing.py",
+              "start_line": 633
+            }
+          ],
+          "changed_paths": [
+            "fastapi/routing.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        9
+      ],
+      "capability_proofs": {
+        "9": {
+          "reason": "Positive exact source-line and direct argument syntax only; pair/data-flow semantics, runtime compatibility and causal verification remain unqualified.",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "fastapi/routing.py"
+      ],
+      "id": "fastapi-stream-response-arguments",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "semantic answer sufficiency and test relevance not independently reviewed"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "caller-nominated explicit source paths"
+        }
+      },
+      "native_required": false,
+      "problem_id": "e92a0dc3ce5ecbebb8655dbe5465cb61d48f9fc0",
+      "repository": "fastapi",
+      "source_observations": {
+        "after": {
+          "context_lines": {
+            "lines": [
+              358,
+              359,
+              366,
+              367,
+              369,
+              370,
+              633,
+              639
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "fastapi/routing.py"
+          ],
+          "result_mode": "member"
+        },
+        "before": {
+          "context_lines": {
+            "lines": [
+              358,
+              359,
+              366,
+              367,
+              369,
+              370,
+              633,
+              636
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "fastapi/routing.py"
+          ],
+          "result_mode": "member"
+        }
+      },
+      "task": "Streaming response branches do not preserve the declared response status and dependency background metadata. Inspect fastapi/routing.py.",
+      "transitions": [
+        {
+          "after_path": "fastapi/routing.py",
+          "before_path": "fastapi/routing.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "fastapi-frontend-dependency-metadata-after",
+      "before": "fastapi-frontend-dependency-metadata-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 2204,
+              "path": "fastapi/routing.py",
+              "start_line": 2204
+            }
+          ],
+          "changed_paths": [
+            "fastapi/routing.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 2193,
+              "path": "fastapi/routing.py",
+              "start_line": 2193
+            }
+          ],
+          "changed_paths": [
+            "fastapi/routing.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        9
+      ],
+      "capability_proofs": {
+        "9": {
+          "reason": "Positive exact source-line and direct argument syntax only; pair/data-flow semantics, runtime compatibility and causal verification remain unqualified.",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "fastapi/routing.py"
+      ],
+      "id": "fastapi-frontend-dependency-metadata",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "semantic answer sufficiency and test relevance not independently reviewed"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "caller-nominated explicit source paths"
+        }
+      },
+      "native_required": false,
+      "problem_id": "d62354434b2e508fe89024213b220ca8e67dea5e",
+      "repository": "fastapi",
+      "source_observations": {
+        "after": {
+          "context_lines": {
+            "lines": [
+              725,
+              726,
+              728,
+              729,
+              730
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "fastapi/dependencies/utils.py"
+          ],
+          "result_mode": "member"
+        },
+        "before": {
+          "context_lines": {
+            "lines": [
+              725,
+              726,
+              728,
+              729,
+              730
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "fastapi/dependencies/utils.py"
+          ],
+          "result_mode": "member"
+        }
+      },
+      "task": "Frontend responses lose headers and background tasks supplied through dependency results. Inspect fastapi/routing.py.",
+      "transitions": [
+        {
+          "after_path": "fastapi/routing.py",
+          "before_path": "fastapi/routing.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "litestar-serializer-keyerror-boundary-after",
+      "before": "litestar-serializer-keyerror-boundary-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 165,
+              "path": "litestar/serialization/msgspec_hooks.py",
+              "start_line": 165
+            }
+          ],
+          "changed_paths": [
+            "litestar/serialization/msgspec_hooks.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 164,
+              "path": "litestar/serialization/msgspec_hooks.py",
+              "start_line": 164
+            }
+          ],
+          "changed_paths": [
+            "litestar/serialization/msgspec_hooks.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        9
+      ],
+      "capability_proofs": {
+        "9": {
+          "reason": "Positive exact source-line and direct argument syntax only; pair/data-flow semantics, runtime compatibility and causal verification remain unqualified.",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "litestar/serialization/msgspec_hooks.py"
+      ],
+      "id": "litestar-serializer-keyerror-boundary",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "semantic answer sufficiency and test relevance not independently reviewed"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "caller-nominated explicit source paths"
+        }
+      },
+      "native_required": false,
+      "problem_id": "673c1e93f9fe467f4839976c51d072668ecd98e1",
+      "repository": "litestar",
+      "source_observations": {
+        "after": {
+          "context_lines": {
+            "lines": [
+              87,
+              88,
+              89,
+              90,
+              91,
+              92,
+              93,
+              95
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "litestar/serialization/msgspec_hooks.py"
+          ],
+          "result_mode": "member"
+        },
+        "before": {
+          "context_lines": {
+            "lines": [
+              87,
+              88,
+              89,
+              90,
+              91,
+              92,
+              94
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "litestar/serialization/msgspec_hooks.py"
+          ],
+          "result_mode": "member"
+        }
+      },
+      "task": "A serializer dispatch branch consumes an encoder KeyError as though its type entry were missing. Inspect litestar/serialization/msgspec_hooks.py.",
+      "transitions": [
+        {
+          "after_path": "litestar/serialization/msgspec_hooks.py",
+          "before_path": "litestar/serialization/msgspec_hooks.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "litestar-nested-field-renaming-after",
+      "before": "litestar-nested-field-renaming-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 186,
+              "path": "litestar/dto/_backend.py",
+              "start_line": 175
+            }
+          ],
+          "changed_paths": [
+            "litestar/dto/_backend.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 153,
+              "path": "litestar/dto/_backend.py",
+              "start_line": 142
+            }
+          ],
+          "changed_paths": [
+            "litestar/dto/_backend.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        9
+      ],
+      "capability_proofs": {
+        "9": {
+          "reason": "Positive exact source-line and direct argument syntax only; pair/data-flow semantics, runtime compatibility and causal verification remain unqualified.",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "litestar/dto/_backend.py"
+      ],
+      "id": "litestar-nested-field-renaming",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "semantic answer sufficiency and test relevance not independently reviewed"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "caller-nominated explicit source paths"
+        }
+      },
+      "native_required": false,
+      "problem_id": "dfe872c6379142d6c5a266a6e5a19fa48dacddb8",
+      "repository": "litestar",
+      "source_observations": {
+        "after": {
+          "context_lines": {
+            "lines": [
+              166,
+              167,
+              173,
+              177,
+              653,
+              654,
+              667,
+              669
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "litestar/dto/_backend.py"
+          ],
+          "result_mode": "member"
+        },
+        "before": {
+          "context_lines": {
+            "lines": [
+              133,
+              134,
+              140,
+              144,
+              591,
+              592,
+              605,
+              607
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "litestar/dto/_backend.py"
+          ],
+          "result_mode": "member"
+        }
+      },
+      "task": "Nested transfer metadata does not carry field renaming through the declared producer and consumer stages. Inspect litestar/dto/_backend.py.",
+      "transitions": [
+        {
+          "after_path": "litestar/dto/_backend.py",
+          "before_path": "litestar/dto/_backend.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "litestar-dtodata-renamed-instance-after",
+      "before": "litestar-dtodata-renamed-instance-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 37,
+              "path": "litestar/dto/data_structures.py",
+              "start_line": 35
+            }
+          ],
+          "changed_paths": [
+            "litestar/dto/data_structures.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 35,
+              "path": "litestar/dto/data_structures.py",
+              "start_line": 35
+            }
+          ],
+          "changed_paths": [
+            "litestar/dto/data_structures.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        9
+      ],
+      "capability_proofs": {
+        "9": {
+          "reason": "Positive exact source-line and direct argument syntax only; pair/data-flow semantics, runtime compatibility and causal verification remain unqualified.",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "litestar/dto/_backend.py",
+        "litestar/dto/data_structures.py"
+      ],
+      "id": "litestar-dtodata-renamed-instance",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "semantic answer sufficiency and test relevance not independently reviewed"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "caller-nominated explicit source paths"
+        }
+      },
+      "native_required": false,
+      "problem_id": "031df7f45e69200624779356074f6f9470d2c1b3",
+      "repository": "litestar",
+      "source_observations": {
+        "after": {
+          "context_lines": {
+            "lines": [
+              263,
+              264,
+              266,
+              270,
+              272,
+              273,
+              589,
+              590
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "litestar/dto/_backend.py"
+          ],
+          "result_mode": "member"
+        },
+        "before": {
+          "context_lines": {
+            "lines": [
+              262,
+              264,
+              267,
+              268,
+              583,
+              584
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "litestar/dto/_backend.py"
+          ],
+          "result_mode": "member"
+        }
+      },
+      "task": "Creating an instance from DTOData confuses original field names with serialization names. Inspect litestar/dto/data_structures.py.",
+      "transitions": [
+        {
+          "after_path": "litestar/dto/_backend.py",
+          "before_path": "litestar/dto/_backend.py",
+          "kind": "modify"
+        },
+        {
+          "after_path": "litestar/dto/data_structures.py",
+          "before_path": "litestar/dto/data_structures.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "litestar-url-encoded-string-values-after",
+      "before": "litestar-url-encoded-string-values-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 257,
+              "path": "litestar/dto/_backend.py",
+              "start_line": 255
+            }
+          ],
+          "changed_paths": [
+            "litestar/dto/_backend.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 255,
+              "path": "litestar/dto/_backend.py",
+              "start_line": 255
+            }
+          ],
+          "changed_paths": [
+            "litestar/dto/_backend.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        9
+      ],
+      "capability_proofs": {
+        "9": {
+          "reason": "Positive exact source-line and direct argument syntax only; pair/data-flow semantics, runtime compatibility and causal verification remain unqualified.",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "litestar/_parsers.py",
+        "litestar/dto/_backend.py"
+      ],
+      "id": "litestar-url-encoded-string-values",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "semantic answer sufficiency and test relevance not independently reviewed"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "caller-nominated explicit source paths"
+        }
+      },
+      "native_required": false,
+      "problem_id": "e50ffb978c6e34588d7ed4cec71a2bec18d19a92",
+      "repository": "litestar",
+      "source_observations": {
+        "after": {
+          "context_lines": {
+            "lines": [
+              15,
+              24
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "litestar/_parsers.py"
+          ],
+          "result_mode": "member"
+        },
+        "before": {
+          "context_lines": {
+            "lines": [
+              15,
+              24
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "litestar/_parsers.py"
+          ],
+          "result_mode": "member"
+        }
+      },
+      "task": "URL-encoded input changes scalar representation before DTO transfer consumes it. Inspect litestar/dto/_backend.py.",
+      "transitions": [
+        {
+          "after_path": "litestar/_parsers.py",
+          "before_path": "litestar/_parsers.py",
+          "kind": "modify"
+        },
+        {
+          "after_path": "litestar/dto/_backend.py",
+          "before_path": "litestar/dto/_backend.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "faststream-keyed-none-tombstone-after",
+      "before": "faststream-keyed-none-tombstone-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 118,
+              "path": "faststream/kafka/publisher/producer.py",
+              "start_line": 118
+            }
+          ],
+          "changed_paths": [
+            "faststream/kafka/publisher/producer.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 113,
+              "path": "faststream/kafka/publisher/producer.py",
+              "start_line": 113
+            }
+          ],
+          "changed_paths": [
+            "faststream/kafka/publisher/producer.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        9
+      ],
+      "capability_proofs": {
+        "9": {
+          "reason": "Positive exact source-line and direct argument syntax only; pair/data-flow semantics, runtime compatibility and causal verification remain unqualified.",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "faststream/confluent/publisher/producer.py",
+        "faststream/kafka/publisher/producer.py"
+      ],
+      "id": "faststream-keyed-none-tombstone",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "semantic answer sufficiency and test relevance not independently reviewed"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "caller-nominated explicit source paths"
+        }
+      },
+      "native_required": false,
+      "problem_id": "5b98b87c433c28dabbb21d092fc854e4ecb0bcbd",
+      "repository": "faststream",
+      "source_observations": {
+        "after": {
+          "context_lines": {
+            "lines": [
+              142,
+              143,
+              145,
+              147,
+              148,
+              152,
+              154,
+              155
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "faststream/confluent/publisher/producer.py"
+          ],
+          "result_mode": "member"
+        },
+        "before": {
+          "context_lines": {
+            "lines": [
+              142,
+              144,
+              145,
+              149,
+              151,
+              152
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "faststream/confluent/publisher/producer.py"
+          ],
+          "result_mode": "member"
+        }
+      },
+      "task": "Publishing a keyed None body loses tombstone identity while passing through the message codec. Inspect faststream/kafka/publisher/producer.py.",
+      "transitions": [
+        {
+          "after_path": "faststream/confluent/publisher/producer.py",
+          "before_path": "faststream/confluent/publisher/producer.py",
+          "kind": "modify"
+        },
+        {
+          "after_path": "faststream/kafka/publisher/producer.py",
+          "before_path": "faststream/kafka/publisher/producer.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "faststream-decoded-none-cache-after",
+      "before": "faststream-decoded-none-cache-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 102,
+              "path": "faststream/message/message.py",
+              "start_line": 102
+            }
+          ],
+          "changed_paths": [
+            "faststream/message/message.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 99,
+              "path": "faststream/message/message.py",
+              "start_line": 99
+            }
+          ],
+          "changed_paths": [
+            "faststream/message/message.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        9
+      ],
+      "capability_proofs": {
+        "9": {
+          "reason": "Positive exact source-line and direct argument syntax only; pair/data-flow semantics, runtime compatibility and causal verification remain unqualified.",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "faststream/message/message.py"
+      ],
+      "id": "faststream-decoded-none-cache",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "semantic answer sufficiency and test relevance not independently reviewed"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "caller-nominated explicit source paths"
+        }
+      },
+      "native_required": false,
+      "problem_id": "0876b55ab9dea96a7533bcf6171d79febd37a2e2",
+      "repository": "faststream",
+      "source_observations": {
+        "after": {
+          "context_lines": {
+            "lines": [
+              82,
+              88,
+              89,
+              90
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "faststream/_internal/endpoint/call_wrapper.py"
+          ],
+          "result_mode": "member"
+        },
+        "before": {
+          "context_lines": {
+            "lines": [
+              82,
+              88,
+              89,
+              90
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "faststream/_internal/endpoint/call_wrapper.py"
+          ],
+          "result_mode": "member"
+        }
+      },
+      "task": "A valid decoded None value is mistaken for an unobserved decoder result. Inspect faststream/message/message.py.",
+      "transitions": [
+        {
+          "after_path": "faststream/message/message.py",
+          "before_path": "faststream/message/message.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "faststream-parser-decoder-precedence-after",
+      "before": "faststream-parser-decoder-precedence-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 154,
+              "path": "faststream/_internal/endpoint/subscriber/usecase.py",
+              "start_line": 154
+            }
+          ],
+          "changed_paths": [
+            "faststream/_internal/endpoint/subscriber/usecase.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 127,
+              "path": "faststream/_internal/endpoint/subscriber/usecase.py",
+              "start_line": 127
+            }
+          ],
+          "changed_paths": [
+            "faststream/_internal/endpoint/subscriber/usecase.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        9
+      ],
+      "capability_proofs": {
+        "9": {
+          "reason": "Positive exact source-line and direct argument syntax only; pair/data-flow semantics, runtime compatibility and causal verification remain unqualified.",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "faststream/_internal/endpoint/subscriber/usecase.py",
+        "faststream/redis/parser/binary.py"
+      ],
+      "id": "faststream-parser-decoder-precedence",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "semantic answer sufficiency and test relevance not independently reviewed"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "caller-nominated explicit source paths"
+        }
+      },
+      "native_required": false,
+      "problem_id": "254b0a83d4d493573eb06f2f1f6390b5ffb1969d",
+      "repository": "faststream",
+      "source_observations": {
+        "after": {
+          "context_lines": {
+            "lines": [
+              88,
+              89,
+              90,
+              92,
+              95,
+              97
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "faststream/redis/parser/binary.py"
+          ],
+          "result_mode": "member"
+        },
+        "before": {
+          "context_lines": {
+            "lines": [
+              87,
+              88,
+              89,
+              91,
+              93,
+              94,
+              96
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "faststream/redis/parser/binary.py"
+          ],
+          "result_mode": "member"
+        }
+      },
+      "task": "Configured parser and decoder values are not carried consistently through subscriber setup and Redis fallback parsing. Inspect faststream/_internal/endpoint/subscriber/usecase.py.",
+      "transitions": [
+        {
+          "after_path": "faststream/_internal/endpoint/subscriber/usecase.py",
+          "before_path": "faststream/_internal/endpoint/subscriber/usecase.py",
+          "kind": "modify"
+        },
+        {
+          "after_path": "faststream/redis/parser/binary.py",
+          "before_path": "faststream/redis/parser/binary.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "faststream-address-escape-correspondence-after",
+      "before": "faststream-address-escape-correspondence-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 42,
+              "path": "faststream/rabbit/publisher/factory.py",
+              "start_line": 35
+            }
+          ],
+          "changed_paths": [
+            "faststream/rabbit/publisher/factory.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 35,
+              "path": "faststream/rabbit/publisher/factory.py",
+              "start_line": 28
+            }
+          ],
+          "changed_paths": [
+            "faststream/rabbit/publisher/factory.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        9
+      ],
+      "capability_proofs": {
+        "9": {
+          "reason": "Positive exact source-line and direct argument syntax only; pair/data-flow semantics, runtime compatibility and causal verification remain unqualified.",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "faststream/_internal/utils/path.py",
+        "faststream/rabbit/publisher/config.py",
+        "faststream/rabbit/publisher/factory.py"
+      ],
+      "id": "faststream-address-escape-correspondence",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "semantic answer sufficiency and test relevance not independently reviewed"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "caller-nominated explicit source paths"
+        }
+      },
+      "native_required": false,
+      "problem_id": "425e08861e24290adce8ec9a8de21e7d48f5e757",
+      "repository": "faststream",
+      "source_observations": {
+        "after": {
+          "context_lines": {
+            "lines": [
+              35,
+              36,
+              39,
+              42,
+              43
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "faststream/_internal/utils/path.py"
+          ],
+          "result_mode": "member"
+        },
+        "before": {
+          "context_lines": {
+            "lines": [
+              40,
+              41,
+              44,
+              45
+            ],
+            "radius": 1
+          },
+          "paths": [
+            "faststream/_internal/utils/path.py"
+          ],
+          "result_mode": "member"
+        }
+      },
+      "task": "Address declaration escapes leak into values consumed by publisher configuration and schema readers. Inspect faststream/rabbit/publisher/factory.py.",
+      "transitions": [
+        {
+          "after_path": "faststream/_internal/utils/path.py",
+          "before_path": "faststream/_internal/utils/path.py",
+          "kind": "modify"
+        },
+        {
+          "after_path": "faststream/rabbit/publisher/config.py",
+          "before_path": "faststream/rabbit/publisher/config.py",
+          "kind": "modify"
+        },
+        {
+          "after_path": "faststream/rabbit/publisher/factory.py",
+          "before_path": "faststream/rabbit/publisher/factory.py",
+          "kind": "modify"
+        }
+      ]
+    }
+  ]
+}

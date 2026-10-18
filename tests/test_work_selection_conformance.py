@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from copy import deepcopy
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
@@ -117,10 +117,10 @@ def test_plan_rejects_recomputed_identity_with_unknown_shard_field(
     tmp_path: Path,
 ) -> None:
     _write_repo(tmp_path)
-    payload = deepcopy(plan(tmp_path, 3))
+    payload = cast(dict[str, Any], plan(tmp_path, 3))
     payload["shards"][0]["timeout_seconds"] = 10  # type: ignore[index]
     _resign_plan(payload)
-    result = validate_test_shard_plan(payload)
+    result = cast(dict[str, Any], validate_test_shard_plan(payload))
     assert result["valid"] is False
     assert "unexpected-shard-field" in result["reasons"]
     assert "$.selection.shards[0].timeout_seconds" in result["unexpected_fields"]
@@ -130,14 +130,14 @@ def test_plan_rejects_duplicate_membership_even_if_identity_is_recomputed(
     tmp_path: Path,
 ) -> None:
     _write_repo(tmp_path)
-    payload = deepcopy(plan(tmp_path, 3))
+    payload = cast(dict[str, Any], plan(tmp_path, 3))
     duplicate = payload["shards"][0]["nodeids"][0]  # type: ignore[index]
     payload["shards"][1]["nodeids"].append(duplicate)  # type: ignore[index]
     payload["test_node_count"] = len(
         {nodeid for row in payload["shards"] for nodeid in row["nodeids"]}  # type: ignore[index]
     )
     _resign_plan(payload)
-    result = validate_test_shard_plan(payload)
+    result = cast(dict[str, Any], validate_test_shard_plan(payload))
     assert result["valid"] is False
     assert "duplicate-nodeid" in result["reasons"]
     assert result["membership_identity"] is None
@@ -147,23 +147,23 @@ def test_plan_rejects_unowned_isolation_requirement_even_if_resigned(
     tmp_path: Path,
 ) -> None:
     _write_repo(tmp_path)
-    payload = deepcopy(plan(tmp_path, 5))
+    payload = cast(dict[str, Any], plan(tmp_path, 5))
     payload["shards"][0]["isolated_process"] = True  # type: ignore[index]
     _resign_plan(payload)
-    result = validate_test_shard_plan(payload)
+    result = cast(dict[str, Any], validate_test_shard_plan(payload))
     assert result["valid"] is False
     assert "process-isolation-requirements-mismatch" in result["reasons"]
 
 
 def test_envelope_enforces_exact_frozen_authority_declaration(tmp_path: Path) -> None:
     _write_repo(tmp_path)
-    envelope = deepcopy(work_selection_envelope(tmp_path, 3))
+    envelope = cast(dict[str, Any], work_selection_envelope(tmp_path, 3))
     assert envelope["authority"]["hashmarks"] == list(HASHMARKS_AUTHORITIES)  # type: ignore[index]
     assert envelope["authority"]["execution_layer"] == list(EXECUTION_LAYER_AUTHORITIES)  # type: ignore[index]
 
     envelope["authority"]["hashmarks"].append("process-launch")  # type: ignore[index]
     _resign_envelope(envelope)
-    result = validate_work_selection_envelope(envelope)
+    result = cast(dict[str, Any], validate_work_selection_envelope(envelope))
     assert result["valid"] is False
     assert "hashmarks-authority-mismatch" in result["reasons"]
 
@@ -172,10 +172,10 @@ def test_envelope_rejects_unknown_or_execution_policy_fields_after_resign(
     tmp_path: Path,
 ) -> None:
     _write_repo(tmp_path)
-    envelope = deepcopy(work_selection_envelope(tmp_path, 3))
+    envelope = cast(dict[str, Any], work_selection_envelope(tmp_path, 3))
     envelope["timeout_seconds"] = 30
     _resign_envelope(envelope)
-    result = validate_work_selection_envelope(envelope)
+    result = cast(dict[str, Any], validate_work_selection_envelope(envelope))
     assert result["valid"] is False
     assert "unexpected-envelope-field" in result["reasons"]
     assert "execution-policy-field-present" in result["reasons"]
@@ -187,10 +187,10 @@ def test_envelope_rejects_unknown_non_execution_extension_after_resign(
     tmp_path: Path,
 ) -> None:
     _write_repo(tmp_path)
-    envelope = deepcopy(work_selection_envelope(tmp_path, 3))
+    envelope = cast(dict[str, Any], work_selection_envelope(tmp_path, 3))
     envelope["future_hint"] = {"value": True}
     _resign_envelope(envelope)
-    result = validate_work_selection_envelope(envelope)
+    result = cast(dict[str, Any], validate_work_selection_envelope(envelope))
     assert result["valid"] is False
     assert "unexpected-envelope-field" in result["reasons"]
     assert "$.future_hint" in result["unexpected_fields"]
@@ -205,8 +205,10 @@ def test_repository_binding_reproof_accepts_current_exact_repository(
     tmp_path: Path,
 ) -> None:
     _write_repo(tmp_path)
-    envelope = work_selection_envelope(tmp_path, 3)
-    result = validate_work_selection_repository_binding(tmp_path, envelope)
+    envelope = cast(dict[str, Any], work_selection_envelope(tmp_path, 3))
+    result = cast(
+        dict[str, Any], validate_work_selection_repository_binding(tmp_path, envelope)
+    )
     assert result["valid"] is True
     assert result["repository_bound"] is True
     assert (
@@ -220,9 +222,11 @@ def test_repository_binding_reproof_rejects_stale_non_test_source(
     tmp_path: Path,
 ) -> None:
     _write_repo(tmp_path)
-    envelope = work_selection_envelope(tmp_path, 3)
+    envelope = cast(dict[str, Any], work_selection_envelope(tmp_path, 3))
     (tmp_path / "src.py").write_text("VALUE = 2\n", encoding="utf-8")
-    result = validate_work_selection_repository_binding(tmp_path, envelope)
+    result = cast(
+        dict[str, Any], validate_work_selection_repository_binding(tmp_path, envelope)
+    )
     assert result["valid"] is False
     assert result["repository_bound"] is False
     assert "repository-content-identity-mismatch" in result["reasons"]
@@ -234,15 +238,17 @@ def test_repository_binding_reproof_rejects_resigned_forged_membership(
     tmp_path: Path,
 ) -> None:
     _write_repo(tmp_path)
-    envelope = deepcopy(work_selection_envelope(tmp_path, 3))
+    envelope = cast(dict[str, Any], work_selection_envelope(tmp_path, 3))
     first = envelope["selection"]["shards"][0]  # type: ignore[index]
     second = envelope["selection"]["shards"][1]  # type: ignore[index]
     moved = first["nodeids"].pop()
     second["nodeids"].append(moved)
     _resign_plan(envelope["selection"])  # type: ignore[arg-type]
     _resign_envelope(envelope)
-    structural = validate_work_selection_envelope(envelope)
+    structural = cast(dict[str, Any], validate_work_selection_envelope(envelope))
     assert structural["valid"] is True
-    rebound = validate_work_selection_repository_binding(tmp_path, envelope)
+    rebound = cast(
+        dict[str, Any], validate_work_selection_repository_binding(tmp_path, envelope)
+    )
     assert rebound["valid"] is False
     assert "selection-does-not-reproduce" in rebound["reasons"]

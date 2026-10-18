@@ -20,8 +20,8 @@ def test_javascript_test_parent_import_resolves_active_owner(tmp_path: Path) -> 
         'import test from "node:test";\nimport { routeEmber731 } from "../src/route.js";\ntest("Ember731",()=>routeEmber731());\n'
     )
     with CodeMap(tmp_path) as c:
-        c.sync()
-        brief = c.task_action_brief("Change Ember731 accepted response")
+        c.index.sync()
+        brief = c.tasks.action_brief("Change Ember731 accepted response")
     assert brief["edit"] == "src/engine_b.js"
     assert (
         brief["owner_path"]
@@ -48,8 +48,8 @@ def test_go_same_package_test_uses_task_local_entry_then_module_owner(
         'package route\nimport "testing"\nfunc TestEmber731(t *testing.T){}\n'
     )
     with CodeMap(tmp_path) as c:
-        c.sync()
-        brief = c.task_action_brief("Change Ember731 accepted response")
+        c.index.sync()
+        brief = c.tasks.action_brief("Change Ember731 accepted response")
     assert brief["edit"] == "engineb/b.go"
     assert brief["verify"] == ["go", "test", "./route"]
     assert brief["owner_path"] == "route/route.go --imports--> engineb/b.go"
@@ -72,8 +72,8 @@ def test_sql_test_literal_reference_beats_archive_decoy(tmp_path: Path) -> None:
         'from pathlib import Path\ndef test_ember731():\n    Path("queries/ember731_active.sql").read_text()\n'
     )
     with CodeMap(tmp_path) as c:
-        c.sync()
-        brief = c.task_action_brief("For Ember731, change the SQL result label")
+        c.index.sync()
+        brief = c.tasks.action_brief("For Ember731, change the SQL result label")
     assert brief["edit"] == "queries/ember731_active.sql"
     assert (
         brief["owner_path"]
@@ -96,8 +96,8 @@ def test_javascript_parent_escape_import_is_not_resolved_into_workspace(
         'test("Ember731",()=>Ember731());\n'
     )
     with CodeMap(tmp_path) as c:
-        c.sync()
-        graph = c.ownership_relation_graph(
+        c.index.sync()
+        graph = c.ownership.relations(
             "Change Ember731 accepted response", "tests/ember731.test.js"
         )
     assert graph["selected"] is None
@@ -121,8 +121,8 @@ def test_sql_parent_escape_literal_is_not_promoted_as_owner(tmp_path: Path) -> N
         '    Path("../queries/ember731.sql").read_text()\n'
     )
     with CodeMap(tmp_path) as c:
-        c.sync()
-        brief = c.task_action_brief("For Ember731, change the SQL result label")
+        c.index.sync()
+        brief = c.tasks.action_brief("For Ember731, change the SQL result label")
     assert (
         brief.get("owner_path")
         != "tests/test_ember731.py --references--> queries/ember731.sql"
@@ -151,8 +151,8 @@ def test_typescript_runtime_js_specifier_resolves_ts_source_owner(
         'import { routeABC123 } from "../src/route.js";\nconst value = routeABC123(); void value;\n'
     )
     with CodeMap(tmp_path) as c:
-        c.sync()
-        brief = c.task_action_brief("For ABC123 change the accepted response")
+        c.index.sync()
+        brief = c.tasks.action_brief("For ABC123 change the accepted response")
     assert brief["edit"] == "src/engine_b.ts"
     assert (
         brief["owner_path"]
@@ -179,8 +179,8 @@ def test_uppercase_ticket_identifier_suppresses_unrelated_contract(
         "class AcceptedResponseContract: pass\n"
     )
     with CodeMap(tmp_path) as c:
-        c.sync()
-        brief = c.task_action_brief("For ABC123 change the accepted response contract")
+        c.index.sync()
+        brief = c.tasks.action_brief("For ABC123 change the accepted response contract")
     assert brief["edit"] == "src/abc123/engine.py"
     assert brief["verify"] == [
         "python",
@@ -215,8 +215,8 @@ def test_go_same_package_unique_route_starts_structural_owner_when_phrase_is_con
         "// amber valley behavior verification\n"
     )
     with CodeMap(tmp_path) as c:
-        c.sync()
-        brief = c.task_action_brief(
+        c.index.sync()
+        brief = c.tasks.action_brief(
             "Change the amber valley accepted response from old to new"
         )
     assert brief["status"] == "safe-unknown"
@@ -248,8 +248,8 @@ def test_go_same_package_unique_route_can_continue_to_engine_when_service_delega
         "// velvet lantern behavior verification\n"
     )
     with CodeMap(tmp_path) as c:
-        c.sync()
-        brief = c.task_action_brief(
+        c.index.sync()
+        brief = c.tasks.action_brief(
             "Change the velvet lantern accepted response from old to new"
         )
     assert brief["status"] == "safe-unknown"

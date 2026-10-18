@@ -67,7 +67,7 @@ Environment identity is optional provenance for externally supplied observations
 
 The existing repository member observer additionally exposes bounded, exact
 single-member literal occurrences and physical UTF-8 source shape through
-`CodeMap.source_observation`. Its member revision and stable byte-read authority
+`CodeMap.source.observe`. Its member revision and stable byte-read authority
 are reused from the canonical member owner; the projection does not create a
 parallel full-text index or claim repository-wide search completeness.
 

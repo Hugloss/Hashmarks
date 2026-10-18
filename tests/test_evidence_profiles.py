@@ -4,9 +4,11 @@ import json
 from typing import TYPE_CHECKING
 
 import pytest
+from contract_assertions import assert_object
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.change_impact import ChangeImpactOptions
+from hashmarks.codemap.evidence_profiles import EvidenceProfileProjection
 from hashmarks.codemap.repository_intelligence_query import (
     RepositoryIntelligenceQueryOptions,
 )
@@ -38,16 +40,16 @@ def test_profiles_share_one_snapshot_identity_and_are_deterministic(
 ) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         profiles = {
-            name: codemap.repository_intelligence_profile(
+            name: codemap.views.profile(
                 "Fix widget accepted response behavior",
                 ["src/owner.py"],
                 profile=name,
             )
             for name in ("compact", "standard", "audit")
         }
-        repeated = codemap.repository_intelligence_profile(
+        repeated = codemap.views.profile(
             "Fix widget accepted response behavior",
             ["src/owner.py"],
             profile="compact",
@@ -71,33 +73,34 @@ def test_profiles_share_one_snapshot_identity_and_are_deterministic(
 def test_profile_density_contract_preserves_authoritative_facts(tmp_path: Path) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        compact = codemap.repository_intelligence_profile(
+        codemap.index.sync()
+        compact = codemap.views.profile(
             "Fix widget accepted response behavior",
             ["src/owner.py"],
             profile="compact",
         )
-        standard = codemap.repository_intelligence_profile(
+        standard = codemap.views.profile(
             "Fix widget accepted response behavior",
             ["src/owner.py"],
             profile="standard",
         )
-        audit = codemap.repository_intelligence_profile(
+        audit = codemap.views.profile(
             "Fix widget accepted response behavior",
             ["src/owner.py"],
             profile="audit",
         )
 
-    compact_evidence = compact["evidence"]
-    standard_evidence = standard["evidence"]
-    snapshot = audit["evidence"]["snapshot"]
+    compact_evidence = assert_object(compact["evidence"])
+    standard_evidence = assert_object(standard["evidence"])
+    snapshot = assert_object(assert_object(audit["evidence"])["snapshot"])
     assert (
-        compact_evidence["verification"]["member"] == snapshot["verification"]["member"]
+        assert_object(compact_evidence["verification"])["member"]
+        == assert_object(snapshot["verification"])["member"]
     )
     assert standard_evidence["ownership"] == snapshot["ownership"]
     assert standard_evidence["freshness"] == snapshot["freshness"]
-    assert snapshot["verification"]["facts"]
-    assert "facts" not in standard_evidence["verification"]
+    assert assert_object(snapshot["verification"])["facts"]
+    assert "facts" not in assert_object(standard_evidence["verification"])
     assert "ownership" not in compact_evidence
     assert compact["storage"] == "derived-not-persisted"
     assert compact["execution_effect"] == "none"
@@ -106,20 +109,20 @@ def test_profile_density_contract_preserves_authoritative_facts(tmp_path: Path) 
 def test_audit_profile_contains_exact_snapshot(tmp_path: Path) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        snapshot = codemap.repository_intelligence_snapshot(
+        codemap.index.sync()
+        snapshot = codemap.changes.snapshot(
             "Fix widget accepted response behavior",
             ["src/owner.py"],
         )
-        audit = codemap._profile_from_snapshot(snapshot, profile="audit")
+        audit = EvidenceProfileProjection.from_snapshot(snapshot, profile="audit")
     assert audit["source_snapshot_identity"] == snapshot["snapshot_identity"]
-    assert audit["evidence"]["snapshot"] == snapshot
+    assert assert_object(audit["evidence"])["snapshot"] == snapshot
 
 
 def test_profile_applies_typed_impact_bounds(tmp_path: Path) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        profile = codemap.repository_intelligence_profile(
+        profile = codemap.views.profile(
             "Fix widget accepted response behavior",
             ["src/owner.py"],
             profile="audit",
@@ -131,7 +134,8 @@ def test_profile_applies_typed_impact_bounds(tmp_path: Path) -> None:
             ),
         )
 
-    bounds = profile["evidence"]["snapshot"]["bounds"]
+    snapshot = assert_object(assert_object(profile["evidence"])["snapshot"])
+    bounds = assert_object(snapshot["bounds"])
     assert bounds["depth"] == 1
     assert bounds["per_surface"] == 2
 
@@ -139,9 +143,9 @@ def test_profile_applies_typed_impact_bounds(tmp_path: Path) -> None:
 def test_invalid_profile_fails_closed(tmp_path: Path) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         with pytest.raises(ValueError, match="profile must be one of"):
-            codemap.repository_intelligence_profile(
+            codemap.views.profile(
                 "Fix widget accepted response behavior",
                 ["src/owner.py"],
                 profile="tiny",

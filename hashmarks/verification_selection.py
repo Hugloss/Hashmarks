@@ -5,6 +5,7 @@ import json
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from typing import NotRequired, TypedDict
 
 from ._version import __version__
 from .generation_domain import is_valid_generation, require_generation
@@ -17,6 +18,13 @@ MEMBERSHIP_SCHEMA = "hashmarks.verification-membership.v1"
 SELECTION_ENVELOPE_SCHEMA = "hashmarks.verification-selection-envelope.v2"
 DOWNSTREAM_CONTRACT_SCHEMA = "hashmarks.downstream-verification-contract.v2"
 _SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
+
+
+class VerificationSelectionValidation(TypedDict):
+    valid: bool
+    reasons: list[str]
+    membership_identity: NotRequired[object]
+    envelope_identity: NotRequired[str | None]
 
 
 @dataclass(frozen=True)
@@ -247,8 +255,8 @@ def _member_shape_reasons(members: list[object]) -> list[str]:
 
 
 def validate_verification_membership(
-    membership: Mapping[str, object],
-) -> dict[str, object]:
+    membership: object,
+) -> VerificationSelectionValidation:
     membership, root_reasons = require_mapping_for_validation(
         membership, reason="invalid-membership"
     )
@@ -366,8 +374,8 @@ def _envelope_evidence_reasons(envelope: Mapping[str, object]) -> list[str]:
 
 
 def validate_verification_selection_envelope(
-    envelope: Mapping[str, object],
-) -> dict[str, object]:
+    envelope: object,
+) -> VerificationSelectionValidation:
     envelope, root_reasons = require_mapping_for_validation(
         envelope, reason="invalid-envelope"
     )
@@ -457,9 +465,9 @@ def downstream_consumption_contract(
 
 
 def validate_downstream_consumption_contract(
-    envelope: Mapping[str, object],
-    contract: Mapping[str, object],
-) -> dict[str, object]:
+    envelope: object,
+    contract: object,
+) -> VerificationSelectionValidation:
     envelope, envelope_root_reasons = require_mapping_for_validation(
         envelope, reason="invalid-envelope"
     )

@@ -5,11 +5,11 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hashmarks.codemap import CodeMap
 from hashmarks.codemap.post_change import (
     POST_CHANGE_DEFAULT_OPTIONS,
     PostChangeOptions,
 )
+from hashmarks.codemap.repository_changes import RepositoryChanges
 from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
 
 if TYPE_CHECKING:
@@ -21,9 +21,7 @@ def test_post_change_defaults_have_one_owner(
 ) -> None:
     defaults = POST_CHANGE_DEFAULT_OPTIONS
     assert (
-        inspect.signature(CodeMap.refresh_after_change_delta)
-        .parameters["options"]
-        .default
+        inspect.signature(RepositoryChanges.refresh_delta).parameters["options"].default
         is defaults
     )
     assert (
@@ -33,8 +31,11 @@ def test_post_change_defaults_have_one_owner(
         is defaults
     )
 
-    for owner in (CodeMap, CodeMapServiceClient):
-        for method_name in ("refresh_after_change_brief", "refresh_after_change"):
+    for owner, methods in (
+        (RepositoryChanges, ("refresh_brief", "refresh")),
+        (CodeMapServiceClient, ("refresh_after_change_brief", "refresh_after_change")),
+    ):
+        for method_name in methods:
             parameters = inspect.signature(getattr(owner, method_name)).parameters
             assert parameters["limit"].default == defaults.limit
             assert parameters["per_role"].default == defaults.per_role
@@ -42,8 +43,8 @@ def test_post_change_defaults_have_one_owner(
 
     captured: dict[str, object] = {}
 
-    class _Map:
-        def refresh_after_change_delta(
+    class _Changes:
+        def refresh_delta(
             self,
             task: str,
             changed_paths: list[str],
@@ -53,7 +54,7 @@ def test_post_change_defaults_have_one_owner(
             captured["delta"] = options
             return {}
 
-        def refresh_after_change_brief(
+        def refresh_brief(
             self,
             task: str,
             changed_paths: list[str],
@@ -65,7 +66,7 @@ def test_post_change_defaults_have_one_owner(
             captured["brief"] = (limit, per_role, token_budget)
             return {}
 
-        def refresh_after_change(
+        def refresh(
             self,
             task: str,
             changed_paths: list[str],
@@ -76,6 +77,9 @@ def test_post_change_defaults_have_one_owner(
         ) -> dict[str, object]:
             captured["full"] = (limit, per_role, token_budget)
             return {}
+
+    class _Map:
+        changes = _Changes()
 
     service = CodeMapService(tmp_path, socket_path=tmp_path / "service.sock")
     monkeypatch.setattr(service, "_map", lambda: _Map())

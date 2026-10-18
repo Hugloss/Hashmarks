@@ -24,7 +24,7 @@ def make_tree(workspace: Path) -> tuple[FileDigestStore, MerkleTree]:
     return store, MerkleTree(workspace, store)
 
 
-def test_state_directory_does_not_change_workspace_digest(tmp_path: Path):
+def test_state_directory_does_not_change_workspace_digest(tmp_path: Path) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     (workspace / "src.py").write_text("x = 1\n")
@@ -45,7 +45,7 @@ def test_state_directory_does_not_change_workspace_digest(tmp_path: Path):
     assert first == second
 
 
-def test_custom_in_workspace_store_files_are_auto_excluded(tmp_path: Path):
+def test_custom_in_workspace_store_files_are_auto_excluded(tmp_path: Path) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     (workspace / "src.py").write_text("x")
@@ -74,7 +74,7 @@ def test_custom_in_workspace_store_files_are_auto_excluded(tmp_path: Path):
     assert tree._is_mandatory_excluded("custom-state/digests.sqlite3-journal")
 
 
-def test_default_noise_directories_are_ignored(tmp_path: Path):
+def test_default_noise_directories_are_ignored(tmp_path: Path) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     (workspace / "src.py").write_text("x")
@@ -90,7 +90,7 @@ def test_default_noise_directories_are_ignored(tmp_path: Path):
     assert tree.directory_digest("") == first
 
 
-def test_explicit_excluded_input_is_rejected(tmp_path: Path):
+def test_explicit_excluded_input_is_rejected(tmp_path: Path) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     store, tree = make_tree(workspace)
@@ -98,29 +98,29 @@ def test_explicit_excluded_input_is_rejected(tmp_path: Path):
         tree.digest_selected([".hashmarks"])
 
 
-def test_resolve_inputs_rejects_absolute_literal(tmp_path: Path):
+def test_resolve_inputs_rejects_absolute_literal(tmp_path: Path) -> None:
     absolute = tmp_path / "outside.txt"
     absolute.write_text("x")
     with pytest.raises(ValueError, match="relative to workspace"):
         resolve_inputs(tmp_path, [str(absolute)])
 
 
-def test_resolve_inputs_rejects_absolute_glob(tmp_path: Path):
+def test_resolve_inputs_rejects_absolute_glob(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="relative to workspace"):
         resolve_inputs(tmp_path, ["/tmp/*.py"])
 
 
-def test_resolve_inputs_rejects_windows_absolute_pattern(tmp_path: Path):
+def test_resolve_inputs_rejects_windows_absolute_pattern(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="relative to workspace"):
         resolve_inputs(tmp_path, [r"C:\\Windows\\*.dll"])
 
 
-def test_resolve_inputs_rejects_parent_escape(tmp_path: Path):
+def test_resolve_inputs_rejects_parent_escape(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="must not contain '..'"):
         resolve_inputs(tmp_path, ["../outside"])
 
 
-def test_resolve_inputs_glob_and_missing_pattern(tmp_path: Path):
+def test_resolve_inputs_glob_and_missing_pattern(tmp_path: Path) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "src" / "a.py").write_text("a")
     (tmp_path / "src" / "b.txt").write_text("b")
@@ -129,7 +129,7 @@ def test_resolve_inputs_glob_and_missing_pattern(tmp_path: Path):
         resolve_inputs(tmp_path, ["missing/*.py"])
 
 
-def test_file_invalidation_never_adds_file_path_to_dirty_dirs(tmp_path: Path):
+def test_file_invalidation_never_adds_file_path_to_dirty_dirs(tmp_path: Path) -> None:
     workspace = tmp_path / "repo"
     (workspace / "src").mkdir(parents=True)
     (workspace / "src" / "a.py").write_text("a")
@@ -142,7 +142,7 @@ def test_file_invalidation_never_adds_file_path_to_dirty_dirs(tmp_path: Path):
     assert "" in tree._dirty_dirs
 
 
-def test_directory_invalidation_includes_directory_itself(tmp_path: Path):
+def test_directory_invalidation_includes_directory_itself(tmp_path: Path) -> None:
     workspace = tmp_path / "repo"
     (workspace / "src").mkdir(parents=True)
     _, tree = make_tree(workspace)
@@ -151,7 +151,7 @@ def test_directory_invalidation_includes_directory_itself(tmp_path: Path):
     assert tree._dirty_dirs == {"", "src"}
 
 
-def test_identity_graph_cycle_detection():
+def test_identity_graph_cycle_detection() -> None:
     graph: IdentityGraph[str, str] = IdentityGraph()
     graph.add("a", lambda d: d["b"], dependencies=("b",))
     graph.add("b", lambda d: d["a"], dependencies=("a",))
@@ -160,12 +160,12 @@ def test_identity_graph_cycle_detection():
         graph.get("a")
 
 
-def test_identity_graph_concurrent_get_and_invalidate():
+def test_identity_graph_concurrent_get_and_invalidate() -> None:
     current = {"value": "A"}
     state_lock = threading.Lock()
     graph: IdentityGraph[str, str] = IdentityGraph()
 
-    def leaf(_):
+    def leaf(_: object) -> str:
         with state_lock:
             return current["value"]
 
@@ -173,12 +173,12 @@ def test_identity_graph_concurrent_get_and_invalidate():
     graph.add("parent", lambda deps: "P:" + deps["leaf"], dependencies=("leaf",))
     assert graph.get("parent") == "P:A"
 
-    def reader():
+    def reader() -> None:
         for _ in range(200):
             value = graph.get("parent")
             assert value in {"P:A", "P:B"}
 
-    def writer():
+    def writer() -> None:
         for i in range(100):
             with state_lock:
                 current["value"] = "A" if i % 2 == 0 else "B"
@@ -191,7 +191,9 @@ def test_identity_graph_concurrent_get_and_invalidate():
             future.result()
 
 
-def test_symlink_target_string_changes_identity_without_following(tmp_path: Path):
+def test_symlink_target_string_changes_identity_without_following(
+    tmp_path: Path,
+) -> None:
     if not hasattr(os, "symlink"):
         pytest.skip("symlinks unsupported")
 
@@ -225,7 +227,7 @@ def test_symlink_target_string_changes_identity_without_following(tmp_path: Path
     assert third == second
 
 
-def test_selected_symlink_uses_link_node_semantics(tmp_path: Path):
+def test_selected_symlink_uses_link_node_semantics(tmp_path: Path) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     target = workspace / "target"
@@ -244,7 +246,7 @@ def test_selected_symlink_uses_link_node_semantics(tmp_path: Path):
     assert tree.digest_selected(["link"]) == selected
 
 
-def test_cas_detects_corruption_and_maintenance(tmp_path: Path):
+def test_cas_detects_corruption_and_maintenance(tmp_path: Path) -> None:
     cas = CAS(tmp_path / "cas")
     digest = cas.put_bytes(b"hello")
     assert cas.size_bytes() == 5
@@ -258,7 +260,7 @@ def test_cas_detects_corruption_and_maintenance(tmp_path: Path):
     assert not cas.delete(digest)
 
 
-def test_file_store_count_and_prune_missing(tmp_path: Path):
+def test_file_store_count_and_prune_missing(tmp_path: Path) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     file = workspace / "a.txt"
@@ -271,7 +273,7 @@ def test_file_store_count_and_prune_missing(tmp_path: Path):
     assert store.count(workspace) == 0
 
 
-def test_dirty_batch_deduplicates_and_sorts():
+def test_dirty_batch_deduplicates_and_sorts() -> None:
     batch = DirtyBatch()
     batch.add("foo")
     batch.add("foo")
@@ -282,7 +284,7 @@ def test_dirty_batch_deduplicates_and_sorts():
 
 def test_fresh_process_style_reopen_is_stable_with_state_inside_workspace(
     tmp_path: Path,
-):
+) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     (workspace / "src.py").write_text("x = 1\n")

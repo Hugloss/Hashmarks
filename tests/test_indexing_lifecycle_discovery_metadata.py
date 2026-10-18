@@ -15,7 +15,7 @@ def test_preflight_reuses_discovery_size_without_restating_files(
     source.write_text("value = 1\n", encoding="utf-8")
     codemap = CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3")
     try:
-        discovered, warnings = codemap._discover()
+        discovered, warnings = codemap.index._discover()
         assert warnings == []
         item = next(item for item in discovered if item.rel == "src/module.py")
         assert item.size == source.stat().st_size
@@ -24,7 +24,7 @@ def test_preflight_reuses_discovery_size_without_restating_files(
             "stat",
             side_effect=AssertionError("preflight must not restat discovered files"),
         ):
-            preflight = codemap._preflight_from_discovered(discovered)
+            preflight = codemap.index._preflight_from_discovered(discovered)
         assert preflight["source_bytes"] == item.size
         assert preflight["measured_files"] == 1
     finally:
@@ -39,10 +39,10 @@ def test_incremental_subtree_carries_measured_size_into_preflight(
     source.write_text("value = 123\n", encoding="utf-8")
     codemap = CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3")
     try:
-        discovered = codemap._discover_subtree("src")
+        discovered = codemap.index._discover_subtree("src")
         item = next(item for item in discovered if item.rel == "src/module.py")
         assert item.size == source.stat().st_size
-        preflight = codemap._preflight_from_discovered(discovered)
+        preflight = codemap.index._preflight_from_discovered(discovered)
         assert preflight["source_bytes"] == item.size
     finally:
         codemap.close()
@@ -59,11 +59,11 @@ def test_sync_projects_module_identity_once_per_file(tmp_path: Path, mode: str) 
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         if mode != "cold":
-            codemap.sync()
+            codemap.index.sync()
         with patch.object(
             lifecycle, "_module_name", wraps=lifecycle._module_name
         ) as project:
-            codemap.sync(["src/pkg/module.py"] if mode == "incremental" else None)
+            codemap.index.sync(["src/pkg/module.py"] if mode == "incremental" else None)
         assert (
             sum(call.args[0] == "src/pkg/module.py" for call in project.call_args_list)
             == 1

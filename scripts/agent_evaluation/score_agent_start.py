@@ -6,6 +6,7 @@ import json
 import logging
 import time
 from collections import Counter, defaultdict
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -33,7 +34,7 @@ def _identity(value: object) -> str:
     return "sha256:" + hashlib.sha256(raw).hexdigest()
 
 
-def _task_candidate(packet: dict[str, object]) -> dict[str, object] | None:
+def _task_candidate(packet: Mapping[str, object]) -> dict[str, object] | None:
     ownership = packet.get("ownership")
     if not isinstance(ownership, dict):
         return None
@@ -41,12 +42,12 @@ def _task_candidate(packet: dict[str, object]) -> dict[str, object] | None:
     return candidate if isinstance(candidate, dict) else None
 
 
-def _task_verification(packet: dict[str, object]) -> dict[str, object]:
+def _task_verification(packet: Mapping[str, object]) -> dict[str, object]:
     value = packet.get("verification")
     return value if isinstance(value, dict) else {}
 
 
-def _packet_bytes(packet: dict[str, object]) -> int:
+def _packet_bytes(packet: Mapping[str, object]) -> int:
     return len(
         json.dumps(
             packet, sort_keys=True, separators=(",", ":"), ensure_ascii=False
@@ -55,24 +56,22 @@ def _packet_bytes(packet: dict[str, object]) -> int:
 
 
 def _freeze_packets(
-    repo: Path, tasks: list[object], token_budget: int
+    repo: Path, tasks: Sequence[Mapping[str, object]], token_budget: int
 ) -> tuple[list[dict[str, Any]], float]:
     frozen: list[dict[str, Any]] = []
     with CodeMap(repo) as codemap:
         sync_started = time.perf_counter()
-        codemap.sync()
+        codemap.index.sync()
         sync_ms = (time.perf_counter() - sync_started) * 1000.0
         for task in tasks:
             started = time.perf_counter()
-            packet = codemap.task_evidence(
+            packet = codemap.tasks.evidence(
                 str(task["query"]), token_budget=token_budget
             )
             first_ms = (time.perf_counter() - started) * 1000.0
-            provenance = (
-                packet.get("provenance")
-                if isinstance(packet.get("provenance"), dict)
-                else {}
-            )
+            provenance = packet["provenance"]
+            raw_freshness = packet.get("freshness")
+            freshness = raw_freshness if isinstance(raw_freshness, dict) else {}
             candidate = _task_candidate(packet)
             edit_path = (
                 str(candidate.get("path") or "") if candidate is not None else ""
@@ -90,17 +89,14 @@ def _freeze_packets(
                     "provenance_complete": bool(
                         provenance.get("why")
                         and provenance.get("revision")
-                        and isinstance(packet.get("freshness"), dict)
-                        and packet["freshness"].get("state")
-                        in {"current", "stale", "unknown"}
+                        and isinstance(raw_freshness, dict)
+                        and freshness.get("state") in {"current", "stale", "unknown"}
                     ),
                     "revision_current": bool(
                         indexed_revision
                         and provenance.get("revision") == indexed_revision
                     ),
-                    "freshness_state": str(
-                        (packet.get("freshness") or {}).get("state", "missing")
-                    ),
+                    "freshness_state": str(freshness.get("state", "missing")),
                     "selection_reason": str(provenance.get("why") or "missing"),
                 }
             )
@@ -109,7 +105,7 @@ def _freeze_packets(
         # before SECRET is opened and without altering the frozen decisions.
         for row, task in zip(frozen, tasks, strict=True):
             started = time.perf_counter()
-            repeated = codemap.task_evidence(
+            repeated = codemap.tasks.evidence(
                 str(task["query"]), token_budget=token_budget
             )
             row["cached_warm_ms"] = (time.perf_counter() - started) * 1000.0
@@ -128,28 +124,23 @@ def _grade_task(
         str(candidate.get("path") or "") if candidate is not None else ""
     ) == str(truth["expected_edit_path"])
     verification = _task_verification(packet)
-    plan = (
-        verification.get("plan") if isinstance(verification.get("plan"), dict) else {}
-    )
+    raw_plan = verification.get("plan")
+    plan = raw_plan if isinstance(raw_plan, dict) else {}
     argv = plan.get("argv")
     surface = verification_surface(argv if isinstance(argv, list) else ())
     verify_correct = str(surface.get("surface") or "") == str(
         truth["expected_verify_path"]
     )
-    ownership = (
-        packet.get("ownership") if isinstance(packet.get("ownership"), dict) else {}
-    )
+    raw_ownership = packet.get("ownership")
+    ownership = raw_ownership if isinstance(raw_ownership, dict) else {}
     next_read = ownership.get("next_read")
     next_read_reason = (
         str(next_read["reason"])
         if isinstance(next_read, dict) and next_read.get("reason")
         else None
     )
-    source_budget = (
-        ownership.get("source_budget")
-        if isinstance(ownership.get("source_budget"), dict)
-        else {}
-    )
+    raw_budget = ownership.get("source_budget")
+    source_budget = raw_budget if isinstance(raw_budget, dict) else {}
     return {
         "id": row["id"],
         "category": str(truth.get("category") or "unknown"),

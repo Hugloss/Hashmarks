@@ -4,6 +4,29 @@ Hashmarks separates producer evidence from its presentation. Formatting is a
 pure projection of an already observed packet: it performs no repository reads,
 changes no producer identity, and acquires no reasoning or execution authority.
 
+The current stabilization milestone records 6,000 estimated tokens as an
+advisory optimization target for each complete initial compact/text CLI or MCP
+reply, following the user's explicit clarification. MCP measurement includes
+its full consumer-visible text and structured content. Larger replies are
+reported for later improvement and do not justify hiding facts or delaying
+stabilization. Existing backend qualification reports retain their recorded
+size-policy result. This development measurement changes no source authority,
+projection semantics, caller context defaults or runtime execution ownership.
+
+Project-impact provenance retains distinct explicit links between the projects
+selected by the existing bounded reverse traversal. Parallel link kinds and
+both declared sides of a diamond remain distinct. Provenance does not add
+projects, change minimum depths, infer shortcut edges or consume project slots.
+Verbose, compact and cross-repository projections preserve those admitted links;
+an incomplete project population remains incomplete.
+
+Admitted package declarations with the same npm name retain separate
+manifest-qualified project identities. Their metadata and enrichment warnings
+identify name ambiguity, and dependencies using that ambiguous name do not
+choose a target. Unique ordinary package names retain their name-based identity.
+Removing a duplicate requires fresh provider observation before the name becomes
+unique. Denied manifests do not participate in visible name resolution.
+
 ## Optional MCP formats
 
 All fourteen current MCP tools accept `presentation` with the ordered values
@@ -84,6 +107,37 @@ Unsupported schemas return explicit unsupported coverage. Malformed required
 collections fail clearly. Empty text says “No displayed findings in this
 projection”; it never claims repository absence.
 
+Explicit source-member line requests use the existing 48-row presentation
+bound in every format. Their producer-bounded anchors precede literal matches,
+so all supported requested lines remain visible even when literal matches fill
+the display. This changes no source qualification or negative-evidence rule.
+
+Initial compact verification groups can share repeated qualifier combinations
+through `qualifier_columns` and `qualifier_sets`. A finding's `details.qualifiers`
+is an index into that group's sets; zip its selected set with the declared
+columns to recover the exact supplied values. Other details and absolute
+`source_refs` remain attached to that finding. This representation is used only
+when it reduces serialized bytes. It does not merge candidates, alter reference
+authority, omit a qualifier, or change the native packet. Uniform groups may
+instead retain the existing `locator_qualifiers` mapping.
+
+Initial verification locators retain supplied `test_symbol` and `test_revision`
+alongside reference strength, selection authority, edit relationship and
+negative-evidence qualification. A null test symbol stays null; a missing field
+stays missing. Structured, compact and text use the same locator projection.
+Text encodes each locator as a JSON record with its native source reference.
+Shared qualifier tables preserve those values without granting test sufficiency
+or execution authority.
+
+Task-local verification candidates may also carry `test_declarations`: up to
+three indexed function/method declarations matching multiple task-name families,
+with exact symbol spans, current file revision, visibility qualification and
+explicit observed/returned/omitted counts. Coverage stays incomplete. These are
+lexical candidates; they do not replace `test_symbol`, resolve tied tests, prove
+runtime reachability or change selected verification. Initial readable locators
+retain the declaration context. Identical repeated qualification copies can be
+removed when their values remain beside the same referenced record.
+
 Text encodes the same selected findings, locators, qualifications, source
 identities, references, and exclusions as its structured backing. JSON escaping
 keeps multiline native values identifiable without inventing new assertions.
@@ -137,6 +191,60 @@ containing owner path. An ambiguous candidate/next-read is a
 remains a producer claim. The complete native ownership/verification records
 remain visible in the original result. All projections preserve source
 pointers, current freshness and their producer-owned qualifications.
+
+For a task that explicitly names a current source-visible Python file, its
+retrieval row also carries `field_declarations`. Tasks borrows the canonical
+RepositoryDeclarations owner and its built-in static Python producer; it does
+not parse fields independently. The first three classes with annotated fields
+appear in source order, with observed/returned/omitted class counts. Each value
+retains the producer's supported annotations, initializer references, source
+lines, unknown runtime binding, incomplete semantic coverage and unresolved
+correspondence. The source revision, repository qualification, provider
+provenance and originating discovery identity remain attached. Empty syntax
+does not establish absence; provider failure yields unavailable disclosure with
+incomplete coverage. Outline/denied files disclose no field values.
+
+The initial profile retains at most three fields from those source groups.
+Tasks supplies a lexical field-name selection: matching task terms first, or
+source order when no field name matches. This is disclosure relevance only.
+Full packets retain all admitted fields; initial omissions count excluded
+fields and retain their original group/field indexes. Coverage stays incomplete
+and exclusions never establish absent declarations. Existing owner and verifier
+facts are preserved independently of this bound.
+
+Initial compact/text field scopes keep the selected field records readable.
+`metadata_ref_base` names their scope in the decoded native packet; a
+`metadata_ref` is a JSON pointer relative to that base. Recover each complete
+mapping from that exact reference and overlay its displayed keys, recursively
+for groups and values. Repository/provider qualifications and future metadata
+remain in the native packet; source revision, incomplete coverage and the
+non-authoritative/runtime-unknown qualifiers remain readable. This representation
+performs no source read and changes no supplied fact. This
+supplement changes no owner or verification selection and acquires no runtime
+configuration or execution authority.
+
+### Task-local source excerpts
+
+Tasks can attach `source_observation` and separate `source_selection` to a
+retrieval row for an explicit current source-visible Python file. Cached AST
+identifier loads nominate positions; Source alone observes the bytes and emits
+the unchanged native source packet. At most 4,096 AST nodes and three anchors
+are considered, with one context line per anchor and a 262,144-byte input bound.
+Selection prefers more matched normalized task-word families, then rarer
+families within the scanned file, with source order breaking ties. Single-term
+sites remain candidates so a directly relevant assignment is not hidden behind
+an arbitrary multiword requirement. This is retrieval ordering only and does
+not infer a control-flow edge, runtime guard, ownership or test sufficiency.
+Already disclosed field spans are excluded from duplicate nomination. Source
+coverage/freshness and selection coverage are independent; truncated lookup
+remains visible even when it returns no anchors. No result proves absence.
+
+The initial readable source view retains exact anchors, member binding,
+freshness, completeness, truncation and negative-evidence qualification.
+Its `metadata_ref` names the complete original mapping in decoded native data;
+overlay its displayed fields to recover the exact source packet. Additional
+source-shape/identity/limit metadata remains in that native packet. Text and
+compact views use the same projection, with selection uncertainty alongside it.
 
 ### Qualified owner labels must match producer proof
 
@@ -479,6 +587,17 @@ responses retain the native result **as well as** their bounded presentation,
 so choosing `compact` is not proof of total payload/token reduction.
 No projection-only model transport is enabled without separate measured
 admission and an independently sufficient omission/identity contract.
+
+Initial compact source excerpts may carry `line_anchor_qualifiers` beside
+`line_anchors`. Overlay each anchor on that mapping to recover its exact fields.
+An anchor may similarly carry `context_excerpt_qualifiers`; overlay each context
+row on that mapping. Shared fields are present and JSON-identical in every
+displayed row, and factoring is used only when smaller. Missing keys, null,
+false and numeric zero remain distinct; row order, text, hashes and source
+pointers are conserved. The native source observation remains unchanged.
+Duplicate qualification context is omitted only when its exact fields are
+already retained in the displayed source record. Standalone Source responses
+retain their existing line/context representation.
 
 Cross-producer relationship correspondence is shown with
 `assertion: producer_claim`: agreement of two tool claims is not independent

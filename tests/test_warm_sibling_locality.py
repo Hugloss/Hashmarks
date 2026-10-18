@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any, cast
 
 from hashmarks.codemap import CodeMap
 
@@ -84,12 +85,15 @@ def test_repetitive_warm_repository_keeps_edit_and_verify_in_task_namespace(
 ) -> None:
     tasks = _build_repetitive_repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         for task in tasks:
-            action = codemap.task_action_map(task["query"], limit=20, per_role=3)
+            action = cast(
+                dict[str, Any],
+                codemap.tasks.action_map(task["query"], limit=20, per_role=3),
+            )
             assert action["edit"]["path"] == task["edit"], task["token"]
             assert action["verify"]["path"] == task["verify"], task["token"]
-            brief = codemap.task_action_brief(task["query"])
+            brief = cast(dict[str, Any], codemap.tasks.action_brief(task["query"]))
             assert brief["status"] == "safe-unknown", task["token"]
             assert brief["edit"] == task["edit"], task["token"]
             assert task["verify"] in brief["verify"][-1], task["token"]
@@ -104,8 +108,8 @@ def test_rare_identifier_component_is_preserved_before_generic_siblings(
     tasks = _build_repetitive_repo(tmp_path, count=12)
     target = tasks[-1]
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        hits = codemap.find_task(target["query"], limit=20)
+        codemap.index.sync()
+        hits = codemap.search.find_task(target["query"], limit=20)
     paths = [hit.path for hit in hits]
     assert target["verify"] in paths
     assert "src/unit_012/route.py" in paths
@@ -119,9 +123,12 @@ def test_unique_identifier_anchor_excludes_generic_contract_sibling_owners(
     target = tasks[0]
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        action = codemap.task_action_map(target["query"], limit=20, per_role=3)
-        brief = codemap.task_action_brief(target["query"])
+        codemap.index.sync()
+        action = cast(
+            dict[str, Any],
+            codemap.tasks.action_map(target["query"], limit=20, per_role=3),
+        )
+        brief = cast(dict[str, Any], codemap.tasks.action_brief(target["query"]))
 
     assert action["edit"]["path"] == target["edit"]
     assert action["verify"]["path"] == target["verify"]

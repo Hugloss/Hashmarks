@@ -7,7 +7,7 @@ from typing import Any
 from hashmarks.operation_contract import operation_response, operation_schema
 
 CODEMAP_SCHEMA = "hashmarks.codemap.v1"
-PYTHON_PARSER = "hashmarks.python-ast.v5"
+PYTHON_PARSER = "hashmarks.python-ast.v7"
 
 
 class EvidenceVisibility(str, Enum):

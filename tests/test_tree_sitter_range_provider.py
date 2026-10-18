@@ -1,7 +1,12 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
+from dataclasses import dataclass
+from pathlib import Path
 
+import pytest
+
+from hashmarks.codemap import CodeMap, providers
+from hashmarks.codemap.parsers import artifact_key_for
 from hashmarks.codemap.providers import TreeSitterRangeProvider
 
 
@@ -32,6 +37,106 @@ class FakeNode:
         return self.fields.get(field)
 
 
+@dataclass
+class FakeTree:
+    root_node: FakeNode
+
+
+@dataclass
+class FakeParser:
+    root: FakeNode
+
+    def parse(self, source: bytes) -> FakeTree:
+        return FakeTree(self.root)
+
+
+def test_native_binding_change_invalidates_range_artifact_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pytest.importorskip("tree_sitter_language_pack")
+    versions = {
+        "tree-sitter-language-pack": "grammar-fixture",
+        "tree-sitter": "binding-before",
+    }
+    monkeypatch.setattr(providers.metadata, "version", lambda name: versions[name])
+    before = TreeSitterRangeProvider.auto()
+    versions["tree-sitter"] = "binding-after"
+    after = TreeSitterRangeProvider.auto()
+    assert before.available and after.available
+    assert before.version == after.version
+    assert artifact_key_for(
+        "same-source", "typescript", range_provider=before
+    ) != artifact_key_for(
+        "same-source",
+        "typescript",
+        range_provider=after,
+    )
+
+
+@pytest.mark.parametrize("missing", ["tree-sitter-language-pack", "tree-sitter"])
+def test_unqualified_native_versions_keep_range_enrichment_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+    missing: str,
+) -> None:
+    pytest.importorskip("tree_sitter_language_pack")
+
+    def version(name: str) -> str:
+        if name == missing:
+            raise providers.metadata.PackageNotFoundError(name)
+        return "present"
+
+    monkeypatch.setattr(providers.metadata, "version", version)
+    provider = TreeSitterRangeProvider.auto()
+    assert provider.available is False
+    assert provider.signature("typescript") is None
+    assert "metadata unavailable" in (provider.status().detail or "")
+
+
+def test_reopen_refreshes_ranges_after_native_binding_change(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    language_pack = pytest.importorskip("tree_sitter_language_pack")
+    source = "class Request {\n  value() {}\n}\n"
+    identifier = FakeNode("type_identifier", position=(6, 13, 0, 0))
+    declaration = FakeNode(
+        "class_declaration",
+        position=(0, len(source) - 1, 0, 0),
+        children=(identifier,),
+        fields={"name": identifier},
+    )
+    parser = FakeParser(FakeNode("program", children=(declaration,)))
+    monkeypatch.setattr(language_pack, "get_parser", lambda name: parser)
+    real_version = providers.metadata.version
+    versions = {"tree-sitter-language-pack": "same-grammar", "tree-sitter": "before"}
+
+    def version(name: str) -> str:
+        return versions[name] if name in versions else real_version(name)
+
+    monkeypatch.setattr(providers.metadata, "version", version)
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "request.ts").write_text(source)
+    with CodeMap(
+        repo, state_dir=tmp_path / "state", artifact_db=tmp_path / "artifacts.db"
+    ) as codemap:
+        codemap.index.sync()
+        before = codemap.source.outline("request.ts")
+        symbols = before["symbols"]
+        assert isinstance(symbols, list)
+        assert symbols[0]["end_line"] == 1
+    versions["tree-sitter"] = "after"
+    declaration.end_point = (2, 0)
+    with CodeMap(
+        repo, state_dir=tmp_path / "state", artifact_db=tmp_path / "artifacts.db"
+    ) as codemap:
+        after = codemap.source.outline("request.ts")
+        assert after["file_digest"] == before["file_digest"]
+        symbols = after["symbols"]
+        assert isinstance(symbols, list)
+        assert symbols[0]["end_line"] == 3
+
+
 def test_range_provider_name_lookup_handles_declarators_and_fallback() -> None:
     identifier = FakeNode("identifier")
     wrapper = FakeNode("declarator", children=(identifier,))
@@ -48,7 +153,7 @@ def test_range_provider_name_lookup_handles_declarators_and_fallback() -> None:
     assert TreeSitterRangeProvider._name_node(FakeNode("unknown")) is None
     assert (
         TreeSitterRangeProvider._name_node(
-            SimpleNamespace(children=(FakeNode("comment"), identifier))
+            FakeNode("function_definition", children=(FakeNode("comment"), identifier))
         )
         is identifier
     )
@@ -75,7 +180,7 @@ def test_range_provider_collects_nested_symbols_from_one_parser_tree() -> None:
         fields={"name": alpha},
     )
     root = FakeNode("module", children=(klass,))
-    parser = SimpleNamespace(parse=lambda data: SimpleNamespace(root_node=root))
+    parser = FakeParser(root)
     provider = TreeSitterRangeProvider(lambda language: parser, version="fixture")
 
     symbols = provider._collect(source, "javascript")
@@ -108,7 +213,7 @@ def test_range_provider_ignores_unnamed_nodes_and_bounds_long_headers() -> None:
         fields={"name": identifier},
     )
     root = FakeNode("module", children=(unnamed, blank, function))
-    parser = SimpleNamespace(parse=lambda data: SimpleNamespace(root_node=root))
+    parser = FakeParser(root)
     provider = TreeSitterRangeProvider(lambda language: parser)
 
     symbols = provider._collect(source, "javascript")

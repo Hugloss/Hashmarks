@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 from .freshness import FRESHNESS_STATES
 from .generation_domain import require_generation
@@ -14,6 +14,14 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
 EVIDENCE_CONTEXT_SCHEMA = "hashmarks.evidence-context.v1"
+
+
+class EvidenceContextValidation(TypedDict):
+    valid: bool
+    reasons: list[str]
+    context_identity: str | None
+
+
 _SHA = re.compile(r"^sha256:[0-9a-f]{64}$")
 
 
@@ -83,11 +91,11 @@ def evidence_context_identity(
 
 
 def validate_evidence_context(
-    evidence_receipt: Mapping[str, object],
-    provenance: Mapping[str, object],
+    evidence_receipt: object,
+    provenance: object,
     *,
     producer_implementation_identity: str | None = None,
-) -> dict[str, object]:
+) -> EvidenceContextValidation:
     """Validate an opaque context identity without transferring hash semantics downstream."""
     evidence_receipt, receipt_reasons = require_mapping_for_validation(
         evidence_receipt, reason="invalid-evidence-receipt"

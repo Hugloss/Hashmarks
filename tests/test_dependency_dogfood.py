@@ -3,6 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from contract_assertions import (
+    assert_array,
+    assert_object,
+    assert_present,
+    assert_records,
+    assert_text,
+)
 
 from hashmarks.adapters import (
     maven_dependency_observation,
@@ -82,8 +89,10 @@ def _selection_versions(
     observation: dict[str, object],
 ) -> dict[str, set[str]]:
     versions: dict[str, set[str]] = {}
-    for row in observation["selections"]:
-        versions.setdefault(row["component_id"], set()).add(row["version"])
+    for row in assert_records(observation["selections"]):
+        versions.setdefault(assert_text(row["component_id"]), set()).add(
+            assert_text(row["version"])
+        )
     return versions
 
 
@@ -111,7 +120,9 @@ def _selection(
 
 def _root_id(observation: dict[str, object], context: str) -> str:
     return next(
-        row["node_id"] for row in observation["roots"] if row["context"] == context
+        assert_text(row["node_id"])
+        for row in assert_records(observation["roots"])
+        if row["context"] == context
     )
 
 
@@ -120,10 +131,13 @@ def _direct_components(
     context: str,
 ) -> set[str]:
     root_id = _root_id(observation, context)
-    selections = {row["node_id"]: row for row in observation["selections"]}
+    selections = {
+        assert_text(row["node_id"]): row
+        for row in assert_records(observation["selections"])
+    }
     return {
-        selections[row["target"]]["component_id"]
-        for row in observation["relationships"]
+        assert_text(selections[assert_text(row["target"])]["component_id"])
+        for row in assert_records(observation["relationships"])
         if row["context"] == context and row["source"] == root_id
     }
 
@@ -133,7 +147,9 @@ def _query(
     observation: dict[str, object],
     request: dict[str, object],
 ) -> dict[str, object]:
-    return codemap.dependency_resolution_queries(observation, [request])["results"][0]
+    return assert_records(
+        codemap.dependencies.queries(observation, [request])["results"]
+    )[0]
 
 
 def _dummy_selection(
@@ -142,7 +158,7 @@ def _dummy_selection(
     return next(
         (
             row
-            for row in observation["selections"]
+            for row in assert_records(observation["selections"])
             if row["component_id"] == component_id
         ),
         None,
@@ -163,15 +179,19 @@ def _assert_dependency_state(
         assert graph["result"] == []
         return
     assert selection is not None
-    assert selection["version"] == expected_version
+    assert assert_present(selection)["version"] == expected_version
     assert graph["result"] == [
-        {"depth": 1, "node_id": selection["node_id"], "selection": selection}
+        {
+            "depth": 1,
+            "node_id": assert_present(selection)["node_id"],
+            "selection": selection,
+        }
     ]
     assert [
         row["target"]
-        for row in observation["relationships"]
-        if row["source"] == observation["roots"][0]["node_id"]
-    ] == [selection["node_id"]]
+        for row in assert_records(observation["relationships"])
+        if row["source"] == assert_records(observation["roots"])[0]["node_id"]
+    ] == [assert_present(selection)["node_id"]]
 
 
 def _assert_maven_module_change(
@@ -186,17 +206,25 @@ def _assert_maven_module_change(
         if after_state == "absent"
         else [
             next(
-                row for row in after["module_ownership"] if row["module"] == "dummy.dep"
+                row
+                for row in assert_records(after["module_ownership"])
+                if row["module"] == "dummy.dep"
             )
         ]
     )
     if after_state != "absent":
-        assert after_module["result"][0]["owners"] == [
-            _dummy_selection(after, "example.fixture:dummy-dep")["node_id"]
+        assert assert_records(after_module["result"])[0]["owners"] == [
+            assert_present(_dummy_selection(after, "example.fixture:dummy-dep"))[
+                "node_id"
+            ]
         ]
-    assert len(delta["module_ownership_added"]) == (before_state == "absent")
-    assert len(delta["module_ownership_removed"]) == (after_state == "absent")
-    assert len(delta["module_ownership_changed"]) == (
+    assert len(assert_array(delta["module_ownership_added"])) == (
+        before_state == "absent"
+    )
+    assert len(assert_array(delta["module_ownership_removed"])) == (
+        after_state == "absent"
+    )
+    assert len(assert_array(delta["module_ownership_changed"])) == (
         before_state == "v1" and after_state == "v2"
     )
     assert after_module["negative_evidence"] == (
@@ -214,18 +242,25 @@ def _assert_delta_side(
     effective_scopes: tuple[str, ...],
 ) -> None:
     selection = _dummy_selection(observation, component_id)
-    context = observation["roots"][0]["context"]
-    root_id = observation["roots"][0]["node_id"]
-    expected_node = [] if selection is None else [selection["node_id"]]
+    context = assert_records(observation["roots"])[0]["context"]
+    root_id = assert_records(observation["roots"])[0]["node_id"]
+    expected_node = [] if selection is None else [assert_present(selection)["node_id"]]
     assert delta[f"selections_{side}"] == expected_node
     assert delta[f"inventory_{side}"] == (
-        [] if selection is None else [[selection["node_id"], context]]
+        [] if selection is None else [[assert_present(selection)["node_id"], context]]
     )
     assert delta[f"relationships_{side}"] == (
         []
         if selection is None
         else [
-            [root_id, selection["node_id"], "dependency", context, scope, ""]
+            [
+                root_id,
+                assert_present(selection)["node_id"],
+                "dependency",
+                context,
+                scope,
+                "",
+            ]
             for scope in effective_scopes
         ]
     )
@@ -249,17 +284,14 @@ def test_real_producer_dependency_change_dogfood(
 ) -> None:
     context = "lock" if producer == "uv" else "compile"
     component_id = "dummy-dep" if producer == "uv" else "example.fixture:dummy-dep"
+    after_module = None
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        before = codemap.dependency_resolution_evidence(
-            _observation(producer, before_state)
-        )
-        after = codemap.dependency_resolution_evidence(
-            _observation(producer, after_state)
-        )
-        delta = codemap.dependency_resolution_delta(before, after)
-        before_root = before["roots"][0]["node_id"]
-        after_root = after["roots"][0]["node_id"]
+        codemap.index.sync()
+        before = codemap.dependencies.observe(_observation(producer, before_state))
+        after = codemap.dependencies.observe(_observation(producer, after_state))
+        delta = codemap.dependencies.delta(before, after)
+        before_root = assert_records(before["roots"])[0]["node_id"]
+        after_root = assert_records(after["roots"])[0]["node_id"]
         before_graph = _query(
             codemap,
             before,
@@ -276,7 +308,9 @@ def test_real_producer_dependency_change_dogfood(
             {"operation": "component", "component_id": component_id},
         )
         selected_side = before if after_state == "absent" else after
-        missing_selection = _dummy_selection(selected_side, component_id)["node_id"]
+        missing_selection = assert_present(
+            _dummy_selection(selected_side, component_id)
+        )["node_id"]
         absence_observation = after if after_state == "absent" else before
         inventory_absence = _query(
             codemap,
@@ -313,12 +347,16 @@ def test_real_producer_dependency_change_dogfood(
         component_id,
         ("",) if producer == "uv" else ("compile",),
     )
-    assert len(delta["components_added"]) == (before_state == "absent")
-    assert len(delta["components_removed"]) == (after_state == "absent")
-    assert len(before["evidence_sources"]) == (1 if producer == "uv" else 2)
-    assert len(after["evidence_sources"]) == (1 if producer == "uv" else 2)
-    assert len(before_graph["result"]) == (before_state != "absent")
-    assert len(after_graph["result"]) == (after_state != "absent")
+    assert len(assert_array(delta["components_added"])) == (before_state == "absent")
+    assert len(assert_array(delta["components_removed"])) == (after_state == "absent")
+    assert len(assert_array(before["evidence_sources"])) == (
+        1 if producer == "uv" else 2
+    )
+    assert len(assert_array(after["evidence_sources"])) == (
+        1 if producer == "uv" else 2
+    )
+    assert len(assert_array(before_graph["result"])) == (before_state != "absent")
+    assert len(assert_array(after_graph["result"])) == (after_state != "absent")
     assert after_graph["negative_evidence"] == (
         "admissible-within-declared-scope"
         if after_state == "absent"
@@ -333,7 +371,7 @@ def test_real_producer_dependency_change_dogfood(
     assert inventory_absence["negative_evidence"] == "admissible-within-declared-scope"
     if producer == "maven":
         _assert_maven_module_change(
-            after, after_module, delta, before_state, after_state
+            after, assert_present(after_module), delta, before_state, after_state
         )
 
 
@@ -341,14 +379,10 @@ def test_real_maven_transitive_upgrade_dogfood_preserves_large_graph_delta(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        before = codemap.dependency_resolution_evidence(
-            _realworld_maven_observation("before")
-        )
-        after = codemap.dependency_resolution_evidence(
-            _realworld_maven_observation("after")
-        )
-        delta = codemap.dependency_resolution_delta(before, after)
+        codemap.index.sync()
+        before = codemap.dependencies.observe(_realworld_maven_observation("before"))
+        after = codemap.dependencies.observe(_realworld_maven_observation("after"))
+        delta = codemap.dependencies.delta(before, after)
 
         before_okhttp = _dummy_selection(before, "com.squareup.okhttp3:okhttp")
         after_okhttp = _dummy_selection(after, "com.squareup.okhttp3:okhttp")
@@ -357,7 +391,7 @@ def test_real_maven_transitive_upgrade_dogfood_preserves_large_graph_delta(
             before,
             {
                 "operation": "dependencies",
-                "node_id": before_okhttp["node_id"],
+                "node_id": assert_present(before_okhttp)["node_id"],
                 "context": "compile",
             },
         )
@@ -366,19 +400,19 @@ def test_real_maven_transitive_upgrade_dogfood_preserves_large_graph_delta(
             after,
             {
                 "operation": "dependencies",
-                "node_id": after_okhttp["node_id"],
+                "node_id": assert_present(after_okhttp)["node_id"],
                 "context": "compile",
             },
         )
 
     assert delta["comparability"] == "comparable"
     assert delta["producer_authority"] == "caller-claimed"
-    assert len(before["inventory"]) == 26
-    assert len(after["inventory"]) == 22
-    assert len(delta["selections_removed"]) == 21
-    assert len(delta["selections_added"]) == 17
-    assert len(delta["relationships_removed"]) == 26
-    assert len(delta["relationships_added"]) == 22
+    assert len(assert_array(before["inventory"])) == 26
+    assert len(assert_array(after["inventory"])) == 22
+    assert len(assert_array(delta["selections_removed"])) == 21
+    assert len(assert_array(delta["selections_added"])) == 17
+    assert len(assert_array(delta["relationships_removed"])) == 26
+    assert len(assert_array(delta["relationships_added"])) == 22
 
     assert delta["components_added"] == ["org.jspecify:jspecify"]
     assert delta["components_removed"] == [
@@ -401,22 +435,31 @@ def test_real_maven_transitive_upgrade_dogfood_preserves_large_graph_delta(
         {"3.15.0"},
     )
     transitions = {
-        row["component_id"]: row for row in delta["component_selection_transitions"]
+        row["component_id"]: row
+        for row in assert_records(delta["component_selection_transitions"])
     }
     assert set(transitions) == set(changed_versions)
     assert len(transitions) == 16
     assert [
-        row["version"] for row in transitions["com.squareup.okhttp3:okhttp"]["removed"]
+        row["version"]
+        for row in assert_records(
+            assert_object(transitions["com.squareup.okhttp3:okhttp"])["removed"]
+        )
     ] == ["4.12.0"]
     assert [
-        row["version"] for row in transitions["com.squareup.okhttp3:okhttp"]["added"]
+        row["version"]
+        for row in assert_records(
+            assert_object(transitions["com.squareup.okhttp3:okhttp"])["added"]
+        )
     ] == ["5.1.0"]
 
     before_okhttp_components = {
-        row["selection"]["component_id"] for row in before_okhttp_graph["result"]
+        assert_object(row["selection"])["component_id"]
+        for row in assert_records(before_okhttp_graph["result"])
     }
     after_okhttp_components = {
-        row["selection"]["component_id"] for row in after_okhttp_graph["result"]
+        assert_object(row["selection"])["component_id"]
+        for row in assert_records(after_okhttp_graph["result"])
     }
     assert "org.jetbrains.kotlin:kotlin-stdlib-jdk8" in before_okhttp_components
     assert "org.jetbrains.kotlin:kotlin-stdlib-jdk8" not in after_okhttp_components
@@ -429,14 +472,14 @@ def test_real_maven_mediation_changes_only_transitive_selections(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        before = codemap.dependency_resolution_evidence(
+        codemap.index.sync()
+        before = codemap.dependencies.observe(
             _maven_scenario_observation("mediation", "before")
         )
-        after = codemap.dependency_resolution_evidence(
+        after = codemap.dependencies.observe(
             _maven_scenario_observation("mediation", "after")
         )
-        delta = codemap.dependency_resolution_delta(before, after)
+        delta = codemap.dependencies.delta(before, after)
         before_graph = _query(
             codemap,
             before,
@@ -475,12 +518,13 @@ def test_real_maven_mediation_changes_only_transitive_selections(
     assert not (set(changed_versions) & before_direct)
     assert delta["components_added"] == []
     assert delta["components_removed"] == []
-    assert len(delta["selections_added"]) == 5
-    assert len(delta["selections_removed"]) == 5
+    assert len(assert_array(delta["selections_added"])) == 5
+    assert len(assert_array(delta["selections_removed"])) == 5
     assert {
-        row["component_id"] for row in delta["component_selection_transitions"]
+        row["component_id"]
+        for row in assert_records(delta["component_selection_transitions"])
     } == set(changed_versions)
-    assert len(delta["component_selection_transitions"]) == 5
+    assert len(assert_array(delta["component_selection_transitions"])) == 5
     assert before_graph["completeness"] == "complete"
     assert after_graph["completeness"] == "complete"
 
@@ -489,14 +533,14 @@ def test_real_maven_exclusion_removes_complete_transitive_branch(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        before = codemap.dependency_resolution_evidence(
+        codemap.index.sync()
+        before = codemap.dependencies.observe(
             _maven_scenario_observation("exclusion", "before")
         )
-        after = codemap.dependency_resolution_evidence(
+        after = codemap.dependencies.observe(
             _maven_scenario_observation("exclusion", "after")
         )
-        delta = codemap.dependency_resolution_delta(before, after)
+        delta = codemap.dependencies.delta(before, after)
 
         removed_absence = [
             _query(
@@ -508,7 +552,7 @@ def test_real_maven_exclusion_removes_complete_transitive_branch(
                     "context": "compile",
                 },
             )
-            for node_id in delta["selections_removed"]
+            for node_id in assert_array(delta["selections_removed"])
         ]
 
     before_direct = _direct_components(before, "compile")
@@ -525,10 +569,10 @@ def test_real_maven_exclusion_removes_complete_transitive_branch(
         == _selection(after, direct_component)["version"]
     )
     assert delta["components_added"] == []
-    assert len(delta["components_removed"]) == 6
-    assert len(delta["selections_removed"]) == 6
+    assert len(assert_array(delta["components_removed"])) == 6
+    assert len(assert_array(delta["selections_removed"])) == 6
     assert delta["selections_added"] == []
-    assert len(delta["relationships_removed"]) == 6
+    assert len(assert_array(delta["relationships_removed"])) == 6
     assert delta["relationships_added"] == []
     assert delta["component_selection_transitions"] == []
     assert all(result["result"] == [] for result in removed_absence)
@@ -542,14 +586,14 @@ def test_real_maven_bom_upgrade_changes_many_versions_without_component_churn(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        before = codemap.dependency_resolution_evidence(
+        codemap.index.sync()
+        before = codemap.dependencies.observe(
             _maven_scenario_observation("bom-upgrade", "before")
         )
-        after = codemap.dependency_resolution_evidence(
+        after = codemap.dependencies.observe(
             _maven_scenario_observation("bom-upgrade", "after")
         )
-        delta = codemap.dependency_resolution_delta(before, after)
+        delta = codemap.dependencies.delta(before, after)
 
     direct_components = _direct_components(before, "compile")
     changed_versions = _changed_component_versions(before, after)
@@ -561,30 +605,27 @@ def test_real_maven_bom_upgrade_changes_many_versions_without_component_churn(
     assert len(direct_components) == 5
     assert direct_components <= set(changed_versions)
     assert len(changed_versions) == 17
-    assert len(before["inventory"]) == 18
-    assert len(after["inventory"]) == 18
+    assert len(assert_array(before["inventory"])) == 18
+    assert len(assert_array(after["inventory"])) == 18
     assert delta["components_added"] == []
     assert delta["components_removed"] == []
-    assert len(delta["selections_added"]) == 17
-    assert len(delta["selections_removed"]) == 17
+    assert len(assert_array(delta["selections_added"])) == 17
+    assert len(assert_array(delta["selections_removed"])) == 17
     assert {
-        row["component_id"] for row in delta["component_selection_transitions"]
+        row["component_id"]
+        for row in assert_records(delta["component_selection_transitions"])
     } == set(changed_versions)
-    assert len(delta["component_selection_transitions"]) == 17
+    assert len(assert_array(delta["component_selection_transitions"])) == 17
 
 
 def test_real_maven_multi_module_change_propagates_across_contexts(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        before = codemap.dependency_resolution_evidence(
-            _maven_multi_module_observation("before")
-        )
-        after = codemap.dependency_resolution_evidence(
-            _maven_multi_module_observation("after")
-        )
-        delta = codemap.dependency_resolution_delta(before, after)
+        codemap.index.sync()
+        before = codemap.dependencies.observe(_maven_multi_module_observation("before"))
+        after = codemap.dependencies.observe(_maven_multi_module_observation("after"))
+        delta = codemap.dependencies.delta(before, after)
 
         before_graphs = {
             context: _query(
@@ -626,12 +667,13 @@ def test_real_maven_multi_module_change_propagates_across_contexts(
         _selection(after, component_id)["contexts"] == ["alpha", "beta"]
         for component_id in changed_versions
     )
-    assert len(delta["components_added"]) == 1
-    assert len(delta["components_removed"]) == 2
+    assert len(assert_array(delta["components_added"])) == 1
+    assert len(assert_array(delta["components_removed"])) == 2
     assert {
-        row["component_id"] for row in delta["component_selection_transitions"]
+        row["component_id"]
+        for row in assert_records(delta["component_selection_transitions"])
     } == set(changed_versions)
-    assert len(delta["component_selection_transitions"]) == 3
+    assert len(assert_array(delta["component_selection_transitions"])) == 3
     assert all(graph["completeness"] == "complete" for graph in before_graphs.values())
     assert all(graph["completeness"] == "complete" for graph in after_graphs.values())
 
@@ -640,10 +682,8 @@ def test_real_maven_profile_contexts_remain_isolated(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        observation = codemap.dependency_resolution_evidence(
-            _maven_profile_observation()
-        )
+        codemap.index.sync()
+        observation = codemap.dependencies.observe(_maven_profile_observation())
         root_id = _root_id(observation, "default")
 
         with pytest.raises(
@@ -707,18 +747,18 @@ def test_real_maven_profile_contexts_remain_isolated(
     assert default_absence["negative_evidence"] == "admissible-within-declared-scope"
     assert default_graph["completeness"] == "complete"
     assert extra_graph["completeness"] == "complete"
-    assert len(extra_graph["result"]) > len(default_graph["result"])
+    assert len(assert_array(extra_graph["result"])) > len(
+        assert_array(default_graph["result"])
+    )
 
 
 def test_real_uv_grouped_edges_do_not_duplicate_topology_paths(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        observation = codemap.dependency_resolution_evidence(
-            _observation("uv", "grouped")
-        )
-        root_id = observation["roots"][0]["node_id"]
+        codemap.index.sync()
+        observation = codemap.dependencies.observe(_observation("uv", "grouped"))
+        root_id = assert_records(observation["roots"])[0]["node_id"]
         selection = _dummy_selection(observation, "dummy-dep")
         paths = _query(
             codemap,
@@ -726,13 +766,13 @@ def test_real_uv_grouped_edges_do_not_duplicate_topology_paths(
             {
                 "operation": "paths",
                 "node_id": root_id,
-                "target_id": selection["node_id"],
+                "target_id": assert_present(selection)["node_id"],
                 "context": "lock",
                 "max_results": 1,
             },
         )
 
-    assert paths["result"] == [[root_id, selection["node_id"]]]
+    assert paths["result"] == [[root_id, assert_present(selection)["node_id"]]]
     assert paths["completeness"] == "complete"
     assert paths["omissions"] == []
 
@@ -746,12 +786,10 @@ def test_real_uv_grouped_dependency_dogfood(
     tmp_path: Path, before_state: str, after_state: str
 ) -> None:
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        before = codemap.dependency_resolution_evidence(
-            _observation("uv", before_state)
-        )
-        after = codemap.dependency_resolution_evidence(_observation("uv", after_state))
-        delta = codemap.dependency_resolution_delta(before, after)
+        codemap.index.sync()
+        before = codemap.dependencies.observe(_observation("uv", before_state))
+        after = codemap.dependencies.observe(_observation("uv", after_state))
+        delta = codemap.dependencies.delta(before, after)
         present = before if before_state == "grouped" else after
         absent = after if after_state == "absent" else before
         selection = _dummy_selection(present, "dummy-dep")
@@ -760,7 +798,7 @@ def test_real_uv_grouped_dependency_dogfood(
             present,
             {
                 "operation": "dependencies",
-                "node_id": present["roots"][0]["node_id"],
+                "node_id": assert_records(present["roots"])[0]["node_id"],
                 "context": "lock",
             },
         )
@@ -769,7 +807,7 @@ def test_real_uv_grouped_dependency_dogfood(
             absent,
             {
                 "operation": "dependencies",
-                "node_id": absent["roots"][0]["node_id"],
+                "node_id": assert_records(absent["roots"])[0]["node_id"],
                 "context": "lock",
             },
         )
@@ -778,7 +816,7 @@ def test_real_uv_grouped_dependency_dogfood(
             absent,
             {
                 "operation": "inventory",
-                "node_id": selection["node_id"],
+                "node_id": assert_present(selection)["node_id"],
                 "context": "lock",
             },
         )
@@ -786,16 +824,24 @@ def test_real_uv_grouped_dependency_dogfood(
     assert before["definition_identity"] == after["definition_identity"]
     assert delta["comparability"] == "comparable"
     assert delta["producer_authority"] == "caller-claimed"
-    assert selection["version"] == "1.0.0"
-    assert len(present["evidence_sources"]) == 1
+    assert assert_present(selection)["version"] == "1.0.0"
+    assert len(assert_array(present["evidence_sources"])) == 1
     assert _dummy_selection(absent, "dummy-dep") is None
-    assert {row["effective_scope"] for row in present["relationships"]} == {
+    assert {
+        row["effective_scope"] for row in assert_records(present["relationships"])
+    } == {
         "extra:extra",
         "dev:test",
     }
-    assert {row["target"] for row in present["relationships"]} == {selection["node_id"]}
+    assert {row["target"] for row in assert_records(present["relationships"])} == {
+        assert_present(selection)["node_id"]
+    }
     assert present_graph["result"] == [
-        {"depth": 1, "node_id": selection["node_id"], "selection": selection}
+        {
+            "depth": 1,
+            "node_id": assert_present(selection)["node_id"],
+            "selection": selection,
+        }
     ]
     assert absent_graph["result"] == []
     assert absent_graph["negative_evidence"] == "admissible-within-declared-scope"

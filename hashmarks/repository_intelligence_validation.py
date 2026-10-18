@@ -14,10 +14,16 @@ from .codemap.diagnostic_observation import (
 from .codemap.diagnostic_provenance import diagnostic_member_claims
 from .codemap.diagnostic_source_revision import (
     DIAGNOSTIC_SOURCE_REVISION_EVIDENCE_SCHEMA,
+    EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA,
     normalize_source_revision_claims,
     validated_diagnostic_source_revision_evidence,
 )
-from .codemap.repository_delta import EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA
+from .codemap.filesystem_lifecycle_contract import (
+    SCHEMA as LIFECYCLE_SCHEMA,
+)
+from .codemap.filesystem_lifecycle_contract import (
+    validate_lifecycle_observation,
+)
 from .codemap.semantic_relationship_delta import validate_relationship_delta
 from .codemap.semantic_relationship_model import (
     DELTA_SCHEMA as RELATIONSHIP_DELTA_SCHEMA,
@@ -41,6 +47,7 @@ _OWNERSHIP_RELATION_SCHEMA = operation_schema("ownership_relation_graph")
 _TASK_ACTION_MAP_SCHEMA = operation_schema("task_action_map")
 
 _CURRENT_EVIDENCE_KINDS: dict[str, str] = {
+    LIFECYCLE_SCHEMA: "filesystem-lifecycle-observation",
     RELATIONSHIP_OBSERVATION_SCHEMA: "semantic-relationship-observation",
     RELATIONSHIP_DELTA_SCHEMA: "semantic-relationship-delta",
     _DECISION_PACKET_SCHEMA: "decision",
@@ -432,11 +439,20 @@ def _observation_freshness(
     completeness = payload.get("change_set_completeness")
     if completeness not in ("caller-claimed-complete", "unknown"):
         reasons.append("invalid-change-set-completeness")
+    if payload.get("producer_freshness", "unknown") != "unknown":
+        reasons.append("producer-freshness-not-established")
+    if (
+        payload.get("freshness_scope", "repository-correspondence-only")
+        != "repository-correspondence-only"
+    ):
+        reasons.append("invalid-freshness-scope")
     return {
         "freshness_state": state,
         "stale": None if state == "unknown" else state != "current",
         "change_set_completeness": completeness,
         "freshness_reason": payload.get("reason"),
+        "freshness_scope": "repository-correspondence-only",
+        "producer_freshness": "unknown",
     }
 
 
@@ -468,7 +484,32 @@ def _semantic_relationship_evidence(
         return {}
 
 
+def _lifecycle_evidence(
+    payload: Mapping[str, object], reasons: list[str]
+) -> dict[str, object]:
+    try:
+        packet = validate_lifecycle_observation(payload)
+    except (TypeError, ValueError, KeyError):
+        reasons.append("invalid-filesystem-lifecycle-evidence")
+        return {}
+    return {
+        "repository_identity": packet["repository_identity"],
+        "codemap_generation": packet["generation"],
+        "stale": packet["stale"],
+        "source_revisions": packet["source_revisions"],
+        "projection_coverage": "projection-only",
+        "unprojected_sections": [
+            "/operations",
+            "/observations",
+            "/unresolved",
+            "/coverage",
+            "/accounting",
+        ],
+    }
+
+
 _VALIDATORS = {
+    LIFECYCLE_SCHEMA: _lifecycle_evidence,
     RELATIONSHIP_OBSERVATION_SCHEMA: _semantic_relationship_evidence,
     RELATIONSHIP_DELTA_SCHEMA: _semantic_relationship_evidence,
     _DECISION_PACKET_SCHEMA: _decision_packet,
@@ -566,10 +607,14 @@ def validate_repository_intelligence_evidence(
                     "diagnostic_path_locality",
                     "diagnostic_change_set",
                     "diagnostic_scope_paths",
+                    "diagnostic_occurrence_counts",
+                    "diagnostic_changed_claims",
                     "source_revision_rows",
                     "source_revision_coverage",
                     "change_set_completeness",
                     "freshness_reason",
+                    "freshness_scope",
+                    "producer_freshness",
                     "semantic_relationship_observations",
                     "semantic_relationship_coverage",
                     "semantic_relationship_deltas",

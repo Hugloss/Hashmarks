@@ -50,7 +50,7 @@ def normalization_policy_identity(tool_map: dict[str, Any]) -> str:
     return "sha256:" + hashlib.sha256(raw).hexdigest()
 
 
-def _nonempty(value: Any, field: str, path: Path) -> str:
+def _nonempty(value: object, field: str, path: Path) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{field} must be a non-empty string: {path}")
     return value
@@ -65,13 +65,13 @@ def _relative_path(value: str, field: str, path: Path) -> str:
     return normalized
 
 
-def _nonnegative_integer(value: Any, field: str, path: Path) -> int:
+def _nonnegative_integer(value: object, field: str, path: Path) -> int:
     if not isinstance(value, int) or isinstance(value, bool) or value < 0:
         raise ValueError(f"{field} must be a non-negative integer: {path}")
     return value
 
 
-def _relative_paths(value: Any, field: str, path: Path) -> list[str]:
+def _relative_paths(value: object, field: str, path: Path) -> list[str]:
     if not isinstance(value, list) or any(
         not isinstance(item, str) or not item.strip() for item in value
     ):
@@ -79,7 +79,7 @@ def _relative_paths(value: Any, field: str, path: Path) -> list[str]:
     return [_relative_path(item, field, path) for item in value]
 
 
-def _validate_event_value(field: str, value: Any, path: Path) -> Any:
+def _validate_event_value(field: str, value: object, path: Path) -> object:
     if field in {
         "bytes",
         "estimated_tokens",
@@ -139,7 +139,7 @@ def _validated_tool_map(value: dict[str, Any], path: Path) -> dict[str, Any]:
 
 
 def _validate_event(
-    event: Any, tool_map: dict[str, Any], last_sequence: int, path: Path
+    event: object, tool_map: dict[str, object], last_sequence: int, path: Path
 ) -> int:
     if not isinstance(event, dict):
         raise ValueError(f"runner event must be an object: {path}")

@@ -1,8 +1,17 @@
 import json
 from pathlib import Path
 
+import pytest
+from contract_assertions import is_available_plan
+
 from hashmarks import cli
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.task_evidence_types import (
+    TaskActionMap,
+    TaskEvidencePacket,
+    TaskOwnership,
+    TaskVerification,
+)
 
 
 def _semantic_repo(root: Path) -> None:
@@ -22,13 +31,13 @@ def _semantic_repo(root: Path) -> None:
     )
 
 
-def _ownership(packet: dict[str, object]) -> dict[str, object]:
+def _ownership(packet: TaskEvidencePacket) -> TaskOwnership:
     value = packet.get("ownership")
     assert isinstance(value, dict)
     return value
 
 
-def _verification(packet: dict[str, object]) -> dict[str, object]:
+def _verification(packet: TaskEvidencePacket) -> TaskVerification:
     value = packet.get("verification")
     assert isinstance(value, dict)
     return value
@@ -46,24 +55,30 @@ def test_task_evidence_supplies_exact_owner_source_and_verification(
 ) -> None:
     _semantic_repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        start = codemap.task_evidence(_task(), token_budget=512)
+        codemap.index.sync()
+        start = codemap.tasks.evidence(_task(), token_budget=512)
 
     ownership = _ownership(start)
     verification = _verification(start)
     assert start["schema"] == "hashmarks.task-evidence.v5"
     assert "status" not in start
     assert ownership["status"] == "resolved"
+    assert ownership["owner"] is not None
     assert ownership["owner"]["path"] == "src/engine.py"
-    assert verification["plan"]["argv"] == [
+    plan = verification["plan"]
+    assert is_available_plan(plan)
+    assert plan["argv"] == [
         "python",
         "-m",
         "pytest",
         "-q",
         "tests/test_engine.py::test_normalize_widget_semantics",
     ]
+    assert verification["selected"] is not None
     assert verification["selected"]["path"] == "tests/test_engine.py"
+    assert ownership["source_budget"] is not None
     assert ownership["source_budget"]["complete"] is True
+    assert ownership["source_evidence"] is not None
     assert ownership["source_evidence"]["representation"] == "source-range"
     assert "len(value)" in ownership["source_evidence"]["content"]
     assert "'length': 3" not in json.dumps(start, sort_keys=True)
@@ -75,12 +90,14 @@ def test_task_evidence_never_emits_partial_source_when_exact_range_exceeds_budge
 ) -> None:
     _semantic_repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        start = codemap.task_evidence(_task(), token_budget=4)
+        codemap.index.sync()
+        start = codemap.tasks.evidence(_task(), token_budget=4)
 
     ownership = _ownership(start)
     assert ownership["status"] == "resolved"
+    assert ownership["source_budget"] is not None
     assert ownership["source_budget"]["complete"] is False
+    assert ownership["next_read"] is not None
     assert ownership["next_read"]["reason"] == "exact-source-range-exceeds-start-budget"
     assert (
         ownership["source_evidence"] is None
@@ -94,14 +111,16 @@ def test_task_evidence_respects_outline_only_policy(tmp_path: Path) -> None:
         '[[rule]]\npattern = "src/**"\nvisibility = "outline"\n', encoding="utf-8"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        start = codemap.task_evidence(_task(), token_budget=512)
+        codemap.index.sync()
+        start = codemap.tasks.evidence(_task(), token_budget=512)
 
     ownership = _ownership(start)
     assert ownership["source_evidence"]
     assert ownership["source_evidence"]["representation"] in {"signature", "outline"}
     assert "len(value)" not in json.dumps(start, sort_keys=True)
+    assert ownership["next_read"] is not None
     assert ownership["next_read"]["reason"] == "source-body-not-authorized"
+    assert ownership["source_budget"] is not None
     assert ownership["source_budget"]["complete"] is False
 
 
@@ -114,8 +133,10 @@ def test_task_evidence_fails_closed_before_disclosing_evidence_without_edit_auth
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        start = codemap.task_evidence("Change the scarlet field behavior and verify it")
+        codemap.index.sync()
+        start = codemap.tasks.evidence(
+            "Change the scarlet field behavior and verify it"
+        )
 
     ownership = _ownership(start)
     assert ownership["status"] == "unresolved"
@@ -128,23 +149,25 @@ def test_task_evidence_fails_closed_before_disclosing_evidence_without_edit_auth
 def test_task_evidence_computes_action_map_once(tmp_path: Path) -> None:
     _semantic_repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        original = codemap.task_action_map
+        codemap.index.sync()
+        original = codemap.tasks.action_map
         calls = 0
 
-        def counted(*args, **kwargs):
+        def counted(*args, **kwargs) -> TaskActionMap:
             nonlocal calls
             calls += 1
             return original(*args, **kwargs)
 
-        codemap.task_action_map = counted  # type: ignore[method-assign]
-        start = codemap.task_evidence(_task())
+        codemap.tasks.action_map = counted  # type: ignore[method-assign]
+        start = codemap.tasks.evidence(_task())
 
     assert _ownership(start)["status"] == "resolved"
     assert calls == 1
 
 
-def test_task_evidence_cli_exposes_native_start_packet(tmp_path: Path, capsys) -> None:
+def test_task_evidence_cli_exposes_native_start_packet(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     _semantic_repo(tmp_path)
     assert (
         cli.main(
@@ -189,13 +212,13 @@ def test_task_evidence_and_owner_graph_never_cross_agent_deny_boundary(
         '[[rule]]\npattern = "hidden/**"\nvisibility = "deny"\n', encoding="utf-8"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        graph = codemap.ownership_relation_graph(
+        codemap.index.sync()
+        graph = codemap.ownership.relations(
             "Change cobalt route behavior and verify it",
             "tests/test_route.py",
             max_depth=3,
         )
-        start = codemap.task_evidence("Change cobalt route behavior and verify it")
+        start = codemap.tasks.evidence("Change cobalt route behavior and verify it")
 
     encoded = json.dumps({"graph": graph, "start": start}, sort_keys=True)
     assert "hidden/engine.py" not in encoded
@@ -246,17 +269,23 @@ def test_task_evidence_keeps_typescript_test_path_when_runner_is_project_scoped(
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        start = codemap.task_evidence(
+        codemap.index.sync()
+        start = codemap.tasks.evidence(
             "For TSCOBALT41 change the accepted response from old to new and verify the route behavior",
             token_budget=512,
         )
     ownership = _ownership(start)
     verification = _verification(start)
-    assert ownership["status"] == "resolved"
+    assert ownership["status"] == "unresolved"
+    assert ownership["candidate"] is not None
     assert ownership["candidate"]["path"] == "src/engine.ts"
     assert ownership["owner"] is None
-    assert verification["plan"]["argv"] == ["tsc", "--noEmit", "-p", "tsconfig.json"]
+    assert ownership["proof_scope_complete"] is False
+    assert ownership["source_evidence"] is None
+    plan = verification["plan"]
+    assert is_available_plan(plan)
+    assert plan["argv"] == ["tsc", "--noEmit", "-p", "tsconfig.json"]
+    assert verification["selected"] is not None
     assert verification["selected"]["path"] == "tests/cobalt.test.ts"
     encoded = json.dumps(start, sort_keys=True)
     assert "throw new Error" not in encoded

@@ -2,18 +2,30 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import logging
-
-from hashmarks._command_output import log_command_output
-
-try:
-    from scripts._module_loader import import_sibling
-except ModuleNotFoundError:  # direct script execution
-    from _module_loader import import_sibling
 import json
+import logging
 from collections import defaultdict
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Literal, TypedDict, TypeGuard
+
+from hashmarks._command_output import log_command_output
+from scripts._module_loader import import_sibling
+
+if TYPE_CHECKING:
+    from scripts.agent_evaluation.metrics_agent_regret import (
+        RegretComparison,
+        RegretReport,
+    )
+    from scripts.agent_evaluation.metrics_agent_regret import (
+        analyze as analyze_trace,
+    )
+    from scripts.agent_evaluation.metrics_agent_regret import (
+        compare as compare_reports,
+    )
+else:
+    _regret = import_sibling("metrics_agent_regret", __package__)
+    analyze_trace = _regret.analyze
+    compare_reports = _regret.compare
 
 logger = logging.getLogger(__name__)
 
@@ -21,21 +33,57 @@ MANIFEST_SCHEMA = "hashmarks.agent-retrieval-regret-suite.v1"
 REPORT_SCHEMA = "hashmarks.agent-retrieval-regret-suite-report.v1"
 
 
-def _load_regret_module() -> Any:
-    return import_sibling("metrics_agent_regret", __package__)
+class RegretManifest(TypedDict):
+    schema: str
+    suite_id: str
+    entries: list[object]
+
+
+class OpportunityTotal(TypedDict):
+    kind: str
+    observed_estimated_tokens: int
+
+
+class RegretSuiteSummary(TypedDict):
+    runs: int
+    tasks: int
+    paired_tasks: int
+    complete_required_evidence_runs: int
+    incomplete_required_evidence_runs: int
+    observed_opportunity_totals: dict[str, int]
+    observed_opportunities_ranked: list[OpportunityTotal]
+    opportunities_overlap: bool
+    claim_boundary: str
+
+
+class RegretSuiteReport(TypedDict):
+    schema: str
+    manifest_sha256: str
+    suite_id: str
+    reports: list[RegretReport]
+    comparisons: list[RegretComparison]
+    summary: RegretSuiteSummary
+
+
+OpportunityMetric = Literal[
+    "tokens_before_all_required_evidence",
+    "duplicate_query_estimated_tokens",
+    "duplicate_read_estimated_tokens",
+    "irrelevant_read_estimated_tokens",
+]
 
 
 def _digest_bytes(path: Path) -> str:
     return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _nonempty(value: Any, field: str, path: Path) -> str:
+def _nonempty(value: object, field: str, path: Path) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{field} must be a non-empty string: {path}")
     return value
 
 
-def _resolve_member(base: Path, raw: Any, field: str, manifest_path: Path) -> Path:
+def _resolve_member(base: Path, raw: object, field: str, manifest_path: Path) -> Path:
     text = _nonempty(raw, field, manifest_path).replace("\\", "/")
     member = Path(text)
     if member.is_absolute() or ".." in member.parts:
@@ -52,24 +100,29 @@ def _resolve_member(base: Path, raw: Any, field: str, manifest_path: Path) -> Pa
     return resolved
 
 
-def load_manifest(path: Path) -> dict[str, Any]:
-    value = json.loads(path.read_text(encoding="utf-8"))
+def _validate_manifest(value: object, path: Path) -> TypeGuard[RegretManifest]:
     if not isinstance(value, dict) or value.get("schema") != MANIFEST_SCHEMA:
         raise ValueError(f"unsupported regret suite schema: {path}")
     _nonempty(value.get("suite_id"), "suite_id", path)
     entries = value.get("entries")
     if not isinstance(entries, list) or not entries:
         raise ValueError(f"entries must be a non-empty list: {path}")
+    return True
+
+
+def load_manifest(path: Path) -> RegretManifest:
+    value: object = json.loads(path.read_text(encoding="utf-8"))
+    if not _validate_manifest(value, path):
+        raise ValueError(f"invalid regret suite: {path}")
     return value
 
 
 def _entry_report(
-    regret: Any,
     base: Path,
-    entry: Any,
+    entry: object,
     index: int,
     manifest_path: Path,
-) -> dict[str, Any]:
+) -> RegretReport:
     if not isinstance(entry, dict):
         raise ValueError(f"entry {index} must be an object: {manifest_path}")
     trace_path = _resolve_member(
@@ -90,17 +143,17 @@ def _entry_report(
             raise ValueError(
                 f"entry {index} {field} mismatch: expected {expected}, got {actual}"
             )
-    return regret.analyze(trace_path, evidence_path)
+    return analyze_trace(trace_path, evidence_path)
 
 
 def _comparisons(
-    regret: Any, reports: list[dict[str, Any]]
-) -> tuple[dict[str, dict[str, dict[str, Any]]], list[dict[str, Any]]]:
-    by_task: dict[str, dict[str, dict[str, Any]]] = defaultdict(dict)
+    reports: list[RegretReport],
+) -> tuple[dict[str, dict[str, RegretReport]], list[RegretComparison]]:
+    by_task: dict[str, dict[str, RegretReport]] = defaultdict(dict)
     for report in reports:
         by_task[str(report["task_id"])][str(report["mode"])] = report
     comparisons = [
-        regret.compare(modes["baseline"], modes["hashmarks"])
+        compare_reports(modes["baseline"], modes["hashmarks"])
         for _task_id, modes in sorted(by_task.items())
         if set(modes) == {"baseline", "hashmarks"}
     ]
@@ -108,43 +161,42 @@ def _comparisons(
 
 
 def _opportunities(
-    reports: list[dict[str, Any]],
-) -> tuple[list[dict[str, Any]], dict[str, int], list[dict[str, Any]]]:
+    reports: list[RegretReport],
+) -> tuple[list[RegretReport], dict[str, int], list[OpportunityTotal]]:
     complete = [
         report for report in reports if report["summary"]["required_evidence_complete"]
     ]
-    opportunity_fields = {
+    opportunity_fields: dict[str, OpportunityMetric] = {
         "late_all_required_evidence": "tokens_before_all_required_evidence",
         "repeated_queries": "duplicate_query_estimated_tokens",
         "repeated_reads": "duplicate_read_estimated_tokens",
         "irrelevant_reads": "irrelevant_read_estimated_tokens",
     }
     totals = {
-        name: sum(int(report["summary"].get(field) or 0) for report in complete)
+        name: sum(report["summary"][field] or 0 for report in complete)
         for name, field in opportunity_fields.items()
     }
-    ranked = [
+    ranked: list[OpportunityTotal] = [
         {"kind": name, "observed_estimated_tokens": value}
         for name, value in sorted(totals.items(), key=lambda item: (-item[1], item[0]))
     ]
     return complete, totals, ranked
 
 
-def analyze(manifest_path: Path) -> dict[str, Any]:
-    regret = _load_regret_module()
+def analyze(manifest_path: Path) -> RegretSuiteReport:
     manifest = load_manifest(manifest_path)
     base = manifest_path.parent.resolve()
-    reports: list[dict[str, Any]] = []
+    reports: list[RegretReport] = []
     seen: set[tuple[str, str]] = set()
     for index, entry in enumerate(manifest["entries"]):
-        report = _entry_report(regret, base, entry, index, manifest_path)
+        report = _entry_report(base, entry, index, manifest_path)
         key = (str(report["task_id"]), str(report["mode"]))
         if key in seen:
             raise ValueError(f"duplicate task/mode in regret suite: {key[0]}:{key[1]}")
         seen.add(key)
         reports.append(report)
 
-    by_task, comparisons = _comparisons(regret, reports)
+    by_task, comparisons = _comparisons(reports)
     complete, totals, ranked = _opportunities(reports)
     return {
         "schema": REPORT_SCHEMA,

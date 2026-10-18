@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from contract_assertions import assert_present
+
 from hashmarks.codemap import CodeMap
 
 
@@ -38,13 +40,13 @@ def test_explicit_config_surface_beats_same_stem_contract_source(
     _write(tmp_path / "src/case/policy.toml", "suffix = '-old'\n")
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        action = codemap.task_action_map(
+        codemap.index.sync()
+        action = codemap.tasks.action_map(
             "Change flare001 policy.toml from x-old to x-new"
         )
 
-    assert action["edit"]["path"] == "src/case/policy.toml"
-    assert action["verify"]["path"] == "tests/case/test_behavior.py"
+    assert assert_present(action["edit"])["path"] == "src/case/policy.toml"
+    assert assert_present(action["verify"])["path"] == "tests/case/test_behavior.py"
 
 
 def test_multiple_concrete_configs_use_unique_task_specificity(tmp_path: Path) -> None:
@@ -53,12 +55,12 @@ def test_multiple_concrete_configs_use_unique_task_specificity(tmp_path: Path) -
     _write(tmp_path / "src/case/policy.yaml", "suffix: '-old'\n")
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        toml = codemap.task_action_map("Change flare001 policy.toml to x-new")
-        yaml = codemap.task_action_map("Change flare001 policy.yaml to x-new")
+        codemap.index.sync()
+        toml = codemap.tasks.action_map("Change flare001 policy.toml to x-new")
+        yaml = codemap.tasks.action_map("Change flare001 policy.yaml to x-new")
 
-    assert toml["edit"]["path"] == "src/case/policy.toml"
-    assert yaml["edit"]["path"] == "src/case/policy.yaml"
+    assert assert_present(toml["edit"])["path"] == "src/case/policy.toml"
+    assert assert_present(yaml["edit"])["path"] == "src/case/policy.yaml"
 
 
 def test_multiple_concrete_configs_do_not_invent_generic_winner(tmp_path: Path) -> None:
@@ -67,9 +69,9 @@ def test_multiple_concrete_configs_do_not_invent_generic_winner(tmp_path: Path) 
     _write(tmp_path / "src/case/policy.yaml", "suffix: '-old'\n")
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        generic = codemap.task_action_map(
+        codemap.index.sync()
+        generic = codemap.tasks.action_map(
             "Repair flare001 accepted response contract to x-new"
         )
 
-    assert generic["edit"]["path"] == "src/case/policy.py"
+    assert assert_present(generic["edit"])["path"] == "src/case/policy.py"

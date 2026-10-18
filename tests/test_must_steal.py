@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Never
 
 import pytest
 
 from hashmarks.cas import CAS
+from hashmarks.digest import Digest
 from hashmarks.directory_store import DirectoryDigestStore
 from hashmarks.engine import IdentityEngine
 from hashmarks.file_store import FileDigestStore
@@ -13,7 +15,9 @@ from hashmarks.merkle import MerkleTree, UnstableObservationError
 from hashmarks.observation import ChangeTracker, ObservationState
 
 
-def test_input_manifest_resolves_once_and_matches_selected_digest(tmp_path: Path):
+def test_input_manifest_resolves_once_and_matches_selected_digest(
+    tmp_path: Path,
+) -> None:
     workspace = tmp_path / "repo"
     (workspace / "src").mkdir(parents=True)
     (workspace / "src" / "a.py").write_text("a")
@@ -26,7 +30,7 @@ def test_input_manifest_resolves_once_and_matches_selected_digest(tmp_path: Path
     assert tree.digest_manifest(manifest) == tree.digest_selected(manifest.paths)
 
 
-def test_dirty_tracker_invalidates_without_direct_tree_call(tmp_path: Path):
+def test_dirty_tracker_invalidates_without_direct_tree_call(tmp_path: Path) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     target = workspace / "a.txt"
@@ -45,7 +49,9 @@ def test_dirty_tracker_invalidates_without_direct_tree_call(tmp_path: Path):
     assert tracker.snapshot().state is ObservationState.CLEAN
 
 
-def test_unknown_tracker_forces_safe_reconciliation_without_path_list(tmp_path: Path):
+def test_unknown_tracker_forces_safe_reconciliation_without_path_list(
+    tmp_path: Path,
+) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     target = workspace / "a.txt"
@@ -63,7 +69,7 @@ def test_unknown_tracker_forces_safe_reconciliation_without_path_list(tmp_path: 
     assert tracker.snapshot().state is ObservationState.CLEAN
 
 
-def test_reconciliation_generation_cannot_erase_newer_event():
+def test_reconciliation_generation_cannot_erase_newer_event() -> None:
     tracker = ChangeTracker()
     assert tracker.mark_reconciled()
     before = tracker.snapshot()
@@ -94,7 +100,7 @@ def test_merkle_reconciliation_marks_unknown_after_operation_failure(
 
 
 def test_merkle_reconciliation_fails_closed_when_generation_never_stabilizes(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     tracker = ChangeTracker()
     store = FileDigestStore(tmp_path / "files.sqlite3")
@@ -134,8 +140,8 @@ def test_merkle_directory_and_manifest_include_nested_file_and_symlink(
 
 
 def test_verify_rehashes_bytes_but_preserves_canonical_identity(
-    tmp_path: Path, monkeypatch
-):
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     (workspace / "a.txt").write_text("A")
@@ -149,7 +155,7 @@ def test_verify_rehashes_bytes_but_preserves_canonical_identity(
     real_hash_file = file_store_module.hash_file
     calls = {"count": 0}
 
-    def counting_hash_file(path):
+    def counting_hash_file(path: Path) -> Digest:
         calls["count"] += 1
         return real_hash_file(path)
 
@@ -167,7 +173,7 @@ def test_verify_rehashes_bytes_but_preserves_canonical_identity(
 
 def test_directory_nodes_are_persisted_but_not_used_as_freshness_authority(
     tmp_path: Path,
-):
+) -> None:
     workspace = tmp_path / "repo"
     (workspace / "src").mkdir(parents=True)
     (workspace / "src" / "a.py").write_text("a")
@@ -185,7 +191,9 @@ def test_directory_nodes_are_persisted_but_not_used_as_freshness_authority(
     assert fresh.directory_digest("") != root
 
 
-def test_warm_scan_reuses_file_bytes_after_hot_cache_drop(tmp_path: Path, monkeypatch):
+def test_warm_scan_reuses_file_bytes_after_hot_cache_drop(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     for i in range(25):
@@ -197,14 +205,16 @@ def test_warm_scan_reuses_file_bytes_after_hot_cache_drop(tmp_path: Path, monkey
 
     import hashmarks.file_store as file_store_module
 
-    def should_not_hash(_path):
+    def should_not_hash(_path: Path) -> Never:
         raise AssertionError("unchanged file bytes were reread")
 
     monkeypatch.setattr(file_store_module, "hash_file", should_not_hash)
     assert tree.directory_digest("") == first
 
 
-def test_identity_engine_owns_state_and_keeps_it_out_of_identity(tmp_path: Path):
+def test_identity_engine_owns_state_and_keeps_it_out_of_identity(
+    tmp_path: Path,
+) -> None:
     workspace = tmp_path / "repo"
     (workspace / "src").mkdir(parents=True)
     (workspace / "src" / "a.py").write_text("A")
@@ -226,7 +236,9 @@ def test_identity_engine_owns_state_and_keeps_it_out_of_identity(tmp_path: Path)
     engine.close()
 
 
-def test_file_hash_retries_if_file_changes_during_read(tmp_path: Path, monkeypatch):
+def test_file_hash_retries_if_file_changes_during_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     target = workspace / "a.txt"
@@ -238,7 +250,7 @@ def test_file_hash_retries_if_file_changes_during_read(tmp_path: Path, monkeypat
     real_hash_file = file_store_module.hash_file
     calls = {"count": 0}
 
-    def mutating_hash_file(path):
+    def mutating_hash_file(path: Path) -> Digest:
         digest = real_hash_file(path)
         if calls["count"] == 0:
             Path(path).write_text("B")
@@ -258,8 +270,8 @@ def test_file_hash_retries_if_file_changes_during_read(tmp_path: Path, monkeypat
 
 
 def test_observation_change_during_reconciliation_is_retried(
-    tmp_path: Path, monkeypatch
-):
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     (workspace / "a.txt").write_text("A")
@@ -271,7 +283,7 @@ def test_observation_change_during_reconciliation_is_retried(
     original = tree._directory_digest
     calls = {"count": 0}
 
-    def changing_once(rel, *, verify):
+    def changing_once(rel: str, *, verify: bool) -> Digest:
         result = original(rel, verify=verify)
         if calls["count"] == 0:
             tracker.mark_dirty(["a.txt"])
@@ -285,7 +297,7 @@ def test_observation_change_during_reconciliation_is_retried(
     assert tracker.snapshot().state is ObservationState.CLEAN
 
 
-def test_cas_streaming_file_put_and_materialize(tmp_path: Path):
+def test_cas_streaming_file_put_and_materialize(tmp_path: Path) -> None:
     source = tmp_path / "large.bin"
     source.write_bytes((b"abcdef" * 10000) + b"tail")
     cas = CAS(tmp_path / "cas")
@@ -298,7 +310,7 @@ def test_cas_streaming_file_put_and_materialize(tmp_path: Path):
     assert cas.get_bytes(digest) == source.read_bytes()
 
 
-def test_manifest_collapses_descendants_of_selected_directory(tmp_path: Path):
+def test_manifest_collapses_descendants_of_selected_directory(tmp_path: Path) -> None:
     workspace = tmp_path / "repo"
     (workspace / "src").mkdir(parents=True)
     (workspace / "src" / "a.py").write_text("a")
@@ -306,7 +318,7 @@ def test_manifest_collapses_descendants_of_selected_directory(tmp_path: Path):
     assert manifest.paths == ("src",)
 
 
-def test_engine_relative_state_dir_is_workspace_relative(tmp_path: Path):
+def test_engine_relative_state_dir_is_workspace_relative(tmp_path: Path) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     engine = IdentityEngine(workspace, state_dir="state/cache")
@@ -314,7 +326,7 @@ def test_engine_relative_state_dir_is_workspace_relative(tmp_path: Path):
     engine.close()
 
 
-def test_watcher_stop_marks_observation_unknown(tmp_path: Path):
+def test_watcher_stop_marks_observation_unknown(tmp_path: Path) -> None:
     from hashmarks.watcher import WatchdogBatchWatcher
 
     tracker = ChangeTracker()
@@ -327,8 +339,8 @@ def test_watcher_stop_marks_observation_unknown(tmp_path: Path):
 
 
 def test_selected_file_manifest_uses_one_batched_store_lookup(
-    tmp_path: Path, monkeypatch
-):
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     paths = []
@@ -342,7 +354,9 @@ def test_selected_file_manifest_uses_one_batched_store_lookup(
     calls = {"count": 0}
     original = store._rows_many
 
-    def counting_rows_many(workspace_key, relpaths):
+    def counting_rows_many(
+        workspace_key: str, relpaths: list[str]
+    ) -> dict[str, tuple[int, int, int, int, int, int, str]]:
         calls["count"] += 1
         return original(workspace_key, relpaths)
 

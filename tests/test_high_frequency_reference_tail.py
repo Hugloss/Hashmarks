@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from hashmarks.codemap import CodeMap
 
 
@@ -24,21 +26,25 @@ def test_qualified_reference_beyond_global_short_name_prefix_remains_direct(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         global_prefix = codemap.store.refs_many(["f"], limit_per_target=1024)["f"]
         assert not any(row["path"] == "tests/test_target.py" for row in global_prefix)
-        relevance = codemap.verification_relevance(
+        relevance = codemap.tasks.verification_relevance(
             "src/target.py", limit=20, candidate_limit=8
         )
 
+    assert relevance["selected"] is not None
     assert relevance["selected"]["path"] == "tests/test_target.py"
+    assert "direct_reference" in relevance["selected"]
     assert relevance["selected"]["direct_reference"] is True
+    assert "reference_strength" in relevance["selected"]
     assert relevance["selected"]["reference_strength"] == "reachable-symbol-use"
+    assert "reference_symbols" in relevance["selected"]
     assert relevance["selected"]["reference_symbols"] == ["f"]
 
 
 def test_targeted_tail_uses_full_module_identity_when_leaf_names_collide(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     for package in ("pkg_a", "pkg_b"):
         directory = tmp_path / package
@@ -57,22 +63,26 @@ def test_targeted_tail_uses_full_module_identity_when_leaf_names_collide(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         observed: list[str] = []
         original = codemap.store.refs_matching_target_suffix
 
-        def recorded(short: str, suffix: str, *, limit: int = 1024):
+        def recorded(
+            short: str, suffix: str, *, limit: int = 1024
+        ) -> list[dict[str, object]]:
             observed.append(suffix)
             return original(short, suffix, limit=limit)
 
         monkeypatch.setattr(codemap.store, "refs_matching_target_suffix", recorded)
-        relevance = codemap.verification_relevance(
+        relevance = codemap.tasks.verification_relevance(
             "change pkg_b/target.py run behavior", limit=20, candidate_limit=8
         )
 
     assert "pkg_b.target.run" in observed
     assert "target.run" not in observed
+    assert relevance["selected"] is not None
     assert relevance["selected"]["path"] == "tests/test_target.py"
+    assert "direct_reference" in relevance["selected"]
     assert relevance["selected"]["direct_reference"] is True
 
 
@@ -95,11 +105,14 @@ def test_literal_repository_path_is_not_replaced_by_structural_neighbor(
     )
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        action = codemap.task_action_map("change pkg/target.py run behavior", limit=20)
+        codemap.index.sync()
+        action = codemap.tasks.action_map("change pkg/target.py run behavior", limit=20)
 
+    assert action["edit"] is not None
     assert action["edit"]["path"] == "pkg/target.py"
+    assert action["verification_relevance"]["selected"] is not None
     assert (
         action["verification_relevance"]["selected"]["path"] == "tests/test_target.py"
     )
+    assert "direct_reference" in action["verification_relevance"]["selected"]
     assert action["verification_relevance"]["selected"]["direct_reference"] is True

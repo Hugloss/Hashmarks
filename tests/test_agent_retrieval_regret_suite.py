@@ -6,16 +6,10 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from scripts.agent_evaluation import metrics_agent_regret_suite as regret_suite
+
 if TYPE_CHECKING:
     from pathlib import Path
-
-_MODULE = __import__(
-    "scripts.agent_evaluation.metrics_agent_regret_suite", fromlist=["*"]
-)
-
-
-def _load():
-    return _MODULE
 
 
 def _sha(path: Path) -> str:
@@ -68,7 +62,6 @@ def _entry(root: Path, trace: Path, evidence: Path) -> dict:
 
 
 def test_suite_ranks_observed_opportunities_and_pairs_modes(tmp_path: Path) -> None:
-    module = _load()
     base, evidence = _write_run(
         tmp_path,
         "t1",
@@ -107,7 +100,7 @@ def test_suite_ranks_observed_opportunities_and_pairs_modes(tmp_path: Path) -> N
             }
         )
     )
-    report = module.analyze(manifest)
+    report = regret_suite.analyze(manifest)
     assert report["summary"]["paired_tasks"] == 1
     assert report["summary"]["complete_required_evidence_runs"] == 2
     assert (
@@ -120,7 +113,6 @@ def test_suite_ranks_observed_opportunities_and_pairs_modes(tmp_path: Path) -> N
 
 
 def test_suite_binds_exact_trace_and_evidence_bytes(tmp_path: Path) -> None:
-    module = _load()
     trace, evidence = _write_run(
         tmp_path, "t1", "baseline", [{"kind": "file_read", "path": "src/target.py"}]
     )
@@ -137,11 +129,10 @@ def test_suite_binds_exact_trace_and_evidence_bytes(tmp_path: Path) -> None:
         )
     )
     with pytest.raises(ValueError, match="trace_sha256 mismatch"):
-        module.analyze(manifest)
+        regret_suite.analyze(manifest)
 
 
 def test_suite_rejects_path_escape(tmp_path: Path) -> None:
-    module = _load()
     manifest = tmp_path / "suite.json"
     manifest.write_text(
         json.dumps(
@@ -160,4 +151,4 @@ def test_suite_rejects_path_escape(tmp_path: Path) -> None:
         )
     )
     with pytest.raises(ValueError, match="inside the suite directory"):
-        module.analyze(manifest)
+        regret_suite.analyze(manifest)

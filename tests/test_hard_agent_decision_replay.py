@@ -1,10 +1,14 @@
 from pathlib import Path
 
+from contract_assertions import assert_object
+
 from scripts.agent_evaluation.generate_hard_agent_corpus import generate
 from scripts.agent_evaluation.score_hard_agent_decisions import run
 
 
-def test_replay_freezes_before_grading_and_reports_all_categories(tmp_path: Path):
+def test_replay_freezes_before_grading_and_reports_all_categories(
+    tmp_path: Path,
+) -> None:
     repo = tmp_path / "repo"
     public = tmp_path / "public.json"
     secret = tmp_path / "secret.json"
@@ -18,7 +22,9 @@ def test_replay_freezes_before_grading_and_reports_all_categories(tmp_path: Path
     assert all("expected_edit_path" not in row for row in result["results"])
 
 
-def test_task_specific_symbol_anchor_beats_sibling_contract_noise(tmp_path: Path):
+def test_task_specific_symbol_anchor_beats_sibling_contract_noise(
+    tmp_path: Path,
+) -> None:
     repo = tmp_path / "repo"
     public = tmp_path / "public.json"
     secret = tmp_path / "secret.json"
@@ -46,14 +52,14 @@ def test_task_specific_symbol_anchor_beats_sibling_contract_noise(tmp_path: Path
     from hashmarks.codemap import CodeMap
 
     with CodeMap(combined) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         task = public_payload["tasks"][1]
-        packet = codemap.task_decision_packet(task["query"], token_budget=512)
+        packet = codemap.tasks.decision_packet(task["query"], token_budget=512)
     truth = {r["id"]: r for r in secret_payload["tasks"]}[task["id"]]
-    assert packet["edit"]["path"] == truth["expected_edit_path"]
+    assert assert_object(packet["edit"])["path"] == truth["expected_edit_path"]
 
 
-def test_explicit_policy_uses_task_namespace_not_sibling_policy(tmp_path: Path):
+def test_explicit_policy_uses_task_namespace_not_sibling_policy(tmp_path: Path) -> None:
     import json
     import shutil
 
@@ -82,6 +88,8 @@ def test_explicit_policy_uses_task_namespace_not_sibling_policy(tmp_path: Path):
     from hashmarks.codemap import CodeMap
 
     with CodeMap(repo) as codemap:
-        codemap.sync()
-        packet = codemap.task_decision_packet(task["query"], token_budget=512)
-    assert packet["edit"]["path"] == truth[task["id"]]["expected_edit_path"]
+        codemap.index.sync()
+        packet = codemap.tasks.decision_packet(task["query"], token_budget=512)
+    assert (
+        assert_object(packet["edit"])["path"] == truth[task["id"]]["expected_edit_path"]
+    )

@@ -1,5 +1,8 @@
 from pathlib import Path
 
+import pytest
+from contract_assertions import assert_object
+
 from hashmarks.codemap import CodeMap
 
 
@@ -19,77 +22,77 @@ def _repo(root: Path) -> None:
 
 
 def test_unknown_freshness_converges_across_decision_surfaces(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _repo(tmp_path)
     task = "widget implementation test"
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         generation = codemap.store.generation()
 
-        def unknown_status(observation=None):
+        def unknown_status(observation: object = None) -> tuple[int, int, bool | None]:
             del observation
             return generation, generation, None
 
-        monkeypatch.setattr(codemap, "_generation_status", unknown_status)
+        monkeypatch.setattr(codemap.reads, "generation_status", unknown_status)
 
-        packet = codemap.task_decision_packet(task, token_budget=256)
-        decision = codemap.task_decision_brief(task, token_budget=256)
-        action = codemap.task_action_brief(task, token_budget=256)
+        packet = codemap.tasks.decision_packet(task, token_budget=256)
+        decision = codemap.tasks.decision_brief(task, token_budget=256)
+        action = codemap.tasks.action_brief(task, token_budget=256)
 
-    assert packet["identity"]["stale"] is True
-    assert packet["identity"]["codemap_complete"] is True
-    assert packet["evidence_receipt"]["stale"] is None
+    assert assert_object(packet["identity"])["stale"] is True
+    assert assert_object(packet["identity"])["codemap_complete"] is True
+    assert assert_object(packet["evidence_receipt"])["stale"] is None
 
     assert decision["stale"] is True
-    assert decision["evidence_receipt"]["stale"] is None
+    assert assert_object(decision["evidence_receipt"])["stale"] is None
 
     assert action["status"] == "safe-unknown"
-    assert action["evidence_receipt"]["stale"] is None
+    assert assert_object(action["evidence_receipt"])["stale"] is None
 
 
 def test_codemap_completeness_does_not_redefine_freshness(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _repo(tmp_path)
     task = "widget implementation test"
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         generation = codemap.store.generation()
 
-        def current_status(observation=None):
+        def current_status(observation: object = None) -> tuple[int, int, bool]:
             del observation
             return generation, generation, False
 
-        monkeypatch.setattr(codemap, "_generation_status", current_status)
+        monkeypatch.setattr(codemap.reads, "generation_status", current_status)
         monkeypatch.setattr(
-            codemap,
+            codemap.index,
             "_codemap_build_state",
             lambda: {"state": "BUILDING", "complete": False},
         )
 
-        packet = codemap.task_decision_packet(task, token_budget=256)
+        packet = codemap.tasks.decision_packet(task, token_budget=256)
 
-    assert packet["identity"]["stale"] is False
-    assert packet["identity"]["codemap_complete"] is False
-    assert packet["identity"]["codemap_build_state"] == "BUILDING"
+    assert assert_object(packet["identity"])["stale"] is False
+    assert assert_object(packet["identity"])["codemap_complete"] is False
+    assert assert_object(packet["identity"])["codemap_build_state"] == "BUILDING"
 
 
 def test_action_brief_status_consumes_receipt_freshness_once(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _repo(tmp_path)
     task = "widget implementation test"
 
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         generation = codemap.store.generation()
-        action = codemap.task_action_map(task)
+        action = codemap.tasks.action_map(task)
         reads = 0
 
-        def one_freshness_read(observation=None):
+        def one_freshness_read(observation: object = None) -> tuple[int, int, bool]:
             nonlocal reads
             del observation
             reads += 1
@@ -99,8 +102,8 @@ def test_action_brief_status_consumes_receipt_freshness_once(
                 )
             return generation, generation, False
 
-        monkeypatch.setattr(codemap, "_generation_status", one_freshness_read)
-        brief = codemap._task_action_brief_from_action(
+        monkeypatch.setattr(codemap.reads, "generation_status", one_freshness_read)
+        brief = codemap.tasks._task_action_brief_from_action(
             action,
             task=task,
             token_budget=256,
@@ -109,4 +112,4 @@ def test_action_brief_status_consumes_receipt_freshness_once(
 
     assert reads == 1
     assert brief["status"] == "safe-fresh"
-    assert brief["evidence_receipt"]["stale"] is False
+    assert assert_object(brief["evidence_receipt"])["stale"] is False

@@ -134,7 +134,7 @@ def _codemap_candidates(
 ) -> tuple[list[str], str | None, bool, list[dict[str, Any]], dict[str, Any]]:
     started = time.perf_counter()
     if strategy == "find-task":
-        hits = codemap.find_task(query, limit=limit)
+        hits = codemap.search.find_task(query, limit=limit)
         candidates = [hit.path for hit in hits]
         return (
             candidates,
@@ -147,10 +147,11 @@ def _codemap_candidates(
                 "candidates": candidates[:10],
             },
         )
-    entry_points = codemap.task_entry_points(query, limit=limit)
-    recommended = [
-        row for row in entry_points.get("recommended", []) if isinstance(row, dict)
-    ]
+    entry_points = codemap.tasks.entry_points(query, limit=limit)
+    raw_recommended = entry_points.get("recommended", [])
+    if not isinstance(raw_recommended, list):
+        raise ValueError("recommended entries must be a list")
+    recommended = [row for row in raw_recommended if isinstance(row, dict)]
     candidates = [str(row.get("path") or "") for row in recommended]
     ambiguity = entry_points.get("ambiguity")
     ambiguity = ambiguity if isinstance(ambiguity, dict) else {}
@@ -175,7 +176,7 @@ def _codemap_observation(
 ) -> WorkerObservation:
     with CodeMap(repo) as codemap:
         started = time.perf_counter()
-        codemap.sync()
+        codemap.index.sync()
         cold_ms = (time.perf_counter() - started) * 1000
         candidates, first, ambiguity, alternatives, search_event = _codemap_candidates(
             codemap, query, strategy, limit=limit
@@ -193,7 +194,9 @@ def _codemap_observation(
             if resolution.get("resolved"):
                 first = str(resolution.get("target") or first)
         started = time.perf_counter()
-        verification_hits = codemap.find_task(query + " test verification", limit=limit)
+        verification_hits = codemap.search.find_task(
+            query + " test verification", limit=limit
+        )
         verification_ms = (time.perf_counter() - started) * 1000
     observation = WorkerObservation(
         candidates=candidates,
@@ -399,7 +402,7 @@ def run(config: SwarmRunConfig) -> dict[str, Any]:
     return result
 
 
-def main():
+def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--repo", type=Path, required=True)
     p.add_argument("--public", type=Path, required=True)

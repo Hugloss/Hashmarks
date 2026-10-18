@@ -3,8 +3,11 @@ import threading
 import time
 from pathlib import Path
 
+import pytest
+
 from hashmarks import cli
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.repository_observation import packet_digest
 from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
 
 
@@ -25,11 +28,12 @@ def test_task_post_change_delta_invalidates_only_changed_revision_and_reuses_aut
 ) -> None:
     source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        previous = codemap.task_evidence(task)
+        codemap.index.sync()
+        previous = codemap.tasks.evidence(task)
+        assert "revision" in previous["provenance"]
         old_revision = previous["provenance"]["revision"]
         source.write_text("def widget(): return 'new'\n", encoding="utf-8")
-        delta = codemap.task_post_change_delta(
+        delta = codemap.changes.task_delta(
             task, ["src/owner.py"], previous_evidence=previous
         )
 
@@ -39,6 +43,7 @@ def test_task_post_change_delta_invalidates_only_changed_revision_and_reuses_aut
     assert delta["consumer_owner"] == "external"
     assert "previous_index_binding" not in delta
     assert delta["path_changes"][0]["state"] == "changed"
+    assert "revision" in delta["path_changes"][0]
     assert delta["path_changes"][0]["revision"] != old_revision
     assert delta["generation_after"] > delta["generation_before"]
     assert delta["invalidated"] == [
@@ -51,6 +56,7 @@ def test_task_post_change_delta_invalidates_only_changed_revision_and_reuses_aut
         "verification-plan",
         "selection-provenance",
     }
+    assert "revision" in delta["path_changes"][0]
     assert delta["path_changes"][0]["revision"] != old_revision
     assert "replacement" not in delta
     encoded = json.dumps(delta, sort_keys=True)
@@ -63,10 +69,10 @@ def test_task_post_change_delta_noop_keeps_generation_and_revision_reusable(
 ) -> None:
     source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        previous = codemap.task_evidence(task)
+        codemap.index.sync()
+        previous = codemap.tasks.evidence(task)
         source.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
-        delta = codemap.task_post_change_delta(
+        delta = codemap.changes.task_delta(
             task, ["src/owner.py"], previous_evidence=previous
         )
 
@@ -77,18 +83,15 @@ def test_task_post_change_delta_noop_keeps_generation_and_revision_reusable(
     assert "candidate-source-revision" in delta["reused"]
 
 
-def test_task_post_change_delta_verifies_historical_v4_packet_identity(
+def test_task_post_change_delta_rejects_historical_v4_packet_before_sync(
     tmp_path: Path,
 ) -> None:
     source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        previous = codemap.task_evidence(task)
+        codemap.index.sync()
+        previous = codemap.tasks.evidence(task)
         previous["schema"] = "hashmarks.task-evidence.v4"
-        bounds = previous["retrieval"]["bounds"]
-        for key in ("canonical_completeness", "canonical_truncation", "bound_reasons"):
-            bounds.pop(key)
-        previous["evidence_packet_identity"] = "sha256:" + codemap._packet_digest(
+        previous["evidence_packet_identity"] = "sha256:" + packet_digest(
             previous["schema"],
             {
                 key: value
@@ -97,11 +100,12 @@ def test_task_post_change_delta_verifies_historical_v4_packet_identity(
             },
         )
         source.write_text("def widget(): return 'new'\n", encoding="utf-8")
-        delta = codemap.task_post_change_delta(
-            task, ["src/owner.py"], previous_evidence=previous
-        )
-
-    assert delta["change"] == "changed"
+        generation = codemap.store.generation()
+        with pytest.raises(ValueError, match="hashmarks.task-evidence.v5 packet"):
+            codemap.changes.task_delta(
+                task, ["src/owner.py"], previous_evidence=previous
+            )
+        assert codemap.store.generation() == generation
 
 
 def test_task_post_change_delta_reports_new_owner_without_replaying_unchanged_verification(
@@ -126,18 +130,25 @@ def test_task_post_change_delta_reports_new_owner_without_replaying_unchanged_ve
     )
     task = "change route widget behavior and verify route test"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        previous = codemap.task_evidence(task)
+        codemap.index.sync()
+        previous = codemap.tasks.evidence(task)
+        assert previous["ownership"]["candidate"] is not None
         assert previous["ownership"]["candidate"]["path"] == "src/engine_a.py"
         route.write_text(
             "from src.engine_b import widget\ndef route(): return widget()\n",
             encoding="utf-8",
         )
-        delta = codemap.task_post_change_delta(
+        delta = codemap.changes.task_delta(
             task, ["src/route.py"], previous_evidence=previous
         )
 
-    assert delta["replacement"]["ownership"]["candidate"]["path"] == "src/engine_b.py"
+    assert "replacement" in delta
+    assert "ownership" in delta["replacement"]
+    ownership = delta["replacement"]["ownership"]
+    assert isinstance(ownership, dict)
+    candidate = ownership["candidate"]
+    assert isinstance(candidate, dict)
+    assert candidate["path"] == "src/engine_b.py"
     assert "task-candidate" in delta["invalidated"]
     assert "verification-surface" in delta["reused"]
     assert "verification-plan" in delta["reused"]
@@ -147,9 +158,9 @@ def test_task_post_change_delta_reports_new_owner_without_replaying_unchanged_ve
 def test_task_post_change_delta_rejects_non_start_packet(tmp_path: Path) -> None:
     _source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         try:
-            codemap.task_post_change_delta(
+            codemap.changes.task_delta(
                 task, ["src/owner.py"], previous_evidence={"schema": "wrong"}
             )
         except ValueError as exc:
@@ -159,14 +170,14 @@ def test_task_post_change_delta_rejects_non_start_packet(tmp_path: Path) -> None
 
 
 def test_post_change_cli_reads_exact_previous_evidence_packet(
-    tmp_path: Path, capsys
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     source, task = _repo(tmp_path)
     previous_path = tmp_path / "previous-evidence.json"
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
+        codemap.index.sync()
         previous_path.write_text(
-            json.dumps(codemap.task_evidence(task)), encoding="utf-8"
+            json.dumps(codemap.tasks.evidence(task)), encoding="utf-8"
         )
     source.write_text("def widget(): return 'new'\n", encoding="utf-8")
 
@@ -269,12 +280,12 @@ def test_task_post_change_delta_rejects_foreign_repository_previous_evidence(
     source_a, task = _repo(repo_a)
     _source_b, _ = _repo(repo_b)
     with CodeMap(repo_a) as codemap_a:
-        codemap_a.sync()
-        previous = codemap_a.task_evidence(task)
+        codemap_a.index.sync()
+        previous = codemap_a.tasks.evidence(task)
     with CodeMap(repo_b) as codemap_b:
-        codemap_b.sync()
+        codemap_b.index.sync()
         try:
-            codemap_b.task_post_change_delta(
+            codemap_b.changes.task_delta(
                 task, ["src/owner.py"], previous_evidence=previous
             )
         except ValueError as exc:
@@ -288,10 +299,10 @@ def test_task_post_change_delta_rejects_previous_evidence_for_other_task(
 ) -> None:
     _source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        previous = codemap.task_evidence(task)
+        codemap.index.sync()
+        previous = codemap.tasks.evidence(task)
         try:
-            codemap.task_post_change_delta(
+            codemap.changes.task_delta(
                 "different task", ["src/owner.py"], previous_evidence=previous
             )
         except ValueError as exc:
@@ -305,12 +316,12 @@ def test_task_post_change_delta_rejects_tampered_context_identity(
 ) -> None:
     _source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        previous = codemap.task_evidence(task)
-        previous["provenance"] = dict(previous["provenance"])
+        codemap.index.sync()
+        previous = codemap.tasks.evidence(task)
+        previous["provenance"] = previous["provenance"].copy()
         previous["provenance"]["context_identity"] = "sha256:" + "0" * 64
         try:
-            codemap.task_post_change_delta(
+            codemap.changes.task_delta(
                 task, ["src/owner.py"], previous_evidence=previous
             )
         except ValueError as exc:
@@ -324,12 +335,13 @@ def test_task_post_change_delta_rejects_tampered_retained_ownership(
 ) -> None:
     _source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        previous = codemap.task_evidence(task)
+        codemap.index.sync()
+        previous = codemap.tasks.evidence(task)
+        assert previous["ownership"]["candidate"] is not None
         previous["ownership"]["candidate"]["path"] = "tests/test_owner.py"
 
         try:
-            codemap.task_post_change_delta(
+            codemap.changes.task_delta(
                 task, ["src/owner.py"], previous_evidence=previous
             )
         except ValueError as exc:
@@ -343,12 +355,15 @@ def test_task_post_change_delta_rejects_tampered_retained_verification(
 ) -> None:
     _source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        previous = codemap.task_evidence(task)
-        previous["verification"]["plan"]["argv"] = ["pytest", "forged-target"]
+        codemap.index.sync()
+        previous = codemap.tasks.evidence(task)
+        verification_plan = previous["verification"]["plan"]
+        assert verification_plan["available"]
+        assert "argv" in verification_plan
+        verification_plan["argv"] = ["pytest", "forged-target"]
 
         try:
-            codemap.task_post_change_delta(
+            codemap.changes.task_delta(
                 task, ["src/owner.py"], previous_evidence=previous
             )
         except ValueError as exc:
@@ -362,12 +377,12 @@ def test_task_post_change_delta_rejects_previous_generation_before_reuse(
 ) -> None:
     source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        previous = codemap.task_evidence(task)
+        codemap.index.sync()
+        previous = codemap.tasks.evidence(task)
         source.write_text("def widget(): return 'new'\n", encoding="utf-8")
-        codemap.sync(["src/owner.py"])
+        codemap.index.sync(["src/owner.py"])
         try:
-            codemap.task_post_change_delta(
+            codemap.changes.task_delta(
                 task, ["src/owner.py"], previous_evidence=previous
             )
         except ValueError as exc:
@@ -381,11 +396,11 @@ def test_task_post_change_delta_rejects_unbound_previous_evidence(
 ) -> None:
     _source, task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        previous = codemap.task_evidence(task)
+        codemap.index.sync()
+        previous = dict(codemap.tasks.evidence(task))
         previous.pop("provenance")
         try:
-            codemap.task_post_change_delta(
+            codemap.changes.task_delta(
                 task, ["src/owner.py"], previous_evidence=previous
             )
         except ValueError as exc:

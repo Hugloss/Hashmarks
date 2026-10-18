@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
+from contract_assertions import assert_object, assert_records, assert_text
+
 from hashmarks.codemap import (
+    RepositoryDeclarationProvider,
     RepositoryDeclarationProviderContext,
     RepositoryDeclarationProviderResult,
 )
@@ -139,11 +143,14 @@ class _CorrelationProvider:
         )
 
 
-def _groups(packet: dict[str, object]) -> dict[str, dict[str, object]]:
-    return {row["group_id"]: row for row in packet["declarations"]["groups"]}
+def _groups(packet: Mapping[str, object]) -> dict[str, dict[str, object]]:
+    return {
+        assert_text(row["group_id"]): row
+        for row in assert_records(assert_object(packet["declarations"])["groups"])
+    }
 
 
-def _source_providers() -> list[object]:
+def _source_providers() -> list[RepositoryDeclarationProvider]:
     return [
         _SourceProvider("provider-a", "owner-a.txt"),
         _SourceProvider("provider-b", "owner-b.txt"),
@@ -156,11 +163,11 @@ def _initial_correspondence_packet(
 ) -> dict[str, object]:
     providers = [*_source_providers(), _CorrelationProvider()]
     with CodeMap(repo, state_dir=state_dir) as codemap:
-        codemap.sync()
-        packet = codemap.discover_repository_declarations(providers)
+        codemap.index.sync()
+        packet = codemap.declarations.discover(providers)
 
     assert packet["storage"] == "derived-not-persisted"
-    assert packet["declarations"]["storage"] == "derived-not-persisted"
+    assert assert_object(packet["declarations"])["storage"] == "derived-not-persisted"
     assert set(_groups(packet)) == {
         "provider-a-owner",
         "provider-b-owner",
@@ -176,23 +183,23 @@ def _assert_reopen_removes_only_explicit_correspondence(
     previous: dict[str, object],
 ) -> dict[str, object]:
     with CodeMap(repo, state_dir=state_dir) as codemap:
-        current = codemap.discover_repository_declarations(
+        current = codemap.declarations.discover(
             _source_providers(),
             previous_observation=previous,
         )
 
     assert set(_groups(current)) == {"provider-a-owner", "provider-b-owner"}
     assert current["storage"] == "derived-not-persisted"
-    assert current["delta_from_previous"]["providers"] == {
+    assert assert_object(current["delta_from_previous"])["providers"] == {
         "added": [],
         "removed": ["correlation-ab"],
         "changed": [],
     }
-    delta = current["delta_from_previous"]["declarations"]
+    delta = assert_object(assert_object(current["delta_from_previous"])["declarations"])
     assert delta["removed_group_ids"] == ["correspondence-ab"]
     assert delta["added_group_ids"] == []
     assert delta["changed_groups"] == []
-    assert delta["semantic_subjects"]["removed"] == [
+    assert assert_object(delta["semantic_subjects"])["removed"] == [
         _groups(previous)["correspondence-ab"]["semantic_subject_identity"]
     ]
     return current
@@ -203,7 +210,7 @@ def _assert_reopen_has_no_hidden_correspondence(
     state_dir: Path,
 ) -> dict[str, object]:
     with CodeMap(repo, state_dir=state_dir) as codemap:
-        current = codemap.discover_repository_declarations(_source_providers())
+        current = codemap.declarations.discover(_source_providers())
 
     assert set(_groups(current)) == {"provider-a-owner", "provider-b-owner"}
     assert "correspondence-ab" not in _groups(current)
@@ -218,25 +225,27 @@ def _assert_old_packet_replay_is_one_call_only(
     expected_current: dict[str, object],
 ) -> None:
     with CodeMap(repo, state_dir=state_dir) as codemap:
-        replayed = codemap.discover_repository_declarations(
+        replayed = codemap.declarations.discover(
             _source_providers(),
             previous_observation=old_correspondence,
         )
-        fresh = codemap.discover_repository_declarations(_source_providers())
+        fresh = codemap.declarations.discover(_source_providers())
 
     assert set(_groups(replayed)) == {"provider-a-owner", "provider-b-owner"}
-    assert replayed["delta_from_previous"]["providers"]["removed"] == ["correlation-ab"]
+    assert assert_object(assert_object(replayed["delta_from_previous"])["providers"])[
+        "removed"
+    ] == ["correlation-ab"]
     assert (
-        replayed["declarations"]["observation_identity"]
-        == expected_current["declarations"]["observation_identity"]
+        assert_object(replayed["declarations"])["observation_identity"]
+        == assert_object(expected_current["declarations"])["observation_identity"]
     )
 
     assert set(_groups(fresh)) == {"provider-a-owner", "provider-b-owner"}
     assert "delta_from_previous" not in fresh
     assert fresh["observation_identity"] == expected_current["observation_identity"]
     assert (
-        fresh["declarations"]["observation_identity"]
-        == expected_current["declarations"]["observation_identity"]
+        assert_object(fresh["declarations"])["observation_identity"]
+        == assert_object(expected_current["declarations"])["observation_identity"]
     )
 
 

@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from contract_assertions import assert_object
+
 from hashmarks.codemap import CodeMap
 
 
@@ -13,15 +15,16 @@ def test_action_ambiguity_explains_plausibility_and_discriminator_without_secret
         "from src.widget import widget\ndef test_widget(): assert widget() == 1\n"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        action = codemap.task_action_map("widget implementation test", limit=20)
+        codemap.index.sync()
+        action = codemap.tasks.action_map("widget implementation test", limit=20)
     ambiguity = action["ambiguity"]
     assert ambiguity["schema"] == "hashmarks.action-ambiguity.v2"
     assert ambiguity["secret_knowledge_used"] is False
     if ambiguity["ambiguous"]:
         assert len(ambiguity["candidates"]) >= 2
-        assert all(row["plausibility"] for row in ambiguity["candidates"])
-        assert all(row["discriminator"] for row in ambiguity["candidates"])
+        for row in ambiguity["candidates"]:
+            assert "plausibility" in row and row["plausibility"]
+            assert "discriminator" in row and row["discriminator"]
         assert ambiguity["discrimination_question"]
 
 
@@ -35,15 +38,18 @@ def test_decision_packet_carries_ambiguity_only_when_scout_needs_it(
         "def test_widget(): assert True\n"
     )
     with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        packet = codemap.task_decision_packet("widget implementation test", limit=20)
+        codemap.index.sync()
+        packet = codemap.tasks.decision_packet("widget implementation test", limit=20)
     if (
-        packet["discrimination"]["needed"]
-        and packet["discrimination"]["reason"] == "competing-action-roles"
+        assert_object(packet["discrimination"])["needed"]
+        and assert_object(packet["discrimination"])["reason"]
+        == "competing-action-roles"
     ):
         assert (
-            packet["discrimination"]["ambiguity"]["schema"]
+            assert_object(assert_object(packet["discrimination"])["ambiguity"])[
+                "schema"
+            ]
             == "hashmarks.action-ambiguity.v2"
         )
     else:
-        assert packet["discrimination"]["ambiguity"] is None
+        assert assert_object(packet["discrimination"])["ambiguity"] is None

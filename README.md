@@ -304,17 +304,17 @@ from hashmarks import CodeMap
 workspace = Path(".").resolve()
 
 with CodeMap(workspace) as codemap:
-    codemap.sync()
+    codemap.index.sync()
 
-    print(codemap.orient())
+    print(codemap.context.orient())
 
-    for hit in codemap.find_task(
+    for hit in codemap.search.find_task(
         "where is repository freshness decided?",
         limit=5,
     ):
         print(hit.path, hit.score)
 
-    print(codemap.affected("hashmarks/codemap/engine.py"))
+    print(codemap.relationships.affected("hashmarks/codemap/engine.py"))
 ```
 
 ### Repository evidence bindings
@@ -323,8 +323,8 @@ with CodeMap(workspace) as codemap:
 from hashmarks import CodeMap
 
 with CodeMap(".") as codemap:
-    codemap.sync()
-    before = codemap.repository_evidence_bindings(
+    codemap.index.sync()
+    before = codemap.bindings.observe(
         [
             {
                 "binding_id": "consumer:contract-a",
@@ -342,9 +342,9 @@ Bindings are read-only repository intelligence: the ID is opaque, exact line/mem
 
 ### Cross-artifact repository declarations
 
-`CodeMap.repository_declarations(...)` binds provider-normalized declaration claims to exact current repository evidence and reports equivalence, difference, ambiguity, and coverage-qualified absence. Semantic extraction/correspondence remain provider claims; Hashmarks does not choose a winning declaration. See [Repository declarations](docs/reference/REPOSITORY_DECLARATIONS.md).
+`CodeMap.declarations.observe(...)` binds provider-normalized declaration claims to exact current repository evidence and reports equivalence, difference, ambiguity, and coverage-qualified absence. Semantic extraction/correspondence remain provider claims; Hashmarks does not choose a winning declaration. See [Repository declarations](docs/reference/REPOSITORY_DECLARATIONS.md).
 
-For in-process integrations, `RepositoryDeclarationProvider` plus `RepositoryDeclarationProviderContext` and `CodeMap.discover_repository_declarations(...)` provides an explicit, revision-bound provider-discovery seam. The context exposes bounded admitted `paths(prefix)`, `exists`, and revision-bound `read_*` operations rather than a raw workspace filesystem handle. Providers are caller-selected and producer-specific; Hashmarks does not auto-load plugins or run arbitrary providers inside MCP. The existing MCP `repository_declarations` tool accepts already normalized groups.
+For in-process integrations, `RepositoryDeclarationProvider` plus `RepositoryDeclarationProviderContext` and `CodeMap.declarations.discover(...)` provides an explicit, revision-bound provider-discovery seam. The context exposes bounded admitted `paths(prefix)`, `exists`, and revision-bound `read_*` operations rather than a raw workspace filesystem handle. Providers are caller-selected and producer-specific; Hashmarks does not auto-load plugins or run arbitrary providers inside MCP. The existing MCP `repository_declarations` tool accepts already normalized groups.
 
 ### Canonical repository identity with `RepositoryIdentity`
 
@@ -464,6 +464,12 @@ uv sync --frozen --extra mcp --group test
 ```
 
 Use that direct command when repairing or materializing the project environment without Make. The same MCP-capable `.venv` is required when this checkout is used as the Hashmarks subject by an external benchmark harness.
+
+The test environment includes the optional native syntax parser. Installed-package
+users can enable the same declaration ranges with `pip install 'hashmarks[syntax]'`.
+This uses bundled grammars and keeps repository parsing local. Without this extra,
+JavaScript/TypeScript outlines retain their advisory header ranges; native scope
+and full declaration ranges are unavailable.
 
 External benchmark execution is owned by the sibling agentsCookbook checkout. Configure its explicit `.env` so `HASHMARKS_BENCH_SOURCE` names this clean committed Hashmarks checkout, then use `make benchmark-check`, `make benchmark`, or `make benchmark-report` here as thin aliases. Hashmarks does not mirror agentsCookbook suite, agent, campaign, run/resume, interpreter, or reporting defaults.
 

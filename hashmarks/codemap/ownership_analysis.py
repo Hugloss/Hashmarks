@@ -1,26 +1,41 @@
 from __future__ import annotations
 
 import ast
-from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, cast
 
 from hashmarks.operation_contract import operation_response, operation_schema
 from hashmarks.paths import normalize_relative_path
 from hashmarks.python_ast_cache import read_python_ast
 
-from .decision_session import decision_scoped
+from .decision_session import ReadScopeOwner, decision_scoped
 from .ownership.cache_invalidation import CacheInvalidationAnalyzer
 from .ownership.cache_ownership import CacheOwnershipAnalyzer
 from .ownership.concurrency_risk import ConcurrencyRiskAnalyzer
+from .ownership.filesystem_lifecycle import (
+    FilesystemLifecycleAnalyzer,
+    lifecycle_findings,
+)
 from .ownership.import_ownership import ImportOwnershipAnalyzer
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from .engine import CodeMap
+    from .ownership.results import (
+        CacheInvalidationResult,
+        CacheOwnershipResult,
+        ConcurrencyRiskResult,
+        ImportOwnershipResult,
+    )
+    from .ownership_graph import RepositoryOwnership
 
 
-class OwnershipAnalysisMixin:
+def _ownership_line_number(value: object) -> int:
+    if not isinstance(value, (int, str, float, bytes, bytearray)):
+        raise TypeError("ownership source coordinates must be numeric")
+    return int(value)
+
+
+class OwnershipAnalysisMixin(ReadScopeOwner):
     def _ownership_analysis_inputs(
         self, paths: Sequence[str] | None
     ) -> tuple[tuple[str, ...] | None, list[dict[str, object]]]:
@@ -31,15 +46,15 @@ class OwnershipAnalysisMixin:
         lazy-refresh contract while allowing composed analyses to reuse one snapshot.
         """
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         normalized: tuple[str, ...] | None = None
         if paths is not None:
             current: list[str] = []
             for raw in paths:
                 rel = normalize_relative_path(raw, allow_root=False)
-                if not self._path_admitted_for_analysis(rel):
+                if not self.files.is_admitted(rel):
                     continue
-                self._ensure_path_current(rel)
+                self.source.ensure_current(rel)
                 current.append(rel)
             normalized = tuple(current)
 
@@ -47,14 +62,12 @@ class OwnershipAnalysisMixin:
 
     @operation_response("import_ownership")
     @decision_scoped
-    def import_ownership_findings(
-        self, paths: Sequence[str] | None = None
-    ) -> dict[str, object]:
+    def import_findings(self, paths: Sequence[str] | None = None) -> dict[str, object]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        self._ensure_map_ready()
+            self = cast("RepositoryOwnership", self)
+        self.reads.ready()
         normalized, all_rows = self._ownership_analysis_inputs(paths)
-        result = ImportOwnershipAnalyzer().analyze(self, normalized, all_rows)
+        result = ImportOwnershipAnalyzer().analyze(self.source, normalized, all_rows)
         return cast(dict[str, object], result)
 
     @staticmethod
@@ -135,9 +148,7 @@ class OwnershipAnalysisMixin:
 
     @operation_response("repository_findings")
     @decision_scoped
-    def repository_findings(
-        self, paths: Sequence[str] | None = None
-    ) -> dict[str, object]:
+    def findings(self, paths: Sequence[str] | None = None) -> dict[str, object]:
         """Project actionable repository-analysis evidence from existing analyzers.
 
         This is composition only. It does not add scanners, execute repository code,
@@ -145,20 +156,22 @@ class OwnershipAnalysisMixin:
         output remains available from the dedicated ownership commands.
         """
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        self._ensure_map_ready()
+            self = cast("RepositoryOwnership", self)
+        self.reads.ready()
         normalized, all_rows = self._ownership_analysis_inputs(paths)
-        import_result = ImportOwnershipAnalyzer().analyze(self, normalized, all_rows)
+        import_result = ImportOwnershipAnalyzer().analyze(
+            self.source, normalized, all_rows
+        )
         repository_import_result = (
             import_result
             if normalized is None
-            else ImportOwnershipAnalyzer().analyze(self, None, all_rows)
+            else ImportOwnershipAnalyzer().analyze(self.source, None, all_rows)
         )
         cache_result = CacheOwnershipAnalyzer().analyze(
-            self, normalized, all_rows, import_result=repository_import_result
+            self.source, normalized, all_rows, import_result=repository_import_result
         )
         concurrency_result = ConcurrencyRiskAnalyzer().analyze(
-            self, normalized, all_rows
+            self.source, normalized, all_rows
         )
 
         findings = [
@@ -178,12 +191,19 @@ class OwnershipAnalysisMixin:
             ),
         ]
         findings = [self._adjudicate_repository_finding(item) for item in findings]
+        lifecycle = FilesystemLifecycleAnalyzer(
+            self.structure.source,
+            self.structure.imports,
+            self.structure.relationships,
+            self.structure._resolve_call_target,
+        ).analyze(paths)
+        findings.extend(lifecycle_findings(lifecycle))
         severity_order = {"warning": 0, "advisory": 1}
         findings.sort(
             key=lambda item: (
                 severity_order.get(str(item["severity"]), 9),
                 str(item["path"]),
-                int(item["line"]),
+                int(str(item["line"])),
                 str(item["code"]),
             )
         )
@@ -191,7 +211,7 @@ class OwnershipAnalysisMixin:
         for finding in findings:
             category = str(finding["category"])
             categories[category] = categories.get(category, 0) + 1
-        generation, identity_generation, stale = self._generation_status()
+        generation, identity_generation, stale = self.reads.generation_status()
         return {
             "schema": operation_schema("repository_findings"),
             "generation": generation,
@@ -213,6 +233,7 @@ class OwnershipAnalysisMixin:
                 "concurrency_risk": dict(concurrency_result["summary"]),
             },
             "findings": findings,
+            "resource_lifecycle": lifecycle,
             "boundary": (
                 "repository-evidence projection only; no execution, remediation, "
                 "admission, certification, or agent authority"
@@ -221,49 +242,15 @@ class OwnershipAnalysisMixin:
 
     @operation_response("concurrency_risk")
     @decision_scoped
-    def concurrency_risk_findings(
+    def concurrency_findings(
         self, paths: Sequence[str] | None = None
     ) -> dict[str, object]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        self._ensure_map_ready()
+            self = cast("RepositoryOwnership", self)
+        self.reads.ready()
         normalized, all_rows = self._ownership_analysis_inputs(paths)
-        result = ConcurrencyRiskAnalyzer().analyze(self, normalized, all_rows)
+        result = ConcurrencyRiskAnalyzer().analyze(self.source, normalized, all_rows)
         return cast(dict[str, object], result)
-
-    def _python_module_for_path(self, path: str) -> str | None:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        target = PurePosixPath(path)
-        if target.suffix not in {".py", ".pyi"}:
-            return None
-        parts = list(target.parts)
-        if not parts:
-            return None
-        if target.stem == "__init__":
-            parts = parts[:-1]
-        else:
-            parts[-1] = target.stem
-        if not parts:
-            return None
-        # Package components above a non-top-level module must be backed by
-        # __init__.py/__init__.pyi; otherwise do not invent import identity.
-        if len(parts) > 1 and not self._python_package_chain_exists(parts[:-1]):
-            return None
-        return ".".join(parts)
-
-    def _python_package_chain_exists(self, packages: list[str]) -> bool:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        current = PurePosixPath()
-        for package in packages:
-            current = current / package
-            if not (
-                (self.workspace / current / "__init__.py").is_file()
-                or (self.workspace / current / "__init__.pyi").is_file()
-            ):
-                return False
-        return True
 
     @staticmethod
     def _ast_imports_owner(tree: ast.AST, module: str, owner_name: str) -> bool:
@@ -283,8 +270,8 @@ class OwnershipAnalysisMixin:
         self, reader: str, owner_path: str, owner_name: str
     ) -> bool:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        module = self._python_module_for_path(owner_path)
+            self = cast("RepositoryOwnership", self)
+        module = self.imports.module_for_path(owner_path)
         if not module:
             return False
         try:
@@ -294,7 +281,11 @@ class OwnershipAnalysisMixin:
         return self._ast_imports_owner(tree, module, owner_name)
 
     @staticmethod
-    def _ownership_add_imports(nodes, edges, findings) -> None:
+    def _ownership_add_imports(
+        nodes: dict[tuple[str, str, str], dict[str, object]],
+        edges: list[dict[str, object]],
+        findings: list[dict[str, object]],
+    ) -> None:
         for finding in findings:
             source = str(finding["path"])
             target = finding.get("target_path")
@@ -324,7 +315,11 @@ class OwnershipAnalysisMixin:
             )
 
     @staticmethod
-    def _ownership_add_cache_owners(nodes, edges, owners) -> None:
+    def _ownership_add_cache_owners(
+        nodes: dict[tuple[str, str, str], dict[str, object]],
+        edges: list[dict[str, object]],
+        owners: list[dict[str, object]],
+    ) -> None:
         for owner in owners:
             path = str(owner["path"])
             name = str(owner["owner"])
@@ -353,7 +348,7 @@ class OwnershipAnalysisMixin:
             )
 
     @staticmethod
-    def _cache_owner_name_counts(owners) -> dict[str, int]:
+    def _cache_owner_name_counts(owners: list[dict[str, object]]) -> dict[str, int]:
         counts: dict[str, int] = {}
         for owner in owners:
             name = str(owner["owner"])
@@ -361,10 +356,14 @@ class OwnershipAnalysisMixin:
         return counts
 
     def _ownership_add_cache_readers(
-        self, nodes, edges, owners, selected: set[str]
+        self,
+        nodes: dict[tuple[str, str, str], dict[str, object]],
+        edges: list[dict[str, object]],
+        owners: list[dict[str, object]],
+        selected: set[str],
     ) -> None:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         counts = self._cache_owner_name_counts(owners)
         for owner in owners:
             path = str(owner["path"])
@@ -406,7 +405,9 @@ class OwnershipAnalysisMixin:
 
     @staticmethod
     def _ownership_add_invalidations(
-        nodes, edges, invalidation_result
+        nodes: dict[tuple[str, str, str], dict[str, object]],
+        edges: list[dict[str, object]],
+        invalidation_result: CacheInvalidationResult,
     ) -> tuple[set[str], set[str]]:
         cache_ids = {
             str(node["id"]) for node in nodes.values() if node.get("kind") == "cache"
@@ -428,12 +429,16 @@ class OwnershipAnalysisMixin:
         return cache_ids, resolved
 
     @staticmethod
-    def _ownership_add_concurrency(nodes, edges, findings) -> int:
+    def _ownership_add_concurrency(
+        nodes: dict[tuple[str, str, str], dict[str, object]],
+        edges: list[dict[str, object]],
+        findings: list[dict[str, object]],
+    ) -> int:
         unguarded = 0
         for finding in findings:
             path = str(finding["path"])
             function = str(finding["function"])
-            line = int(finding["line"])
+            line = _ownership_line_number(finding["line"])
             nodes.setdefault(
                 ("file", path, path),
                 {"id": f"file:{path}", "kind": "file", "path": path, "role": "source"},
@@ -465,43 +470,54 @@ class OwnershipAnalysisMixin:
             unguarded += int(not bool(finding["guarded"]))
         return unguarded
 
-    def _ownership_graph_sources(self, paths: Sequence[str] | None):
+    def _ownership_graph_sources(
+        self, paths: Sequence[str] | None
+    ) -> tuple[
+        ImportOwnershipResult,
+        CacheOwnershipResult,
+        CacheInvalidationResult,
+        ConcurrencyRiskResult,
+    ]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+            self = cast("RepositoryOwnership", self)
         normalized, all_rows = self._ownership_analysis_inputs(paths)
-        import_result = ImportOwnershipAnalyzer().analyze(self, normalized, all_rows)
+        import_result = ImportOwnershipAnalyzer().analyze(
+            self.source, normalized, all_rows
+        )
         repository_import_result = (
             import_result
             if normalized is None
-            else ImportOwnershipAnalyzer().analyze(self, None, all_rows)
+            else ImportOwnershipAnalyzer().analyze(self.source, None, all_rows)
         )
         cache_result = CacheOwnershipAnalyzer().analyze(
-            self, normalized, all_rows, import_result=repository_import_result
+            self.source, normalized, all_rows, import_result=repository_import_result
         )
         repository_cache_result = (
             cache_result
             if normalized is None
             else CacheOwnershipAnalyzer().analyze(
-                self, None, all_rows, import_result=repository_import_result
+                self.source, None, all_rows, import_result=repository_import_result
             )
         )
         invalidation_result = CacheInvalidationAnalyzer().analyze(
-            self, normalized, all_rows, cache_result=repository_cache_result
+            self.source,
+            self.imports,
+            normalized,
+            all_rows,
+            cache_result=repository_cache_result,
         )
         concurrency_result = ConcurrencyRiskAnalyzer().analyze(
-            self, normalized, all_rows
+            self.source, normalized, all_rows
         )
         return import_result, cache_result, invalidation_result, concurrency_result
 
     @operation_response("repository_ownership")
     @decision_scoped
-    def repository_ownership_graph(
-        self, paths: Sequence[str] | None = None
-    ) -> dict[str, object]:
+    def repository_graph(self, paths: Sequence[str] | None = None) -> dict[str, object]:
         """Compose repository ownership evidence without inventing runtime authority."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        self._ensure_map_ready()
+            self = cast("RepositoryOwnership", self)
+        self.reads.ready()
         import_result, cache_result, invalidation_result, concurrency_result = (
             self._ownership_graph_sources(paths)
         )
@@ -519,7 +535,7 @@ class OwnershipAnalysisMixin:
             nodes, edges, concurrency_result["findings"]
         )
         ambiguous = sorted(cache_ids - resolved)
-        generation, identity_generation, stale = self._generation_status()
+        generation, identity_generation, stale = self.reads.generation_status()
         return {
             "schema": operation_schema("repository_ownership"),
             "generation": generation,
@@ -540,7 +556,7 @@ class OwnershipAnalysisMixin:
                     str(x["source"]),
                     str(x["target"]),
                     str(x["relation"]),
-                    int(x.get("line", 0) or 0),
+                    _ownership_line_number(x.get("line", 0) or 0),
                 ),
             ),
             "ambiguities": ambiguous,
@@ -549,34 +565,36 @@ class OwnershipAnalysisMixin:
 
     @operation_response("cache_invalidation_ownership")
     @decision_scoped
-    def cache_invalidation_ownership_graph(
+    def cache_invalidation_graph(
         self, paths: Sequence[str] | None = None
     ) -> dict[str, object]:
         """Resolve repository-visible cache invalidators to exact cache owners."""
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        self._ensure_map_ready()
+            self = cast("RepositoryOwnership", self)
+        self.reads.ready()
         normalized, all_rows = self._ownership_analysis_inputs(paths)
-        import_result = ImportOwnershipAnalyzer().analyze(self, None, all_rows)
+        import_result = ImportOwnershipAnalyzer().analyze(self.source, None, all_rows)
         repository_cache_result = CacheOwnershipAnalyzer().analyze(
-            self, None, all_rows, import_result=import_result
+            self.source, None, all_rows, import_result=import_result
         )
         result = CacheInvalidationAnalyzer().analyze(
-            self, normalized, all_rows, cache_result=repository_cache_result
+            self.source,
+            self.imports,
+            normalized,
+            all_rows,
+            cache_result=repository_cache_result,
         )
         return cast(dict[str, object], result)
 
     @operation_response("cache_ownership")
     @decision_scoped
-    def cache_ownership_findings(
-        self, paths: Sequence[str] | None = None
-    ) -> dict[str, object]:
+    def cache_findings(self, paths: Sequence[str] | None = None) -> dict[str, object]:
         if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        self._ensure_map_ready()
+            self = cast("RepositoryOwnership", self)
+        self.reads.ready()
         normalized, all_rows = self._ownership_analysis_inputs(paths)
-        import_result = ImportOwnershipAnalyzer().analyze(self, None, all_rows)
+        import_result = ImportOwnershipAnalyzer().analyze(self.source, None, all_rows)
         result = CacheOwnershipAnalyzer().analyze(
-            self, normalized, all_rows, import_result=import_result
+            self.source, normalized, all_rows, import_result=import_result
         )
         return cast(dict[str, object], result)

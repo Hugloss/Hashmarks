@@ -1,4 +1,6 @@
-from hashmarks.codemap.engine import CodeMap
+from contract_assertions import assert_number, assert_object, assert_records
+
+from hashmarks.codemap.work_context import WorkContextProjection
 
 
 def _row(path: str, rank: int, role: str) -> dict[str, object]:
@@ -26,10 +28,10 @@ def _action() -> dict[str, object]:
 
 
 def test_work_context_preserves_mandatory_roles_monotonically() -> None:
-    codemap = object.__new__(CodeMap)
+    codemap = WorkContextProjection()
     previous_mandatory: set[tuple[str, str]] = set()
     for budget in (128, 192, 256, 384, 512, 640, 768, 1024, 1280, 1536, 1800):
-        packet = codemap.work_context(_action(), token_budget=budget)
+        packet = codemap.work(_action(), token_budget=budget)
         assert packet["safe"] is True
         assert packet["role_coverage"] == {
             "edit": True,
@@ -38,7 +40,7 @@ def test_work_context_preserves_mandatory_roles_monotonically() -> None:
         }
         mandatory = {
             (str(item["role"]), str(item["path"]))
-            for item in packet["items"]
+            for item in assert_records(packet["items"])
             if item["mandatory"]
         }
         assert previous_mandatory <= mandatory
@@ -46,35 +48,39 @@ def test_work_context_preserves_mandatory_roles_monotonically() -> None:
 
 
 def test_optional_evidence_never_evicts_mandatory_skeleton() -> None:
-    codemap = object.__new__(CodeMap)
+    codemap = WorkContextProjection()
     action = _action()
-    baseline = codemap.work_context(action, token_budget=128)
-    expanded = codemap.work_context(action, token_budget=1800)
-    baseline_mandatory = [item for item in baseline["items"] if item["mandatory"]]
-    expanded_mandatory = [item for item in expanded["items"] if item["mandatory"]]
+    baseline = codemap.work(action, token_budget=128)
+    expanded = codemap.work(action, token_budget=1800)
+    baseline_mandatory = [
+        item for item in assert_records(baseline["items"]) if item["mandatory"]
+    ]
+    expanded_mandatory = [
+        item for item in assert_records(expanded["items"]) if item["mandatory"]
+    ]
     assert baseline_mandatory == expanded_mandatory[: len(baseline_mandatory)]
-    assert expanded["estimated_tokens"] >= baseline["estimated_tokens"]
+    assert assert_number(expanded["estimated_tokens"]) >= assert_number(
+        baseline["estimated_tokens"]
+    )
 
 
 def test_tiny_budget_reports_missing_roles_instead_of_claiming_safety() -> None:
-    codemap = object.__new__(CodeMap)
-    packet = codemap.work_context(_action(), token_budget=1)
+    codemap = WorkContextProjection()
+    packet = codemap.work(_action(), token_budget=1)
     assert packet["safe"] is False
     assert packet["items"] == []
     assert packet["missing_roles"] == ["edit", "verify", "contract"]
 
 
 def test_budget_sweep_finds_smallest_safe_budget_and_density() -> None:
-    codemap = object.__new__(CodeMap)
-    sweep = codemap.work_context_budget_sweep(
-        _action(), budgets=(64, 128, 192, 256, 384, 512)
-    )
+    codemap = WorkContextProjection()
+    sweep = codemap.budget_sweep(_action(), budgets=(64, 128, 192, 256, 384, 512))
     assert sweep["mandatory_monotonic"] is True
     assert sweep["smallest_safe_budget"] is not None
-    rows = sweep["rows"]
+    rows = assert_records(sweep["rows"])
     assert [row["budget"] for row in rows] == [64, 128, 192, 256, 384, 512]
     assert all(row["duplicate_evidence_bytes"] == 0 for row in rows)
-    assert all(0.0 <= row["useful_bytes_ratio"] <= 1.0 for row in rows)
+    assert all(0.0 <= assert_number(row["useful_bytes_ratio"]) <= 1.0 for row in rows)
     safe_rows = [row for row in rows if row["safe"]]
     assert safe_rows
     assert all(
@@ -83,7 +89,7 @@ def test_budget_sweep_finds_smallest_safe_budget_and_density() -> None:
 
 
 def test_same_path_can_cover_multiple_mandatory_roles_without_false_unsafe() -> None:
-    codemap = object.__new__(CodeMap)
+    codemap = WorkContextProjection()
     shared = _row("pkg/policy.py", 1, "edit")
     action = {
         "edit": shared,
@@ -92,25 +98,33 @@ def test_same_path_can_cover_multiple_mandatory_roles_without_false_unsafe() -> 
         "related": [],
         "inspect": [],
     }
-    packet = codemap.work_context(action, token_budget=512)
+    packet = codemap.work(action, token_budget=512)
     assert packet["safe"] is True
     assert packet["missing_roles"] == []
     assert packet["role_coverage"] == {"edit": True, "verify": True, "contract": True}
-    shared_items = [item for item in packet["items"] if item["path"] == "pkg/policy.py"]
+    shared_items = [
+        item
+        for item in assert_records(packet["items"])
+        if item["path"] == "pkg/policy.py"
+    ]
     assert len(shared_items) == 1
     assert shared_items[0]["covered_roles"] == ["edit", "contract"]
-    assert packet["evidence_metrics"]["duplicate_evidence_bytes"] == 0
+    assert assert_object(packet["evidence_metrics"])["duplicate_evidence_bytes"] == 0
 
 
 def test_optional_duplicate_of_mandatory_path_cannot_change_role_authority() -> None:
-    codemap = object.__new__(CodeMap)
+    codemap = WorkContextProjection()
     action = _action()
     action["related"] = [
         _row("pkg/engine.py", 99, "related"),
         _row("pkg/new_helper.py", 7, "related"),
     ]
-    packet = codemap.work_context(action, token_budget=1800)
-    engine = [item for item in packet["items"] if item["path"] == "pkg/engine.py"]
+    packet = codemap.work(action, token_budget=1800)
+    engine = [
+        item
+        for item in assert_records(packet["items"])
+        if item["path"] == "pkg/engine.py"
+    ]
     assert len(engine) == 1
     assert engine[0]["role"] == "edit"
     assert engine[0]["mandatory"] is True
@@ -120,7 +134,7 @@ def test_optional_duplicate_of_mandatory_path_cannot_change_role_authority() -> 
 def test_shared_mandatory_path_reports_all_uncovered_roles_when_budget_is_tiny() -> (
     None
 ):
-    codemap = object.__new__(CodeMap)
+    codemap = WorkContextProjection()
     shared = _row("pkg/policy.py", 1, "edit")
     action = {
         "edit": shared,
@@ -129,7 +143,7 @@ def test_shared_mandatory_path_reports_all_uncovered_roles_when_budget_is_tiny()
         "related": [],
         "inspect": [],
     }
-    packet = codemap.work_context(action, token_budget=1)
+    packet = codemap.work(action, token_budget=1)
     assert packet["safe"] is False
     assert packet["items"] == []
     assert packet["missing_roles"] == ["edit", "verify", "contract"]

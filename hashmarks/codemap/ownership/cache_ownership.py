@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Sequence
+from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 from hashmarks.operation_contract import operation_schema
 from hashmarks.python_ast_cache import read_python_ast
@@ -8,13 +9,13 @@ from hashmarks.python_ast_cache import read_python_ast
 from .results import CacheOwnershipResult, ImportOwnershipResult
 
 if TYPE_CHECKING:
-    from ..engine import CodeMap
+    from ..repository_source import RepositorySource
 
 
 class CacheOwnershipAnalyzer:
     def analyze(
         self,
-        codemap: CodeMap,
+        source: RepositorySource,
         paths: Sequence[str] | None,
         all_rows: Sequence[dict[str, object]],
         import_result: ImportOwnershipResult,
@@ -23,7 +24,7 @@ class CacheOwnershipAnalyzer:
             str(row["path"]) for row in all_rows if row["language"] == "python"
         }
         if paths is None:
-            rows = codemap.store.lexical_file_candidates(
+            rows = source.reads.lexical_file_candidates(
                 [
                     "cache",
                     "memo",
@@ -41,7 +42,7 @@ class CacheOwnershipAnalyzer:
         else:
             candidates = []
             for rel in paths:
-                if rel in python_paths or (codemap.workspace / rel).suffix in {
+                if rel in python_paths or (source.workspace / rel).suffix in {
                     ".py",
                     ".pyi",
                 }:
@@ -61,7 +62,7 @@ class CacheOwnershipAnalyzer:
         findings: list[dict[str, object]] = []
         for rel in sorted(set(candidates)):
             try:
-                snapshot = read_python_ast(codemap.workspace / rel, errors="replace")
+                snapshot = read_python_ast(source.workspace / rel, errors="replace")
             except (OSError, UnicodeError, SyntaxError, ValueError):
                 continue
 
@@ -77,7 +78,7 @@ class CacheOwnershipAnalyzer:
                 )
             )
 
-        generation, identity_generation, stale = codemap._generation_status()
+        generation, identity_generation, stale = source.reads.generation_status()
         risky = sum(1 for f in findings if f["import_identity_risk"])
         unresolved = sum(1 for f in findings if f["invalidation"] == "not-proven")
         return {

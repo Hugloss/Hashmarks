@@ -260,7 +260,9 @@ def _decode_mapping_payload(
             )
         return structured
     if isinstance(value.get("schema"), str):
-        return dict(value)
+        if not all(isinstance(key, str) for key in value):
+            raise HostGateError("structured MCP payload keys must be strings")
+        return {str(key): item for key, item in value.items()}
     if "content" in value:
         return _decode_mcp_payload(value["content"], host=host, tool=tool)
     raise HostGateError(
