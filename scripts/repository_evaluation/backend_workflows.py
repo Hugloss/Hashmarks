@@ -20,6 +20,7 @@ from .backend_gates import combine_required, fact_state, presentation_conformanc
 from .backend_grading import _authority_safe, _gates, _packet, display_fact_gate
 from .backend_matrix import INITIAL_TOKEN_CEILING
 from .backend_runtime import observe_runtime
+from .backend_source import observe_source_stage
 from .backend_structural import observe_structural
 from .backend_transport import capture_cli, capture_mcp
 from .backend_witnesses import (
@@ -235,18 +236,26 @@ def _observe_stage(
     )
     structural_inputs = workflow.get("structural_observations", {}).get(rule["_stage"])
     structural_rule = rule.get("structural_oracles", {}).get(rule["_stage"])
-    structural = (
-        observe_structural(
-            workspace,
-            state,
-            structural_inputs,
-            structural_rule,
-            output / "structural",
-            transports,
-        )
-        if structural_inputs is not None and structural_rule is not None
-        else None
-    )
+    components = {
+        "boundary": boundary,
+        "declarations": declarations,
+        "runtime": runtime,
+        "structural": (
+            observe_structural(
+                workspace,
+                state,
+                structural_inputs,
+                structural_rule,
+                output / "structural",
+                transports,
+            )
+            if structural_inputs is not None and structural_rule is not None
+            else None
+        ),
+        "source": observe_source_stage(
+            workspace, state, workflow, rule, output, transports
+        ),
+    }
     # A sequence of public observations must belong to one stable repository
     # snapshot, including producer and transport reads after the writer closes.
     _check_snapshot(workspace, snapshot)
@@ -259,10 +268,7 @@ def _observe_stage(
         "grade": grade_facts(workflow["id"], {"packet": packet}, rule),
         "revision_bound": _revision_bound(workspace, packet),
         "initial": profiles["initial"],
-        "boundary": boundary,
-        "declarations": declarations,
-        "runtime": runtime,
-        "structural": structural,
+        **components,
     }
 
 
@@ -389,6 +395,7 @@ def execute_workflow(
             stage["declarations"],
             stage["runtime"],
             stage["structural"],
+            stage["source"],
         ):
             if component is None:
                 continue
@@ -415,6 +422,16 @@ def execute_workflow(
             "before": before["declarations"],
             "after": after["declarations"],
         },
+        **(
+            {
+                "source_observations": {
+                    "before": before["source"],
+                    "after": after["source"],
+                }
+            }
+            if "source_observations" in workflow
+            else {}
+        ),
         **(
             {
                 "structural_observations": {
@@ -458,6 +475,11 @@ def execute_workflow(
                 "delta": delta,
                 "boundary": [before["boundary"], after["boundary"]],
                 "declarations": [before["declarations"], after["declarations"]],
+                **(
+                    {"source": [before["source"], after["source"]]}
+                    if "source_observations" in workflow
+                    else {}
+                ),
                 **(
                     {"structural": [before["structural"], after["structural"]]}
                     if "structural_observations" in workflow

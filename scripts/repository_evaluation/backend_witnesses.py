@@ -236,6 +236,7 @@ def stage_fact_witnesses(
             None,
         ),
         ("structural", "structural_observations", "structural_oracles", None),
+        ("source", "source_observations", "source_oracles", "paths"),
     ):
         inputs = workflow.get(input_key, {}).get(stage)
         oracle = rule.get(oracle_key, {}).get(stage)

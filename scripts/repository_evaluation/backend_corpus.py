@@ -191,7 +191,53 @@ def _check_workflow(
     _check_declaration_inputs(workflow, rule, sources)
     _check_runtime_inputs(workflow, rule, sources)
     _check_structural_inputs(workflow, rule, sources)
+    _check_source_inputs(workflow, rule, sources)
     _check_native_oracles(rule)
+
+
+def _check_source_inputs(
+    workflow: dict[str, Any], rule: dict[str, Any], sources: dict[str, Path]
+) -> None:
+    from .backend_source import source_request_lines
+
+    inputs, oracles = workflow.get("source_observations"), rule.get("source_oracles")
+    if inputs is None and oracles is None:
+        return
+    if (
+        not isinstance(inputs, dict)
+        or not isinstance(oracles, dict)
+        or set(inputs) != {"before", "after"}
+        or set(oracles) != set(inputs)
+    ):
+        raise ValueError("source observations require both revision inputs and oracles")
+    for stage in ("before", "after"):
+        oracle = oracles[stage]
+        path, lines = source_request_lines(inputs[stage])
+        labels = oracle.get("source_labels")
+        if (
+            oracle.get("source") != workflow[stage]
+            or not isinstance(labels, list)
+            or not labels
+            or any(not isinstance(label, dict) for label in labels)
+        ):
+            raise ValueError("source observation requires revision-bound source labels")
+        if (
+            {label["path"] for label in labels} != {path}
+            or sorted(label["start_line"] for label in labels) != sorted(lines)
+            or any(label["end_line"] != label["start_line"] for label in labels)
+        ):
+            raise ValueError("source observation oracle differs from its source scope")
+        if (
+            not oracle.get("checks")
+            or set(oracle.get("display_checks", {}))
+            != {"structured", "compact", "text"}
+            or any(not checks for checks in oracle["display_checks"].values())
+        ):
+            raise ValueError(
+                "source observation requires native and display fact checks"
+            )
+        for label in labels:
+            _check_label(sources[workflow[stage]], label)
 
 
 def _check_structural_inputs(

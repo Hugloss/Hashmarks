@@ -351,11 +351,185 @@
         }
       },
       "task": "A cached yield dependency accepts unsupported provider configuration. Inspect litestar/di.py."
+    },
+    {
+      "capability_reviewed": false,
+      "causal_test_relevance": "not-reviewed",
+      "guard_semantics": "not-qualified-by-call-syntax",
+      "id": "faststream-composed-context-provider",
+      "problem_id": "bee90b9b41748e04598c12230550de4ba72815f5",
+      "repository": "faststream",
+      "stages": {
+        "after": {
+          "declaration": {
+            "declaration_line": 66,
+            "end_line": 71,
+            "path": "faststream/_internal/context/composition.py",
+            "sha256": "855b4671326eecb740279dbde9d5de3e3c02fbd6b369c4ccbb9673a9556445e3",
+            "start_line": 65,
+            "symbol": "ContextRepoComposition.get"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "position": 0,
+            "value": {
+              "identifier": "key",
+              "state": "identifier-syntax"
+            }
+          },
+          "expected_argument_pointer": "/sites/*/argument_syntax/positional/*",
+          "expected_site": {
+            "callee_identifier_syntax": "context.get",
+            "end_line": 68,
+            "line": 68,
+            "positional_argument_count": 2,
+            "syntax_kind": "call"
+          },
+          "file_sha256": "d1ca2b32c0098898cc73a0c68b56cd057638aa8d2470e433308aa3a591929fc4",
+          "same_callee_occurrences": 1,
+          "selection": "unique nominated callee within exact source declaration",
+          "site": {
+            "end_line": 68,
+            "path": "faststream/_internal/context/composition.py",
+            "sha256": "f71f9765c44c4b68ba406786de5744e9dcc706a6a86dd3a9eaf27f994e7d25ef",
+            "start_line": 68
+          },
+          "source": "faststream-composed-context-provider-after",
+          "source_call": "context.get(key, EMPTY)",
+          "source_identity": "sha256:446a39cbd40ea8133a5ce36d2477d4ff47125a293788359eafc9fadb544c5f33:2131"
+        },
+        "before": {
+          "declaration": {
+            "declaration_line": 119,
+            "end_line": 131,
+            "path": "faststream/_internal/context/repository.py",
+            "sha256": "9ced3d5815a797114f72e35e847c7d548d8872739f204b15d8d76694034a4673",
+            "start_line": 119,
+            "symbol": "ContextRepo.get"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "position": 0,
+            "value": {
+              "identifier": "key",
+              "state": "identifier-syntax"
+            }
+          },
+          "expected_argument_pointer": "/sites/*/argument_syntax/positional/*",
+          "expected_site": {
+            "callee_identifier_syntax": "self._global_context.get",
+            "end_line": 129,
+            "line": 129,
+            "positional_argument_count": 2,
+            "syntax_kind": "call"
+          },
+          "file_sha256": "ea26514440dc4071e1e48fc389668d5f6bd1ec064695962f748837b737265dc9",
+          "same_callee_occurrences": 1,
+          "selection": "unique nominated callee within exact source declaration",
+          "site": {
+            "end_line": 129,
+            "path": "faststream/_internal/context/repository.py",
+            "sha256": "c28055f7020ccfe8c6e55d1323759d6182ad60375671e1c39e201f9110130e35",
+            "start_line": 129
+          },
+          "source": "faststream-composed-context-provider-before",
+          "source_call": "self._global_context.get(key, EMPTY)",
+          "source_identity": "sha256:f2b28f7cfa2052f60e0a2f502fc6eb5d058a1948fb514890bc99aafd4a14b8aa:2129"
+        }
+      },
+      "task": "Context providers need explicit composition across nominated context repositories. Inspect faststream/_internal/context/repository.py and faststream/_internal/context/composition.py."
+    },
+    {
+      "capability_reviewed": false,
+      "causal_test_relevance": "not-reviewed",
+      "guard_semantics": "not-qualified-by-call-syntax",
+      "id": "faststream-dependant-constructor-metadata",
+      "problem_id": "d9aa36f5697c5044a7598999754a07c6c23bd30d",
+      "repository": "faststream",
+      "stages": {
+        "after": {
+          "declaration": {
+            "declaration_line": 69,
+            "end_line": 159,
+            "path": "faststream/_internal/fastapi/get_dependant.py",
+            "sha256": "ed7ed542dca257e7cdaf2a58a8eacba8c9241ca9253d5af97abff3da8a0eb407",
+            "start_line": 69,
+            "symbol": "_patch_fastapi_dependent"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "position": 0,
+            "value": {
+              "identifier": "dependant",
+              "state": "identifier-syntax"
+            }
+          },
+          "expected_argument_pointer": "/sites/*/argument_syntax/positional/*",
+          "expected_site": {
+            "callee_identifier_syntax": "_extend_fastapi_dependant",
+            "end_line": 75,
+            "line": 75,
+            "positional_argument_count": 1,
+            "syntax_kind": "call"
+          },
+          "file_sha256": "bc41691d0880458259d35f77b045dcbde315d1ada0d28f366c8e74c1620cbe2c",
+          "same_callee_occurrences": 1,
+          "selection": "unique nominated callee within exact source declaration",
+          "site": {
+            "end_line": 75,
+            "path": "faststream/_internal/fastapi/get_dependant.py",
+            "sha256": "27b25ad7302a119da13757f81cde0e883a92bf7a961eb6e5f417aa227c90d1fa",
+            "start_line": 75
+          },
+          "source": "faststream-dependant-constructor-metadata-after",
+          "source_call": "_extend_fastapi_dependant(dependant)",
+          "source_identity": "sha256:22b54379dfbb33818bf606b46313ec9b50f7d1ace66a57d5e16d5b905a0e27f3:2110"
+        },
+        "before": {
+          "declaration": {
+            "declaration_line": 52,
+            "end_line": 141,
+            "path": "faststream/_internal/fastapi/get_dependant.py",
+            "sha256": "7e9329d97ebdbc46b86951ad8d4062c56e3da819c69f9a3c6678f63f0294cd32",
+            "start_line": 52,
+            "symbol": "_patch_fastapi_dependent"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "position": 0,
+            "value": {
+              "expression_kind": "Call",
+              "state": "expression-unestablished"
+            }
+          },
+          "expected_argument_pointer": "/sites/*/argument_syntax/positional/*",
+          "expected_site": {
+            "callee_identifier_syntax": "create_model",
+            "end_line": 133,
+            "line": 131,
+            "positional_argument_count": 1,
+            "syntax_kind": "call"
+          },
+          "file_sha256": "93a5de7b58fe74987b988dede40129529e85d2f5f26d04e7c27ab62e359acff6",
+          "same_callee_occurrences": 1,
+          "selection": "unique nominated callee within exact source declaration",
+          "site": {
+            "end_line": 133,
+            "path": "faststream/_internal/fastapi/get_dependant.py",
+            "sha256": "fd9617edc160129a7ee8e8d8f1338e99c8084a0ab39e7e5f61cbcf1358d54c70",
+            "start_line": 131
+          },
+          "source": "faststream-dependant-constructor-metadata-before",
+          "source_call": "create_model(getattr(call, '__name__', type(call).__name__))",
+          "source_identity": "sha256:9219915facfe9e62a28c0960c09a3c7b20a37e349117b215e463a193ea2a2eb8:2108"
+        }
+      },
+      "task": "Dependency-declaration adaptation forwards incompatible constructor metadata. Inspect faststream/_internal/fastapi/get_dependant.py."
     }
   ],
   "observer_outputs_used": false,
   "original_workflows_and_assertions_preserved": true,
   "schema": "hashmarks.configuration-call-source-oracles.v1",
-  "scope": "four additive source-authored declaration/call/argument slices; not causal ownership, runtime behavior, sufficient verification or independently qualified capability proof",
+  "scope": "six additive source-authored declaration/call/argument slices; no causal ownership, runtime behavior, sufficient verification or independently qualified capability proof",
   "status": "INCOMPLETE"
 }

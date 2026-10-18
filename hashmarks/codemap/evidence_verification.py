@@ -4,12 +4,12 @@ import os
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, TypeAlias, cast
 
 from hashmarks.operation_contract import operation_response, operation_schema
 from hashmarks.python_ast_cache import read_python_ast
 
-from .decision_session import ReadScopeOwner, decision_scoped
+from .decision_session import ReadScope, ReadScopeOwner, decision_scoped
 from .model import EvidenceVisibility
 from .query_primitives import _TASK_STOPWORDS, _query_terms
 from .repository_domains import RepositoryDomain, classify_repository_path
@@ -35,6 +35,9 @@ from .verification_relevance_model import (
 
 _LIMIT = VERIFICATION_RELEVANCE_DEFAULTS.limit
 _CANDIDATES = VERIFICATION_RELEVANCE_DEFAULTS.candidate_limit
+VerificationKeywordObservations: TypeAlias = dict[
+    tuple[ReadScope, str, tuple[str, ...]], dict[str, object]
+]
 if TYPE_CHECKING:
     from .decision_session import DecisionScope
     from .import_resolution import RepositoryImports
@@ -431,7 +434,10 @@ class RepositoryVerification(
         return index
 
     def _verification_task_keyword_syntax(
-        self, state: _VerificationRelevanceState, path: str
+        self,
+        state: _VerificationRelevanceState,
+        path: str,
+        observations: VerificationKeywordObservations | None = None,
     ) -> dict[str, object]:
         """Observe multiword task matches in named call arguments, without binding."""
         if (
@@ -441,6 +447,13 @@ class RepositoryVerification(
         ):
             return {}
         self.source.ensure_current(path)
+        key = (
+            (self.reads.scope, path, tuple(sorted(state.task_terms)))
+            if self.reads.scope is not None
+            else None
+        )
+        if observations is not None and key is not None and key in observations:
+            return observations[key]
         member = self.reads.file_row(path)
         index = self._verification_reference_index_for_path(state, path)
         if member is None or index is None:
@@ -458,23 +471,28 @@ class RepositoryVerification(
                     }
                 )
         self.source.ensure_current(path)
-        if not matches:
-            return {}
-        return {
-            "task_keyword_syntax": {
-                "basis": "named-call-keyword-syntax-and-task-terms",
-                "source_revision": member["file_digest"],
-                "matches": matches[:16],
-                "observed_keywords": len(matches),
-                "omitted_keywords": max(0, len(matches) - 16),
-                "returned_bound": 16,
-                "identifier_chars_bound": MAX_KEYWORD_IDENTIFIER_CHARS,
-                "scope": "named keywords outside statically dead/type-only branches",
-                "runtime_binding": "not-established",
-                "verification_selection_authority": False,
-                "negative_evidence_admissible": False,
+        result: dict[str, object] = (
+            {
+                "task_keyword_syntax": {
+                    "basis": "named-call-keyword-syntax-and-task-terms",
+                    "source_revision": member["file_digest"],
+                    "matches": matches[:16],
+                    "observed_keywords": len(matches),
+                    "omitted_keywords": max(0, len(matches) - 16),
+                    "returned_bound": 16,
+                    "identifier_chars_bound": MAX_KEYWORD_IDENTIFIER_CHARS,
+                    "scope": "named keywords outside statically dead/type-only branches",
+                    "runtime_binding": "not-established",
+                    "verification_selection_authority": False,
+                    "negative_evidence_admissible": False,
+                }
             }
-        }
+            if matches
+            else {}
+        )
+        if observations is not None and key is not None:
+            observations[key] = result
+        return result
 
     def _verification_module_alias_reference_owner_match(
         self,

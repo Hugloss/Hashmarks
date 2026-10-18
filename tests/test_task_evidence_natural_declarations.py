@@ -6,6 +6,19 @@ from contract_assertions import assert_object, assert_records
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.task_evidence_initial import decode_initial_packet
+from hashmarks.codemap.task_retrieval import TaskRetrievalMixin
+
+
+def test_word_variants_keep_derivation_modes_separate_when_reused() -> None:
+    for word in ("validation", "__VALIDATION--", "validation"):
+        for mode in (False, True, False, True):
+            variants = TaskRetrievalMixin._task_natural_term_variants(
+                word, include_derivations=mode
+            )
+            assert isinstance(variants, tuple)
+            assert variants == (
+                ("validation", "validate", "valide") if mode else ("validation",)
+            )
 
 
 def _surface_identity(value: object) -> tuple[object, ...] | None:

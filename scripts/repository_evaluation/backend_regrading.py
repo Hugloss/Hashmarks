@@ -20,6 +20,7 @@ from .backend_gates import combine_required, presentation_conformance
 from .backend_grading import _gates, component_summary, validate_transport_capture
 from .backend_runtime import RuntimeObservation, regrade_runtime
 from .backend_runtime_witnesses import _object, _text
+from .backend_source import grade_source, grade_source_transport
 from .backend_structural import (
     grade_structural,
     grade_structural_transport,
@@ -134,7 +135,7 @@ def regrade_task_workflow(
     gates = _gates(before, after, _freshness(root, workflow, sources), rule, delta)
     components: dict[str, dict[str, object]] = {
         family: {stage: None for stage in ("before", "after")}
-        for family in ("boundary", "declarations", "structural")
+        for family in ("boundary", "declarations", "structural", "source")
     }
     runtime: dict[str, RuntimeObservation] = {}
     for stage in ("before", "after"):
@@ -142,6 +143,7 @@ def regrade_task_workflow(
             ("boundary", "boundary_observations", "function_boundary_oracles"),
             ("declarations", "declaration_observations", "declaration_oracles"),
             ("structural", "structural_observations", "structural_oracles"),
+            ("source", "source_observations", "source_oracles"),
         ):
             if input_key not in workflow:
                 continue
@@ -172,6 +174,11 @@ def regrade_task_workflow(
         "delta": delta,
         "boundary_observations": components["boundary"],
         "declaration_observations": components["declarations"],
+        **(
+            {"source_observations": components["source"]}
+            if "source_observations" in workflow
+            else {}
+        ),
         **(
             {"structural_observations": components["structural"]}
             if "structural_observations" in workflow
@@ -246,6 +253,17 @@ def _component(
     rule: dict[str, object],
     family: str,
 ) -> dict[str, object]:
+    if family == "source":
+        return component_summary(
+            grade_source(source, _object(_read(root, "api.json")), rule),
+            {
+                transport: [
+                    grade_source_transport(source, capture, rule)
+                    for capture in _records(_read(root, transport + ".json"))
+                ]
+                for transport in ("cli", "mcp")
+            },
+        )
     if family == "structural":
         grader = grade_structural
         paths = structural_source_paths(rule)

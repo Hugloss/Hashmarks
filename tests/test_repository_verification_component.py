@@ -5,20 +5,129 @@ import sys
 from pathlib import Path
 
 import pytest
+from contract_assertions import assert_object, assert_records
 from test_repository_index_component import index as index
 from test_repository_source_component import _source
 
-from hashmarks.codemap.evidence_verification import RepositoryVerification
+from hashmarks.codemap.decision_session import DecisionRefreshRequired
+from hashmarks.codemap.evidence_verification import (
+    RepositoryVerification,
+    VerificationKeywordObservations,
+)
 from hashmarks.codemap.import_resolution import RepositoryImports
 from hashmarks.codemap.indexing_lifecycle import RepositoryIndex
 from hashmarks.codemap.query_router import normalize_task_query
 from hashmarks.codemap.verification_relevance_model import VerificationRequest
+from hashmarks.digest import FILE_DOMAIN, hash_file
 
 
 def _verification(index: RepositoryIndex) -> RepositoryVerification:
     source = _source(index)
     imports = RepositoryImports(source)
     return RepositoryVerification(imports)
+
+
+def test_keyword_observations_bind_query_and_read_scope(index: RepositoryIndex) -> None:
+    path = "test_packet.py"
+    (index.workspace / path).write_text(
+        "perform(payload_codec=True, retry_budget=True)\n"
+    )
+    index.sync()
+    verification = _verification(index)
+    observations: VerificationKeywordObservations = {}
+    with verification.reads.session():
+        for task, name in (
+            ("payload codec", "payload_codec"),
+            ("retry budget", "retry_budget"),
+        ):
+            state = verification._verification_state(
+                normalize_task_query(task), "", "", ()
+            )
+            result = verification._verification_task_keyword_syntax(
+                state, path, observations
+            )
+            facts = assert_object(result["task_keyword_syntax"])
+            assert [row["name"] for row in assert_records(facts["matches"])] == [name]
+        facts["source_revision"] = "modified-after-consumption"
+    with verification.reads.session():
+        state = verification._verification_state(
+            normalize_task_query("retry budget"), "", "", ()
+        )
+        current = verification._verification_task_keyword_syntax(
+            state, path, observations
+        )
+    assert (
+        assert_object(current["task_keyword_syntax"])["source_revision"]
+        == hash_file(index.workspace / path, domain=FILE_DOMAIN).hash
+    )
+
+
+@pytest.mark.parametrize("initial_match", [False, True])
+def test_keyword_observation_reuse_rejects_changed_source_inside_scope(
+    index: RepositoryIndex, initial_match: bool
+) -> None:
+    path = "test_packet.py"
+    file = index.workspace / path
+    file.write_text(
+        "perform(payload_codec=True)\n"
+        if initial_match
+        else "perform(unrelated=True)\n"
+    )
+    index.sync()
+    verification = _verification(index)
+    observations: VerificationKeywordObservations = {}
+    with verification.reads.session():
+        state = verification._verification_state(
+            normalize_task_query("payload codec"), "", "", ()
+        )
+        observed = verification._verification_task_keyword_syntax(
+            state, path, observations
+        )
+        assert bool(observed) is initial_match
+        file.write_text("perform(payload_codec_later=True)\n")
+        with pytest.raises(DecisionRefreshRequired):
+            verification._verification_task_keyword_syntax(state, path, observations)
+    index.sync([path])
+    with verification.reads.session():
+        state = verification._verification_state(
+            normalize_task_query("payload codec"), "", "", ()
+        )
+        current = verification._verification_task_keyword_syntax(
+            state, path, observations
+        )
+    facts = assert_object(current["task_keyword_syntax"])
+    assert [row["name"] for row in assert_records(facts["matches"])] == [
+        "payload_codec_later"
+    ]
+    assert facts["source_revision"] == hash_file(file, domain=FILE_DOMAIN).hash
+
+
+@pytest.mark.parametrize("visibility", ["deny", "outline"])
+def test_keyword_observation_reuse_cannot_override_new_visibility(
+    index: RepositoryIndex, visibility: str
+) -> None:
+    path = "test_packet.py"
+    (index.workspace / path).write_text("perform(payload_codec=True)\n")
+    index.sync()
+    verification = _verification(index)
+    observations: VerificationKeywordObservations = {}
+    with verification.reads.session():
+        state = verification._verification_state(
+            normalize_task_query("payload codec"), "", "", ()
+        )
+        assert verification._verification_task_keyword_syntax(state, path, observations)
+    (index.workspace / ".hashmarks-context.toml").write_text(
+        f'[[rule]]\npattern = "{path}"\nvisibility = "{visibility}"\n'
+    )
+    index.sync([path])
+    with verification.reads.session():
+        state = verification._verification_state(
+            normalize_task_query("payload codec"), "", "", ()
+        )
+        assert (
+            verification._verification_task_keyword_syntax(state, path, observations)
+            == {}
+        )
 
 
 def test_direct_verifier_selects_reference_backed_test_and_rejects_expired_binding(

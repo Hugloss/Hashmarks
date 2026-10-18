@@ -4,6 +4,7 @@ import heapq
 import math
 from contextlib import nullcontext
 from dataclasses import dataclass, replace
+from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -1161,10 +1162,15 @@ class TaskRetrievalMixin(ReadScopeOwner):
             self._task_preserve_component_hits(hits, fusion)
 
     @staticmethod
+    @lru_cache(maxsize=4096)
     def _task_natural_term_variants(
         token: str, *, include_derivations: bool = False
     ) -> tuple[str, ...]:
-        """Return conservative identifier-like forms for one natural-language token."""
+        """Return conservative identifier-like forms for one natural-language token.
+
+        Reuse immutable spellings only; the bounded cache contains no repository
+        evidence, source binding, ranking or freshness decision.
+        """
         value = token.lower().strip("_-")
         variants = [value]
         if len(value) >= 5 and value.endswith("ies"):

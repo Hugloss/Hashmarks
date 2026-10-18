@@ -12,7 +12,10 @@ from .model import EvidenceVisibility
 from .task_evidence_contract import read_task_candidate
 
 if TYPE_CHECKING:
-    from .evidence_verification import _VerificationRelevanceState
+    from .evidence_verification import (
+        VerificationKeywordObservations,
+        _VerificationRelevanceState,
+    )
     from .repository_tasks import RepositoryTasks
     from .task_evidence_types import RetrievalLocator, TaskEvidenceDraft
 
@@ -424,7 +427,11 @@ class TaskEvidenceScopedMethodMixin:
         return matches[0] if len(matches) == 1 else None
 
     def _task_evidence_candidate_verifiers(
-        self, task: str, row: Mapping[str, object]
+        self,
+        task: str,
+        row: Mapping[str, object],
+        *,
+        keyword_observations: VerificationKeywordObservations | None = None,
     ) -> list[dict[str, object]]:
         """Disclose source references without proving behavior ownership."""
         from .query_primitives import _query_terms
@@ -489,7 +496,7 @@ class TaskEvidenceScopedMethodMixin:
             candidate.update(filename_candidates.get(str(candidate["path"]), {}))
             candidate.update(
                 codemap.verification._verification_task_keyword_syntax(
-                    state, str(candidate["path"])
+                    state, str(candidate["path"]), keyword_observations
                 )
             )
         candidates.sort(
@@ -757,6 +764,18 @@ class TaskEvidenceScopedMethodMixin:
             if codemap.index.is_current(str(row["path"]))
         }
 
+    def _task_evidence_candidate_verifier_groups(
+        self, task: str, rows: Sequence[Mapping[str, object]]
+    ) -> list[list[dict[str, object]]]:
+        """Compose source-local groups sharing one qualified keyword observation."""
+        keyword_observations: VerificationKeywordObservations = {}
+        return [
+            self._task_evidence_candidate_verifiers(
+                task, row, keyword_observations=keyword_observations
+            )
+            for row in rows
+        ]
+
     def _task_evidence_attach_candidate_verifiers(
         self, packet: TaskEvidenceDraft, task: str
     ) -> None:
@@ -779,9 +798,9 @@ class TaskEvidenceScopedMethodMixin:
             not in classify_repository_path(str(row.get("path") or ""))
         ][:3]
         source_rows = codemap._task_evidence_verification_subject_rows(source_rows)
-        candidate_groups = [
-            codemap._task_evidence_candidate_verifiers(task, row) for row in source_rows
-        ]
+        candidate_groups = codemap._task_evidence_candidate_verifier_groups(
+            task, source_rows
+        )
         by_path = {
             str(row["path"]): dict(row) for row in relevance.get("candidates", [])
         }
