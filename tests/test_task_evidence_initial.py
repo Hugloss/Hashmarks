@@ -490,6 +490,71 @@ def test_initial_disclosure_keeps_admitted_owner_and_verification_alternatives(
                 assert recovered[key] == expected[recovered["path"]][key]
 
 
+def test_compact_initial_preserves_mixed_verification_qualifier_sets(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "owner.py").write_text("def widget(): return 1\n")
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        packet = cast("dict[str, Any]", codemap.tasks.evidence("Inspect owner.py"))
+    variants = [
+        ("none", False, False),
+        ("reachable-symbol-use", True, True),
+        ("none", False, True),
+        ("reachable-symbol-use", True, False),
+    ]
+    columns = ["reference_strength", "direct_reference", "indirect_reference"]
+    candidates = [
+        {
+            "path": f"tests/test_{index}.py",
+            "qualname": None,
+            **dict(zip(columns, variants[index % len(variants)], strict=True)),
+        }
+        for index in range(8)
+    ]
+    packet["verification"]["relevance"]["candidates"] = candidates
+    packet["verification"]["relevance"]["candidate_count"] = len(candidates)
+    original = deepcopy(packet)
+    initial = initial_task_evidence(packet)
+    initial["evidence_packet_identity"] = initial_packet_identity(initial)
+    display = cast(
+        "dict[str, Any]",
+        presentation_response(
+            "task_evidence",
+            encode_initial_packet(initial),
+            result_mode="initial",
+            format="compact",
+        ),
+    )["presentation"]
+    group = next(g for g in display["groups"] if g["family"] == "verification")
+    assert group["qualifier_columns"] == columns
+    assert group["qualifier_sets"] == [list(values) for values in variants]
+    assert group["count_observed_in_packet"] == len(candidates)
+    assert group["omitted_from_presentation"] == 0
+    restored = []
+    expanded = deepcopy(group)
+    expanded.pop("qualifier_columns")
+    expanded.pop("qualifier_sets")
+    for index, finding in enumerate(group["findings"]):
+        detail = finding["details"]
+        row = {
+            **{key: value for key, value in detail.items() if key != "qualifiers"},
+            **dict(
+                zip(
+                    columns,
+                    group["qualifier_sets"][detail["qualifiers"]],
+                    strict=True,
+                )
+            ),
+        }
+        restored.append(row)
+        expanded["findings"][index]["details"] = row
+        assert finding["source_refs"] == [f"/verification/relevance/candidates/{index}"]
+    assert restored == candidates
+    assert len(json.dumps(group)) < len(json.dumps(expanded))
+    assert packet == original
+
+
 def test_initial_tables_preserve_missing_extra_fields_and_reject_corruption() -> None:
     encoding = {"kind": "columns-rows-with-extras.v1", "columns": ["path", "current"]}
     rows = [["a.py", False, {"uncertainty": None}], ["b.py", True, {}]]

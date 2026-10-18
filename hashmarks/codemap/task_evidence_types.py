@@ -43,6 +43,7 @@ class TaskCandidate(TypedDict):
     exact_identifier_projection: NotRequired[bool]
     qualified_identifier_index_projection: NotRequired[bool]
     locality_projection: NotRequired[bool]
+    task_keyword_syntax: NotRequired[dict[str, object]]
 
 
 class ActionDiscrimination(TypedDict):

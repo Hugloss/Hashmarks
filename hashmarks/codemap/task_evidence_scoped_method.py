@@ -487,6 +487,11 @@ class TaskEvidenceScopedMethodMixin:
                 str(candidate["path"]), 0
             )
             candidate.update(filename_candidates.get(str(candidate["path"]), {}))
+            candidate.update(
+                codemap.verification._verification_task_keyword_syntax(
+                    state, str(candidate["path"])
+                )
+            )
         candidates.sort(
             key=lambda candidate: codemap._task_evidence_candidate_verifier_score(
                 candidate, source_symbol=str(row.get("symbol") or ""), source_path=path
@@ -612,6 +617,12 @@ class TaskEvidenceScopedMethodMixin:
 
         codemap = cast("RepositoryTasks", self)
         score = codemap.verification._verification_candidate_score(row)
+        keyword_syntax = row.get("task_keyword_syntax")
+        keyword_matches = (
+            keyword_syntax.get("observed_keywords", 0)
+            if isinstance(keyword_syntax, Mapping)
+            else 0
+        )
         declaration_matches = self._task_evidence_test_declaration_matches(
             row, fallback=score[2]
         )
@@ -631,6 +642,7 @@ class TaskEvidenceScopedMethodMixin:
         return (
             score[0],
             score[1],
+            keyword_matches,
             source_overlap if source_overlap >= 2 else 0,
             int(row.get("source_filename_prefix_match") is True),
             self._task_evidence_problem_filename_matches(

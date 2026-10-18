@@ -11,6 +11,7 @@ from test_repository_native_component import _native
 from hashmarks.codemap.evidence_graph import RepositoryRelationships
 from hashmarks.codemap.import_resolution import RepositoryImports
 from hashmarks.codemap.indexing_lifecycle import RepositoryIndex
+from hashmarks.codemap.structural_locality import RepositoryStructure
 
 
 def _relationships(index: RepositoryIndex) -> RepositoryRelationships:
@@ -61,6 +62,33 @@ def test_relationships_import_does_not_load_facade_or_retrieval() -> None:
         text=True,
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_production_test_shaped_caller_is_not_a_verification_surface(
+    index: RepositoryIndex,
+) -> None:
+    (index.workspace / "src").mkdir()
+    (index.workspace / "tests").mkdir()
+    (index.workspace / "src/__init__.py").write_text("")
+    (index.workspace / "src/owner.py").write_text("def compute(): return 1\n")
+    (index.workspace / "src/test_adapter.py").write_text(
+        "from src.owner import compute\ndef serve(): return compute()\n"
+    )
+    (index.workspace / "tests/test_owner.py").write_text(
+        "from src.owner import compute\ndef test_compute(): assert compute()==1\n"
+    )
+    index.sync()
+    relationships = _relationships(index)
+    assert relationships.affected("src/owner.py")["affected_files"] == [
+        "src/test_adapter.py",
+        "tests/test_owner.py",
+    ]
+    assert relationships.tests("src/owner.py")["tests"] == ["tests/test_owner.py"]
+    structure = RepositoryStructure(
+        relationships.source, relationships.imports, relationships.native, relationships
+    )
+    observed = structure.locality("src/owner.py::compute", refresh=False)
+    assert observed["verification_paths"] == ["tests/test_owner.py"]
 
 
 def test_retired_root_relationship_operations_are_removed() -> None:

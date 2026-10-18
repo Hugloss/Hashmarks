@@ -1,5 +1,720 @@
 {
   "cases": {
+    "fastapi-body-dependency-flattening": {
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "fastapi/dependencies/utils.py"
+            }
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "fastapi/dependencies/utils.py"
+            }
+          }
+        ]
+      },
+      "checks": [],
+      "delta_checks": [
+        {
+          "authority_check": true,
+          "id": "changed-source-current",
+          "pointer": "/path_changes/*/revision",
+          "predicate": "includes",
+          "value": "db3f108486f3c86a9291c082306f8f98a8755332f4e01a4aa59893ccbf7e4260"
+        }
+      ],
+      "expected_owner_path": "fastapi/dependencies/utils.py",
+      "function_boundary_oracles": {
+        "after": {
+          "checks": [
+            {
+              "id": "declared-provider-call",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/sites/*",
+                "record": {
+                  "callee_identifier_syntax": "create_body_model",
+                  "end_line": 1075,
+                  "line": 1075,
+                  "positional_argument_count": 0,
+                  "syntax_kind": "call"
+                },
+                "scope": {
+                  "state": "source-index-bound",
+                  "subject": "fastapi/dependencies/utils.py::_get_body_field"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "runtime-boundary-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "authority_check": true,
+              "id": "callee-resolution-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/callee_resolution",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "id": "declared-provider-argument",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*/sites/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/argument_syntax/keywords/*",
+                "record": {
+                  "expansion": false,
+                  "name": "fields",
+                  "name_state": "literal",
+                  "value": {
+                    "identifier": "body_params",
+                    "state": "identifier-syntax"
+                  }
+                },
+                "scope": {
+                  "callee_identifier_syntax": "create_body_model",
+                  "end_line": 1075,
+                  "line": 1075,
+                  "positional_argument_count": 0,
+                  "syntax_kind": "call"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "argument-runtime-binding-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*/sites/*/argument_syntax/runtime_binding",
+              "predicate": "all_equal",
+              "value": "not-established"
+            }
+          ],
+          "literal_source_line_sha256": "7216723b369f8a200762ef7a9004dff62d5e771a4d1326ef003ced9ba5251607",
+          "reported_span": {
+            "end_line": 1075,
+            "path": "fastapi/dependencies/utils.py",
+            "start_line": 1075
+          },
+          "site_source_label": {
+            "end_line": 1075,
+            "path": "fastapi/dependencies/utils.py",
+            "sha256": "7216723b369f8a200762ef7a9004dff62d5e771a4d1326ef003ced9ba5251607",
+            "start_line": 1075
+          },
+          "source": "fastapi-body-dependency-flattening-after",
+          "source_label": {
+            "declaration_line": 1056,
+            "end_line": 1103,
+            "path": "fastapi/dependencies/utils.py",
+            "sha256": "cbe45062b271c7b31fbd74e056e4ff02b37336af9771d5bf0ce16efd38d145df",
+            "start_line": 1056,
+            "symbol": "_get_body_field"
+          }
+        },
+        "before": {
+          "checks": [
+            {
+              "id": "declared-provider-call",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/sites/*",
+                "record": {
+                  "callee_identifier_syntax": "create_body_model",
+                  "end_line": 1067,
+                  "line": 1065,
+                  "positional_argument_count": 0,
+                  "syntax_kind": "call"
+                },
+                "scope": {
+                  "state": "source-index-bound",
+                  "subject": "fastapi/dependencies/utils.py::get_body_field"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "runtime-boundary-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "authority_check": true,
+              "id": "callee-resolution-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/callee_resolution",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "id": "declared-provider-argument",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*/sites/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/argument_syntax/keywords/*",
+                "record": {
+                  "expansion": false,
+                  "name": "fields",
+                  "name_state": "literal",
+                  "value": {
+                    "identifier": "flat_dependant.body_params",
+                    "state": "identifier-syntax"
+                  }
+                },
+                "scope": {
+                  "callee_identifier_syntax": "create_body_model",
+                  "end_line": 1067,
+                  "line": 1065,
+                  "positional_argument_count": 0,
+                  "syntax_kind": "call"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "argument-runtime-binding-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*/sites/*/argument_syntax/runtime_binding",
+              "predicate": "all_equal",
+              "value": "not-established"
+            }
+          ],
+          "literal_source_line_sha256": "245a0fb4087f6c66ad9778060d5862efd94f11b24db0f008e866c1489476f56f",
+          "reported_span": {
+            "end_line": 1067,
+            "path": "fastapi/dependencies/utils.py",
+            "start_line": 1065
+          },
+          "site_source_label": {
+            "end_line": 1067,
+            "path": "fastapi/dependencies/utils.py",
+            "sha256": "57dca6fd6bca8ecfdeea3470a8df251da610c466c5e42c7a79f102dd189af4db",
+            "start_line": 1065
+          },
+          "source": "fastapi-body-dependency-flattening-before",
+          "source_label": {
+            "declaration_line": 1046,
+            "end_line": 1097,
+            "path": "fastapi/dependencies/utils.py",
+            "sha256": "57b2b578d02bf3edf0daff63650b3a37f60eedad4d128f80e8e178082005c87f",
+            "start_line": 1046,
+            "symbol": "get_body_field"
+          }
+        }
+      },
+      "source_labels": {
+        "after": [
+          {
+            "declaration_line": 1056,
+            "end_line": 1103,
+            "path": "fastapi/dependencies/utils.py",
+            "sha256": "cbe45062b271c7b31fbd74e056e4ff02b37336af9771d5bf0ce16efd38d145df",
+            "start_line": 1056,
+            "symbol": "_get_body_field"
+          }
+        ],
+        "before": [
+          {
+            "declaration_line": 1046,
+            "end_line": 1097,
+            "path": "fastapi/dependencies/utils.py",
+            "sha256": "57b2b578d02bf3edf0daff63650b3a37f60eedad4d128f80e8e178082005c87f",
+            "start_line": 1046,
+            "symbol": "get_body_field"
+          }
+        ]
+      }
+    },
+    "fastapi-dependency-model-memory": {
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "fastapi/dependencies/models.py"
+            }
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "fastapi/dependencies/models.py"
+            }
+          }
+        ]
+      },
+      "checks": [],
+      "delta_checks": [
+        {
+          "authority_check": true,
+          "id": "changed-source-current",
+          "pointer": "/path_changes/*/revision",
+          "predicate": "includes",
+          "value": "635814ecfbc47b20f0c1266e0e0cb7509fcf830b3502ba7b338b42384f73c41d"
+        }
+      ],
+      "expected_owner_path": "fastapi/dependencies/models.py",
+      "function_boundary_oracles": {
+        "after": {
+          "checks": [
+            {
+              "id": "declared-provider-call",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/sites/*",
+                "record": {
+                  "callee_identifier_syntax": "_is_coroutine_callable_cached",
+                  "end_line": 229,
+                  "line": 229,
+                  "positional_argument_count": 1,
+                  "syntax_kind": "call"
+                },
+                "scope": {
+                  "state": "source-index-bound",
+                  "subject": "fastapi/dependencies/models.py::_is_coroutine_callable"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "runtime-boundary-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "authority_check": true,
+              "id": "callee-resolution-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/callee_resolution",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "id": "declared-provider-argument",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*/sites/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/argument_syntax/positional/*",
+                "record": {
+                  "expansion": false,
+                  "position": 0,
+                  "value": {
+                    "expression_kind": "Call",
+                    "state": "expression-unestablished"
+                  }
+                },
+                "scope": {
+                  "callee_identifier_syntax": "_is_coroutine_callable_cached",
+                  "end_line": 229,
+                  "line": 229,
+                  "positional_argument_count": 1,
+                  "syntax_kind": "call"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "argument-runtime-binding-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*/sites/*/argument_syntax/runtime_binding",
+              "predicate": "all_equal",
+              "value": "not-established"
+            }
+          ],
+          "literal_source_line_sha256": "acce934854bb7388ac1501e06ec3c0222f84c4d454f99976d586ef1abcf37b12",
+          "reported_span": {
+            "end_line": 229,
+            "path": "fastapi/dependencies/models.py",
+            "start_line": 229
+          },
+          "site_source_label": {
+            "end_line": 229,
+            "path": "fastapi/dependencies/models.py",
+            "sha256": "acce934854bb7388ac1501e06ec3c0222f84c4d454f99976d586ef1abcf37b12",
+            "start_line": 229
+          },
+          "source": "fastapi-dependency-model-memory-after",
+          "source_label": {
+            "declaration_line": 226,
+            "end_line": 229,
+            "path": "fastapi/dependencies/models.py",
+            "sha256": "aa72751b99989bcc2e7f2861dadd3a4a02cdd780235557b8e0c5a19af65503b4",
+            "start_line": 226,
+            "symbol": "_is_coroutine_callable"
+          }
+        },
+        "before": {
+          "checks": [
+            {
+              "id": "declared-provider-call",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/sites/*",
+                "record": {
+                  "callee_identifier_syntax": "inspect.isroutine",
+                  "end_line": 161,
+                  "line": 161,
+                  "positional_argument_count": 1,
+                  "syntax_kind": "call"
+                },
+                "scope": {
+                  "state": "source-index-bound",
+                  "subject": "fastapi/dependencies/models.py::Dependant.is_coroutine_callable"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "runtime-boundary-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "authority_check": true,
+              "id": "callee-resolution-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/callee_resolution",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "id": "declared-provider-argument",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*/sites/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/argument_syntax/positional/*",
+                "record": {
+                  "expansion": false,
+                  "position": 0,
+                  "value": {
+                    "expression_kind": "Call",
+                    "state": "expression-unestablished"
+                  }
+                },
+                "scope": {
+                  "callee_identifier_syntax": "inspect.isroutine",
+                  "end_line": 161,
+                  "line": 161,
+                  "positional_argument_count": 1,
+                  "syntax_kind": "call"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "argument-runtime-binding-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*/sites/*/argument_syntax/runtime_binding",
+              "predicate": "all_equal",
+              "value": "not-established"
+            }
+          ],
+          "literal_source_line_sha256": "df1a19047ffbaabd2da9403040594dd5482d6d0ed0fcd0854f556f9a0b2c145e",
+          "reported_span": {
+            "end_line": 161,
+            "path": "fastapi/dependencies/models.py",
+            "start_line": 161
+          },
+          "site_source_label": {
+            "end_line": 161,
+            "path": "fastapi/dependencies/models.py",
+            "sha256": "df1a19047ffbaabd2da9403040594dd5482d6d0ed0fcd0854f556f9a0b2c145e",
+            "start_line": 161
+          },
+          "source": "fastapi-dependency-model-memory-before",
+          "source_label": {
+            "declaration_line": 158,
+            "end_line": 185,
+            "path": "fastapi/dependencies/models.py",
+            "sha256": "eaec2b20918b6383c3b3eb25399f981413f270a1be5cdea90328c7028cff497b",
+            "start_line": 157,
+            "symbol": "Dependant.is_coroutine_callable"
+          }
+        }
+      },
+      "source_labels": {
+        "after": [
+          {
+            "declaration_line": 226,
+            "end_line": 229,
+            "path": "fastapi/dependencies/models.py",
+            "sha256": "aa72751b99989bcc2e7f2861dadd3a4a02cdd780235557b8e0c5a19af65503b4",
+            "start_line": 226,
+            "symbol": "_is_coroutine_callable"
+          }
+        ],
+        "before": [
+          {
+            "declaration_line": 158,
+            "end_line": 185,
+            "path": "fastapi/dependencies/models.py",
+            "sha256": "eaec2b20918b6383c3b3eb25399f981413f270a1be5cdea90328c7028cff497b",
+            "start_line": 157,
+            "symbol": "Dependant.is_coroutine_callable"
+          }
+        ]
+      }
+    },
+    "fastapi-repeat-dependency-bookkeeping": {
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "fastapi/dependencies/utils.py"
+            }
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "fastapi/dependencies/utils.py"
+            }
+          }
+        ]
+      },
+      "checks": [],
+      "delta_checks": [
+        {
+          "authority_check": true,
+          "id": "changed-source-current",
+          "pointer": "/path_changes/*/revision",
+          "predicate": "includes",
+          "value": "0a2773a587f1e0739435b80d76ccd75bcb0dd3d4afe2eb530cb048b0827670bd"
+        }
+      ],
+      "expected_owner_path": "fastapi/dependencies/utils.py",
+      "function_boundary_oracles": {
+        "after": {
+          "checks": [
+            {
+              "id": "declared-provider-call",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/sites/*",
+                "record": {
+                  "callee_identifier_syntax": "_get_cache_key",
+                  "end_line": 167,
+                  "line": 164,
+                  "positional_argument_count": 0,
+                  "syntax_kind": "call"
+                },
+                "scope": {
+                  "state": "source-index-bound",
+                  "subject": "fastapi/dependencies/utils.py::get_flat_dependant"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "runtime-boundary-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "authority_check": true,
+              "id": "callee-resolution-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/callee_resolution",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "id": "declared-provider-argument",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*/sites/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/argument_syntax/keywords/*",
+                "record": {
+                  "expansion": false,
+                  "name": "dependant",
+                  "name_state": "literal",
+                  "value": {
+                    "identifier": "dependant",
+                    "state": "identifier-syntax"
+                  }
+                },
+                "scope": {
+                  "callee_identifier_syntax": "_get_cache_key",
+                  "end_line": 167,
+                  "line": 164,
+                  "positional_argument_count": 0,
+                  "syntax_kind": "call"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "argument-runtime-binding-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*/sites/*/argument_syntax/runtime_binding",
+              "predicate": "all_equal",
+              "value": "not-established"
+            }
+          ],
+          "literal_source_line_sha256": "f0a9a54d2d6746fcd2b7a7367ae1317508e8142126b36d6e3118f35da8b0f858",
+          "reported_span": {
+            "end_line": 167,
+            "path": "fastapi/dependencies/utils.py",
+            "start_line": 164
+          },
+          "site_source_label": {
+            "end_line": 167,
+            "path": "fastapi/dependencies/utils.py",
+            "sha256": "363ca4ccc87efdabe8ed8e9cb4a74e6ea1e680da17d730af299cb25c86367a89",
+            "start_line": 164
+          },
+          "source": "fastapi-repeat-dependency-bookkeeping-after",
+          "source_label": {
+            "declaration_line": 147,
+            "end_line": 219,
+            "path": "fastapi/dependencies/utils.py",
+            "sha256": "d5e392c49324dc4443f9d94742619d247f7a7f93ff02d7a724fe01cafc7991dd",
+            "start_line": 147,
+            "symbol": "get_flat_dependant"
+          }
+        },
+        "before": {
+          "checks": [
+            {
+              "id": "declared-provider-call",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/sites/*",
+                "record": {
+                  "callee_identifier_syntax": "_get_cache_key",
+                  "end_line": 163,
+                  "line": 160,
+                  "positional_argument_count": 0,
+                  "syntax_kind": "call"
+                },
+                "scope": {
+                  "state": "source-index-bound",
+                  "subject": "fastapi/dependencies/utils.py::get_flat_dependant"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "runtime-boundary-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "authority_check": true,
+              "id": "callee-resolution-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/callee_resolution",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "id": "declared-provider-argument",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*/sites/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/argument_syntax/keywords/*",
+                "record": {
+                  "expansion": false,
+                  "name": "dependant",
+                  "name_state": "literal",
+                  "value": {
+                    "identifier": "dependant",
+                    "state": "identifier-syntax"
+                  }
+                },
+                "scope": {
+                  "callee_identifier_syntax": "_get_cache_key",
+                  "end_line": 163,
+                  "line": 160,
+                  "positional_argument_count": 0,
+                  "syntax_kind": "call"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "argument-runtime-binding-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*/sites/*/argument_syntax/runtime_binding",
+              "predicate": "all_equal",
+              "value": "not-established"
+            }
+          ],
+          "literal_source_line_sha256": "00bee13763c82b6d7322ee65360c2126bd80c1e667202df5e3233948ffd67800",
+          "reported_span": {
+            "end_line": 163,
+            "path": "fastapi/dependencies/utils.py",
+            "start_line": 160
+          },
+          "site_source_label": {
+            "end_line": 163,
+            "path": "fastapi/dependencies/utils.py",
+            "sha256": "1d0793993d40645ea9d84b2e6aa7542640e1712457ba2d93f63ce58c6fca2a6b",
+            "start_line": 160
+          },
+          "source": "fastapi-repeat-dependency-bookkeeping-before",
+          "source_label": {
+            "declaration_line": 147,
+            "end_line": 214,
+            "path": "fastapi/dependencies/utils.py",
+            "sha256": "4f78fdb996ab64f90bd7f1c4f041102808f2b17392951278731d0d50dcbceb85",
+            "start_line": 147,
+            "symbol": "get_flat_dependant"
+          }
+        }
+      },
+      "source_labels": {
+        "after": [
+          {
+            "declaration_line": 147,
+            "end_line": 219,
+            "path": "fastapi/dependencies/utils.py",
+            "sha256": "d5e392c49324dc4443f9d94742619d247f7a7f93ff02d7a724fe01cafc7991dd",
+            "start_line": 147,
+            "symbol": "get_flat_dependant"
+          }
+        ],
+        "before": [
+          {
+            "declaration_line": 147,
+            "end_line": 214,
+            "path": "fastapi/dependencies/utils.py",
+            "sha256": "4f78fdb996ab64f90bd7f1c4f041102808f2b17392951278731d0d50dcbceb85",
+            "start_line": 147,
+            "symbol": "get_flat_dependant"
+          }
+        ]
+      }
+    },
     "fastapi-request-parameter-dependency-flattening": {
       "after": {
         "checks": [
@@ -588,6 +1303,243 @@
             "path": "litestar/di.py",
             "sha256": "2adb4332e2531f71ecd5e335729e7bb6c24a698333bc86d7352c947dcb630622",
             "start_line": 44,
+            "symbol": "Provide.__init__"
+          }
+        ]
+      }
+    },
+    "litestar-cached-yield-provider": {
+      "after": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "litestar/di.py"
+            }
+          }
+        ]
+      },
+      "before": {
+        "checks": [
+          {
+            "id": "source-owner-visible",
+            "pointer": "/retrieval/results/*",
+            "predicate": "includes_record",
+            "value": {
+              "path": "litestar/di.py"
+            }
+          }
+        ]
+      },
+      "checks": [],
+      "delta_checks": [
+        {
+          "authority_check": true,
+          "id": "changed-source-current",
+          "pointer": "/path_changes/*/revision",
+          "predicate": "includes",
+          "value": "26970ddefb66215c7e2d3db3eb4975435f903bc7ab140af70a3370275597adf9"
+        }
+      ],
+      "expected_owner_path": "litestar/di.py",
+      "function_boundary_oracles": {
+        "after": {
+          "checks": [
+            {
+              "id": "declared-provider-call",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/sites/*",
+                "record": {
+                  "callee_identifier_syntax": "isgeneratorfunction",
+                  "end_line": 59,
+                  "line": 57,
+                  "positional_argument_count": 1,
+                  "syntax_kind": "call"
+                },
+                "scope": {
+                  "state": "source-index-bound",
+                  "subject": "litestar/di.py::Provide.__init__"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "runtime-boundary-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "authority_check": true,
+              "id": "callee-resolution-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/callee_resolution",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "id": "declared-provider-argument",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*/sites/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/argument_syntax/positional/*",
+                "record": {
+                  "expansion": false,
+                  "position": 0,
+                  "value": {
+                    "expression_kind": "IfExp",
+                    "state": "expression-unestablished"
+                  }
+                },
+                "scope": {
+                  "callee_identifier_syntax": "isgeneratorfunction",
+                  "end_line": 59,
+                  "line": 57,
+                  "positional_argument_count": 1,
+                  "syntax_kind": "call"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "argument-runtime-binding-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*/sites/*/argument_syntax/runtime_binding",
+              "predicate": "all_equal",
+              "value": "not-established"
+            }
+          ],
+          "literal_source_line_sha256": "f465ab7d21e71cbc7d1b420f008d0c3266ad22de8e4b321d611f6515dc70e478",
+          "reported_span": {
+            "end_line": 59,
+            "path": "litestar/di.py",
+            "start_line": 57
+          },
+          "site_source_label": {
+            "end_line": 59,
+            "path": "litestar/di.py",
+            "sha256": "d52e98268807c12dbb1e95a8a25e522de9e7d53f4914bf8790b84cf335da32cb",
+            "start_line": 57
+          },
+          "source": "litestar-cached-yield-provider-after",
+          "source_label": {
+            "declaration_line": 40,
+            "end_line": 89,
+            "path": "litestar/di.py",
+            "sha256": "540031dbc9256e1eed92a96a537780743fee071d6ff83e7163620c817c1eb165",
+            "start_line": 40,
+            "symbol": "Provide.__init__"
+          }
+        },
+        "before": {
+          "checks": [
+            {
+              "id": "declared-provider-call",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/sites/*",
+                "record": {
+                  "callee_identifier_syntax": "is_sync_or_async_generator",
+                  "end_line": 59,
+                  "line": 59,
+                  "positional_argument_count": 1,
+                  "syntax_kind": "call"
+                },
+                "scope": {
+                  "state": "source-index-bound",
+                  "subject": "litestar/di.py::Provide.__init__"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "runtime-boundary-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/runtime_boundary_kind",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "authority_check": true,
+              "id": "callee-resolution-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/callee_resolution",
+              "predicate": "all_equal",
+              "value": "not-established"
+            },
+            {
+              "id": "declared-provider-argument",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*/sites/*",
+              "predicate": "includes_scoped_record",
+              "value": {
+                "pointer": "/argument_syntax/positional/*",
+                "record": {
+                  "expansion": false,
+                  "position": 0,
+                  "value": {
+                    "identifier": "dependency",
+                    "state": "identifier-syntax"
+                  }
+                },
+                "scope": {
+                  "callee_identifier_syntax": "is_sync_or_async_generator",
+                  "end_line": 59,
+                  "line": 59,
+                  "positional_argument_count": 1,
+                  "syntax_kind": "call"
+                }
+              }
+            },
+            {
+              "authority_check": true,
+              "id": "argument-runtime-binding-unestablished",
+              "pointer": "/changed_line_evidence/observations/*/function_boundary_syntax/observations/*/sites/*/argument_syntax/runtime_binding",
+              "predicate": "all_equal",
+              "value": "not-established"
+            }
+          ],
+          "literal_source_line_sha256": "f7e53ae487d03ddad6201468505933ec16d5aaf80ba1e2b538f560df2dd8103e",
+          "reported_span": {
+            "end_line": 59,
+            "path": "litestar/di.py",
+            "start_line": 59
+          },
+          "site_source_label": {
+            "end_line": 59,
+            "path": "litestar/di.py",
+            "sha256": "f7e53ae487d03ddad6201468505933ec16d5aaf80ba1e2b538f560df2dd8103e",
+            "start_line": 59
+          },
+          "source": "litestar-cached-yield-provider-before",
+          "source_label": {
+            "declaration_line": 40,
+            "end_line": 75,
+            "path": "litestar/di.py",
+            "sha256": "989a3ce7cc023d26e13503b955fd76e0444cc24699f07590d4f3aa2c83a6b51e",
+            "start_line": 40,
+            "symbol": "Provide.__init__"
+          }
+        }
+      },
+      "source_labels": {
+        "after": [
+          {
+            "declaration_line": 40,
+            "end_line": 89,
+            "path": "litestar/di.py",
+            "sha256": "540031dbc9256e1eed92a96a537780743fee071d6ff83e7163620c817c1eb165",
+            "start_line": 40,
+            "symbol": "Provide.__init__"
+          }
+        ],
+        "before": [
+          {
+            "declaration_line": 40,
+            "end_line": 75,
+            "path": "litestar/di.py",
+            "sha256": "989a3ce7cc023d26e13503b955fd76e0444cc24699f07590d4f3aa2c83a6b51e",
+            "start_line": 40,
             "symbol": "Provide.__init__"
           }
         ]

@@ -65,7 +65,7 @@
       ]
     },
     {
-      "grader_sha256": "b88b3d23d517531499e40c9225676d296041fac481e7179ad8960aee6eaa8919",
+      "grader_sha256": "9953cff9fe48c6d5a400dcdf61eaa7b8a0e10f3c80f7036a1386f49ca180c225",
       "id": "backend-model-v2",
       "suite_file": "suites/model/suite.json",
       "suite_sha256": "12d8d84f32a79c29ade5516d2b68416c97af01bde9ddc79896342745253ee238",

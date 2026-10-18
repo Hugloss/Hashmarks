@@ -28,13 +28,18 @@ and verify `hashmarks.test_shards.repository_content_identity` against the catal
 Verify archive and selected-file hashes as well. Source extraction does not run
 the target repository, its broker or its tests.
 
-`suite.json` and `grader.json` now admit four selected workflows over all three
+`suite.json` and `grader.json` now admit eight selected workflows over all three
 repositories: default-provider initializer references, dependency-parameter
-traversal calls, bound-method classification and stateful callable arguments.
+traversal calls, bound-method classification, stateful callable arguments,
+body-field construction arguments, repeat-bookkeeping calls, callable-cache
+wrapping and generator-provider classification.
 Their before/after oracles were written from exact AST/source hashes before
 observer acquisition. Runtime binding and callee resolution remain explicitly
 unknown. The default-provider source omission is reproduced on the original
-observer. The other eight workflows, broader causal provider semantics,
+observer. `call-source-oracles.json` records the four added call slices, exact
+declarations and argument syntax. These slices do not establish the surrounding
+guard behavior, runtime performance or causal test relevance. The other four
+workflows, broader causal provider semantics,
 adversaries and capability proof remain unreviewed; every capability flag is false.
 
 The existing materializer and backend runner accept this suite. Use the three
@@ -42,7 +47,7 @@ caller-selected checkouts with
 `scripts.repository_evaluation.materialize_backend --suite .../suite.json`, then
 pass its `sources.json` to `scripts.repository_evaluation.run_backend --suite
 .../suite.json`. The generic materializer verifies all twenty-four source trees;
-the runner currently observes four workflows and reports missing qualification.
+the runner currently observes eight workflows and reports missing qualification.
 
 Next, inspect the other source changes and their existing tests, write independent
 declaration/wiring facts with exact ranges and revisions, and freeze answer-blind

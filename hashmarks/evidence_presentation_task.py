@@ -308,6 +308,47 @@ def compact_initial_declarations(groups: list[dict[str, Any]]) -> None:
                     details[family] = declaration_scope_table(context, shared=shared)
 
 
+def _initial_verification_qualifier_table(
+    details: list[dict[str, Any]],
+) -> tuple[list[str], list[list[object]], list[dict[str, Any]]] | None:
+    """Encode repeated qualifier combinations without changing any supplied value."""
+    columns = ["reference_strength", "direct_reference", "indirect_reference"]
+    if not all(all(key in row for key in columns) for row in details):
+        return None
+    keys: dict[str, int] = {}
+    qualifiers: list[list[object]] = []
+    rows = []
+    for detail in details:
+        values = [detail[key] for key in columns]
+        key = json.dumps(values, sort_keys=True, ensure_ascii=False, allow_nan=False)
+        index = keys.setdefault(key, len(qualifiers))
+        if index == len(qualifiers):
+            qualifiers.append(values)
+        rows.append(
+            {
+                **{key: value for key, value in detail.items() if key not in columns},
+                "qualifiers": index,
+            }
+        )
+    original = {"rows": details}
+    encoded = {
+        "rows": rows,
+        "qualifier_columns": columns,
+        "qualifier_sets": qualifiers,
+    }
+    sizes = [
+        len(
+            json.dumps(
+                value, ensure_ascii=False, separators=(",", ":"), allow_nan=False
+            ).encode("utf-8")
+        )
+        for value in (original, encoded)
+    ]
+    if sizes[1] >= sizes[0]:
+        return None
+    return columns, qualifiers, rows
+
+
 def compact_initial_verification_qualifiers(groups: list[dict[str, Any]]) -> None:
     """Common qualifier values apply to each locator, never to omitted evidence."""
     for group in groups:
@@ -324,6 +365,13 @@ def compact_initial_verification_qualifiers(groups: list[dict[str, Any]]) -> Non
             )
         }
         if not common:
+            table = _initial_verification_qualifier_table(details)
+            if table is not None:
+                columns, qualifiers, rows = table
+                group["qualifier_columns"] = columns
+                group["qualifier_sets"] = qualifiers
+                for finding, row in zip(group["findings"], rows, strict=True):
+                    finding["details"] = row
             continue
         group["locator_qualifiers"] = common
         for row in details:

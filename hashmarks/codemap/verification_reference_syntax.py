@@ -10,6 +10,8 @@ import ast
 from dataclasses import dataclass
 from functools import lru_cache
 
+MAX_KEYWORD_IDENTIFIER_CHARS = 128
+
 
 @dataclass(frozen=True)
 class VerificationReferenceIndex:
@@ -20,6 +22,7 @@ class VerificationReferenceIndex:
     reachable_attribute_chains: frozenset[str]
     bound_names: frozenset[str]
     star_import: bool
+    keyword_arguments: tuple[tuple[str, int, int], ...]
 
     def imported_attribute(self, target: str) -> tuple[str, str] | None:
         """Expand one unshadowed import alias, without resolving its owner."""
@@ -52,6 +55,7 @@ class _VerificationReferenceIndexVisitor(ast.NodeVisitor):
         self.reachable_attribute_chains: set[str] = set()
         self.bound_names: set[str] = set()
         self.star_import = False
+        self.keyword_arguments: dict[str, tuple[int, int]] = {}
 
     def visit(self, node: ast.AST) -> None:
         match node:
@@ -114,6 +118,17 @@ class _VerificationReferenceIndexVisitor(ast.NodeVisitor):
             for alias in node.names
         )
 
+    def visit_keyword(self, node: ast.keyword) -> None:
+        if (
+            self.guard is None
+            and node.arg is not None
+            and len(node.arg) <= MAX_KEYWORD_IDENTIFIER_CHARS
+        ):
+            self.keyword_arguments.setdefault(
+                node.arg, (node.lineno, node.end_lineno or node.lineno)
+            )
+        self.generic_visit(node)
+
     @staticmethod
     def _attribute_chain(node: ast.Attribute) -> str | None:
         parts = [node.attr]
@@ -174,4 +189,8 @@ def verification_reference_index(
         reachable_attribute_chains=frozenset(visitor.reachable_attribute_chains),
         bound_names=frozenset(visitor.bound_names),
         star_import=visitor.star_import,
+        keyword_arguments=tuple(
+            (name, start, end)
+            for name, (start, end) in visitor.keyword_arguments.items()
+        ),
     )

@@ -14,17 +14,25 @@ acceptance requirements remain unchanged.
 Current position, updated 2026-10-18: all **23 canonical component owners**
 are implemented. `CodeMap` composes them and owns resource lifetime; domain
 operations and caches belong to named components. Current full configured Ty
-and Pyright checks pass. The latest independently extracted retrieval/declaration
-ring passes 109 tests; the earlier initializer/evaluator candidate passed 154.
-Four selected configuration workflows over three repositories pass every
+and Pyright checks pass. The latest independently extracted verification and
+presentation ring passes 147 tests; all 146 frozen original affected tests also
+pass against that changed production tree. The earlier path-role candidate
+passed 193 affected tests and all 182 unchanged original affected tests. The full CR-25
+membership passed 4,856 pytest cases over 64 shards, with zero skips; that full
+result remains bound to CR-25 rather than the later repairs.
+Four additional configuration workflows over three repositories pass every
 admitted API/CLI/official MCP gate. The handler
 suite pins twelve source-reviewed genuine workflows over three repositories.
-Current selected API/CLI/official MCP replays close AsyncAPI and registration
-verification disclosure; Iterable still omits its independently nominated test
-on both revisions. The late-keyword source disclosure repair remains qualified
+Retained selected API/CLI/official MCP replays close AsyncAPI and registration
+verification disclosure. Current Iterable acquisition now retains the nominated
+test on both revisions, preserves source facts through native transports, and
+passes the 4,000-token compact/text bound. Its added warm observation cost still
+needs reduction. The late-keyword source disclosure repair remains qualified
 on its earlier candidate. Direct public-operation review now covers all 95
-listed behaviors, with current extracted execution for their 143 named test
-functions. Internal-stage and baseline correspondence remain open. Earlier
+listed behaviors, with extracted execution for their 143 named test functions
+on the retained CR-17 candidate. Internal-stage and baseline correspondence
+remain open. The configuration suite now admits eight source-authored workflows;
+four catalog problems and broader semantic/capability review remain pending. Earlier
 reports retain their original identities. Architecture
 acceptance remains open for complete operation/direct-
 test/baseline correspondence and locality qualification (CR-11), followed by
@@ -36,7 +44,7 @@ Remaining completion work:
 
 | Work | What still needs proof |
 | --- | --- |
-| CR-11 architecture acceptance | Complete introduced/internal-stage direct-test and baseline correspondence, qualified locality/caller scopes and comparable measurements. All 95 public-operation behavior reviews now have current extracted test evidence; this does not close internal stages or full architecture acceptance. |
+| CR-11 architecture acceptance | Complete introduced/internal-stage direct-test and baseline correspondence, qualified locality/caller scopes and comparable measurements. All 95 public-operation behavior reviews have extracted test evidence on their recorded candidate; this does not close internal stages or full architecture acceptance. |
 | Q-01 corpus breadth | Qualify the twelve-problem handler and DI/config source intakes; build producer/consumer, dependency/build, cross-service, additional native and economics populations; add eight debug problems over two more repositories. Source counts alone are not qualification. |
 | Q-02 independent oracles/witnesses | Review causal owners, symbols/ranges/revisions, relevant existing tests, eligibility, unknowns and semantic adversaries; close every required artifact-bound witness. |
 | Q-03 observer defects/workflows | Repair retained owner/symbol/verifier failures; acquire the complete eligible before/after API/CLI/official MCP/native population with edit, stale, rebuild, reopen and wrong-source/tampering controls. |
@@ -2468,19 +2476,253 @@ CR-25 declaration CLI error boundary — 2026-10-18:
   still reach the shared boundary. Current typing, exact-artifact and named
   deterministic batch requalification follow; completed old-source batches
   remain proof for their original source, not silently rebound after this fix.
+- Candidate `cr25-cli-boundary-source/source.zip`, SHA-256
+  `f177a673114767d064b93ec6c17f9049b77a2d3ef84975c8d79aa00b016f7966`,
+  source identity
+  `sha256:9f5f339658ac40b8f0141c9610fc234ffe0e54729fc4c2d410bc6e7d86b55ef0`,
+  observer
+  `sha256:a69d706b4b872d9f148e7a4a0afed376be6b4070af49b07b75c38811c2f08574`,
+  passes all sixteen named batches / 64 shards: 4,856 pytest cases over 3,495
+  deterministic selected test nodes, zero skips, with every source byte held
+  fixed through completion (`cr25-full-test-membership.json`). The declared
+  plan identity and complete terminal logs are retained. Full configured typing
+  and all 29 independently extracted CLI/declaration tests pass, including the
+  six MCP cases omitted from the first focused ring.
+- The genuine sender/metadata workflows pass every admitted common, owner-recall
+  and initial-evidence gate through API/CLI/official MCP at this exact observer
+  (`cr25-core-public/summary.json`); aggregate status remains INCOMPLETE for
+  unselected cases and capability proof. The current four-repository evaluation
+  repeats all 24 cases and retains the same five ambiguity failures, with no
+  new false-safe/false-unique outcome (`cr25-heldout-current/summary.json`).
+  These are current measurements, not complete twenty-capability acceptance.
+
+CR-26 active source-oracle propagation — 2026-10-18:
+
+- The active campaign is `backend-campaign-v2`, not its historical v1 baseline.
+  Its copied model grader still held the original nested initializer records.
+  The already validated source-derived extension is now applied there: exactly
+  four records add direct references, and the campaign changes only that grader
+  digest. Every original assertion, task, source label, expected test, threshold,
+  witness, membership and review flag is preserved. This proposal stayed
+  unapplied until all CR-25 test batches completed.
+- Four captured source cases and eight old/new corruption controls pass under
+  the active copied oracle, with observer/process construction forbidden
+  (`cr26-active-oracle-proposal/controls.json`). Source admission validates all
+  twelve model workflows; all eight suite/grader digests and 89-entry / 59-problem
+  membership identities revalidate. The existing grader/gate/workflow regression
+  ring passes 130 tests (`cr26-active-oracle-regressions.xml`). The README's
+  stale seven-suite count is corrected. No historical report or full test result
+  is rebound after these data changes; full active-campaign qualification remains
+  incomplete.
+
+CR-27 canonical test-path role — 2026-10-18:
+
+- A neutral indexed workflow proves a production `src/service/test_adapter.py`
+  caller is incorrectly listed as a test by impact and structural locality
+  (`cr27-role-workflow-probe/summary.json`). The shared boolean classifier,
+  repository domain classifier and import-loader classifier independently
+  interpret the same path. Seven new semantic controls fail on the parent
+  (`cr27-role-parent.xml`), including the actual verification-path contamination.
+- Classification: REFACTOR INTERNALLY. The existing repository-domain owner now
+  supplies the single test-path role predicate to ranking, context, impact,
+  locality and import-loader diagnostics. Production-root Python test-shaped
+  names stay source; explicit test/testing directories and supported test suffixes
+  remain candidates. This is path-role evidence, never test execution or coverage
+  authority. Both independent alternate predicates are removed rather than
+  allowed to disagree with the canonical role.
+- The first domain/relationship/import/authority ring passes 93 cases, and a
+  direct production-loader control preserves its source warning rather than
+  incorrectly downgrading it to a test advisory (`cr27-role-controls.xml`,
+  `cr27-loader-role.xml`). Affected production callers remain implementation
+  evidence while verification lists contain only test-role paths. Current
+  typing, exact artifact and broader affected-source qualification are now
+  recorded below. The completed CR-25 membership remains bound to that earlier
+  source.
+- Exact candidate `cr27-canonical-test-role-source/source.zip`, SHA-256
+  `6d2be5fc041a4c19bfd9b0e779b15a432fb5780967f845f0fba06302356abbdd`,
+  source identity
+  `sha256:75d5d4fdefc6ac0de90df87389b96224f6be8c33302d8b8c409231b8c80e5989`,
+  observer
+  `sha256:16257d502d3cbe9d09f02f1e482e892816f191d63571a6546724ad8712cdcc18`,
+  passes 193 independently extracted affected-source tests with zero skips,
+  including official MCP transport (`cr27-role-extracted.xml`). Both full
+  configured type gates pass (`cr27-role-typing.log`). An explicit old-test
+  overlay additionally replays all 182 original affected tests from CR-25
+  against the complete changed production tree; all pass with zero skips
+  (`cr27-frozen-tests.xml`, `cr27-frozen-tests-receipt.json`). This is behavior
+  preservation proof, not an unchanged extraction or full test-membership run.
+- The latest four-repository evaluation completes all 24 cases and retains
+  exactly the same three WRONG_AMBIGUOUS and two OVER_AMBIGUOUS failures,
+  with zero false-safe/false-unique outcomes
+  (`cr27-heldout-current/summary.json`). These failures remain open; neither
+  the role repair nor passing affected tests closes architecture or 5/5.
+- Paired locality observes the same four canonical role stages before/after
+  at depth three and both 1,024 reference/call bounds. All eight observations
+  have zero unresolved repository calls and complete caller bounds
+  (`cr27-role-locality/summary.json`). The removed import-local predicate is
+  accounted as removed, not queried as a surviving owner. External/unindexed
+  observations retain their classification; this scoped proof does not replace
+  the larger architecture census.
+
+CR-28 configuration call-source oracles — 2026-10-18:
+
+- Four previously pending catalog problems now have exact before/after
+  call/argument oracles authored from pinned source ASTs before observer
+  acquisition: body-field construction, repeat bookkeeping, callable cache
+  wrapping and generator-provider classification. The existing four workflows,
+  their assertions and all twenty-four source identities are unchanged.
+  `backend-configuration-v1/call-source-oracles.json` retains exact declaration
+  and call hashes, selected occurrence and expected argument syntax.
+- These are bounded syntax slices, not runtime wiring, guard semantics,
+  performance or causal-test proof. All capability review flags remain false.
+  The executable configuration suite now has eight workflows; four catalog
+  problems remain pending. Active campaign membership remains unchanged.
+  Source admission revalidates all eight workflows and twenty-four trees. Eight
+  minimal source-authored cases pass and 56 mutations fail closed, including
+  borrowing the correct argument from a different call. Observer construction
+  and process launch are forbidden during these pure grader controls
+  (`cr28-configuration-call-oracles/controls.json`). They validate the oracle,
+  not product behavior.
+- Frozen candidate `cr28-configuration-call-source/source.zip`, SHA-256
+  `4828a677838d8cdf3690372ec65c7041992853f357982c9384c60615564ea88e`,
+  source identity
+  `sha256:762e36996accca10525b400b5683dfc07aa4142425df384d329a252400aef1e6`,
+  retains observer `16257d50…`. Its independent extraction passes all 121
+  existing grader/workflow tests and 91 export/import binding tests, zero skips
+  (`cr28-corpus-extracted.xml`, `cr28-internal-binding-tests.xml`). The unchanged
+  binding owners and their direct test bytes match CR-24 exactly; that byte
+  correspondence does not rebind the earlier full-candidate measurements.
+  A redundant in-sandbox workflow-test replay was stopped while waiting on MCP;
+  it is not counted as proof. The complete extracted run includes its transport
+  checks with the necessary local-socket permission.
+- All four new genuine workflows pass every admitted common and boundary gate
+  on both revisions through API/CLI/official MCP
+  (`cr28-configuration-public/summary.json`). Maximum compact/text initial
+  costs are 2,783 / 2,518 / 2,647 / 2,809 tokens. The aggregate is INCOMPLETE for
+  unselected workflows and independent capability review. Source/call hashes
+  revalidate independently against the frozen data candidate
+  (`cr28-configuration-call-oracles/source-recheck.json`). No review flag,
+  original oracle, threshold, witness requirement or active membership changed.
+- Pure regrading reproduces all four outcomes with observer construction and
+  process launch forbidden (`cr28-configuration-pure-regrade.json`). The exact
+  artifact hashes are checked before replay. This remains four newly observed
+  slices, not eight current workflow observations or a capability rating.
+
+CR-29 task-matched call-keyword evidence — 2026-10-18:
+
+- A source-only probe finds the retained Iterable verifier uniquely declares
+  four task-matched keyword variants in both revisions
+  (`cr28-keyword-source-probe.json`). A neutral public task with thirty competing
+  test filenames reproduces the omitted test in full and initial replies:
+  both new cases fail at the missing-path assertion on the parent
+  (`cr29-keyword-parent.xml`). There is no project-name or expected-test lookup.
+- Classification: KEEP COHESIVE. The existing immutable reference-syntax
+  artifact records named call keywords and source lines during its existing
+  AST traversal. RepositoryVerification qualifies visibility, current source
+  and revision; Tasks retains these facts while ordering source-candidate
+  disclosure. Existing direct-reference and namespace precedence remain ahead
+  of this additional syntax discriminator. Edit ownership and selected
+  verification remain independently owned.
+- Observer ownership note: observed evidence is named call-keyword spelling,
+  exact source lines and normalized task-term overlap. Authority is the admitted
+  indexed file and its cached stable AST snapshot. At most sixteen distinct
+  matching names are returned, with explicit observed/omitted counts and the
+  128-character identifier scope; statically dead/type-only branches are outside
+  this observation. Freshness stays with Source. Existing reference-syntax,
+  RepositoryVerification and Tasks owners are extended; runtime argument binding,
+  causal test sufficiency, source-edit choice and verification execution remain
+  unestablished/outside. Decision: OBSERVER.
+- The first focused authority/disclosure ring passes 27 cases, including hidden
+  and outline paths, stale keyword removal, wrong-owner references, exact source
+  lines, explicit omissions and full/decoded-initial preservation. Every original
+  test/helper AST in the modified test file is unchanged. A temporary misplaced
+  original assertion caused one test NameError during authoring; its original
+  function body is restored and the passing ring includes it. Current extracted,
+  genuine workflow, typing, locality and economics qualification follow below.
+- Candidate `cr29-task-keyword-source/source.zip`, SHA-256
+  `f85b5cf61cdf3ebea263462df6d5f12a89d025b772af3ce597f58ea9fc7561bf`,
+  source identity
+  `sha256:2041f46d6dcd5df40d151fc67b6b3540a7b474c15ff681346b4124d4a7dabd17`,
+  observer
+  `sha256:6cdac79680a9b8d9ac9c0f0783093a903fea71ca2978c75e3789ed0067c88f60`,
+  passes 146 independently extracted verification/initial/MCP tests, zero skips.
+  Full configured typing passes. Exact frozen overlays reproduce both missing
+  candidate assertions against CR-28 and pass all 126 original affected tests
+  against the complete CR-29 production tree (`cr29-keyword-preservation.json`).
+- The unchanged genuine Iterable workflow now passes source/verifier, authority,
+  freshness, revision, transport and presentation gates on both revisions, but
+  FAILS initial size: MCP compact costs 4,060 / 4,053 tokens; required text and
+  CLI formats stay below 4,000 (`cr29-iterable-public/summary.json`). This failed
+  candidate is retained. The new source facts are not removed to reduce size.
+- Paired locality covers three existing stages and both introduced stages at
+  depth three / 1,024 bounds (`cr29-keyword-locality/summary.json`). Caller bounds
+  are complete, but two repository-call sites remain unresolved; this remains
+  scoped INCOMPLETE architecture evidence rather than a locality waiver.
+
+CR-30 compact verification qualifier combinations — 2026-10-18:
+
+- Classification: REFACTOR INTERNALLY in the existing task-presentation owner.
+  Mixed verifier qualifiers previously repeated three field names and their
+  values per finding. Compact groups now use an explicit column/set table when
+  its actual compact UTF-8 size is smaller. Each finding retains its path and
+  absolute source reference; its qualifier index recovers the exact original
+  tuple. Uniform groups retain the existing common-qualifier encoding. No native
+  fact, bound, identity or selection authority changes.
+- A pure reconstruction of the exact retained MCP replies conserves every
+  qualifier and reduces compact cost from 4,060 / 4,053 to 3,962 / 3,946 tokens.
+  This is a proposal measurement against retained replies, not fresh current
+  transport proof. Lossless LZMA/table probes did not give a useful alternative
+  and no codec change was introduced. The focused initial/authority/presentation
+  ring passes 51 tests. The new mixed-state test restores all eight findings and
+  qualifier tuples, preserves input bytes semantically and checks a real byte
+  reduction. Fresh artifact, typing, transport and economics qualification follow.
+- Exact candidate `cr30-verification-qualifier-source/source.zip`, SHA-256
+  `4cb676e88e38318181e783fadd786cf2e7e06783ecd11973a7704411a07b2a17`,
+  source identity
+  `sha256:12dad3ecb92ae92fb878a61ae28d60ce4d1be51e70b378323fb766afb70a12e5`,
+  observer
+  `sha256:a32f264cb3a6e96f2a1dfa1b5d63f4283b3dd798b65acc0b9c4cfc9120d7cfbd`,
+  passes 147 independent extracted tests and all 146 exact original affected
+  tests over the complete changed source, zero skips
+  (`cr30-qualifier-preservation.json`). Both full type gates pass. The pure
+  projection conservation receipt reconstructs every prior presentation field
+  while preserving the original native wires and identities
+  (`cr30-projection-conservation.json`). Five paired presentation/locality
+  observations have zero unresolved repository calls and complete caller bounds
+  (`cr30-qualifier-locality/summary.json`); this does not waive CR-29's two sites.
+- Fresh genuine Iterable acquisition passes every admitted common gate on both
+  revisions through API/CLI/official MCP. Maximum required initial compact/text
+  costs are 3,962 / 3,945 tokens (`cr30-iterable-public/summary.json`). Its aggregate
+  remains INCOMPLETE for eleven unselected workflows and capability review.
+  Pure regrading, with observer construction/process launch forbidden, reproduces
+  the outcome and independently checks the four exact keyword names, lines,
+  source revisions and unknown authority in all 36 acquired native observations
+  (`cr30-iterable-pure-regrade.json`). The original oracle and every threshold,
+  review flag and campaign membership remain unchanged.
+- Warm economics compare the same genuine source/task/bounds with two warmups,
+  nine samples and a parent repeat (`cr30-keyword-economics/summary.json`). Each
+  sample observes full plus initial plus compact presentation. Median costs are
+  3,211 / 3,892 / 3,365 ms, with unchanged admitted owner and selected verifier;
+  the independently nominated verifier appears only on the repaired observer. Last-observation
+  file-row read counters increase from 2,663 to 4,148. This 16–21% warm cost
+  increase remains open work; it is not a performance win or broad economics
+  qualification. Complete cold/churn measurements remain mandatory at Q-04.
 
 Next work after this checkpoint:
 
-1. Repair the retained Iterable evidence-projection defect using a neutral
-   reproduction and unchanged source/test oracle. Preserve source-scope authority
-   and the 4,000-token compact/text bound; do not tune generic ranks for one
-   named test.
-2. Reduce the measured repeated import/reference work only with explicit
-   read-scope/source binding and exact output conservation. The measured cost
-   remains visible until qualified; do not hide source facts to regain timing.
+1. Reduce the newly measured keyword-observation read cost at its canonical
+   verification/read-scope owners. Inspect existing bulk/memo contracts before
+   adding anything. Preserve all CR-30 source facts, stale/visibility behavior,
+   unchanged ownership/verification selection and the 4,000-token bound; compare
+   exact outputs with explicit producer-identity binding and same-version noise.
+2. Complete the four pending configuration workflows and the five missing source
+   populations, independent oracles and witnesses. The Iterable disclosure and
+   size failure is closed at CR-30; do not reopen it by hiding syntax facts or
+   tuning ranks for an expected filename. Retained owner failures still need
+   correction and current-candidate qualification.
 3. Close introduced/internal-stage owning-test and pre/post baseline/locality
    correspondence. The 95-operation public review inventory is now closed for
-   its listed behaviors and current named tests; it must not be redone or treated
+   its recorded behaviors and named tests; it must not be redone or treated
    as complete internal-stage/architecture proof.
 4. Complete CR-12 and Q-00–Q-05 on one eventual final candidate, including all
    corpus/oracle/witness breadth and retained current failures. The full goal
@@ -3642,9 +3884,10 @@ interface case has bounded source/transport proof; it does not qualify the full
 handler population. Configuration source intake now also pins twelve changes
 over the three admitted repositories in
 `backend-configuration-v1/source-catalog.json`, with all twenty-four tree/file
-identities independently rechecked. Its semantic, capability and problem-
-distinctness reviews remain false, with no executable suite or active campaign
-membership. The other five populations remain to be built; all seven still need
+identities independently rechecked. Its executable suite now covers eight
+source-authored declaration/call slices, with four catalog workflows pending.
+Semantic, capability and problem-distinctness reviews remain false, and it is
+outside active campaign membership. The other five populations remain to be built; all seven still need
 qualification. Current configured full typing is green; Q-04 still requires those
 same gates on the eventual final candidate.
 

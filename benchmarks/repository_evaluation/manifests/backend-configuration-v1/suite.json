@@ -1,16 +1,12 @@
 {
   "grader_file": "grader.json",
   "pending_catalog_workflows": [
-    "fastapi-body-dependency-flattening",
-    "fastapi-repeat-dependency-bookkeeping",
-    "fastapi-dependency-model-memory",
-    "litestar-cached-yield-provider",
     "litestar-named-dependency-markers",
     "faststream-composed-context-provider",
     "faststream-non-init-dependant-fields",
     "faststream-dependant-constructor-metadata"
   ],
-  "qualification_scope": "Four source-reviewed declaration/call slices over three repositories; explicit source nomination, exact initializer/argument facts and unknown runtime binding. Eight pending workflows, all independent capability/semantic/adversarial/native review remain incomplete.",
+  "qualification_scope": "Eight source-authored declaration/call slices over three repositories; exact initializer/call/argument syntax with explicit unknown runtime authority. Four pending workflows and all independent semantic/capability/adversarial review remain incomplete.",
   "schema": "hashmarks.backend-evidence-workflows.v2",
   "sources": {
     "fastapi-body-dependency-flattening-after": {
@@ -412,6 +408,278 @@
       "problem_id": "ce25bff4bb5956af8731ab51024bcdbe5ba5a3c3",
       "repository": "litestar",
       "task": "Stateful callable providers lose declared cleanup behavior. Inspect litestar/di.py.",
+      "transitions": [
+        {
+          "after_path": "litestar/di.py",
+          "before_path": "litestar/di.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "fastapi-body-dependency-flattening-after",
+      "before": "fastapi-body-dependency-flattening-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 1075,
+              "path": "fastapi/dependencies/utils.py",
+              "start_line": 1075
+            }
+          ],
+          "changed_paths": [
+            "fastapi/dependencies/utils.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 1067,
+              "path": "fastapi/dependencies/utils.py",
+              "start_line": 1065
+            }
+          ],
+          "changed_paths": [
+            "fastapi/dependencies/utils.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        11
+      ],
+      "capability_proofs": {
+        "11": {
+          "reason": "source-bound declared call/argument slice only; guard semantics, causal test relevance, provider wiring and adversaries remain unqualified",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "fastapi/dependencies/utils.py"
+      ],
+      "id": "fastapi-body-dependency-flattening",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "semantic sufficiency not independently reviewed"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "explicit caller-nominated production path"
+        }
+      },
+      "native_required": false,
+      "problem_id": "23e4a10434cf61438c4508d94404680bdcd8bf59",
+      "repository": "fastapi",
+      "task": "Body-field dependency inspection repeats flattening work. Inspect fastapi/dependencies/utils.py.",
+      "transitions": [
+        {
+          "after_path": "fastapi/dependencies/utils.py",
+          "before_path": "fastapi/dependencies/utils.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "fastapi-repeat-dependency-bookkeeping-after",
+      "before": "fastapi-repeat-dependency-bookkeeping-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 167,
+              "path": "fastapi/dependencies/utils.py",
+              "start_line": 164
+            }
+          ],
+          "changed_paths": [
+            "fastapi/dependencies/utils.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 163,
+              "path": "fastapi/dependencies/utils.py",
+              "start_line": 160
+            }
+          ],
+          "changed_paths": [
+            "fastapi/dependencies/utils.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        11
+      ],
+      "capability_proofs": {
+        "11": {
+          "reason": "source-bound declared call/argument slice only; guard semantics, causal test relevance, provider wiring and adversaries remain unqualified",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "fastapi/dependencies/utils.py"
+      ],
+      "id": "fastapi-repeat-dependency-bookkeeping",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "semantic sufficiency not independently reviewed"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "explicit caller-nominated production path"
+        }
+      },
+      "native_required": false,
+      "problem_id": "7134121a7113df50d18b186c586666733e8510f2",
+      "repository": "fastapi",
+      "task": "Dependency traversal keeps repeat bookkeeping for already visited declarations. Inspect fastapi/dependencies/utils.py.",
+      "transitions": [
+        {
+          "after_path": "fastapi/dependencies/utils.py",
+          "before_path": "fastapi/dependencies/utils.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "fastapi-dependency-model-memory-after",
+      "before": "fastapi-dependency-model-memory-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 229,
+              "path": "fastapi/dependencies/models.py",
+              "start_line": 229
+            }
+          ],
+          "changed_paths": [
+            "fastapi/dependencies/models.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 161,
+              "path": "fastapi/dependencies/models.py",
+              "start_line": 161
+            }
+          ],
+          "changed_paths": [
+            "fastapi/dependencies/models.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        11
+      ],
+      "capability_proofs": {
+        "11": {
+          "reason": "source-bound declared call/argument slice only; guard semantics, causal test relevance, provider wiring and adversaries remain unqualified",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "fastapi/dependencies/models.py"
+      ],
+      "id": "fastapi-dependency-model-memory",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "semantic sufficiency not independently reviewed"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "explicit caller-nominated production path"
+        }
+      },
+      "native_required": false,
+      "problem_id": "027082950068d6e3897b5422ab6cde3168f7d8b0",
+      "repository": "fastapi",
+      "task": "Dependency declarations retain repeated derived metadata. Inspect fastapi/dependencies/models.py.",
+      "transitions": [
+        {
+          "after_path": "fastapi/dependencies/models.py",
+          "before_path": "fastapi/dependencies/models.py",
+          "kind": "modify"
+        }
+      ]
+    },
+    {
+      "after": "litestar-cached-yield-provider-after",
+      "before": "litestar-cached-yield-provider-before",
+      "boundary_observations": {
+        "after": {
+          "changed_line_spans": [
+            {
+              "end_line": 59,
+              "path": "litestar/di.py",
+              "start_line": 57
+            }
+          ],
+          "changed_paths": [
+            "litestar/di.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        },
+        "before": {
+          "changed_line_spans": [
+            {
+              "end_line": 59,
+              "path": "litestar/di.py",
+              "start_line": 59
+            }
+          ],
+          "changed_paths": [
+            "litestar/di.py"
+          ],
+          "max_depth": 1,
+          "task": "Inspect caller-reported source lines"
+        }
+      },
+      "capabilities": [
+        11
+      ],
+      "capability_proofs": {
+        "11": {
+          "reason": "source-bound declared call/argument slice only; guard semantics, causal test relevance, provider wiring and adversaries remain unqualified",
+          "reviewed": false
+        }
+      },
+      "changed_paths": [
+        "litestar/di.py"
+      ],
+      "id": "litestar-cached-yield-provider",
+      "metric_eligibility": {
+        "initial_evidence": {
+          "eligible": false,
+          "reason": "semantic sufficiency not independently reviewed"
+        },
+        "owner_top_three": {
+          "eligible": false,
+          "reason": "explicit caller-nominated production path"
+        }
+      },
+      "native_required": false,
+      "problem_id": "2612798456dada20c15ae3c0d5676a62195abe7a",
+      "repository": "litestar",
+      "task": "A cached yield dependency accepts unsupported provider configuration. Inspect litestar/di.py.",
       "transitions": [
         {
           "after_path": "litestar/di.py",

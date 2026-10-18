@@ -1,0 +1,361 @@
+{
+  "cases": [
+    {
+      "capability_reviewed": false,
+      "causal_test_relevance": "not-reviewed",
+      "guard_semantics": "not-qualified-by-call-syntax",
+      "id": "fastapi-body-dependency-flattening",
+      "problem_id": "23e4a10434cf61438c4508d94404680bdcd8bf59",
+      "repository": "fastapi",
+      "stages": {
+        "after": {
+          "declaration": {
+            "declaration_line": 1056,
+            "end_line": 1103,
+            "path": "fastapi/dependencies/utils.py",
+            "sha256": "cbe45062b271c7b31fbd74e056e4ff02b37336af9771d5bf0ce16efd38d145df",
+            "start_line": 1056,
+            "symbol": "_get_body_field"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "name": "fields",
+            "name_state": "literal",
+            "value": {
+              "identifier": "body_params",
+              "state": "identifier-syntax"
+            }
+          },
+          "expected_argument_pointer": "/sites/*/argument_syntax/keywords/*",
+          "expected_site": {
+            "callee_identifier_syntax": "create_body_model",
+            "end_line": 1075,
+            "line": 1075,
+            "positional_argument_count": 0,
+            "syntax_kind": "call"
+          },
+          "file_sha256": "f226d7d5062e705d687795eeabb0f920d5376ac7c30bd8f974f6f788d40b9de6",
+          "same_callee_occurrences": 1,
+          "selection": "first physical source occurrence of nominated callee within exact declaration",
+          "site": {
+            "end_line": 1075,
+            "path": "fastapi/dependencies/utils.py",
+            "sha256": "7216723b369f8a200762ef7a9004dff62d5e771a4d1326ef003ced9ba5251607",
+            "start_line": 1075
+          },
+          "source": "fastapi-body-dependency-flattening-after",
+          "source_call": "create_body_model(fields=body_params, model_name=model_name)",
+          "source_identity": "sha256:81a185020a65044497f5d5ba9560543d11b1bbeebcad623d73c4fbb905f2a3aa:3131"
+        },
+        "before": {
+          "declaration": {
+            "declaration_line": 1046,
+            "end_line": 1097,
+            "path": "fastapi/dependencies/utils.py",
+            "sha256": "57b2b578d02bf3edf0daff63650b3a37f60eedad4d128f80e8e178082005c87f",
+            "start_line": 1046,
+            "symbol": "get_body_field"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "name": "fields",
+            "name_state": "literal",
+            "value": {
+              "identifier": "flat_dependant.body_params",
+              "state": "identifier-syntax"
+            }
+          },
+          "expected_argument_pointer": "/sites/*/argument_syntax/keywords/*",
+          "expected_site": {
+            "callee_identifier_syntax": "create_body_model",
+            "end_line": 1067,
+            "line": 1065,
+            "positional_argument_count": 0,
+            "syntax_kind": "call"
+          },
+          "file_sha256": "596bc4b09501b46f42805283bda2aa74e2b57e758b8929aa0176e972154bbdcd",
+          "same_callee_occurrences": 1,
+          "selection": "first physical source occurrence of nominated callee within exact declaration",
+          "site": {
+            "end_line": 1067,
+            "path": "fastapi/dependencies/utils.py",
+            "sha256": "57dca6fd6bca8ecfdeea3470a8df251da610c466c5e42c7a79f102dd189af4db",
+            "start_line": 1065
+          },
+          "source": "fastapi-body-dependency-flattening-before",
+          "source_call": "create_body_model(fields=flat_dependant.body_params, model_name=model_name)",
+          "source_identity": "sha256:6ec3c2f38a3d25c2f9e1b57be537e40c60f11a100931e8dd9077080001a7518e:3131"
+        }
+      },
+      "task": "Body-field dependency inspection repeats flattening work. Inspect fastapi/dependencies/utils.py."
+    },
+    {
+      "capability_reviewed": false,
+      "causal_test_relevance": "not-reviewed",
+      "guard_semantics": "not-qualified-by-call-syntax",
+      "id": "fastapi-repeat-dependency-bookkeeping",
+      "problem_id": "7134121a7113df50d18b186c586666733e8510f2",
+      "repository": "fastapi",
+      "stages": {
+        "after": {
+          "declaration": {
+            "declaration_line": 147,
+            "end_line": 219,
+            "path": "fastapi/dependencies/utils.py",
+            "sha256": "d5e392c49324dc4443f9d94742619d247f7a7f93ff02d7a724fe01cafc7991dd",
+            "start_line": 147,
+            "symbol": "get_flat_dependant"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "name": "dependant",
+            "name_state": "literal",
+            "value": {
+              "identifier": "dependant",
+              "state": "identifier-syntax"
+            }
+          },
+          "expected_argument_pointer": "/sites/*/argument_syntax/keywords/*",
+          "expected_site": {
+            "callee_identifier_syntax": "_get_cache_key",
+            "end_line": 167,
+            "line": 164,
+            "positional_argument_count": 0,
+            "syntax_kind": "call"
+          },
+          "file_sha256": "596bc4b09501b46f42805283bda2aa74e2b57e758b8929aa0176e972154bbdcd",
+          "same_callee_occurrences": 2,
+          "selection": "first physical source occurrence of nominated callee within exact declaration",
+          "site": {
+            "end_line": 167,
+            "path": "fastapi/dependencies/utils.py",
+            "sha256": "363ca4ccc87efdabe8ed8e9cb4a74e6ea1e680da17d730af299cb25c86367a89",
+            "start_line": 164
+          },
+          "source": "fastapi-repeat-dependency-bookkeeping-after",
+          "source_call": "_get_cache_key(dependant=dependant, uses_scopes_cache=_uses_scopes_cache)",
+          "source_identity": "sha256:42017585e18ba0cd7e3aa8c4b587b1ba3bcca4d7c1c636992138c39943b86f01:3131"
+        },
+        "before": {
+          "declaration": {
+            "declaration_line": 147,
+            "end_line": 214,
+            "path": "fastapi/dependencies/utils.py",
+            "sha256": "4f78fdb996ab64f90bd7f1c4f041102808f2b17392951278731d0d50dcbceb85",
+            "start_line": 147,
+            "symbol": "get_flat_dependant"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "name": "dependant",
+            "name_state": "literal",
+            "value": {
+              "identifier": "dependant",
+              "state": "identifier-syntax"
+            }
+          },
+          "expected_argument_pointer": "/sites/*/argument_syntax/keywords/*",
+          "expected_site": {
+            "callee_identifier_syntax": "_get_cache_key",
+            "end_line": 163,
+            "line": 160,
+            "positional_argument_count": 0,
+            "syntax_kind": "call"
+          },
+          "file_sha256": "fe1d9ae1bbd3da03e6bc5bd5496ab541beafcd81af0a0c7cedb4153665fa0fb0",
+          "same_callee_occurrences": 2,
+          "selection": "first physical source occurrence of nominated callee within exact declaration",
+          "site": {
+            "end_line": 163,
+            "path": "fastapi/dependencies/utils.py",
+            "sha256": "1d0793993d40645ea9d84b2e6aa7542640e1712457ba2d93f63ce58c6fca2a6b",
+            "start_line": 160
+          },
+          "source": "fastapi-repeat-dependency-bookkeeping-before",
+          "source_call": "_get_cache_key(dependant=dependant, uses_scopes_cache=_uses_scopes_cache)",
+          "source_identity": "sha256:308ee093da2a56b36cf3566a28e829c66d8696aa1789d54caff470fb5c94cbc3:3131"
+        }
+      },
+      "task": "Dependency traversal keeps repeat bookkeeping for already visited declarations. Inspect fastapi/dependencies/utils.py."
+    },
+    {
+      "capability_reviewed": false,
+      "causal_test_relevance": "not-reviewed",
+      "guard_semantics": "not-qualified-by-call-syntax",
+      "id": "fastapi-dependency-model-memory",
+      "problem_id": "027082950068d6e3897b5422ab6cde3168f7d8b0",
+      "repository": "fastapi",
+      "stages": {
+        "after": {
+          "declaration": {
+            "declaration_line": 226,
+            "end_line": 229,
+            "path": "fastapi/dependencies/models.py",
+            "sha256": "aa72751b99989bcc2e7f2861dadd3a4a02cdd780235557b8e0c5a19af65503b4",
+            "start_line": 226,
+            "symbol": "_is_coroutine_callable"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "position": 0,
+            "value": {
+              "expression_kind": "Call",
+              "state": "expression-unestablished"
+            }
+          },
+          "expected_argument_pointer": "/sites/*/argument_syntax/positional/*",
+          "expected_site": {
+            "callee_identifier_syntax": "_is_coroutine_callable_cached",
+            "end_line": 229,
+            "line": 229,
+            "positional_argument_count": 1,
+            "syntax_kind": "call"
+          },
+          "file_sha256": "cf67c1c8ca5a2f1d99947aeed1e4759ad95402cc59f5d96758a1955ce06e0182",
+          "same_callee_occurrences": 1,
+          "selection": "first physical source occurrence of nominated callee within exact declaration",
+          "site": {
+            "end_line": 229,
+            "path": "fastapi/dependencies/models.py",
+            "sha256": "acce934854bb7388ac1501e06ec3c0222f84c4d454f99976d586ef1abcf37b12",
+            "start_line": 229
+          },
+          "source": "fastapi-dependency-model-memory-after",
+          "source_call": "_is_coroutine_callable_cached(_CallIdentity(call))",
+          "source_identity": "sha256:4ecb7b1b292928e20ef99d7aeb071a0b3e3b6703c086b633458da6140094ff1e:3130"
+        },
+        "before": {
+          "declaration": {
+            "declaration_line": 158,
+            "end_line": 185,
+            "path": "fastapi/dependencies/models.py",
+            "sha256": "eaec2b20918b6383c3b3eb25399f981413f270a1be5cdea90328c7028cff497b",
+            "start_line": 157,
+            "symbol": "Dependant.is_coroutine_callable"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "position": 0,
+            "value": {
+              "expression_kind": "Call",
+              "state": "expression-unestablished"
+            }
+          },
+          "expected_argument_pointer": "/sites/*/argument_syntax/positional/*",
+          "expected_site": {
+            "callee_identifier_syntax": "inspect.isroutine",
+            "end_line": 161,
+            "line": 161,
+            "positional_argument_count": 1,
+            "syntax_kind": "call"
+          },
+          "file_sha256": "5cf22411aba41da4da173f4ba1e23d7ff4fede8b4e015928382d75dd3a456d62",
+          "same_callee_occurrences": 2,
+          "selection": "first physical source occurrence of nominated callee within exact declaration",
+          "site": {
+            "end_line": 161,
+            "path": "fastapi/dependencies/models.py",
+            "sha256": "df1a19047ffbaabd2da9403040594dd5482d6d0ed0fcd0854f556f9a0b2c145e",
+            "start_line": 161
+          },
+          "source": "fastapi-dependency-model-memory-before",
+          "source_call": "inspect.isroutine(_impartial(self.call))",
+          "source_identity": "sha256:50077ceea9aa3854771e882a97951618da4612b644e4037842f18695b7e04fb5:3129"
+        }
+      },
+      "task": "Dependency declarations retain repeated derived metadata. Inspect fastapi/dependencies/models.py."
+    },
+    {
+      "capability_reviewed": false,
+      "causal_test_relevance": "not-reviewed",
+      "guard_semantics": "not-qualified-by-call-syntax",
+      "id": "litestar-cached-yield-provider",
+      "problem_id": "2612798456dada20c15ae3c0d5676a62195abe7a",
+      "repository": "litestar",
+      "stages": {
+        "after": {
+          "declaration": {
+            "declaration_line": 40,
+            "end_line": 89,
+            "path": "litestar/di.py",
+            "sha256": "540031dbc9256e1eed92a96a537780743fee071d6ff83e7163620c817c1eb165",
+            "start_line": 40,
+            "symbol": "Provide.__init__"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "position": 0,
+            "value": {
+              "expression_kind": "IfExp",
+              "state": "expression-unestablished"
+            }
+          },
+          "expected_argument_pointer": "/sites/*/argument_syntax/positional/*",
+          "expected_site": {
+            "callee_identifier_syntax": "isgeneratorfunction",
+            "end_line": 59,
+            "line": 57,
+            "positional_argument_count": 1,
+            "syntax_kind": "call"
+          },
+          "file_sha256": "f3201763ec85d57ee7097ea4ff00af6595953aeef40bd07a916cb6a636ef4406",
+          "same_callee_occurrences": 1,
+          "selection": "first physical source occurrence of nominated callee within exact declaration",
+          "site": {
+            "end_line": 59,
+            "path": "litestar/di.py",
+            "sha256": "d52e98268807c12dbb1e95a8a25e522de9e7d53f4914bf8790b84cf335da32cb",
+            "start_line": 57
+          },
+          "source": "litestar-cached-yield-provider-after",
+          "source_call": "isgeneratorfunction(dependency if not is_class_dependency else dependency.__call__)",
+          "source_identity": "sha256:238218771c77647e5aac17437009817d637c1f0c45d3b8a67c6aaf8bb9fcb654:1228"
+        },
+        "before": {
+          "declaration": {
+            "declaration_line": 40,
+            "end_line": 75,
+            "path": "litestar/di.py",
+            "sha256": "989a3ce7cc023d26e13503b955fd76e0444cc24699f07590d4f3aa2c83a6b51e",
+            "start_line": 40,
+            "symbol": "Provide.__init__"
+          },
+          "expected_argument": {
+            "expansion": false,
+            "position": 0,
+            "value": {
+              "identifier": "dependency",
+              "state": "identifier-syntax"
+            }
+          },
+          "expected_argument_pointer": "/sites/*/argument_syntax/positional/*",
+          "expected_site": {
+            "callee_identifier_syntax": "is_sync_or_async_generator",
+            "end_line": 59,
+            "line": 59,
+            "positional_argument_count": 1,
+            "syntax_kind": "call"
+          },
+          "file_sha256": "fc5e601d509efd282437a48d58b40edc592eb57cbd747f01d1f02ce91cafcc8d",
+          "same_callee_occurrences": 2,
+          "selection": "first physical source occurrence of nominated callee within exact declaration",
+          "site": {
+            "end_line": 59,
+            "path": "litestar/di.py",
+            "sha256": "f7e53ae487d03ddad6201468505933ec16d5aaf80ba1e2b538f560df2dd8103e",
+            "start_line": 59
+          },
+          "source": "litestar-cached-yield-provider-before",
+          "source_call": "is_sync_or_async_generator(dependency)",
+          "source_identity": "sha256:4cfa8c3260c34cebb0f9e772998f1946609f81a06888bfc1d674d251191f3be6:1228"
+        }
+      },
+      "task": "A cached yield dependency accepts unsupported provider configuration. Inspect litestar/di.py."
+    }
+  ],
+  "observer_outputs_used": false,
+  "original_workflows_and_assertions_preserved": true,
+  "schema": "hashmarks.configuration-call-source-oracles.v1",
+  "scope": "four additive source-authored declaration/call/argument slices; not causal ownership, runtime behavior, sufficient verification or independently qualified capability proof",
+  "status": "INCOMPLETE"
+}

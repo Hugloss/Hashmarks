@@ -27,14 +27,24 @@ including two problems already in the core suite. See
 [the debugging source review](suites/debug/README.md). Its partial population
 does not satisfy capability-4 breadth.
 
-The campaign declares 77 entries representing 59 distinct upstream problems
-across seven suites. Reuse adds no distinct problem. Semantic review, executable
+The path catalog adds twelve source/call views of existing problems. The campaign
+declares 89 entries representing 59 distinct upstream problems across eight
+suites. Reuse adds no distinct problem. Semantic review, executable
 witness membership and observed results still govern qualification.
 
 The model grader now separates `task_source_labels` from native `source_labels`.
 Task labels cover production and verification members at both revisions without
 silently adding native targets. Validating these bytes does not complete the
 independent semantic or capability review.
+
+The active model copy also retains the source-derived initializer-reference
+extension documented in
+`../backend-model-v1/initializer-reference-source-oracles.json`. It preserves
+every original assertion and adds direct keyword-reference expectations to four
+records. The campaign binds the augmented grader digest; no task, membership,
+source label, required witness, threshold or review flag is relaxed. Historical
+reports remain bound to their original grader identities. This source-data
+revision does not qualify a capability or rebind prior observer results.
 
 Aggregation also accepts disjoint `workflow_reports` lists and `native_reports`
 lists whose entries contain `native_report` and `capture_root`. Do not mix a list

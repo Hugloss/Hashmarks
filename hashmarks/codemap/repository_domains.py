@@ -57,9 +57,11 @@ def _explicit_control_domains(
 
 def _is_test_surface(name: str, parts: set[str]) -> bool:
     """Keep test role independent of test-shaped production source names."""
-    if "test" in parts or "tests" in parts:
+    if parts.intersection({"test", "tests", "testing"}):
         return True
-    if name.startswith("test_") and not parts.intersection({"src", "lib", "app"}):
+    if (
+        name.startswith("test_") or name.endswith("_test.py")
+    ) and not parts.intersection({"src", "lib", "app"}):
         return True
     if "checks" in parts and name.endswith("_spec.py"):
         return True
@@ -106,17 +108,8 @@ def _document_contract_domains(
 
 @lru_cache(maxsize=32768)
 def is_test_path(path: str) -> bool:
-    """Return pure path-only test classification with bounded process-local reuse."""
-    name = path.rsplit("/", 1)[-1]
-    lowered = path.lower()
-    return (
-        lowered.startswith("tests/")
-        or "/tests/" in lowered
-        or name.startswith("test_")
-        or name.endswith("_test.py")
-        or ".test." in name
-        or ".spec." in name
-    )
+    """Project the canonical path role without a second test-name heuristic."""
+    return RepositoryDomain.TEST in classify_repository_path(path)
 
 
 @lru_cache(maxsize=32768)

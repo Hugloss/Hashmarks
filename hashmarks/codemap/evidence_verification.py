@@ -20,6 +20,9 @@ from .verification_explanation import VerificationExplanationMixin
 from .verification_ownership import VerificationOwnershipMixin
 from .verification_plan import VerificationPlanMixin
 from .verification_reference_syntax import (
+    MAX_KEYWORD_IDENTIFIER_CHARS,
+)
+from .verification_reference_syntax import (
     VerificationReferenceIndex as _VerificationReferenceIndex,
 )
 from .verification_reference_syntax import (
@@ -426,6 +429,52 @@ class RepositoryVerification(
         if state is not None:
             state.reference_indexes[path] = index
         return index
+
+    def _verification_task_keyword_syntax(
+        self, state: _VerificationRelevanceState, path: str
+    ) -> dict[str, object]:
+        """Observe multiword task matches in named call arguments, without binding."""
+        if (
+            not path.endswith(".py")
+            or self.files.decide(path).evidence_visibility
+            is not EvidenceVisibility.SOURCE
+        ):
+            return {}
+        self.source.ensure_current(path)
+        member = self.reads.file_row(path)
+        index = self._verification_reference_index_for_path(state, path)
+        if member is None or index is None:
+            return {}
+        matches = []
+        for name, line, end_line in index.keyword_arguments:
+            terms = sorted(state.task_terms.intersection(_query_terms(name)))
+            if len(terms) >= 2:
+                matches.append(
+                    {
+                        "name": name,
+                        "line": line,
+                        "end_line": end_line,
+                        "matched_task_terms": terms,
+                    }
+                )
+        self.source.ensure_current(path)
+        if not matches:
+            return {}
+        return {
+            "task_keyword_syntax": {
+                "basis": "named-call-keyword-syntax-and-task-terms",
+                "source_revision": member["file_digest"],
+                "matches": matches[:16],
+                "observed_keywords": len(matches),
+                "omitted_keywords": max(0, len(matches) - 16),
+                "returned_bound": 16,
+                "identifier_chars_bound": MAX_KEYWORD_IDENTIFIER_CHARS,
+                "scope": "named keywords outside statically dead/type-only branches",
+                "runtime_binding": "not-established",
+                "verification_selection_authority": False,
+                "negative_evidence_admissible": False,
+            }
+        }
 
     def _verification_module_alias_reference_owner_match(
         self,

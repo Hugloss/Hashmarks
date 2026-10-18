@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
+import pytest
 from contract_assertions import assert_array, assert_object, assert_records
 
 from hashmarks.codemap import CodeMap
@@ -208,3 +210,177 @@ def test_file_locator_keeps_qualified_module_test_without_deciding_authority(
     assert packet["verification"]["selected"] is not None
     assert action["verify"] is not None
     assert packet["verification"]["selected"]["path"] == action["verify"]["path"]
+
+
+@pytest.mark.parametrize("visibility", ["deny", "outline"])
+def test_keyword_candidate_disclosure_respects_source_visibility(
+    tmp_path: Path, visibility: str
+) -> None:
+    _keyword_repository(tmp_path)
+    (tmp_path / ".hashmarks-context.toml").write_text(
+        f'[[rule]]\npattern = "tests/test_sparse.py"\nvisibility = "{visibility}"\n'
+    )
+    with CodeMap(tmp_path) as repository:
+        repository.index.sync()
+        packet = repository.tasks.evidence(
+            "Payload-codec options are ignored in service.py."
+        )
+    assert "payload_codec_strict" not in json.dumps(packet)
+    assert all(
+        row["path"] != "tests/test_sparse.py" or not row.get("task_keyword_syntax")
+        for row in packet["verification"]["relevance"]["candidates"]
+    )
+
+
+def test_keyword_candidate_disclosure_drops_changed_snapshot_facts(
+    tmp_path: Path,
+) -> None:
+    _keyword_repository(tmp_path)
+    task = "Payload-codec options are ignored in service.py."
+    with CodeMap(tmp_path) as repository:
+        repository.index.sync()
+        before = repository.tasks.evidence(task)
+        assert "payload_codec_strict" in json.dumps(before)
+        (tmp_path / "tests/test_sparse.py").write_text(
+            "from service import Encoder\n"
+            "def test_result(): Encoder().encode(payload_codec=True)\n"
+        )
+        after = repository.tasks.evidence(task)
+    assert "payload_codec_strict" not in json.dumps(after)
+    assert "payload_codec_fields" not in json.dumps(after)
+
+
+def test_keyword_candidate_disclosure_reports_omitted_names(tmp_path: Path) -> None:
+    _keyword_repository(tmp_path)
+    arguments = ", ".join(f"payload_codec_option_{n}=True" for n in range(20))
+    (tmp_path / "tests/test_sparse.py").write_text(
+        "from service import Encoder\n"
+        f"def test_result(): Encoder().encode({arguments})\n"
+    )
+    with CodeMap(tmp_path) as repository:
+        repository.index.sync()
+        packet = repository.tasks.evidence(
+            "Payload-codec options are ignored in service.py."
+        )
+    row = next(
+        row
+        for row in packet["verification"]["relevance"]["candidates"]
+        if row["path"] == "tests/test_sparse.py"
+    )
+    syntax = assert_object(row.get("task_keyword_syntax"))
+    assert len(assert_records(syntax["matches"])) == syntax["returned_bound"] == 16
+    assert syntax["observed_keywords"] == 20
+    assert syntax["omitted_keywords"] == 4
+    assert syntax["negative_evidence_admissible"] is False
+
+
+def _keyword_repository(root: Path) -> None:
+    (root / "service.py").write_text(
+        "class Encoder:\n    def encode(self, **options): return options\n"
+    )
+    (root / "tests").mkdir()
+    (root / "tests/test_sparse.py").write_text(
+        "from service import Encoder\n"
+        "encoder = Encoder()\n"
+        "@encoder.encode(payload_codec=True, payload_codec_strict=True, "
+        "payload_codec_fields=('x',))\n"
+        "def endpoint(): pass\n"
+        "def test_result(): assert True\n"
+        "from typing import TYPE_CHECKING\n"
+        "if False: encoder.encode(payload_codec_dead=True)\n"
+        "if TYPE_CHECKING: encoder.encode(payload_codec_type_only=True)\n"
+        "encoder.encode(**{'payload_codec_dynamic': True})\n"
+        "text = 'payload_codec_string is not a call keyword'\n"
+    )
+    for n in range(30):
+        (root / f"tests/test_payload_codec_options_{n:02}.py").write_text(
+            "from service import Encoder\n"
+            "def test_payload_codec_options():\n"
+            "    Encoder().encode(payload_codec=True)\n"
+        )
+
+
+@pytest.mark.parametrize("mode", ["full", "initial"])
+def test_call_keyword_source_facts_survive_competing_test_filenames(
+    tmp_path: Path, mode: str
+) -> None:
+    _keyword_repository(tmp_path)
+    task = "Payload-codec options are ignored in service.py."
+    with CodeMap(tmp_path) as repository:
+        repository.index.sync()
+        action = repository.tasks.action_map(task)
+        packet = (
+            repository.tasks.evidence(task)
+            if mode == "full"
+            else read_initial_projection(
+                decode_initial_packet(
+                    repository.tasks.evidence(task, result_mode="initial")
+                )
+            )
+        )
+    relevance = packet["verification"]["relevance"]
+    rows: object = relevance["candidates"]
+    if "candidates_encoding" in relevance:
+        rows = decode_initial_collection(
+            rows, assert_object(relevance["candidates_encoding"])
+        )
+    candidates = assert_records(rows)
+    by_path = {row["path"]: row for row in candidates}
+    assert "tests/test_sparse.py" in by_path
+    observed = assert_object(by_path["tests/test_sparse.py"].get("task_keyword_syntax"))
+    assert {row["name"] for row in assert_records(observed["matches"])} == {
+        "payload_codec",
+        "payload_codec_strict",
+        "payload_codec_fields",
+    }
+    assert all(row["line"] == 3 for row in assert_records(observed["matches"]))
+    assert observed["runtime_binding"] == "not-established"
+    assert observed["negative_evidence_admissible"] is False
+    assert (
+        observed["source_revision"]
+        == hash_file(tmp_path / "tests/test_sparse.py", domain=FILE_DOMAIN).hash
+    )
+    assert packet["ownership"]["owner"] == action["admitted_edit"]
+    selected = packet["verification"]["selected"]
+    assert selected is not None and action["verify"] is not None
+    assert selected["path"] == action["verify"]["path"]
+    assert relevance["selection_changed"] is False
+
+
+def test_keyword_syntax_does_not_prove_a_reference_to_another_owner(
+    tmp_path: Path,
+) -> None:
+    for path in ("service.py", "other.py"):
+        (tmp_path / path).write_text(
+            "class Encoder:\n    def encode(self, **options): return options\n"
+        )
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/test_actual.py").write_text(
+        "from service import Encoder\n"
+        "def test_result(): Encoder().encode(payload_codec=True)\n"
+    )
+    (tmp_path / "tests/test_other.py").write_text(
+        "from other import Encoder\n"
+        "def test_result():\n"
+        "    Encoder().encode(payload_codec=True, payload_codec_strict=True, "
+        "payload_codec_fields=True)\n"
+    )
+    task = "Payload-codec options are ignored in service.py."
+    with CodeMap(tmp_path) as repository:
+        repository.index.sync()
+        action = repository.tasks.action_map(task)
+        packet = repository.tasks.evidence(task)
+    candidate = next(
+        row
+        for row in packet["verification"]["relevance"]["candidates"]
+        if row["path"] == "tests/test_other.py"
+    )
+    assert assert_object(candidate.get("task_keyword_syntax"))["observed_keywords"] == 3
+    assert all(
+        basis["direct_reference"] is False
+        for basis in assert_records(candidate.get("source_candidate_basis"))
+        if basis["path"] == "service.py"
+    )
+    assert candidate.get("verification_selection_authority") is False
+    assert packet["ownership"]["owner"] == action["admitted_edit"]
+    assert packet["verification"]["selected"] == action["verify"]

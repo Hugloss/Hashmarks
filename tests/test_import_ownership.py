@@ -86,6 +86,19 @@ def test_import_ownership_downgrades_test_loader_to_advisory(tmp_path: Path) -> 
     assert finding["target_module"] == "scripts.helper"
 
 
+def test_production_test_shaped_loader_keeps_source_diagnostic_role(
+    tmp_path: Path,
+) -> None:
+    _write_package(tmp_path, loader_path="src/test_loader.py")
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        result = codemap.ownership.import_findings(["src/test_loader.py"])
+    (finding,) = assert_records(result["findings"])
+    assert finding["domain"] == "source"
+    assert finding["severity"] == "warning"
+    assert finding["target_path"] == "scripts/helper.py"
+
+
 def test_import_ownership_recognizes_explicit_sys_modules_owner(tmp_path: Path) -> None:
     _write_package(tmp_path, register=True)
     with CodeMap(tmp_path) as codemap:

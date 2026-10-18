@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, cast
 
+from .repository_domains import is_test_path
+
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
@@ -166,16 +168,6 @@ def _importable_module(
     return None
 
 
-def _is_test_path(path: str) -> bool:
-    parts = {part.lower() for part in PurePosixPath(path).parts}
-    name = PurePosixPath(path).name.lower()
-    return (
-        bool(parts & {"test", "tests", "testing"})
-        or name.startswith("test_")
-        or name.endswith("_test.py")
-    )
-
-
 def _is_pluginish(path: str, source: str) -> bool:
     lowered = f"{path}\n{source}".lower()
     return any(
@@ -273,7 +265,7 @@ class ImportOwnershipFinding:
 def _finding_domain_severity(
     path: str, source: str, target_path: str | None, registered: bool
 ) -> tuple[str, str, str]:
-    test_path = _is_test_path(path)
+    test_path = is_test_path(path)
     pluginish = _is_pluginish(path, source)
     domain = "test" if test_path else ("plugin" if pluginish else "source")
     if registered:

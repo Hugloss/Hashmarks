@@ -84,6 +84,15 @@ Unsupported schemas return explicit unsupported coverage. Malformed required
 collections fail clearly. Empty text says “No displayed findings in this
 projection”; it never claims repository absence.
 
+Initial compact verification groups can share repeated qualifier combinations
+through `qualifier_columns` and `qualifier_sets`. A finding's `details.qualifiers`
+is an index into that group's sets; zip its selected set with the declared
+columns to recover the exact supplied values. Other details and absolute
+`source_refs` remain attached to that finding. This representation is used only
+when it reduces serialized bytes. It does not merge candidates, alter reference
+authority, omit a qualifier, or change the native packet. Uniform groups may
+instead retain the existing `locator_qualifiers` mapping.
+
 Text encodes the same selected findings, locators, qualifications, source
 identities, references, and exclusions as its structured backing. JSON escaping
 keeps multiline native values identifiable without inventing new assertions.
