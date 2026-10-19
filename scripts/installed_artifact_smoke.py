@@ -72,6 +72,9 @@ def _check_repository_intelligence() -> None:
             encoding="utf-8",
         )
         (root / "Makefile").write_text("check:\n\tuv run pytest\n", encoding="utf-8")
+        (root / "consumer.ts").write_text(
+            "const client = transport; client.send();\n", encoding="utf-8"
+        )
         (root / "pyproject.toml").write_text(
             '[project]\nname = "example"\nversion = "1"\n'
             '[project.scripts]\nexample = "sample:answer"\n',
@@ -101,6 +104,7 @@ def _check_repository_intelligence() -> None:
             if not any(hit.path == "sample.py" for hit in hits):
                 raise RuntimeError("installed CodeMap did not retrieve sample.py")
             _check_source_receipt(codemap)
+            _check_ecmascript_source(codemap)
             _check_declaration_providers(codemap)
             _check_membership_handoff(codemap)
 
@@ -113,6 +117,20 @@ def _check_source_receipt(codemap: CodeMap) -> None:
         or base64.b64decode(str(content.get("data")), validate=True) != b"def"
     ):
         raise RuntimeError("installed source receipt did not preserve exact bytes")
+
+
+def _check_ecmascript_source(codemap: CodeMap) -> None:
+    packet = codemap.source.ecmascript("consumer.ts", limit=2)
+    facts = packet.get("facts")
+    if (
+        packet.get("schema") != operation_schema("source_ecmascript")
+        or packet.get("semantic_resolution") != "not-performed"
+        or packet.get("negative_evidence") != "not-admissible"
+        or not isinstance(facts, list)
+    ):
+        raise RuntimeError("installed ECMAScript source contract is malformed")
+    if packet.get("availability") == "observed" and not facts:
+        raise RuntimeError("installed native ECMAScript syntax lost authored facts")
 
 
 def _check_declaration_providers(codemap: CodeMap) -> None:
@@ -189,6 +207,7 @@ def _check_cli() -> None:
             "def answer() -> int:\n    return 42\n",
             encoding="utf-8",
         )
+        _check_observation_cli(root)
         doctor = _run_cli("--workspace", str(root), "doctor", "--mode", "local")
         if doctor.get("workspace") != str(root.resolve()):
             raise RuntimeError(
@@ -217,6 +236,39 @@ def _check_cli() -> None:
             )
         ):
             raise RuntimeError("installed find did not retrieve sample.py")
+
+
+def _check_observation_cli(root: Path) -> None:
+    observation = _run_cli(
+        "--workspace",
+        str(root),
+        "observe-inputs",
+        "--mode",
+        "local",
+        "--input",
+        "sample.py",
+    )
+    counts = observation.get("counts")
+    if not isinstance(counts, dict) or counts.get("file_count") != 1:
+        raise RuntimeError("installed input CLI lost its selected inventory")
+    receipt = _run_cli(
+        "--workspace",
+        str(root),
+        "source-observation",
+        "sample.py",
+        "--result-mode",
+        "range",
+        "--start-byte",
+        "0",
+        "--end-byte",
+        "3",
+    )
+    content = receipt.get("content")
+    if (
+        not isinstance(content, dict)
+        or base64.b64decode(str(content.get("data")), validate=True) != b"def"
+    ):
+        raise RuntimeError("installed range CLI lost original bytes")
 
 
 def main() -> int:

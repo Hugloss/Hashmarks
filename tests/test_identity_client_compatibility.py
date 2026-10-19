@@ -125,10 +125,11 @@ def test_compatibility_missing_capabilities(
 ) -> None:
     import json
 
-    # Remove one required capability
+    # The final capability is optional for legacy snapshot operations. Remove
+    # an actual protocol-v3 baseline capability here.
     caps = list(DAEMON_CAPABILITIES)
     if caps:
-        caps.pop()
+        caps.pop(0)
 
     response = {
         "ok": True,

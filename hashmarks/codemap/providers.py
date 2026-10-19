@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, replace
 from importlib import metadata
-from typing import TYPE_CHECKING, Literal, Protocol
+from typing import TYPE_CHECKING, Literal, Protocol, runtime_checkable
 
 from .model import ParsedArtifact, SymbolRecord
 from .python_ast import estimate_tokens
@@ -16,6 +16,7 @@ _LanguageName = Literal[
     "python",
     "javascript",
     "typescript",
+    "tsx",
     "go",
     "rust",
     "java",
@@ -101,6 +102,15 @@ class SourceRangeProvider(Protocol):
     def status(self) -> ProviderStatus: ...
 
 
+@runtime_checkable
+class SourceSyntaxProvider(Protocol):
+    """Optional native syntax capability on the existing range provider."""
+
+    def signature(self, language: str) -> str | None: ...
+    def status(self) -> ProviderStatus: ...
+    def syntax_tree(self, source: bytes, language: str) -> StructuralTree | None: ...
+
+
 class TreeSitterRangeProvider:
     """Optional structural range enrichment for CodeMap.
 
@@ -115,6 +125,7 @@ class TreeSitterRangeProvider:
         "python": "python",
         "javascript": "javascript",
         "typescript": "typescript",
+        "tsx": "tsx",
         "go": "go",
         "rust": "rust",
         "java": "java",
@@ -222,6 +233,19 @@ class TreeSitterRangeProvider:
         self._parsers[name] = parser
         return parser
 
+    def syntax_tree(self, source: bytes, language: str) -> StructuralTree | None:
+        """Parse with this provider's grammar, rejecting recovered error trees.
+
+        Source observations and declaration ranges share one native parser
+        owner. Trees are request-local; this adds no source or artifact cache.
+        """
+        if not self.supports(language):
+            return None
+        tree = self._parser(language).parse(source)
+        if getattr(tree.root_node, "has_error", False):
+            raise ValueError("native syntax tree contains errors")
+        return tree
+
     @staticmethod
     def _name_node(node: StructuralNode) -> StructuralNode | None:
         for field in ("name", "declarator"):
@@ -299,11 +323,10 @@ class TreeSitterRangeProvider:
         )
 
     def _collect(self, source: str, language: str) -> list[SymbolRecord]:
-        parser = self._parser(language)
         source_bytes = source.encode("utf-8")
-        tree = parser.parse(source_bytes)
-        if getattr(tree.root_node, "has_error", False):
-            raise ValueError("native syntax tree contains errors")
+        tree = self.syntax_tree(source_bytes, language)
+        if tree is None:
+            return []
         found: list[SymbolRecord] = []
 
         def visit(node: StructuralNode, parent: str | None = None) -> None:

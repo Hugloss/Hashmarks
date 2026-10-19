@@ -23,6 +23,7 @@ from .python_ast import estimate_tokens
 from .query_primitives import _WORD_RE
 from .repository_observation import evidence_identity, packet_digest
 from .scoped_source_literals import ScopedSourceLiteralsMixin
+from .source_ecmascript import SourceEcmascriptMixin
 from .source_line_correspondence import (
     source_line_anchors,
     source_shape,
@@ -126,7 +127,9 @@ class _ScopedSourceAggregation:
         )
 
 
-class RepositorySource(ScopedSourceLiteralsMixin, ReadScopeOwner):
+class RepositorySource(
+    ScopedSourceLiteralsMixin, SourceEcmascriptMixin, ReadScopeOwner
+):
     """Own admitted member bytes, revisions, ranges and source disclosure.
 
     Index reconciles before a read scope; drift inside a scope stays explicit.
@@ -712,6 +715,7 @@ class RepositorySource(ScopedSourceLiteralsMixin, ReadScopeOwner):
         )
         return packet
 
+    @operation_response("source_range_receipt")
     def range_receipt(
         self,
         relpath: str,

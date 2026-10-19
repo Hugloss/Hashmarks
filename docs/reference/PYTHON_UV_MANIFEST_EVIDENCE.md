@@ -170,8 +170,51 @@ The registered `repository_declarations` MCP tool accepts:
 }
 ```
 
-Direct Python and this registered MCP adapter use the same provider. Dedicated
-CLI flags and service-client parity are not claimed by this addition.
+Direct Python, MCP, CLI and the CodeMap service use the same provider and selector.
+
+### CLI
+
+Select each manifest explicitly with the repeatable flag:
+
+```sh
+hashmarks --workspace /repo repository-declarations \
+  --python-uv-manifest-path pyproject.toml \
+  --python-uv-manifest-path packages/demo/pyproject.toml
+```
+
+`--source-selection-json selection.json` instead reads the inner
+`source_selection` object shown above, allowing combined registered providers.
+It cannot be mixed with source-selection flags. Use
+`--previous-observation previous.json` for the existing discovery delta; an
+explicit empty selection never restores manifests from the previous packet.
+
+### CodeMap service
+
+For an existing service bound to the workspace:
+
+```python
+from hashmarks.codemap import CodeMapServiceClient
+
+client = CodeMapServiceClient("/repo")
+observation = client.repository_declarations(
+    [],
+    result_mode="discovery",
+    source_selection={
+        "python_uv_manifest_paths": [
+            "pyproject.toml",
+            "packages/demo/pyproject.toml",
+        ]
+    },
+)
+```
+
+The service transports JSON selections, not provider objects or import paths.
+It uses the current service-owned CodeMap and its existing `sync()` and message
+limits. It preserves exact member revisions, declaration uncertainty and native
+delta semantics. The transport performs no uv invocation, source resolution,
+package installation, script import or entrypoint execution.
+
+### Standalone example
 
 The [standalone example](../../examples/python_uv_manifest_declarations.py)
 creates a neutral temporary workspace, observes two declaration origins and a

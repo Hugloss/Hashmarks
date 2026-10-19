@@ -8,17 +8,31 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from .input_observation import DEFAULT_MAX_INPUT_MEMBERS
+from .input_observation_transport import (
+    decode_input_observation,
+    encode_input_observation_request,
+)
 from .observation import ObservationState
 from .paths import canonical_host_path
-from .schema import DAEMON_CAPABILITIES, DAEMON_PROTOCOL_VERSION, DAEMON_SEMANTICS
+from .schema import (
+    DAEMON_CAPABILITIES,
+    DAEMON_MAX_RESPONSE_BYTES,
+    DAEMON_PROTOCOL_VERSION,
+    DAEMON_REQUIRED_CAPABILITIES,
+    DAEMON_SEMANTICS,
+    INPUT_OBSERVATION_CAPABILITY,
+)
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Iterable, Sequence
 
     from .inputs import InputManifest
+    from .snapshot import InputObservation
+    from .specs import InputValue
 
 _PROTOCOL_VERSION = DAEMON_PROTOCOL_VERSION
-_MAX_RESPONSE = 4 * 1024 * 1024
+_MAX_RESPONSE = DAEMON_MAX_RESPONSE_BYTES
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,6 +180,7 @@ class IdentityClient:
         )
         self.timeout = timeout
         self._compatibility_validated = False
+        self._capabilities: frozenset[str] = frozenset()
 
     def request(self, op: str, **payload: object) -> dict[str, Any]:
         message = {"protocol": _PROTOCOL_VERSION, "op": op, **payload}
@@ -244,13 +259,14 @@ class IdentityClient:
             raise DaemonCompatibilityError(
                 "identity daemon did not advertise a valid capability set"
             )
-        missing = sorted(set(DAEMON_CAPABILITIES) - set(capabilities))
+        missing = sorted(set(DAEMON_REQUIRED_CAPABILITIES) - set(capabilities))
         if missing:
             raise DaemonCompatibilityError(
                 "identity daemon is missing required capabilities: "
                 + ", ".join(missing)
             )
         self._compatibility_validated = True
+        self._capabilities = frozenset(capabilities)
         return response
 
     def _ensure_compatible(self) -> None:
@@ -406,3 +422,38 @@ class IdentityClient:
             require_matches=require_matches,
             verify=verify,
         )
+
+    def observe_inputs(
+        self,
+        inputs: Iterable[InputValue],
+        *,
+        exclude: Iterable[InputValue] = (),
+        require_matches: bool = True,
+        verify: bool = False,
+        max_members: int = DEFAULT_MAX_INPUT_MEMBERS,
+    ) -> InputObservation:
+        """Return the daemon's complete canonical selected-input observation."""
+        payload = encode_input_observation_request(
+            self.workspace,
+            inputs,
+            exclude=exclude,
+            require_matches=require_matches,
+            verify=verify,
+            max_members=max_members,
+        )
+        self._ensure_compatible()
+        if INPUT_OBSERVATION_CAPABILITY not in self._capabilities:
+            raise DaemonCompatibilityError(
+                f"identity daemon is missing required capability: {INPUT_OBSERVATION_CAPABILITY}"
+            )
+        response = self.request("observe_inputs", **payload)
+        try:
+            if set(response) != {"ok", "observation"} or response["ok"] is not True:
+                raise ValueError("input observation response envelope is invalid")
+            return decode_input_observation(
+                response["observation"], max_members=max_members
+            )
+        except (TypeError, ValueError) as exc:
+            raise DaemonProtocolError(
+                f"daemon returned an invalid input observation: {exc}"
+            ) from exc

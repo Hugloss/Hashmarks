@@ -12,10 +12,11 @@ This is the single catalog for the current maintained documentation in `docs/`.
 - [`reference/ARCHITECTURE.md`](reference/ARCHITECTURE.md) — architecture and authority model.
 - [`reference/API_STABILITY.md`](reference/API_STABILITY.md) — supported Python/CLI surface and pre-1.0 compatibility policy.
 - [`reference/EVIDENCE_CORRELATION.md`](reference/EVIDENCE_CORRELATION.md) — bounded external-observation correlation and authority limits.
+- [`reference/ECMASCRIPT_SOURCE_OBSERVATIONS.md`](reference/ECMASCRIPT_SOURCE_OBSERVATIONS.md) — native JavaScript/TypeScript alias, binding, property, and call syntax over canonical Source bytes.
 - [`reference/FILESYSTEM_LIFECYCLE_EVIDENCE.md`](reference/FILESYSTEM_LIFECYCLE_EVIDENCE.md) — qualified Python filesystem checks, source-reference flow, protection syntax and uncertainty.
 - [`reference/DEPENDENCY_EVIDENCE.md`](reference/DEPENDENCY_EVIDENCE.md) — producer-neutral dependency evidence, adapter boundaries, semantic authorities, and coverage rules.
 - [`reference/INVARIANTS.md`](reference/INVARIANTS.md) — normative correctness, freshness, and authority guarantees.
-- [`reference/INPUT_OBSERVATIONS.md`](reference/INPUT_OBSERVATIONS.md) — coherent selected-input identity, recursive inventory, explicit counts, and local observation bounds.
+- [`reference/INPUT_OBSERVATIONS.md`](reference/INPUT_OBSERVATIONS.md) — coherent selected-input identity, recursive inventory, counts, and local/daemon/CLI transport bounds.
 - [`reference/MAKE_SHELL_EVIDENCE.md`](reference/MAKE_SHELL_EVIDENCE.md) — explicitly selected Make/shell declarations, invocation syntax, and unresolved expansion.
 - [`reference/OBSERVER_DELTA.md`](reference/OBSERVER_DELTA.md) — observer/delta ownership and change semantics.
 - [`reference/PRODUCT_BOUNDARY.md`](reference/PRODUCT_BOUNDARY.md) — normative feature-admission and ownership contract.

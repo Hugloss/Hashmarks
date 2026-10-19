@@ -156,10 +156,10 @@ Hashmarks intentionally exposes a small read-only repository-intelligence tool c
 | `repository_declarations` | bind declaration claims to exact evidence, or discover syntax from selected backend source with tracked input revisions |
 | `post_change` | refresh changed paths against a previous `task_evidence` packet and return evidence deltas |
 | `repository_intelligence_query` | expose existing bounded profiles, snapshots, deltas, freshness, verification explanations, and cross-repository evidence |
-| `source_observation` | exact revision-bound source occurrences for one member or an explicit bounded member set |
+| `source_observation` | exact revision-bound literals, original byte-range receipts, or native JavaScript/TypeScript syntax in explicit source members |
 | `evidence_comparison` | caller-supplied structural-locality, binding, or external diagnostic endpoint comparison, preserving native uncertainty and completeness |
 | `structural_locality` | static structural locality, exact callers and unresolved candidates for one symbol |
-| `repository_evidence` | exact evidence bindings or explicit changed-path coverage, using existing core producers and native qualification |
+| `repository_evidence` | exact evidence bindings, explicit changed-path coverage, or supplied verification membership with native source qualification |
 | `repository_findings` | existing bounded import, cache, and concurrency repository findings |
 
 ### Backend changed-line correspondence (B01–B05)
@@ -262,6 +262,21 @@ qualified scoped absence. It is not regex or a repository-wide search.
 its optional presentation. Compact projection shows occurrence hits before
 the member inventory; omitted rows are counted and do not prove absence.
 A member-only or stale result cannot silently imply repository-wide completeness.
+
+For one path, `result_mode="range"` accepts
+`byte_range={"start_byte": 0, "end_byte": 12}` and returns original bytes in the
+native [range receipt](../reference/SOURCE_RANGE_RECEIPTS.md).
+`result_mode="ecmascript"` observes bounded native JavaScript/TypeScript alias,
+binding, property, and call syntax through the existing Source parser. Both modes
+accept a whole-member `max_bytes` budget and reject literal/line selectors. Syntax
+mode retains the MCP result cap of 50 and never resolves runtime targets; see
+[ECMAScript source observations](../reference/ECMASCRIPT_SOURCE_OBSERVATIONS.md).
+
+`repository_evidence` also accepts `result_mode="membership"` with one supplied
+verification report in `request`. It binds the nominated input revisions to
+current Source observations while preserving membership and collection
+completeness as caller claims. The [membership handoff](../reference/VERIFICATION_MEMBERSHIP_HANDOFF.md)
+documents the report schema and public retained-packet validator.
 
 The `task_evidence` presentation also shows independently referenced owner,
 source, verifier, verification-plan and ambiguity-discrimination rows. Owner

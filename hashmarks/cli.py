@@ -15,6 +15,7 @@ from hashmarks._command_output import log_command_output
 from ._version import __version__
 from .client import (
     DaemonCompatibilityError,
+    DaemonProtocolError,
     DaemonUnavailableError,
     IdentityClient,
     StateDirectoryError,
@@ -22,8 +23,11 @@ from .client import (
 )
 from .daemon import IdentityDaemon
 from .errors import UserFacingError
+from .file_store import UnstableFileError
 from .identity import RepositoryIdentity, RepositoryIdentityMode
+from .input_observation import DEFAULT_MAX_INPUT_MEMBERS
 from .mcp_launch import installed_mcp_command
+from .observation import UnstableObservationError
 from .opencode_registration import (
     effective_command_uses_executable,
     inspect_effective_hashmarks_command,
@@ -275,6 +279,24 @@ def _snapshot(args: argparse.Namespace) -> int:
     return 0
 
 
+def _observe_inputs(args: argparse.Namespace) -> int:
+    with RepositoryIdentity(
+        args.workspace,
+        state_dir=args.state_dir,
+        mode=args.mode,
+        timeout=args.timeout,
+    ) as identity:
+        observation = identity.observe_inputs(
+            *args.input,
+            exclude=args.exclude,
+            require_matches=not args.allow_unmatched,
+            verify=args.verify,
+            max_members=args.max_members,
+        )
+    _print(observation.as_dict())
+    return 0
+
+
 def _stats(args: argparse.Namespace) -> int:
     with RepositoryIdentity(
         args.workspace,
@@ -432,6 +454,8 @@ def _add_identity_cli(sub: argparse._SubParsersAction[argparse.ArgumentParser]) 
     snapshot.add_argument("--verify", action="store_true")
     snapshot.set_defaults(func=_snapshot, automatic_update_check=True)
 
+    _add_input_observation_cli(sub)
+
     stats = sub.add_parser("stats")
     _add_common_arguments(stats, inherited=True)
     _add_mode_argument(stats)
@@ -470,6 +494,22 @@ def _add_identity_cli(sub: argparse._SubParsersAction[argparse.ArgumentParser]) 
         ),
     )
     doctor.set_defaults(func=_doctor, automatic_update_check=True)
+
+
+def _add_input_observation_cli(
+    sub: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    observe = sub.add_parser(
+        "observe-inputs", help="observe selected-input identity and complete inventory"
+    )
+    _add_common_arguments(observe, inherited=True)
+    _add_mode_argument(observe)
+    observe.add_argument("--input", action="append", default=[])
+    observe.add_argument("--exclude", action="append", default=[])
+    observe.add_argument("--allow-unmatched", action="store_true")
+    observe.add_argument("--verify", action="store_true")
+    observe.add_argument("--max-members", type=int, default=DEFAULT_MAX_INPUT_MEMBERS)
+    observe.set_defaults(func=_observe_inputs, automatic_update_check=True)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -536,11 +576,14 @@ def main(argv: list[str] | None = None) -> int:
         return int(args.func(args))
     except (
         UserFacingError,
-        DaemonUnavailableError,
-        DaemonCompatibilityError,
+        DaemonProtocolError,
         StateDirectoryError,
         ReleaseCheckError,
         StandaloneUpgradeError,
+        ValueError,
+        OSError,
+        UnstableObservationError,
+        UnstableFileError,
     ) as exc:
         raise SystemExit(str(exc)) from exc
 

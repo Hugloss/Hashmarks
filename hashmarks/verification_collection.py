@@ -8,11 +8,12 @@ from collections.abc import Mapping
 from typing import TypedDict
 
 from .codemap.repository_observation import evidence_identity
+from .operation_contract import operation_schema
 from .paths import normalize_relative_path
 from .verification_selection import verification_member, verification_membership
 
 COLLECTION_REPORT_SCHEMA = "hashmarks.verification-membership-report.v1"
-MEMBERSHIP_OBSERVATION_SCHEMA = "hashmarks.verification-membership-observation.v1"
+MEMBERSHIP_OBSERVATION_SCHEMA = operation_schema("verification_membership")
 EMPTY_MEMBERSHIP_SCHEMA = "hashmarks.verification-empty-membership.v1"
 MAX_COLLECTION_MEMBERS = 10_000
 MAX_COLLECTION_INPUTS = 256

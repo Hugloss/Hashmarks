@@ -277,6 +277,10 @@ def test_service_routes_are_exhaustively_classified() -> None:
     assert set(routes) == {
         "status",
         "sync",
+        "repository_declarations",
+        "source_range_receipt",
+        "source_ecmascript",
+        "verification_membership",
         "repository_findings",
         "import_ownership",
         "cache_ownership",
@@ -308,6 +312,16 @@ def test_service_routes_are_exhaustively_classified() -> None:
         if entry.classification == "canonical-semantic"
     }
     assert semantic == {
+        "repository_declarations": (
+            "repository_declarations",
+            "repository_declarations",
+        ),
+        "source_range_receipt": ("source_range_receipt", "source_range_receipt"),
+        "source_ecmascript": ("source_ecmascript", "source_ecmascript"),
+        "verification_membership": (
+            "verification_membership",
+            "verification_membership",
+        ),
         "repository_findings": ("repository_findings", "repository_findings"),
         "import_ownership": ("import_ownership", "import_ownership"),
         "cache_ownership": ("cache_ownership", "cache_ownership"),

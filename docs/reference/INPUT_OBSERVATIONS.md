@@ -49,13 +49,17 @@ source files:
 uv run --frozen python examples/input_observation.py /work/project src pyproject.toml
 ```
 
+Add `--mode auto` to use a capable running Identity daemon with the existing
+local fallback, or `--mode daemon` to require it. The example defaults to local
+observation; the no-argument neutral demo remains local.
+
 The empty example describes only its selected scope; it does not establish that
 the repository has no other files.
 
 ```python
 from hashmarks import Directory, File, RepositoryIdentity
 
-with RepositoryIdentity("/work/project", mode="local") as identity:
+with RepositoryIdentity("/work/project", mode="auto") as identity:
     observation = identity.observe_inputs(
         Directory("src"),
         File("pyproject.toml"),
@@ -84,6 +88,20 @@ Inputs and exclusions accept the existing string, `Path`, `File`, `Directory`,
 and `Glob` forms. Paths are workspace relative and follow the same canonical path
 rules as `snapshot()`. The caller may supply an explicit `state_dir`; Hashmarks'
 own state files remain excluded by the existing storage owner.
+
+The CLI projects the same complete observation as JSON:
+
+```bash
+hashmarks --workspace /work/project observe-inputs --mode auto \
+  --input src --input pyproject.toml \
+  --exclude src/generated --exclude src/local.env --verify
+```
+
+Repeat `--input` and `--exclude` for additional patterns. Omitting `--input`
+requests an explicit empty scope. `--allow-unmatched` maps to
+`require_matches=False`; `--max-members` has the same positive-integer bound as
+the Python API. CLI paths and globs use the existing string input form. Python
+callers can additionally use `File`, `Directory`, and `Glob` assertions.
 
 ## Scope and canonical identity
 
@@ -189,6 +207,13 @@ Failures return no `InputObservation`:
   returned as complete. The bound counts real directories and symlinks as well
   as files and must be a positive integer.
 
+These are the local engine's errors. The daemon's existing IPC boundary returns
+operation failures as `DaemonProtocolError`, including member limits and source
+read failures. An unavailable daemon raises `DaemonUnavailableError`; an
+incompatible protocol or missing observation capability raises
+`DaemonCompatibilityError`. The CLI renders failures as nonzero errors and
+prints no complete observation on failure.
+
 The versioned dictionary has schema `hashmarks.input-observation.v1`, the existing
 snapshot envelope, explicit scope, members, counts, completeness, and freshness.
 `authority="repository-evidence-only"` and `execution_effect="none"` describe the
@@ -201,9 +226,37 @@ not become Hashmarks evidence.
 | Requested authority or mode | Support |
 | --- | --- |
 | `RepositoryIdentity(..., mode="local")` | Supported for live filesystem inputs. Existing `reconcile`, `watcher`, and explicit `manual` observer choices retain their documented roles. The inventory itself traverses the selected scope on each call. |
-| `mode="auto"` | `observe_inputs()` raises `NotImplementedError`, including when no daemon is running. Use an explicit local identity object for this API. |
-| `mode="daemon"` | Inventory transport is not implemented. The constructor retains its existing required-daemon check; an available daemon does not enable this method. |
+| `mode="auto"` | Uses a running compatible daemon that advertises `input-observation.v1`. Falls back to the same local engine only when the daemon is unavailable or incompatible with this operation. |
+| `mode="daemon"` | Requires a compatible running daemon and the observation capability. Availability and compatibility errors propagate; there is no local fallback. |
+| `IdentityClient.observe_inputs(inputs, ...)` | Direct daemon-only client. It takes an iterable of input specifications and the same observation options. |
+| `hashmarks observe-inputs` | CLI projection of the public Identity method, with `local`, `auto`, and `daemon` modes. |
+| CodeMap service or MCP | No projection of this Identity operation. These transports do not substitute the CodeMap admission set for selected filesystem inputs. |
 | Git commit, ref, or tree selection | Not implemented by this method. There are no `ref` or `revision` parameters, and path strings are not interpreted as Git selectors. |
+
+The daemon adds the `observe_inputs` operation to protocol v3. The
+`input-observation.v1` capability is checked for this method; existing snapshot
+calls can continue to use an older v3 daemon that supports their baseline
+capabilities. The transport retains typed input declarations, so caller-side
+kind checks and the canonical engine's scope checks both remain effective.
+The request contains the input specifications, exclusions, `require_matches`,
+`verify`, and `max_members`. Unsupported fields, including Git selectors, are
+rejected rather than silently ignored.
+
+The daemon invokes the same `IdentityEngine.observe_inputs()` owner and sends
+the complete observation envelope. Only `snapshot.mode` changes to `"daemon"`;
+the recorded scope, member revisions, counts, observer generation, and freshness
+travel together. Client decoding checks schema, scalar domains, canonical paths,
+manifest fingerprint, member ordering/scope, and count consistency. It preserves
+`stale` and `unknown` and does not independently reobserve the filesystem or
+authenticate a peer's supplied digest.
+
+The existing daemon response budget is **4 MiB**, including the JSON envelope
+and newline. If a complete encoded observation exceeds it, the daemon writes a
+small error response instead of any partial observation. `max_members` and the
+encoded response budget are separate bounds. Neither a response-budget error
+nor a malformed successful reply triggers automatic local fallback. Use an
+explicit local API or CLI call when the required complete inventory exceeds the
+IPC budget.
 
 A caller may point a local Identity object at a filesystem checkout that the
 caller and Git already materialized. Git history observation and checkout

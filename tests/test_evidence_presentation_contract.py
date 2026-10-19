@@ -122,6 +122,9 @@ def native_packets(
         "from src.owner import widget\ndef test_widget(): assert widget() == 1\n",
         encoding="utf-8",
     )
+    (root / "src" / "observed.ts").write_text(
+        "const client = transport; client.send();\n", encoding="utf-8"
+    )
     task, paths = "inspect src/owner.py widget", ["src/owner.py"]
     dependency = {
         "schema": "hashmarks.dependency-resolution.v3",
@@ -251,7 +254,35 @@ def native_packets(
                 "literals",
                 codemap.source.scoped_literals(paths, ["widget", "missing"]),
             ),
+            (
+                "source_observation",
+                "range",
+                codemap.source.range_receipt(paths[0], start_byte=0, end_byte=6),
+            ),
+            (
+                "source_observation",
+                "ecmascript",
+                codemap.source.ecmascript("src/observed.ts"),
+            ),
             ("repository_evidence", "observation", binding),
+            (
+                "repository_evidence",
+                "membership",
+                codemap.verification.observe_membership(
+                    {
+                        "schema": "hashmarks.verification-membership-report.v1",
+                        "selection_kind": "caller-selected",
+                        "producer": {"name": "fixture"},
+                        "provenance": {},
+                        "scope": {"paths": paths},
+                        "status": "succeeded",
+                        "completeness": "complete",
+                        "truncation": "complete",
+                        "members": [{"path": paths[0]}],
+                        "inputs": [{"path": paths[0], "member_revision": None}],
+                    }
+                ),
+            ),
             (
                 "repository_evidence",
                 "coverage",

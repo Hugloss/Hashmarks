@@ -14,6 +14,7 @@ until included in a published package.
 | Make targets and authored shell invocation syntax | Explicit `MakeShellDeclarations`; Declarations provider context | Make/shell expansion, effective command behavior, and execution |
 | Python/uv manifest declarations | Explicit `PythonUvManifestDeclarations`; Declarations provider context | Package resolution and effective uv workspace membership |
 | Original contiguous source bytes and a range identity | `codemap.source.range_receipt(...)`; Source | Selecting the range, interpreting bytes, and editing |
+| JavaScript/TypeScript aliases, property accesses, and call syntax | `codemap.source.ecmascript(...)`; Source and its configured native parser | Semantic alias closure, imported implementations, runtime targets, and execution |
 | Hashmarks verification contract validation | `validate_native_consumer_bundle(...)`; existing public consumer validator | Trust/admission policy and execution-result authority |
 
 Each result carries the facts its existing owner can establish. A source-bound
@@ -86,16 +87,24 @@ methods that connect to an already managed CodeMap service.
 
 | Added capability | Supported surface in this change |
 | --- | --- |
-| Coherent input observation | `RepositoryIdentity` in explicit local mode; other modes reject the new operation |
-| Native membership observation | Direct Python Verification component |
+| Coherent input observation | `RepositoryIdentity` in local, auto, and daemon modes; CLI `observe-inputs` |
+| Native membership observation | Python `verification.observe_membership(report)`; CLI `verification-membership`; MCP `repository_evidence` membership mode; service `verification_membership(report)` |
 | Retained membership validation | Public pure Python consumer validator |
-| Make/shell and Python/uv declarations | Explicit Python provider selection and registered MCP declaration-discovery adapters; no dedicated CLI flags or service-client parity |
-| Exact byte-range receipt | Direct Python Source component |
+| Make/shell and Python/uv declarations | Explicit Python providers; CLI path selectors or source-selection JSON; MCP and service `repository_declarations` discovery mode |
+| Exact byte-range receipt | Python `source.range_receipt(...)`; CLI/MCP `source_observation` range mode; service `source_range_receipt(...)` |
+| JavaScript/TypeScript syntax | Python `source.ecmascript(...)`; CLI/MCP `source_observation` ecmascript mode; service `source_ecmascript(...)` |
 
-No service or daemon parity is implied for a newly added direct method. Existing
-supported operations keep their own transport contracts. Arbitrary Python
-provider execution is never enabled through MCP; only explicitly registered
-first-party discovery adapters are eligible there.
+The CLI spells the source command `source-observation`. Identity input observations
+use method-specific daemon capability negotiation: auto mode falls back locally
+only for an unavailable daemon or missing capability. Malformed or oversized
+successful replies remain protocol errors. These observations have no Git-ref,
+CodeMap-service, or MCP projection.
+
+Service consumers use `client.sync()` to reconcile the repository when needed;
+read methods preserve the native owner's freshness. Explicit selector adapters
+construct registered first-party declaration providers for CLI/MCP/service
+discovery. Arbitrary supplied Python provider execution is outside these
+transport contracts.
 
 ## Using the observations together
 
@@ -128,6 +137,12 @@ Use `range_receipt()` when exact source bytes are needed. Its byte completeness
 applies to that range only. `freshness` remains `current`, `stale`, or `unknown`;
 source-equivalence states belong to their separate correspondence contract.
 
+Use `source.ecmascript()` when the question needs source facts such as
+`const transport = client`, object destructuring, or `transport.send(...)`.
+The optional native syntax capability supplies exact byte ranges and lexical
+scope. Dynamic property expressions and call targets remain unresolved. Bounded
+facts, unsupported parsers, and incomplete native syntax never establish absence.
+
 ## Standalone examples and qualification
 
 The examples under `examples/` use neutral temporary repositories or an explicit
@@ -141,15 +156,19 @@ package and require no Oh-Goon installation, repository, or test archive.
 | Make/shell syntax | [Make/shell evidence](../reference/MAKE_SHELL_EVIDENCE.md) | [make_shell_declarations.py](../../examples/make_shell_declarations.py) |
 | Python manifest syntax | [Python/uv manifests](../reference/PYTHON_UV_MANIFEST_EVIDENCE.md) | [python_uv_manifest_declarations.py](../../examples/python_uv_manifest_declarations.py) |
 | Source byte range | [Byte receipts](../reference/SOURCE_RANGE_RECEIPTS.md) | Inline direct-Python example in the reference |
+| JavaScript/TypeScript syntax | [ECMAScript source](../reference/ECMASCRIPT_SOURCE_OBSERVATIONS.md) | [ecmascript_source.py](../../examples/ecmascript_source.py) |
 
 Focused tests cover inventory/digest agreement, mutation, exact selectors, empty
 and incomplete reports, stale or missing source binding, bounded declaration
-coverage, and byte-preserving receipts. These qualify Hashmarks observation
+coverage, byte-preserving receipts, native ECMAScript syntax, and real transport
+round trips. These qualify Hashmarks observation
 semantics; they do not claim that an external collector, resolver, or executor has
 been integrated or certified.
 
-General TypeScript alias/property observations remain deferred until a concrete
-consumer requirement and source-evidenced contract establish their scope.
+The admitted JavaScript/TypeScript scope is the syntax gap demonstrated by import
+aliases, assigned bindings, destructuring, property accesses, and call sites in
+one explicit source member. Existing Source reads and native parsing own that
+observation. A resolver graph or runtime interpretation is not part of this scope.
 
 See [Public API and stability](../reference/API_STABILITY.md) for the supported
 contract and [Hashmarks ↔ Oh-Goon](OH_GOON_INTEGRATION.md) for the application of

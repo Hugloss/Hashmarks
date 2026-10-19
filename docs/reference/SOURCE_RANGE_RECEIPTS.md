@@ -2,8 +2,8 @@
 
 `CodeMap.source.range_receipt()` returns original bytes for one contiguous range
 of one admitted repository member. It extends the existing Source owner and
-stable member read. The supported surface is the direct Python component; this
-method is not currently exposed by the daemon, CodeMap service client, CLI, or MCP.
+stable member read. The direct Python component, CLI, MCP, and CodeMap service
+client all return the same canonical receipt.
 
 ```python
 import base64
@@ -16,6 +16,29 @@ with CodeMap(".") as codemap:
     if receipt["availability"] == "observed":
         original_bytes = base64.b64decode(receipt["content"]["data"], validate=True)
 ```
+
+## Transport entry points
+
+The CLI selects the range mode explicitly:
+
+```bash
+hashmarks --workspace . source-observation src/example.py \
+  --result-mode range --start-byte 0 --end-byte 12
+```
+
+MCP uses the existing `source_observation` tool with one path,
+`result_mode: "range"`, and
+`byte_range: {"start_byte": 0, "end_byte": 12}`. The coordinates retain their
+JSON scalar types, so boolean and fractional coordinates are rejected.
+`CodeMapServiceClient.source_range_receipt(path, start_byte=0, end_byte=12)` is
+the flat service method. Optional `max_bytes` selects the whole-member budget.
+CLI and MCP also support the existing optional evidence presentations; the
+original receipt remains in the presentation envelope.
+
+CLI and MCP synchronize the requested path at their existing request boundary.
+Service callers use `client.sync(...)` when they need to reconcile current source;
+the receipt preserves the Source owner's generation and freshness qualifications.
+The Identity daemon has a separate identity/inventory contract.
 
 ## Contract
 
@@ -73,4 +96,6 @@ No second filesystem read, source cache, or repository index is introduced.
 - **Consumer responsibility:** choosing ranges, interpreting the bytes, editing, and executing remain external.
 - **Decision:** OBSERVER.
 
-Regression coverage: `tests/test_source_range_receipt.py`.
+Regression coverage: `tests/test_source_range_receipt.py`,
+`tests/test_observation_transport_completion.py`, and
+`tests/test_standalone_codemap_service_observations.py`.

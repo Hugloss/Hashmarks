@@ -43,18 +43,24 @@ def main() -> None:
     parser.add_argument("--exclude", action="append", default=[], help="Excluded scope")
     parser.add_argument("--state-dir", help="Optional Hashmarks state directory")
     parser.add_argument(
+        "--mode",
+        choices=("local", "auto", "daemon"),
+        default="local",
+        help="Identity transport for an explicitly supplied workspace",
+    )
+    parser.add_argument(
         "--verify", action="store_true", help="Force native file hashing"
     )
     args = parser.parse_args()
     if args.workspace is None:
-        if args.exclude or args.state_dir or args.verify:
+        if args.exclude or args.state_dir or args.verify or args.mode != "local":
             parser.error("observation options require a workspace and selected inputs")
         result = _demo()
     else:
         if not args.inputs:
             parser.error("a workspace requires at least one selected input")
         with RepositoryIdentity(
-            args.workspace, mode="local", state_dir=args.state_dir
+            args.workspace, mode=args.mode, state_dir=args.state_dir
         ) as identity:
             result = identity.observe_inputs(
                 *args.inputs, exclude=args.exclude, verify=args.verify

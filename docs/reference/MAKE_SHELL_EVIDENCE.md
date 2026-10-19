@@ -135,8 +135,52 @@ The existing registered `repository_declarations` MCP tool accepts:
 ```
 
 This uses the same built-in provider selector as direct adapter calls. Arbitrary
-repository-supplied provider code is never loaded by this selector. Dedicated
-CLI flags and service-client parity are not part of this provider addition.
+repository-supplied provider code is never loaded by this selector.
+
+### CLI
+
+The existing declaration-discovery command accepts repeatable source paths:
+
+```sh
+hashmarks --workspace /repo repository-declarations \
+  --make-path Makefile --shell-path scripts/demo.sh --shell-path scripts/other.sh
+```
+
+Alternatively, `--source-selection-json selection.json` reads the same inner
+`source_selection` object shown above. It can combine this provider with other
+registered providers. JSON selection and source-selection flags are mutually
+exclusive. An explicit empty JSON object selects no providers; a supplied
+`--previous-observation previous.json` remains comparison input and cannot
+restore old selections. The normal evidence-presentation options remain available.
+
+### CodeMap service
+
+With the existing CodeMap service running for the workspace:
+
+```python
+from hashmarks.codemap import CodeMapServiceClient
+
+client = CodeMapServiceClient("/repo")
+observation = client.repository_declarations(
+    [],
+    result_mode="discovery",
+    source_selection={
+        "make_shell": {
+            "make_paths": ["Makefile"],
+            "shell_paths": ["scripts/demo.sh"],
+        }
+    },
+)
+```
+
+CLI, MCP and service discovery all delegate to the same selector and
+`RepositoryDeclarations.operation()`. The service retains its existing warm
+CodeMap, request/response limits and explicit `sync()` behavior. Stale inputs
+cannot become current through transport; previous packets remain explicit
+comparison inputs. No transport accepts provider import paths or executes
+repository-supplied Python providers.
+
+### Standalone example
 
 The standalone [consumer example](../../examples/make_shell_declarations.py)
 creates a neutral temporary repository, observes selected sources and a missing

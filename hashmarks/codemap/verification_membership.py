@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 
 from hashmarks.file_store import UnstableFileError
+from hashmarks.operation_contract import operation_response
 from hashmarks.verification_collection import (
     collection_bundle,
     collection_inputs,
@@ -25,6 +26,7 @@ class VerificationMembershipMixin:
         assert isinstance(member, dict)
         return dict(member)
 
+    @operation_response("verification_membership")
     def observe_membership(self, report: object) -> dict[str, object]:
         """Bind an explicit supplied selection/collection report to current source.
 

@@ -412,10 +412,15 @@ Run `hashmarks --help` for the complete command surface.
 | `map sync` | Build/update derived repository intelligence |
 | `map status` | Inspect CodeMap generation and freshness |
 | `map findings` | Project high-signal actionable repository findings |
+| `observe-inputs --input PATH` | Return coherent selected-input identity, manifest, member inventory, and counts through local/auto/daemon mode |
 | `orient` | Compact repository context/orientation capsule |
 | `find QUERY` | Search maintained path/symbol evidence |
 | `outline PATH` | Show code structure without loading full bodies |
 | `source SYMBOL` | Return exact symbol source under an explicit budget |
+| `source-observation PATH --result-mode range --start-byte N --end-byte M` | Return original source bytes with a full-member revision and exact range identity |
+| `source-observation PATH --result-mode ecmascript` | Observe bounded JavaScript/TypeScript alias, binding, property, and call syntax |
+| `verification-membership --input-json FILE` | Bind a supplied native membership report to repository source observations |
+| `repository-declarations --make-path Makefile` | Observe explicitly selected first-party declarations; shell and Python/uv manifest selectors are also available |
 | `deps QUERY` / `refs QUERY` | Inspect static dependency/reference evidence |
 | `affected PATH` | Reverse change impact from repository relationships |
 | `tests QUERY` | Structurally related verification surfaces |

@@ -67,10 +67,18 @@ _EXPECTED = {
         "member": "hashmarks.source-observation.v1",
         "scope": "hashmarks.scoped-source-occurrences.v1",
         "literals": "hashmarks.scoped-source-literal-set.v1",
+        "range": "hashmarks.source-range-receipt.v1",
+        "ecmascript": "hashmarks.ecmascript-source-observation.v1",
     },
     "repository_evidence": {
         "observation": "hashmarks.repository-evidence-bindings.v1",
         "coverage": "hashmarks.repository-evidence-coverage.v1",
+        "membership": "hashmarks.verification-membership-observation.v1",
+    },
+    "source_range_receipt": {"default": "hashmarks.source-range-receipt.v1"},
+    "source_ecmascript": {"default": "hashmarks.ecmascript-source-observation.v1"},
+    "verification_membership": {
+        "default": "hashmarks.verification-membership-observation.v1"
     },
     "evidence_comparison": {
         "structural": "hashmarks.structural-locality-delta.v1",
@@ -375,6 +383,18 @@ def test_operation_modes_fail_closed() -> None:
 
 
 _FIXED_MODE_CORE_BOUNDARIES = {
+    "source_range_receipt": (
+        "hashmarks/codemap/repository_source.py",
+        "range_receipt",
+    ),
+    "source_ecmascript": (
+        "hashmarks/codemap/source_ecmascript.py",
+        "ecmascript",
+    ),
+    "verification_membership": (
+        "hashmarks/codemap/verification_membership.py",
+        "observe_membership",
+    ),
     "repository_context": ("hashmarks/codemap/repository_context.py", "orient"),
     "find": ("hashmarks/codemap/find_engine.py", "packet"),
     "change_impact": ("hashmarks/codemap/change_impact.py", "task_impact"),

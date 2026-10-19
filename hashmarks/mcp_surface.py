@@ -23,6 +23,7 @@ from .codemap.repository_declaration_contract import (
 from .codemap.repository_declaration_provider import MAX_DISCOVERY_PACKET_BYTES
 from .codemap.repository_declaration_selection import source_declaration_providers
 from .codemap.repository_intelligence_query import RepositoryIntelligenceQueryOptions
+from .codemap.source_range_receipt import validate_source_range
 from .codemap.task_evidence_types import (
     InitialTaskEvidenceEnvelope,
     PreviousTaskEvidence,
@@ -120,6 +121,13 @@ def _bounded_int(value: int, *, name: str, minimum: int, maximum: int) -> int:
     if value < minimum or value > maximum:
         raise McpSurfaceError(f"{name} must be between {minimum} and {maximum}")
     return value
+
+
+def _source_result_limit(limit: int, result_mode: str) -> int:
+    limit = _bounded_int(limit, name="limit", minimum=1, maximum=50)
+    if result_mode == "range" and limit != 50:
+        raise McpSurfaceError("range mode requires the default limit of 50")
+    return limit
 
 
 def _source_context_request(
@@ -607,8 +615,13 @@ class HashmarksMcpSurface:
         literals: list[str] | None,
         path_count: int,
     ) -> None:
-        if result_mode not in ("member", "scope", "literals"):
-            raise McpSurfaceError("result_mode must be one of: member, scope, literals")
+        if result_mode not in operation_modes("source_observation"):
+            raise McpSurfaceError(
+                "result_mode must be one of: "
+                + ", ".join(operation_modes("source_observation"))
+            )
+        if result_mode in {"range", "ecmascript"}:
+            return
         if result_mode == "literals":
             if literal is not None:
                 raise McpSurfaceError("literals mode forbids literal")
@@ -637,8 +650,14 @@ class HashmarksMcpSurface:
         HashmarksMcpSurface._validate_source_mode(
             result_mode, literal, literals, len(paths)
         )
+        if result_mode in {"range", "ecmascript"} and (
+            len(paths) != 1 or literal is not None or literals is not None
+        ):
+            raise McpSurfaceError(
+                f"{result_mode} mode requires exactly one path and no literals"
+            )
 
-    def source_observation(
+    def source_observation(  # noqa: PLR0913 - preserve source selectors plus exact byte bounds
         self,
         paths: list[str],
         *,
@@ -647,11 +666,14 @@ class HashmarksMcpSurface:
         result_mode: str = operation_default_mode("source_observation"),
         limit: int = 50,
         context_lines: int | dict[str, object] = 0,
+        byte_range: dict[str, object] | None = None,
+        max_bytes: int = 1_048_576,
     ) -> dict[str, object]:
         self._validate_source_request(paths, literal, result_mode, literals)
         if literal is not None:
             literal = _bounded_text(literal, name="literal", maximum=_MAX_QUERY_CHARS)
-        limit = _bounded_int(limit, name="limit", minimum=1, maximum=50)
+        limit = _source_result_limit(limit, result_mode)
+        coordinates = self._source_byte_request(result_mode, byte_range, max_bytes)
         literal_context, requested_lines, anchor_context = _source_context_request(
             context_lines,
             literal=literal
@@ -663,6 +685,18 @@ class HashmarksMcpSurface:
         def project() -> dict[str, object]:
             try:
                 self._map.index.sync(paths)
+                if result_mode == "range":
+                    assert coordinates is not None
+                    return self._map.source.range_receipt(
+                        paths[0],
+                        start_byte=coordinates[0],
+                        end_byte=coordinates[1],
+                        max_bytes=max_bytes,
+                    )
+                if result_mode == "ecmascript":
+                    return self._map.source.ecmascript(
+                        paths[0], limit=limit, max_bytes=max_bytes
+                    )
                 if result_mode == "member":
                     return self._map.source.observe(
                         paths[0],
@@ -685,6 +719,31 @@ class HashmarksMcpSurface:
                 raise _surface_value_error(exc) from exc
 
         return self._read(project)
+
+    @staticmethod
+    def _source_byte_request(
+        result_mode: str, byte_range: dict[str, object] | None, max_bytes: int
+    ) -> tuple[int, int] | None:
+        _bounded_int(max_bytes, name="max_bytes", minimum=1, maximum=8_388_608)
+        if result_mode != "range":
+            if byte_range is not None:
+                raise McpSurfaceError("byte_range requires range mode")
+            if result_mode != "ecmascript" and max_bytes != 1_048_576:
+                raise McpSurfaceError("max_bytes requires range or ecmascript mode")
+            return None
+        if not isinstance(byte_range, dict) or set(byte_range) != {
+            "start_byte",
+            "end_byte",
+        }:
+            raise McpSurfaceError("byte_range requires exactly start_byte and end_byte")
+        start, end = byte_range["start_byte"], byte_range["end_byte"]
+        if type(start) is not int or type(end) is not int:
+            raise McpSurfaceError("source range coordinates must be integers")
+        try:
+            validate_source_range(start, end, max_bytes)
+        except ValueError as exc:
+            raise _surface_value_error(exc) from exc
+        return start, end
 
     def _repository_binding_observation(
         self, request: dict[str, Any]
@@ -725,8 +784,11 @@ class HashmarksMcpSurface:
         request = _bounded_json(
             request, name="request", maximum=1_048_576, expected_type=dict
         )
-        if result_mode not in ("observation", "coverage"):
-            raise McpSurfaceError("result_mode must be one of: observation, coverage")
+        if result_mode not in operation_modes("repository_evidence"):
+            raise McpSurfaceError(
+                "result_mode must be one of: "
+                + ", ".join(operation_modes("repository_evidence"))
+            )
 
         def project() -> dict[str, object]:
             try:
@@ -734,6 +796,7 @@ class HashmarksMcpSurface:
                 producers = {
                     "observation": self._repository_binding_observation,
                     "coverage": self._repository_binding_coverage,
+                    "membership": self._map.verification.observe_membership,
                 }
                 return producers[result_mode](request)
             except ValueError as exc:

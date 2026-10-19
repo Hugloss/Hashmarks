@@ -80,6 +80,23 @@ else:
     _TaskEvidenceResultMode = Literal[*tuple(operation_modes("task_evidence"))]
 
 
+class _StrictSdkInteger:
+    """Disable SDK coercion without importing its optional schema dependency."""
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, _source_type: object, _handler: object
+    ) -> object:
+        # The native SDK evaluates this hook while registering the tool. Plain
+        # module imports and catalog-only adapters never load Pydantic.
+        from pydantic_core import core_schema
+
+        return core_schema.int_schema(strict=True)
+
+
+_SourceInteger = Annotated[int, _StrictSdkInteger]
+
+
 def _sdk() -> tuple[type[MCPServer], type[ToolAnnotations], type[ToolError]]:
     try:
         from mcp.server import MCPServer
@@ -296,13 +313,16 @@ def _register_agent_evidence_tools(
         description=source_contract.description,
         annotations=annotations,
     )
-    def source_observation(
+    def source_observation(  # noqa: PLR0913 - stable selectors and explicit source byte bounds
         paths: list[str],
         literal: str | list[str] | None = None,
         result_mode: _SourceObservationResultMode = source_contract.default_response_mode,
-        limit: int = 50,
+        limit: _SourceInteger = 50,
         context_lines: int | dict[str, object] = 0,
         presentation: _Presentation = "none",
+        *,
+        byte_range: dict[str, object] | None = None,
+        max_bytes: _SourceInteger = 1_048_576,
     ) -> dict[str, object]:
         return _call_surface(
             source_contract,
@@ -315,6 +335,8 @@ def _register_agent_evidence_tools(
             response_mode=result_mode,
             limit=limit,
             context_lines=context_lines,
+            byte_range=byte_range,
+            max_bytes=max_bytes,
             presentation=presentation,
         )
 

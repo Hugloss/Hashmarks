@@ -6,6 +6,9 @@
 - Add source-bound observations of externally collected native verification membership and public consumer validation, preserving full selectors, empty collections, and incomplete or stale evidence. Collection and execution remain external.
 - Add explicitly selected Make/shell and Python/uv manifest declaration providers over the existing revision-bound provider context. These report authored syntax and unresolved semantics without executing build tools or resolving dependencies.
 - Add `CodeMap.source.range_receipt()` for exact original byte ranges, full-member revision binding, and canonical freshness, including byte-preserving CRLF, BOM, and empty-range behavior.
+- Add bounded JavaScript/TypeScript alias, binding, object-destructuring, assignment, property, and call syntax through `CodeMap.source.ecmascript()`, reusing the existing native parser and Source member read. Exact syntax retains unresolved semantic and runtime targets.
+- Complete local/auto/daemon and CLI input observations; expose declaration discovery, exact byte receipts, ECMAScript observations, and supplied membership through their documented CLI/MCP/service routes. Transport schemas and result modes reuse the central operation contract.
+- Repair the Verification architecture contract for its borrowed canonical Correlation component, with regressions that prove shared Source, Bindings, Correlation, and read-scope ownership.
 - Correct Python integration guidance to distinguish direct CodeMap components from flat service-client methods and to use the canonical `current`/`stale`/`unknown` freshness vocabulary. Document supported imports, installation, transport scope, and neutral standalone examples.
 
 ## 0.30.0 — Explicit Python API owners and backend evidence

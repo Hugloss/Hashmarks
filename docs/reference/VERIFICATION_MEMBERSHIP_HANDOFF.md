@@ -1,6 +1,6 @@
 # Source-bound verification membership
 
-**Status: current direct-Python contract, added after the 0.30.0 baseline.**
+**Status: current observation contract, added after the 0.30.0 baseline.**
 
 `CodeMap.verification.observe_membership(report)` observes the repository inputs
 named by a supplied verification selection or native collection report. It keeps
@@ -34,8 +34,22 @@ assert validated["valid"], validated["reasons"]
 ~~~
 
 The supported observation schema is
-`hashmarks.verification-membership-observation.v1`. This initial handoff is a
-direct Python API. Service, CLI and MCP do not acquire it automatically.
+`hashmarks.verification-membership-observation.v1`.
+
+The CLI accepts the exact report from a JSON file:
+
+~~~bash
+hashmarks --workspace . verification-membership --input-json collected.json
+~~~
+
+The existing MCP `repository_evidence` tool accepts the report as `request` with
+`result_mode: "membership"`. The flat service method is
+`CodeMapServiceClient.verification_membership(report)`. These transports call the
+existing Verification owner and preserve its complete observation. CLI and MCP
+synchronize at their existing request boundary; service consumers reconcile with
+`client.sync()` when needed. CLI/MCP optional presentations retain the native
+packet alongside the descriptive projection. None of these entry points invokes
+the collector or validates its claimed execution.
 
 The existing `validate_native_consumer_bundle(envelope, contract, ...)` call
 continues to validate its existing verification-selection envelope and downstream

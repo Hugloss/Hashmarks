@@ -10,7 +10,6 @@ from typing import cast
 import pytest
 
 from hashmarks import RepositoryIdentity
-from hashmarks.client import IdentityClient
 from hashmarks.digest import Digest
 from hashmarks.file_store import FileDigestStore
 from hashmarks.inputs import ResolvedInputScope
@@ -185,19 +184,6 @@ def test_member_bound_requires_a_positive_integer(
     with _identity(tmp_path) as identity:
         with pytest.raises(ValueError, match="positive integer"):
             identity.observe_inputs("src", max_members=cast(int, maximum))
-
-
-@pytest.mark.parametrize("mode", ["auto", "daemon"])
-def test_inventory_transport_is_explicitly_local_only(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str
-) -> None:
-    monkeypatch.setattr(IdentityClient, "status", lambda _self: {})
-    with RepositoryIdentity(
-        tmp_path, mode=mode, state_dir=tmp_path / "state"
-    ) as identity:
-        with pytest.raises(NotImplementedError, match="explicit mode='local'"):
-            identity.observe_inputs()
-        assert identity._engine is None
 
 
 @pytest.mark.parametrize("selector", ["ref", "revision"])

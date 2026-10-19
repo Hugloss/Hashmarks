@@ -773,11 +773,22 @@ async def _literal_wire_reply(
 
 def _assert_literal_wire_schema(tool: Tool) -> None:
     properties = assert_object(tool.input_schema["properties"])
-    assert len(properties) == 6
+    assert set(properties) == {
+        "paths",
+        "literal",
+        "result_mode",
+        "limit",
+        "context_lines",
+        "presentation",
+        "byte_range",
+        "max_bytes",
+    }
     assert assert_object(properties["result_mode"])["enum"] == [
         "member",
         "scope",
         "literals",
+        "range",
+        "ecmascript",
     ]
     assert {
         row["type"]

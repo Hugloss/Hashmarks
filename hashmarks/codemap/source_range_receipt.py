@@ -6,9 +6,11 @@ import base64
 import hashlib
 from collections.abc import Mapping
 
+from hashmarks.operation_contract import operation_schema
+
 from .repository_observation import evidence_identity
 
-SOURCE_RANGE_RECEIPT_SCHEMA = "hashmarks.source-range-receipt.v1"
+SOURCE_RANGE_RECEIPT_SCHEMA = operation_schema("source_range_receipt")
 
 
 def validate_source_range(start_byte: int, end_byte: int, max_bytes: int) -> None:
