@@ -10,6 +10,7 @@ from test_repository_index_component import index as index
 from test_repository_source_component import _source
 
 from hashmarks.codemap.decision_session import DecisionRefreshRequired
+from hashmarks.codemap.evidence_correlation import RepositoryCorrelation
 from hashmarks.codemap.evidence_verification import (
     RepositoryVerification,
     VerificationKeywordObservations,
@@ -17,6 +18,7 @@ from hashmarks.codemap.evidence_verification import (
 from hashmarks.codemap.import_resolution import RepositoryImports
 from hashmarks.codemap.indexing_lifecycle import RepositoryIndex
 from hashmarks.codemap.query_router import normalize_task_query
+from hashmarks.codemap.repository_evidence_bindings import RepositoryBindings
 from hashmarks.codemap.verification_relevance_model import VerificationRequest
 from hashmarks.digest import FILE_DOMAIN, hash_file
 
@@ -25,6 +27,28 @@ def _verification(index: RepositoryIndex) -> RepositoryVerification:
     source = _source(index)
     imports = RepositoryImports(source)
     return RepositoryVerification(imports)
+
+
+def test_codemap_verification_reuses_canonical_correlation(tmp_path: Path) -> None:
+    from hashmarks import CodeMap
+
+    workspace = tmp_path / "repository"
+    workspace.mkdir()
+    with CodeMap(workspace, state_dir=tmp_path / "state") as repository:
+        correlation = repository.verification._collection_correlation
+        assert correlation is repository.correlation
+        assert correlation.bindings is repository.bindings
+        assert correlation.source is repository.verification.source
+        assert correlation.reads is repository.verification.reads
+
+
+def test_verification_rejects_correlation_from_another_source(
+    index: RepositoryIndex,
+) -> None:
+    imports = RepositoryImports(_source(index))
+    correlation = RepositoryCorrelation(RepositoryBindings(_source(index)))
+    with pytest.raises(ValueError, match="must share their source owner"):
+        RepositoryVerification(imports, correlation=correlation)
 
 
 def test_keyword_observations_bind_query_and_read_scope(index: RepositoryIndex) -> None:

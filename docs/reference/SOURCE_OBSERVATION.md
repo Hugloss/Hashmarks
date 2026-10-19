@@ -4,6 +4,13 @@ Hashmarks exposes additional **descriptive repository evidence** through the exi
 CodeMap repository observer. It does not choose agent tools, run language servers,
 execute verification, or create a second freshness/index authority.
 
+For a contiguous original byte range, use
+[`source.range_receipt()`](SOURCE_RANGE_RECEIPTS.md). It shares Source's stable
+member authority and preserves bytes without display-oriented text normalization.
+For bounded native JavaScript/TypeScript alias, binding, property, and call facts,
+use [`source.ecmascript()`](ECMASCRIPT_SOURCE_OBSERVATIONS.md). Its facts retain
+exact byte ranges and unresolved semantic targets.
+
 ## Exact source occurrence and physical source shape (H1 + H3)
 
 Python API:

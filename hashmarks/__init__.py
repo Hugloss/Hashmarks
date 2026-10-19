@@ -18,7 +18,7 @@ from .observation import (
     ObservationState,
     UnstableObservationError,
 )
-from .snapshot import Snapshot, SnapshotDiff
+from .snapshot import InputCounts, InputMember, InputObservation, Snapshot, SnapshotDiff
 from .specs import (
     Directory,
     File,
@@ -68,6 +68,9 @@ __all__ = [
     "IdentityCycleError",
     "IdentityGraph",
     "InputManifest",
+    "InputObservation",
+    "InputMember",
+    "InputCounts",
     "InputSpec",
     "InputValue",
     "File",

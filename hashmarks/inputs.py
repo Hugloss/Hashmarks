@@ -111,3 +111,56 @@ def resolve_inputs(
             raise FileNotFoundError(f"input pattern matched nothing: {pattern}")
 
     return sorted(found)
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedInputScope:
+    """One resolved selection shared by Merkle identity and member observation."""
+
+    manifest: InputManifest
+    excluded_paths: tuple[str, ...] = ()
+
+    def excludes(self, relative_path: str) -> bool:
+        return any(
+            relative_path == excluded or relative_path.startswith(excluded + "/")
+            for excluded in self.excluded_paths
+        )
+
+    @classmethod
+    def resolve(
+        cls,
+        workspace: str | Path,
+        patterns: Iterable[str],
+        exclude: Iterable[str],
+        *,
+        require_matches: bool = True,
+    ) -> ResolvedInputScope:
+        included = InputManifest.resolve(
+            workspace, patterns, require_matches=require_matches
+        )
+        excluded = _resolve_exclusions(workspace, exclude)
+        scope = cls(included, excluded)
+        return cls(
+            InputManifest(tuple(path for path in included if not scope.excludes(path))),
+            excluded,
+        )
+
+
+def _resolve_exclusions(
+    workspace: str | Path, patterns: Iterable[str]
+) -> tuple[str, ...]:
+    resolved: set[str] = set()
+    for value in patterns:
+        pattern = normalize_relative_pattern(value)
+        if has_glob(pattern):
+            resolved.update(
+                resolve_inputs(workspace, (pattern,), require_matches=False)
+            )
+        else:
+            # Literal exclusions apply even when the named entry is absent.
+            resolved.add(pattern)
+    selected: list[str] = []
+    for path in sorted(resolved):
+        if not any(path.startswith(parent + "/") for parent in selected):
+            selected.append(path)
+    return tuple(selected)

@@ -178,8 +178,11 @@ class CodeMap:
         self._ownership = RepositoryOwnership(
             self.source, self._imports, self.structure, self.search
         )
-        self._verification = RepositoryVerification(self._imports)
         self._bindings = RepositoryBindings(self.source)
+        self._correlation = RepositoryCorrelation(self.bindings)
+        self._verification = RepositoryVerification(
+            self._imports, correlation=self.correlation
+        )
         self._declarations = RepositoryDeclarations(self.bindings)
         self._tasks = RepositoryTasks(
             self.search,
@@ -189,7 +192,6 @@ class CodeMap:
             self.context,
             declarations=self.declarations,
         )
-        self._correlation = RepositoryCorrelation(self.bindings)
         self._dependencies = RepositoryDependencies(
             self.source, self._imports, self.correlation
         )

@@ -46,10 +46,28 @@ calls therefore remain separate measurements. These labels and timings describe
 runtime diagnostics only and carry no repository or execution authority.
 
 Source operations use `CodeMap.source.outline()`, `.symbol()`, `.read()`, `.grep()`,
-`.observe()`, `.scoped_occurrences()` and `.scoped_literals()`. The source component
+`.observe()`, `.range_receipt()`, `.ecmascript()`, `.scoped_occurrences()` and
+`.scoped_literals()`. The source component
 owns qualified member/range reads and returns detached public outline symbols.
 Its instruction-scope primitive consumes explicit paths. Query-based instruction
 seed selection remains Context composition, above Source and retrieval.
+
+`CodeMap.source.range_receipt()` is a supported direct Python operation with
+schema `hashmarks.source-range-receipt.v1`. It preserves original bytes in an
+explicit zero-based half-open range and binds them to the canonical full-member
+revision. CLI/MCP expose the existing source-observation operation's `range` mode;
+the flat service-client method is `source_range_receipt(...)`. All use the same
+native receipt. See [Exact source byte-range receipts](SOURCE_RANGE_RECEIPTS.md).
+
+`CodeMap.source.ecmascript()` is the supported bounded JavaScript/TypeScript
+syntax observation. It uses the configured native Source parser and canonical
+member read for import/export aliases, bindings, object destructuring,
+assignments, property accesses, and calls. Exact byte ranges and lexical scopes
+do not establish semantic alias closure or runtime call targets. Unsupported
+parsers and bounded/incomplete evidence retain explicit unknown qualifications.
+Its schema is `hashmarks.ecmascript-source-observation.v1`; CLI/MCP use the
+`ecmascript` source-observation mode and the service client exposes
+`source_ecmascript(...)`. See [ECMAScript source observations](ECMASCRIPT_SOURCE_OBSERVATIONS.md).
 
 Native publication uses `CodeMap.native.import_scip()` and `.enrich_projects()`.
 `CodeMap.native.status()` reports native evidence qualification. Repository
@@ -181,6 +199,18 @@ It borrows Source, Imports and repository Correlation directly; it has no Tasks
 or root dependency. Producer syntax remains in adapters. The old root operations
 are removed.
 
+`RepositoryIdentity.observe_inputs()` is the supported selected-input
+identity/inventory operation. It returns the immutable `InputObservation`,
+`InputMember`, and `InputCounts` types, exported from `hashmarks`, and preserves
+the existing `Snapshot` digest domain. Recursive member counts and regular-file
+byte totals describe the same observation as the digest; `Snapshot.digest.size`
+retains its established identity meaning. Local, auto, and daemon modes are
+supported; the CLI command is `observe-inputs`. A method-specific daemon
+capability admits the new operation without invalidating older v3 snapshot
+clients. Auto mode falls back only for an unavailable daemon or missing
+capability; malformed and oversized replies are protocol errors. See
+[Selected-input observations](INPUT_OBSERVATIONS.md).
+
 The supported Python API is:
 
 1. names exported by `hashmarks.__all__`, including the lazily exposed `CodeMap`;
@@ -200,11 +230,37 @@ The documented dependency-resolution observation/query surface uses `hashmarks.d
 
 The documented `CodeMap.declarations.observe()` surface is supported Python API. Its schemas are `hashmarks.repository-declarations.v1` and `hashmarks.repository-declarations-delta.v1`; declaration derivation and explanation use `hashmarks.repository-declaration-derivation.v1` and `hashmarks.repository-declaration-explain.v1`; see [`REPOSITORY_DECLARATIONS.md`](REPOSITORY_DECLARATIONS.md). Semantic extraction, normalized values, correspondence, roles, and coverage remain provider claims; the repository-evidence binding, identity, freshness, ambiguity, qualified-absence, factual-delta, derivation, and explanation behavior is the Hashmarks contract. Direct declaration groups require a non-empty `semantic_namespace`; discovery binds that namespace to provider name. Groups/declarations expose deterministic `semantic_subject_identity` over `semantic_namespace + concept + scope`. A declaration may additionally provide a non-empty opaque `semantic_role`, producing `semantic_declaration_identity` over the subject identity plus that role; without a role no child semantic identity exists. Both semantic identities remain separate from exact declaration-definition and observation identity. Declaration delta exposes ambiguity-preserving `semantic_subjects` endpoint correlation and nested `semantic_declarations` only for explicitly role-tagged children.
 
-The local read-only MCP tools `dependency_codemap` and `repository_declarations` preserve their existing default observation responses. Both accept bounded `result_mode` projection: dependency supports `observation | explain | compare`, while declarations support `observation | explain`. Dependency `compare` requires an explicit caller-supplied `previous_observation` and returns the existing `hashmarks.dependency-resolution-delta.v3` schema; explain modes return the existing typed explain schemas. These are transport projections only: no server-side observation history is retained and no parallel CLI explain/compare command is part of the contract.
+The local read-only MCP tools `dependency_codemap` and `repository_declarations` preserve their existing default observation responses. Both accept bounded `result_mode` projection: dependency supports `observation | explain | compare`, while declarations support `observation | explain | discovery`. Dependency `compare` requires an explicit caller-supplied `previous_observation` and returns the existing `hashmarks.dependency-resolution-delta.v3` schema; explain modes return the existing typed explain schemas. These are transport projections only: no server-side observation history is retained and no parallel CLI explain/compare command is part of the contract.
 
 The documented `RepositoryDeclarationProvider`, `RepositoryDeclarationProviderContext`, `RepositoryDeclarationProviderResult`, `RepositoryDeclarationProviderError`, and `CodeMap.declarations.discover()` surface is also supported Python API. The provider context exposes bounded admitted-path enumeration via `paths(prefix)`, plus revision-bound `exists`, `read_bytes`, and `read_text`; it intentionally does not expose a raw repository filesystem path. Discovery uses the `hashmarks.repository-declaration-discovery.v1` and `hashmarks.repository-declaration-discovery-delta.v1` wrapper schemas. Providers are explicitly supplied Python objects; ambient entry-point loading and arbitrary provider execution inside MCP are not part of the public contract.
 
 `CodeMap.tasks.evidence()` is the supported role-separated task-evidence API. Its default schema is `hashmarks.task-evidence.v5`: bounded retrieval, explicit-target evidence, ownership, verification, related evidence, freshness and provenance are distinct authority domains. Initial responses use `hashmarks.task-evidence-initial.v2` and retain the same facts through the initial packet codec; presentation bounds do not establish repository absence or ownership uniqueness.
+
+`CodeMap.verification.observe_membership(report)` is a supported direct Python
+operation for `hashmarks.verification-membership-report.v1` inputs. It returns
+`hashmarks.verification-membership-observation.v1`, preserving native producer
+claims, exact selectors, explicit empty/unavailable membership, and source
+correspondence through the existing Source/Bindings/Correlation owners.
+`validate_native_consumer_bundle(observation)` validates this retained packet;
+the existing two-argument envelope/contract path remains supported. Pure retained
+validation does not observe the current filesystem. CLI `verification-membership`,
+MCP `repository_evidence` membership mode, and the flat service method
+`verification_membership(report)` preserve the native observation and its caller
+claims. Native collection and execution remain external. See
+[Verification membership handoff](VERIFICATION_MEMBERSHIP_HANDOFF.md).
+
+`MakeShellDeclarations` and `PythonUvManifestDeclarations`, imported from
+`hashmarks.codemap`, are supported first-party declaration providers. Consumers
+select their exact paths and invoke `CodeMap.declarations.discover(...)`; the
+registered `make_shell` and `python_uv_manifest_paths` source-selection adapters
+also support CLI/MCP/service declaration discovery. The CLI offers exact
+`--make-path`, `--shell-path`, and `--python-uv-manifest-path` selectors, or one
+`--source-selection-json` file. The flat service method is
+`repository_declarations(..., result_mode="discovery", source_selection=...)`.
+Provider output remains
+bounded authored syntax with qualified coverage and unresolved native semantics.
+See [Make/shell evidence](MAKE_SHELL_EVIDENCE.md) and
+[Python/uv manifest evidence](PYTHON_UV_MANIFEST_EVIDENCE.md).
 
 CodeMap service clients require canonical replies to be JSON objects with the
 expected operation schema. The existing service route definitions supply the
@@ -214,6 +270,14 @@ and literal null/boolean/numeric values are preserved. Internal `find_task` repl
 require an array of objects and retain its order; an empty bounded array carries
 no repository-negative authority. Service handlers also reject non-object replies
 before serialization.
+
+`from hashmarks.codemap import CodeMapServiceClient` is the documented
+Python service-client import. The service client retains flat transport methods,
+including `sync()` and `task_evidence(...)`; named component families belong to
+direct `CodeMap` instances. The service client connects to a separately managed
+service and does not promise parity with every direct Python operation. The
+[standalone consumer guide](../integration/STANDALONE_CONSUMERS.md) lists the
+transport scope of the added observation APIs.
 
 The current task-action, task-evidence, initial-envelope, and post-change response shapes are declared once in `hashmarks.codemap.task_evidence_types`. These `TypedDict` contracts preserve ordinary dictionary/JSON responses; they describe field structure, not repository authority. Default and initial calls have distinct return types. Nullable evidence remains nullable and conditional fields remain optional. Ownership hops and bounded graph projections share `hashmarks.codemap.ownership_relation_types`; trace and authority records are owned by `hashmarks.ownership_decision`. Service-client responses use these same shapes and validate their required fields and nested structure at the JSON boundary, preserving additional producer evidence. MCP Python calls retain the default/initial return distinction. Available and unavailable verification plans have separate typed shapes.
 

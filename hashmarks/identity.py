@@ -8,9 +8,11 @@ from .client import DaemonCompatibilityError, DaemonUnavailableError, IdentityCl
 from .digest import Digest
 from .engine import IdentityEngine
 from .generation_domain import require_generation
+from .input_observation import DEFAULT_MAX_INPUT_MEMBERS
+from .input_observation_transport import validate_observation_options
 from .inputs import InputManifest
 from .schema import IDENTITY_SCHEMA
-from .snapshot import Snapshot
+from .snapshot import InputObservation, Snapshot
 from .specs import InputValue, validate_input_values
 
 if TYPE_CHECKING:
@@ -224,6 +226,47 @@ class RepositoryIdentity:
                     raise
                 self._daemon_confirmed = False
         return self._prepare_local_read().snapshot(manifest, verify=verify)
+
+    def observe_inputs(
+        self,
+        *inputs: InputValue,
+        exclude: Iterable[InputValue] = (),
+        require_matches: bool = True,
+        verify: bool = False,
+        max_members: int = DEFAULT_MAX_INPUT_MEMBERS,
+    ) -> InputObservation:
+        """Observe live selected identity, members, and counts together.
+
+        Auto prefers a capable daemon and otherwise uses the same local engine.
+        Empty resolved selections are complete only for that empty scope. This
+        method observes live filesystem inputs, not Git refs.
+        """
+        excluded_inputs = tuple(exclude)
+        validate_observation_options(require_matches, verify, max_members)
+        # Retain typed declarations for the canonical engine's scope validation,
+        # while rejecting wrong-kind caller assertions before contacting IPC.
+        validate_input_values(self.workspace, inputs, require_matches=require_matches)
+        validate_input_values(self.workspace, excluded_inputs, require_matches=False)
+        if self._daemon_available():
+            try:
+                return self.client.observe_inputs(
+                    inputs,
+                    exclude=excluded_inputs,
+                    require_matches=require_matches,
+                    verify=verify,
+                    max_members=max_members,
+                )
+            except (DaemonUnavailableError, DaemonCompatibilityError):
+                if self.mode is RepositoryIdentityMode.DAEMON:
+                    raise
+                self._daemon_confirmed = False
+        return self._prepare_local_read().observe_inputs(
+            inputs,
+            exclude=excluded_inputs,
+            require_matches=require_matches,
+            verify=verify,
+            max_members=max_members,
+        )
 
     def code_map(self) -> CodeMap:
         """Return the lazily-created derived CodeMap for repository-intelligence queries.

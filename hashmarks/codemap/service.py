@@ -15,6 +15,8 @@ from hashmarks.client import default_runtime_dir
 from hashmarks.evidence_presentation import validate_presentation
 from hashmarks.ipc_boundary import dispatch_json_request
 from hashmarks.operation_contract import (
+    operation_default_mode,
+    require_operation_mode,
     require_registered_operation,
     validate_operation_response,
 )
@@ -34,6 +36,7 @@ from .evidence_packet import (
 from .ownership_relation_defaults import OWNERSHIP_RELATION_DEFAULT_OPTIONS
 from .ownership_relation_types import OwnershipRelationGraph
 from .post_change import POST_CHANGE_DEFAULT_OPTIONS, PostChangeOptions
+from .repository_declaration_selection import source_declaration_providers
 from .repository_intelligence_query import (
     REPOSITORY_INTELLIGENCE_QUERY_DEFAULT_OPTIONS,
     RepositoryIntelligenceQueryOptions,
@@ -56,6 +59,26 @@ from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 PROTOCOL = "hashmarks.codemap-service.v2"
 MAX_REQUEST = 1024 * 1024
 MAX_RESPONSE = 8 * 1024 * 1024
+
+
+def _request_result_mode(operation: str, request: dict[str, object]) -> str:
+    """Select the operation-owned mode without coercing malformed wire values."""
+    mode = request.get("result_mode")
+    if mode is not None and not isinstance(mode, str):
+        raise ValueError("result_mode must be a string")
+    return require_operation_mode(operation, mode)
+
+
+def _source_request(
+    request: dict[str, Any], option_names: tuple[str, ...]
+) -> tuple[str, dict[str, Any]]:
+    unexpected = set(request) - {"protocol", "op", "result_mode", "path", *option_names}
+    if unexpected:
+        raise ValueError(f"unsupported source request fields: {sorted(unexpected)}")
+    path = request.get("path")
+    if not isinstance(path, str) or not path:
+        raise ValueError("path must be a non-empty string")
+    return path, {name: request[name] for name in option_names if name in request}
 
 
 _ServiceRouteClassification = Literal["canonical-semantic", "internal-service"]
@@ -92,7 +115,9 @@ class _ServiceRoute:
             assert self.operation is not None
             require_registered_operation(self.operation)
 
-    def validate_response(self, response: dict[str, Any]) -> None:
+    def validate_response(
+        self, response: dict[str, Any], *, result_mode: str | None = None
+    ) -> None:
         if self.classification != "canonical-semantic":
             return
         assert self.operation is not None
@@ -100,6 +125,7 @@ class _ServiceRoute:
         validate_operation_response(
             self.operation,
             response.get(self.response_key),
+            mode=result_mode,
         )
 
 
@@ -127,6 +153,26 @@ def _canonical_service_route(
 _SERVICE_ROUTES = {
     "status": _internal_service_route("_status_response"),
     "sync": _internal_service_route("_sync_response"),
+    "repository_declarations": _canonical_service_route(
+        "_repository_declarations_response",
+        operation="repository_declarations",
+        response_key="repository_declarations",
+    ),
+    "source_range_receipt": _canonical_service_route(
+        "_source_range_receipt_response",
+        operation="source_range_receipt",
+        response_key="source_range_receipt",
+    ),
+    "source_ecmascript": _canonical_service_route(
+        "_source_ecmascript_response",
+        operation="source_ecmascript",
+        response_key="source_ecmascript",
+    ),
+    "verification_membership": _canonical_service_route(
+        "_verification_membership_response",
+        operation="verification_membership",
+        response_key="verification_membership",
+    ),
     "repository_findings": _canonical_service_route(
         "_repository_findings_response",
         operation="repository_findings",
@@ -396,6 +442,67 @@ class CodeMapService:
         return {
             "ok": True,
             "repository_findings": self._map().ownership.findings(self._paths(request)),
+        }
+
+    def _repository_declarations_response(
+        self, request: dict[str, Any]
+    ) -> dict[str, Any]:
+        unexpected = set(request) - {
+            "protocol",
+            "op",
+            "groups",
+            "result_mode",
+            "source_selection",
+            "previous_observation",
+        }
+        if unexpected:
+            raise ValueError(
+                f"unsupported declaration request fields: {sorted(unexpected)}"
+            )
+        groups = request.get("groups", [])
+        if not isinstance(groups, list):
+            raise ValueError("groups must be an array")
+        previous = request.get("previous_observation")
+        if previous is not None and not isinstance(previous, dict):
+            raise ValueError("previous_observation must be an object")
+        mode = _request_result_mode("repository_declarations", request)
+        providers = source_declaration_providers(mode, request.get("source_selection"))
+        result = self._map().declarations.operation(
+            groups,
+            previous_observation=previous,
+            result_mode=mode,
+            providers=providers,
+        )
+        return {"ok": True, "repository_declarations": result}
+
+    def _source_range_receipt_response(self, request: dict[str, Any]) -> dict[str, Any]:
+        path, options = _source_request(
+            request, ("start_byte", "end_byte", "max_bytes")
+        )
+        if not {"start_byte", "end_byte"} <= set(options):
+            raise ValueError("source range requires start_byte and end_byte")
+        return {
+            "ok": True,
+            "source_range_receipt": self._map().source.range_receipt(path, **options),
+        }
+
+    def _source_ecmascript_response(self, request: dict[str, Any]) -> dict[str, Any]:
+        path, options = _source_request(request, ("limit", "max_bytes"))
+        return {
+            "ok": True,
+            "source_ecmascript": self._map().source.ecmascript(path, **options),
+        }
+
+    def _verification_membership_response(
+        self, request: dict[str, Any]
+    ) -> dict[str, Any]:
+        if set(request) - {"protocol", "op", "result_mode", "report"}:
+            raise ValueError("verification membership accepts only a supplied report")
+        return {
+            "ok": True,
+            "verification_membership": self._map().verification.observe_membership(
+                request.get("report")
+            ),
         }
 
     def _import_ownership_response(self, request: dict[str, Any]) -> dict[str, Any]:
@@ -786,6 +893,11 @@ class CodeMapService:
             raise ValueError(f"unsupported operation: {op!r}")
 
         route.admit()
+        result_mode = (
+            _request_result_mode(route.operation, request)
+            if route.operation is not None
+            else None
+        )
         handler = getattr(self, route.handler_name, None)
         if not callable(handler):
             raise RuntimeError(
@@ -796,7 +908,7 @@ class CodeMapService:
         response = handler(request)
         if not _is_wire_object(response):
             raise RuntimeError("CodeMap service handler must return a JSON object")
-        route.validate_response(response)
+        route.validate_response(response, result_mode=result_mode)
         return response
 
     def _prepare_socket(self) -> None:
@@ -911,10 +1023,11 @@ class CodeMapServiceClient:
         route = _SERVICE_ROUTES[op]
         if route.operation is None or route.response_key is None:
             raise RuntimeError(f"CodeMap service route {op} is not semantic")
+        result_mode = _request_result_mode(route.operation, payload)
         response = self.request(op, **payload)
         return dict(
             validate_operation_response(
-                route.operation, response.get(route.response_key)
+                route.operation, response.get(route.response_key), mode=result_mode
             )
         )
 
@@ -923,6 +1036,60 @@ class CodeMapServiceClient:
 
     def sync(self) -> dict[str, Any]:
         return self.request("sync")
+
+    def repository_declarations(
+        self,
+        groups: list[dict[str, object]],
+        *,
+        previous_observation: dict[str, object] | None = None,
+        result_mode: str = operation_default_mode("repository_declarations"),
+        source_selection: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        """Project declarations or select registered source providers over IPC."""
+        return self._canonical_payload(
+            "repository_declarations",
+            groups=groups,
+            previous_observation=previous_observation,
+            result_mode=result_mode,
+            source_selection=source_selection,
+        )
+
+    def source_range_receipt(
+        self,
+        path: str,
+        *,
+        start_byte: int,
+        end_byte: int,
+        max_bytes: int | None = None,
+    ) -> dict[str, object]:
+        """Read an exact range; omitted bounds retain the Source owner's defaults."""
+        options = {} if max_bytes is None else {"max_bytes": max_bytes}
+        return self._canonical_payload(
+            "source_range_receipt",
+            path=path,
+            start_byte=start_byte,
+            end_byte=end_byte,
+            **options,
+        )
+
+    def source_ecmascript(
+        self,
+        path: str,
+        *,
+        limit: int | None = None,
+        max_bytes: int | None = None,
+    ) -> dict[str, object]:
+        """Transport bounded ECMAScript source facts from their existing owner."""
+        options = {
+            name: value
+            for name, value in {"limit": limit, "max_bytes": max_bytes}.items()
+            if value is not None
+        }
+        return self._canonical_payload("source_ecmascript", path=path, **options)
+
+    def verification_membership(self, report: object) -> dict[str, object]:
+        """Bind a supplied collection report without running its producer."""
+        return self._canonical_payload("verification_membership", report=report)
 
     def repository_findings(
         self, paths: tuple[str, ...] | list[str] | None = None

@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 from .client import default_socket_path, prepare_default_state_dir
 from .engine import IdentityEngine
+from .input_observation_transport import decode_input_observation_request
 from .inputs import InputManifest
 from .ipc_boundary import dispatch_json_request
 from .observation import ObservationState
@@ -22,6 +23,7 @@ from .paths import (
 )
 from .schema import (
     DAEMON_CAPABILITIES,
+    DAEMON_MAX_RESPONSE_BYTES,
     DAEMON_PROTOCOL_VERSION,
     DAEMON_SEMANTICS,
     IDENTITY_SCHEMA,
@@ -33,6 +35,7 @@ if TYPE_CHECKING:
 
 _PROTOCOL_VERSION = DAEMON_PROTOCOL_VERSION
 _MAX_REQUEST = 4 * 1024 * 1024
+_MAX_RESPONSE = DAEMON_MAX_RESPONSE_BYTES
 _MAX_PENDING_MANIFESTS = 8
 _MAX_REGISTERED_MANIFEST_PATHS = 2_000_000
 _MAX_TOTAL_REGISTERED_MANIFEST_PATHS = 4_000_000
@@ -132,11 +135,18 @@ class IdentityDaemon:
 
     @staticmethod
     def _write_response(stream: _ResponseStream, response: dict[str, object]) -> None:
-        stream.write(
-            (json.dumps(response, separators=(",", ":"), sort_keys=True) + "\n").encode(
-                "utf-8"
-            )
-        )
+        encoded = bytearray()
+        encoder = json.JSONEncoder(separators=(",", ":"), sort_keys=True)
+        for part in encoder.iterencode(response):
+            chunk = part.encode("utf-8")
+            if len(encoded) + len(chunk) + 1 > _MAX_RESPONSE:
+                encoded = bytearray(
+                    b'{"ok":false,"error":"daemon response exceeded size limit"}'
+                )
+                break
+            encoded.extend(chunk)
+        encoded.extend(b"\n")
+        stream.write(bytes(encoded))
         stream.flush()
 
     def _manifest(
@@ -348,6 +358,14 @@ class IdentityDaemon:
         payload["mode"] = "daemon"
         return {"ok": True, **payload}
 
+    def _input_observation_response(self, request: dict[str, Any]) -> dict[str, Any]:
+        arguments = decode_input_observation_request(request)
+        self._synchronize_observer()
+        observation = self.engine.observe_inputs(**arguments)
+        payload = observation.as_dict()
+        payload["snapshot"] = {**observation.snapshot.as_dict(), "mode": "daemon"}
+        return {"ok": True, "observation": payload}
+
     def _stop_response(self, _request: dict[str, Any]) -> dict[str, Any]:
         with self._request_lock:
             server = self._server
@@ -369,6 +387,7 @@ class IdentityDaemon:
             "manifest_commit": self._manifest_commit_response,
             "manifest_drop": self._manifest_drop_response,
             "input_root": self._input_root_response,
+            "observe_inputs": self._input_observation_response,
             "stop": self._stop_response,
         }
         op = request.get("op")

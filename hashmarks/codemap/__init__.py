@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from .evidence_correlation import (
         validate_evidence_locator_claim as validate_evidence_locator_claim,
     )
+    from .make_shell_declarations import MakeShellDeclarations as MakeShellDeclarations
     from .model import ContextDisclosure as ContextDisclosure
     from .model import ContextPack as ContextPack
     from .model import EvidenceVisibility as EvidenceVisibility
@@ -25,6 +26,9 @@ if TYPE_CHECKING:
     )
     from .project_impact_codec import compact_project_impact as compact_project_impact
     from .project_impact_codec import expand_project_impact as expand_project_impact
+    from .python_uv_manifest_declarations import (
+        PythonUvManifestDeclarations as PythonUvManifestDeclarations,
+    )
     from .repository_declaration_provider import (
         RepositoryDeclarationProvider as RepositoryDeclarationProvider,
     )
@@ -60,6 +64,8 @@ _EXPORTS: dict[str, str] = {
     "RepositoryDeclarationProviderContext": "repository_declaration_provider",
     "RepositoryDeclarationProviderError": "repository_declaration_provider",
     "RepositoryDeclarationProviderResult": "repository_declaration_provider",
+    "MakeShellDeclarations": "make_shell_declarations",
+    "PythonUvManifestDeclarations": "python_uv_manifest_declarations",
     "CodeMapService": "service",
     "CodeMapServiceClient": "service",
     "default_codemap_socket": "service",
@@ -88,6 +94,8 @@ __all__ = [
     "RepositoryDeclarationProviderContext",
     "RepositoryDeclarationProviderError",
     "RepositoryDeclarationProviderResult",
+    "MakeShellDeclarations",
+    "PythonUvManifestDeclarations",
     "CodeMapService",
     "CodeMapServiceClient",
     "default_codemap_socket",

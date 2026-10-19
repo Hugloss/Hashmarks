@@ -107,6 +107,8 @@ OPERATION_CONTRACTS = (
             ("member", "hashmarks.source-observation.v1"),
             ("scope", "hashmarks.scoped-source-occurrences.v1"),
             ("literals", "hashmarks.scoped-source-literal-set.v1"),
+            ("range", "hashmarks.source-range-receipt.v1"),
+            ("ecmascript", "hashmarks.ecmascript-source-observation.v1"),
         ),
     ),
     OperationContract(
@@ -114,7 +116,19 @@ OPERATION_CONTRACTS = (
         (
             ("observation", "hashmarks.repository-evidence-bindings.v1"),
             ("coverage", "hashmarks.repository-evidence-coverage.v1"),
+            ("membership", "hashmarks.verification-membership-observation.v1"),
         ),
+    ),
+    OperationContract(
+        "source_range_receipt", (("default", "hashmarks.source-range-receipt.v1"),)
+    ),
+    OperationContract(
+        "source_ecmascript",
+        (("default", "hashmarks.ecmascript-source-observation.v1"),),
+    ),
+    OperationContract(
+        "verification_membership",
+        (("default", "hashmarks.verification-membership-observation.v1"),),
     ),
     OperationContract(
         "evidence_comparison",

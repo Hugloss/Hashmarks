@@ -6,20 +6,6 @@
 
 Hashmarks and Oh-Goon are complementary systems with different authority.
 
-```text
-Repository state
-      │
-      ▼
-  Hashmarks
-repository-evidence plane
-      │
-      ├──────────────► Agent / human
-      │                  solution plane
-      │
-      └──────────────► Oh-Goon
-                         execution/certification plane
-```
-
 - **Hashmarks** answers what repository evidence says matters: identity, topology, ownership, impact, freshness, verification relevance, and provenance.
 - **The agent/human** decides what change to make and owns its reasoning, hypotheses, attempt history, and solution behavior.
 - **Oh-Goon** decides whether work is admitted, how it runs, how processes/environments are controlled, and whether execution evidence is certifiable.
@@ -93,11 +79,14 @@ Oh-Goon/external runners own:
 
 Consumers should treat Hashmarks freshness/provenance as a repository-evidence contract:
 
-- `proven` means the required repository evidence is positively current under the relevant observation authority;
+- `current` means the required repository evidence is positively current under the relevant observation authority;
 - `stale` means a relevant change invalidated it;
 - `unknown` means currentness cannot be proven.
 
 A consumer must not convert `unknown` to fresh based on recency or convenience.
+`source_equivalence: "proven"`, where present in a correspondence contract,
+describes source correspondence. It is not an alternative spelling of the
+canonical freshness state.
 
 ## Trust and producer policy
 
@@ -113,18 +102,41 @@ Keep Hashmarks standalone. Oh-Goon should consume a pinned Hashmarks package/ver
 
 Record the resolved Hashmarks version and relevant evidence/contract identities in execution provenance so later certification can reproduce the exact decision inputs.
 
+Embedding consumers install the selected wheel from
+[GitHub Releases](https://github.com/Hugloss/Hashmarks/releases) into their own
+Python environment using the environment's native package tool. A standalone
+CLI/MCP executable is a separate distribution, not an importable Python library.
+Hashmarks does not publish this release workflow to PyPI. Pin the selected release
+or reviewed source commit; source changes documented as Unreleased require that
+source build until a release includes them. See
+[Public API and stability](../reference/API_STABILITY.md) for supported imports.
+
 ## CodeMap integration
 
-CodeMap is optional derived intelligence. A typical local topology is:
+Identity observations can be consumed independently of CodeMap. Consumers choose
+whether derived CodeMap intelligence is required for a particular workflow. A
+service failure or unknown freshness does not weaken that consumer's requirement;
+reconciliation and any alternative evidence path remain explicit consumer choices.
 
-```text
-Hashmarks identity/observation  -> canonical repository identity/freshness
-Hashmarks CodeMap service      -> derived repository intelligence
-Agent                           -> reasoning and edits
-Oh-Goon                         -> admission/execution/certification
-```
+Direct Python and service transport have distinct call shapes:
 
-A CodeMap service/watch process may be managed as infrastructure, but its failure must not silently weaken execution/certification policy. Consumers should reconcile or fall back when freshness is insufficient.
+| Operation | Direct `CodeMap` | `CodeMapServiceClient` |
+| --- | --- | --- |
+| Synchronize | `codemap.index.sync()` | `client.sync()` |
+| Task evidence | `codemap.tasks.evidence(task)` | `client.task_evidence(task)` |
+| Selected-input inventory | `RepositoryIdentity.observe_inputs(...)` | No service-client method |
+| Native membership observation | `codemap.verification.observe_membership(report)` | No service-client method |
+| Exact byte receipt | `codemap.source.range_receipt(...)` | No service-client method |
+
+The documented service client import is
+`from hashmarks.codemap import CodeMapServiceClient`. It connects to an
+already managed CodeMap service. Do not assume a direct component method is
+automatically available over CLI, MCP, or service transport.
+
+The standalone observer capabilities and ownership boundaries are collected in
+[Standalone consumer integration](STANDALONE_CONSUMERS.md). They let consumers
+use Hashmarks identity, declarations, source, and membership semantics without a
+dependency on Oh-Goon or a copy of its execution behavior.
 
 ## Normative references
 

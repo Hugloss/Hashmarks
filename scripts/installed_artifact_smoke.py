@@ -6,6 +6,7 @@ artifact. The source checkout must not be able to satisfy Hashmarks imports.
 
 from __future__ import annotations
 
+import base64
 import importlib.resources
 import json
 import logging
@@ -16,8 +17,9 @@ import tempfile
 from pathlib import Path
 
 import hashmarks
-from hashmarks import CodeMap, File, RepositoryIdentity
+from hashmarks import CodeMap, File, RepositoryIdentity, validate_native_consumer_bundle
 from hashmarks._command_output import log_command_output
+from hashmarks.codemap import MakeShellDeclarations, PythonUvManifestDeclarations
 from hashmarks.operation_contract import operation_schema
 
 logger = logging.getLogger(__name__)
@@ -27,6 +29,9 @@ REQUIRED_PUBLIC = {
     "Digest",
     "RepositoryIdentity",
     "Snapshot",
+    "InputObservation",
+    "InputMember",
+    "InputCounts",
     "File",
     "Directory",
     "Glob",
@@ -66,11 +71,28 @@ def _check_repository_intelligence() -> None:
             "def answer() -> int:\n    return 42\n",
             encoding="utf-8",
         )
+        (root / "Makefile").write_text("check:\n\tuv run pytest\n", encoding="utf-8")
+        (root / "consumer.ts").write_text(
+            "const client = transport; client.send();\n", encoding="utf-8"
+        )
+        (root / "pyproject.toml").write_text(
+            '[project]\nname = "example"\nversion = "1"\n'
+            '[project.scripts]\nexample = "sample:answer"\n',
+            encoding="utf-8",
+        )
         with RepositoryIdentity(root, mode="local") as identity:
             snapshot = identity.snapshot(File("sample.py"))
             if not snapshot.hash:
                 raise RuntimeError(
                     "installed RepositoryIdentity produced an empty hash"
+                )
+            observation = identity.observe_inputs(File("sample.py"))
+            if (
+                observation.snapshot.digest != snapshot.digest
+                or observation.counts.file_count != 1
+            ):
+                raise RuntimeError(
+                    "installed input observation disagrees with canonical identity"
                 )
         with CodeMap(root) as codemap:
             result = codemap.index.sync()
@@ -81,6 +103,70 @@ def _check_repository_intelligence() -> None:
             hits = codemap.search.find_task("answer", limit=5)
             if not any(hit.path == "sample.py" for hit in hits):
                 raise RuntimeError("installed CodeMap did not retrieve sample.py")
+            _check_source_receipt(codemap)
+            _check_ecmascript_source(codemap)
+            _check_declaration_providers(codemap)
+            _check_membership_handoff(codemap)
+
+
+def _check_source_receipt(codemap: CodeMap) -> None:
+    receipt = codemap.source.range_receipt("sample.py", start_byte=0, end_byte=3)
+    content = receipt.get("content")
+    if (
+        not isinstance(content, dict)
+        or base64.b64decode(str(content.get("data")), validate=True) != b"def"
+    ):
+        raise RuntimeError("installed source receipt did not preserve exact bytes")
+
+
+def _check_ecmascript_source(codemap: CodeMap) -> None:
+    packet = codemap.source.ecmascript("consumer.ts", limit=2)
+    facts = packet.get("facts")
+    if (
+        packet.get("schema") != operation_schema("source_ecmascript")
+        or packet.get("semantic_resolution") != "not-performed"
+        or packet.get("negative_evidence") != "not-admissible"
+        or not isinstance(facts, list)
+    ):
+        raise RuntimeError("installed ECMAScript source contract is malformed")
+    if packet.get("availability") == "observed" and not facts:
+        raise RuntimeError("installed native ECMAScript syntax lost authored facts")
+
+
+def _check_declaration_providers(codemap: CodeMap) -> None:
+    observation = codemap.declarations.discover(
+        [
+            MakeShellDeclarations(make_paths=("Makefile",)),
+            PythonUvManifestDeclarations(paths=("pyproject.toml",)),
+        ]
+    )
+    declarations = observation.get("declarations")
+    if not isinstance(declarations, dict) or not declarations.get("groups"):
+        raise RuntimeError("installed first-party providers returned no declarations")
+
+
+def _check_membership_handoff(codemap: CodeMap) -> None:
+    member, _ = codemap.source.member("sample.py")
+    report: dict[str, object] = {
+        "schema": "hashmarks.verification-membership-report.v1",
+        "selection_kind": "caller-selected",
+        "producer": {"name": "installed-consumer-example", "version": "1"},
+        "provenance": {"source": "explicit-caller-selection"},
+        "scope": {"paths": ["sample.py"]},
+        "status": "succeeded",
+        "completeness": "complete",
+        "truncation": "complete",
+        "members": [{"path": "sample.py"}],
+        "inputs": [{"path": "sample.py", "member_revision": member["member_revision"]}],
+    }
+    for members in ([{"path": "sample.py"}], []):
+        report["members"] = members
+        observed = codemap.verification.observe_membership(report)
+        validated = validate_native_consumer_bundle(observed)
+        if not validated["valid"]:
+            raise RuntimeError(
+                f"installed membership handoff failed: {validated['reasons']}"
+            )
 
 
 def _console_script() -> Path:
@@ -121,6 +207,7 @@ def _check_cli() -> None:
             "def answer() -> int:\n    return 42\n",
             encoding="utf-8",
         )
+        _check_observation_cli(root)
         doctor = _run_cli("--workspace", str(root), "doctor", "--mode", "local")
         if doctor.get("workspace") != str(root.resolve()):
             raise RuntimeError(
@@ -149,6 +236,39 @@ def _check_cli() -> None:
             )
         ):
             raise RuntimeError("installed find did not retrieve sample.py")
+
+
+def _check_observation_cli(root: Path) -> None:
+    observation = _run_cli(
+        "--workspace",
+        str(root),
+        "observe-inputs",
+        "--mode",
+        "local",
+        "--input",
+        "sample.py",
+    )
+    counts = observation.get("counts")
+    if not isinstance(counts, dict) or counts.get("file_count") != 1:
+        raise RuntimeError("installed input CLI lost its selected inventory")
+    receipt = _run_cli(
+        "--workspace",
+        str(root),
+        "source-observation",
+        "sample.py",
+        "--result-mode",
+        "range",
+        "--start-byte",
+        "0",
+        "--end-byte",
+        "3",
+    )
+    content = receipt.get("content")
+    if (
+        not isinstance(content, dict)
+        or base64.b64decode(str(content.get("data")), validate=True) != b"def"
+    ):
+        raise RuntimeError("installed range CLI lost original bytes")
 
 
 def main() -> int:

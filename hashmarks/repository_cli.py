@@ -269,18 +269,51 @@ def _repository_intelligence_query_code(args: Namespace) -> int:
     return 0
 
 
+def _declaration_source_selection(args: Namespace) -> dict[str, object]:
+    path_options = (
+        args.python_backend_path,
+        args.python_interface_json,
+        args.make_path,
+        args.shell_path,
+        args.python_uv_manifest_path,
+    )
+    selected = any(value is not None for value in path_options)
+    if args.source_selection_json is not None:
+        if selected or args.include_class_fields:
+            raise RepositoryCliError(
+                "--source-selection-json cannot be combined with source selection flags"
+            )
+        return _read_json_object(
+            args.source_selection_json, option="--source-selection-json"
+        )
+    if not selected:
+        raise RepositoryCliError(
+            "select --python-backend-path, --python-interface-json, --make-path, "
+            "--shell-path, --python-uv-manifest-path or --source-selection-json"
+        )
+    return {
+        "python_backend_paths": args.python_backend_path,
+        "include_class_fields": args.include_class_fields,
+        "python_interface": (
+            _read_json_object(
+                args.python_interface_json, option="--python-interface-json"
+            )
+            if args.python_interface_json is not None
+            else None
+        ),
+        "make_shell": (
+            {"make_paths": args.make_path or [], "shell_paths": args.shell_path or []}
+            if args.make_path is not None or args.shell_path is not None
+            else None
+        ),
+        "python_uv_manifest_paths": args.python_uv_manifest_path,
+    }
+
+
 def _repository_declarations_code(args: Namespace) -> int:
     from .codemap.repository_declaration_selection import source_declaration_providers
 
-    if args.python_backend_path is None and args.python_interface_json is None:
-        raise RepositoryCliError(
-            "select --python-backend-path or --python-interface-json"
-        )
-    interface = (
-        _read_json_object(args.python_interface_json, option="--python-interface-json")
-        if args.python_interface_json
-        else None
-    )
+    selection = _declaration_source_selection(args)
     previous = (
         _read_json_object(args.previous_observation, option="--previous-observation")
         if args.previous_observation
@@ -290,14 +323,7 @@ def _repository_declarations_code(args: Namespace) -> int:
         args,
         lambda codemap: codemap.declarations.operation(
             [],
-            providers=source_declaration_providers(
-                "discovery",
-                {
-                    "python_backend_paths": args.python_backend_path,
-                    "include_class_fields": args.include_class_fields,
-                    "python_interface": interface,
-                },
-            ),
+            providers=source_declaration_providers("discovery", selection),
             previous_observation=previous,
             result_mode="discovery",
         ),
@@ -684,9 +710,20 @@ def _post_change_code(args: Namespace) -> int:
 
 def _source_observation_code(args: Namespace) -> int:
     requested = validated_source_lines(args.line or ())
+    mode = args.result_mode
+    options = _source_observation_options(args)
 
     def observe(codemap: CodeMap) -> object:
         codemap.index.sync([args.path])
+        if mode == "range":
+            return codemap.source.range_receipt(
+                args.path,
+                start_byte=args.start_byte,
+                end_byte=args.end_byte,
+                **options,
+            )
+        if mode == "ecmascript":
+            return codemap.source.ecmascript(args.path, **options)
         return codemap.source.observe(
             args.path,
             lines=requested,
@@ -695,8 +732,39 @@ def _source_observation_code(args: Namespace) -> int:
 
     value = _call_codemap(args, observe)
     _print_operation(
-        "source_observation", value, mode="member", presentation=args.presentation
+        "source_observation", value, mode=mode, presentation=args.presentation
     )
+    return 0
+
+
+def _source_observation_options(args: Namespace) -> dict[str, int]:
+    if args.result_mode != "member" and args.line:
+        raise RepositoryCliError("--line requires member mode")
+    if args.result_mode == "range":
+        if args.start_byte is None or args.end_byte is None:
+            raise RepositoryCliError("range mode requires --start-byte and --end-byte")
+    elif args.start_byte is not None or args.end_byte is not None:
+        raise RepositoryCliError("byte coordinates require range mode")
+    if args.limit is not None and args.result_mode != "ecmascript":
+        raise RepositoryCliError("--limit requires ecmascript mode")
+    if args.max_bytes is not None and args.result_mode == "member":
+        raise RepositoryCliError("--max-bytes requires range or ecmascript mode")
+    return {
+        name: value
+        for name, value in (("max_bytes", args.max_bytes), ("limit", args.limit))
+        if value is not None
+    }
+
+
+def _verification_membership_code(args: Namespace) -> int:
+    report = _read_json_object(args.input_json, option="--input-json")
+
+    def observe(codemap: CodeMap) -> dict[str, object]:
+        codemap.index.sync()
+        return codemap.verification.observe_membership(report)
+
+    value = _call_codemap(args, observe)
+    _print_operation("verification_membership", value, presentation=args.presentation)
     return 0
 
 
@@ -714,11 +782,22 @@ def _add_source_observation_cli(
 ) -> None:
     source = sub.add_parser(
         "source-observation",
-        help="observe one repository member and exact caller-selected source lines",
+        help="observe one member, exact byte range, or ECMAScript syntax",
     )
     add_common_arguments(source, inherited=True)
     _add_evidence_presentation_cli(source)
     source.add_argument("path")
+    source.add_argument(
+        "--result-mode", choices=("member", "range", "ecmascript"), default="member"
+    )
+    source.add_argument(
+        "--start-byte", type=int, help="zero-based inclusive byte start"
+    )
+    source.add_argument("--end-byte", type=int, help="zero-based exclusive byte end")
+    source.add_argument(
+        "--max-bytes", type=int, help="maximum full source member bytes"
+    )
+    source.add_argument("--limit", type=int, help="maximum ECMAScript syntax facts")
     source.add_argument(
         "--line", type=int, action="append", help="1-based source line; repeatable"
     )
@@ -1190,7 +1269,7 @@ def add_repository_cli(
     _add_json_observation_cli(sub, add_common_arguments=add_common_arguments)
     declarations = sub.add_parser(
         "repository-declarations",
-        help="observe declarations in explicitly selected Python source files",
+        help="observe declarations in explicitly selected repository source files",
     )
     add_common_arguments(declarations, inherited=True)
     _add_evidence_presentation_cli(declarations)
@@ -1201,6 +1280,16 @@ def add_repository_cli(
         help="JSON object selecting interface paths, receiver names and syntax options",
     )
     declarations.add_argument("--include-class-fields", action="store_true")
+    declarations.add_argument("--make-path", action="append", metavar="PATH")
+    declarations.add_argument("--shell-path", action="append", metavar="PATH")
+    declarations.add_argument(
+        "--python-uv-manifest-path", action="append", metavar="PATH"
+    )
+    declarations.add_argument(
+        "--source-selection-json",
+        metavar="FILE",
+        help="JSON object selecting registered source providers; replaces selection flags",
+    )
     declarations.add_argument(
         "--previous-observation", help="JSON file containing the prior discovery packet"
     )
@@ -1213,6 +1302,11 @@ def _add_json_observation_cli(
     sub: _SubParsersAction[ArgumentParser], *, add_common_arguments: Callable[..., None]
 ) -> None:
     for name, handler, description in (
+        (
+            "verification-membership",
+            _verification_membership_code,
+            "bind a supplied verification membership report to repository sources",
+        ),
         (
             "correlate-evidence",
             _correlate_evidence_code,

@@ -21,9 +21,9 @@ from .evidence_correlation_replay import (
     CORRELATION_REQUEST_MAX_BYTES,
     CorrelationPacketValidation,
     _json_size,
+    validate_correlation_packet,
     validate_previous_correlation_size,
 )
-from .repository_evidence_binding_validation import validate_bindings_packet
 from .repository_observation import packet_digest
 
 if TYPE_CHECKING:
@@ -382,11 +382,9 @@ class RepositoryCorrelation(
         *,
         label: str,
     ) -> None:
-        if packet.get("schema") != _CORRELATION_SCHEMA:
-            raise ValueError(f"{label} must be a {_CORRELATION_SCHEMA} packet")
+        validate_correlation_packet(packet, label=label)
         repository_evidence = packet.get("repository_evidence")
-        if not isinstance(repository_evidence, Mapping):
-            raise ValueError("correlation packets must contain repository_evidence")
+        assert isinstance(repository_evidence, Mapping)
         repository = repository_evidence.get("repository")
         repository_identity = (
             str(repository.get("repository_identity") or "")
@@ -395,27 +393,6 @@ class RepositoryCorrelation(
         )
         if repository_identity != self.reads.repository_identity():
             raise ValueError(f"{label} correlation repository-mismatch")
-        validate_bindings_packet(repository_evidence, name=f"{label} repository")
-        supplied_identity = packet.get("correlation_identity")
-        if not isinstance(supplied_identity, str) or not _SHA256.fullmatch(
-            supplied_identity
-        ):
-            raise ValueError(
-                f"{label} correlation_identity must use sha256:<64 lowercase hex characters>"
-            )
-        identity_payload = dict(packet)
-        identity_payload.pop("correlation_identity", None)
-        identity_payload.pop("delta_from_previous", None)
-        expected_identity = "sha256:" + packet_digest(
-            _CORRELATION_SCHEMA,
-            identity_payload,
-        )
-        if supplied_identity != expected_identity:
-            raise ValueError(
-                f"{label} correlation_identity does not match packet content"
-            )
-
-        self._validate_correlation_projections(packet, label=label)
 
     @staticmethod
     def _correlation_path_mappings(
