@@ -1395,6 +1395,10 @@ class RepositoryIndex(IndexWatchMixin):
 
     def status(self) -> dict[str, object]:
         """Report index-owned publication/build facts without native qualification."""
+        with self.store.read_snapshot():
+            return self._status_snapshot()
+
+    def _status_snapshot(self) -> dict[str, object]:
         generation = self.store.generation()
         last_sync = self.store.meta("last_sync_unix")
         economics = self.store.meta("sync.economics")

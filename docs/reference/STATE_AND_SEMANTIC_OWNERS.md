@@ -57,7 +57,7 @@ introduce a dispatcher, interface registry or additional repository authority.
 | Changed-path composition and reuse | `repository_changes.py::RepositoryChanges`, exposed by `CodeMap.changes` | Owns existing impact, refresh, post-change, brief, freshness, snapshot and delta implementations. It borrows Tasks and Relationships, with Source/Index from the same task owner. Snapshot and impact memos belong to one exact read scope. Compositions bind the first qualified input generation and reject publication drift; cached snapshots validate that same binding before return. Explicit endpoint comparison never recollects another current endpoint. |
 | Cross-repository projection | `cross_repository_evidence.py::RepositoryCrossRepository`, exposed by `CodeMap.cross_repository` | Consumes Changes and its exact task facts. Caller-nominated boundaries, identities and explicit relationships remain evidence; no service discovery, inferred graph or lifecycle state is introduced. |
 | Evidence economics | `intelligence_economics.py::RepositoryEconomics`, exposed by `CodeMap.economics` | Consumes one Changes snapshot and the pure profile projection. Optional delta economics compare that same endpoint; invalid retained input rejects before current observation. Byte measurements do not choose execution, retries, schedules or certification. |
-| Aggregate views and status | `repository_intelligence_query.py::RepositoryViews`, exposed by `CodeMap.views` | Composes named Changes, CrossRepository, Economics and Structure operations. `evidence_profiles.py::EvidenceProfileProjection` formats supplied snapshot values without live repository services. Full status combines Index facts with existing native/watch qualification, rejecting generation drift. Index status remains index facts only. |
+| Aggregate views and status | `repository_intelligence_query.py::RepositoryViews`, exposed by `CodeMap.views` | Composes named Changes, CrossRepository, Economics and Structure operations. `evidence_profiles.py::EvidenceProfileProjection` formats supplied snapshot values without live repository services. Full status combines Index facts with existing native/watch qualification in one committed workspace-store read snapshot. Index status uses the same store mechanism and remains index facts only. Status callbacks cannot publish through the reader connection. |
 | Read-only worktree fusion | `worktree_overlay.py::WorktreeOverlay` | Borrows base Index, Search and DecisionScope plus an optional immutable artifact database path. It owns only its local CodeMap and retains no borrowed base root. Sync and fused reads bind both the base publication generation and fingerprint; only caller-requested resync adopts another binding. No worktree creation, Git mutation or execution control belongs here. |
 | Generation-bound read scope | `decision_session.py::DecisionScope.session` and `.observe`, exposed by `CodeMap.reads` | Owns primitive query reuse and diagnostics for one existing store generation and atomic identity observation. Nested scopes share an immutable `ReadScope` value. `.observe` recomputes only the read stage after member drift, preserving the caller's original before snapshot and sync facts. Index reconciliation atomically checks the expected generation and returns the exact publication adopted by the next read. Nested observations propagate refresh requests to their outer owner; another writer or repeated drift fails closed. Task-evidence preparation uses `reconcile_decision` around its staged read. Ended scopes cannot supply another scope's final task/snapshot/impact/ownership memo; those paired memo values remain domain-owned. The static `ReadScopeOwner` port has no state, registry or runtime policy. |
 | Parsed artifact | `parsers.py::parse_source`, `artifact_key_for` | Interprets supplied source under the supplied content revision and parser signature. File-backed ingestion must bind the supplied digest to the bytes actually parsed. Mechanisms do not own repository admission or generation. |
@@ -89,6 +89,31 @@ index reconciliation. Indexing must not call back through that reconciliation
 path merely to obtain bytes; it uses the stable-byte mechanism after admission.
 Keep coordination with the existing composition owner, and preserve fail-closed
 validation at every untrusted boundary.
+
+### Status observations during publication
+
+`WorkspaceMapStore.read_snapshot()` owns the temporary SQLite read transaction
+and connection lock used by `RepositoryIndex.status()` and
+`RepositoryViews.status()`. Nested status reads share that transaction; they do
+not create another generation or retain a snapshot after the call. An existing
+write transaction cannot supply status, and callbacks cannot mutate the reader
+connection. Exceptions release the snapshot and restore the connection settings.
+
+The workspace generation, fingerprint, build/economics metadata, row counts,
+watch continuity, and retained native-evidence records come from the selected
+committed snapshot. A writer on another connection can publish while status is
+being collected. The current response keeps its original snapshot, and the next
+call can observe the newer publication. This also keeps publication metadata
+consistent when a no-change sync does not advance the repository generation.
+
+Status may describe never-synced or incomplete state without initiating indexing.
+Identity-daemon observations, provider availability, live source qualification,
+and shared artifact-cache counts retain their existing owners and observation
+semantics; the workspace transaction does not make them globally atomic.
+`DecisionScope` and standalone publication-binding reads retain their existing
+generation-drift rejection contracts. The owning regressions are
+`tests/test_codemap_status_snapshot.py`, `tests/test_repository_views_component.py`,
+and `tests/test_codemap_watcher.py`.
 
 ## State families are separate axes
 

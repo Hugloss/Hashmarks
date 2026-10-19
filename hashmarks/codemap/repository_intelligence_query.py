@@ -119,6 +119,11 @@ class RepositoryViews(ReadScopeOwner):
         return EvidenceProfileProjection.from_snapshot(snapshot, profile=profile)
 
     def status(self) -> dict[str, object]:
+        """Compose status from one committed workspace-store observation."""
+        with self.index.store.read_snapshot():
+            return self._status_snapshot()
+
+    def _status_snapshot(self) -> dict[str, object]:
         index_facts = self.index.status()
         watch_record = self.index.watch_continuity()
         generation, identity_generation, stale = (
