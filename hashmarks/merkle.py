@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Literal, TypeVar
 
 from .digest import DIR_DOMAIN, INPUT_ROOT_DOMAIN, Digest, encode_field
+from .input_observation import InputCapture
 from .inputs import InputManifest
 from .observation import ChangeTracker, ObservationState, UnstableObservationError
 from .paths import canonical_host_path, normalize_relative_path
@@ -17,6 +18,8 @@ if TYPE_CHECKING:
 
     from .directory_store import DirectoryDigestStore
     from .file_store import FileDigestStore
+    from .inputs import ResolvedInputScope
+    from .snapshot import InputCounts, InputMember
 
 DEFAULT_WALK_IGNORE_NAMES = frozenset(
     {
@@ -64,8 +67,17 @@ class _ManifestTrieNode:
         for child in self.children.values():
             child.mark_subtree_dirty()
 
-    def as_node(self, owner: MerkleTree, *, verify: bool) -> _Node:
+    def as_node(
+        self, owner: MerkleTree, *, verify: bool, capture: InputCapture | None = None
+    ) -> _Node:
         if self.terminal_rel is not None:
+            if capture is not None:
+                return owner._node_for_path(
+                    self.terminal_rel,
+                    name=self.segment,
+                    verify=verify,
+                    capture=capture,
+                )
             if not verify and not self.dirty and self.cached_node is not None:
                 return self.cached_node
             if verify:
@@ -103,7 +115,7 @@ class _ManifestTrieNode:
             )
 
         child_nodes = [
-            self.children[name].as_node(owner, verify=verify)
+            self.children[name].as_node(owner, verify=verify, capture=capture)
             for name in sorted(
                 self.children,
                 key=lambda value: value.encode("utf-8", errors="surrogateescape"),
@@ -189,11 +201,13 @@ class _ManifestTree:
         visit(self.root)
         return tuple(result)
 
-    def digest(self, owner: MerkleTree, *, verify: bool) -> Digest:
+    def digest(
+        self, owner: MerkleTree, *, verify: bool, capture: InputCapture | None = None
+    ) -> Digest:
         if not verify and not self._root_dirty and self._root_digest is not None:
             return self._root_digest
         nodes = [
-            self.root.children[name].as_node(owner, verify=verify)
+            self.root.children[name].as_node(owner, verify=verify, capture=capture)
             for name in sorted(
                 self.root.children,
                 key=lambda value: value.encode("utf-8", errors="surrogateescape"),
@@ -489,11 +503,20 @@ class MerkleTree:
         target = os.readlink(absolute).encode("utf-8", errors="surrogateescape")
         return _Node(kind=b"L", name=self._entry_name(name), target=target)
 
-    def _node_for_path(self, rel: str, *, name: str, verify: bool) -> _Node:
+    def _node_for_path(
+        self,
+        rel: str,
+        *,
+        name: str,
+        verify: bool,
+        capture: InputCapture | None = None,
+    ) -> _Node:
         if self._is_mandatory_excluded(rel):
             raise ValueError(f"input path is excluded from identity: {rel}")
 
-        if not verify:
+        if capture is not None:
+            capture.begin(rel)
+        elif not verify:
             with self._lock:
                 cached = self._path_cache.get(rel)
                 if cached is not None:
@@ -508,36 +531,48 @@ class MerkleTree:
                         target=cached.target,
                     )
 
-        absolute = self.workspace / rel
-        if absolute.is_symlink():
-            node = self._symlink_node(absolute, name)
+        node = self._read_path_node(rel, name=name, verify=verify, capture=capture)
+        if capture is not None:
+            capture.record(rel, node, self._node_revision(node))
+        elif node.kind != b"D":
             with self._lock:
                 self._path_cache[rel] = _Node(
-                    kind=node.kind, name=b"", target=node.target
+                    kind=node.kind,
+                    name=b"",
+                    digest=node.digest,
+                    executable=node.executable,
+                    target=node.target,
                 )
-            return node
+        return node
+
+    def _read_path_node(
+        self,
+        rel: str,
+        *,
+        name: str,
+        verify: bool,
+        capture: InputCapture | None,
+    ) -> _Node:
+        absolute = self.workspace / rel
+        if absolute.is_symlink():
+            return self._symlink_node(absolute, name)
         if absolute.is_file():
             digest, executable = self.file_store.digest_many_info(
                 [(absolute, rel)],
                 workspace=self.workspace,
                 force=verify,
             )[rel]
-            node = _Node(
+            return _Node(
                 kind=b"F",
                 name=self._entry_name(name),
                 digest=digest,
                 executable=executable,
             )
-            with self._lock:
-                self._path_cache[rel] = _Node(
-                    kind=b"F", name=b"", digest=digest, executable=executable
-                )
-            return node
         if absolute.is_dir():
             return _Node(
                 kind=b"D",
                 name=self._entry_name(name),
-                digest=self._directory_digest(rel, verify=verify),
+                digest=self._directory_digest(rel, verify=verify, capture=capture),
             )
         raise FileNotFoundError(absolute)
 
@@ -568,6 +603,7 @@ class MerkleTree:
         file_info: dict[str, tuple[Digest, bool]],
         *,
         verify: bool,
+        capture: InputCapture | None = None,
     ) -> list[_Node]:
         nodes: list[_Node] = []
         for entry in entries:
@@ -575,29 +611,70 @@ class MerkleTree:
             if self._should_skip_during_walk(child_rel):
                 continue
             if entry.is_symlink():
-                nodes.append(self._symlink_node(Path(entry.path), entry.name))
+                node = self._symlink_node(Path(entry.path), entry.name)
             elif entry.is_file(follow_symlinks=False):
-                nodes.append(
-                    _Node(
-                        kind=b"F",
-                        name=self._entry_name(entry.name),
-                        digest=file_info[child_rel][0],
-                        executable=file_info[child_rel][1],
-                    )
+                node = _Node(
+                    kind=b"F",
+                    name=self._entry_name(entry.name),
+                    digest=file_info[child_rel][0],
+                    executable=file_info[child_rel][1],
                 )
             elif entry.is_dir(follow_symlinks=False):
-                nodes.append(
-                    _Node(
-                        kind=b"D",
-                        name=self._entry_name(entry.name),
-                        digest=self._directory_digest(child_rel, verify=verify),
-                    )
+                node = _Node(
+                    kind=b"D",
+                    name=self._entry_name(entry.name),
+                    digest=self._directory_digest(
+                        child_rel, verify=verify, capture=capture
+                    ),
                 )
+            else:
+                # Inventory capture rejects unsupported entries before any file
+                # reads. Preserve the existing digest-only traversal semantics.
+                continue
+            nodes.append(node)
+            if capture is not None:
+                capture.record(child_rel, node, self._node_revision(node))
         return nodes
 
-    def _directory_digest(self, rel: str, *, verify: bool) -> Digest:
+    def _scoped_entries(
+        self, rel: str, scope: ResolvedInputScope
+    ) -> list[os.DirEntry[str]]:
+        return [
+            entry
+            for entry in self._sorted_scandir(self.workspace / rel)
+            if not self._should_skip_during_walk(
+                child_rel := f"{rel}/{entry.name}" if rel else entry.name
+            )
+            and not scope.excludes(child_rel)
+        ]
+
+    def _directory_entries(
+        self, rel: str, capture: InputCapture | None
+    ) -> list[os.DirEntry[str]]:
+        if capture is None:
+            return self._sorted_scandir(self.workspace / rel)
+        entries = self._scoped_entries(rel, capture.scope)
+        capture.directory(rel, tuple(entry.name for entry in entries))
+        for entry in entries:
+            capture.begin(f"{rel}/{entry.name}" if rel else entry.name)
+        return entries
+
+    def _cache_directory(self, rel: str, digest: Digest) -> None:
         with self._lock:
-            if not verify and rel not in self._dirty_dirs:
+            self._dir_cache[rel] = digest
+            self._dirty_dirs.discard(rel)
+        if self.directory_store is not None:
+            self.directory_store.put(
+                workspace=self.workspace,
+                relative_path=rel,
+                digest=digest,
+            )
+
+    def _directory_digest(
+        self, rel: str, *, verify: bool, capture: InputCapture | None = None
+    ) -> Digest:
+        with self._lock:
+            if capture is None and not verify and rel not in self._dirty_dirs:
                 cached = self._dir_cache.get(rel)
                 if cached is not None:
                     self._stats["directory_cache_hits"] += 1
@@ -611,24 +688,18 @@ class MerkleTree:
         if not absolute.is_dir():
             raise NotADirectoryError(absolute)
 
-        entries = self._sorted_scandir(absolute)
+        entries = self._directory_entries(rel, capture)
         file_info = self.file_store.digest_many_info(
             self._directory_file_items(rel, entries),
             workspace=self.workspace,
             force=verify,
         )
-        nodes = self._directory_nodes(rel, entries, file_info, verify=verify)
+        nodes = self._directory_nodes(
+            rel, entries, file_info, verify=verify, capture=capture
+        )
         digest = self._hash_nodes(nodes, domain=DIR_DOMAIN)
-        with self._lock:
-            self._dir_cache[rel] = digest
-            self._dirty_dirs.discard(rel)
-
-        if self.directory_store is not None:
-            self.directory_store.put(
-                workspace=self.workspace,
-                relative_path=rel,
-                digest=digest,
-            )
+        if capture is None:
+            self._cache_directory(rel, digest)
         return digest
 
     def path_digest(
@@ -639,15 +710,19 @@ class MerkleTree:
             lambda: self._node_for_path(rel, name=Path(rel).name or rel, verify=verify)
         )
 
+        return node.kind, self._node_revision(node), node.executable
+
+    @staticmethod
+    def _node_revision(node: _Node) -> Digest:
         if node.kind == b"L":
             assert node.target is not None
             h = sha256()
             h.update(SYMLINK_DOMAIN)
             h.update(encode_field(node.target))
-            return b"L", Digest(h.hexdigest(), len(node.target)), False
+            return Digest(h.hexdigest(), len(node.target))
 
         assert node.digest is not None
-        return node.kind, node.digest, node.executable
+        return node.digest
 
     def _manifest_terminal_needs_observation(self, rel: str, *, verify: bool) -> bool:
         with self._lock:
@@ -727,6 +802,60 @@ class MerkleTree:
             return tree.digest(self, verify=verify)
 
         return self._run_reconciled(compute)
+
+    def observe_inputs(
+        self,
+        resolve_scope: Callable[[], ResolvedInputScope],
+        *,
+        verify: bool,
+        max_members: int,
+    ) -> tuple[ResolvedInputScope, Digest, tuple[InputMember, ...], InputCounts]:
+        """Capture members within the existing canonical Merkle reconciliation.
+
+        A filtered request has no reusable directory/manifest cache identity, so
+        its synthetic tree is request-local. File revisions still come from the
+        canonical FileDigestStore, and no filtered nodes enter unfiltered caches.
+        """
+
+        def compute() -> tuple[
+            ResolvedInputScope, Digest, tuple[InputMember, ...], InputCounts
+        ]:
+            scope = resolve_scope()
+            capture = InputCapture(
+                self.workspace,
+                scope,
+                max_members=max_members,
+                directory_members=lambda rel: tuple(
+                    entry.name for entry in self._scoped_entries(rel, scope)
+                ),
+            )
+            for rel in scope.manifest:
+                capture.bind_ancestors(rel)
+                capture.begin(rel)
+            digest = _ManifestTree(scope.manifest.paths).digest(
+                self, verify=verify, capture=capture
+            )
+            self._validate_input_scope(scope, resolve_scope)
+            capture.validate()
+            members, counts = capture.result()
+            return scope, digest, members, counts
+
+        return self._run_reconciled(compute)
+
+    @staticmethod
+    def _validate_input_scope(
+        scope: ResolvedInputScope, resolve_scope: Callable[[], ResolvedInputScope]
+    ) -> None:
+        try:
+            current = resolve_scope()
+        except (FileNotFoundError, NotADirectoryError, ValueError) as exc:
+            raise UnstableObservationError(
+                "selected-input selection changed during observation"
+            ) from exc
+        if current != scope:
+            raise UnstableObservationError(
+                "selected-input selection changed during observation"
+            )
 
     def stats(self) -> dict[str, int]:
         with self._lock:

@@ -46,10 +46,16 @@ calls therefore remain separate measurements. These labels and timings describe
 runtime diagnostics only and carry no repository or execution authority.
 
 Source operations use `CodeMap.source.outline()`, `.symbol()`, `.read()`, `.grep()`,
-`.observe()`, `.scoped_occurrences()` and `.scoped_literals()`. The source component
+`.observe()`, `.range_receipt()`, `.scoped_occurrences()` and `.scoped_literals()`. The source component
 owns qualified member/range reads and returns detached public outline symbols.
 Its instruction-scope primitive consumes explicit paths. Query-based instruction
 seed selection remains Context composition, above Source and retrieval.
+
+`CodeMap.source.range_receipt()` is a supported direct Python operation with
+schema `hashmarks.source-range-receipt.v1`. It preserves original bytes in an
+explicit zero-based half-open range and binds them to the canonical full-member
+revision. Its current scope does not include daemon, CodeMap service, CLI, or MCP
+transport. See [Exact source byte-range receipts](SOURCE_RANGE_RECEIPTS.md).
 
 Native publication uses `CodeMap.native.import_scip()` and `.enrich_projects()`.
 `CodeMap.native.status()` reports native evidence qualification. Repository
@@ -181,6 +187,14 @@ It borrows Source, Imports and repository Correlation directly; it has no Tasks
 or root dependency. Producer syntax remains in adapters. The old root operations
 are removed.
 
+`RepositoryIdentity.observe_inputs()` is the supported local selected-input
+identity/inventory operation. It returns the immutable `InputObservation`,
+`InputMember`, and `InputCounts` types, exported from `hashmarks`, and preserves
+the existing `Snapshot` digest domain. Recursive member counts and regular-file
+byte totals describe the same observation as the digest; `Snapshot.digest.size`
+retains its established identity meaning. Unsupported transports reject the new
+operation explicitly. See [Selected-input observations](INPUT_OBSERVATIONS.md).
+
 The supported Python API is:
 
 1. names exported by `hashmarks.__all__`, including the lazily exposed `CodeMap`;
@@ -206,6 +220,27 @@ The documented `RepositoryDeclarationProvider`, `RepositoryDeclarationProviderCo
 
 `CodeMap.tasks.evidence()` is the supported role-separated task-evidence API. Its default schema is `hashmarks.task-evidence.v5`: bounded retrieval, explicit-target evidence, ownership, verification, related evidence, freshness and provenance are distinct authority domains. Initial responses use `hashmarks.task-evidence-initial.v2` and retain the same facts through the initial packet codec; presentation bounds do not establish repository absence or ownership uniqueness.
 
+`CodeMap.verification.observe_membership(report)` is a supported direct Python
+operation for `hashmarks.verification-membership-report.v1` inputs. It returns
+`hashmarks.verification-membership-observation.v1`, preserving native producer
+claims, exact selectors, explicit empty/unavailable membership, and source
+correspondence through the existing Source/Bindings/Correlation owners.
+`validate_native_consumer_bundle(observation)` validates this retained packet;
+the existing two-argument envelope/contract path remains supported. Pure retained
+validation does not observe the current filesystem. No collection, execution, or
+service/MCP transport is added for this operation. See
+[Verification membership handoff](VERIFICATION_MEMBERSHIP_HANDOFF.md).
+
+`MakeShellDeclarations` and `PythonUvManifestDeclarations`, imported from
+`hashmarks.codemap`, are supported first-party declaration providers. Consumers
+select their exact paths and invoke `CodeMap.declarations.discover(...)`; the
+registered `make_shell` and `python_uv_manifest_paths` source-selection adapters
+also support the existing MCP declaration discovery surface. These additions do
+not imply dedicated CLI flags or service-client parity. Provider output remains
+bounded authored syntax with qualified coverage and unresolved native semantics.
+See [Make/shell evidence](MAKE_SHELL_EVIDENCE.md) and
+[Python/uv manifest evidence](PYTHON_UV_MANIFEST_EVIDENCE.md).
+
 CodeMap service clients require canonical replies to be JSON objects with the
 expected operation schema. The existing service route definitions supply the
 semantic operation and response key. Malformed objects, other operation schemas
@@ -214,6 +249,14 @@ and literal null/boolean/numeric values are preserved. Internal `find_task` repl
 require an array of objects and retain its order; an empty bounded array carries
 no repository-negative authority. Service handlers also reject non-object replies
 before serialization.
+
+`from hashmarks.codemap import CodeMapServiceClient` is the documented
+Python service-client import. The service client retains flat transport methods,
+including `sync()` and `task_evidence(...)`; named component families belong to
+direct `CodeMap` instances. The service client connects to a separately managed
+service and does not promise parity with every direct Python operation. The
+[standalone consumer guide](../integration/STANDALONE_CONSUMERS.md) lists the
+transport scope of the added observation APIs.
 
 The current task-action, task-evidence, initial-envelope, and post-change response shapes are declared once in `hashmarks.codemap.task_evidence_types`. These `TypedDict` contracts preserve ordinary dictionary/JSON responses; they describe field structure, not repository authority. Default and initial calls have distinct return types. Nullable evidence remains nullable and conditional fields remain optional. Ownership hops and bounded graph projections share `hashmarks.codemap.ownership_relation_types`; trace and authority records are owned by `hashmarks.ownership_decision`. Service-client responses use these same shapes and validate their required fields and nested structure at the JSON boundary, preserving additional producer evidence. MCP Python calls retain the default/initial return distinction. Available and unavailable verification plans have separate typed shapes.
 

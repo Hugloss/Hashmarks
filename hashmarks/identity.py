@@ -8,9 +8,10 @@ from .client import DaemonCompatibilityError, DaemonUnavailableError, IdentityCl
 from .digest import Digest
 from .engine import IdentityEngine
 from .generation_domain import require_generation
+from .input_observation import DEFAULT_MAX_INPUT_MEMBERS
 from .inputs import InputManifest
 from .schema import IDENTITY_SCHEMA
-from .snapshot import Snapshot
+from .snapshot import InputObservation, Snapshot
 from .specs import InputValue, validate_input_values
 
 if TYPE_CHECKING:
@@ -224,6 +225,30 @@ class RepositoryIdentity:
                     raise
                 self._daemon_confirmed = False
         return self._prepare_local_read().snapshot(manifest, verify=verify)
+
+    def observe_inputs(
+        self,
+        *inputs: InputValue,
+        exclude: Iterable[InputValue] = (),
+        require_matches: bool = True,
+        verify: bool = False,
+        max_members: int = DEFAULT_MAX_INPUT_MEMBERS,
+    ) -> InputObservation:
+        """Observe live selected identity, members, and counts together.
+
+        The initial inventory transport requires explicit ``mode='local'``;
+        auto/daemon and Git-ref observations are not supported by this method.
+        Empty resolved selections are complete only for that empty scope.
+        """
+        if self.mode is not RepositoryIdentityMode.LOCAL:
+            raise NotImplementedError("observe_inputs requires explicit mode='local'")
+        return self._prepare_local_read().observe_inputs(
+            inputs,
+            exclude=tuple(exclude),
+            require_matches=require_matches,
+            verify=verify,
+            max_members=max_members,
+        )
 
     def code_map(self) -> CodeMap:
         """Return the lazily-created derived CodeMap for repository-intelligence queries.

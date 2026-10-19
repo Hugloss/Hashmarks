@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Add a coherent selected-input observation to `RepositoryIdentity`, returning canonical identity, the resolved manifest, member revisions/kinds, and explicit inventory counts from the same observation.
+- Add source-bound observations of externally collected native verification membership and public consumer validation, preserving full selectors, empty collections, and incomplete or stale evidence. Collection and execution remain external.
+- Add explicitly selected Make/shell and Python/uv manifest declaration providers over the existing revision-bound provider context. These report authored syntax and unresolved semantics without executing build tools or resolving dependencies.
+- Add `CodeMap.source.range_receipt()` for exact original byte ranges, full-member revision binding, and canonical freshness, including byte-preserving CRLF, BOM, and empty-range behavior.
+- Correct Python integration guidance to distinguish direct CodeMap components from flat service-client methods and to use the canonical `current`/`stale`/`unknown` freshness vocabulary. Document supported imports, installation, transport scope, and neutral standalone examples.
+
 ## 0.30.0 — Explicit Python API owners and backend evidence
 
 - Replace the flat `CodeMap` Python API with named components for indexing, source, search, context, ownership, verification, tasks, changes, declarations, dependencies, and other repository evidence. `CodeMap` remains the composition root and context manager; retired flat methods have no compatibility aliases. See [Public API and stability](docs/reference/API_STABILITY.md) for the migration contract.
@@ -12,7 +20,7 @@
 
 ### Upgrade notes
 
-- Migrate Python calls such as `codemap.sync()` to `codemap.index.sync()`, `codemap.outline(...)` to `codemap.source.outline(...)`, `codemap.source(...)` to `codemap.source.read(...)`, `codemap.task_evidence(...)` to `codemap.tasks.evidence(...)`, and `codemap.discover_repository_declarations(...)` to `codemap.declarations.discover(...)`. Python service clients also use named component families.
+- Migrate direct Python calls such as `codemap.sync()` to `codemap.index.sync()`, `codemap.outline(...)` to `codemap.source.outline(...)`, `codemap.source(...)` to `codemap.source.read(...)`, `codemap.task_evidence(...)` to `codemap.tasks.evidence(...)`, and `codemap.discover_repository_declarations(...)` to `codemap.declarations.discover(...)`. `CodeMapServiceClient` retains flat transport methods such as `client.sync()` and `client.task_evidence(...)`; it does not expose the direct CodeMap component families.
 - Update task-evidence consumers for the current v5 packet. The initial profile uses `hashmarks.task-evidence-initial.v2` and is a bounded projection of the default evidence. Post-change operations reject obsolete task-evidence packets before synchronization; obtain a fresh current packet before continuing.
 - Import structural-locality comparison from `hashmarks.codemap.structural_locality_delta`; the former callable package alias is removed. Generated caches remain disposable, and incompatible native caches require fresh import. See the [API reference](docs/reference/API_STABILITY.md) and [native evidence compatibility notes](docs/reference/STATIC_INTERFACE_EVIDENCE.md) for details.
 

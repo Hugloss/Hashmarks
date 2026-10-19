@@ -9,6 +9,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import NotRequired, TypedDict
 
+from .make_shell_declarations import MakeShellDeclarations
+from .python_uv_manifest_declarations import PythonUvManifestDeclarations
 from .repository_declaration_provider import RepositoryDeclarationProvider
 from .static_python_backend_declarations import StaticPythonBackendDeclarations
 from .static_python_interface_declarations import StaticPythonInterfaceDeclarations
@@ -66,6 +68,35 @@ def _interface_provider(selection: object) -> StaticPythonInterfaceDeclarations:
     return StaticPythonInterfaceDeclarations(**arguments)
 
 
+def _make_shell_provider(selection: object) -> MakeShellDeclarations:
+    if not isinstance(selection, Mapping) or set(selection) - {
+        "make_paths",
+        "shell_paths",
+    }:
+        raise ValueError(
+            "make_shell must be an object of selected make_paths/shell_paths"
+        )
+    return MakeShellDeclarations(
+        make_paths=_strings(selection.get("make_paths", []), "make_paths"),
+        shell_paths=_strings(selection.get("shell_paths", []), "shell_paths"),
+    )
+
+
+def _tool_providers(
+    make_shell: object, manifests: object
+) -> list[RepositoryDeclarationProvider]:
+    providers: list[RepositoryDeclarationProvider] = []
+    if make_shell is not None:
+        providers.append(_make_shell_provider(make_shell))
+    if manifests is not None:
+        providers.append(
+            PythonUvManifestDeclarations(
+                paths=_strings(manifests, "python_uv_manifest_paths")
+            )
+        )
+    return providers
+
+
 def source_declaration_providers(
     mode: str,
     selection: Mapping[str, object] | None,
@@ -77,6 +108,8 @@ def source_declaration_providers(
         "python_backend_paths",
         "include_class_fields",
         "python_interface",
+        "make_shell",
+        "python_uv_manifest_paths",
     }:
         raise ValueError(
             "source_selection must be an object of supported source options"
@@ -88,8 +121,12 @@ def source_declaration_providers(
     include_class_fields = _boolean(
         selection.get("include_class_fields", False), "include_class_fields"
     )
+    make_shell = selection.get("make_shell")
+    manifests = selection.get("python_uv_manifest_paths")
     if mode != "discovery":
-        if paths is not None or include_class_fields or interface is not None:
+        if include_class_fields or any(
+            item is not None for item in (paths, interface, make_shell, manifests)
+        ):
             raise ValueError("source selection requires result_mode=discovery")
         return None
     if include_class_fields and paths is None:
@@ -104,4 +141,5 @@ def source_declaration_providers(
         )
     if interface is not None:
         providers.append(_interface_provider(interface))
+    providers.extend(_tool_providers(make_shell, manifests))
     return providers

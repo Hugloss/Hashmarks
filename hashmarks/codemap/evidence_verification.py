@@ -17,6 +17,7 @@ from .repository_observation import evidence_identity
 from .task_evidence_contract import read_task_candidate
 from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 from .verification_explanation import VerificationExplanationMixin
+from .verification_membership import VerificationMembershipMixin
 from .verification_ownership import VerificationOwnershipMixin
 from .verification_plan import VerificationPlanMixin
 from .verification_reference_syntax import (
@@ -40,6 +41,7 @@ VerificationKeywordObservations: TypeAlias = dict[
 ]
 if TYPE_CHECKING:
     from .decision_session import DecisionScope
+    from .evidence_correlation import RepositoryCorrelation
     from .import_resolution import RepositoryImports
     from .query_router import NormalizedTaskQuery
     from .task_evidence_types import (
@@ -90,6 +92,7 @@ class _VerificationRelevanceState:
 
 
 class RepositoryVerification(
+    VerificationMembershipMixin,
     VerificationPlanMixin,
     VerificationOwnershipMixin,
     VerificationExplanationMixin,
@@ -97,12 +100,27 @@ class RepositoryVerification(
 ):
     """Own source-qualified test relevance for supplied owner/candidate facts."""
 
-    def __init__(self, imports: RepositoryImports) -> None:
+    def __init__(
+        self,
+        imports: RepositoryImports,
+        *,
+        correlation: RepositoryCorrelation | None = None,
+    ) -> None:
         self.source = source = imports.source
         self.imports = imports
         self.store = source.store
         self.files = source.files
         self.workspace = source.workspace
+        if correlation is None:
+            from .evidence_correlation import RepositoryCorrelation
+            from .repository_evidence_bindings import RepositoryBindings
+
+            correlation = RepositoryCorrelation(RepositoryBindings(source))
+        if correlation.source is not source:
+            raise ValueError(
+                "verification and correlation must share their source owner"
+            )
+        self._collection_correlation = correlation
 
     @property
     def reads(self) -> DecisionScope:

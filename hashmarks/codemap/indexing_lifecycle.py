@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import contextlib
-import fnmatch
 import hashlib
 import json
 import os
@@ -13,6 +12,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.codemap.uv_workspace import (
+    uv_workspace_member as _uv_workspace_member,
+)
+from hashmarks.codemap.uv_workspace import uv_workspace_patterns
 from hashmarks.digest import Digest
 from hashmarks.file_store import FileDigestStore, UnstableFileError
 from hashmarks.paths import normalize_relative_path
@@ -104,24 +107,6 @@ def _language_for_path(path: Path) -> str | None:
     return None
 
 
-def _uv_workspace_member(
-    pyproject: Path,
-    workspace: Path,
-    members: Sequence[str],
-    excludes: Sequence[str],
-) -> bool:
-    """Apply one admitted workspace declaration to a candidate manifest."""
-    if pyproject == workspace / "pyproject.toml":
-        return True
-    try:
-        project = pyproject.parent.relative_to(workspace).as_posix()
-    except ValueError:
-        return False
-    return any(
-        fnmatch.fnmatchcase(project, pattern) for pattern in members
-    ) and not any(fnmatch.fnmatchcase(project, pattern) for pattern in excludes)
-
-
 def _uv_workspace_pyprojects(
     workspace: Path, pyprojects: Sequence[Path]
 ) -> tuple[Path, ...]:
@@ -141,21 +126,8 @@ def _uv_workspace_pyprojects(
     members = workspace_cfg.get("members")
     if not isinstance(members, list):
         return tuple(pyprojects)
-    member_patterns = tuple(
-        value.strip().strip("/")
-        for value in members
-        if isinstance(value, str) and value.strip()
-    )
-    excludes = workspace_cfg.get("exclude")
-    exclude_patterns = (
-        tuple(
-            value.strip().strip("/")
-            for value in excludes
-            if isinstance(value, str) and value.strip()
-        )
-        if isinstance(excludes, list)
-        else ()
-    )
+    member_patterns = uv_workspace_patterns(members)
+    exclude_patterns = uv_workspace_patterns(workspace_cfg.get("exclude"))
 
     return tuple(
         pyproject

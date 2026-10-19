@@ -5,10 +5,6 @@ from copy import deepcopy
 from typing import TYPE_CHECKING, NotRequired, TypedDict
 
 from .evidence_context import validate_evidence_context
-from .qualification_units import (
-    native_qualification_handoff,
-    validate_native_qualification_handoff,
-)
 from .validation_inputs import require_mapping_for_validation
 from .verification_selection import (
     VerificationSelectionEnvelopeState,
@@ -56,6 +52,8 @@ def _bundle_handoff_reasons(
 ) -> list[str]:
     if handoff is None:
         return []
+    from .qualification_units import validate_native_qualification_handoff
+
     if not isinstance(handoff, Mapping):
         state = validate_native_qualification_handoff(handoff)
         return [f"handoff:{reason}" for reason in state.get("reasons", [])]
@@ -103,13 +101,33 @@ def _normalized_bundle(
 
 def validate_native_consumer_bundle(
     envelope: object,
-    contract: object,
+    contract: object = None,
     *,
     handoff: object = None,
     expected_producer_implementation_identity: str | None = None,
     require_fresh: bool = False,
 ) -> NativeConsumerValidation:
     """Validate Hashmarks-issued evidence without reproducing producer identity generation."""
+    from .verification_collection import MEMBERSHIP_OBSERVATION_SCHEMA
+
+    if (
+        isinstance(envelope, Mapping)
+        and envelope.get("schema") == MEMBERSHIP_OBSERVATION_SCHEMA
+    ):
+        from .verification_collection_observation import validate_membership_observation
+
+        result = validate_membership_observation(
+            envelope,
+            expected_producer_implementation_identity=expected_producer_implementation_identity,
+            require_fresh=require_fresh,
+        )
+        if contract is not None or handoff is not None:
+            result["valid"] = False
+            result["normalized"] = None
+            result["reasons"].append(
+                "membership-observation-does-not-use-legacy-contract-or-handoff"
+            )
+        return result
     envelope, envelope_root_reasons = require_mapping_for_validation(
         envelope, reason="invalid-envelope"
     )
@@ -319,6 +337,8 @@ def _consumer_conformance_vectors_from_handoff(
 
 def consumer_conformance_vectors(root: Path) -> tuple[dict[str, object], ...]:
     """Return deterministic interoperability vectors for downstream consumers."""
+    from .qualification_units import native_qualification_handoff
+
     handoff = native_qualification_handoff(root.resolve())
     return _consumer_conformance_vectors_from_handoff(handoff)
 

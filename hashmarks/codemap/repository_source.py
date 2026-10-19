@@ -28,6 +28,11 @@ from .source_line_correspondence import (
     source_shape,
     validated_source_lines,
 )
+from .source_range_receipt import (
+    SOURCE_RANGE_RECEIPT_SCHEMA,
+    source_range_evidence,
+    validate_source_range,
+)
 
 if TYPE_CHECKING:
     from .indexing_lifecycle import RepositoryIndex
@@ -705,6 +710,54 @@ class RepositorySource(ScopedSourceLiteralsMixin, ReadScopeOwner):
                 "truncation": packet["truncation"],
             },
         )
+        return packet
+
+    def range_receipt(
+        self,
+        relpath: str,
+        *,
+        start_byte: int,
+        end_byte: int,
+        max_bytes: int = 1_048_576,
+    ) -> dict[str, object]:
+        """Return original bytes for [start_byte, end_byte) from one stable read.
+
+        Coordinates are zero-based byte offsets, independent of text encoding.
+        The observation identity binds the range to the full member revision.
+        Completeness describes only the requested range; canonical freshness
+        remains separate. Unavailable members never return content or identity.
+        """
+        validate_source_range(start_byte, end_byte, max_bytes)
+        generation_before = self.store.generation()
+        member, raw = self._bounded_source_observation(relpath, max_bytes)
+        generation, identity_generation, stale = self.reads.generation_status()
+        packet: dict[str, object] = {
+            "schema": SOURCE_RANGE_RECEIPT_SCHEMA,
+            "member": member,
+            "generation": generation,
+            "identity_generation": identity_generation,
+            "freshness": (
+                "stale" if generation != generation_before else freshness_state(stale)
+            ),
+            "observation_scope": "exact-admitted-member-byte-range",
+            "range": {
+                "coordinate_system": "zero-based-half-open-bytes",
+                "start_byte": start_byte,
+                "end_byte": end_byte,
+            },
+            "limits": {"max_bytes": max_bytes},
+            "availability": "unavailable",
+            "completeness": "unknown",
+            "truncation": "unknown",
+            "source_byte_count": None,
+            "content": None,
+            "observation_identity": None,
+            "negative_evidence": "not-admissible",
+            "authority": "repository-evidence-only",
+            "execution_effect": "none",
+        }
+        if raw is not None:
+            packet.update(source_range_evidence(raw, member, start_byte, end_byte))
         return packet
 
     def _scoped_source_member(

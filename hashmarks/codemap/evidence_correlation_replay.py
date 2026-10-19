@@ -8,6 +8,7 @@ from typing import cast
 from hashmarks.operation_contract import operation_schema
 
 from .evidence_correlation_model import CorrelationValues
+from .repository_evidence_binding_validation import validate_bindings_packet
 from .repository_observation import packet_digest
 
 _MAX_TOTAL_ANCHORS = 256
@@ -44,6 +45,37 @@ def validate_previous_correlation_size(packet: Mapping[str, object]) -> None:
         raise ValueError(
             f"previous correlation exceeds {CORRELATION_PACKET_MAX_BYTES} encoded bytes"
         )
+
+
+def validate_correlation_packet(packet: Mapping[str, object], *, label: str) -> None:
+    """Validate retained correlation integrity without constructing repository services.
+
+    This establishes the packet's internal contract, not present-day freshness
+    or the authenticity of an external producer's claims.
+    """
+    validate_previous_correlation_size(packet)
+    if packet.get("schema") != _CORRELATION_SCHEMA:
+        raise ValueError(f"{label} must be a {_CORRELATION_SCHEMA} packet")
+    repository = packet.get("repository_evidence")
+    if not isinstance(repository, Mapping):
+        raise ValueError(f"{label} must contain repository_evidence")
+    validate_bindings_packet(repository, name=f"{label} repository")
+    identity = packet.get("correlation_identity")
+    if not isinstance(identity, str) or not _SHA256.fullmatch(identity):
+        raise ValueError(
+            f"{label} correlation_identity must use sha256:<64 lowercase hex characters>"
+        )
+    expected = "sha256:" + packet_digest(
+        _CORRELATION_SCHEMA,
+        {
+            key: value
+            for key, value in packet.items()
+            if key not in {"correlation_identity", "delta_from_previous"}
+        },
+    )
+    if packet.get("correlation_identity") != expected:
+        raise ValueError(f"{label} correlation_identity does not match packet content")
+    CorrelationPacketValidation()._validate_correlation_projections(packet, label=label)
 
 
 class CorrelationPacketValidation(CorrelationValues):

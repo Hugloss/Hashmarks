@@ -294,6 +294,13 @@ MCP clients can use `post_change` for the same repository-intelligence refresh w
 
 ## Python API
 
+Embedding consumers can use coherent input observations, native verification
+membership handoff, first-party declaration providers, and exact source byte
+receipts through the documented Python package. See
+[Standalone consumer integration](docs/integration/STANDALONE_CONSUMERS.md) for
+ownership, supported imports, installation, examples, and transport scope. These
+additions are Unreleased until included in a published package.
+
 ### Repository intelligence with `CodeMap`
 
 ```python

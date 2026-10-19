@@ -6,12 +6,13 @@ from typing import TYPE_CHECKING
 from .client import prepare_default_state_dir
 from .directory_store import DirectoryDigestStore
 from .file_store import FileDigestStore
-from .inputs import InputManifest
+from .freshness import freshness_state
+from .inputs import InputManifest, ResolvedInputScope
 from .merkle import MerklePathScope, MerkleTree
-from .observation import ChangeTracker
+from .observation import ChangeTracker, ObservationState
 from .paths import canonical_host_path
 from .schema import IDENTITY_SCHEMA
-from .snapshot import Snapshot
+from .snapshot import InputObservation, Snapshot
 from .specs import InputValue, validate_input_values
 
 if TYPE_CHECKING:
@@ -103,6 +104,64 @@ class IdentityEngine:
             generation=after.generation,
             observed_paths=before.paths,
             mode="local",
+        )
+
+    def observe_inputs(
+        self,
+        inputs: tuple[InputValue, ...],
+        *,
+        exclude: tuple[InputValue, ...],
+        require_matches: bool,
+        verify: bool,
+        max_members: int,
+    ) -> InputObservation:
+        if type(max_members) is not int or max_members < 1:
+            raise ValueError("max_members must be a positive integer")
+        before = self.changes.snapshot()
+        scope, digest, members, counts = self.merkle.observe_inputs(
+            lambda: self._input_scope(inputs, exclude, require_matches=require_matches),
+            verify=verify,
+            max_members=max_members,
+        )
+        after = self.changes.snapshot()
+        stale = {
+            ObservationState.CLEAN: False,
+            ObservationState.DIRTY: True,
+            ObservationState.UNKNOWN: None,
+        }[after.state]
+        return InputObservation(
+            snapshot=Snapshot(
+                digest=digest,
+                manifest_fingerprint=scope.manifest.fingerprint,
+                generation=after.generation,
+                observed_paths=before.paths,
+                mode="local",
+            ),
+            manifest=scope.manifest,
+            excluded_paths=scope.excluded_paths,
+            members=members,
+            counts=counts,
+            freshness=freshness_state(stale),
+            walk_ignore_names=tuple(sorted(self.merkle.walk_ignore_names)),
+            mandatory_exclude_names=tuple(sorted(self.merkle.mandatory_exclude_names)),
+            internal_excluded_paths=tuple(sorted(self.merkle._excluded_paths)),
+        )
+
+    def _input_scope(
+        self,
+        inputs: tuple[InputValue, ...],
+        exclude: tuple[InputValue, ...],
+        *,
+        require_matches: bool,
+    ) -> ResolvedInputScope:
+        patterns = validate_input_values(
+            self.workspace, inputs, require_matches=require_matches
+        )
+        exclusions = validate_input_values(
+            self.workspace, exclude, require_matches=False
+        )
+        return ResolvedInputScope.resolve(
+            self.workspace, patterns, exclusions, require_matches=require_matches
         )
 
     def stats(self) -> dict[str, object]:

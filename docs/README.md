@@ -15,19 +15,25 @@ This is the single catalog for the current maintained documentation in `docs/`.
 - [`reference/FILESYSTEM_LIFECYCLE_EVIDENCE.md`](reference/FILESYSTEM_LIFECYCLE_EVIDENCE.md) — qualified Python filesystem checks, source-reference flow, protection syntax and uncertainty.
 - [`reference/DEPENDENCY_EVIDENCE.md`](reference/DEPENDENCY_EVIDENCE.md) — producer-neutral dependency evidence, adapter boundaries, semantic authorities, and coverage rules.
 - [`reference/INVARIANTS.md`](reference/INVARIANTS.md) — normative correctness, freshness, and authority guarantees.
+- [`reference/INPUT_OBSERVATIONS.md`](reference/INPUT_OBSERVATIONS.md) — coherent selected-input identity, recursive inventory, explicit counts, and local observation bounds.
+- [`reference/MAKE_SHELL_EVIDENCE.md`](reference/MAKE_SHELL_EVIDENCE.md) — explicitly selected Make/shell declarations, invocation syntax, and unresolved expansion.
 - [`reference/OBSERVER_DELTA.md`](reference/OBSERVER_DELTA.md) — observer/delta ownership and change semantics.
 - [`reference/PRODUCT_BOUNDARY.md`](reference/PRODUCT_BOUNDARY.md) — normative feature-admission and ownership contract.
+- [`reference/PYTHON_UV_MANIFEST_EVIDENCE.md`](reference/PYTHON_UV_MANIFEST_EVIDENCE.md) — authored Python dependencies, scripts, uv sources, and static workspace candidates.
 - [`reference/REPOSITORY_EVIDENCE_BINDINGS.md`](reference/REPOSITORY_EVIDENCE_BINDINGS.md) — repository evidence bindings and change semantics.
 - [`reference/REPOSITORY_DECLARATIONS.md`](reference/REPOSITORY_DECLARATIONS.md) — cross-artifact declaration correspondence, exact evidence, ambiguity, qualified absence, and factual deltas.
 - [`reference/SOURCE_OBSERVATION.md`](reference/SOURCE_OBSERVATION.md) — bounded source occurrences, observable scope, diagnostic correspondence, and source-shape evidence.
+- [`reference/SOURCE_RANGE_RECEIPTS.md`](reference/SOURCE_RANGE_RECEIPTS.md) — exact original byte ranges, member revision binding, and canonical freshness.
 - [`reference/STATE_AND_SEMANTIC_OWNERS.md`](reference/STATE_AND_SEMANTIC_OWNERS.md) — canonical state families, semantic owners, and reuse-before-new-owner rules.
 - [`reference/STRUCTURAL_LOCALITY.md`](reference/STRUCTURAL_LOCALITY.md) — bounded structural-locality evidence for repository symbols.
 - [`reference/STATIC_INTERFACE_EVIDENCE.md`](reference/STATIC_INTERFACE_EVIDENCE.md) — selected static Python route/tool syntax and bounded SCIP symbol evidence.
+- [`reference/VERIFICATION_MEMBERSHIP_HANDOFF.md`](reference/VERIFICATION_MEMBERSHIP_HANDOFF.md) — source-bound supplied native membership and public retained-packet validation.
 
 ## Integration
 
 - [`integration/MCP.md`](integration/MCP.md) — local read-only MCP server, freshness behavior, and host configuration.
 - [`integration/OH_GOON_INTEGRATION.md`](integration/OH_GOON_INTEGRATION.md) — Hashmarks ↔ Oh-Goon evidence/authority boundary.
+- [`integration/STANDALONE_CONSUMERS.md`](integration/STANDALONE_CONSUMERS.md) — installed-package consumer entry points, identity/inventory, membership handoff, declarations, and byte receipts.
 
 ## Maintainers
 

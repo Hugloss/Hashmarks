@@ -4,6 +4,10 @@ Hashmarks exposes additional **descriptive repository evidence** through the exi
 CodeMap repository observer. It does not choose agent tools, run language servers,
 execute verification, or create a second freshness/index authority.
 
+For a contiguous original byte range, use
+[`source.range_receipt()`](SOURCE_RANGE_RECEIPTS.md). It shares Source's stable
+member authority and preserves bytes without display-oriented text normalization.
+
 ## Exact source occurrence and physical source shape (H1 + H3)
 
 Python API:
