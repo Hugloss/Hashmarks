@@ -92,7 +92,7 @@ def test_economics_comparison_rejects_a_moved_current_snapshot(
         views.economics.receipt(task, ["owner.py"], previous_snapshot=before)
 
 
-def test_full_status_rejects_publication_drift_during_native_observation(
+def test_full_status_rejects_same_connection_publication_during_native_observation(
     index: RepositoryIndex,
     tasks: RepositoryTasks,
     monkeypatch: pytest.MonkeyPatch,
@@ -100,6 +100,7 @@ def test_full_status_rejects_publication_drift_during_native_observation(
     (index.workspace / "owner.py").write_text("def owner(): pass\n")
     index.sync()
     views = _views(tasks)
+    generation = index.store.generation()
     original = views.native.status
 
     def publish_during_status() -> list[dict[str, object]]:
@@ -108,10 +109,9 @@ def test_full_status_rejects_publication_drift_during_native_observation(
         return result
 
     monkeypatch.setattr(views.native, "status", publish_during_status)
-    with pytest.raises(
-        RuntimeError, match="generation changed during status observation"
-    ):
+    with pytest.raises(RuntimeError, match="nested CodeMap publication transactions"):
         views.status()
+    assert index.store.generation() == generation
 
 
 def test_economics_comparison_observes_its_current_snapshot_once(

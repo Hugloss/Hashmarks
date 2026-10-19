@@ -438,6 +438,36 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         self._bulk_file_write_committed = 0
         self._bulk_file_write_on_commit: Callable[[int], None] | None = None
         self._publication_transaction_active = False
+        self._read_snapshot_active = False
+
+    @contextmanager
+    def read_snapshot(self) -> Generator[None, None, None]:
+        """Observe one committed workspace publication without blocking WAL writers.
+
+        Nested reads share this connection's snapshot. A status observation must
+        not join an unpublished write transaction or mutate the selected rows.
+        """
+        with self._lock:
+            if self._read_snapshot_active:
+                yield
+                return
+            if self._db.in_transaction:
+                raise RuntimeError(
+                    "cannot start CodeMap read snapshot inside a transaction"
+                )
+            query_only = int(self._db.execute("PRAGMA query_only").fetchone()[0])
+            self._db.execute("PRAGMA query_only=ON")
+            try:
+                self._db.execute("BEGIN")
+                self._read_snapshot_active = True
+                yield
+            finally:
+                try:
+                    if self._db.in_transaction:
+                        self._db.execute("ROLLBACK")
+                finally:
+                    self._read_snapshot_active = False
+                    self._db.execute(f"PRAGMA query_only={query_only}")
 
     @contextmanager
     def publication_transaction(self) -> Generator[None, None, None]:
