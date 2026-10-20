@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.31.1 — Readable initial repository evidence
 
 - Make default MCP `task_evidence` initial replies readable through the existing grouped-text projection while preserving the lossless structured packet, explicit presentations, and complete v5 mode. Retain ambiguity reasons, questions, alternatives and independently supplied source qualifications in readable text; align omitted-mode schema lookup with the MCP initial default. Clarify test relevance and the external voluntary-adoption/economics follow-up for #289; no adoption or performance gain is claimed.
 - Rewrite the existing MCP orientation/find/task-evidence catalog guidance in plain coding-agent intent language: broad orientation, exact known-name lookup, and unknown-path behavior localization with owning file/function, relevant tests, next-read, and freshness. Keep the same tool catalog, semantic owners, and <220-character discovery budget.
