@@ -736,7 +736,10 @@ def test_sdk_calls_all_tools_with_native_defaults_and_optional_formats(
             )
             native = packets[contract.operation, contract.default_response_mode]
             expected = presentation_response(
-                contract.operation, native, format=contract.default_presentation
+                contract.operation,
+                native,
+                format=contract.default_presentation,
+                result_mode=contract.default_response_mode,
             )
             assert default.structured_content == expected
             for mode, format in product(contract.response_modes, FORMATS):

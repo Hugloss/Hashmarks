@@ -91,6 +91,17 @@ def test_scoped_literal_tool_description_stays_within_public_catalog_limit() -> 
     assert "repository-wide absence" in description
 
 
+def test_task_evidence_mcp_default_is_bounded_without_changing_core_default() -> None:
+    from hashmarks.operation_contract import operation_default_mode
+
+    contract = tool_contract("task_evidence")
+    assert operation_default_mode("task_evidence") == "default"
+    assert contract.default_response_mode == "initial"
+    assert contract.default_response_schema == "hashmarks.task-evidence-initial.v2"
+    assert "default" in contract.response_modes
+    assert "initial" in contract.response_modes
+
+
 def test_mcp_contract_manifest_is_deterministic_and_complete() -> None:
     first = qualify_mcp_observation(_observation())
     second = qualify_mcp_observation(copy.deepcopy(_observation()))

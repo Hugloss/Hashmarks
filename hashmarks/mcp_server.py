@@ -558,7 +558,7 @@ def build_server(
         token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
         presentation: _Presentation = "none",
         supplied_observations: list[dict[str, Any]] | None = None,
-        result_mode: _TaskEvidenceResultMode = "default",
+        result_mode: _TaskEvidenceResultMode = task_evidence_contract.default_response_mode,
     ) -> CallToolResult:
         result = _call_surface(
             task_evidence_contract,
