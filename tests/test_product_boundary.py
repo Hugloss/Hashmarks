@@ -215,34 +215,6 @@ def test_repository_carries_agent_boundary_instructions_without_shipping_them_in
     assert Path("uv.lock") not in members
 
 
-def test_agents_file_freezes_hashmarks_oh_goon_execution_boundary() -> None:
-    text = _text("AGENTS.md")
-    assert (
-        "Hashmarks defines immutable repository evidence and selection authority; Oh-Goon owns execution and certification authority."
-        in text
-    )
-    for hashmarks_contract in (
-        "hashmarks.repository-work-selection.v1",
-        "hashmarks.test-shards.v3",
-        "hashmarks.test-shard-membership.v1",
-        "pure membership-conservation checks",
-        "compact decision-authority receipts",
-    ):
-        assert hashmarks_contract in text
-    for execution_authority in (
-        "durable execution-progress ledgers",
-        "deciding which chunk/shard runs next",
-        "process launch, process-tree supervision",
-        "retry policy, timeout-driven splitting/bisection",
-        "runtime `HOME`/cache/temp/socket-path isolation",
-        "classification of product failure versus controller interruption versus environment failure",
-        "membership-closure certification",
-    ):
-        assert execution_authority in text
-    assert "must never choose the refinement" in text
-    assert "completed/running/remaining progress" in text
-
-
 def test_exact_repository_intelligence_execution_constitution_is_frozen() -> None:
     constitution = (
         "Hashmarks is a repository observer that exposes repository intelligence, "

@@ -16,6 +16,7 @@ EXPECTED_PUBLIC = {
     "IdentityGraph",
     "InputManifest",
     "InputObservation",
+    "DirectoryObservation",
     "InputMember",
     "InputCounts",
     "InputSpec",
@@ -36,6 +37,8 @@ EXPECTED_PUBLIC = {
     "validate_input_values",
     "native_producer_implementation_identity",
     "validate_native_consumer_bundle",
+    "NativeVerificationMember",
+    "NativeVerificationSelectionProjection",
     "validate_repository_intelligence_evidence",
 }
 

@@ -51,17 +51,33 @@ The agent can query Hashmarks again after repository bytes change, but its own w
 
 ## Repository-work selection handoff
 
-Hashmarks may emit deterministic work/test membership evidence such as `hashmarks.test-shards.v3` and a repository-bound `hashmarks.repository-work-selection.v1` envelope.
+The active selected-work handoff is
+`hashmarks.verification-selection-envelope.v2` plus
+`hashmarks.downstream-verification-contract.v2`. Its exact flat
+`hashmarks.verification-membership.v1` membership is repository evidence.
+`execution_layout="external"` leaves physical grouping and isolation to Oh-Goon.
+Hashmarks' own qualification `test-shards.v3` and repository-work-selection
+formats are separate contracts; their layouts do not become consumer execution policy.
 
 An execution system should:
 
-1. validate the Hashmarks producer/schema/identity contract;
-2. bind repository-selection evidence to the source/repository it admitted;
-3. preserve required isolation semantics such as `isolated_process`;
-4. reject stale or mismatched evidence;
-5. execute the selected membership under its own policies.
+1. resolve the loaded producer implementation identity once;
+2. call `validate_native_consumer_bundle()` with that expected identity;
+3. consume the detached validated projection and bind its repository/source to admitted work;
+4. reject stale, unknown, mismatched or unsupported evidence under its admission policy;
+5. project safe native executable selectors and execute the exact membership under its own policies.
 
-Oh-Goon may refine runtime grouping after a timeout only if membership is conserved exactly. Hashmarks may provide a membership identity/proof; it does not choose timeout budgets, retry policies, worker counts, schedules, machines, or refinement strategy.
+The producer owns schema validation, member ordering, duplicate-member rules and
+opaque producer/member/envelope/contract identities. The consumer preserves those
+identities and checks its own executable-target constraints. It does not reconstruct
+producer hashes or reparse raw envelopes after successful validation.
+
+Oh-Goon may refine runtime grouping after a timeout only if completed, remaining
+and unexecuted membership account for every admitted member exactly once.
+Hashmarks does not choose timeout budgets, retries, concurrency, schedules,
+machines, isolation or refinement strategy. A retained validator proves the
+supplied packet's consistency; live source observation and admission are explicit
+operations with their own scope and freshness.
 
 ## Verification handoff
 
@@ -125,8 +141,9 @@ Direct Python and service transport have distinct call shapes:
 | Synchronize | `codemap.index.sync()` | `client.sync()` |
 | Task evidence | `codemap.tasks.evidence(task)` | `client.task_evidence(task)` |
 | Selected-input inventory | `RepositoryIdentity.observe_inputs(...)` | No service-client method |
-| Native membership observation | `codemap.verification.observe_membership(report)` | No service-client method |
-| Exact byte receipt | `codemap.source.range_receipt(...)` | No service-client method |
+| Native membership observation | `codemap.verification.observe_membership(report)` | `client.verification_membership(report)` |
+| ECMAScript source syntax | `codemap.source.ecmascript(...)` | `client.source_ecmascript(...)` |
+| Exact byte receipt | `codemap.source.range_receipt(...)` | `client.source_range_receipt(...)` |
 
 The documented service client import is
 `from hashmarks.codemap import CodeMapServiceClient`. It connects to an
