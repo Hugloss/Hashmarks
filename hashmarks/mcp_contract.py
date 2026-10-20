@@ -224,10 +224,9 @@ MCP_TOOL_CONTRACTS = (
     McpToolContract(
         "task_evidence",
         (
-            "Unknown implementation path: first-turn semantic localization with retrieval, "
-            "ownership/ambiguity, source/next-read, verification and freshness. The MCP "
-            "default is the bounded lossless initial packet; request result_mode=default "
-            "only when the full v5 packet is needed. No editing or tests."
+            "Unknown implementation path: semantic localization with ownership/ambiguity, "
+            "source/next-read, verification and freshness. Defaults to bounded lossless "
+            "initial packet; result_mode=default gets full v5 packet."
         ),
         "task_evidence",
         "initial",
