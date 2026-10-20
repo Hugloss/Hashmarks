@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from hashlib import sha256
 from typing import TYPE_CHECKING
@@ -14,7 +15,7 @@ from .paths import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator
+    from collections.abc import Callable, Iterable, Iterator
     from pathlib import Path
 
 _MANIFEST_DOMAIN = b"fastidentity.input-manifest.v1\0"
@@ -79,15 +80,55 @@ def _remove_descendants_of_selected_dirs(root: Path, rels: list[str]) -> list[st
     return selected
 
 
+@contextmanager
+def _input_match_scope(
+    root: Path,
+    pattern: str,
+    *,
+    bounded: bool,
+) -> Iterator[Iterable[str]]:
+    if bounded and pattern == "*":
+        # pathlib glob implementations may buffer the whole directory. Direct
+        # contents need no pattern engine, and this owner closes on interruption.
+        with os.scandir(root) as entries:
+            yield (entry.name for entry in entries)
+    else:
+        yield (match.relative_to(root).as_posix() for match in root.glob(pattern))
+
+
+def _collect_input_match(
+    found: set[str],
+    relative: str,
+    *,
+    max_members: int | None,
+    exclude_paths: tuple[str, ...],
+    checkpoint: Callable[[], None] | None,
+) -> None:
+    if checkpoint is not None:
+        checkpoint()
+    if any(
+        relative == path or relative.startswith(path + "/") for path in exclude_paths
+    ):
+        return
+    if relative not in found and max_members is not None and len(found) >= max_members:
+        raise ValueError("selected-input member limit exceeded")
+    found.add(relative)
+
+
 def resolve_inputs(
     workspace: str | Path,
     patterns: Iterable[str],
     *,
     require_matches: bool = True,
+    max_members: int | None = None,
+    exclude_paths: tuple[str, ...] = (),
+    checkpoint: Callable[[], None] | None = None,
 ) -> list[str]:
     """Resolve declared relative paths/globs into canonical relative paths."""
     root = canonical_host_path(workspace)
     found: set[str] = set()
+    if max_members is not None and (type(max_members) is not int or max_members < 1):
+        raise ValueError("max_members must be a positive integer")
 
     for raw_pattern in patterns:
         pattern = normalize_relative_pattern(raw_pattern)
@@ -95,18 +136,31 @@ def resolve_inputs(
 
         if not has_glob(pattern):
             if os.path.lexists(candidate):
-                found.add(pattern)
+                _collect_input_match(
+                    found,
+                    pattern,
+                    max_members=max_members,
+                    exclude_paths=exclude_paths,
+                    checkpoint=checkpoint,
+                )
                 continue
             if require_matches:
                 raise FileNotFoundError(f"input pattern matched nothing: {pattern}")
             continue
 
         matched = False
-        for match in root.glob(pattern):
-            matched = True
-            # Do not resolve the leaf: resolving would follow symlinks and
-            # change canonical link semantics.
-            found.add(match.relative_to(root).as_posix())
+        with _input_match_scope(
+            root, pattern, bounded=max_members is not None
+        ) as matches:
+            for relative in matches:
+                matched = True
+                _collect_input_match(
+                    found,
+                    relative,
+                    max_members=max_members,
+                    exclude_paths=exclude_paths,
+                    checkpoint=checkpoint,
+                )
         if require_matches and not matched:
             raise FileNotFoundError(f"input pattern matched nothing: {pattern}")
 
@@ -125,6 +179,29 @@ class ResolvedInputScope:
             relative_path == excluded or relative_path.startswith(excluded + "/")
             for excluded in self.excluded_paths
         )
+
+    @classmethod
+    def directory_contents(
+        cls,
+        workspace: str | Path,
+        excluded_paths: tuple[str, ...],
+        *,
+        max_members: int,
+        checkpoint: Callable[[], None] | None = None,
+    ) -> ResolvedInputScope:
+        """Resolve bounded direct contents with literal selected exclusions."""
+        paths = _collapse_exclusions(
+            normalize_relative_path(path, allow_root=False) for path in excluded_paths
+        )
+        selected = resolve_inputs(
+            workspace,
+            ("*",),
+            require_matches=False,
+            max_members=max_members,
+            exclude_paths=paths,
+            checkpoint=checkpoint,
+        )
+        return cls(InputManifest(tuple(selected)), paths)
 
     @classmethod
     def resolve(
@@ -159,8 +236,12 @@ def _resolve_exclusions(
         else:
             # Literal exclusions apply even when the named entry is absent.
             resolved.add(pattern)
+    return _collapse_exclusions(resolved)
+
+
+def _collapse_exclusions(paths: Iterable[str]) -> tuple[str, ...]:
     selected: list[str] = []
-    for path in sorted(resolved):
+    for path in sorted(set(paths)):
         if not any(path.startswith(parent + "/") for parent in selected):
             selected.append(path)
     return tuple(selected)

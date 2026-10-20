@@ -155,3 +155,16 @@ class InputObservation:
             "authority": "repository-evidence-only",
             "execution_effect": "none",
         }
+
+
+@dataclass(frozen=True, slots=True)
+class DirectoryObservation:
+    """Directory contents identity and physical counts from one local read.
+
+    ``inputs`` retains the ordinary ``snapshot('*')`` identity scope. Physical
+    counts also include walk-ignored descendants; they describe materialization,
+    never additional hashed membership. Caller exclusions apply to both scopes.
+    """
+
+    inputs: InputObservation
+    materialization_counts: InputCounts

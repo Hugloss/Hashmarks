@@ -90,7 +90,7 @@ def test_agent_routing_descriptions_are_plain_intent_and_bounded() -> None:
         assert len(description) < 220
 
     assert "broad repository orientation" in context
-    assert "what tests cover it" in context
+    assert "which tests are relevant" in context
     assert "use task_evidence" in context
 
     assert "exact path or symbol name" in find
@@ -124,6 +124,20 @@ def test_task_evidence_mcp_default_is_bounded_without_changing_core_default() ->
     assert contract.default_response_schema == "hashmarks.task-evidence-initial.v2"
     assert "default" in contract.response_modes
     assert "initial" in contract.response_modes
+
+
+@pytest.mark.parametrize(
+    ("mode", "expected_schema"),
+    [
+        (None, "hashmarks.task-evidence-initial.v2"),
+        ("initial", "hashmarks.task-evidence-initial.v2"),
+        ("default", "hashmarks.task-evidence.v5"),
+    ],
+)
+def test_task_evidence_schema_lookup_preserves_mcp_default_and_explicit_modes(
+    mode: str | None, expected_schema: str
+) -> None:
+    assert response_schema_for_mode("task_evidence", mode) == expected_schema
 
 
 def test_mcp_contract_manifest_is_deterministic_and_complete() -> None:

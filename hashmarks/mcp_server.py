@@ -14,6 +14,7 @@ from .errors import OptionalFeatureError, UserFacingError
 from .evidence_presentation import (
     FORMATS,
     PresentationFormat,
+    present_repository_evidence,
     presentation_response,
     validate_presentation,
 )
@@ -135,8 +136,8 @@ def _task_evidence_tool_result(
     native = result.get("result", result)
     projection = result.get("presentation")
     if projection is None:
-        text = "Initial repository evidence is available in structuredContent."
-    elif presentation == "text":
+        projection = present_repository_evidence(native, format="text")
+    if presentation in {"none", "text"}:
         text = str(projection["text"])
     else:
         text = json.dumps(

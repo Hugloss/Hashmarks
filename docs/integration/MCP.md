@@ -292,13 +292,26 @@ observations into repository-wide truth.
 
 Every tool accepts optional `presentation`: `none`, `structured`, `compact`, or
 `text`. The default remains `compact` for `repository_intelligence_query` and
-`none` for the other tools. `none` preserves the native response. Other formats
-use `hashmarks.evidence-presentation-envelope.v1` with the intact native `result`
-and a `hashmarks.evidence-presentation.v1` projection. The query tool keeps its
-existing query envelope with a sibling presentation. Native response modes and
+`none` for the other tools. `none` preserves the native response. Except for
+`repository_intelligence_query` and `task_evidence` in `initial` mode, other
+formats use `hashmarks.evidence-presentation-envelope.v1` with the intact native
+`result` and a `hashmarks.evidence-presentation.v1` projection. The query tool
+keeps its existing query envelope with a sibling presentation. Native response modes and
 schemas remain separately advertised; display bounds never establish absence,
 completeness, or unique ownership. See the presentation contract above for exact
 row caps, source references, qualification metadata, and omission accounting.
+
+For MCP `task_evidence` in `initial` mode, the text content is readable even when
+`presentation` is omitted or `none`: it uses the existing grouped-text initial
+projection, including the producer's ambiguity reason, discrimination question,
+retained alternatives, freshness, proof scope and source qualifications. Displayed
+omissions never establish absence. The unchanged lossless encoded initial packet
+remains in `structuredContent` for every presentation format. A host must decode
+that packet before treating it as native
+JSON evidence; forwarding compressed data to a model does not establish usable
+evidence delivery. Explicit `structured`, `compact`, and `text` presentations keep
+their existing text-content formats. Explicit `result_mode="default"` keeps the
+complete v5 response and its JSON text mirror.
 
 The tools are read-only from the repository consumer's perspective. Hashmarks may update its own disposable derived cache while answering them.
 
@@ -482,6 +495,35 @@ python scripts/host_qualification/opencode_mcp_host_gate.py --selection-diagnost
 ```
 
 The receipt binds the prompt manifest, fixture content, runner, executable, installed MCP source, and captured catalog by SHA-256. The catalog comes from an actual OpenCode model request sent to a local non-reasoning endpoint. `--catalog-only` captures that wire catalog without an external model call. The catalog probe does not measure model choice; only completed real-model trials can do that. Provider authentication or connection failure is `ENVIRONMENT_BLOCKED`; timeouts are `INCOMPLETE`, and tool or host failures are `FAIL`. None counts as a selection outcome. Review the JSONL events and source-backed answers before judging use or cost; path mentions and invocation counts alone are not correctness measures. This diagnostic is not a release gate.
+
+### Follow-up for low voluntary adoption
+
+[Issue #289](https://github.com/Hugloss/Hashmarks/issues/289) records 3/36
+Hashmarks invocations and only two valid invoked pairs in campaign `000006`.
+Neither the absent calls nor the unassisted prefix-path mistake authorize
+changing repository semantic owners. Bounded delivery and intent descriptions
+are product repairs; they do not prove increased adoption or incremental value.
+
+AgentsCookbook owns the next paired campaign, task difficulty, scoring and
+invocation-separated economics. Keep native tools available, use neutral prompts
+that name no tool, and bind both arms to the same repository revision, host,
+model, tool exposure and workload. Include Python and TypeScript cases with
+import/alias-backed ownership among similarly named implementations, relevant
+tests, incomplete/ambiguous evidence, and caller-reported changes. Retain broad
+orientation and exact-known-file controls, where additional MCP calls may add no
+value. Freeze source-backed expected evidence independently of candidate output;
+do not add package-specific behavior or tune runtime routing to the tasks.
+
+Report configured-but-unused trials separately from actually invoked trials.
+Within valid pairs, compare semantic correctness, unsupported certainty,
+search/read calls, latency and host-reported token counts. Preserve the invoked
+sample size and unknown metrics; missing or incomplete outcomes are not zero
+cost. Capture the actual model request after the tool result to establish which
+readable evidence and qualifications were included. A successful MCP return or
+catalog capture alone cannot establish model-visible delivery or comprehension.
+Only revisit discovery wording if those harder voluntary trials still show low
+adoption. No product-side change closes the benchmark findings without that
+external evidence.
 
 ## Claude Code real-call qualification
 

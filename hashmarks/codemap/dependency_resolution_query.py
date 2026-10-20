@@ -293,6 +293,57 @@ def _coverage_complete(
     )
 
 
+def dependency_inventory_assessment(
+    observation: Mapping[str, object],
+) -> dict[str, object]:
+    """Project inventory coverage over every declared context, before any bounds."""
+    coverage = cast("Sequence[Mapping[str, object]]", observation["coverage"])
+    contexts: list[dict[str, object]] = []
+    for context in cast("Sequence[str]", observation["contexts"]):
+        rows = [
+            row
+            for row in coverage
+            if row["kind"] == "resolved-inventory" and row["context"] == context
+        ]
+        complete = _coverage_complete(
+            observation, context=context, kind="resolved-inventory"
+        )
+        incomplete = any(
+            row["completeness"] == "incomplete" or row["truncation"] == "truncated"
+            for row in rows
+        )
+        contexts.append(
+            {
+                "context": context,
+                "completeness": "complete"
+                if complete
+                else "incomplete"
+                if incomplete
+                else "unknown",
+                "truncation": (
+                    "truncated"
+                    if any(row["truncation"] == "truncated" for row in rows)
+                    else "complete"
+                    if rows and all(row["truncation"] == "complete" for row in rows)
+                    else "unknown"
+                ),
+                "negative_evidence": (
+                    "admissible-within-declared-scope" if complete else "not-admissible"
+                ),
+            }
+        )
+    return {
+        "contexts": contexts,
+        "completeness": (
+            "complete"
+            if contexts and all(row["completeness"] == "complete" for row in contexts)
+            else "incomplete"
+            if any(row["completeness"] == "incomplete" for row in contexts)
+            else "unknown"
+        ),
+    }
+
+
 def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
     observation: Mapping[str, object],
     request: Mapping[str, object],

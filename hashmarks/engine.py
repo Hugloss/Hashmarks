@@ -7,12 +7,13 @@ from .client import prepare_default_state_dir
 from .directory_store import DirectoryDigestStore
 from .file_store import FileDigestStore
 from .freshness import freshness_state
+from .input_observation import CapturedInputs, DirectoryCapture
 from .inputs import InputManifest, ResolvedInputScope
 from .merkle import MerklePathScope, MerkleTree
 from .observation import ChangeTracker, ObservationState
 from .paths import canonical_host_path
 from .schema import IDENTITY_SCHEMA
-from .snapshot import InputObservation, Snapshot
+from .snapshot import DirectoryObservation, InputObservation, Snapshot
 from .specs import InputValue, validate_input_values
 
 if TYPE_CHECKING:
@@ -118,12 +119,43 @@ class IdentityEngine:
         if type(max_members) is not int or max_members < 1:
             raise ValueError("max_members must be a positive integer")
         before = self.changes.snapshot()
-        scope, digest, members, counts = self.merkle.observe_inputs(
+        captured = self.merkle.observe_inputs(
             lambda: self._input_scope(inputs, exclude, require_matches=require_matches),
             verify=verify,
             max_members=max_members,
         )
+        return self._input_observation(before.paths, captured)
+
+    def observe_directory(
+        self,
+        *,
+        exclude: tuple[str, ...],
+        verify: bool,
+        max_members: int,
+        capture: DirectoryCapture,
+    ) -> DirectoryObservation:
+        before = self.changes.snapshot()
+        captured = self.merkle.observe_inputs(
+            lambda: ResolvedInputScope.directory_contents(
+                self.workspace,
+                tuple(sorted(set(exclude) | (self.merkle._excluded_paths - {""}))),
+                max_members=max_members,
+                checkpoint=capture.check,
+            ),
+            verify=verify,
+            max_members=max_members,
+            directory_capture=capture,
+        )
+        return DirectoryObservation(
+            self._input_observation(before.paths, captured),
+            captured.materialization_counts,
+        )
+
+    def _input_observation(
+        self, observed_paths: tuple[str, ...], captured: CapturedInputs
+    ) -> InputObservation:
         after = self.changes.snapshot()
+        scope = captured.scope
         stale = {
             ObservationState.CLEAN: False,
             ObservationState.DIRTY: True,
@@ -131,16 +163,16 @@ class IdentityEngine:
         }[after.state]
         return InputObservation(
             snapshot=Snapshot(
-                digest=digest,
+                digest=captured.digest,
                 manifest_fingerprint=scope.manifest.fingerprint,
                 generation=after.generation,
-                observed_paths=before.paths,
+                observed_paths=observed_paths,
                 mode="local",
             ),
             manifest=scope.manifest,
             excluded_paths=scope.excluded_paths,
-            members=members,
-            counts=counts,
+            members=captured.members,
+            counts=captured.counts,
             freshness=freshness_state(stale),
             walk_ignore_names=tuple(sorted(self.merkle.walk_ignore_names)),
             mandatory_exclude_names=tuple(sorted(self.merkle.mandatory_exclude_names)),

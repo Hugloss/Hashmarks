@@ -288,11 +288,11 @@ async def _assert_initial_delivery(session: ClientSession) -> None:
         assert identity == initial_identity
         assert len(initial.content) == 1
         text = _text_content(initial.content[0])
-        if mode != "none":
-            projection = present_repository_evidence(native, format=mode)
-            assert (text if mode == "text" else json.loads(text)) == (
-                projection["text"] if mode == "text" else projection
-            )
+        display = "text" if mode == "none" else mode
+        projection = present_repository_evidence(native, format=display)
+        assert (text if display == "text" else json.loads(text)) == (
+            projection["text"] if display == "text" else projection
+        )
         assert (
             "encoding" not in json.loads(text)
             if mode in {"structured", "compact"}
@@ -306,11 +306,27 @@ async def _assert_initial_delivery(session: ClientSession) -> None:
         == "hashmarks.task-evidence-initial.v2"
     )
     assert (
+        default_initial.structured_content["evidence_packet_identity"]
+        == initial_identity
+    )
+    assert (
         decode_initial_packet(default_initial.structured_content)["ownership"]["owner"][
             "path"
         ]
         == "src/feature.py"
     )
+    default_text = _text_content(default_initial.content[0])
+    assert (
+        default_text
+        == present_repository_evidence(
+            default_initial.structured_content, format="text"
+        )["text"]
+    )
+    assert "src/feature.py" in default_text
+    assert "tests/test_feature.py" in default_text
+    assert "freshness:" in default_text
+    assert "omissions do not establish absence" in default_text
+    assert "tests were not executed" in default_text
 
     full = await session.call_tool(
         "task_evidence",
@@ -318,3 +334,36 @@ async def _assert_initial_delivery(session: ClientSession) -> None:
     )
     assert full.structured_content["schema"] == "hashmarks.task-evidence.v5"
     assert json.loads(_text_content(full.content[0])) == full.structured_content
+
+
+@pytest.mark.skipif(not _MCP_AVAILABLE, reason=_NATIVE_REASON)
+def test_mcp_default_text_preserves_unresolved_ownership(tmp_path: Path) -> None:
+    from mcp.types import CallToolResult
+
+    from hashmarks.codemap.task_evidence_initial import decode_initial_packet
+    from hashmarks.evidence_presentation import present_repository_evidence
+    from hashmarks.mcp_server import build_server
+
+    repo = tmp_path / "repo"
+    (repo / "src").mkdir(parents=True)
+    for name in ("feature", "other"):
+        (repo / "src" / f"{name}.py").write_text(
+            "def flare041(value: int) -> int:\n    return value - 1\n", encoding="utf-8"
+        )
+    server = build_server(repo, state_dir=tmp_path / "state")
+    try:
+        reply = asyncio.run(server.call_tool("task_evidence", {"task": "Fix flare041"}))
+        assert isinstance(reply, CallToolResult) and reply.is_error is not True
+        native = reply.structured_content
+        assert isinstance(native, dict)
+        logical = decode_initial_packet(native)
+        assert logical["ownership"]["owner"] is None
+        assert logical["ownership"]["ambiguity"]["ambiguous"] is True
+        text = _text_content(reply.content[0])
+        assert text == present_repository_evidence(native, format="text")["text"]
+        assert "Owner unresolved" in text
+        assert "Ambiguity: True" in text
+        assert "src/feature.py" in text and "src/other.py" in text
+        assert "omissions do not establish absence" in text
+    finally:
+        close_sdk_server(server)

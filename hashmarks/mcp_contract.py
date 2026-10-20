@@ -49,7 +49,8 @@ MCP_SERVER_INSTRUCTIONS = (
     "For a task asking where behavior is implemented, which file or function owns it, "
     "what should be inspected next, or what tests are relevant when the exact "
     "implementation path is not already known, call task_evidence before exploratory "
-    "grep, glob, or read. Its MCP default is the bounded lossless initial packet; request "
+    "grep, glob, or read. Its MCP default includes readable initial evidence in text "
+    "and the bounded lossless initial packet in structuredContent; request "
     "result_mode=default only when the complete v5 packet is needed. task_evidence can "
     "separate supporting retrieval from ownership "
     "authority, resolve a unique owner when admissible, preserve ambiguity when it cannot, "
@@ -126,7 +127,8 @@ class McpToolContract:
         self, result_mode: str | None = None, *, presentation: str = "none"
     ) -> str:
         validate_presentation(presentation)
-        native = operation_schema(self.operation, result_mode)
+        mode = self.default_response_mode if result_mode is None else result_mode
+        native = operation_schema(self.operation, mode)
         return native if presentation == "none" else self.presentation_response_schema
 
     def validate_response(
@@ -207,7 +209,7 @@ MCP_TOOL_CONTRACTS = (
         "repository_context",
         (
             "Use for broad repository orientation only: freshness, languages, areas, "
-            "and topology. For where behavior lives, who owns it, or what tests cover it, "
+            "and topology. For where behavior lives, who owns it, or which tests are relevant, "
             "use task_evidence."
         ),
         "repository_context",

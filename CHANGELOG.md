@@ -2,7 +2,16 @@
 
 ## Unreleased
 
+- Make default MCP `task_evidence` initial replies readable through the existing grouped-text projection while preserving the lossless structured packet, explicit presentations, and complete v5 mode. Retain ambiguity reasons, questions, alternatives and independently supplied source qualifications in readable text; align omitted-mode schema lookup with the MCP initial default. Clarify test relevance and the external voluntary-adoption/economics follow-up for #289; no adoption or performance gain is claimed.
 - Rewrite the existing MCP orientation/find/task-evidence catalog guidance in plain coding-agent intent language: broad orientation, exact known-name lookup, and unknown-path behavior localization with owning file/function, relevant tests, next-read, and freshness. Keep the same tool catalog, semantic owners, and <220-character discovery budget.
+
+## 0.31.0 — Producer-owned integration observations
+
+- Expose a detached typed verification-selection projection with contract and evidence identities so embedding consumers validate producer semantics once and retain their own admission and execution policy.
+- Qualify dependency input currentness, declared-context inventory coverage, and negative evidence through the existing dependency owner, preserving source correspondence and repository-wide freshness separately.
+- Add a local directory observation that preserves native contents identity and physical materialization counts while supporting caller cancellation/progress without creating execution authority.
+- Align the Hashmarks/Oh-Goon handoff on exact flat membership and external execution ownership, and correct documented service transport availability.
+
 - Make the MCP `task_evidence` first-turn default the bounded lossless `initial` packet while keeping the complete v5 packet available through explicit `result_mode="default"`. Direct Python task evidence keeps its existing default; this reduces default agent-delivery cost without changing repository semantics or forcing tool use.
 - Add a coherent selected-input observation to `RepositoryIdentity`, returning canonical identity, the resolved manifest, member revisions/kinds, and explicit inventory counts from the same observation.
 - Add source-bound observations of externally collected native verification membership and public consumer validation, preserving full selectors, empty collections, and incomplete or stale evidence. Collection and execution remain external.

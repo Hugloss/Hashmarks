@@ -859,13 +859,11 @@ def _assert_initial_delivery(
 ) -> None:
     assert called.structured_content == native
     text = _content_text(called.content[0])
-    if format == "none":
-        assert "structuredContent" in text
-    else:
-        projected = present_repository_evidence(native, format=format)
-        assert (text if format == "text" else json.loads(text)) == (
-            assert_text(projected["text"]) if format == "text" else projected
-        )
+    display = "text" if format == "none" else format
+    projected = present_repository_evidence(native, format=display)
+    assert (text if display == "text" else json.loads(text)) == (
+        assert_text(projected["text"]) if display == "text" else projected
+    )
 
 
 def _assert_mode_delivery(

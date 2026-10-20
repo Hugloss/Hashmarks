@@ -19,6 +19,27 @@ DEFAULT_MAX_INPUT_MEMBERS = 100_000
 
 
 @dataclass(frozen=True, slots=True)
+class DirectoryCapture:
+    """Request-local physical counting and caller observation hooks."""
+
+    checkpoint: Callable[[], None] | None = None
+    progress: Callable[[InputCounts], None] | None = None
+
+    def check(self) -> None:
+        if self.checkpoint is not None:
+            self.checkpoint()
+
+
+@dataclass(frozen=True, slots=True)
+class CapturedInputs:
+    scope: ResolvedInputScope
+    digest: Digest
+    members: tuple[InputMember, ...]
+    counts: InputCounts
+    materialization_counts: InputCounts
+
+
+@dataclass(frozen=True, slots=True)
 class _EntryState:
     device: int
     inode: int
@@ -62,17 +83,33 @@ class InputCapture:
         *,
         max_members: int,
         directory_members: Callable[[str], tuple[str, ...]],
+        directory_capture: DirectoryCapture | None = None,
     ) -> None:
         self.workspace = workspace
         self.scope = scope
         self.max_members = max_members
         self._directory_members = directory_members
+        self.directory_capture = directory_capture
         self._states: dict[str, _EntryState] = {}
         self._ancestors: dict[str, _EntryState] = {}
         self._directories: dict[str, tuple[str, ...]] = {}
         self._members: dict[str, InputMember] = {}
+        self._counts = InputCounts(0, 0, 0, 0)
+
+    def check(self) -> None:
+        if self.directory_capture is not None:
+            self.directory_capture.check()
+
+    def check_pending_member(self, relative_path: str, pending: int) -> int:
+        """Bound enumeration before allocating or sorting uncaptured entries."""
+        self.check()
+        pending += relative_path not in self._states
+        if len(self._states) + pending > self.max_members:
+            raise ValueError("selected-input member limit exceeded")
+        return pending
 
     def begin(self, relative_path: str) -> None:
+        self.check()
         if relative_path in self._states:
             return
         if len(self._states) >= self.max_members:
@@ -84,6 +121,18 @@ class InputCapture:
         ):
             raise ValueError(f"unsupported selected-input entry: {relative_path}")
         self._states[relative_path] = state
+        self._counts = InputCounts(
+            self._counts.file_count + stat.S_ISREG(state.mode),
+            self._counts.directory_count + stat.S_ISDIR(state.mode),
+            self._counts.symlink_count + stat.S_ISLNK(state.mode),
+            self._counts.regular_file_bytes
+            + (state.size if stat.S_ISREG(state.mode) else 0),
+        )
+        if (
+            self.directory_capture is not None
+            and self.directory_capture.progress is not None
+        ):
+            self.directory_capture.progress(self._counts)
 
     def bind_ancestors(self, relative_path: str) -> None:
         for parent in Path(relative_path).parents:
@@ -144,8 +193,10 @@ class InputCapture:
     def validate(self) -> None:
         try:
             for relative_path, before in self._states.items():
+                self.check()
                 self._validate_entry(relative_path, before)
             for relative_path, before in self._ancestors.items():
+                self.check()
                 after = _EntryState.read(self.workspace / relative_path)
                 if not before.same_directory(after):
                     raise UnstableObservationError(
@@ -170,3 +221,7 @@ class InputCapture:
             symlink_count=sum(member.kind == "symlink" for member in members),
             regular_file_bytes=sum(member.regular_file_bytes for member in members),
         )
+
+    @property
+    def materialization_counts(self) -> InputCounts:
+        return self._counts
