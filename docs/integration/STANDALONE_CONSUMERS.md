@@ -2,13 +2,15 @@
 
 Hashmarks supplies canonical repository observations that an embedding tool can
 consume through a thin adapter. This guide covers the observation gaps identified
-by the 0.30 integration review. The additions are documented under Unreleased
-until included in a published package.
+by the 0.30 integration review. These observer contracts are introduced in
+Hashmarks 0.31.0; embedding consumers select that package through their native
+environment owner.
 
 ## Ownership and public entry points
 
 | Consumer need | Hashmarks entry point and owner | Authority kept by the consumer or native tool |
 | --- | --- | --- |
+| Native directory contents identity and physical materialization counts | `RepositoryIdentity.observe_directory(...)` in local mode; Identity | Scope selection, copying/freezing bytes, cancellation and execution admission |
 | Selected-input digest, manifest, inventory, and byte counts | `RepositoryIdentity.observe_inputs(...)`; Identity | Choosing the input scope and interpreting changes |
 | Source-bound native test membership | `codemap.verification.observe_membership(report)`; Verification borrowing Source, Bindings, and Correlation | Native collection, selector meaning, execution, scheduling, retries, and results |
 | Make targets and authored shell invocation syntax | Explicit `MakeShellDeclarations`; Declarations provider context | Make/shell expansion, effective command behavior, and execution |
@@ -31,22 +33,21 @@ tool may install the selected checkout or a wheel built from it. Hashmarks does
 not manage the consumer's environment, and the standalone CLI/MCP executable is
 not the importable Python package. The release workflow does not publish to PyPI.
 
-For example, the published **0.30.0 baseline** can be pinned from its actual wheel
+For example, the **0.31.0 package** can be pinned from its versioned release wheel
 asset in an existing uv-managed consumer project:
 
 ```bash
-uv add --bounds exact "hashmarks @ https://github.com/Hugloss/Hashmarks/releases/download/v0.30.0/hashmarks-0.30.0-py3-none-any.whl"
+uv add --bounds exact "hashmarks @ https://github.com/Hugloss/Hashmarks/releases/download/v0.31.0/hashmarks-0.31.0-py3-none-any.whl"
 uv run --frozen python -c "from hashmarks import RepositoryIdentity"
 ```
 
 Retain the resulting `pyproject.toml` and `uv.lock` with the consumer project.
-**The Unreleased APIs in this guide require a build containing this change; they
-are not present in the published 0.30.0 baseline.** To try a reviewed candidate,
+These APIs are absent from the older 0.30.0 baseline. To try a reviewed candidate,
 run `uv build --wheel --out-dir ../hashmarks-wheels` from that Hashmarks checkout,
 then select the exact built wheel from the consumer project, for example:
 
 ```bash
-uv add --bounds exact /absolute/path/hashmarks-wheels/hashmarks-0.30.0-py3-none-any.whl
+uv add --bounds exact /absolute/path/hashmarks-wheels/hashmarks-0.31.0-py3-none-any.whl
 ```
 
 Use the filename emitted by that build; release preparation owns the next version
@@ -57,6 +58,7 @@ Use these documented imports:
 ```python
 from hashmarks import (
     CodeMap,
+    DirectoryObservation,
     InputCounts,
     InputMember,
     InputObservation,
@@ -87,6 +89,7 @@ methods that connect to an already managed CodeMap service.
 
 | Added capability | Supported surface in this change |
 | --- | --- |
+| Directory contents and physical counts | Local Python `RepositoryIdentity.observe_directory(...)`; no daemon/CLI/MCP/service projection |
 | Coherent input observation | `RepositoryIdentity` in local, auto, and daemon modes; CLI `observe-inputs` |
 | Native membership observation | Python `verification.observe_membership(report)`; CLI `verification-membership`; MCP `repository_evidence` membership mode; service `verification_membership(report)` |
 | Retained membership validation | Public pure Python consumer validator |
@@ -113,6 +116,14 @@ counts through one `observe_inputs()` call. Use the returned regular-file byte
 total for inventory reporting; `Snapshot.digest.size` retains its canonical
 identity semantics. A second filesystem count pass would describe a different
 observation and can disagree during mutation.
+
+When reporting physical materialization size rather than hashed selection size,
+use the local `observe_directory()` result. Its separately named
+`materialization_counts` include native walk-ignored physical descendants, while
+`inputs.counts` describe hashed membership. Caller cancellation checkpoints run
+between native capture operations; they do not interrupt an individual native
+file hash. The default physical-member bound is 100,000 and exhaustion returns
+no partial complete observation.
 
 For native test membership, the native collector supplies exact selectors and
 the revisions of the inputs it actually observed. Include relevant configuration

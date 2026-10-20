@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Literal, TypeVar
 
 from .digest import DIR_DOMAIN, INPUT_ROOT_DOMAIN, Digest, encode_field
-from .input_observation import InputCapture
+from .input_observation import CapturedInputs, DirectoryCapture, InputCapture
 from .inputs import InputManifest
 from .observation import ChangeTracker, ObservationState, UnstableObservationError
 from .paths import canonical_host_path, normalize_relative_path
@@ -19,7 +19,6 @@ if TYPE_CHECKING:
     from .directory_store import DirectoryDigestStore
     from .file_store import FileDigestStore
     from .inputs import ResolvedInputScope
-    from .snapshot import InputCounts, InputMember
 
 DEFAULT_WALK_IGNORE_NAMES = frozenset(
     {
@@ -637,27 +636,70 @@ class MerkleTree:
         return nodes
 
     def _scoped_entries(
-        self, rel: str, scope: ResolvedInputScope
+        self,
+        rel: str,
+        scope: ResolvedInputScope,
+        *,
+        physical: bool = False,
+        capture: InputCapture | None = None,
     ) -> list[os.DirEntry[str]]:
-        return [
-            entry
-            for entry in self._sorted_scandir(self.workspace / rel)
-            if not self._should_skip_during_walk(
-                child_rel := f"{rel}/{entry.name}" if rel else entry.name
-            )
-            and not scope.excludes(child_rel)
-        ]
+        if capture is None:
+            return [
+                entry
+                for entry in self._sorted_scandir(self.workspace / rel)
+                if not scope.excludes(
+                    child_rel := f"{rel}/{entry.name}" if rel else entry.name
+                )
+                and (physical or not self._should_skip_during_walk(child_rel))
+            ]
+        entries: list[os.DirEntry[str]] = []
+        pending = 0
+        with os.scandir(self.workspace / rel) as scan:
+            for entry in scan:
+                capture.check()
+                child_rel = f"{rel}/{entry.name}" if rel else entry.name
+                if (
+                    scope.excludes(child_rel)
+                    or not physical
+                    and self._should_skip_during_walk(child_rel)
+                ):
+                    continue
+                pending = capture.check_pending_member(child_rel, pending)
+                entries.append(entry)
+        entries.sort(key=lambda entry: self._entry_name(entry.name))
+        return entries
 
     def _directory_entries(
-        self, rel: str, capture: InputCapture | None
+        self, rel: str, capture: InputCapture | None, *, inventory_only: bool = False
     ) -> list[os.DirEntry[str]]:
         if capture is None:
             return self._sorted_scandir(self.workspace / rel)
-        entries = self._scoped_entries(rel, capture.scope)
+        capture.check()
+        physical = capture.directory_capture is not None
+        entries = self._scoped_entries(
+            rel, capture.scope, physical=physical, capture=capture
+        )
         capture.directory(rel, tuple(entry.name for entry in entries))
         for entry in entries:
-            capture.begin(f"{rel}/{entry.name}" if rel else entry.name)
-        return entries
+            child_rel = f"{rel}/{entry.name}" if rel else entry.name
+            capture.begin(child_rel)
+            if (
+                physical
+                and entry.is_dir(follow_symlinks=False)
+                and (inventory_only or self._should_skip_during_walk(child_rel))
+            ):
+                self._directory_entries(child_rel, capture, inventory_only=True)
+        return (
+            []
+            if inventory_only
+            else [
+                entry
+                for entry in entries
+                if not self._should_skip_during_walk(
+                    f"{rel}/{entry.name}" if rel else entry.name
+                )
+            ]
+        )
 
     def _cache_directory(self, rel: str, digest: Digest) -> None:
         with self._lock:
@@ -809,7 +851,8 @@ class MerkleTree:
         *,
         verify: bool,
         max_members: int,
-    ) -> tuple[ResolvedInputScope, Digest, tuple[InputMember, ...], InputCounts]:
+        directory_capture: DirectoryCapture | None = None,
+    ) -> CapturedInputs:
         """Capture members within the existing canonical Merkle reconciliation.
 
         A filtered request has no reusable directory/manifest cache identity, so
@@ -817,17 +860,24 @@ class MerkleTree:
         canonical FileDigestStore, and no filtered nodes enter unfiltered caches.
         """
 
-        def compute() -> tuple[
-            ResolvedInputScope, Digest, tuple[InputMember, ...], InputCounts
-        ]:
+        def compute() -> CapturedInputs:
+            if directory_capture is not None:
+                directory_capture.check()
             scope = resolve_scope()
             capture = InputCapture(
                 self.workspace,
                 scope,
                 max_members=max_members,
                 directory_members=lambda rel: tuple(
-                    entry.name for entry in self._scoped_entries(rel, scope)
+                    entry.name
+                    for entry in self._scoped_entries(
+                        rel,
+                        scope,
+                        physical=directory_capture is not None,
+                        capture=capture,
+                    )
                 ),
+                directory_capture=directory_capture,
             )
             for rel in scope.manifest:
                 capture.bind_ancestors(rel)
@@ -838,7 +888,9 @@ class MerkleTree:
             self._validate_input_scope(scope, resolve_scope)
             capture.validate()
             members, counts = capture.result()
-            return scope, digest, members, counts
+            return CapturedInputs(
+                scope, digest, members, counts, capture.materialization_counts
+            )
 
         return self._run_reconciled(compute)
 

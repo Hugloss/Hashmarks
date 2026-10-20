@@ -5,8 +5,8 @@ recursive member revisions, and regular-file counts from one reconciled
 observation. A consumer can retain that result without assembling its own
 authoritative inventory or interpreting `Snapshot.digest.size` as file bytes.
 
-This API is part of the unreleased selected-input handoff change. It is not
-present in the published Hashmarks 0.30.0 package.
+This API is introduced in Hashmarks 0.31.0. It is absent from the older
+Hashmarks 0.30.0 package.
 
 ## Ownership
 
@@ -179,6 +179,40 @@ zero counts. Its `completeness="complete"` concerns that explicit empty scope;
 it is not evidence that the repository contains no files.
 
 ## Coherence, errors, and freshness
+
+### Local directory materialization observations
+
+`RepositoryIdentity(..., mode="local").observe_directory()` returns a
+`DirectoryObservation` from the same Merkle/InputCapture traversal. Its `inputs`
+is the ordinary selected-input observation of direct contents (`"*"`), retaining
+the native `snapshot("*")` hash domain. `materialization_counts` additionally
+counts physical descendants ignored by native hashing, such as nested
+`__pycache__` entries. Those counts do not add members to `inputs.members` or
+strengthen identity coverage. Symlinks are counted without following targets.
+No bytes in an ignored subtree are hashed merely for physical counting.
+Producer-owned state paths are omitted from both scopes, including the default
+`.hashmarks` directory and an explicitly configured state directory beneath the
+workspace. The recorded internal exclusions remain producer-owned scope facts.
+Explicit state-path selections through `snapshot()` or `observe_inputs()` retain
+the existing rejection policy.
+
+`exclude_paths` contains literal workspace-relative paths, including names with
+glob characters; each path and its descendants is omitted from both scopes.
+`verify=True` forces native hashing of identity members. `max_members` bounds all
+physical counted entries (default 100,000). Unstable physical entries, unsupported
+entries, or exhausted bounds prevent a complete result. Physical counts exclude
+the workspace root itself, matching the selected direct-contents namespace.
+
+Optional synchronous `checkpoint()` and `progress(InputCounts)` callbacks let a
+caller bound its observation and receive physical counting progress. An exception
+from either callback aborts the operation without returning a partial result.
+Progress is provisional until the final stability checks succeed. This operation
+requires explicit local mode and does not change the daemon wire contract.
+
+Observe each child workspace separately when its `snapshot("*")` identity is
+required: a parent observation's directory member revision has a different native
+hash domain and traversal boundary. Independent calls do not claim one coherent
+multi-workspace snapshot; freezing and custody remain consumer responsibilities.
 
 Member metadata is captured before the native file digest read. After identity
 construction and scope validation, the capture checks the selected members and

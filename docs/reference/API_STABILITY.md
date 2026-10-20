@@ -199,6 +199,16 @@ It borrows Source, Imports and repository Correlation directly; it has no Tasks
 or root dependency. Producer syntax remains in adapters. The old root operations
 are removed.
 
+`RepositoryIdentity.observe_directory()` is a local-only contents observation
+with native `snapshot("*")` identity and separately named physical materialization
+counts. Literal `exclude_paths` constrain both scopes. Producer-owned state is
+omitted from both scopes; explicit own-state selections through the ordinary
+input/snapshot APIs remain rejected. Its synchronous
+`checkpoint` and `progress` callbacks grant no execution authority; callback
+exceptions, physical instability, or `max_members` exhaustion prevent a result.
+It does not alter the daemon protocol or reinterpret directory member revisions
+as child input-root snapshots. See [input observations](INPUT_OBSERVATIONS.md).
+
 `RepositoryIdentity.observe_inputs()` is the supported selected-input
 identity/inventory operation. It returns the immutable `InputObservation`,
 `InputMember`, and `InputCounts` types, exported from `hashmarks`, and preserves
@@ -219,6 +229,16 @@ The supported Python API is:
 4. explicitly versioned producer/consumer schemas whose validators are part of the documented repository-evidence contract.
 
 Consumer-facing producer binding is also part of the supported top-level Python API: `native_producer_implementation_identity()` returns the exact loaded Hashmarks producer implementation identity, and `validate_native_consumer_bundle()` validates Hashmarks-issued verification-selection evidence against its producer-owned contract. Consumers should import these names from `hashmarks`, not from implementation submodules; the identity remains opaque and Hashmarks-owned, while execution/result/certification authority remains external.
+
+For a valid envelope/contract bundle, `normalized` is a detached
+`NativeVerificationSelectionProjection`; that type and its
+`NativeVerificationMember` rows are supported top-level imports. The projection
+retains typed producer metadata, repository/source/generation/freshness fields,
+exact members, opaque membership/selection/provenance/contract identities,
+evidence hashes, and repository-only/external-layout authority declarations.
+Invalid bundles return no normalized projection. Consumers bind this validated
+representation to their admitted source and execution policy rather than
+reparsing the original envelope or reproducing producer validation.
 
 `validate_repository_intelligence_evidence()` is the supported consumer validator for current repository-intelligence evidence contracts used across decision, context, impact, verification, ownership, action-map, repository snapshot/delta, and external diagnostic/freshness surfaces. Hashmarks owns current schema recognition and producer-semantic validation. Obsolete development schema names are rejected rather than preserved as compatibility aliases. The returned `normalized` value is a compact, validated projection, not a lossless copy of its input. For diagnostic deltas it declares `projection_coverage: "projection-only"` and lists unprojected source pointers in `unprojected_sections`; consumers needing those facts must retain the original packet, whose identity is included in the normalized result. The projection may bind repository identity, generation, freshness, and the loaded producer implementation identity, but execution, result, retry, scheduling, and certification authority remain external.
 
@@ -317,6 +337,14 @@ commands remain available even when edit ownership is unresolved.
 Importable implementation submodules under `hashmarks.*` are **not automatically public** merely because Python allows importing them. Internal helpers, storage classes, parsers, adapters, and mixins may change without compatibility guarantees unless a current public document explicitly promotes them into the contract.
 
 Development material under `scripts/agent_evaluation/`, `benchmarks/agent_evaluation/`, and `tests/` is measurement/evidence infrastructure, not installed product API.
+
+`CodeMap.dependencies.assessment(observation)` is the supported live assessment
+of a retained dependency endpoint. Its `hashmarks.dependency-resolution-assessment.v1`
+result keeps exact declared-input freshness, external source equivalence,
+repository-wide freshness and per-context resolved-inventory qualification separate.
+It observes only the declared source inputs through Source, revalidates stability,
+and grants no resolver, admission or execution authority. See
+[dependency evidence](DEPENDENCY_EVIDENCE.md).
 
 ## Pre-1.0 contract evolution
 

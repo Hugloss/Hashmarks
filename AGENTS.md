@@ -138,9 +138,17 @@ Hashmarks may observe caller-selected commits, trees, worktrees, or other reposi
 
 ### Execution-layer boundary
 
-Hashmarks may describe deterministic, replayable execution/certification **selection contracts** (for example immutable test-shard membership, process-isolation requirements, expected evidence, and plan identity). It must not become the executor for those contracts. **The execution layer belongs somewhere else, not inside Hashmarks.** External harnesses/CI systems own launching processes, enforcing deadlines, retrying or resuming incomplete shards, choosing concurrency, scheduling jobs, allocating environments, and recovering broken execution environments.
+Hashmarks may describe deterministic, replayable repository **selection contracts** (for example immutable flat verification membership, source correspondence, evidence provenance, and selection identity). It must not become the executor for those contracts. **The execution layer belongs somewhere else, not inside Hashmarks.** External harnesses/CI systems own launching processes, enforcing deadlines, retrying or resuming incomplete shards, choosing concurrency, scheduling jobs, allocating environments, and recovering broken execution environments.
 
-Generation-bound handoff follows the same rule. Hashmarks may emit `hashmarks.repository-work-selection.v1` to bind immutable `test-shards.v3` membership and process-isolation requirements to repository-content/selection-input identity and producer provenance. The envelope must not contain execution policy: no argv, timeout/deadline, retry count/delay, worker/concurrency choice, scheduling, machine placement, process state, or environment-recovery instruction. Consumers such as Oh-Goon verify/admit the envelope and remain the sole execution/certification authority.
+Generation-bound handoff follows the same rule. The active consumer handoff is
+`hashmarks.verification-selection-envelope.v2` plus
+`hashmarks.downstream-verification-contract.v2`, carrying flat membership and
+repository/source provenance with `execution_layout=external`. The envelope must
+not contain execution policy: no argv, timeout/deadline, retry count/delay,
+worker/concurrency choice, scheduling, machine placement, process state, or
+environment-recovery instruction. Consumers such as Oh-Goon verify/admit the
+producer projection and remain the sole execution/certification authority.
+Hashmarks own-qualification shard layouts remain separate from this consumer contract.
 
 Consumer conformance does not change that boundary. Hashmarks may validate its own envelope/shard schema, re-prove repository binding, and derive a grouping-independent identity for exact selected test-node membership. An external execution layer may use that identity to prove conservation while refining execution grouping, but Hashmarks must not choose the refinement, timeout, retry, worker count, or schedule. Unknown v1 handoff fields and attempts to expand Hashmarks authority fail closed.
 
@@ -156,9 +164,9 @@ Hashmarks and Oh-Goon are deliberately separate planes. **Hashmarks defines immu
 
 Hashmarks may produce or validate deterministic, replayable evidence needed by an execution layer, including:
 
-- `hashmarks.repository-work-selection.v1` envelopes bound to repository-content and selection-input identity;
-- `hashmarks.test-shards.v3` immutable selected test membership and `isolated_process` requirements;
-- `hashmarks.test-shard-membership.v1` grouping-independent membership identity;
+- `hashmarks.verification-selection-envelope.v2` and its downstream contract, bound to repository/source identity;
+- `hashmarks.verification-membership.v1` exact flat membership and grouping-independent identity;
+- source-bound native membership observations that preserve external collector claims and unknowns;
 - plan identity, producer provenance, repository freshness, and strict consumer-conformance validation;
 - pure membership-conservation checks such as proving that completed plus remaining members exactly equal the admitted original membership;
 - compact decision-authority receipts that let bounded worker projections refer back to the exact repository/task/edit/verification authority without embedding all evidence.

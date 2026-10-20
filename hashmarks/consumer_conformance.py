@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from copy import deepcopy
-from typing import TYPE_CHECKING, NotRequired, TypedDict
+from typing import TYPE_CHECKING, NotRequired, TypedDict, cast
 
 from .evidence_context import validate_evidence_context
 from .validation_inputs import require_mapping_for_validation
@@ -23,13 +23,45 @@ CONSUMER_CONFORMANCE_SCHEMA = "hashmarks.consumer-conformance.v1"
 CONSUMER_VECTOR_SCHEMA = "hashmarks.consumer-conformance-vector.v1"
 
 
+class NativeVerificationMember(TypedDict):
+    schema: str
+    path: str
+    test_symbol: str | None
+    member_id: str
+
+
+class _NativeSelectionProducer(TypedDict):
+    name: str
+    version: str
+    implementation_identity: str
+
+
+class NativeVerificationSelectionProjection(TypedDict):
+    """Detached producer-validated selection; consumer admission remains external."""
+
+    producer: _NativeSelectionProducer
+    repository_identity: str
+    source_identity: str
+    codemap_generation: int
+    identity_generation: int | None
+    stale: bool
+    members: list[NativeVerificationMember]
+    membership_identity: str
+    selection_identity: str
+    repository_provenance_identity: str
+    producer_contract_identity: str
+    evidence_hashes: dict[str, str]
+    authority: str
+    execution_layout: str
+
+
 class NativeConsumerValidation(TypedDict):
     schema: str
     valid: bool
     reasons: list[str]
     producer_implementation_identity: NotRequired[object]
     identity_semantics: str
-    normalized: NotRequired[dict[str, object] | None]
+    normalized: NotRequired[Mapping[str, object] | None]
     context_identity: NotRequired[str | None]
     authority: NotRequired[str]
     execution_authority: str
@@ -71,32 +103,27 @@ def _bundle_handoff_reasons(
 
 
 def _normalized_bundle(
-    envelope: Mapping[str, object], producer_identity: object
-) -> dict[str, object]:
-    """Project the validated envelope fields exposed to a consumer."""
-    repository = envelope.get("repository")
-    repository_binding = repository if isinstance(repository, Mapping) else {}
-    producer = envelope.get("producer")
-    producer_binding = producer if isinstance(producer, Mapping) else {}
-    selection = envelope.get("selection")
-    selection_binding = selection if isinstance(selection, Mapping) else {}
-    members = selection_binding.get("members")
-    return {
-        "producer": {
-            "name": producer_binding.get("name"),
-            "version": producer_binding.get("version"),
-            "implementation_identity": producer_identity,
-        },
-        "repository_identity": repository_binding.get("repository_identity"),
-        "source_identity": repository_binding.get("source_identity"),
-        "codemap_generation": repository_binding.get("codemap_generation"),
-        "identity_generation": repository_binding.get("identity_generation"),
-        "stale": repository_binding.get("stale"),
-        "members": list(members) if isinstance(members, list) else [],
-        "membership_identity": selection_binding.get("membership_identity"),
-        "selection_identity": envelope.get("envelope_identity"),
-        "repository_provenance_identity": envelope.get("envelope_identity"),
-    }
+    envelope: Mapping[str, object], contract: Mapping[str, object]
+) -> NativeVerificationSelectionProjection:
+    """Detach one projection after native envelope and contract validation."""
+    repository = cast(Mapping[str, object], envelope["repository"])
+    selection = cast(Mapping[str, object], envelope["selection"])
+    return NativeVerificationSelectionProjection(
+        producer=deepcopy(cast(_NativeSelectionProducer, envelope["producer"])),
+        repository_identity=cast(str, repository["repository_identity"]),
+        source_identity=cast(str, repository["source_identity"]),
+        codemap_generation=cast(int, repository["codemap_generation"]),
+        identity_generation=cast(int | None, repository.get("identity_generation")),
+        stale=cast(bool, repository["stale"]),
+        members=deepcopy(cast(list[NativeVerificationMember], selection["members"])),
+        membership_identity=cast(str, selection["membership_identity"]),
+        selection_identity=cast(str, envelope["envelope_identity"]),
+        repository_provenance_identity=cast(str, envelope["envelope_identity"]),
+        producer_contract_identity=cast(str, contract["contract_identity"]),
+        evidence_hashes=dict(cast(Mapping[str, str], envelope["evidence_hashes"])),
+        authority=cast(str, contract["authority"]),
+        execution_layout=cast(str, contract["execution_layout"]),
+    )
 
 
 def validate_native_consumer_bundle(
@@ -149,8 +176,10 @@ def validate_native_consumer_bundle(
         and producer_identity != expected_producer_implementation_identity
     ):
         reasons.append("producer-implementation-identity-not-expected")
-    normalized = _normalized_bundle(envelope, producer_identity)
-    if require_fresh and normalized["stale"] is not False:
+    repository = envelope.get("repository")
+    if require_fresh and (
+        not isinstance(repository, Mapping) or repository.get("stale") is not False
+    ):
         reasons.append("fresh-evidence-required")
     valid = not reasons
     return {
@@ -159,7 +188,7 @@ def validate_native_consumer_bundle(
         "reasons": list(dict.fromkeys(reasons)),
         "producer_implementation_identity": producer_identity,
         "identity_semantics": "opaque-hashmarks-issued",
-        "normalized": normalized if valid else None,
+        "normalized": _normalized_bundle(envelope, contract) if valid else None,
         "authority": "repository-intelligence-only",
         "execution_authority": "external",
         "result_authority": "external",

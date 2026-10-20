@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.31.0 — Producer-owned integration observations
+
+- Expose a detached typed verification-selection projection with contract and evidence identities so embedding consumers validate producer semantics once and retain their own admission and execution policy.
+- Qualify dependency input currentness, declared-context inventory coverage, and negative evidence through the existing dependency owner, preserving source correspondence and repository-wide freshness separately.
+- Add a local directory observation that preserves native contents identity and physical materialization counts while supporting caller cancellation/progress without creating execution authority.
+- Align the Hashmarks/Oh-Goon handoff on exact flat membership and external execution ownership, and correct documented service transport availability.
 
 - Make the MCP `task_evidence` first-turn default the bounded lossless `initial` packet while keeping the complete v5 packet available through explicit `result_mode="default"`. Direct Python task evidence keeps its existing default; this reduces default agent-delivery cost without changing repository semantics or forcing tool use.
 - Add a coherent selected-input observation to `RepositoryIdentity`, returning canonical identity, the resolved manifest, member revisions/kinds, and explicit inventory counts from the same observation.

@@ -114,6 +114,34 @@ Built-in adapters declare a stable `producer.adapter_semantics` token that ident
 
 The derivation projection is intentionally not a history store or another repository identity. It can be computed from any explicit, structurally valid qualified packet, including a caller-retained before/after endpoint that is no longer current. It never scans Git history, executes the producer, or persists an observation. If adapter semantics are not explicit, derivation authority fails closed rather than guessing from producer kind or schema version.
 
+### Scoped input and inventory assessment
+
+`CodeMap.dependencies.assessment(observation)` validates a retained v3 packet,
+then reobserves only its explicit `repository_inputs` through bounded, byte-backed
+Source observations. It returns `hashmarks.dependency-resolution-assessment.v1`.
+This operation does not index the repository or execute a resolver.
+
+The result keeps these authorities separate:
+
+- `repository_freshness` describes the original repository/CodeMap binding.
+- `source_scope.freshness` compares recorded member revisions with current native
+  Source reads for exactly the nominated inputs. Matching stable byte observations
+  can establish scoped currentness while repository-wide freshness is unknown.
+- `source_scope.source_equivalence` compares the producer's original revision
+  claims with current source. Missing claims stay unknown; current bytes never
+  retrospectively prove what an external producer read.
+- `resolved_inventory.contexts` includes every declared context, including contexts
+  with missing inventory coverage. Its completeness and semantic negative-evidence
+  qualifications use the existing dependency query coverage authority.
+
+The aggregate `resolved_inventory.negative_evidence` is admissible only when all
+declared contexts have complete, untruncated inventory coverage, all nominated
+inputs are available and current, and all producer revision claims match.
+Incomplete, missing, truncated, denied, oversized, unstable or unbound evidence
+cannot establish absence. The source budget is 8 MiB per input; unavailable source
+retains its native reason. Revalidation rejects an input changing during the call.
+The result is request-local evidence, not a stored observation or execution policy.
+
 ### Explain projection
 
 `CodeMap.dependencies.explain(observation)` is a pure read-only explanation of one already-qualified dependency endpoint. It returns schema `hashmarks.dependency-resolution-explain.v1` and contains:

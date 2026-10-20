@@ -18,7 +18,14 @@ from .observation import (
     ObservationState,
     UnstableObservationError,
 )
-from .snapshot import InputCounts, InputMember, InputObservation, Snapshot, SnapshotDiff
+from .snapshot import (
+    DirectoryObservation,
+    InputCounts,
+    InputMember,
+    InputObservation,
+    Snapshot,
+    SnapshotDiff,
+)
 from .specs import (
     Directory,
     File,
@@ -46,6 +53,12 @@ if TYPE_CHECKING:
         RepositoryDeclarationProviderResult as RepositoryDeclarationProviderResult,
     )
     from .consumer_conformance import (
+        NativeVerificationMember as NativeVerificationMember,
+    )
+    from .consumer_conformance import (
+        NativeVerificationSelectionProjection as NativeVerificationSelectionProjection,
+    )
+    from .consumer_conformance import (
         validate_native_consumer_bundle as validate_native_consumer_bundle,
     )
     from .producer_identity import (
@@ -69,6 +82,7 @@ __all__ = [
     "IdentityGraph",
     "InputManifest",
     "InputObservation",
+    "DirectoryObservation",
     "InputMember",
     "InputCounts",
     "InputSpec",
@@ -89,6 +103,8 @@ __all__ = [
     "validate_input_values",
     "native_producer_implementation_identity",
     "validate_native_consumer_bundle",
+    "NativeVerificationMember",
+    "NativeVerificationSelectionProjection",
     "validate_repository_intelligence_evidence",
 ]
 
@@ -107,6 +123,16 @@ def __getattr__(name: str) -> object:
         from .consumer_conformance import validate_native_consumer_bundle
 
         return validate_native_consumer_bundle
+    if name in {"NativeVerificationMember", "NativeVerificationSelectionProjection"}:
+        from .consumer_conformance import (
+            NativeVerificationMember,
+            NativeVerificationSelectionProjection,
+        )
+
+        return {
+            "NativeVerificationMember": NativeVerificationMember,
+            "NativeVerificationSelectionProjection": NativeVerificationSelectionProjection,
+        }[name]
     if name == "validate_repository_intelligence_evidence":
         from .repository_intelligence_validation import (
             validate_repository_intelligence_evidence,

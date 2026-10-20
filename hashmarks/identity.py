@@ -8,15 +8,15 @@ from .client import DaemonCompatibilityError, DaemonUnavailableError, IdentityCl
 from .digest import Digest
 from .engine import IdentityEngine
 from .generation_domain import require_generation
-from .input_observation import DEFAULT_MAX_INPUT_MEMBERS
+from .input_observation import DEFAULT_MAX_INPUT_MEMBERS, DirectoryCapture
 from .input_observation_transport import validate_observation_options
 from .inputs import InputManifest
 from .schema import IDENTITY_SCHEMA
-from .snapshot import InputObservation, Snapshot
+from .snapshot import DirectoryObservation, InputCounts, InputObservation, Snapshot
 from .specs import InputValue, validate_input_values
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Mapping
+    from collections.abc import Callable, Iterable, Mapping
     from pathlib import Path
 
     from .codemap import CodeMap
@@ -266,6 +266,36 @@ class RepositoryIdentity:
             require_matches=require_matches,
             verify=verify,
             max_members=max_members,
+        )
+
+    def observe_directory(
+        self,
+        *,
+        exclude_paths: Iterable[str | Path] = (),
+        verify: bool = False,
+        max_members: int = DEFAULT_MAX_INPUT_MEMBERS,
+        checkpoint: Callable[[], None] | None = None,
+        progress: Callable[[InputCounts], None] | None = None,
+    ) -> DirectoryObservation:
+        """Observe native contents identity and physical materialization counts.
+
+        This local-only operation retains ``snapshot('*')`` hash semantics.
+        Literal workspace-relative exclusions affect both scopes. Physical counts
+        include walk-ignored descendants without adding them to hashed membership.
+        Hooks are synchronous: caller exceptions abort the observation, and no
+        partial result is returned. A child directory needs its own observation;
+        its native directory revision is not an input-root snapshot identity.
+        """
+        if self.mode is not RepositoryIdentityMode.LOCAL:
+            raise ValueError("directory observation requires mode='local'")
+        validate_observation_options(False, verify, max_members)
+        capture = DirectoryCapture(checkpoint, progress)
+        capture.check()
+        return self._prepare_local_read().observe_directory(
+            exclude=tuple(str(path) for path in exclude_paths),
+            verify=verify,
+            max_members=max_members,
+            capture=capture,
         )
 
     def code_map(self) -> CodeMap:

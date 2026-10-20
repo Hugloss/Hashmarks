@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 from collections.abc import Callable, Iterable
+from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import cast
 
@@ -13,7 +14,6 @@ from hashmarks import RepositoryIdentity
 from hashmarks.digest import Digest
 from hashmarks.file_store import FileDigestStore
 from hashmarks.inputs import ResolvedInputScope
-from hashmarks.merkle import MerkleTree
 from hashmarks.observation import UnstableObservationError
 
 
@@ -138,11 +138,16 @@ def test_glob_scope_drift_between_resolution_and_capture_is_unstable(
 def test_permission_failure_never_returns_complete_inventory(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    def denied(_path: Path) -> list[os.DirEntry[str]]:
-        raise PermissionError("cannot list selected directory")
+    original = os.scandir
+    selected = tmp_path / "repo" / "src"
+
+    def denied(path: str | Path) -> AbstractContextManager[Iterable[os.DirEntry[str]]]:
+        if Path(path) == selected:
+            raise PermissionError("cannot list selected directory")
+        return original(path)
 
     with _identity(tmp_path) as identity:
-        monkeypatch.setattr(MerkleTree, "_sorted_scandir", staticmethod(denied))
+        monkeypatch.setattr(os, "scandir", denied)
         with pytest.raises(PermissionError, match="cannot list"):
             identity.observe_inputs("src")
 

@@ -148,9 +148,52 @@ def test_consumer_bundle_returns_small_normalized_repository_projection() -> Non
         == assert_object(envelope["selection"])["membership_identity"]
     )
     assert normalized["selection_identity"] == envelope["envelope_identity"]
+    assert normalized["producer_contract_identity"] == contract["contract_identity"]
+    assert normalized["evidence_hashes"] == envelope["evidence_hashes"]
+    assert normalized["authority"] == "repository-intelligence-only"
+    assert normalized["execution_layout"] == "external"
     assert normalized["stale"] is False
     assert "timeout" not in normalized
     assert "workers" not in normalized
+
+
+def test_consumer_projection_detaches_validated_members_and_provenance() -> None:
+    identity = "sha256:" + "a" * 64
+    envelope, contract = _bundle(identity)
+    checked = validate_native_consumer_bundle(envelope, contract)
+    assert checked["valid"] is True
+    normalized = assert_object(checked.get("normalized"))
+    before = deepcopy(normalized)
+
+    assert_object(envelope["producer"])["implementation_identity"] = "changed"
+    members = assert_records(assert_object(envelope["selection"])["members"])
+    assert_object(members[0])["path"] = "changed.py"
+    assert_object(envelope["evidence_hashes"])["new"] = "changed"
+    contract["contract_identity"] = "changed"
+
+    assert normalized == before
+    assert assert_object(normalized["producer"])["implementation_identity"] == identity
+    assert assert_records(normalized["members"])[0]["path"] == "tests/test_x.py"
+
+
+def test_consumer_projection_preserves_unavailable_identity_generation() -> None:
+    from hashmarks.verification_selection import SELECTION_ENVELOPE_SCHEMA, _identity
+
+    envelope, _contract = _bundle("sha256:" + "a" * 64)
+    assert_object(envelope["repository"]).pop("identity_generation")
+    payload = {
+        key: value for key, value in envelope.items() if key != "envelope_identity"
+    }
+    envelope["envelope_identity"] = _identity(SELECTION_ENVELOPE_SCHEMA, payload)
+    contract = downstream_consumption_contract(envelope)
+
+    checked = validate_native_consumer_bundle(envelope, contract)
+
+    assert checked["valid"] is True
+    normalized = assert_object(checked.get("normalized"))
+    assert normalized["identity_generation"] is None
+    assert normalized["codemap_generation"] == 1
+    assert normalized["repository_provenance_identity"] == envelope["envelope_identity"]
 
 
 def test_consumer_bundle_can_require_fresh_repository_evidence() -> None:
