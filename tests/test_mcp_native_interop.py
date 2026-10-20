@@ -300,9 +300,14 @@ async def _assert_initial_delivery(session: ClientSession) -> None:
     default_initial = await session.call_tool(
         "task_evidence", arguments={"task": "Fix flare041"}
     )
-    assert default_initial.structured_content["schema"] == "hashmarks.task-evidence-initial.v2"
     assert (
-        decode_initial_packet(default_initial.structured_content)["ownership"]["owner"]["path"]
+        default_initial.structured_content["schema"]
+        == "hashmarks.task-evidence-initial.v2"
+    )
+    assert (
+        decode_initial_packet(default_initial.structured_content)["ownership"]["owner"][
+            "path"
+        ]
         == "src/feature.py"
     )
 
