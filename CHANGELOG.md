@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Make the MCP `task_evidence` first-turn default the bounded lossless `initial` packet while keeping the complete v5 packet available through explicit `result_mode="default"`. Direct Python task evidence keeps its existing default; this reduces default agent-delivery cost without changing repository semantics or forcing tool use.
 - Add a coherent selected-input observation to `RepositoryIdentity`, returning canonical identity, the resolved manifest, member revisions/kinds, and explicit inventory counts from the same observation.
 - Add source-bound observations of externally collected native verification membership and public consumer validation, preserving full selectors, empty collections, and incomplete or stale evidence. Collection and execution remain external.
 - Add explicitly selected Make/shell and Python/uv manifest declaration providers over the existing revision-bound provider context. These report authored syntax and unresolved semantics without executing build tools or resolving dependencies.

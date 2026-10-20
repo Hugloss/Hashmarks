@@ -91,6 +91,7 @@ def _assert_task_evidence_defaults(
         assert_object(task_properties["token_budget"])["default"]
         == defaults.token_budget
     )
+    assert assert_object(task_properties["result_mode"])["default"] == "initial"
     assert (
         assert_object(
             assert_object(schemas["post_change"]["properties"])["token_budget"]
@@ -125,15 +126,15 @@ def test_mcp_native_server_catalog_and_structured_call(tmp_path: Path) -> None:
         ] == _EXPECTED_TOOLS
         task_description = descriptions["task_evidence"]
         for phrase in (
-            "Unknown paths",
-            "retrieval",
+            "Unknown implementation path",
+            "semantic localization",
             "ownership/ambiguity",
             "source/next-read",
             "verification",
             "freshness",
-            "structuredContent",
-            "readable text",
-            "JSON mirror",
+            "bounded lossless initial packet",
+            "result_mode=default",
+            "full v5 packet",
         ):
             assert phrase in task_description
         schemas = _assert_canonical_result_mode_schemas(
@@ -296,6 +297,18 @@ async def _assert_initial_delivery(session: ClientSession) -> None:
             if mode in {"structured", "compact"}
             else True
         )
-    full = await session.call_tool("task_evidence", arguments={"task": "Fix flare041"})
+    default_initial = await session.call_tool(
+        "task_evidence", arguments={"task": "Fix flare041"}
+    )
+    assert default_initial.structured_content["schema"] == "hashmarks.task-evidence-initial.v2"
+    assert (
+        decode_initial_packet(default_initial.structured_content)["ownership"]["owner"]["path"]
+        == "src/feature.py"
+    )
+
+    full = await session.call_tool(
+        "task_evidence",
+        arguments={"task": "Fix flare041", "result_mode": "default"},
+    )
     assert full.structured_content["schema"] == "hashmarks.task-evidence.v5"
     assert json.loads(_text_content(full.content[0])) == full.structured_content

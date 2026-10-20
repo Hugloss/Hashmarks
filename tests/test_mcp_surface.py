@@ -638,6 +638,7 @@ def _assert_registered_task_evidence_defaults(
     assert parameters["limit"].default == defaults.limit
     assert parameters["per_role"].default == defaults.per_role
     assert parameters["token_budget"].default == defaults.token_budget
+    assert parameters["result_mode"].default == "initial"
 
 
 def _assert_registered_change_impact_defaults(

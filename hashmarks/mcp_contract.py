@@ -49,7 +49,9 @@ MCP_SERVER_INSTRUCTIONS = (
     "For a task asking where behavior is implemented, which file or function owns it, "
     "what should be inspected next, or what verification is relevant when the exact "
     "implementation path is not already known, call task_evidence before exploratory "
-    "grep, glob, or read. task_evidence can separate supporting retrieval from ownership "
+    "grep, glob, or read. Its MCP default is the bounded lossless initial packet; request "
+    "result_mode=default only when the complete v5 packet is needed. task_evidence can "
+    "separate supporting retrieval from ownership "
     "authority, resolve a unique owner when admissible, preserve ambiguity when it cannot, "
     "return bounded source evidence or an exact next-read, select verification evidence "
     "and a verification plan, and report freshness. Prefer that semantic reduction over "
@@ -77,9 +79,18 @@ class McpToolContract:
     name: str
     description: str
     operation: str
+    mcp_default_mode: str | None = None
 
     def __post_init__(self) -> None:
         require_registered_operation(self.operation)
+        if (
+            self.mcp_default_mode is not None
+            and self.mcp_default_mode not in operation_modes(self.operation)
+        ):
+            raise ValueError(
+                f"unsupported MCP default mode for {self.operation}: "
+                f"{self.mcp_default_mode}"
+            )
 
     @property
     def default_presentation(self) -> str:
@@ -105,11 +116,11 @@ class McpToolContract:
 
     @property
     def default_response_mode(self) -> str:
-        return operation_default_mode(self.operation)
+        return self.mcp_default_mode or operation_default_mode(self.operation)
 
     @property
     def default_response_schema(self) -> str:
-        return operation_schema(self.operation)
+        return operation_schema(self.operation, self.default_response_mode)
 
     def response_schema_for_mode(
         self, result_mode: str | None = None, *, presentation: str = "none"
@@ -213,11 +224,13 @@ MCP_TOOL_CONTRACTS = (
     McpToolContract(
         "task_evidence",
         (
-            "Unknown paths: retrieval, ownership/ambiguity, source/next-read, verification "
-            "and freshness. Initial: lossless packet in structuredContent plus readable text. "
-            "Default: JSON mirror. No editing or tests."
+            "Unknown implementation path: first-turn semantic localization with retrieval, "
+            "ownership/ambiguity, source/next-read, verification and freshness. The MCP "
+            "default is the bounded lossless initial packet; request result_mode=default "
+            "only when the full v5 packet is needed. No editing or tests."
         ),
         "task_evidence",
+        "initial",
     ),
     McpToolContract(
         "change_impact",
