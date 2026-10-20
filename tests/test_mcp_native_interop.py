@@ -126,15 +126,16 @@ def test_mcp_native_server_catalog_and_structured_call(tmp_path: Path) -> None:
         ] == _EXPECTED_TOOLS
         task_description = descriptions["task_evidence"]
         for phrase in (
-            "Unknown implementation path",
-            "semantic localization",
-            "ownership/ambiguity",
+            "Use first",
+            "behavior",
+            "implementation path is unknown",
+            "owning file/function",
             "source/next-read",
-            "verification",
+            "relevant tests",
             "freshness",
-            "bounded lossless initial packet",
+            "Default initial",
             "result_mode=default",
-            "full v5 packet",
+            "full v5",
         ):
             assert phrase in task_description
         schemas = _assert_canonical_result_mode_schemas(

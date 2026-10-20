@@ -147,9 +147,9 @@ Hashmarks intentionally exposes a small read-only repository-intelligence tool c
 
 | Tool | Purpose |
 | --- | --- |
-| `repository_context` | compact orientation, generation/freshness, languages, areas, projects |
-| `find` | bounded exact path/symbol discovery with freshness, completeness, and negative/uniqueness admissibility |
-| `task_evidence` | role-separated retrieval, explicit-target, ownership, verification, freshness, ambiguity, and next-read repository evidence; MCP defaults to the bounded lossless `initial` packet, while `result_mode="default"` requests the complete v5 packet |
+| `repository_context` | broad repository orientation: generation/freshness, languages, areas, and projects; not behavior ownership |
+| `find` | exact path/symbol lookup when the path or symbol name is already known |
+| `task_evidence` | first choice when behavior is described but its implementation path is unknown: locate owning file/function or ambiguity, source/next-read, relevant tests, and freshness; MCP defaults to the bounded lossless `initial` packet, while `result_mode="default"` requests complete v5 |
 | `change_impact` | bounded structural impact for caller-reported changed paths |
 | `correlate_evidence` | correlate bounded external/derived observations to canonical repository evidence without inferring causation |
 | `dependency_codemap` | qualify dependency observations, explain their authority, compare explicit endpoints, or run bounded factual queries |
