@@ -1,6 +1,9 @@
 """Required facts must have artifact/source bindings and reproducible witnesses."""
 
+import json
+from copy import deepcopy
 from dataclasses import replace
+from pathlib import Path
 from typing import Any, cast
 
 import pytest
@@ -239,3 +242,57 @@ def test_path_and_qualified_selectors_cannot_be_combined(
     rule["checks"][0]["source_paths"] = ["owner.py"]
     with pytest.raises(ValueError, match="cannot mix"):
         grade_fact_observation({"value": 1}, rule, observation)
+
+
+def test_initial_mcp_capture_requires_canonical_readable_text_and_native_packet(
+    tmp_path: Path,
+) -> None:
+    from hashmarks.codemap import CodeMap
+    from hashmarks.evidence_presentation import present_repository_evidence
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "backend.py").write_text("def handler():\n    return 1\n")
+    with CodeMap(repo, state_dir=tmp_path / "state") as repository:
+        repository.index.sync()
+        native = dict(
+            repository.tasks.evidence(
+                "Inspect handler in backend.py", result_mode="initial"
+            )
+        )
+    before = deepcopy(native)
+    text = present_repository_evidence(native, format="text")["text"]
+    wire: dict[str, Any] = {
+        "content": [{"type": "text", "text": text}],
+        "structuredContent": native,
+        "isError": False,
+    }
+    capture = {
+        "format": "none",
+        **_capture(native, json.dumps(wire), transport="mcp"),
+    }
+    validate_transport_capture(capture)
+    assert native == before
+
+    for altered in (
+        "Initial repository evidence is available in structuredContent.",
+        str(text) + "\nUnsupported ownership assertion.",
+    ):
+        changed = deepcopy(wire)
+        changed["content"][0]["text"] = altered
+        capture = {
+            "format": "none",
+            **_capture(native, json.dumps(changed), transport="mcp"),
+        }
+        with pytest.raises(ValueError, match="MCP display differs from visible bytes"):
+            validate_transport_capture(capture)
+
+    changed = deepcopy(wire)
+    changed["structuredContent"]["evidence_packet_identity"] = "foreign-packet"
+    capture = {
+        "format": "none",
+        **_capture(native, json.dumps(changed), transport="mcp"),
+    }
+    with pytest.raises(ValueError, match="MCP structured response differs"):
+        validate_transport_capture(capture)
+    assert native == before

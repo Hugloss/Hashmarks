@@ -14,7 +14,7 @@ from pathlib import PurePosixPath
 from typing import Any
 
 from hashmarks.codemap.python_ast import estimate_tokens
-from hashmarks.evidence_presentation import FORMATS
+from hashmarks.evidence_presentation import FORMATS, present_repository_evidence
 from hashmarks.operation_contract import operation_schema
 
 from .backend_gates import combine_required, fact_state
@@ -281,9 +281,8 @@ def _validate_mcp_wire(
         displayed = json.loads(texts[0])
         expected = response
     elif format == "none":
-        if texts[0] != "Initial repository evidence is available in structuredContent.":
-            raise ValueError("backend initial MCP none display differs from contract")
-        return
+        displayed = texts[0]
+        expected = present_repository_evidence(native, format="text")["text"]
     elif format == "text":
         displayed = texts[0]
         expected = response["presentation"]["text"]
