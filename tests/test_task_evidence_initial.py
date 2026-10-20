@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
+from contract_assertions import assert_object, assert_text
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.task_evidence_initial import (
@@ -571,3 +572,112 @@ def test_initial_tables_preserve_missing_extra_fields_and_reject_corruption() ->
             decode_initial_collection(invalid, encoding)
     with pytest.raises(ValueError, match="encoding"):
         decode_initial_collection(rows, {**encoding, "columns": ["path", "path"]})
+
+
+@pytest.fixture(scope="module")
+def initial_text_source(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> tuple[dict[str, Any], dict[str, object]]:
+    root = tmp_path_factory.mktemp("initial-text")
+    (root / "owner.py").write_text("def widget():\n    return 1\n")
+    with CodeMap(root) as codemap:
+        codemap.index.sync()
+        native = cast("dict[str, Any]", codemap.tasks.evidence("Inspect owner.py"))
+        observation = codemap.source.observe("owner.py", lines=[1])
+    return native, observation
+
+
+def test_initial_text_keeps_ambiguity_alternatives_outside_retrieval_prefix(
+    initial_text_source: tuple[dict[str, Any], dict[str, object]],
+) -> None:
+    native = deepcopy(initial_text_source[0])
+    alternatives = [
+        {"path": f"candidate_{index}.py", "qualname": "widget"} for index in range(4)
+    ]
+    native["ownership"].update(
+        status="unresolved", owner=None, proof_scope_complete=False
+    )
+    native["ownership"]["ambiguity"].update(
+        ambiguous=True,
+        reason="multiple-qualified-owners-remain",
+        discrimination_question="Which exported handler is intended?",
+        alternatives=alternatives,
+    )
+    native["freshness"]["state"] = "unknown"
+    prefix = [{"path": f"prefix_{index}.py", "symbol": "support"} for index in range(3)]
+    native["retrieval"]["results"] = prefix + alternatives
+    initial = initial_task_evidence(native)
+    assert initial["retrieval"]["results"] == prefix
+    initial["evidence_packet_identity"] = initial_packet_identity(initial)
+    wire = encode_initial_packet(initial)
+    before = deepcopy(wire)
+
+    response = presentation_response(
+        "task_evidence", wire, result_mode="initial", format="text"
+    )
+    text = assert_text(assert_object(response["presentation"])["text"])
+
+    assert wire == response["result"] == before
+    assert "multiple-qualified-owners-remain" in text
+    assert "Which exported handler is intended?" in text
+    for index, alternative in enumerate(alternatives):
+        assert alternative["path"] in text
+        assert f"@ /ownership/ambiguity/alternatives/{index}" in text
+    assert "Owner unresolved" in text
+    assert '"state": "unknown"' in text
+    assert "complete: False" in text
+    assert "omissions do not establish absence" in text
+
+
+@pytest.mark.parametrize(
+    "source_fields",
+    [
+        ("source_observation",),
+        ("source_selection",),
+        ("source_observation", "source_selection"),
+    ],
+)
+def test_initial_text_source_qualifications_do_not_require_a_selection(
+    initial_text_source: tuple[dict[str, Any], dict[str, object]],
+    source_fields: tuple[str, ...],
+) -> None:
+    native, observation = deepcopy(initial_text_source)
+    observation.update(
+        freshness="unknown", completeness="incomplete", truncation="truncated"
+    )
+    row = {"path": "owner.py", "symbol": "widget"}
+    fields = {
+        "source_observation": observation,
+        "source_selection": {
+            "basis": "supplied-source-lines",
+            "negative_evidence_admissible": False,
+        },
+    }
+    native["retrieval"]["results"] = [
+        {**row, **{key: fields[key] for key in source_fields}}
+    ]
+    initial = initial_task_evidence(native)
+    initial["evidence_packet_identity"] = initial_packet_identity(initial)
+    wire = encode_initial_packet(initial)
+    before = deepcopy(wire)
+
+    response = presentation_response(
+        "task_evidence", wire, result_mode="initial", format="text"
+    )
+    text = assert_text(assert_object(response["presentation"])["text"])
+
+    assert wire == response["result"] == before
+    for field in fields:
+        marker = f"@ /retrieval/results/0/{field}: "
+        assert (marker in text) == (field in source_fields)
+        if field in source_fields:
+            line = next(line for line in text.splitlines() if marker in line)
+            shown = json.loads(line.split(marker, 1)[1])
+            if field == "source_observation":
+                assert shown["member"] == observation["member"]
+                assert shown["freshness"] == "unknown"
+                assert shown["completeness"] == "incomplete"
+                assert shown["truncation"] == "truncated"
+                assert shown["negative_evidence"] == observation["negative_evidence"]
+            else:
+                assert shown == fields[field]

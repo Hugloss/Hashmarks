@@ -81,6 +81,30 @@ def _observation() -> dict[str, Any]:
     }
 
 
+def test_agent_routing_descriptions_are_plain_intent_and_bounded() -> None:
+    context = tool_contract("repository_context").description
+    find = tool_contract("find").description
+    task = tool_contract("task_evidence").description
+
+    for description in (context, find, task):
+        assert len(description) < 220
+
+    assert "broad repository orientation" in context
+    assert "which tests are relevant" in context
+    assert "use task_evidence" in context
+
+    assert "exact path or symbol name" in find
+    assert "implementation is unknown" in find
+    assert "use task_evidence first" in find
+
+    assert "Use first" in task
+    assert "implementation path is unknown" in task
+    assert "owning file/function" in task
+    assert "relevant tests" in task
+    assert "Default initial" in task
+    assert "result_mode=default" in task
+
+
 def test_scoped_literal_tool_description_stays_within_public_catalog_limit() -> None:
     """Agent guidance must preserve strict discovery semantics within 220 chars."""
     description = tool_contract("source_observation").description
@@ -100,6 +124,20 @@ def test_task_evidence_mcp_default_is_bounded_without_changing_core_default() ->
     assert contract.default_response_schema == "hashmarks.task-evidence-initial.v2"
     assert "default" in contract.response_modes
     assert "initial" in contract.response_modes
+
+
+@pytest.mark.parametrize(
+    ("mode", "expected_schema"),
+    [
+        (None, "hashmarks.task-evidence-initial.v2"),
+        ("initial", "hashmarks.task-evidence-initial.v2"),
+        ("default", "hashmarks.task-evidence.v5"),
+    ],
+)
+def test_task_evidence_schema_lookup_preserves_mcp_default_and_explicit_modes(
+    mode: str | None, expected_schema: str
+) -> None:
+    assert response_schema_for_mode("task_evidence", mode) == expected_schema
 
 
 def test_mcp_contract_manifest_is_deterministic_and_complete() -> None:

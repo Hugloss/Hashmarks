@@ -657,25 +657,49 @@ def _project_initial_source_context(
 
 
 def _initial_source_context_text(rows: list[dict[str, Any]]) -> list[str]:
-    return [
-        (
-            f"Source observation @ /retrieval/results/{index}/source_observation: "
-            + json.dumps(
-                _source_context_view(
-                    row["source_observation"],
-                    f"/retrieval/results/{index}/source_observation",
-                ),
-                sort_keys=True,
-                separators=(",", ":"),
+    lines = []
+    for index, row in enumerate(rows):
+        observation = row.get("source_observation")
+        if isinstance(observation, Mapping):
+            ref = f"/retrieval/results/{index}/source_observation"
+            lines.append(
+                f"Source observation @ {ref}: "
+                + json.dumps(
+                    _source_context_view(observation, ref),
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
             )
-            if isinstance(row.get("source_observation"), Mapping)
-            else ""
+        selection = row.get("source_selection")
+        if isinstance(selection, Mapping):
+            lines.append(
+                f"Source selection @ /retrieval/results/{index}/source_selection: "
+                + json.dumps(selection, sort_keys=True, separators=(",", ":"))
+            )
+    return lines
+
+
+def _initial_ambiguity_text(ambiguity: Mapping[str, Any]) -> list[str]:
+    """Display retained producer alternatives without expanding their scope."""
+    lines = []
+    for key, label in (
+        ("reason", "Ambiguity reason"),
+        ("discrimination_question", "Discrimination question"),
+    ):
+        if ambiguity.get(key) is not None:
+            lines.append(f"{label}: {ambiguity[key]} (@ /ownership/ambiguity/{key}).")
+    for index, alternative in enumerate(ambiguity.get("alternatives", [])):
+        locator = {
+            key: alternative[key]
+            for key in ("path", "symbol", "qualname", "start_line", "end_line")
+            if key in alternative
+        }
+        lines.append(
+            "Owner alternative: "
+            + json.dumps(locator, ensure_ascii=False, separators=(",", ":"))
+            + f" (@ /ownership/ambiguity/alternatives/{index})."
         )
-        + f"\nSource selection @ /retrieval/results/{index}/source_selection: "
-        + json.dumps(row["source_selection"], sort_keys=True, separators=(",", ":"))
-        for index, row in enumerate(rows)
-        if isinstance(row.get("source_selection"), Mapping)
-    ]
+    return lines
 
 
 def initial_evidence_text(packet: Mapping[str, object]) -> str:
@@ -710,6 +734,7 @@ def initial_evidence_text(packet: Mapping[str, object]) -> str:
         lines.append(f"Owner observation: {owner_locator} (@ /ownership/owner).")
     else:
         lines.append("Owner unresolved (@ /ownership/owner).")
+    lines.extend(_initial_ambiguity_text(ambiguity))
     for index, row in enumerate(retrieval.get("results", [])):
         lines.append(
             f"Source candidate: {row['path']}::{row.get('symbol', row.get('qualname', ''))} ({row.get('start_line', 'unknown')}:{row.get('end_line', 'unknown')}; basis: {row.get('supplement', 'canonical-retrieval')}; @ /retrieval/results/{index})."

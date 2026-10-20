@@ -47,13 +47,14 @@ MCP_SERVER_DESCRIPTION = (
 MCP_SERVER_INSTRUCTIONS = (
     "Hashmarks is the semantic repository-intelligence layer, not a text-search shortcut. "
     "For a task asking where behavior is implemented, which file or function owns it, "
-    "what should be inspected next, or what verification is relevant when the exact "
+    "what should be inspected next, or what tests are relevant when the exact "
     "implementation path is not already known, call task_evidence before exploratory "
-    "grep, glob, or read. Its MCP default is the bounded lossless initial packet; request "
+    "grep, glob, or read. Its MCP default includes readable initial evidence in text "
+    "and the bounded lossless initial packet in structuredContent; request "
     "result_mode=default only when the complete v5 packet is needed. task_evidence can "
     "separate supporting retrieval from ownership "
     "authority, resolve a unique owner when admissible, preserve ambiguity when it cannot, "
-    "return bounded source evidence or an exact next-read, select verification evidence "
+    "return bounded source evidence or an exact next-read, identify relevant test evidence "
     "and a verification plan, and report freshness. Prefer that semantic reduction over "
     "reconstructing ownership from repeated native search/read calls. For exact literal "
     "occurrences within already known paths, use source_observation with an explicit "
@@ -126,7 +127,8 @@ class McpToolContract:
         self, result_mode: str | None = None, *, presentation: str = "none"
     ) -> str:
         validate_presentation(presentation)
-        native = operation_schema(self.operation, result_mode)
+        mode = self.default_response_mode if result_mode is None else result_mode
+        native = operation_schema(self.operation, mode)
         return native if presentation == "none" else self.presentation_response_schema
 
     def validate_response(
@@ -206,27 +208,26 @@ MCP_TOOL_CONTRACTS = (
     McpToolContract(
         "repository_context",
         (
-            "Broad orientation only: freshness, languages, areas, and topology. "
-            "Do not use for behavior ownership; use task_evidence for owner, "
-            "source/next-read, or verification evidence."
+            "Use for broad repository orientation only: freshness, languages, areas, "
+            "and topology. For where behavior lives, who owns it, or which tests are relevant, "
+            "use task_evidence."
         ),
         "repository_context",
     ),
     McpToolContract(
         "find",
         (
-            "Exact lookup for a path or symbol you already know by name. Do not use as a "
-            "behavior-localization substitute: when the task describes behavior and the "
-            "implementation path is unknown, use task_evidence first."
+            "Use when you already know an exact path or symbol name but need to locate it. "
+            "For behavior questions where the implementation is unknown, use task_evidence first."
         ),
         "find",
     ),
     McpToolContract(
         "task_evidence",
         (
-            "Unknown implementation path: semantic localization with ownership/ambiguity, "
-            "source/next-read, verification and freshness. Defaults to bounded lossless "
-            "initial packet; result_mode=default gets full v5 packet."
+            "Use first when behavior is described but its implementation path is unknown: "
+            "locate owning file/function or ambiguity, source/next-read, relevant tests, "
+            "freshness. Default initial; result_mode=default returns full v5."
         ),
         "task_evidence",
         "initial",
