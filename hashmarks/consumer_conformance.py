@@ -4,7 +4,9 @@ from collections.abc import Mapping
 from copy import deepcopy
 from typing import TYPE_CHECKING, NotRequired, TypedDict, cast
 
+from ._version import __version__
 from .evidence_context import validate_evidence_context
+from .producer_identity import native_producer_implementation_identity
 from .validation_inputs import require_mapping_for_validation
 from .verification_selection import (
     VerificationSelectionEnvelopeState,
@@ -76,6 +78,18 @@ def _bundle_producer_identity(envelope: Mapping[str, object]) -> object:
         if isinstance(producer, Mapping)
         else None
     )
+
+
+def _bundle_loaded_version_reasons(
+    envelope: Mapping[str, object], producer_identity: object
+) -> list[str]:
+    """Qualify version provenance only for the implementation loaded here."""
+    if producer_identity != native_producer_implementation_identity():
+        return []
+    producer = envelope.get("producer")
+    if isinstance(producer, Mapping) and producer.get("version") != __version__:
+        return ["producer-version-does-not-match-loaded-implementation"]
+    return []
 
 
 def _bundle_handoff_reasons(
@@ -169,6 +183,7 @@ def validate_native_consumer_bundle(
         *contract_root_reasons,
         *(f"envelope:{reason}" for reason in envelope_state.get("reasons", [])),
         *(f"contract:{reason}" for reason in contract_state.get("reasons", [])),
+        *_bundle_loaded_version_reasons(envelope, producer_identity),
         *_bundle_handoff_reasons(handoff, producer_identity),
     ]
     if (

@@ -3,6 +3,7 @@ from pathlib import Path
 
 from contract_assertions import assert_array, assert_object, assert_records, assert_text
 
+from hashmarks import native_producer_implementation_identity
 from hashmarks.consumer_conformance import (
     _consumer_conformance_vectors_from_handoff,
     validate_native_consumer_bundle,
@@ -63,6 +64,27 @@ def test_consumer_bundle_rejects_same_version_cross_pair() -> None:
         "producer-implementation-identity-mismatch" in assert_text(reason)
         for reason in assert_array(result["reasons"])
     )
+
+
+def test_loaded_implementation_cannot_claim_a_forged_producer_version() -> None:
+    from hashmarks.verification_selection import SELECTION_ENVELOPE_SCHEMA, _identity
+
+    identity = native_producer_implementation_identity()
+    envelope, _contract = _bundle(identity)
+    assert_object(envelope["producer"])["version"] = "99.0.0"
+    payload = {
+        key: value for key, value in envelope.items() if key != "envelope_identity"
+    }
+    envelope["envelope_identity"] = _identity(SELECTION_ENVELOPE_SCHEMA, payload)
+    contract = downstream_consumption_contract(envelope)
+
+    checked = validate_native_consumer_bundle(
+        envelope, contract, expected_producer_implementation_identity=identity
+    )
+
+    assert checked["valid"] is False
+    assert "producer-version-does-not-match-loaded-implementation" in checked["reasons"]
+    assert checked.get("normalized") is None
 
 
 def test_native_handoff_validator_rejects_tampering_and_keeps_authority_external(
