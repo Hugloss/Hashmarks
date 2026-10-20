@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.31.2 — Local operation without Unix-domain sockets
+
+- Report missing or unsupported native Unix-domain sockets through the existing daemon-unavailable boundary. Default local identity and CodeMap reads continue to work on Windows without inventing daemon observation or freshness evidence; explicitly required daemon mode still fails.
+- Qualify default map sync and status with the installed Windows standalone before publication, alongside existing installer, upgrade, checksum and handoff checks.
+
 ## 0.31.1 — Readable initial repository evidence
 
 - Make default MCP `task_evidence` initial replies readable through the existing grouped-text projection while preserving the lossless structured packet, explicit presentations, and complete v5 mode. Retain ambiguity reasons, questions, alternatives and independently supplied source qualifications in readable text; align omitted-mode schema lookup with the MCP initial default. Clarify test relevance and the external voluntary-adoption/economics follow-up for #289; no adoption or performance gain is claimed.

@@ -90,6 +90,21 @@ def test_request_translates_connection_failure_and_closes_socket(
     assert sock.closed
 
 
+def test_invalid_timeout_closes_socket_without_hiding_the_caller_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sock = _FakeSocket([])
+
+    def invalid_timeout(_timeout: float) -> None:
+        raise ValueError("invalid caller timeout")
+
+    monkeypatch.setattr(sock, "settimeout", invalid_timeout)
+    client = _client_with_socket(tmp_path, monkeypatch, sock)
+    with pytest.raises(ValueError, match="invalid caller timeout"):
+        client.request("status")
+    assert sock.closed
+
+
 def test_request_rejects_response_above_size_limit(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

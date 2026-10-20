@@ -43,6 +43,18 @@ try {
     & $installer
     Assert-InstalledVersion
 
+    $workspace = Join-Path $tempRoot "workspace"
+    New-Item -ItemType Directory -Path $workspace | Out-Null
+    Set-Content -LiteralPath (Join-Path $workspace "example.py") -Value "ANSWER = 42" -Encoding ascii
+    & $target --workspace $workspace map sync
+    if ($LASTEXITCODE -ne 0) {
+        throw "installed Windows standalone default map sync failed"
+    }
+    & $target --workspace $workspace map status
+    if ($LASTEXITCODE -ne 0) {
+        throw "installed Windows standalone default map status failed"
+    }
+
     $resolved = Get-Command hashmarks -CommandType Application -ErrorAction Stop
     if ([IO.Path]::GetFullPath($resolved.Source) -ine [IO.Path]::GetFullPath($target)) {
         throw "Windows installer PATH binding mismatch: $($resolved.Source)"

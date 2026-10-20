@@ -190,9 +190,15 @@ class IdentityClient:
         return self._decode_response(self._read_response(raw))
 
     def _read_response(self, raw: bytes) -> bytes:
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.settimeout(self.timeout)
+        family = getattr(socket, "AF_UNIX", None)
+        if family is None:
+            raise DaemonUnavailableError(
+                "identity daemon requires Unix-domain socket support"
+            )
+        sock: socket.socket | None = None
         try:
+            sock = socket.socket(family, socket.SOCK_STREAM)
+            sock.settimeout(self.timeout)
             sock.connect(str(self.socket_path))
             sock.sendall(raw)
             chunks = bytearray()
@@ -213,7 +219,8 @@ class IdentityClient:
                 f"identity daemon unavailable at {self.socket_path}: {exc}"
             ) from exc
         finally:
-            sock.close()
+            if sock is not None:
+                sock.close()
         return bytes(chunks)
 
     @staticmethod

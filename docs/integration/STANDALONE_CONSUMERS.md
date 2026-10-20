@@ -82,6 +82,12 @@ rules, membership normalization, or schema validators.
 
 ## Transport scope
 
+Unavailable native Unix-domain sockets are reported as daemon unavailability.
+Identity `auto` mode retains the canonical local engine, while an explicitly
+required daemon still fails. CodeMap can index and read locally without its
+optional daemon observation; missing observation never supplies daemon generation
+or freshness evidence.
+
 The direct API and service client have different call shapes. For example,
 `codemap.index.sync()` and `codemap.tasks.evidence(task)` are direct component
 operations. `client.sync()` and `client.task_evidence(task)` are flat service
