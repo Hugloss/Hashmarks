@@ -77,7 +77,27 @@ The public GitHub Release contains:
 
 ## Post-publish end-user smoke
 
-Publishing a GitHub Release automatically triggers `.github/workflows/post-publish-smoke.yml`. The workflow uses the exact published tag rather than mutable `main` or `releases/latest`, verifies each bootstrap installer against the published `SHA256SUMS.txt`, installs that exact version from public GitHub Release assets, and exercises repository map sync/status on:
+Successful `Publish` completion triggers `.github/workflows/post-publish-smoke.yml`
+through `workflow_run`; publication with `GITHUB_TOKEN` does not emit another
+workflow run through the release event. The smoke consumes the exact Publish run's
+qualified package manifest, while human-published releases retain their
+`release: published` entry point. An explicit `workflow_dispatch` accepts only an
+exact published `vX.Y.Z` tag. A main-branch change to the smoke workflow also
+checks the published version selected by the committed release request, so
+workflow repairs can qualify an existing release without republishing it.
+
+The qualified Python workflow artifact retains a nonpublic source receipt after
+native Git HEAD matches the resolved release source. Automatic smoke compares
+that source and the artifact's wheel/sdist qualification against the public
+publication manifest; it validates those package bytes using the exact released
+source, even when smoke machinery has advanced on main.
+
+All entry points bind the published release's manifest and exact asset membership
+to its native Git tag commit before the three smoke jobs begin. The workflow uses
+that resolved tag and source rather than mutable `main` or `releases/latest`,
+verifies each bootstrap installer against the published `SHA256SUMS.txt`, installs
+that exact version from public GitHub Release assets, and exercises repository
+map sync/status on:
 
 - `ubuntu-latest`, covering the Linux executable/installer path also consumed by WSL2;
 - `windows-latest`, covering the native Windows executable/PowerShell installer path.

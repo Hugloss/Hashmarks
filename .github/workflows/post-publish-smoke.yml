@@ -3,19 +3,169 @@ name: Post-publish release smoke
 on:
   release:
     types: [published]
+  workflow_run:
+    workflows: [Publish]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Exact published release tag to smoke (vX.Y.Z)
+        required: true
+        type: string
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/post-publish-smoke.yml"
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
+  resolve:
+    name: Bind exact published release
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      release_tag: ${{ steps.release.outputs.release_tag }}
+      source_sha: ${{ steps.release.outputs.source_sha }}
+    steps:
+      - name: Checkout smoke machinery
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Read exact successful Publish qualification
+        if: github.event_name == 'workflow_run'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: qualified-python-release-bundle
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: publish-artifact
+      - id: release
+        name: Resolve exact published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+          from pathlib import Path
+
+          from scripts.release_contract import (
+              publication_asset_names,
+              release_manifest,
+              validate_release_candidate,
+          )
+
+          event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
+          event_name = os.environ["GITHUB_EVENT_NAME"]
+          if event_name == "workflow_run":
+              package = json.loads(Path("publish-artifact/package-manifest.json").read_text())
+              tag = package["tag"]
+              qualified_source = Path("publish-artifact/source.sha").read_text().strip()
+              if re.fullmatch(r"[0-9a-f]{40}", qualified_source) is None:
+                  raise SystemExit("Publish qualification requires an exact source commit")
+          elif event_name == "workflow_dispatch":
+              tag = event["inputs"]["release_tag"]
+          elif event_name == "release":
+              tag = event["release"]["tag_name"]
+          elif event_name == "push":
+              tag = f"v{validate_release_candidate(Path('.'))}"
+          else:
+              raise SystemExit("Unsupported post-publish smoke event")
+          if not isinstance(tag, str) or re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+", tag) is None:
+              raise SystemExit("Smoke requires an exact published vX.Y.Z release tag")
+
+          repository = os.environ["GITHUB_REPOSITORY"]
+          release = json.loads(
+              subprocess.check_output(
+                  [
+                      "gh",
+                      "api",
+                      f"repos/{repository}/releases/tags/{tag}",
+                      "--jq",
+                      "{tag_name, draft, prerelease, published_at, target_commitish, assets: [.assets[].name]}",
+                  ],
+                  text=True,
+              )
+          )
+          if (
+              release["tag_name"] != tag
+              or release["draft"] is not False
+              or release["prerelease"] is not False
+              or not release["published_at"]
+          ):
+              raise SystemExit("Smoke requires a published stable release")
+          subprocess.check_call(
+              [
+                  "gh",
+                  "release",
+                  "download",
+                  tag,
+                  "--repo",
+                  repository,
+                  "--pattern",
+                  "release-manifest.json",
+                  "--dir",
+                  "published-manifest",
+              ]
+          )
+          manifest = json.loads(Path("published-manifest/release-manifest.json").read_text())
+          names = publication_asset_names(manifest)
+          if sorted(release["assets"]) != names:
+              raise SystemExit("Published release asset membership differs from its manifest")
+          subprocess.check_call(
+              ["git", "fetch", "--no-tags", "--depth=1", "origin", f"refs/tags/{tag}"]
+          )
+          source = subprocess.check_output(
+              ["git", "rev-parse", "FETCH_HEAD^{commit}"], text=True
+          ).strip()
+          if (
+              manifest["tag"] != tag
+              or manifest["version"] != tag[1:]
+              or manifest["source"] != {"commit_sha": source}
+              or release["target_commitish"] != source
+          ):
+              raise SystemExit("Published release tag, version and source authority differ")
+          if event_name == "workflow_run":
+              if qualified_source != source:
+                  raise SystemExit("Published source differs from the exact Publish qualification")
+              subprocess.check_call(["git", "worktree", "add", "--detach", "qualified-source", source])
+              try:
+                  expected_package = release_manifest(
+                      Path("qualified-source"), Path("publish-artifact/packages"), tag=tag
+                  )
+              finally:
+                  subprocess.check_call(["git", "worktree", "remove", "qualified-source"])
+              if package != expected_package:
+                  raise SystemExit("Qualified package manifest differs from its distribution bytes")
+              if manifest["package_qualification_identity"] != package["manifest_identity"] or any(
+                  manifest[key] != package[key]
+                  for key in (
+                      "project", "version", "tag", "distributions",
+                      "qualification_dependency_resolution", "publication_authority",
+                  )
+              ):
+                  raise SystemExit("Published package differs from the exact Publish qualification")
+          with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as output:
+              output.write(f"release_tag={tag}\nsource_sha={source}\n")
+          PY
+
   linux:
     name: Published Linux/WSL install smoke
+    needs: resolve
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Install and exercise exact published Linux release
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ needs.resolve.outputs.release_tag }}
         run: |
           set -eu
           if ! printf '%s\n' "$RELEASE_TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
@@ -46,6 +196,7 @@ jobs:
 
   python-wheel:
     name: Published Python wheel consumer smoke
+    needs: resolve
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -56,7 +207,7 @@ jobs:
       - run: uv python install 3.14
       - name: Install and exercise exact published Python wheel
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ needs.resolve.outputs.release_tag }}
         run: |
           set -eu
           if ! printf '%s\n' "$RELEASE_TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
@@ -127,13 +278,14 @@ jobs:
 
   windows:
     name: Published Windows install smoke
+    needs: resolve
     runs-on: windows-latest
     timeout-minutes: 15
     steps:
       - name: Install and exercise exact published Windows release
         shell: pwsh
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ needs.resolve.outputs.release_tag }}
         run: |
           Set-StrictMode -Version Latest
           $ErrorActionPreference = "Stop"
@@ -182,7 +334,7 @@ jobs:
       - name: Checkout exact published source for interactive upgrade smoke
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ needs.resolve.outputs.source_sha }}
           persist-credentials: false
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
@@ -193,7 +345,7 @@ jobs:
         run: uv sync --frozen --only-group release-smoke --python 3.14
       - name: Exercise prior installed CLI upgrading to exact published Windows bytes
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ needs.resolve.outputs.release_tag }}
           GH_TOKEN: ${{ github.token }}
         run: |
           & .venv\Scripts\python.exe scripts\windows_published_upgrade_smoke.py `
