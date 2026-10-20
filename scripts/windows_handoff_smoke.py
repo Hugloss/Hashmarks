@@ -18,8 +18,12 @@ def main() -> int:
     args = parser.parse_args()
     if args.child is not None:
         destination = str(args.child).replace("'", "''")
+        pending = str(args.child.with_suffix(".pending")).replace("'", "''")
+        # File existence is the parent's completion signal, so publish it only
+        # after the content write has closed its handle.
         delegate_standalone_upgrade(
-            f"Set-Content -LiteralPath '{destination}' -Value 'handoff-complete'"
+            f"[System.IO.File]::WriteAllText('{pending}', 'handoff-complete'); "
+            f"[System.IO.File]::Move('{pending}', '{destination}')"
         )
         raise RuntimeError(
             "Windows delegation returned instead of replacing the process"
