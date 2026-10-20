@@ -354,7 +354,16 @@ def test_post_publish_smoke_uses_exact_public_release_assets() -> None:
     assert "Published Windows install smoke" in text
     assert "runs-on: ubuntu-latest" in text
     assert "runs-on: windows-latest" in text
-    assert "github.event.release.tag_name" in text
+    assert 'event["release"]["tag_name"]' in text
+    assert "workflow_run:" in text
+    assert "workflows: [Publish]" in text
+    assert "github.event.workflow_run.conclusion == 'success'" in text
+    assert "run-id: ${{ github.event.workflow_run.id }}" in text
+    assert "workflow_dispatch:" in text
+    assert "required: true" in text
+    assert '".github/workflows/post-publish-smoke.yml"' in text
+    assert "needs: resolve" in text
+    assert "RELEASE_TAG: ${{ needs.resolve.outputs.release_tag }}" in text
     assert r"grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'" in text
     assert "Set-StrictMode -Version Latest" in text
     assert "$version = $env:RELEASE_TAG -replace '^v', ''" in text
@@ -376,7 +385,7 @@ def test_post_publish_smoke_uses_exact_public_release_assets() -> None:
     assert "raw.githubusercontent.com" not in text
     assert "/releases/latest/" not in text
     assert "Checkout exact published source for interactive upgrade smoke" in text
-    assert "ref: ${{ github.event.release.tag_name }}" in text
+    assert "ref: ${{ needs.resolve.outputs.source_sha }}" in text
     assert "windows_published_upgrade_smoke.py" in text
 
 
