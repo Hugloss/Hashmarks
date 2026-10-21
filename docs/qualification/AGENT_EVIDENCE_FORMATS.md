@@ -146,7 +146,7 @@ honestly reported what the model saw.
 
 ## External execution and grades
 
-Use agentsCookbook or another external harness to run held-out prompts against
+Use EvalShot or another external harness to run held-out prompts against
 at least two models. Preserve the exported trial, actual serialized MCP/host
 response delivered to the model, answer trace, and grading evidence. The export
 alone is not a measurement of what a host ultimately exposes.
@@ -188,7 +188,7 @@ tool while emitting only a selected intermediary to the next model request.
 Tool invocation or MCP return alone therefore **cannot** prove that a model
 received the canonical packet, any specific finding, or its uncertainty.
 
-A host-neutral evaluator such as agentsCookbook should distinguish catalog
+A host-neutral evaluator such as EvalShot should distinguish catalog
 exposure, invocation, validated producer return, final submitted-request
 inclusion, and later observable follow-through. A host lacking a captured
 submitted-request boundary must report inclusion as **unknown**. The exact

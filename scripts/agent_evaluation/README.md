@@ -24,3 +24,10 @@ receipt, or a claim of improved performance. See
 failure modes, privacy constraints and experiment ownership.
 
 Current product contracts live under `docs/reference/`. Superseded benchmark contracts and development experiments remain recoverable from Git and merged pull requests rather than a parallel historical-document tree.
+
+Native-agent campaigns, independent scoring, and benchmark reports are owned by
+[EvalShot](https://github.com/Hugloss/EvalShot). See the
+[benchmark handoff](../../benchmarks/agent_evaluation/README.md) for current setup
+and thin Make aliases. Reusable Skills and review guidance remain
+agentsCookbook-owned. Historical evaluation receipts retain their source pins
+and versioned schema identifiers.

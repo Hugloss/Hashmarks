@@ -44,14 +44,12 @@ def test_benchmark_make_aliases_delegate_all_launch_authority() -> None:
     text = (ROOT / "Makefile").read_text(encoding="utf-8")
 
     expected = {
-        "benchmark": (
-            '@$(MAKE) --no-print-directory -C "$(AGENTS_COOKBOOK)" benchmark'
-        ),
+        "benchmark": ('@$(MAKE) --no-print-directory -C "$(EVALSHOT)" benchmark'),
         "benchmark-check": (
-            '@$(MAKE) --no-print-directory -C "$(AGENTS_COOKBOOK)" benchmark-check'
+            '@$(MAKE) --no-print-directory -C "$(EVALSHOT)" benchmark-check'
         ),
         "benchmark-report": (
-            '@$(MAKE) --no-print-directory -C "$(AGENTS_COOKBOOK)" benchmark-report'
+            '@$(MAKE) --no-print-directory -C "$(EVALSHOT)" benchmark-report'
         ),
     }
     for target, command in expected.items():

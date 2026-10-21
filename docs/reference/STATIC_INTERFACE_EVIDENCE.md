@@ -425,4 +425,4 @@ Focused regressions:
 
 The full required Python 3.11/3.14, schema, MCP/CLI, source admission, release
 and formatting rings remain required before the consolidated PR is ready.
-No regression benchmark improvement is claimed until measured in agentsCookbook.
+No regression benchmark improvement is claimed until measured in EvalShot.

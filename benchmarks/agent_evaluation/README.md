@@ -71,7 +71,7 @@ content and recomputes hashes.
 `exposure=exported-not-host-attested`,
 `host_visible=not-established`, `agent_used=not-established`,
 `agent_result=not-measured`; the overall report states
-`paired_correctness=not-measured`. An agentsCookbook trial must establish
+`paired_correctness=not-measured`. An EvalShot trial must establish
 its own current-source/host capture, model-visible delivery, usage,
 behavioral outcome, independent grading and paired identity before claiming
 any benefit, and must never project the Hashmarks packet as native MCP
@@ -83,109 +83,62 @@ The hash is not secrecy or authentication. This evaluation module is **not
 installed in the Hashmarks product**, and Hashmarks does not acquire agent
 routing, execution, comparison grading, or any new MCP operation.
 
-## agentsCookbook-owned native Codex and OpenCode benchmark
+## EvalShot-owned native-agent benchmarks
 
-### Benchmark ownership
+Hashmarks is the repository-evidence subject under test. [EvalShot](https://github.com/Hugloss/EvalShot)
+owns frozen experiments, native-agent adapters, execution, independent oracles,
+scoring, receipts, and reports. agentsCookbook owns reusable Skills and guidance.
+The coding agent owns tool choice and code decisions; Oh-Goon owns its execution
+and certification workflows.
 
-Hashmarks does **not** own or implement this benchmark. Hashmarks is one subject
-under test. The benchmark harness, frozen experiment definitions, admission,
-execution evidence, independent grading, receipts, and reporting are owned by
-the adjacent **agentsCookbook** checkout.
+### Setup and thin aliases
 
-The Hashmarks `make benchmark*` targets are convenience entry points only. They
-delegate to agentsCookbook while binding this Hashmarks checkout as the subject
-source:
+Initialize this Hashmarks checkout with `make init`, including its locked MCP
+extra. In the sibling EvalShot checkout, copy `.env.example` to `.env` and select
+`HASHMARKS_BENCH_SOURCE` as this clean committed Hashmarks checkout. Select the
+native agent, suite, and provider environment there. See
+[EvalShot's benchmark guide](https://github.com/Hugloss/EvalShot/blob/main/benchmarks/README.md)
+for the current commands, admission requirements, and native-host setup.
 
-```text
-Hashmarks checkout
-    make benchmark*
-         |
-         v
-agentsCookbook
-    benchmark harness / experiment authority
-         |
-         +-- bare
-         +-- exact admitted Hashmarks executable
-         +-- exact admitted Enola executable
-```
-
-For native OpenCode and Codex trials, agentsCookbook supplies the selected
-subject as a temporary **trial-scoped MCP exposure**. Project or user MCP
-registration is not benchmark authority and is not required for either benchmark
-arm. Each host remains authoritative for its model, provider, authentication,
-permissions, and normal user configuration; agentsCookbook owns only the
-experiment-scoped subject overlay and independently proves the exact executable,
-workspace binding, and exposure identity before agent work.
-
-Start from this Hashmarks checkout with the adjacent `agentsCookbook` checkout:
+From Hashmarks:
 
 ```sh
-make init
-make benchmark-show
 make benchmark-check
 make benchmark
 make benchmark-report
 ```
 
-`make benchmark` runs one pinned localization task through six conditions: native
-OpenCode and native Codex, each with bare, Hashmarks MCP, and Enola MCP access.
-`make benchmark BENCHMARK=matrix` runs all three matrix tasks (18 trials).
-`make benchmark BENCHMARK=cycle` runs an adapted TypeScript cycle task three
-times per condition (18 trials). `make benchmark-show` lists definitions without
-running agents. `make benchmark-check` prepares every selected native arm and
-stops before any model call if source, subject, model, MCP binding, or oracle
-setup is unavailable. It cannot prove remote model authentication; first confirm
-each native CLI works interactively. Set `BENCH_AGENT=opencode-native` or
-`BENCH_AGENT=codex-native` to select one native CLI.
+These three targets delegate unchanged to EvalShot. `benchmark-check` checks
+runtime wiring without inference; `benchmark` may invoke the configured model
+provider. The aliases do not select a suite, bind a subject source, choose an
+agent/model, or reinterpret campaign state. EvalShot's explicit `.env` owns
+those selections. Set `EVALSHOT=/path/to/EvalShot` when the checkout is elsewhere.
+Use EvalShot directly for new/resume, status, scoring, and other campaign commands;
+Hashmarks does not duplicate those defaults or add another runner.
 
-The experiments and runner live in the adjacent `agentsCookbook` checkout; set
-`AGENTS_COOKBOOK=/path/to/checkout` if it is elsewhere. Each `make benchmark`
-invocation creates a fresh local run under `BENCH_ROOT` and prints its path.
-`make benchmark-report` reads the latest run for the selected `BENCHMARK` mode,
-including its original agent selection. Use `BENCH_RUN=<printed-run-id>` to
-resume or report a specific run; resume only with the same model, MCP, and
-harness setup. Start a new run after changing them. `BENCH_PARTIAL=1` explicitly
-reports verified receipts available so far; a normal report requires every
-selected definition. `BENCH_PYTHON` selects the agentsCookbook interpreter,
-including when Hashmarks' `.venv` is active.
+Native Codex/OpenCode trials receive the selected subject through EvalShot's
+trial-scoped MCP exposure. User/project MCP registrations do not select the
+benchmark subject. The host owns model/provider/authentication and normal
+configuration. EvalShot observes and binds the actual executable, source,
+workspace, configuration, and exposure before measured work.
 
-The run uses your installed native CLI model/provider/auth settings. Check that
-`codex` and `opencode` already work interactively. Native Codex requires a
-`model` in your `~/.codex/config.toml`, and native OpenCode requires a configured
-model. The benchmark never chooses or rewrites either host's model/provider/auth
-configuration.
+### Evidence and historical identity
 
-Neither native host needs a pre-existing Hashmarks or Enola MCP registration
-for benchmark execution. agentsCookbook resolves the selected subject from the
-benchmark environment, records its exact identity, disables unrelated subject
-entries for the trial where the host supports that control, and injects the selected
-stdio MCP command against the disposable trial workspace. End-user host registration
-such as `hashmarks install --opencode` remains useful outside the benchmark but does
-not select the benchmark executable.
+Current backend-navigation exports name `external-EvalShot` as the experiment
+owner. That metadata participates in `export_identity`, so new exports receive
+new identities. Retain historical exports and receipts with their original
+bytes, owner metadata, and identities; the internal-consistency validator can
+still inspect them. The metadata change neither regrades old results nor proves
+host delivery, agent use, or correctness.
 
-The benchmark puts this checkout's `.venv/bin` first on `PATH` and proves the
-selected Hashmarks executable, exposure digest, and workspace binding before agent
-work. A missing subject executable, changed exposure identity, or unprovable workspace
-binding yields `INCOMPLETE` before scored work. Native host configuration can still
-supply model/provider/authentication choices, but stale or unrelated MCP registration
-cannot silently choose the subject under test. Enola hooks are excluded; only the
-explicit MCP exposure varies between arms.
+For external harnesses, `hashmarks --workspace . doctor --mcp` exposes the local
+stdio launch projection and canonical MCP contract identity as
+`hashmarks.mcp-readiness.v1`. This is diagnostic evidence. EvalShot or another
+evaluator independently verifies executable/workspace/catalog binding and owns
+experiment admission. Repository-only exports and readiness checks do not prove
+that a model received the evidence or benefited from it.
 
-For external harnesses such as Harbor, Hashmarks exposes a diagnostic-only readiness
-projection:
-
-```sh
-hashmarks --workspace . doctor --mcp
-```
-
-The nested `hashmarks.mcp-readiness.v1` object reports the local stdio launch
-projection and canonical MCP contract identity. It is intentionally **not** admission
-authority: agentsCookbook or another external evaluator must still independently
-verify the exact executable, workspace binding, and host-visible catalog.
-
-The earlier `codex-agent-economics` evaluation remains available through its
-separate Make targets. The native matrix compares subject assistance within each
-agent/model configuration; its scores do not certify either product. The adapted
-cycle task separately counts behavior success and module dependency cycles. See the suite
-READMEs in `agentsCookbook/benchmarks/suites/repository-intelligence/` for exact
-pinned source and oracle semantics.
+The earlier evaluation tools in `scripts/agent_evaluation/` remain development
+measurements, separate from the installed product and EvalShot's native-agent
+campaign authority. Historical benchmark sources, receipts, and versioned schema
+names retain their original provenance.
