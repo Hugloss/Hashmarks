@@ -124,14 +124,26 @@ def _host_capabilities() -> dict[str, bool]:
     }
 
 
+@pytest.hookimpl(trylast=True)
 def pytest_collection_modifyitems(
     config: pytest.Config, items: list[pytest.Item]
 ) -> None:
-    """Qualify optional SDK tests and the additional constrained-host exclusions."""
+    """Require the native SDK; qualify explicit constrained-host exclusions."""
     import os
 
     constrained = os.environ.get("HASHMARKS_CONSTRAINED_HOST") == "1"
     capabilities = _host_capabilities()
+    if (
+        not constrained
+        and not config.option.collectonly
+        and not capabilities["host_mcp_sdk"]
+        and any(item.get_closest_marker("host_mcp_sdk") is not None for item in items)
+    ):
+        raise pytest.UsageError(
+            "MCP SDK is required for the selected tests; run make init to install "
+            "the locked test environment. Restricted hosts may explicitly use "
+            "HASHMARKS_CONSTRAINED_HOST=1 for diagnostic evidence."
+        )
     mandatory_skip = {
         "certification": "native/release authority is excluded from hosted diagnostics",
         "host_dns": "external DNS/network is excluded from hosted diagnostics",
@@ -145,13 +157,11 @@ def pytest_collection_modifyitems(
         for marker, available in capabilities.items():
             if (
                 not available
-                and (constrained or marker == "host_mcp_sdk")
+                and constrained
                 and item.get_closest_marker(marker) is not None
             ):
                 item.add_marker(
                     pytest.mark.skip(
                         reason=f"constrained host lacks capability: {marker}"
-                        if constrained
-                        else "optional official MCP SDK unavailable"
                     )
                 )

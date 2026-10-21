@@ -389,6 +389,7 @@ release-smoke = [
     { name = "pywinpty", marker = "sys_platform == 'win32'" },
 ]
 test = [
+    { name = "mcp" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "tree-sitter-language-pack" },
@@ -415,6 +416,7 @@ hooks = [{ name = "pre-commit" }]
 lint = [{ name = "ruff", specifier = ">=0.12.0" }]
 release-smoke = [{ name = "pywinpty", marker = "sys_platform == 'win32'", specifier = ">=3,<4" }]
 test = [
+    { name = "mcp", specifier = ">=2.2.0" },
     { name = "pytest", specifier = ">=8.4" },
     { name = "pytest-cov", specifier = ">=7.0" },
     { name = "tree-sitter-language-pack" },

@@ -838,11 +838,12 @@ class DecisionScope:
         ]
         self._cache_missing_file_rows(generation, missing)
         output: dict[str, dict[str, object]] = {}
+        missing_set = set(missing)
         for path in unique:
             value = self._file_row_cache.get((generation, path))
             if value is not None:
                 output[path] = value
-            if path not in missing:
+            if path not in missing_set:
                 self._stats["file_row_hit"] += 1
         return output
 

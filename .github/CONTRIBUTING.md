@@ -83,11 +83,11 @@ For native full-suite qualification:
 make test-profile
 ```
 
-The optional `host_mcp_sdk` test marker is capability-aware in normal runs as
-well: without the SDK, only marked MCP cases skip. CLI cases remain runnable.
-Use `make init` for SDK-present development qualification; SDK-absent results do
-not establish that MCP transports work. Other native prerequisites retain their
-normal failure behavior unless the constrained-host mode below is selected.
+The locked `test` dependency group includes the MCP SDK and native syntax parser.
+Normal qualification requires the SDK for selected `host_mcp_sdk` cases and
+reports a setup error if it is missing. Run `make init` to repair the environment.
+CLI-only selections remain runnable without the SDK; capability skips belong to
+the explicit constrained-host mode below.
 
 Restricted CI/container hosts may run capability-aware diagnostics without weakening native qualification:
 
