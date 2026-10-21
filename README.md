@@ -492,7 +492,7 @@ Hashmarks checkout, then use `make benchmark-check`, `make benchmark`, or
 `make benchmark-report` here as thin aliases. Set `EVALSHOT=/path/to/EvalShot`
 when it is elsewhere. Hashmarks does not mirror EvalShot suite, agent, campaign,
 run/resume, interpreter, or reporting defaults. See the
-[evaluation handoff](benchmarks/agent_evaluation/README.md).
+[evaluation handoff](https://github.com/Hugloss/Hashmarks/blob/main/benchmarks/agent_evaluation/README.md).
 
 The normal OSS test surface does not require an external coding-agent host. `make mcp-host-status` inspects project-local MCP registration/readiness; `make mcp-opencode-check` is the real OpenCode release host gate. Native release qualification and the other real-host MCP gates are documented separately.
 
