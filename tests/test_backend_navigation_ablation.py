@@ -111,6 +111,25 @@ def test_modes_are_real_independent_source_experiments(tmp_path: Path) -> None:
         assert assert_object(groups[0]["concept"])["kind"] == kind
 
 
+def test_owner_migration_preserves_historical_export_validation(tmp_path: Path) -> None:
+    _write(tmp_path)
+    current = export_cases(tmp_path, _manifest())
+    historical = copy.deepcopy(current)
+    historical["agent_experiment_owner"] = "external-agentsCookbook"
+    historical["export_identity"] = _digest(
+        {key: value for key, value in historical.items() if key != "export_identity"}
+    )
+    original_bytes = _encode(historical)
+
+    validate_export(historical)
+    validate_export(current)
+
+    assert current["agent_experiment_owner"] == "external-EvalShot"
+    assert current["export_identity"] != historical["export_identity"]
+    assert current["cases"] == historical["cases"]
+    assert _encode(historical) == original_bytes
+
+
 def test_source_edit_changes_snapshot_identity_and_exposed_navigation(
     tmp_path: Path,
 ) -> None:

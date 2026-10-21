@@ -139,11 +139,19 @@ All test filenames in this table are under `tests/`. Add a mechanism inside its
 existing owner; a new parser, query implementation, or wire format does not earn
 another freshness, admission, ownership, or schema authority. Meaningful boundary
 changes name their callers, dependencies, owned state, and direct tests in the
-same change. Use the [component rewrite plan](../plans/CANONICAL_COMPONENT_REWRITE_PLAN.md)
-for the current staged implementation and qualification. Files, identity
-observation access, Index, DecisionScope, Source, Imports, Native evidence, Relationships, Structure, Search and Context are independent components;
-the remaining domain compositions are still being migrated. Context nominates
-instruction-query seed paths; Source observes already-selected path scopes.
+same change. All 23 canonical component owners are implemented for the completed
+stabilization scope. Start with the current
+[state and semantic owner contracts](../reference/STATE_AND_SEMANTIC_OWNERS.md)
+and the direct tests above. Context nominates instruction-query seed paths;
+Source observes already-selected path scopes.
+
+The [stabilization report](../qualification/STABILIZATION_REPORT.md) records the
+qualified source milestone and its limitations; it does not establish every
+later revision or agent-effectiveness claim. Broad backend 5/5 qualification
+remains a [deferred research backlog](../qualification/BACKEND_E2E_REMAINING_PLAN.md).
+The [component rewrite plan](../plans/CANONICAL_COMPONENT_REWRITE_PLAN.md) retains
+implementation history and future qualification specifications, not a current
+component-migration queue.
 
 ## Trace common requests before reading everything
 

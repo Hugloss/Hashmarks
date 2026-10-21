@@ -235,7 +235,7 @@ def export_cases(repo: Path, manifest: dict[str, object]) -> dict[str, object]:
         "cases": result,
         "pair_completeness": "two-frozen-arms-per-case",
         "authority": "source-bound-provider-observations-only",
-        "agent_experiment_owner": "external-agentsCookbook",
+        "agent_experiment_owner": "external-EvalShot",
         "model_delivery": "not-observed",
         "paired_correctness": "not-measured",
         "source_fact_equivalence": "checked",

@@ -15,7 +15,7 @@ DIAGNOSTIC_PYTHON ?= python3
 DIAGNOSTIC_BATCH ?= 0
 DIAGNOSTIC_BATCH_LIMIT ?= 8
 DIAGNOSTIC_SHARD ?= 0
-AGENTS_COOKBOOK ?= ../agentsCookbook
+EVALSHOT ?= ../EvalShot
 RUFF_DEBT_PREVIOUS_BASELINE ?=
 RUFF_AUTOFIX_SELECT ?= E4,E7,E9,I,T201
 
@@ -81,21 +81,21 @@ help:
 	  '  make metrics-derived-authority  Measure controlled + uv/Maven explicit-packet economics before retention' \
 	  '  make metrics        Quick 10k repository-intelligence baseline including daemon + impact metrics' \
 	  '  make metrics-scale  100k repository-intelligence baseline' \
-	  '  make benchmark      Delegate benchmark execution to the sibling agentsCookbook checkout' \
-	  '  make benchmark-check  Delegate benchmark readiness to agentsCookbook' \
-	  '  make benchmark-report  Delegate benchmark reporting to agentsCookbook' \
+	  '  make benchmark      Delegate benchmark execution to the sibling EvalShot checkout' \
+	  '  make benchmark-check  Delegate model-free benchmark readiness to EvalShot' \
+	  '  make benchmark-report  Delegate benchmark reporting to EvalShot' \
 	  '  make evaluation-help  Show external-agent/research evaluation targets' \
 	  '' \
 	  'Override FILES/HOT_REQUESTS, e.g. make metrics FILES=50000 HOT_REQUESTS=50'
 
 benchmark:
-	@$(MAKE) --no-print-directory -C "$(AGENTS_COOKBOOK)" benchmark
+	@$(MAKE) --no-print-directory -C "$(EVALSHOT)" benchmark
 
 benchmark-check:
-	@$(MAKE) --no-print-directory -C "$(AGENTS_COOKBOOK)" benchmark-check
+	@$(MAKE) --no-print-directory -C "$(EVALSHOT)" benchmark-check
 
 benchmark-report:
-	@$(MAKE) --no-print-directory -C "$(AGENTS_COOKBOOK)" benchmark-report
+	@$(MAKE) --no-print-directory -C "$(EVALSHOT)" benchmark-report
 
 evaluation-help:
 	@printf '%s\n' \

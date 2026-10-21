@@ -72,7 +72,7 @@ identities. The receipt is explicitly `diagnostic-only` and sets
 still prove which executable it launched, that the process is bound to the intended
 workspace, and that the host-visible catalog matches the admitted contract.
 
-This is useful for trial-scoped integrations such as agentsCookbook or Harbor because
+This is useful for trial-scoped integrations such as EvalShot or Harbor because
 they can fail before model work when the Hashmarks runtime is not ready, without
 requiring a global Codex/OpenCode/Claude registration.
 
@@ -131,10 +131,10 @@ Use the latest OpenAI `tunnel-client` release and the current Secure MCP Tunnel 
 
 When the target ChatGPT workspace has developer-mode custom-app access, create the app using **Tunnel** and select the OpenAI-managed tunnel. Review the discovered Hashmarks tools before model calls. The tunnel/app/workspace permissions remain OpenAI/organization authority; a successful local Hashmarks handoff does not imply that ChatGPT access has been granted.
 
-For routing benchmarking, do not count a missing Hashmarks app as a tool-selection loss. First capture the host-visible catalog and qualify it with the agentsCookbook host-neutral gate:
+For routing benchmarking, do not count a missing Hashmarks app as a tool-selection loss. First capture the host-visible catalog and qualify it with the EvalShot host-neutral gate:
 
 ```bash
-../agentsCookbook/benchmark tool-routing-catalog \
+../EvalShot/benchmark tool-routing-catalog \
   --catalog host-tools.json \
   --subject hashmarks
 ```
@@ -504,7 +504,7 @@ Neither the absent calls nor the unassisted prefix-path mistake authorize
 changing repository semantic owners. Bounded delivery and intent descriptions
 are product repairs; they do not prove increased adoption or incremental value.
 
-AgentsCookbook owns the next paired campaign, task difficulty, scoring and
+EvalShot owns the next paired campaign, task difficulty, scoring and
 invocation-separated economics. Keep native tools available, use neutral prompts
 that name no tool, and bind both arms to the same repository revision, host,
 model, tool exposure and workload. Include Python and TypeScript cases with
