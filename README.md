@@ -477,8 +477,10 @@ uv sync --frozen --extra mcp --group test
 
 Use that direct command when repairing or materializing the project environment without Make. The same MCP-capable `.venv` is required when this checkout is used as the Hashmarks subject by an external benchmark harness.
 
-The test environment includes the optional native syntax parser. Installed-package
-users can enable the same declaration ranges with `pip install 'hashmarks[syntax]'`.
+The `test` dependency group includes the MCP SDK and native syntax parser, so
+normal CI and local qualification exercise both integrations without dependency
+skips. Installed-package users can enable the same declaration ranges with
+`pip install 'hashmarks[syntax]'`.
 This uses bundled grammars and keeps repository parsing local. Without this extra,
 JavaScript/TypeScript outlines retain their advisory header ranges; native scope
 and full declaration ranges are unavailable.

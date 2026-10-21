@@ -1,4 +1,4 @@
-"""Optional SDK annotations cannot prevent collection of native CLI tests."""
+"""Native SDK coverage is required; constrained diagnostics remain capability-aware."""
 
 from __future__ import annotations
 
@@ -10,7 +10,9 @@ from textwrap import dedent
 from xml.etree import ElementTree as ET
 
 
-def _without_mcp(tmp_path: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
+def _without_mcp(
+    tmp_path: Path, *arguments: str, constrained: bool = False
+) -> subprocess.CompletedProcess[str]:
     script = dedent("""\
         import importlib.util
         import sys
@@ -39,7 +41,7 @@ def _without_mcp(tmp_path: Path, *arguments: str) -> subprocess.CompletedProcess
         env={
             **os.environ,
             "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
-            "HASHMARKS_CONSTRAINED_HOST": "0",
+            "HASHMARKS_CONSTRAINED_HOST": "1" if constrained else "0",
         },
         capture_output=True,
         text=True,
@@ -55,7 +57,35 @@ def test_native_transport_collects_without_optional_mcp(tmp_path: Path) -> None:
     assert "test_native_scip_cli_change_roundtrips_exact_packets" in result.stdout
 
 
-def test_normal_host_without_sdk_skips_mcp_and_keeps_cli_cases(tmp_path: Path) -> None:
+def test_normal_host_without_sdk_rejects_incomplete_qualification(
+    tmp_path: Path,
+) -> None:
+    result = _without_mcp(
+        tmp_path,
+        "-q",
+        "tests/test_repository_observation_cli.py::test_official_mcp_matches_json_cli_observation_contract",
+    )
+    assert result.returncode == 4, result.stdout + result.stderr
+    assert "MCP SDK is required" in result.stderr
+    assert "make init" in result.stderr
+    assert "skipped" not in result.stdout
+
+
+def test_normal_host_without_sdk_can_run_cli_only_cases(tmp_path: Path) -> None:
+    result = _without_mcp(
+        tmp_path,
+        "-q",
+        "-m",
+        "not host_mcp_sdk",
+        "tests/test_function_boundary_arguments.py::test_public_transports_preserve_literal_arguments_and_unknown_binding",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "1 passed" in result.stdout
+
+
+def test_constrained_host_without_sdk_skips_mcp_and_keeps_cli_cases(
+    tmp_path: Path,
+) -> None:
     report = tmp_path / "sdk-absence.xml"
     result = _without_mcp(
         tmp_path,
@@ -65,6 +95,7 @@ def test_normal_host_without_sdk_skips_mcp_and_keeps_cli_cases(tmp_path: Path) -
         "tests/test_function_boundary_arguments.py::test_public_transports_preserve_literal_arguments_and_unknown_binding",
         "tests/test_repository_observation_cli.py::test_official_mcp_matches_json_cli_observation_contract",
         f"--junitxml={report}",
+        constrained=True,
     )
     assert result.returncode == 0, result.stdout + result.stderr
     cases = list(ET.parse(report).getroot().iter("testcase"))
@@ -75,6 +106,6 @@ def test_normal_host_without_sdk_skips_mcp_and_keeps_cli_cases(tmp_path: Path) -
     assert len(sdk) == 4
     assert all(
         (skipped := case.find("skipped")) is not None
-        and "MCP SDK" in skipped.get("message", "")
+        and "host_mcp_sdk" in skipped.get("message", "")
         for case in sdk
     )

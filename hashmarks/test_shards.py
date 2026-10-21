@@ -37,7 +37,7 @@ SCHEMA = "hashmarks.test-shards.v3"
 ENVELOPE_SCHEMA = "hashmarks.repository-work-selection.v1"
 SELECTION_INPUT_SCHEMA = "hashmarks.test-shard-selection-input.v1"
 MEMBERSHIP_SCHEMA = "hashmarks.test-shard-membership.v1"
-SHARD_ALGORITHM = "hashmarks.pytest-test-node-shards.v4"
+SHARD_ALGORITHM = "hashmarks.pytest-test-node-shards.v5"
 
 _SHA256_IDENTITY = re.compile(r"^sha256:[0-9a-f]{64}$")
 _REPOSITORY_CONTENT_IDENTITY = re.compile(r"^sha256:[0-9a-f]{64}:[0-9]+$")
@@ -374,6 +374,26 @@ def _least_loaded_bucket(
     )
 
 
+def _ordinary_shard_groups(
+    nodes: list[tuple[str, int]], shard_count: int
+) -> list[tuple[tuple[str, ...], int]]:
+    """Keep source-file membership together when every shard can remain nonempty."""
+    files: dict[str, list[tuple[str, int]]] = {}
+    for nodeid, weight in nodes:
+        files.setdefault(nodeid.split("::", 1)[0], []).append((nodeid, weight))
+    groups = (
+        list(files.values()) if len(files) >= shard_count else [[row] for row in nodes]
+    )
+    weighted = [
+        (
+            tuple(sorted(nodeid for nodeid, _weight in group)),
+            sum(weight for _nodeid, weight in group),
+        )
+        for group in groups
+    ]
+    return sorted(weighted, key=lambda row: (-row[1], row[0]))
+
+
 def _balanced_shard_buckets(
     nodes: list[tuple[str, int]], shard_count: int
 ) -> tuple[list[list[str]], list[int], int]:
@@ -382,11 +402,12 @@ def _balanced_shard_buckets(
         buckets.append([])
         weights.append(0)
     isolated = {nodeid for bucket in buckets[:isolated_count] for nodeid in bucket}
-    for nodeid, weight in sorted(nodes, key=lambda row: (-row[1], row[0])):
-        if nodeid in isolated:
-            continue
+    ordinary = [row for row in nodes if row[0] not in isolated]
+    for members, weight in _ordinary_shard_groups(
+        ordinary, shard_count - isolated_count
+    ):
         index = _least_loaded_bucket(buckets, weights, isolated_count, shard_count)
-        buckets[index].append(nodeid)
+        buckets[index].extend(members)
         weights[index] += weight
     return buckets, weights, isolated_count
 
