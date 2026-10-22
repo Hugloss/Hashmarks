@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from hashmarks import RepositoryIdentity, test_shards as legacy_shards
+from hashmarks import RepositoryIdentity
+from hashmarks import test_shards as legacy_shards
 from hashmarks._development import test_shards as developer_shards
 from hashmarks.codemap import CodeMap
 
