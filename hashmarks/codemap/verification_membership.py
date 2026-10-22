@@ -6,17 +6,17 @@ from typing import TYPE_CHECKING, cast
 
 from hashmarks.file_store import UnstableFileError
 from hashmarks.operation_contract import operation_response, operation_schema
-from hashmarks.verification_nomination_validation import (
-    validate_verification_nomination,
-)
-
-from .decision_session import decision_scoped, reconcile_decision
 from hashmarks.verification_collection import (
     collection_bundle,
     collection_inputs,
     normalize_collection_report,
 )
 from hashmarks.verification_collection_observation import membership_observation
+from hashmarks.verification_nomination_validation import (
+    validate_verification_nomination,
+)
+
+from .decision_session import decision_scoped, reconcile_decision
 
 if TYPE_CHECKING:
     from .evidence_verification import RepositoryVerification
@@ -59,7 +59,6 @@ class VerificationMembershipMixin:
                         f"verification membership source changed during observation: {path}"
                     )
             return result
-
 
     @staticmethod
     def _nomination_member_correspondence(
@@ -112,12 +111,8 @@ class VerificationMembershipMixin:
                     path = str(claimed["path"])
                     observed = self._observe_nomination_source_member(path)
                     observed_by_path.append(observed)
-                    relation = self._nomination_member_correspondence(
-                        claimed, observed
-                    )
-                    checks.append(
-                        {"path": path, "correspondence": relation}
-                    )
+                    relation = self._nomination_member_correspondence(claimed, observed)
+                    checks.append({"path": path, "correspondence": relation})
                     if relation != "matched":
                         reasons.append(f"source-{relation}:{path}")
                 # A single read scope does not prevent source files changing on

@@ -4,16 +4,11 @@ from __future__ import annotations
 
 from copy import deepcopy
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import pytest
 
 from hashmarks.codemap import CodeMap
 from hashmarks.operation_contract import operation_schema
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
-
 
 def _repo(root: Path, *, with_manifest: bool = True) -> None:
     (root / "tests").mkdir()
@@ -47,7 +42,8 @@ def test_live_binding_matches_qualified_source_members(tmp_path: Path) -> None:
     assert result["source_binding_state"] == "matched"
     assert result["reasons"] == []
     assert [r["correspondence"] for r in result["checked_source_members"]] == [
-        "matched", "matched"
+        "matched",
+        "matched",
     ]
     _assert_external(result)
 
@@ -158,7 +154,5 @@ def test_intervening_source_change_yields_unknown(
         )
         result = codemap.verification.observe_nomination_source_binding(packet)
     assert result["source_binding_state"] == "unknown"
-    assert (
-        "source-changed-during-observation:tests/test_demo.py" in result["reasons"]
-    )
+    assert "source-changed-during-observation:tests/test_demo.py" in result["reasons"]
     _assert_external(result)
