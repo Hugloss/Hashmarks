@@ -316,7 +316,14 @@ row caps, source references, qualification metadata, and omission accounting.
 For MCP `task_evidence` in `initial` mode, the text content is readable even when
 `presentation` is omitted or `none`: it uses the existing grouped-text initial
 projection, including the producer's ambiguity reason, discrimination question,
-retained alternatives, freshness, proof scope and source qualifications. Displayed
+retained alternatives, freshness, proof scope and source qualifications. The
+readable projection leads with the existing producer-qualified owner observation
+(or explicitly unresolved owner) before retrieval candidates; stale or incomplete
+ownership cannot be silently promoted by that presentation order. The display
+consumes the producer's resolved ownership authority and proof scope: it must
+not independently reject a structurally resolved owner merely because the
+producer retained an initial ambiguity observation. The canonical resolver can
+resolve competing candidates with qualifying structural evidence. Displayed
 omissions never establish absence. The unchanged lossless encoded initial packet
 remains in `structuredContent` for every presentation format. A host must decode
 that packet before treating it as native

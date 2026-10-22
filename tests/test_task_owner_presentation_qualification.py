@@ -51,6 +51,47 @@ def _rows(
     ]
 
 
+def test_qualified_structural_resolution_preserves_owner_and_source_labels() -> None:
+    """The canonical resolver may settle competing candidates structurally."""
+    from hashmarks.ownership_decision import (
+        OwnershipDecisionState,
+        ownership_decision_trace,
+    )
+
+    resolved = ownership_decision_trace(
+        OwnershipDecisionState(
+            edit={"path": "src/archive.py"},
+            competing=({"path": "src/other.py"},),
+            structural_owner={"selected": "src/archive.py"},
+            ambiguous=True,
+            ambiguity_reason="competing-ranked-candidate",
+            proof_scope="task",
+            proof_scope_complete=True,
+        )
+    )
+    assert resolved["status"] == "resolved"
+    assert resolved["ambiguity"]["ambiguous"] is True
+    assert resolved["evidence_state"]["proven"] is True
+    native = _packet()
+    native["ownership"]["status"] = resolved["status"]
+    native["ownership"]["ambiguity"] = resolved["ambiguity"]
+    original = deepcopy(native)
+
+    for format in ("structured", "compact", "text"):
+        rows = _rows(native, format=format)
+        qualified = next(row for row in rows if row["kind"] == "qualified_owner")
+        source = next(row for row in rows if row["kind"] == "owner_source_evidence")
+        assert qualified["assertion"] == "observed_fact"
+        assert source["assertion"] == "observed_fact"
+        assert qualified["source_refs"] == ["/ownership/owner"]
+        assert source["source_refs"] == ["/ownership/source_evidence"]
+        ctx = assert_object(
+            assert_object(qualified["source_context"])["task_ownership"]
+        )
+        assert ctx["display_qualification"] == "producer-claimed-qualified"
+    assert native == original
+
+
 def test_current_resolved_complete_owner_keeps_native_paths_and_source() -> None:
     native = _packet()
     original = deepcopy(native)
