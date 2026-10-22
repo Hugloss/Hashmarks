@@ -232,9 +232,10 @@ class VerificationPlanMixin:
     ) -> tuple[str, str, str, str, str | None] | None:
         if TYPE_CHECKING:
             self = cast("RepositoryVerification", self)
-        if Path(rel).name.endswith("_test.go") and (
-            self.workspace / "go.mod"
-        ).is_file():
+        if (
+            Path(rel).name.endswith("_test.go")
+            and (self.workspace / "go.mod").is_file()
+        ):
             return ("go-test", "go-package", "go-mod-plus-test-file", "high", None)
         return None
 
@@ -309,7 +310,9 @@ class VerificationPlanMixin:
         reason: str | None = None
         if not self.files.is_admitted(rel):
             reason = "path-outside-analysis-scope"
-        elif not (self.workspace / rel).is_file() or (self.workspace / rel).is_symlink():
+        elif (
+            not (self.workspace / rel).is_file() or (self.workspace / rel).is_symlink()
+        ):
             reason = "source-file-unavailable"
         elif RepositoryDomain.TEST not in set(classify_repository_path(rel)):
             reason = "path-is-not-test-domain"
