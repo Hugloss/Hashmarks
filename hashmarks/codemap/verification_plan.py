@@ -187,6 +187,39 @@ class VerificationPlanMixin:
             "reason": "unsupported-test-runner",
         }
 
+    def nomination(
+        self, path: str, *, symbol: str | None = None, qualname: str | None = None
+    ) -> dict[str, object]:
+        """Project repository verification evidence without executable instructions.
+
+        Preserve the one existing selection owner: the compatibility Plan owns
+        nomination semantics for now. This view strips its legacy argv,
+        working-directory and executable hints instead of choosing an agent
+        command, execution backend, or native test environment.
+        """
+        selected = self.plan(path, symbol=symbol, qualname=qualname)
+        if not selected["available"]:
+            return {
+                "schema": "hashmarks.verification-nomination.v1",
+                "available": False,
+                "path": selected["path"],
+                "reason": selected["reason"],
+                "authority": "repository-evidence-only",
+                "execution_authority": "external",
+            }
+        nominated = selected["verification_target"]
+        return {
+            "schema": "hashmarks.verification-nomination.v1",
+            "available": True,
+            "verification_target": dict(nominated) if nominated is not None else None,
+            "scope": selected.get("scope"),
+            "runner_evidence": selected["runner"],
+            "source_evidence": selected["evidence"],
+            "confidence": selected["confidence"],
+            "authority": "repository-evidence-only",
+            "execution_authority": "external",
+        }
+
     def plan(
         self, path: str, *, symbol: str | None = None, qualname: str | None = None
     ) -> TaskVerificationPlan:

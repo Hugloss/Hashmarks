@@ -104,3 +104,78 @@ def test_verification_plan_derives_native_node_test_argv(tmp_path: Path) -> None
     assert plan["argv"] == ["node", "--test", "tests/widget.test.js"]
     assert "scope" in plan
     assert plan["scope"] == "test-file"
+
+
+def test_verification_nomination_excludes_native_command_for_python(tmp_path: Path) -> None:
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/test_widget.py").write_text(
+        "def test_widget(): pass\n", encoding="utf-8"
+    )
+    (tmp_path / "pyproject.toml").write_text(
+        "[tool.pytest.ini_options]\n", encoding="utf-8"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        legacy = codemap.verification.plan("tests/test_widget.py", symbol="test_widget")
+        nomination = codemap.verification.nomination(
+            "tests/test_widget.py", symbol="test_widget"
+        )
+    assert nomination == {
+        "schema": "hashmarks.verification-nomination.v1",
+        "available": True,
+        "verification_target": legacy["verification_target"],
+        "scope": "test-node",
+        "runner_evidence": "pytest",
+        "source_evidence": "pyproject-pytest-config",
+        "confidence": "high",
+        "authority": "repository-evidence-only",
+        "execution_authority": "external",
+    }
+    assert {"argv", "working_directory", "command", "executable", "safe"}.isdisjoint(
+        nomination
+    )
+
+
+def test_verification_nomination_preserves_unavailable_scope(tmp_path: Path) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src/widget.py").write_text("x = 1\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        nomination = codemap.verification.nomination("src/widget.py")
+    assert nomination == {
+        "schema": "hashmarks.verification-nomination.v1",
+        "available": False,
+        "path": "src/widget.py",
+        "reason": "path-is-not-test-domain",
+        "authority": "repository-evidence-only",
+        "execution_authority": "external",
+    }
+
+
+def test_verification_nomination_never_promotes_polyglot_argv(tmp_path: Path) -> None:
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "go.mod").write_text("module example.test/widget\n", encoding="utf-8")
+    (tmp_path / "tests/widget_test.go").write_text(
+        "package tests\nfunc TestWidget(t *testing.T) {}\n", encoding="utf-8"
+    )
+    (tmp_path / "tsconfig.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "tests/widget.test.ts").write_text(
+        "export const widget = 1\n", encoding="utf-8"
+    )
+    (tmp_path / "tests/widget.test.js").write_text(
+        "import test from 'node:test';\n", encoding="utf-8"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        for rel in (
+            "tests/widget_test.go",
+            "tests/widget.test.ts",
+            "tests/widget.test.js",
+        ):
+            planned = codemap.verification.plan(rel)
+            nominated = codemap.verification.nomination(rel)
+            assert planned["available"] is True
+            assert nominated["verification_target"] == planned["verification_target"]
+            assert nominated["runner_evidence"] == planned["runner"]
+            assert nominated["execution_authority"] == "external"
+            assert {"argv", "working_directory", "command"}.isdisjoint(nominated)

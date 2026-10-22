@@ -367,6 +367,15 @@ A useful proposal outside the Hashmarks profile should be explicitly routed to t
 
 ## Verification and developer qualification owner map
 
+The new `CodeMap.verification.nomination(...)` method offers a command-free
+projection of the same selected test surface. Its `verification_target`,
+`runner_evidence`, `scope`, `source_evidence` and `confidence` describe
+repository observations only. It returns no executable or working directory.
+It delegates to the existing verification Plan decision for compatibility,
+not a new selector; existing `plan(...)` callers continue to receive the
+legacy advisory fields until separately migrated.
+
+
 Hashmarks owns repository-derived verification **targets**, member/provenance
 identity, ambiguity and freshness, not a consumer's executable selection.
 `CodeMap.verification.plan(...)` exposes `verification_target` as the
