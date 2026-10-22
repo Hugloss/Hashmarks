@@ -34,8 +34,6 @@ def _task_owner_display_qualified(
         ownership.get("status") == "resolved"
         and ownership.get("proof_scope_complete") is True
         and ownership.get("authority") == "repository-ownership-only"
-        and isinstance(ownership.get("ambiguity"), Mapping)
-        and ownership["ambiguity"].get("ambiguous") is False
         and isinstance(owner_path, str)
         and bool(owner_path)
         and isinstance(freshness, Mapping)
