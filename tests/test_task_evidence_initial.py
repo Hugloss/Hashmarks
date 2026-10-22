@@ -587,6 +587,45 @@ def initial_text_source(
     return native, observation
 
 
+@pytest.mark.parametrize("freshness", ["current", "stale", "unknown"])
+def test_initial_owner_display_qualification_converges_across_formats(
+    initial_text_source: tuple[dict[str, Any], dict[str, object]],
+    freshness: str,
+) -> None:
+    native = deepcopy(initial_text_source[0])
+    native["freshness"]["state"] = freshness
+    initial = initial_task_evidence(native)
+    initial["evidence_packet_identity"] = initial_packet_identity(initial)
+    wire = encode_initial_packet(initial)
+    before = deepcopy(wire)
+
+    structured = presentation_response(
+        "task_evidence", wire, result_mode="initial", format="structured"
+    )
+    text_response = presentation_response(
+        "task_evidence", wire, result_mode="initial", format="text"
+    )
+    groups = assert_array(assert_object(structured["presentation"])["groups"])
+    owner_group = next(
+        group
+        for group in groups
+        if assert_object(group)["family"] == "ownership_evidence"
+    )
+    owner_finding = assert_object(assert_array(owner_group["findings"])[0])
+    context = assert_object(owner_finding["source_context"])
+    display_state = assert_text(context["display_qualification"])
+    assert display_state in {"producer-claimed-qualified", "unqualified"}
+    if freshness != "current":
+        assert display_state == "unqualified"
+    readable = assert_text(assert_object(text_response["presentation"])["text"])
+    if initial["ownership"]["owner"] is None:
+        assert "Owner unresolved" in readable
+        assert display_state == "unqualified"
+    else:
+        assert f"qualification: {display_state}" in readable
+    assert wire == structured["result"] == text_response["result"] == before
+
+
 def test_initial_text_keeps_ambiguity_alternatives_outside_retrieval_prefix(
     initial_text_source: tuple[dict[str, Any], dict[str, object]],
 ) -> None:
