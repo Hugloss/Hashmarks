@@ -81,6 +81,9 @@ _EXPECTED = {
         "default": "hashmarks.verification-membership-observation.v1"
     },
     "verification_nomination": {"default": "hashmarks.verification-nomination.v1"},
+    "verification_nomination_binding": {
+        "default": "hashmarks.verification-nomination-binding.v1"
+    },
     "evidence_comparison": {
         "structural": "hashmarks.structural-locality-delta.v1",
         "bindings": "hashmarks.repository-evidence-binding-delta.v1",
@@ -399,6 +402,10 @@ _FIXED_MODE_CORE_BOUNDARIES = {
     "verification_nomination": (
         "hashmarks/codemap/verification_plan.py",
         "nomination",
+    ),
+    "verification_nomination_binding": (
+        "hashmarks/codemap/verification_membership.py",
+        "observe_nomination_source_binding",
     ),
     "repository_context": ("hashmarks/codemap/repository_context.py", "orient"),
     "find": ("hashmarks/codemap/find_engine.py", "packet"),

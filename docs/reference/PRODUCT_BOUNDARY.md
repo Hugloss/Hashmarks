@@ -445,3 +445,24 @@ execution. It explicitly reports `repository_binding: not-checked`,
 `producer_authenticity: not-checked`, and `execution_authority: external`.
 Consumers requiring live source qualification must obtain it separately from
 the source observer; they must not infer it from the digest.
+
+### Current-source correlation for nomination evidence
+
+`CodeMap.verification.observe_nomination_source_binding(packet)` is a
+**separate observation**, never an extension of the pure nomination transport
+validator. It first consumes
+`validate_verification_nomination(packet)`, then asks Hashmarks' existing
+source-member observer for the current state and revision of each *claimed*
+input. It also checks the observed inputs again before returning so an
+intervening source change cannot silently be reported as a match. It does
+not select tests or rederive whether the producer's runner is appropriate.
+
+The result distinguishes `matched`, `mismatch`, `unknown`,
+`not-applicable` (unavailable nomination), and `invalid-packet`. A matched
+state proves only revision correspondence at observation time; it does **not**
+authenticate the caller's nomination, attest provenance, issue a freshness
+lease, select a native command, authorize execution, or certify results.
+Unknown/unreadable/denied source observations never become negative evidence
+or proof that a claimed member is absent. Current repository intelligence is
+provided solely by the existing source observer, not by another hashing,
+filesystem traversal, or validation authority.
