@@ -729,11 +729,10 @@ def initial_evidence_text(packet: Mapping[str, object]) -> str:
     if not isinstance(ambiguity, Mapping):
         raise ValueError("malformed initial ownership ambiguity")
     freshness = json.dumps(packet["freshness"], sort_keys=True, ensure_ascii=False)
-    lines = [
-        f"Ownership: {ownership['status']}; freshness: {freshness} (@ /ownership, /freshness).",
-        f"Ambiguity: {ambiguity.get('ambiguous', 'unknown')} (@ /ownership/ambiguity).",
-        f"Owner proof scope: {ownership.get('proof_scope', 'unknown')}; complete: {ownership.get('proof_scope_complete', 'unknown')}; authority: {ownership.get('authority', 'unknown')} (@ /ownership).",
-    ]
+    # Put the exact, explicitly qualified owner observation first, before
+    # candidate and verification details. This only reorders existing facts;
+    # the producer still owns the resolution, freshness and ambiguity.
+    lines: list[str] = []
     owner = ownership.get("owner")
     if isinstance(owner, Mapping):
         owner_name = owner.get("qualname")
@@ -751,6 +750,13 @@ def initial_evidence_text(packet: Mapping[str, object]) -> str:
         )
     else:
         lines.append("Owner unresolved (@ /ownership/owner).")
+    lines.extend(
+        (
+            f"Ownership: {ownership['status']}; freshness: {freshness} (@ /ownership, /freshness).",
+            f"Ambiguity: {ambiguity.get('ambiguous', 'unknown')} (@ /ownership/ambiguity).",
+            f"Owner proof scope: {ownership.get('proof_scope', 'unknown')}; complete: {ownership.get('proof_scope_complete', 'unknown')}; authority: {ownership.get('authority', 'unknown')} (@ /ownership).",
+        )
+    )
     lines.extend(_initial_ambiguity_text(ambiguity))
     for index, row in enumerate(retrieval.get("results", [])):
         lines.append(
