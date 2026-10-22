@@ -10,6 +10,7 @@ import pytest
 from hashmarks.codemap import CodeMap
 from hashmarks.operation_contract import operation_schema
 
+
 def _repo(root: Path, *, with_manifest: bool = True) -> None:
     (root / "tests").mkdir()
     (root / "tests/test_demo.py").write_text(
