@@ -28,6 +28,7 @@ from hashmarks.mcp_contract import (
     qualify_mcp_observation,
     response_schema_for_mode,
     tool_contract,
+    tool_description,
     validate_tool_response,
 )
 
@@ -397,6 +398,65 @@ def test_mcp_tool_projection_is_canonical_order_and_identity_bound() -> None:
 
     changed = mcp_projection_summary(canonical, ("find",))
     assert changed["projection_identity"] != summary["projection_identity"]
+
+
+def test_restricted_projection_intent_hints_use_only_canonical_selected_tools() -> None:
+    # A projected server may expose less than the full catalog. Its discovery
+    # hints must never instruct the model to invoke a deliberately hidden tool.
+    broad = mcp_projection_instructions(("repository_context",))
+    assert "repository_context: Use for broad repository orientation only" in broad
+    assert "task_evidence" not in broad
+    assert "source_observation" not in broad
+
+    task = mcp_projection_instructions(("task_evidence",))
+    assert (
+        "task_evidence: " + tool_description("task_evidence").split(". ", 1)[0] in task
+    )
+    assert "repository_context:" not in task
+    assert "find:" not in task
+
+    selected = mcp_projection_instructions(
+        ("task_evidence", "find", "source_observation")
+    )
+    assert "find: Use when you already know an exact path" in selected
+    assert "task_evidence: Use first when behavior is described" in selected
+    assert "source_observation: Observe literals" in selected
+    assert "repository_context:" not in selected
+    assert selected == mcp_projection_instructions(
+        ("source_observation", "find", "task_evidence")
+    )
+    # Default catalog is intentionally untouched: this is opt-in projection
+    # discovery, not a new default routing policy or additional MCP tool.
+    assert mcp_projection_instructions(MCP_TOOL_NAMES) == MCP_SERVER_INSTRUCTIONS
+
+
+def test_all_selected_specialist_tools_share_canonical_intent_source() -> None:
+    # A narrow specialist projection must not lose discovery semantics simply
+    # because its tool was not in a separately maintained core-tool shortlist.
+    selected = (
+        "structural_locality",
+        "repository_findings",
+        "repository_declarations",
+        "dependency_codemap",
+    )
+    observed = mcp_projection_instructions(selected)
+    canonical = normalize_mcp_tool_names(selected)
+    for name in canonical:
+        first_sentence = tool_description(name).split(". ", 1)[0].rstrip(".")
+        assert f"{name}: {first_sentence}." in observed
+    assert observed == mcp_projection_instructions(tuple(reversed(selected)))
+    assert "task_evidence:" not in observed
+    assert "find:" not in observed
+    assert "intentional" in observed
+
+    summary = mcp_projection_summary(
+        {"contract_identity": "sha256:canonical"}, selected
+    )
+    assert summary["tools"] == list(canonical)
+    assert summary["instructions"] == observed
+    assert summary["source_contract_identity"] == "sha256:canonical"
+    assert str(summary["projection_identity"]).startswith("sha256:")
+    assert mcp_projection_instructions(MCP_TOOL_NAMES) == MCP_SERVER_INSTRUCTIONS
 
 
 def test_mcp_query_surface_projection_is_canonical_and_identity_bound() -> None:
