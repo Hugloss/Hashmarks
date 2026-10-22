@@ -112,18 +112,29 @@ class VerificationMembershipMixin:
                     observed = self._observe_nomination_source_member(path)
                     observed_by_path.append(observed)
                     relation = self._nomination_member_correspondence(claimed, observed)
-                    checks.append({"path": path, "correspondence": relation})
-                    if relation != "matched":
-                        reasons.append(f"source-{relation}:{path}")
+                    checks.append(
+                        {
+                            "path": path,
+                            "correspondence": relation,
+                            "observed_member": observed,
+                        }
+                    )
                 # A single read scope does not prevent source files changing on
                 # disk. Reobserve each participant before reporting matched.
                 for row, originally in zip(checks, observed_by_path, strict=True):
                     current = self._observe_nomination_source_member(str(row["path"]))
                     if current != originally:
                         row["correspondence"] = "unknown"
-                        reasons.append(
-                            f"source-changed-during-observation:{row['path']}"
-                        )
+                        row["recheck"] = "changed"
+                        row["reobserved_member"] = current
+                    else:
+                        row["recheck"] = "stable"
+                for row in checks:
+                    path = str(row["path"])
+                    if row["recheck"] == "changed":
+                        reasons.append(f"source-changed-during-observation:{path}")
+                    elif row["correspondence"] != "matched":
+                        reasons.append(f"source-{row['correspondence']}:{path}")
                 relations = {row["correspondence"] for row in checks}
                 state = (
                     "mismatch"
