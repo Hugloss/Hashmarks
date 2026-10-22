@@ -719,6 +719,20 @@ def _initial_ambiguity_text(ambiguity: Mapping[str, Any]) -> list[str]:
     return lines
 
 
+def _initial_next_read_text(ownership: Mapping[str, object]) -> list[str]:
+    """Display an existing producer nomination, never choose an action."""
+    next_read = ownership.get("next_read")
+    if not isinstance(next_read, Mapping):
+        return []
+    return [
+        "Producer next-read candidate: "
+        + json.dumps(
+            next_read, sort_keys=True, ensure_ascii=False, separators=(",", ":")
+        )
+        + " (@ /ownership/next_read; repository evidence only, not an execution instruction)."
+    ]
+
+
 def initial_evidence_text(packet: Mapping[str, object]) -> str:
     """Describe admitted initial locators; their native qualifications still govern."""
     from hashmarks.codemap.task_evidence_initial import decode_initial_collection
@@ -768,15 +782,7 @@ def initial_evidence_text(packet: Mapping[str, object]) -> str:
         )
     )
     lines.extend(_initial_ambiguity_text(ambiguity))
-    next_read = ownership.get("next_read")
-    if isinstance(next_read, Mapping):
-        lines.append(
-            "Producer next-read candidate: "
-            + json.dumps(
-                next_read, sort_keys=True, ensure_ascii=False, separators=(",", ":")
-            )
-            + " (@ /ownership/next_read; repository evidence only, not an execution instruction)."
-        )
+    lines.extend(_initial_next_read_text(ownership))
     for index, row in enumerate(retrieval.get("results", [])):
         lines.append(
             f"Source candidate: {row['path']}::{row.get('symbol', row.get('qualname', ''))} ({row.get('start_line', 'unknown')}:{row.get('end_line', 'unknown')}; basis: {row.get('supplement', 'canonical-retrieval')}; @ /retrieval/results/{index})."
