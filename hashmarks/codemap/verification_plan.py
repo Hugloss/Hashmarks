@@ -369,7 +369,6 @@ class VerificationPlanMixin:
                 "confidence": confidence,
                 "authority": "repository-evidence-only",
                 "execution_authority": "external",
-    
             }
         )
 
@@ -411,7 +410,6 @@ class VerificationPlanMixin:
                 "reason": reason,
                 "authority": "repository-evidence-only",
                 "execution_authority": "external",
-    
             }
         )
 
