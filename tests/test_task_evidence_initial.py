@@ -665,7 +665,9 @@ def test_producer_next_read_is_visible_in_initial_text_and_structured_evidence(
         for group in groups
         for row in assert_array(assert_object(group)["findings"])
     ]
-    selected = [row for row in records if row.get("kind") == "initial_discrimination_read"]
+    selected = [
+        row for row in records if row.get("kind") == "initial_discrimination_read"
+    ]
     assert len(selected) == 1
     assert selected[0]["details"] == next_read
     assert selected[0]["source_refs"] == ["/ownership/next_read"]
