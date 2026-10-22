@@ -484,3 +484,16 @@ atomic filesystem snapshot nor proves that bytes remained unchanged after
 the final read. No new hashing, source-selection or verification-execution
 authority is introduced. Consumers can inspect the retained native facts
 rather than reconstructing semantic decisions from status strings.
+
+### Pytest manifest evidence qualification
+
+The Hashmarks verification-nomination owner now interprets already source-
+qualified `pyproject.toml` bytes with Python's standard `tomllib` parser.
+Only a real TOML `[tool.pytest.ini_options]` table supports the
+`pyproject-pytest-config` / high-confidence label. Comments, quoted strings
+and unrelated `[tool.pytest]` tables do **not** establish pytest declaration.
+Malformed TOML does not silently fall back to a medium-confidence claim:
+it remains `source-evidence-unqualified`. This is repository **syntax**
+evidence only, not installed pytest capability, collected test membership,
+command selection, process launch or a guarantee that tests will pass.
+The historical advisory `plan(...)` compatibility API is unchanged.

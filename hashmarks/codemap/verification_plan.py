@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import tomllib
 from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
@@ -243,6 +244,21 @@ class VerificationPlanMixin:
         """Recognize explicit node:test source evidence, not a runtime install."""
         return "node:test" in source or "node:test/" in source
 
+    @staticmethod
+    def _pytest_manifest_declaration(raw: bytes) -> bool:
+        """Qualify authored pytest configuration by TOML syntax, not text hints."""
+        try:
+            manifest = tomllib.loads(raw.decode("utf-8"))
+        except (UnicodeError, tomllib.TOMLDecodeError) as exc:
+            raise _UnqualifiedNominationMember("pyproject.toml") from exc
+        tool = manifest.get("tool")
+        if not isinstance(tool, Mapping):
+            return False
+        pytest = tool.get("pytest")
+        return isinstance(pytest, Mapping) and isinstance(
+            pytest.get("ini_options"), Mapping
+        )
+
     def _python_surface_nomination(
         self,
         members: list[dict[str, object]],
@@ -251,10 +267,7 @@ class VerificationPlanMixin:
         qualname: str | None,
     ) -> tuple[str, str, str, str, str | None]:
         raw = self._nomination_source_member("pyproject.toml", members)
-        try:
-            declared = raw is not None and "[tool.pytest." in raw.decode("utf-8")
-        except UnicodeError as exc:
-            raise _UnqualifiedNominationMember("pyproject.toml") from exc
+        declared = raw is not None and self._pytest_manifest_declaration(raw)
         test_symbol = self._verification_test_symbol(symbol, qualname)
         return (
             "pytest",

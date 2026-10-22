@@ -513,3 +513,101 @@ def test_nomination_identity_detects_foreign_field_changes(tmp_path: Path) -> No
     assert evidence_identity(original["schema"], contents) == identity
     contents["execution_authority"] = "hashmarks"
     assert evidence_identity(original["schema"], contents) != identity
+
+
+@pytest.mark.parametrize(
+    ("manifest", "expected_confidence", "expected_evidence"),
+    [
+        (
+            "[tool.pytest.ini_options]\naddopts = '-q'\n",
+            "high",
+            "pyproject-pytest-config",
+        ),
+        (
+            "# [tool.pytest.ini_options]\n[project]\nname = 'demo'\n",
+            "medium",
+            "python-test-domain",
+        ),
+        (
+            "[project]\nname = 'demo'\ndescription = '[tool.pytest.ini_options]'\n",
+            "medium",
+            "python-test-domain",
+        ),
+        (
+            "[tool.pytest]\nother = true\n",
+            "medium",
+            "python-test-domain",
+        ),
+        (
+            "[tool.pytest.ini_options]\naddopts = '-q'\n[tool.other]\nactive = true\n",
+            "high",
+            "pyproject-pytest-config",
+        ),
+    ],
+)
+def test_nomination_qualifies_pytest_declaration_from_parsed_toml(
+    tmp_path: Path,
+    manifest: str,
+    expected_confidence: str,
+    expected_evidence: str,
+) -> None:
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/test_demo.py").write_text(
+        "def test_demo(): pass\n", encoding="utf-8"
+    )
+    (tmp_path / "pyproject.toml").write_text(manifest, encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        nomination = codemap.verification.nomination("tests/test_demo.py")
+    assert nomination["available"] is True
+    assert nomination["confidence"] == expected_confidence
+    assert nomination["source_evidence"] == expected_evidence
+    assert nomination["supporting_source_members"][1]["path"] == "pyproject.toml"
+    assert {"argv", "executable", "working_directory"}.isdisjoint(nomination)
+
+
+@pytest.mark.parametrize(
+    "manifest",
+    [
+        "[tool.pytest.ini_options]\naddopts = [broken\n",
+        "[tool.pytest.ini_options]\naddopts = 'a'\naddopts = 'b'\n",
+        "[tool.pytest.ini_options]\ninvalid = \\udcff\n",
+    ],
+)
+def test_nomination_fails_closed_on_invalid_pyproject_toml(
+    tmp_path: Path, manifest: str
+) -> None:
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/test_demo.py").write_text(
+        "def test_demo(): pass\n", encoding="utf-8"
+    )
+    (tmp_path / "pyproject.toml").write_text(
+        manifest, encoding="utf-8", errors="surrogatepass"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        nomination = codemap.verification.nomination("tests/test_demo.py")
+    assert nomination["available"] is False
+    assert nomination["reason"] == "source-evidence-unqualified"
+    assert nomination["execution_authority"] == "external"
+
+
+def test_nomination_pytest_confidence_tracks_config_fix_without_source_edit(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/test_demo.py").write_text(
+        "def test_demo(): pass\n", encoding="utf-8"
+    )
+    config = tmp_path / "pyproject.toml"
+    config.write_text("# [tool.pytest.ini_options]\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        before = codemap.verification.nomination("tests/test_demo.py")
+        config.write_text("[tool.pytest.ini_options]\n", encoding="utf-8")
+        codemap.index.sync()
+        after = codemap.verification.nomination("tests/test_demo.py")
+    assert before["confidence"] == "medium"
+    assert after["confidence"] == "high"
+    assert before["source_member_revision"] == after["source_member_revision"]
+    assert before["nomination_identity"] != after["nomination_identity"]
