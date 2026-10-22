@@ -189,6 +189,38 @@ def test_mcp_native_server_can_expose_one_explicit_tool_projection(
         close_sdk_server(server)
 
 
+@pytest.mark.parametrize(
+    "selected_tool", ("repository_declarations", "structural_locality")
+)
+@pytest.mark.skipif(not _MCP_AVAILABLE, reason=_NATIVE_REASON)
+def test_mcp_native_specialist_projection_preserves_advertised_intent(
+    tmp_path: Path, selected_tool: str
+) -> None:
+    from hashmarks.mcp_contract import mcp_projection_instructions
+    from hashmarks.mcp_server import build_server
+
+    server = build_server(
+        _repo(tmp_path),
+        state_dir=tmp_path / "state",
+        tool_names=(selected_tool,),
+    )
+
+    async def exercise() -> None:
+        tools = await server.list_tools()
+        assert [tool.name for tool in tools] == [selected_tool]
+        assert tools[0].description == tool_description(selected_tool)
+        assert server.instructions == mcp_projection_instructions((selected_tool,))
+        first = tool_description(selected_tool).split(". ", 1)[0].rstrip(".")
+        assert f"{selected_tool}: {first}." in server.instructions
+        assert "task_evidence:" not in server.instructions
+        assert "find:" not in server.instructions
+
+    try:
+        asyncio.run(exercise())
+    finally:
+        close_sdk_server(server)
+
+
 @pytest.mark.skipif(not _MCP_AVAILABLE, reason=_NATIVE_REASON)
 def test_mcp_native_stdio_initialize_catalog_call_and_error(tmp_path: Path) -> None:
     from mcp import ClientSession, StdioServerParameters
