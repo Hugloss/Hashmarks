@@ -426,10 +426,7 @@ def mcp_projection_instructions(
     # Tool descriptions remain the sole owner of their discovery semantics.
     selected_names = set(selected)
     intent_hints = " ".join(
-        contract.name
-        + ": "
-        + contract.description.split(". ", 1)[0].rstrip(".")
-        + "."
+        contract.name + ": " + contract.description.split(". ", 1)[0].rstrip(".") + "."
         for contract in MCP_TOOL_CONTRACTS
         if contract.name in selected_names
     )
