@@ -317,26 +317,35 @@ class VerificationPlanMixin:
         elif RepositoryDomain.TEST not in set(classify_repository_path(rel)):
             reason = "path-is-not-test-domain"
         else:
-            nomination = self._test_surface_nomination(
-                rel, symbol=symbol, qualname=qualname
-            )
-            if nomination is not None:
-                runner, scope, evidence, confidence, test_symbol = nomination
-                return {
-                    "schema": operation_schema("verification_nomination"),
-                    "available": True,
-                    "verification_target": {
-                        "path": rel,
-                        "test_symbol": test_symbol,
-                    },
-                    "scope": scope,
-                    "runner_evidence": runner,
-                    "source_evidence": evidence,
-                    "confidence": confidence,
-                    "authority": "repository-evidence-only",
-                    "execution_authority": "external",
-                }
-            reason = "unsupported-repository-verification-source"
+            self.source.ensure_current(rel)
+            observed, _ = self.source.member(rel)
+            if (
+                observed.get("state") != "known-present"
+                or not observed.get("member_revision")
+            ):
+                reason = "source-evidence-unqualified"
+            else:
+                nomination = self._test_surface_nomination(
+                    rel, symbol=symbol, qualname=qualname
+                )
+                if nomination is not None:
+                    runner, scope, evidence, confidence, test_symbol = nomination
+                    return {
+                        "schema": operation_schema("verification_nomination"),
+                        "available": True,
+                        "verification_target": {
+                            "path": rel,
+                            "test_symbol": test_symbol,
+                        },
+                        "source_member_revision": observed["member_revision"],
+                        "scope": scope,
+                        "runner_evidence": runner,
+                        "source_evidence": evidence,
+                        "confidence": confidence,
+                        "authority": "repository-evidence-only",
+                        "execution_authority": "external",
+                    }
+                reason = "unsupported-repository-verification-source"
         return {
             "schema": operation_schema("verification_nomination"),
             "available": False,

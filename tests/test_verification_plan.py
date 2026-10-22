@@ -121,6 +121,7 @@ def test_verification_nomination_excludes_native_command_for_python(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         legacy = codemap.verification.plan("tests/test_widget.py", symbol="test_widget")
+        member, _ = codemap.source.member("tests/test_widget.py")
         nomination = codemap.verification.nomination(
             "tests/test_widget.py", symbol="test_widget"
         )
@@ -128,6 +129,7 @@ def test_verification_nomination_excludes_native_command_for_python(
         "schema": "hashmarks.verification-nomination.v1",
         "available": True,
         "verification_target": legacy["verification_target"],
+        "source_member_revision": member["member_revision"],
         "scope": "test-node",
         "runner_evidence": "pytest",
         "source_evidence": "pyproject-pytest-config",
@@ -237,6 +239,34 @@ def test_nomination_uses_authored_vitest_manifest_without_installation(
         )
         second = codemap.verification.nomination("tests/example.test.ts")
     assert second == first
+
+
+def test_nomination_rejects_unqualified_native_source_observation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/test_example.py").write_text(
+        "def test_example(): pass\n", encoding="utf-8"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+
+        def unknown_member(
+            _path: str, *, include_bytes: bool = False
+        ) -> tuple[dict[str, object], None]:
+            return (
+                {
+                    "state": "unknown",
+                    "reason": "member-revision-mismatch",
+                },
+                None,
+            )
+
+        monkeypatch.setattr(codemap.source, "member", unknown_member)
+        nomination = codemap.verification.nomination("tests/test_example.py")
+    assert nomination["available"] is False
+    assert nomination["reason"] == "source-evidence-unqualified"
+    assert nomination["execution_authority"] == "external"
 
 
 def test_nomination_cannot_promote_nonexistent_test_source(tmp_path: Path) -> None:

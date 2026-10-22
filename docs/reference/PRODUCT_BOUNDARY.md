@@ -372,7 +372,10 @@ operation-registry-bound observation of a repository's verification surface.
 Its `verification_target`, `runner_evidence`, `scope`, `source_evidence`
 and `confidence` describe repository observations only. It returns no
 executable or working directory and never calls the legacy `plan(...)`
-method or probes installed native executables. Vitest evidence comes from
+method or probes installed native executables. Every available nomination
+also carries the `source_member_revision` issued by the existing Hashmarks
+source-member observer; missing or unqualified member observations fail
+closed rather than being promoted from path existence. Vitest evidence comes from
 authored package metadata, not `node_modules` materialization. Unsupported
 or insufficient source evidence remains an unavailable nomination, **not**
 proof that the repository has no verifier. The historical `plan(...)` API
