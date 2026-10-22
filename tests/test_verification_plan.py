@@ -702,15 +702,11 @@ def test_nomination_vitest_manifest_repair_changes_only_support_revision(
         "import test from 'node:test';\\n", encoding="utf-8"
     )
     manifest = tmp_path / "package.json"
-    manifest.write_text(
-        '{"devDependencies":{"vitest":null}}', encoding="utf-8"
-    )
+    manifest.write_text('{"devDependencies":{"vitest":null}}', encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         before = codemap.verification.nomination("tests/widget.test.js")
-        manifest.write_text(
-            '{"devDependencies":{"vitest":"^3.0.0"}}', encoding="utf-8"
-        )
+        manifest.write_text('{"devDependencies":{"vitest":"^3.0.0"}}', encoding="utf-8")
         codemap.index.sync()
         after = codemap.verification.nomination("tests/widget.test.js")
     assert before["available"] is False
