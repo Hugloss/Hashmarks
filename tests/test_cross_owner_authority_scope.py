@@ -28,7 +28,7 @@ def test_developer_shard_compatibility_is_one_module_object(tmp_path: Path) -> N
 def test_legacy_module_execution_still_runs_developer_selector(tmp_path: Path) -> None:
     tests = tmp_path / "tests"
     tests.mkdir()
-    (tests / "test_demo.py").write_text("def test_demo(): pass\\n", encoding="utf-8")
+    (tests / "test_demo.py").write_text("def test_demo(): pass\n", encoding="utf-8")
     completed = subprocess.run(
         [
             sys.executable,
