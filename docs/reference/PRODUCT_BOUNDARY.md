@@ -497,3 +497,21 @@ it remains `source-evidence-unqualified`. This is repository **syntax**
 evidence only, not installed pytest capability, collected test membership,
 command selection, process launch or a guarantee that tests will pass.
 The historical advisory `plan(...)` compatibility API is unchanged.
+
+### Vitest package-declaration qualification
+
+The JavaScript/TypeScript verification-nomination owner interprets only
+**qualified** authored `package.json` source bytes, using Python's standard
+JSON decoder with duplicate-key rejection. A Vitest dependency is declared
+only when a relevant dependency section is an object and its `vitest`
+specifier is a nonblank string. Absent sections or ordinary package scripts
+do not create a Vitest declaration; a malformed section, invalid specifier,
+or duplicate JSON key produces `source-evidence-unqualified`, not a
+high-confidence runner nomination or an invented negative claim.
+
+This is repository **declaration syntax** only. The observation does not
+resolve package versions, prove installed Vitest, choose native executables,
+authorize test execution, or report test outcomes. The established
+source-member revision ledger and nomination identity remain authoritative
+for the exact observed inputs. The legacy advisory `plan(...)` surface is
+not changed.
