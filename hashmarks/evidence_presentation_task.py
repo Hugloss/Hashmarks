@@ -539,6 +539,13 @@ def project_initial_task(
             for alternative in ambiguity.get("alternatives", [])
         ]
     qualification["freshness"] = packet.get("freshness")
+    owner = ownership.get("owner")
+    owner_path = owner.get("path") if isinstance(owner, Mapping) else None
+    qualification["display_qualification"] = (
+        "producer-claimed-qualified"
+        if _task_owner_display_qualified(ownership, owner_path, packet.get("freshness"))
+        else "unqualified"
+    )
     p.add(
         "ownership_evidence",
         "initial_owner",
@@ -731,7 +738,17 @@ def initial_evidence_text(packet: Mapping[str, object]) -> str:
     if isinstance(owner, Mapping):
         owner_name = owner.get("qualname")
         owner_locator = str(owner["path"]) + (f"::{owner_name}" if owner_name else "")
-        lines.append(f"Owner observation: {owner_locator} (@ /ownership/owner).")
+        qualification = (
+            "producer-claimed-qualified"
+            if _task_owner_display_qualified(
+                ownership, owner.get("path"), packet.get("freshness")
+            )
+            else "unqualified"
+        )
+        lines.append(
+            f"Owner observation: {owner_locator}; qualification: {qualification} "
+            "(@ /ownership/owner)."
+        )
     else:
         lines.append("Owner unresolved (@ /ownership/owner).")
     lines.extend(_initial_ambiguity_text(ambiguity))
