@@ -28,6 +28,7 @@ from hashmarks.mcp_contract import (
     qualify_mcp_observation,
     response_schema_for_mode,
     tool_contract,
+    tool_description,
     validate_tool_response,
 )
 
