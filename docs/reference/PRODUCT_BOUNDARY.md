@@ -424,3 +424,24 @@ Consumers may recompute this content identity to detect representation drift.
 This digest is **not a signature, trust proof, freshness lease, execution
 authorization or new repository-source identity**; only the source observer
 qualifies member revisions and the consumer remains responsible for policy.
+
+### Verification nomination transport validation
+
+The pure `hashmarks.verification_nomination_validation.validate_verification_nomination`
+consumer utility replays the **canonical operation schema** and the original
+`nomination_identity` using the existing `evidence_identity` function.
+It checks exact available/unavailable fields, canonical target and member
+paths, present/absent member states, nonduplicate supporting members, test
+revision correspondence, and absence of hidden executable-command fields.
+Malformed or changed packets return `valid: false` with concrete reasons.
+
+A valid packet only proves **structural consistency and content integrity**.
+The structural validator deliberately does not duplicate the producer's
+runner/scope semantic decisions; unknown nonblank labels remain opaque values.
+Rehashing a modified packet can establish self-consistency, not authenticity.
+The validator does not read current repository files, establish producer
+authenticity, issue freshness guarantees, grant test membership, or admit
+execution. It explicitly reports `repository_binding: not-checked`,
+`producer_authenticity: not-checked`, and `execution_authority: external`.
+Consumers requiring live source qualification must obtain it separately from
+the source observer; they must not infer it from the digest.
