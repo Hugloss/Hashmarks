@@ -222,22 +222,46 @@ class VerificationPlanMixin:
         )
         return raw
 
-    def _vitest_declared(self, members: list[dict[str, object]]) -> bool:
-        """Interpret qualified authored package metadata, not installed tools."""
-        raw = self._nomination_source_member("package.json", members)
-        if raw is None:
-            return False
+    @staticmethod
+    def _unique_package_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+        """Reject ambiguous JSON keys without creating a second JSON parser."""
+        result: dict[str, object] = {}
+        for key, value in pairs:
+            if key in result:
+                raise _UnqualifiedNominationMember("package.json")
+            result[key] = value
+        return result
+
+    @classmethod
+    def _vitest_package_declaration(cls, raw: bytes) -> bool:
+        """Qualify an authored, nonblank Vitest spec; never infer installation."""
         try:
-            package = json.loads(raw.decode("utf-8"))
+            package = json.loads(
+                raw.decode("utf-8"),
+                object_pairs_hook=cls._unique_package_object,
+            )
         except (UnicodeError, ValueError) as exc:
             raise _UnqualifiedNominationMember("package.json") from exc
         if not isinstance(package, Mapping):
             raise _UnqualifiedNominationMember("package.json")
-        return any(
-            isinstance(dependencies, Mapping) and "vitest" in dependencies
-            for key in ("dependencies", "devDependencies", "optionalDependencies")
-            if (dependencies := package.get(key)) is not None
-        )
+        declared = False
+        for key in ("dependencies", "devDependencies", "optionalDependencies"):
+            if key not in package:
+                continue
+            dependencies = package[key]
+            if not isinstance(dependencies, Mapping):
+                raise _UnqualifiedNominationMember("package.json")
+            if "vitest" in dependencies:
+                value = dependencies["vitest"]
+                if not isinstance(value, str) or not value.strip():
+                    raise _UnqualifiedNominationMember("package.json")
+                declared = True
+        return declared
+
+    def _vitest_declared(self, members: list[dict[str, object]]) -> bool:
+        """Interpret qualified authored package metadata, not installed tools."""
+        raw = self._nomination_source_member("package.json", members)
+        return raw is not None and self._vitest_package_declaration(raw)
 
     @staticmethod
     def _source_test_import(source: str) -> bool:

@@ -611,3 +611,111 @@ def test_nomination_pytest_confidence_tracks_config_fix_without_source_edit(
     assert after["confidence"] == "high"
     assert before["source_member_revision"] == after["source_member_revision"]
     assert before["nomination_identity"] != after["nomination_identity"]
+
+
+@pytest.mark.parametrize(
+    ("manifest", "expected_runner", "expected_source"),
+    [
+        (
+            '{"devDependencies":{"vitest":"^3.0.0"}}',
+            "vitest",
+            "package-manifest-vitest-declaration",
+        ),
+        (
+            '{"dependencies":{"vitest":"workspace:*"}}',
+            "vitest",
+            "package-manifest-vitest-declaration",
+        ),
+        (
+            '{"optionalDependencies":{"vitest":"npm:vitest@^3.0.0"}}',
+            "vitest",
+            "package-manifest-vitest-declaration",
+        ),
+        (
+            '{"devDependencies":{},"scripts":{"test":"vitest run"}}',
+            "node-test",
+            "node-test-import-plus-test-file",
+        ),
+        (
+            '{"name":"vitest","devDependencies":{}}',
+            "node-test",
+            "node-test-import-plus-test-file",
+        ),
+    ],
+)
+def test_nomination_qualifies_declared_vitest_spec_not_package_mentions(
+    tmp_path: Path, manifest: str, expected_runner: str, expected_source: str
+) -> None:
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/widget.test.js").write_text(
+        "import test from 'node:test';\\n", encoding="utf-8"
+    )
+    (tmp_path / "package.json").write_text(manifest, encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        nominated = codemap.verification.nomination("tests/widget.test.js")
+    assert nominated["available"] is True
+    assert nominated["runner_evidence"] == expected_runner
+    assert nominated["source_evidence"] == expected_source
+    assert nominated["supporting_source_members"][1]["path"] == "package.json"
+    assert nominated["execution_authority"] == "external"
+    assert {"argv", "working_directory", "executable"}.isdisjoint(nominated)
+
+
+@pytest.mark.parametrize(
+    "manifest",
+    [
+        '{"devDependencies":{"vitest":null}}',
+        '{"devDependencies":{"vitest":false}}',
+        '{"devDependencies":{"vitest":7}}',
+        '{"devDependencies":{"vitest":{}}}',
+        '{"devDependencies":{"vitest":""}}',
+        '{"devDependencies":{"vitest":"  "}}',
+        '{"devDependencies":null}',
+        '{"devDependencies":[]}',
+        '{"devDependencies":{"vitest":"^3"},"devDependencies":{"vitest":"^4"}}',
+        '{"devDependencies":{"vitest":"^3","vitest":"^4"}}',
+        '{"devDependencies":{"vitest":"^3"},"name":"first","name":"second"}',
+    ],
+)
+def test_nomination_rejects_ambiguous_or_invalid_vitest_manifest(
+    tmp_path: Path, manifest: str
+) -> None:
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/widget.test.js").write_text(
+        "import test from 'node:test';\\n", encoding="utf-8"
+    )
+    (tmp_path / "package.json").write_text(manifest, encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        nominated = codemap.verification.nomination("tests/widget.test.js")
+    assert nominated["available"] is False
+    assert nominated["reason"] == "source-evidence-unqualified"
+    assert nominated["execution_authority"] == "external"
+
+
+def test_nomination_vitest_manifest_repair_changes_only_support_revision(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/widget.test.js").write_text(
+        "import test from 'node:test';\\n", encoding="utf-8"
+    )
+    manifest = tmp_path / "package.json"
+    manifest.write_text(
+        '{"devDependencies":{"vitest":null}}', encoding="utf-8"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        before = codemap.verification.nomination("tests/widget.test.js")
+        manifest.write_text(
+            '{"devDependencies":{"vitest":"^3.0.0"}}', encoding="utf-8"
+        )
+        codemap.index.sync()
+        after = codemap.verification.nomination("tests/widget.test.js")
+    assert before["available"] is False
+    assert after["available"] is True
+    assert after["runner_evidence"] == "vitest"
+    assert after["supporting_source_members"][0]["path"] == "tests/widget.test.js"
+    assert after["supporting_source_members"][1]["path"] == "package.json"
+    assert after["nomination_identity"] != before["nomination_identity"]
