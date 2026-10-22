@@ -430,6 +430,35 @@ def test_restricted_projection_intent_hints_use_only_canonical_selected_tools() 
     assert mcp_projection_instructions(MCP_TOOL_NAMES) == MCP_SERVER_INSTRUCTIONS
 
 
+def test_all_selected_specialist_tools_share_canonical_intent_source() -> None:
+    # A narrow specialist projection must not lose discovery semantics simply
+    # because its tool was not in a separately maintained core-tool shortlist.
+    selected = (
+        "structural_locality",
+        "repository_findings",
+        "repository_declarations",
+        "dependency_codemap",
+    )
+    observed = mcp_projection_instructions(selected)
+    canonical = normalize_mcp_tool_names(selected)
+    for name in canonical:
+        first_sentence = tool_description(name).split(". ", 1)[0].rstrip(".")
+        assert f"{name}: {first_sentence}." in observed
+    assert observed == mcp_projection_instructions(tuple(reversed(selected)))
+    assert "task_evidence:" not in observed
+    assert "find:" not in observed
+    assert "intentional" in observed
+
+    summary = mcp_projection_summary(
+        {"contract_identity": "sha256:canonical"}, selected
+    )
+    assert summary["tools"] == list(canonical)
+    assert summary["instructions"] == observed
+    assert summary["source_contract_identity"] == "sha256:canonical"
+    assert str(summary["projection_identity"]).startswith("sha256:")
+    assert mcp_projection_instructions(MCP_TOOL_NAMES) == MCP_SERVER_INSTRUCTIONS
+
+
 def test_mcp_query_surface_projection_is_canonical_and_identity_bound() -> None:
     canonical: dict[str, object] = {"contract_identity": "sha256:canonical"}
 
