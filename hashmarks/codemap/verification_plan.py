@@ -353,22 +353,25 @@ class VerificationPlanMixin:
         if nominated is None:
             return None
         runner, scope, evidence, confidence, test_symbol = nominated
-        return self._bound_nomination({
-            "schema": operation_schema("verification_nomination"),
-            "available": True,
-            "verification_target": {
-                "path": rel,
-                "test_symbol": test_symbol,
-            },
-            "source_member_revision": members[0]["member_revision"],
-            "supporting_source_members": members,
-            "scope": scope,
-            "runner_evidence": runner,
-            "source_evidence": evidence,
-            "confidence": confidence,
-            "authority": "repository-evidence-only",
-            "execution_authority": "external",
-        })
+        return self._bound_nomination(
+            {
+                "schema": operation_schema("verification_nomination"),
+                "available": True,
+                "verification_target": {
+                    "path": rel,
+                    "test_symbol": test_symbol,
+                },
+                "source_member_revision": members[0]["member_revision"],
+                "supporting_source_members": members,
+                "scope": scope,
+                "runner_evidence": runner,
+                "source_evidence": evidence,
+                "confidence": confidence,
+                "authority": "repository-evidence-only",
+                "execution_authority": "external",
+    
+            }
+        )
 
     @operation_response("verification_nomination")
     @reconcile_decision
@@ -400,14 +403,17 @@ class VerificationPlanMixin:
                 if nomination is not None:
                     return nomination
                 reason = "unsupported-repository-verification-source"
-        return self._bound_nomination({
-            "schema": operation_schema("verification_nomination"),
-            "available": False,
-            "path": rel,
-            "reason": reason,
-            "authority": "repository-evidence-only",
-            "execution_authority": "external",
-        })
+        return self._bound_nomination(
+            {
+                "schema": operation_schema("verification_nomination"),
+                "available": False,
+                "path": rel,
+                "reason": reason,
+                "authority": "repository-evidence-only",
+                "execution_authority": "external",
+    
+            }
+        )
 
     def plan(
         self, path: str, *, symbol: str | None = None, qualname: str | None = None

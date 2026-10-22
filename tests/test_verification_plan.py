@@ -490,9 +490,9 @@ def test_nomination_identity_binds_source_provenance_without_execution_claims(
             after_manifest_change["source_member_revision"]
             == first["source_member_revision"]
         )
-        assert after_manifest_change["nomination_identity"] != first[
-            "nomination_identity"
-        ]
+        assert (
+            after_manifest_change["nomination_identity"] != first["nomination_identity"]
+        )
 
     assert first["execution_authority"] == "external"
     assert {"argv", "working_directory", "executable"}.isdisjoint(first)
@@ -507,7 +507,9 @@ def test_nomination_identity_detects_foreign_field_changes(tmp_path: Path) -> No
         codemap.index.sync()
         original = codemap.verification.nomination("tests/test_demo.py")
     identity = original["nomination_identity"]
-    contents = {key: value for key, value in original.items() if key != "nomination_identity"}
+    contents = {
+        key: value for key, value in original.items() if key != "nomination_identity"
+    }
     assert evidence_identity(original["schema"], contents) == identity
     contents["execution_authority"] = "hashmarks"
     assert evidence_identity(original["schema"], contents) != identity
