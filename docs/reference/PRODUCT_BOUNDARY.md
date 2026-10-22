@@ -367,13 +367,17 @@ A useful proposal outside the Hashmarks profile should be explicitly routed to t
 
 ## Verification and developer qualification owner map
 
-The new `CodeMap.verification.nomination(...)` method offers a command-free
-projection of the same selected test surface. Its `verification_target`,
-`runner_evidence`, `scope`, `source_evidence` and `confidence` describe
-repository observations only. It returns no executable or working directory.
-It delegates to the existing verification Plan decision for compatibility,
-not a new selector; existing `plan(...)` callers continue to receive the
-legacy advisory fields until separately migrated.
+The new `CodeMap.verification.nomination(...)` method offers a command-free,
+operation-registry-bound observation of a repository's verification surface.
+Its `verification_target`, `runner_evidence`, `scope`, `source_evidence`
+and `confidence` describe repository observations only. It returns no
+executable or working directory and never calls the legacy `plan(...)`
+method or probes installed native executables. Vitest evidence comes from
+authored package metadata, not `node_modules` materialization. Unsupported
+or insufficient source evidence remains an unavailable nomination, **not**
+proof that the repository has no verifier. The historical `plan(...)` API
+retains its independent *advisory command-availability* semantics for old
+consumers until separately migrated; it does not publish admission truth.
 
 
 Hashmarks owns repository-derived verification **targets**, member/provenance

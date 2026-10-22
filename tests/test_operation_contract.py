@@ -80,6 +80,7 @@ _EXPECTED = {
     "verification_membership": {
         "default": "hashmarks.verification-membership-observation.v1"
     },
+    "verification_nomination": {"default": "hashmarks.verification-nomination.v1"},
     "evidence_comparison": {
         "structural": "hashmarks.structural-locality-delta.v1",
         "bindings": "hashmarks.repository-evidence-binding-delta.v1",

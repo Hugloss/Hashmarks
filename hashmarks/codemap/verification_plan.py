@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import json
+from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from hashmarks.native_vitest import local_vitest
+from hashmarks.operation_contract import operation_response, operation_schema
 from hashmarks.paths import normalize_relative_path
 
 from .repository_domains import RepositoryDomain, classify_repository_path
@@ -187,35 +190,123 @@ class VerificationPlanMixin:
             "reason": "unsupported-test-runner",
         }
 
+
+    def _vitest_declared(self) -> bool:
+        """Look at authored package metadata, never installed executable paths."""
+        if TYPE_CHECKING:
+            self = cast("RepositoryVerification", self)
+        manifest = self.workspace / "package.json"
+        if not self.files.is_admitted("package.json") or not manifest.is_file():
+            return False
+        try:
+            package = json.loads(manifest.read_text(encoding="utf-8"))
+        except (OSError, ValueError, UnicodeError):
+            return False
+        if not isinstance(package, Mapping):
+            return False
+        return any(
+            isinstance(dependencies, Mapping) and "vitest" in dependencies
+            for key in ("dependencies", "devDependencies", "optionalDependencies")
+            if (dependencies := package.get(key)) is not None
+        )
+
+    @staticmethod
+    def _source_test_import(source: str) -> bool:
+        """Recognize explicit node:test source evidence, not a runtime install."""
+        return "node:test" in source or "node:test/" in source
+
+    def _test_surface_nomination(
+        self, rel: str, *, symbol: str | None, qualname: str | None
+    ) -> tuple[str, str, str, str, str | None] | None:
+        """One repository-derived nomination; no command or executable lookup."""
+        if TYPE_CHECKING:
+            self = cast("RepositoryVerification", self)
+        target = Path(rel)
+        suffix = target.suffix.lower()
+        if suffix == ".py":
+            declared = self._pytest_declared()
+            test_symbol = self._verification_test_symbol(symbol, qualname)
+            return (
+                "pytest",
+                "test-node" if test_symbol else "test-file",
+                "pyproject-pytest-config" if declared else "python-test-domain",
+                "high" if declared else "medium",
+                test_symbol,
+            )
+        if suffix == ".go" and target.name.endswith("_test.go"):
+            if (self.workspace / "go.mod").is_file():
+                return ("go-test", "go-package", "go-mod-plus-test-file", "high", None)
+            return None
+        javascript = {".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts"}
+        if suffix not in javascript:
+            return None
+        if self._vitest_declared():
+            return ("vitest", "test-file", "package-manifest-vitest-declaration", "high", None)
+        if suffix in {".js", ".mjs", ".cjs"}:
+            try:
+                source = (self.workspace / rel).read_text(encoding="utf-8")
+            except (OSError, UnicodeError):
+                source = ""
+            if self._source_test_import(source):
+                return ("node-test", "test-file", "node-test-import-plus-test-file", "high", None)
+        if suffix in {".ts", ".tsx", ".mts", ".cts"} and (
+            self.workspace / "tsconfig.json"
+        ).is_file():
+            return (
+                "typescript-compiler",
+                "typescript-project",
+                "tsconfig-plus-typescript-test-file",
+                "medium",
+                None,
+            )
+        return None
+
+    @operation_response("verification_nomination")
     def nomination(
         self, path: str, *, symbol: str | None = None, qualname: str | None = None
     ) -> dict[str, object]:
-        """Project repository verification evidence without executable instructions.
+        """Nominate a repository-verifiable target without resolving native tools.
 
-        Preserve the one existing selection owner: the compatibility Plan owns
-        nomination semantics for now. This view strips its legacy argv,
-        working-directory and executable hints instead of choosing an agent
-        command, execution backend, or native test environment.
+        This independent observer cut reads only repository evidence. It does
+        not call the legacy command-producing Plan, inspect node_modules/.bin,
+        discover ambient executables, or authorize execution. Plan's historical
+        argv remains an advisory compatibility projection with different
+        command-availability semantics.
         """
-        selected = self.plan(path, symbol=symbol, qualname=qualname)
-        if not selected["available"]:
-            return {
-                "schema": "hashmarks.verification-nomination.v1",
-                "available": False,
-                "path": selected["path"],
-                "reason": selected["reason"],
-                "authority": "repository-evidence-only",
-                "execution_authority": "external",
-            }
-        nominated = selected["verification_target"]
+        if TYPE_CHECKING:
+            self = cast("RepositoryVerification", self)
+        rel = normalize_relative_path(path, allow_root=False)
+        reason: str | None = None
+        if not self.files.is_admitted(rel):
+            reason = "path-outside-analysis-scope"
+        elif RepositoryDomain.TEST not in set(classify_repository_path(rel)):
+            reason = "path-is-not-test-domain"
+        else:
+            nomination = self._test_surface_nomination(
+                rel, symbol=symbol, qualname=qualname
+            )
+            if nomination is not None:
+                runner, scope, evidence, confidence, test_symbol = nomination
+                return {
+                    "schema": operation_schema("verification_nomination"),
+                    "available": True,
+                    "verification_target": {
+                        "path": rel,
+                        "test_symbol": test_symbol,
+                    },
+                    "scope": scope,
+                    "runner_evidence": runner,
+                    "source_evidence": evidence,
+                    "confidence": confidence,
+                    "authority": "repository-evidence-only",
+                    "execution_authority": "external",
+                }
+            reason = "unsupported-repository-verification-source"
         return {
-            "schema": "hashmarks.verification-nomination.v1",
-            "available": True,
-            "verification_target": dict(nominated) if nominated is not None else None,
-            "scope": selected.get("scope"),
-            "runner_evidence": selected["runner"],
-            "source_evidence": selected["evidence"],
-            "confidence": selected["confidence"],
+            "schema": operation_schema("verification_nomination"),
+            "available": False,
+            "path": rel,
+            "reason": reason,
             "authority": "repository-evidence-only",
             "execution_authority": "external",
         }
