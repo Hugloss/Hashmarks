@@ -319,7 +319,11 @@ projection, including the producer's ambiguity reason, discrimination question,
 retained alternatives, freshness, proof scope and source qualifications. The
 readable projection leads with the existing producer-qualified owner observation
 (or explicitly unresolved owner) before retrieval candidates; stale or incomplete
-ownership cannot be silently promoted by that presentation order. The display
+ownership cannot be silently promoted by that presentation order. When
+the canonical ownership packet includes `next_read`, both readable and structured
+initial presentations now display that exact producer-supplied observation
+with a native JSON pointer. It is a source-inspection candidate, **not** an
+instruction to execute commands or a new independent owner selection. The display
 consumes the producer's resolved ownership authority and proof scope: it must
 not independently reject a structurally resolved owner merely because the
 producer retained an initial ambiguity observation. The canonical resolver can
