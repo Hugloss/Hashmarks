@@ -466,3 +466,21 @@ Unknown/unreadable/denied source observations never become negative evidence
 or proof that a claimed member is absent. Current repository intelligence is
 provided solely by the existing source observer, not by another hashing,
 filesystem traversal, or validation authority.
+
+### Nomination source-binding observation receipts
+
+Each `checked_source_members` row in the current-source correlation contains
+the original **source-observer member record**, not merely a derived match
+label. Its `observed_member` is transported unchanged from the canonical
+Hashmarks source observer (including the member revision or the observer's
+unknown/unsupported reason). `recheck` is `stable` when the second
+observation equals the first; if it differs, the row becomes `unknown`
+with `recheck: changed` and `reobserved_member` containing the exact
+second native observation. Reasons are projected **after** that recheck
+and describe the final state, never a superseded first-read mismatch.
+
+These are observation-time, bounded facts. The receipt neither asserts an
+atomic filesystem snapshot nor proves that bytes remained unchanged after
+the final read. No new hashing, source-selection or verification-execution
+authority is introduced. Consumers can inspect the retained native facts
+rather than reconstructing semantic decisions from status strings.

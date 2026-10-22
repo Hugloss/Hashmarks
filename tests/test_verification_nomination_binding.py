@@ -46,6 +46,21 @@ def test_live_binding_matches_qualified_source_members(tmp_path: Path) -> None:
         "matched",
         "matched",
     ]
+    assert [r["recheck"] for r in result["checked_source_members"]] == [
+        "stable",
+        "stable",
+    ]
+    for claimed, checked in zip(
+        packet["supporting_source_members"],
+        result["checked_source_members"],
+        strict=True,
+    ):
+        observed = checked["observed_member"]
+        assert observed["path"] == claimed["path"]
+        assert observed["state"] == claimed["state"]
+        if claimed["state"] == "known-present":
+            assert observed["member_revision"] == claimed["member_revision"]
+        assert "reobserved_member" not in checked
     _assert_external(result)
 
 
@@ -61,6 +76,13 @@ def test_live_binding_detects_source_revision_drift(tmp_path: Path, path: str) -
     assert result["packet_valid"] is True
     assert result["source_binding_state"] == "mismatch"
     assert f"source-mismatch:{path}" in result["reasons"]
+    row = next(
+        item for item in result["checked_source_members"] if item["path"] == path
+    )
+    assert row["recheck"] == "stable"
+    assert row["correspondence"] == "mismatch"
+    assert row["observed_member"]["state"] == "known-present"
+    assert "reobserved_member" not in row
     _assert_external(result)
 
 
@@ -95,6 +117,9 @@ def test_denied_source_cannot_be_claimed_as_absent(tmp_path: Path) -> None:
     assert observed["packet_valid"] is True
     assert observed["source_binding_state"] == "unknown"
     assert "source-unknown:pyproject.toml" in observed["reasons"]
+    row = observed["checked_source_members"][1]
+    assert row["observed_member"]["state"] == "unsupported"
+    assert row["recheck"] == "stable"
 
 
 def test_structurally_invalid_packet_does_not_read_any_sources(
@@ -156,4 +181,50 @@ def test_intervening_source_change_yields_unknown(
         result = codemap.verification.observe_nomination_source_binding(packet)
     assert result["source_binding_state"] == "unknown"
     assert "source-changed-during-observation:tests/test_demo.py" in result["reasons"]
+    row = result["checked_source_members"][0]
+    assert row["correspondence"] == "unknown"
+    assert row["recheck"] == "changed"
+    assert row["observed_member"]["state"] == "known-present"
+    assert row["reobserved_member"]["state"] == "unknown"
+    assert "source-unknown:tests/test_demo.py" not in result["reasons"]
+    _assert_external(result)
+
+
+def test_intervening_change_overrides_stale_initial_mismatch_reason(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When evidence changes during replay, the final reason is unknown."""
+    _repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        packet = codemap.verification.nomination("tests/test_demo.py")
+        (tmp_path / "tests/test_demo.py").write_text(
+            "def test_demo(): assert True\n", encoding="utf-8"
+        )
+        codemap.index.sync()
+        original = codemap.verification._observe_nomination_source_member
+        calls: dict[str, int] = {}
+
+        def second_read_unknown(path: str) -> dict[str, object]:
+            calls[path] = calls.get(path, 0) + 1
+            observed = original(path)
+            if path == "tests/test_demo.py" and calls[path] == 2:
+                return {**observed, "state": "unknown"}
+            return observed
+
+        monkeypatch.setattr(
+            codemap.verification,
+            "_observe_nomination_source_member",
+            second_read_unknown,
+        )
+        result = codemap.verification.observe_nomination_source_binding(packet)
+
+    row = result["checked_source_members"][0]
+    assert row["observed_member"]["state"] == "known-present"
+    assert row["reobserved_member"]["state"] == "unknown"
+    assert row["recheck"] == "changed"
+    assert row["correspondence"] == "unknown"
+    assert result["source_binding_state"] == "unknown"
+    assert "source-changed-during-observation:tests/test_demo.py" in result["reasons"]
+    assert "source-mismatch:tests/test_demo.py" not in result["reasons"]
     _assert_external(result)
