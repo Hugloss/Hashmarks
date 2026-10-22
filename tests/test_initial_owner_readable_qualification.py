@@ -57,7 +57,9 @@ def test_initial_owner_text_uses_existing_producer_qualification(
     assert packet == original
 
 
-def test_owner_display_requires_explicit_disambiguation_even_if_status_resolved() -> None:
+def test_owner_display_requires_explicit_disambiguation_even_if_status_resolved() -> (
+    None
+):
     from hashmarks.evidence_presentation_task import _task_owner_display_qualified
 
     packet = _packet()
@@ -65,9 +67,7 @@ def test_owner_display_requires_explicit_disambiguation_even_if_status_resolved(
     assert isinstance(ownership, dict)
     owner = ownership["owner"]
     assert isinstance(owner, dict)
-    assert _task_owner_display_qualified(
-        ownership, owner["path"], packet["freshness"]
-    )
+    assert _task_owner_display_qualified(ownership, owner["path"], packet["freshness"])
 
     ownership["ambiguity"] = {"ambiguous": True}
     assert not _task_owner_display_qualified(
