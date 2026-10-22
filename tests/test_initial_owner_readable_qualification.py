@@ -35,6 +35,8 @@ def _packet() -> dict[str, object]:
         ({"ownership": {"proof_scope_complete": False}}, "unqualified"),
         ({"ownership": {"status": "unresolved"}}, "unqualified"),
         ({"ownership": {"authority": "retrieval-candidate-only"}}, "unqualified"),
+        ({"ownership": {"ambiguity": {"ambiguous": True}}}, "unqualified"),
+        ({"ownership": {"ambiguity": {"ambiguous": None}}}, "unqualified"),
     ],
 )
 def test_initial_owner_text_uses_existing_producer_qualification(
@@ -53,6 +55,29 @@ def test_initial_owner_text_uses_existing_producer_qualification(
     assert f"qualification: {expected}" in result
     assert "@ /ownership/owner" in result
     assert packet == original
+
+
+def test_owner_display_requires_explicit_disambiguation_even_if_status_resolved() -> None:
+    from hashmarks.evidence_presentation_task import _task_owner_display_qualified
+
+    packet = _packet()
+    ownership = packet["ownership"]
+    assert isinstance(ownership, dict)
+    owner = ownership["owner"]
+    assert isinstance(owner, dict)
+    assert _task_owner_display_qualified(
+        ownership, owner["path"], packet["freshness"]
+    )
+
+    ownership["ambiguity"] = {"ambiguous": True}
+    assert not _task_owner_display_qualified(
+        ownership, owner["path"], packet["freshness"]
+    )
+    ownership["ambiguity"] = {"ambiguous": None}
+    assert not _task_owner_display_qualified(
+        ownership, owner["path"], packet["freshness"]
+    )
+    assert "qualification: unqualified" in initial_evidence_text(packet)
 
 
 def test_unresolved_initial_owner_does_not_fabricate_a_qualified_owner() -> None:
