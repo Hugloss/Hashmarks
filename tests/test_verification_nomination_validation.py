@@ -46,32 +46,53 @@ def test_validator_accepts_canonical_producer_projection_without_admission(
     assert result["execution_authority"] == "external"
 
 
-@pytest.mark.parametrize("mutation", [
-    "modified-digest",
-    "forged-command",
-    "forged-execution-authority",
-    "absent-test-member",
-    "duplicate-member",
-    "invalid-source-revision",
-    "extra-member-state",
-    "reordered-test-member",
-    "mismatched-source-revision",
-    "noncanonical-target-path",
-    "invalid-availability",
-])
-def test_validator_rejects_mutated_available_nomination(
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "modified-digest",
+        "forged-command",
+        "forged-execution-authority",
+        "noncanonical-target-path",
+        "invalid-availability",
+    ],
+)
+def test_validator_rejects_mutated_nomination_fields(
     tmp_path: Path, mutation: str
 ) -> None:
-    nomination = _nomination(tmp_path)
-    changed = deepcopy(nomination)
-    members = changed["supporting_source_members"]
+    changed = deepcopy(_nomination(tmp_path))
     if mutation == "modified-digest":
         changed["nomination_identity"] = "sha256:" + "0" * 64
     elif mutation == "forged-command":
         changed["argv"] = ["sh", "-c", "echo no"]
     elif mutation == "forged-execution-authority":
         changed["execution_authority"] = "hashmarks"
-    elif mutation == "absent-test-member":
+    elif mutation == "noncanonical-target-path":
+        changed["verification_target"]["path"] = "tests/./test_sample.py"
+    elif mutation == "invalid-availability":
+        changed["available"] = 1
+    result = validate_verification_nomination(changed)
+    assert result["valid"] is False
+    assert result["reasons"]
+    assert result["nomination_identity"] is None
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "absent-test-member",
+        "duplicate-member",
+        "invalid-source-revision",
+        "extra-member-state",
+        "reordered-test-member",
+        "mismatched-source-revision",
+    ],
+)
+def test_validator_rejects_mutated_nomination_ledger(
+    tmp_path: Path, mutation: str
+) -> None:
+    changed = deepcopy(_nomination(tmp_path))
+    members = changed["supporting_source_members"]
+    if mutation == "absent-test-member":
         members[0] = {"path": members[0]["path"], "state": "known-absent"}
     elif mutation == "duplicate-member":
         members.append(deepcopy(members[0]))
@@ -83,10 +104,6 @@ def test_validator_rejects_mutated_available_nomination(
         members.reverse()
     elif mutation == "mismatched-source-revision":
         changed["source_member_revision"] = "f" * 64
-    elif mutation == "noncanonical-target-path":
-        changed["verification_target"]["path"] = "tests/./test_sample.py"
-    elif mutation == "invalid-availability":
-        changed["available"] = 1
     result = validate_verification_nomination(changed)
     assert result["valid"] is False
     assert result["reasons"]
@@ -99,7 +116,9 @@ def test_resigned_malformed_packet_is_still_rejected(tmp_path: Path) -> None:
     without_identity = {
         key: value for key, value in changed.items() if key != "nomination_identity"
     }
-    changed["nomination_identity"] = evidence_identity(changed["schema"], without_identity)
+    changed["nomination_identity"] = evidence_identity(
+        changed["schema"], without_identity
+    )
     result = validate_verification_nomination(changed)
     assert result["valid"] is False
     assert "invalid-source-member-revision" in result["reasons"]

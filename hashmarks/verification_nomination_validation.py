@@ -92,6 +92,30 @@ def _revision(value: object) -> str:
     return value
 
 
+def _member_state(
+    row: dict[str, object],
+    path: str,
+    *,
+    is_test: bool,
+    target: str,
+    revision: str,
+) -> None:
+    state = row.get("state")
+    if state == "known-present":
+        _keys(
+            row, frozenset({"path", "state", "member_revision"}), "present-member"
+        )
+        observed = _revision(row.get("member_revision"))
+        if is_test and (path != target or observed != revision):
+            raise ValueError("test-member-revision-mismatch")
+    elif state == "known-absent":
+        _keys(row, frozenset({"path", "state"}), "absent-member")
+        if is_test:
+            raise ValueError("test-member-not-present")
+    else:
+        raise ValueError("unsupported-source-member-state")
+
+
 def _member_ledger(value: object, target: str, revision: str) -> None:
     if not isinstance(value, list) or not value:
         raise ValueError("invalid-supporting-source-members")
@@ -102,21 +126,11 @@ def _member_ledger(value: object, target: str, revision: str) -> None:
         if path in seen:
             raise ValueError("duplicate-source-member")
         seen.add(path)
-        state = row.get("state")
-        if state == "known-present":
-            _keys(row, frozenset({"path", "state", "member_revision"}), "present-member")
-            observed = _revision(row.get("member_revision"))
-            if index == 0 and (path != target or observed != revision):
-                raise ValueError("test-member-revision-mismatch")
-        elif state == "known-absent":
-            _keys(row, frozenset({"path", "state"}), "absent-member")
-            if index == 0:
-                raise ValueError("test-member-not-present")
-        else:
-            raise ValueError("unsupported-source-member-state")
+        _member_state(
+            row, path, is_test=index == 0, target=target, revision=revision
+        )
     if value[0]["path"] != target:
         raise ValueError("test-member-not-first")
-
 
 def _available(record: dict[str, object]) -> None:
     _keys(record, _AVAILABLE_FIELDS, "available-nomination")
@@ -161,7 +175,9 @@ def _validate_record(value: object) -> str:
     identity = record.get("nomination_identity")
     if not isinstance(identity, str) or _SHA256.fullmatch(identity) is None:
         raise ValueError("invalid-nomination-identity")
-    payload = {key: item for key, item in record.items() if key != "nomination_identity"}
+    payload = {
+        key: item for key, item in record.items() if key != "nomination_identity"
+    }
     if evidence_identity(schema, payload) != identity:
         raise ValueError("nomination-identity-mismatch")
     return identity
