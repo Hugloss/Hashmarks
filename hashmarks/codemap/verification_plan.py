@@ -319,9 +319,8 @@ class VerificationPlanMixin:
         else:
             self.source.ensure_current(rel)
             observed, _ = self.source.member(rel)
-            if (
-                observed.get("state") != "known-present"
-                or not observed.get("member_revision")
+            if observed.get("state") != "known-present" or not observed.get(
+                "member_revision"
             ):
                 reason = "source-evidence-unqualified"
             else:
