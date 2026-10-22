@@ -421,12 +421,29 @@ def mcp_projection_instructions(
             + ", ".join(selected_surfaces)
             + ". Other repository_intelligence_query surfaces are intentionally withheld."
         )
+    # Projection experiments may expose only a subset of the catalog. The
+    # first sentence of each selected tool contract supplies the same intent
+    # description at server discovery time, without a second routing owner or
+    # instructions to call tools deliberately withheld from this projection.
+    discovery_names = (
+        "repository_context",
+        "find",
+        "task_evidence",
+        "source_observation",
+        "change_impact",
+    )
+    intent_hints = " ".join(
+        name + ": " + _TOOL_BY_NAME[name].description.split(". ", 1)[0].rstrip(".") + "."
+        for name in discovery_names
+        if name in selected
+    )
     return (
         "Hashmarks read-only MCP tool projection derived from the canonical "
         "repository-intelligence contract. Available tools: "
         + ", ".join(selected)
         + "."
         + query_note
+        + (" Intent hints from selected tool contracts: " + intent_hints if intent_hints else "")
         + " Use only advertised tools and query surfaces; unavailable Hashmarks "
         "capabilities are intentionally withheld by the caller's experiment. "
         "Hashmarks remains descriptive repository intelligence and does not replace "
