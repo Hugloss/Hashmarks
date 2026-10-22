@@ -171,7 +171,7 @@ class _ShardValidationState:
 
 def release_correctness_nodeids(root: Path) -> tuple[str, ...]:
     """Return deterministic correctness membership from repository-owned classification."""
-    from .qualification_classification import classification_map
+    from hashmarks.qualification_classification import classification_map
 
     root = root.resolve()
     nodeids = tuple(nodeid for nodeid, _weight in _nodeids(root))

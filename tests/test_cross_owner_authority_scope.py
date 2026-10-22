@@ -25,6 +25,15 @@ def test_developer_shard_compatibility_is_one_module_object(tmp_path: Path) -> N
     assert legacy_shards.plan(tmp_path, 1) == developer_shards.plan(tmp_path, 1)
 
 
+def test_relocated_developer_shards_retain_qualification_owner(tmp_path: Path) -> None:
+    tests = tmp_path / "tests"
+    tests.mkdir()
+    (tests / "test_demo.py").write_text("def test_demo(): pass\n", encoding="utf-8")
+    assert developer_shards.release_correctness_nodeids(tmp_path) == (
+        "tests/test_demo.py::test_demo",
+    )
+
+
 def test_legacy_module_execution_still_runs_developer_selector(tmp_path: Path) -> None:
     tests = tmp_path / "tests"
     tests.mkdir()
