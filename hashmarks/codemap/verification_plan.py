@@ -243,8 +243,11 @@ class VerificationPlanMixin:
         return "node:test" in source or "node:test/" in source
 
     def _python_surface_nomination(
-        self, members: list[dict[str, object]], *,
-        symbol: str | None, qualname: str | None
+        self,
+        members: list[dict[str, object]],
+        *,
+        symbol: str | None,
+        qualname: str | None,
     ) -> tuple[str, str, str, str, str | None]:
         raw = self._nomination_source_member("pyproject.toml", members)
         try:
@@ -306,8 +309,13 @@ class VerificationPlanMixin:
         return None
 
     def _test_surface_nomination(
-        self, rel: str, source: bytes, members: list[dict[str, object]],
-        *, symbol: str | None, qualname: str | None
+        self,
+        rel: str,
+        source: bytes,
+        members: list[dict[str, object]],
+        *,
+        symbol: str | None,
+        qualname: str | None,
     ) -> tuple[str, str, str, str, str | None] | None:
         """Dispatch one source-qualified repository nomination, without tool lookup."""
         suffix = Path(rel).suffix.lower()
@@ -320,6 +328,36 @@ class VerificationPlanMixin:
         if suffix in {".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts"}:
             return self._ecmascript_surface_nomination(rel, source, members)
         return None
+
+    def _qualified_nomination(
+        self, rel: str, *, symbol: str | None, qualname: str | None
+    ) -> dict[str, object] | None:
+        members: list[dict[str, object]] = []
+        source = self._nomination_source_member(rel, members)
+        if source is None:
+            raise _UnqualifiedNominationMember(rel)
+        nominated = self._test_surface_nomination(
+            rel, source, members, symbol=symbol, qualname=qualname
+        )
+        if nominated is None:
+            return None
+        runner, scope, evidence, confidence, test_symbol = nominated
+        return {
+            "schema": operation_schema("verification_nomination"),
+            "available": True,
+            "verification_target": {
+                "path": rel,
+                "test_symbol": test_symbol,
+            },
+            "source_member_revision": members[0]["member_revision"],
+            "supporting_source_members": members,
+            "scope": scope,
+            "runner_evidence": runner,
+            "source_evidence": evidence,
+            "confidence": confidence,
+            "authority": "repository-evidence-only",
+            "execution_authority": "external",
+        }
 
     @operation_response("verification_nomination")
     @reconcile_decision
@@ -334,41 +372,23 @@ class VerificationPlanMixin:
         reason: str | None = None
         if not self.files.is_admitted(rel):
             reason = "path-outside-analysis-scope"
-        elif not (self.workspace / rel).is_file() or (self.workspace / rel).is_symlink():
+        elif (
+            not (self.workspace / rel).is_file() or (self.workspace / rel).is_symlink()
+        ):
             reason = "source-file-unavailable"
         elif RepositoryDomain.TEST not in set(classify_repository_path(rel)):
             reason = "path-is-not-test-domain"
         else:
-            members: list[dict[str, object]] = []
             try:
-                source = self._nomination_source_member(rel, members)
-                if source is None:
-                    reason = "source-file-unavailable"
-                else:
-                    nominated = self._test_surface_nomination(
-                        rel, source, members, symbol=symbol, qualname=qualname
-                    )
-                    if nominated is not None:
-                        runner, scope, evidence, confidence, test_symbol = nominated
-                        return {
-                            "schema": operation_schema("verification_nomination"),
-                            "available": True,
-                            "verification_target": {
-                                "path": rel,
-                                "test_symbol": test_symbol,
-                            },
-                            "source_member_revision": members[0]["member_revision"],
-                            "supporting_source_members": members,
-                            "scope": scope,
-                            "runner_evidence": runner,
-                            "source_evidence": evidence,
-                            "confidence": confidence,
-                            "authority": "repository-evidence-only",
-                            "execution_authority": "external",
-                        }
-                    reason = "unsupported-repository-verification-source"
+                nomination = self._qualified_nomination(
+                    rel, symbol=symbol, qualname=qualname
+                )
             except _UnqualifiedNominationMember:
                 reason = "source-evidence-unqualified"
+            else:
+                if nomination is not None:
+                    return nomination
+                reason = "unsupported-repository-verification-source"
         return {
             "schema": operation_schema("verification_nomination"),
             "available": False,

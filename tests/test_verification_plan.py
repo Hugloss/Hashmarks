@@ -393,9 +393,10 @@ def test_nomination_binds_exact_supporting_manifest_revision(
         member["path"]: member for member in updated["supporting_source_members"]
     }
     assert set(first_members) == set(later_members)
-    assert first_members[support]["member_revision"] != later_members[support][
-        "member_revision"
-    ]
+    assert (
+        first_members[support]["member_revision"]
+        != later_members[support]["member_revision"]
+    )
     assert first_members[test_file] == later_members[test_file]
 
 
