@@ -364,3 +364,32 @@ Before proposing implementation work, coding agents must first ask:
 Prefer correctness, simplification, narrower ownership boundaries, better evidence, better economics, and clearer contracts over feature accumulation.
 
 A useful proposal outside the Hashmarks profile should be explicitly routed to the consumer or execution layer rather than implemented here.
+
+## Verification and developer qualification owner map
+
+Hashmarks owns repository-derived verification **targets**, member/provenance
+identity, ambiguity and freshness, not a consumer's executable selection.
+`CodeMap.verification.plan(...)` exposes `verification_target` as the
+repository nomination. Existing `runner`, `argv` and `working_directory`
+fields are **advisory compatibility fields**; they are not admissible
+native-tool, process-launch, sandbox or certification authority. Consumers
+resolve executable bytes and construct commands themselves. Keep old fields
+until their consumers explicitly migrate; do not silently reinterpret them.
+
+`task_decision_brief.safe` and `task_action_brief.status` are historical
+evidence-budget/readability labels. Their `status_scope` is always
+`evidence-role-coverage`: even `safe-fresh` does **not** say that an edit,
+verification suite or execution is safe/admitted. The coding agent reasons
+about changes; the execution system admits and verifies effects. New
+consumers should use explicit evidence role coverage and freshness separately
+instead of using these legacy strings as permission signals.
+
+Hashmarks' own deterministic developer test sharding and associated legacy v2
+source fingerprint belong to `hashmarks._development.test_shards`. The old
+`hashmarks.test_shards` module is an import-identity alias for existing
+scripts/tests and must never be treated as the product CodeMap verification
+membership engine. `developer_selection_source_identity` is an alias of that
+legacy hash algorithm, not a new native repository-content authority. Its
+scope/exclusions are deliberately distinct from `RepositoryIdentity`
+observations, and must not be substituted into external source admission.
+No OH-Goon execution behavior is controlled by these developer shards.

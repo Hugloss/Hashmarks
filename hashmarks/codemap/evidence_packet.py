@@ -190,7 +190,10 @@ class TaskEvidencePacketMixin(
             "verification_argv": list(cast(list[str], plan.get("argv") or []))
             if plan.get("available")
             else None,
+            # Legacy 'safe' means only that required evidence roles fit the
+            # presentation budget. It never grants edit or execution authority.
             "safe": bool(context.get("safe")) and edit is not None,
+            "status_scope": "evidence-role-coverage",
             "stale": identity.get("stale"),
             "decision_generation": identity.get("decision_generation"),
             "evidence_receipt": dict(
@@ -355,6 +358,7 @@ class TaskEvidencePacketMixin(
         authority = authority if isinstance(authority, Mapping) else {}
         result: dict[str, object] = {
             "schema": operation_schema("task_action_brief"),
+            "status_scope": "evidence-role-coverage",
             "status": (
                 "unsafe"
                 if not safe

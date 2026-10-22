@@ -14,7 +14,12 @@ if TYPE_CHECKING:
 
 
 class VerificationPlanMixin:
-    """Repository-owned bounded verification plan projection."""
+    """Repository-owned verification *nomination*, never execution authority.
+
+    A legacy argv remains for existing consumers but is only an advisory
+    candidate; native tool selection and executable command authority belong
+    to the consuming agent or execution system.
+    """
 
     def _pytest_declared(self) -> bool:
         if TYPE_CHECKING:
@@ -206,5 +211,20 @@ class VerificationPlanMixin:
                 "reason": "path-is-not-test-domain",
             }
         if target.suffix.lower() == ".py":
-            return self._python_verification_plan(rel, symbol, qualname)
-        return self._polyglot_verification_plan(rel, target)
+            nominated = self._python_verification_plan(rel, symbol, qualname)
+        else:
+            nominated = self._polyglot_verification_plan(rel, target)
+        if not nominated["available"]:
+            return nominated
+        # The repository-derived test target is the observer's result. The
+        # historical argv/runner fields are advisory compatibility projections:
+        # consumers must resolve their own executable and execution policy.
+        return {
+            **nominated,
+            "verification_target": {
+                "path": rel,
+                "test_symbol": nominated.get("test_symbol"),
+            },
+            "command_intent_authority": "advisory-only",
+            "execution_authority": "external",
+        }

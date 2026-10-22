@@ -94,6 +94,9 @@ class AvailableVerificationPlan(VerificationPlanHeaders):
     evidence: str
     scope: NotRequired[str]
     test_symbol: NotRequired[str | None]
+    verification_target: NotRequired[dict[str, str | None]]
+    command_intent_authority: NotRequired[Literal["advisory-only"]]
+    execution_authority: NotRequired[Literal["external"]]
 
 
 class UnavailableVerificationPlan(VerificationPlanHeaders):
