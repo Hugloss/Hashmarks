@@ -781,8 +781,9 @@ def initial_evidence_text(packet: Mapping[str, object]) -> str:
             f"Owner proof scope: {ownership.get('proof_scope', 'unknown')}; complete: {ownership.get('proof_scope_complete', 'unknown')}; authority: {ownership.get('authority', 'unknown')} (@ /ownership).",
         )
     )
-    lines.extend(_initial_ambiguity_text(ambiguity))
-    lines.extend(_initial_next_read_text(ownership))
+    lines.extend(
+        (*_initial_ambiguity_text(ambiguity), *_initial_next_read_text(ownership))
+    )
     for index, row in enumerate(retrieval.get("results", [])):
         lines.append(
             f"Source candidate: {row['path']}::{row.get('symbol', row.get('qualname', ''))} ({row.get('start_line', 'unknown')}:{row.get('end_line', 'unknown')}; basis: {row.get('supplement', 'canonical-retrieval')}; @ /retrieval/results/{index})."
