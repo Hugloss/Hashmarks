@@ -154,3 +154,17 @@ def test_validated_identity_is_not_current_repository_binding(tmp_path: Path) ->
     result = validate_verification_nomination(packet)
     assert result["valid"] is True
     assert result["repository_binding"] == "not-checked"
+
+
+
+def test_validator_does_not_redecide_runner_or_scope_semantics(tmp_path: Path) -> None:
+    """A resigned payload can be structurally sound without trusted provenance."""
+    packet = _nomination(tmp_path)
+    packet["runner_evidence"] = "future-repository-runner"
+    packet["scope"] = "future-test-scope"
+    payload = {key: value for key, value in packet.items() if key != "nomination_identity"}
+    packet["nomination_identity"] = evidence_identity(packet["schema"], payload)
+    state = validate_verification_nomination(packet)
+    assert state["valid"] is True
+    assert state["producer_authenticity"] == "not-checked"
+    assert state["repository_binding"] == "not-checked"

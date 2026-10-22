@@ -45,7 +45,6 @@ _UNAVAILABLE_FIELDS = frozenset(
         "nomination_identity",
     }
 )
-_SCOPES = frozenset({"test-node", "test-file", "go-package", "typescript-project"})
 
 
 class VerificationNominationValidation(TypedDict):
@@ -102,9 +101,7 @@ def _member_state(
 ) -> None:
     state = row.get("state")
     if state == "known-present":
-        _keys(
-            row, frozenset({"path", "state", "member_revision"}), "present-member"
-        )
+        _keys(row, frozenset({"path", "state", "member_revision"}), "present-member")
         observed = _revision(row.get("member_revision"))
         if is_test and (path != target or observed != revision):
             raise ValueError("test-member-revision-mismatch")
@@ -126,11 +123,10 @@ def _member_ledger(value: object, target: str, revision: str) -> None:
         if path in seen:
             raise ValueError("duplicate-source-member")
         seen.add(path)
-        _member_state(
-            row, path, is_test=index == 0, target=target, revision=revision
-        )
+        _member_state(row, path, is_test=index == 0, target=target, revision=revision)
     if value[0]["path"] != target:
         raise ValueError("test-member-not-first")
+
 
 def _available(record: dict[str, object]) -> None:
     _keys(record, _AVAILABLE_FIELDS, "available-nomination")
@@ -138,12 +134,9 @@ def _available(record: dict[str, object]) -> None:
     _keys(target, frozenset({"path", "test_symbol"}), "verification-target")
     path = _path(target.get("path"), "verification-target-path")
     symbol = target["test_symbol"]
-    if symbol is not None and (
-        not isinstance(symbol, str) or not symbol.startswith("test_")
-    ):
-        raise ValueError("invalid-test-symbol")
-    if record.get("scope") not in _SCOPES:
-        raise ValueError("invalid-verification-scope")
+    if symbol is not None:
+        _text(symbol, "test-symbol")
+    _text(record.get("scope"), "verification-scope")
     for name in ("runner_evidence", "source_evidence", "confidence"):
         _text(record.get(name), name)
     revision = _revision(record.get("source_member_revision"))

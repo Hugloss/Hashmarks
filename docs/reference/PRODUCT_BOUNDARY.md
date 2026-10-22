@@ -436,6 +436,9 @@ revision correspondence, and absence of hidden executable-command fields.
 Malformed or changed packets return `valid: false` with concrete reasons.
 
 A valid packet only proves **structural consistency and content integrity**.
+The structural validator deliberately does not duplicate the producer's
+runner/scope semantic decisions; unknown nonblank labels remain opaque values.
+Rehashing a modified packet can establish self-consistency, not authenticity.
 The validator does not read current repository files, establish producer
 authenticity, issue freshness guarantees, grant test membership, or admit
 execution. It explicitly reports `repository_binding: not-checked`,
