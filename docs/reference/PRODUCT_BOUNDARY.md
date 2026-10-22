@@ -364,3 +364,63 @@ Before proposing implementation work, coding agents must first ask:
 Prefer correctness, simplification, narrower ownership boundaries, better evidence, better economics, and clearer contracts over feature accumulation.
 
 A useful proposal outside the Hashmarks profile should be explicitly routed to the consumer or execution layer rather than implemented here.
+
+## Verification and developer qualification owner map
+
+The new `CodeMap.verification.nomination(...)` method offers a command-free,
+operation-registry-bound observation of a repository's verification surface.
+Its `verification_target`, `runner_evidence`, `scope`, `source_evidence`
+and `confidence` describe repository observations only. It returns no
+executable or working directory and never calls the legacy `plan(...)`
+method or probes installed native executables. Every available nomination
+also carries the `source_member_revision` issued by the existing Hashmarks
+source-member observer and a `supporting_source_members` ledger of exact
+qualified test/manifest revisions (including native `known-absent` observations).
+All supporting inputs use the same read generation and native revision owner;
+denied, unstable or invalid supporting material fails closed without silently
+switching to an alternate native tool. Vitest evidence comes from
+authored package metadata, not `node_modules` materialization. Unsupported
+or insufficient source evidence remains an unavailable nomination, **not**
+proof that the repository has no verifier. The historical `plan(...)` API
+retains its independent *advisory command-availability* semantics for old
+consumers until separately migrated; it does not publish admission truth.
+
+
+Hashmarks owns repository-derived verification **targets**, member/provenance
+identity, ambiguity and freshness, not a consumer's executable selection.
+`CodeMap.verification.plan(...)` exposes `verification_target` as the
+repository nomination. Existing `runner`, `argv` and `working_directory`
+fields are **advisory compatibility fields**; they are not admissible
+native-tool, process-launch, sandbox or certification authority. Consumers
+resolve executable bytes and construct commands themselves. Keep old fields
+until their consumers explicitly migrate; do not silently reinterpret them.
+
+`task_decision_brief.safe` and `task_action_brief.status` are historical
+evidence-budget/readability labels. Their `status_scope` is always
+`evidence-role-coverage`: even `safe-fresh` does **not** say that an edit,
+verification suite or execution is safe/admitted. The coding agent reasons
+about changes; the execution system admits and verifies effects. New
+consumers should use explicit evidence role coverage and freshness separately
+instead of using these legacy strings as permission signals.
+
+Hashmarks' own deterministic developer test sharding and associated legacy v2
+source fingerprint belong to `hashmarks._development.test_shards`. The old
+`hashmarks.test_shards` module is an import-identity alias for existing
+scripts/tests and must never be treated as the product CodeMap verification
+membership engine. `developer_selection_source_identity` is an alias of that
+legacy hash algorithm, not a new native repository-content authority. Its
+scope/exclusions are deliberately distinct from `RepositoryIdentity`
+observations, and must not be substituted into external source admission.
+No OH-Goon execution behavior is controlled by these developer shards.
+
+### Stable nomination projection identity
+
+Each available or unavailable `verification_nomination` response carries a
+`nomination_identity` computed through Hashmarks' existing
+`repository_observation.evidence_identity` function. The domain is the
+operation-registered schema and the payload includes all other response
+fields, including source/supporting-member revisions and unknown reasons.
+Consumers may recompute this content identity to detect representation drift.
+This digest is **not a signature, trust proof, freshness lease, execution
+authorization or new repository-source identity**; only the source observer
+qualifies member revisions and the consumer remains responsible for policy.

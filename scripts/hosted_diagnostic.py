@@ -65,7 +65,7 @@ def marker_expression(extra: str = "") -> str:
 def _selected_nodes(shards: int, shard: int) -> tuple[str, ...]:
     if str(ROOT) not in sys.path:
         sys.path.insert(0, str(ROOT))
-    from hashmarks.test_shards import select
+    from hashmarks._development.test_shards import select
 
     return select(ROOT, shards, shard)
 

@@ -131,6 +131,10 @@ OPERATION_CONTRACTS = (
         (("default", "hashmarks.verification-membership-observation.v1"),),
     ),
     OperationContract(
+        "verification_nomination",
+        (("default", "hashmarks.verification-nomination.v1"),),
+    ),
+    OperationContract(
         "evidence_comparison",
         (
             ("structural", "hashmarks.structural-locality-delta.v1"),
