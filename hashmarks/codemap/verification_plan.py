@@ -309,6 +309,8 @@ class VerificationPlanMixin:
         reason: str | None = None
         if not self.files.is_admitted(rel):
             reason = "path-outside-analysis-scope"
+        elif not (self.workspace / rel).is_file() or (self.workspace / rel).is_symlink():
+            reason = "source-file-unavailable"
         elif RepositoryDomain.TEST not in set(classify_repository_path(rel)):
             reason = "path-is-not-test-domain"
         else:

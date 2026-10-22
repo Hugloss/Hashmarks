@@ -239,6 +239,16 @@ def test_nomination_uses_authored_vitest_manifest_without_installation(
     assert second == first
 
 
+def test_nomination_cannot_promote_nonexistent_test_source(tmp_path: Path) -> None:
+    (tmp_path / "tests").mkdir()
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        result = codemap.verification.nomination("tests/test_missing.py")
+    assert result["available"] is False
+    assert result["reason"] == "source-file-unavailable"
+    assert result["execution_authority"] == "external"
+
+
 def test_nomination_does_not_treat_installed_tool_as_repository_evidence(
     tmp_path: Path,
 ) -> None:
