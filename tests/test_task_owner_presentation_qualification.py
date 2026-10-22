@@ -85,7 +85,9 @@ def test_qualified_structural_resolution_preserves_owner_and_source_labels() -> 
         assert source["assertion"] == "observed_fact"
         assert qualified["source_refs"] == ["/ownership/owner"]
         assert source["source_refs"] == ["/ownership/source_evidence"]
-        ctx = assert_object(assert_object(qualified["source_context"])["task_ownership"])
+        ctx = assert_object(
+            assert_object(qualified["source_context"])["task_ownership"]
+        )
         assert ctx["display_qualification"] == "producer-claimed-qualified"
     assert native == original
 
