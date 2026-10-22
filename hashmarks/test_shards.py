@@ -31,3 +31,9 @@ from hashmarks._development.test_shards import (  # noqa: F401
 from hashmarks._development.test_shards import __all__ as __all__
 
 _modules[__name__] = _import_module("hashmarks._development.test_shards")
+
+if __name__ == "__main__":
+    # Preserve the historical python -m entrypoint as well as import identity.
+    from hashmarks._development.test_shards import main
+
+    raise SystemExit(main())

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
 from pathlib import Path
 
 from hashmarks import RepositoryIdentity
@@ -21,6 +23,29 @@ def test_developer_shard_compatibility_is_one_module_object(tmp_path: Path) -> N
     tests.mkdir()
     (tests / "test_demo.py").write_text("def test_demo(): pass\n", encoding="utf-8")
     assert legacy_shards.plan(tmp_path, 1) == developer_shards.plan(tmp_path, 1)
+
+
+def test_legacy_module_execution_still_runs_developer_selector(tmp_path: Path) -> None:
+    tests = tmp_path / "tests"
+    tests.mkdir()
+    (tests / "test_demo.py").write_text("def test_demo(): pass\\n", encoding="utf-8")
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "hashmarks.test_shards",
+            "--root",
+            str(tmp_path),
+            "--shards",
+            "1",
+            "--json",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert '"shard_count": 1' in completed.stdout
 
 
 def test_developer_identity_keeps_its_explicit_source_scope(tmp_path: Path) -> None:
