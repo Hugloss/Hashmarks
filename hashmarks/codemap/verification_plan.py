@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import json
 import tomllib
 from collections.abc import Mapping
@@ -283,16 +284,38 @@ class VerificationPlanMixin:
             pytest.get("ini_options"), Mapping
         )
 
+    @staticmethod
+    def _qualify_python_test_node(source: bytes, name: str) -> None:
+        """Accept only one top-level declaration found in qualified test bytes.
+
+        A class method or nested function cannot be represented by the current
+        file::function target; a caller must not promote one to test-node.
+        """
+        try:
+            tree = ast.parse(source)
+        except (SyntaxError, ValueError, UnicodeError) as exc:
+            raise _UnqualifiedNominationMember("python-test-syntax") from exc
+        matches = sum(
+            isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and node.name == name
+            for node in tree.body
+        )
+        if matches != 1:
+            raise _UnqualifiedNominationMember("python-test-node-unqualified")
+
     def _python_surface_nomination(
         self,
+        source: bytes,
         members: list[dict[str, object]],
         *,
         symbol: str | None,
         qualname: str | None,
     ) -> tuple[str, str, str, str, str | None]:
+        test_symbol = self._verification_test_symbol(symbol, qualname)
+        if test_symbol:
+            self._qualify_python_test_node(source, test_symbol)
         raw = self._nomination_source_member("pyproject.toml", members)
         declared = raw is not None and self._pytest_manifest_declaration(raw)
-        test_symbol = self._verification_test_symbol(symbol, qualname)
         return (
             "pytest",
             "test-node" if test_symbol else "test-file",
@@ -359,7 +382,7 @@ class VerificationPlanMixin:
         suffix = Path(rel).suffix.lower()
         if suffix == ".py":
             return self._python_surface_nomination(
-                members, symbol=symbol, qualname=qualname
+                source, members, symbol=symbol, qualname=qualname
             )
         if suffix == ".go":
             return self._go_surface_nomination(rel, members)

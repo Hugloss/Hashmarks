@@ -648,7 +648,7 @@ def test_nomination_qualifies_declared_vitest_spec_not_package_mentions(
 ) -> None:
     (tmp_path / "tests").mkdir()
     (tmp_path / "tests/widget.test.js").write_text(
-        "import test from 'node:test';\\n", encoding="utf-8"
+        "import test from 'node:test';\n", encoding="utf-8"
     )
     (tmp_path / "package.json").write_text(manifest, encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
@@ -683,7 +683,7 @@ def test_nomination_rejects_ambiguous_or_invalid_vitest_manifest(
 ) -> None:
     (tmp_path / "tests").mkdir()
     (tmp_path / "tests/widget.test.js").write_text(
-        "import test from 'node:test';\\n", encoding="utf-8"
+        "import test from 'node:test';\n", encoding="utf-8"
     )
     (tmp_path / "package.json").write_text(manifest, encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
@@ -699,7 +699,7 @@ def test_nomination_vitest_manifest_repair_changes_only_support_revision(
 ) -> None:
     (tmp_path / "tests").mkdir()
     (tmp_path / "tests/widget.test.js").write_text(
-        "import test from 'node:test';\\n", encoding="utf-8"
+        "import test from 'node:test';\n", encoding="utf-8"
     )
     manifest = tmp_path / "package.json"
     manifest.write_text('{"devDependencies":{"vitest":null}}', encoding="utf-8")
@@ -715,3 +715,77 @@ def test_nomination_vitest_manifest_repair_changes_only_support_revision(
     assert after["supporting_source_members"][0]["path"] == "tests/widget.test.js"
     assert after["supporting_source_members"][1]["path"] == "package.json"
     assert after["nomination_identity"] != before["nomination_identity"]
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ("def test_widget(): pass\n", True),
+        ("async def test_widget(): pass\n", True),
+        ("# def test_widget(): pass\n", False),
+        ("def helper():\n    def test_widget(): pass\n", False),
+        ("class TestDemo:\n    def test_widget(self): pass\n", False),
+        ("def test_widget(): pass\ndef test_widget(): pass\n", False),
+        ("def test_other(): pass\n", False),
+        ("def test_widget(\n", False),
+    ],
+)
+def test_nomination_requires_unique_top_level_python_test_node(
+    tmp_path: Path, source: str, expected: bool
+) -> None:
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/test_widget.py").write_text(source, encoding="utf-8")
+    (tmp_path / "pyproject.toml").write_text(
+        "[tool.pytest.ini_options]\n", encoding="utf-8"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        result = codemap.verification.nomination(
+            "tests/test_widget.py", symbol="test_widget"
+        )
+    assert result["available"] is expected
+    assert result["execution_authority"] == "external"
+    if expected:
+        assert result["scope"] == "test-node"
+        assert result["verification_target"]["test_symbol"] == "test_widget"
+    else:
+        assert result["reason"] == "source-evidence-unqualified"
+    assert {"argv", "working_directory", "executable"}.isdisjoint(result)
+
+
+def test_python_file_level_nomination_remains_available_without_node_claim(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/test_widget.py").write_text(
+        "class TestDemo:\n    def test_widget(self): pass\n", encoding="utf-8"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        packet = codemap.verification.nomination("tests/test_widget.py")
+    assert packet["available"] is True
+    assert packet["scope"] == "test-file"
+    assert packet["verification_target"]["test_symbol"] is None
+    assert packet["source_member_revision"]
+
+
+def test_python_test_node_nomination_tracks_source_edits(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "tests").mkdir()
+    test_file = tmp_path / "tests/test_widget.py"
+    test_file.write_text("def test_widget(): pass\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        before = codemap.verification.nomination(
+            "tests/test_widget.py", symbol="test_widget"
+        )
+        test_file.write_text("def test_other(): pass\n", encoding="utf-8")
+        codemap.index.sync()
+        after = codemap.verification.nomination(
+            "tests/test_widget.py", symbol="test_widget"
+        )
+    assert before["available"] is True
+    assert after["available"] is False
+    assert before["nomination_identity"] != after["nomination_identity"]
+    assert after["execution_authority"] == "external"
