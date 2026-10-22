@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
-from contract_assertions import assert_object, assert_text
+from contract_assertions import assert_array, assert_object, assert_text
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.task_evidence_initial import (
