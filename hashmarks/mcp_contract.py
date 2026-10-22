@@ -433,7 +433,10 @@ def mcp_projection_instructions(
         "change_impact",
     )
     intent_hints = " ".join(
-        name + ": " + _TOOL_BY_NAME[name].description.split(". ", 1)[0].rstrip(".") + "."
+        name
+        + ": "
+        + _TOOL_BY_NAME[name].description.split(". ", 1)[0].rstrip(".")
+        + "."
         for name in discovery_names
         if name in selected
     )
@@ -443,7 +446,11 @@ def mcp_projection_instructions(
         + ", ".join(selected)
         + "."
         + query_note
-        + (" Intent hints from selected tool contracts: " + intent_hints if intent_hints else "")
+        + (
+            " Intent hints from selected tool contracts: " + intent_hints
+            if intent_hints
+            else ""
+        )
         + " Use only advertised tools and query surfaces; unavailable Hashmarks "
         "capabilities are intentionally withheld by the caller's experiment. "
         "Hashmarks remains descriptive repository intelligence and does not replace "
