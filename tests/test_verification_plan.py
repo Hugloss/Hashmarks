@@ -122,6 +122,7 @@ def test_verification_nomination_excludes_native_command_for_python(
         codemap.index.sync()
         legacy = codemap.verification.plan("tests/test_widget.py", symbol="test_widget")
         member, _ = codemap.source.member("tests/test_widget.py")
+        config, _ = codemap.source.member("pyproject.toml")
         nomination = codemap.verification.nomination(
             "tests/test_widget.py", symbol="test_widget"
         )
@@ -130,6 +131,18 @@ def test_verification_nomination_excludes_native_command_for_python(
         "available": True,
         "verification_target": legacy["verification_target"],
         "source_member_revision": member["member_revision"],
+        "supporting_source_members": [
+            {
+                "path": "tests/test_widget.py",
+                "state": "known-present",
+                "member_revision": member["member_revision"],
+            },
+            {
+                "path": "pyproject.toml",
+                "state": "known-present",
+                "member_revision": config["member_revision"],
+            },
+        ],
         "scope": "test-node",
         "runner_evidence": "pytest",
         "source_evidence": "pyproject-pytest-config",
@@ -319,3 +332,122 @@ def test_nomination_does_not_treat_installed_tool_as_repository_evidence(
         nomination = codemap.verification.nomination("tests/example.test.js")
     assert nomination["available"] is False
     assert nomination["reason"] == "unsupported-repository-verification-source"
+
+
+@pytest.mark.parametrize(
+    ("support", "test_file", "test_source", "before", "after"),
+    [
+        (
+            "pyproject.toml",
+            "tests/test_demo.py",
+            "def test_demo(): pass\n",
+            "[tool.pytest.ini_options]\n",
+            "[tool.pytest.ini_options]\naddopts = '-q'\n",
+        ),
+        (
+            "go.mod",
+            "tests/demo_test.go",
+            "package tests\n",
+            "module example.test/first\n",
+            "module example.test/second\n",
+        ),
+        (
+            "package.json",
+            "tests/demo.test.ts",
+            "export const demo = 1\n",
+            '{"devDependencies":{"vitest":"^3.0.0"}}',
+            '{"devDependencies":{"vitest":"^4.0.0"}}',
+        ),
+        (
+            "tsconfig.json",
+            "tests/demo.test.ts",
+            "export const demo = 1\n",
+            "{}",
+            '{"compilerOptions":{"strict":true}}',
+        ),
+    ],
+)
+def test_nomination_binds_exact_supporting_manifest_revision(
+    tmp_path: Path,
+    support: str,
+    test_file: str,
+    test_source: str,
+    before: str,
+    after: str,
+) -> None:
+    (tmp_path / "tests").mkdir()
+    (tmp_path / test_file).write_text(test_source, encoding="utf-8")
+    (tmp_path / support).write_text(before, encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        original = codemap.verification.nomination(test_file)
+        assert original["available"] is True
+        (tmp_path / support).write_text(after, encoding="utf-8")
+        codemap.index.sync()
+        updated = codemap.verification.nomination(test_file)
+    assert updated["available"] is True
+    first_members = {
+        member["path"]: member for member in original["supporting_source_members"]
+    }
+    later_members = {
+        member["path"]: member for member in updated["supporting_source_members"]
+    }
+    assert set(first_members) == set(later_members)
+    assert first_members[support]["member_revision"] != later_members[support][
+        "member_revision"
+    ]
+    assert first_members[test_file] == later_members[test_file]
+
+
+def test_nomination_rejects_denied_package_metadata_without_fallback(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/example.test.js").write_text(
+        "import test from 'node:test';\n", encoding="utf-8"
+    )
+    (tmp_path / "package.json").write_text(
+        '{"devDependencies":{"vitest":"^3.0.0"}}', encoding="utf-8"
+    )
+    (tmp_path / ".hashmarks-context.toml").write_text(
+        '[[rule]]\npattern = "package.json"\nindex = false\n',
+        encoding="utf-8",
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        nomination = codemap.verification.nomination("tests/example.test.js")
+    assert nomination["available"] is False
+    assert nomination["reason"] == "source-evidence-unqualified"
+
+
+def test_nomination_rejects_invalid_declared_package_metadata(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/example.test.js").write_text(
+        "import test from 'node:test';\n", encoding="utf-8"
+    )
+    (tmp_path / "package.json").write_text("{bad json", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        nomination = codemap.verification.nomination("tests/example.test.js")
+    assert nomination["available"] is False
+    assert nomination["reason"] == "source-evidence-unqualified"
+
+
+def test_nomination_qualifies_missing_metadata_as_observed_absence(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/test_demo.py").write_text(
+        "def test_demo(): pass\n", encoding="utf-8"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        nomination = codemap.verification.nomination("tests/test_demo.py")
+    assert nomination["available"] is True
+    assert nomination["supporting_source_members"][1] == {
+        "path": "pyproject.toml",
+        "state": "known-absent",
+    }
+    assert nomination["confidence"] == "medium"

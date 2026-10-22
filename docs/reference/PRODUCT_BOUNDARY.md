@@ -374,8 +374,11 @@ and `confidence` describe repository observations only. It returns no
 executable or working directory and never calls the legacy `plan(...)`
 method or probes installed native executables. Every available nomination
 also carries the `source_member_revision` issued by the existing Hashmarks
-source-member observer; missing or unqualified member observations fail
-closed rather than being promoted from path existence. Vitest evidence comes from
+source-member observer and a `supporting_source_members` ledger of exact
+qualified test/manifest revisions (including native `known-absent` observations).
+All supporting inputs use the same read generation and native revision owner;
+denied, unstable or invalid supporting material fails closed without silently
+switching to an alternate native tool. Vitest evidence comes from
 authored package metadata, not `node_modules` materialization. Unsupported
 or insufficient source evidence remains an unavailable nomination, **not**
 proof that the repository has no verifier. The historical `plan(...)` API

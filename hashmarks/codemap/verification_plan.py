@@ -9,11 +9,16 @@ from hashmarks.native_vitest import local_vitest
 from hashmarks.operation_contract import operation_response, operation_schema
 from hashmarks.paths import normalize_relative_path
 
+from .decision_session import decision_scoped, reconcile_decision
 from .repository_domains import RepositoryDomain, classify_repository_path
 
 if TYPE_CHECKING:
     from .evidence_verification import RepositoryVerification
     from .task_evidence_types import TaskVerificationPlan
+
+
+class _UnqualifiedNominationMember(RuntimeError):
+    """A supporting source could not be qualified by the canonical observer."""
 
 
 class VerificationPlanMixin:
@@ -190,19 +195,42 @@ class VerificationPlanMixin:
             "reason": "unsupported-test-runner",
         }
 
-    def _vitest_declared(self) -> bool:
-        """Look at authored package metadata, never installed executable paths."""
+    def _nomination_source_member(
+        self, rel: str, members: list[dict[str, object]]
+    ) -> bytes | None:
+        """Read one current supporting input through the canonical source owner."""
         if TYPE_CHECKING:
             self = cast("RepositoryVerification", self)
-        manifest = self.workspace / "package.json"
-        if not self.files.is_admitted("package.json") or not manifest.is_file():
+        self.source.ensure_current(rel)
+        observation, raw = self.source.member(rel, include_bytes=True)
+        state = observation.get("state")
+        if state == "known-absent":
+            members.append({"path": rel, "state": "known-absent"})
+            return None
+        revision = observation.get("member_revision")
+        if (
+            state != "known-present"
+            or not isinstance(revision, str)
+            or not revision
+            or raw is None
+        ):
+            raise _UnqualifiedNominationMember(rel)
+        members.append(
+            {"path": rel, "state": "known-present", "member_revision": revision}
+        )
+        return raw
+
+    def _vitest_declared(self, members: list[dict[str, object]]) -> bool:
+        """Interpret qualified authored package metadata, not installed tools."""
+        raw = self._nomination_source_member("package.json", members)
+        if raw is None:
             return False
         try:
-            package = json.loads(manifest.read_text(encoding="utf-8"))
-        except (OSError, ValueError, UnicodeError):
-            return False
+            package = json.loads(raw.decode("utf-8"))
+        except (UnicodeError, ValueError) as exc:
+            raise _UnqualifiedNominationMember("package.json") from exc
         if not isinstance(package, Mapping):
-            return False
+            raise _UnqualifiedNominationMember("package.json")
         return any(
             isinstance(dependencies, Mapping) and "vitest" in dependencies
             for key in ("dependencies", "devDependencies", "optionalDependencies")
@@ -215,9 +243,14 @@ class VerificationPlanMixin:
         return "node:test" in source or "node:test/" in source
 
     def _python_surface_nomination(
-        self, *, symbol: str | None, qualname: str | None
+        self, members: list[dict[str, object]], *,
+        symbol: str | None, qualname: str | None
     ) -> tuple[str, str, str, str, str | None]:
-        declared = self._pytest_declared()
+        raw = self._nomination_source_member("pyproject.toml", members)
+        try:
+            declared = raw is not None and "[tool.pytest." in raw.decode("utf-8")
+        except UnicodeError as exc:
+            raise _UnqualifiedNominationMember("pyproject.toml") from exc
         test_symbol = self._verification_test_symbol(symbol, qualname)
         return (
             "pytest",
@@ -228,24 +261,19 @@ class VerificationPlanMixin:
         )
 
     def _go_surface_nomination(
-        self, rel: str
+        self, rel: str, members: list[dict[str, object]]
     ) -> tuple[str, str, str, str, str | None] | None:
-        if TYPE_CHECKING:
-            self = cast("RepositoryVerification", self)
-        if (
-            Path(rel).name.endswith("_test.go")
-            and (self.workspace / "go.mod").is_file()
-        ):
+        if not Path(rel).name.endswith("_test.go"):
+            return None
+        if self._nomination_source_member("go.mod", members) is not None:
             return ("go-test", "go-package", "go-mod-plus-test-file", "high", None)
         return None
 
     def _ecmascript_surface_nomination(
-        self, rel: str
+        self, rel: str, source: bytes, members: list[dict[str, object]]
     ) -> tuple[str, str, str, str, str | None] | None:
-        if TYPE_CHECKING:
-            self = cast("RepositoryVerification", self)
         suffix = Path(rel).suffix.lower()
-        if self._vitest_declared():
+        if self._vitest_declared(members):
             return (
                 "vitest",
                 "test-file",
@@ -255,10 +283,10 @@ class VerificationPlanMixin:
             )
         if suffix in {".js", ".mjs", ".cjs"}:
             try:
-                source = (self.workspace / rel).read_text(encoding="utf-8")
-            except (OSError, UnicodeError):
-                source = ""
-            if self._source_test_import(source):
+                source_text = source.decode("utf-8")
+            except UnicodeError as exc:
+                raise _UnqualifiedNominationMember(rel) from exc
+            if self._source_test_import(source_text):
                 return (
                     "node-test",
                     "test-file",
@@ -266,85 +294,81 @@ class VerificationPlanMixin:
                     "high",
                     None,
                 )
-        if (
-            suffix in {".ts", ".tsx", ".mts", ".cts"}
-            and (self.workspace / "tsconfig.json").is_file()
-        ):
-            return (
-                "typescript-compiler",
-                "typescript-project",
-                "tsconfig-plus-typescript-test-file",
-                "medium",
-                None,
-            )
+        if suffix in {".ts", ".tsx", ".mts", ".cts"}:
+            if self._nomination_source_member("tsconfig.json", members) is not None:
+                return (
+                    "typescript-compiler",
+                    "typescript-project",
+                    "tsconfig-plus-typescript-test-file",
+                    "medium",
+                    None,
+                )
         return None
 
     def _test_surface_nomination(
-        self, rel: str, *, symbol: str | None, qualname: str | None
+        self, rel: str, source: bytes, members: list[dict[str, object]],
+        *, symbol: str | None, qualname: str | None
     ) -> tuple[str, str, str, str, str | None] | None:
-        """One repository-derived nomination dispatcher, not an executable selector."""
+        """Dispatch one source-qualified repository nomination, without tool lookup."""
         suffix = Path(rel).suffix.lower()
         if suffix == ".py":
-            return self._python_surface_nomination(symbol=symbol, qualname=qualname)
+            return self._python_surface_nomination(
+                members, symbol=symbol, qualname=qualname
+            )
         if suffix == ".go":
-            return self._go_surface_nomination(rel)
+            return self._go_surface_nomination(rel, members)
         if suffix in {".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts"}:
-            return self._ecmascript_surface_nomination(rel)
+            return self._ecmascript_surface_nomination(rel, source, members)
         return None
 
     @operation_response("verification_nomination")
+    @reconcile_decision
+    @decision_scoped
     def nomination(
         self, path: str, *, symbol: str | None = None, qualname: str | None = None
     ) -> dict[str, object]:
-        """Nominate a repository-verifiable target without resolving native tools.
-
-        This independent observer cut reads only repository evidence. It does
-        not call the legacy command-producing Plan, inspect node_modules/.bin,
-        discover ambient executables, or authorize execution. Plan's historical
-        argv remains an advisory compatibility projection with different
-        command-availability semantics.
-        """
+        """Observe one generation-bound verifier nomination with input revisions."""
         if TYPE_CHECKING:
             self = cast("RepositoryVerification", self)
         rel = normalize_relative_path(path, allow_root=False)
         reason: str | None = None
         if not self.files.is_admitted(rel):
             reason = "path-outside-analysis-scope"
-        elif (
-            not (self.workspace / rel).is_file() or (self.workspace / rel).is_symlink()
-        ):
+        elif not (self.workspace / rel).is_file() or (self.workspace / rel).is_symlink():
             reason = "source-file-unavailable"
         elif RepositoryDomain.TEST not in set(classify_repository_path(rel)):
             reason = "path-is-not-test-domain"
         else:
-            self.source.ensure_current(rel)
-            observed, _ = self.source.member(rel)
-            if observed.get("state") != "known-present" or not observed.get(
-                "member_revision"
-            ):
+            members: list[dict[str, object]] = []
+            try:
+                source = self._nomination_source_member(rel, members)
+                if source is None:
+                    reason = "source-file-unavailable"
+                else:
+                    nominated = self._test_surface_nomination(
+                        rel, source, members, symbol=symbol, qualname=qualname
+                    )
+                    if nominated is not None:
+                        runner, scope, evidence, confidence, test_symbol = nominated
+                        return {
+                            "schema": operation_schema("verification_nomination"),
+                            "available": True,
+                            "verification_target": {
+                                "path": rel,
+                                "test_symbol": test_symbol,
+                            },
+                            "source_member_revision": members[0]["member_revision"],
+                            "supporting_source_members": members,
+                            "scope": scope,
+                            "runner_evidence": runner,
+                            "source_evidence": evidence,
+                            "confidence": confidence,
+                            "authority": "repository-evidence-only",
+                            "execution_authority": "external",
+                        }
+                    reason = "unsupported-repository-verification-source"
+            except _UnqualifiedNominationMember:
                 reason = "source-evidence-unqualified"
-            else:
-                nomination = self._test_surface_nomination(
-                    rel, symbol=symbol, qualname=qualname
-                )
-                if nomination is not None:
-                    runner, scope, evidence, confidence, test_symbol = nomination
-                    return {
-                        "schema": operation_schema("verification_nomination"),
-                        "available": True,
-                        "verification_target": {
-                            "path": rel,
-                            "test_symbol": test_symbol,
-                        },
-                        "source_member_revision": observed["member_revision"],
-                        "scope": scope,
-                        "runner_evidence": runner,
-                        "source_evidence": evidence,
-                        "confidence": confidence,
-                        "authority": "repository-evidence-only",
-                        "execution_authority": "external",
-                    }
-                reason = "unsupported-repository-verification-source"
         return {
             "schema": operation_schema("verification_nomination"),
             "available": False,
