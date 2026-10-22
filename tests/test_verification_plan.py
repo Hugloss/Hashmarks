@@ -106,7 +106,9 @@ def test_verification_plan_derives_native_node_test_argv(tmp_path: Path) -> None
     assert plan["scope"] == "test-file"
 
 
-def test_verification_nomination_excludes_native_command_for_python(tmp_path: Path) -> None:
+def test_verification_nomination_excludes_native_command_for_python(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "tests").mkdir()
     (tmp_path / "tests/test_widget.py").write_text(
         "def test_widget(): pass\n", encoding="utf-8"
