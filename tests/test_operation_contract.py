@@ -396,6 +396,10 @@ _FIXED_MODE_CORE_BOUNDARIES = {
         "hashmarks/codemap/verification_membership.py",
         "observe_membership",
     ),
+    "verification_nomination": (
+        "hashmarks/codemap/verification_plan.py",
+        "nomination",
+    ),
     "repository_context": ("hashmarks/codemap/repository_context.py", "orient"),
     "find": ("hashmarks/codemap/find_engine.py", "packet"),
     "change_impact": ("hashmarks/codemap/change_impact.py", "task_impact"),
