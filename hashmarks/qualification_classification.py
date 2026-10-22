@@ -5,7 +5,10 @@ import json
 from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING
 
-from ._development.test_shards import EXPENSIVE_BENCHMARK_NODEIDS, PROCESS_SENSITIVE_NODEIDS
+from ._development.test_shards import (
+    EXPENSIVE_BENCHMARK_NODEIDS,
+    PROCESS_SENSITIVE_NODEIDS,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path

@@ -50,8 +50,12 @@ def test_developer_identity_keeps_its_explicit_source_scope(tmp_path: Path) -> N
     )
     # Native repository identity and this developer v2 selection identity
     # intentionally have distinct domains; don't pretend that hashes coincide.
-    with RepositoryIdentity(tmp_path, mode="local", state_dir=tmp_path / ".identity-test") as native:
-        observation = native.observe_directory(exclude_paths=("generated-state", ".identity-test"))
+    with RepositoryIdentity(
+        tmp_path, mode="local", state_dir=tmp_path / ".identity-test"
+    ) as native:
+        observation = native.observe_directory(
+            exclude_paths=("generated-state", ".identity-test")
+        )
     assert observation.inputs.snapshot.hash
     assert identity.startswith("sha256:")
 
@@ -65,9 +69,7 @@ def test_verification_target_is_evidence_not_command_authority(tmp_path: Path) -
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
-        nomination = codemap.verification.plan(
-            "tests/test_demo.py", symbol="test_demo"
-        )
+        nomination = codemap.verification.plan("tests/test_demo.py", symbol="test_demo")
     assert nomination["available"] is True
     assert nomination["verification_target"] == {
         "path": "tests/test_demo.py",
