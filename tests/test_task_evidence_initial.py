@@ -626,6 +626,56 @@ def test_initial_owner_display_qualification_converges_across_formats(
     assert wire == structured["result"] == text_response["result"] == before
 
 
+def test_producer_next_read_is_visible_in_initial_text_and_structured_evidence(
+    initial_text_source: tuple[dict[str, Any], dict[str, object]],
+) -> None:
+    native = deepcopy(initial_text_source[0])
+    next_read = {
+        "path": "owner.py",
+        "symbol": "widget",
+        "role": "inspect",
+        "lines": [1],
+        "reason": "inspect implementation before making a change",
+        "estimated_tokens": 25,
+    }
+    native["ownership"]["next_read"] = next_read
+    original = deepcopy(native)
+    initial = initial_task_evidence(native)
+    assert initial["ownership"]["next_read"] == next_read
+    initial["evidence_packet_identity"] = initial_packet_identity(initial)
+    wire = encode_initial_packet(initial)
+    before = deepcopy(wire)
+
+    readable = presentation_response(
+        "task_evidence", wire, result_mode="initial", format="text"
+    )
+    structured = presentation_response(
+        "task_evidence", wire, result_mode="initial", format="structured"
+    )
+    text = assert_text(assert_object(readable["presentation"])["text"])
+    assert "Producer next-read candidate:" in text
+    assert '"/ownership/next_read"' not in text
+    assert "@ /ownership/next_read" in text
+    assert "not an execution instruction" in text
+    assert text.index("Producer next-read candidate:") < text.index("Source candidate:")
+
+    groups = assert_array(assert_object(structured["presentation"])["groups"])
+    records = [
+        assert_object(row)
+        for group in groups
+        for row in assert_array(assert_object(group)["findings"])
+    ]
+    selected = [
+        row for row in records if row["kind"] == "initial_discrimination_read"
+    ]
+    assert len(selected) == 1
+    assert selected[0]["details"] == next_read
+    assert selected[0]["source_refs"] == ["/ownership/next_read"]
+    assert selected[0]["assertion"] == "producer_claim"
+    assert native == original
+    assert wire == readable["result"] == structured["result"] == before
+
+
 def test_initial_text_keeps_ambiguity_alternatives_outside_retrieval_prefix(
     initial_text_source: tuple[dict[str, Any], dict[str, object]],
 ) -> None:
