@@ -554,6 +554,16 @@ def project_initial_task(
         qualification,
         assertion="producer_claim",
     )
+    next_read = ownership.get("next_read")
+    if isinstance(next_read, Mapping):
+        p.add(
+            "ownership_evidence",
+            "initial_discrimination_read",
+            next_read,
+            (*ref, "ownership", "next_read"),
+            qualification,
+            assertion="producer_claim",
+        )
     for index, row in enumerate(retrieval.get("results", [])):
         locator = {
             key: row[key]
@@ -758,6 +768,15 @@ def initial_evidence_text(packet: Mapping[str, object]) -> str:
         )
     )
     lines.extend(_initial_ambiguity_text(ambiguity))
+    next_read = ownership.get("next_read")
+    if isinstance(next_read, Mapping):
+        lines.append(
+            "Producer next-read candidate: "
+            + json.dumps(
+                next_read, sort_keys=True, ensure_ascii=False, separators=(",", ":")
+            )
+            + " (@ /ownership/next_read; repository evidence only, not an execution instruction)."
+        )
     for index, row in enumerate(retrieval.get("results", [])):
         lines.append(
             f"Source candidate: {row['path']}::{row.get('symbol', row.get('qualname', ''))} ({row.get('start_line', 'unknown')}:{row.get('end_line', 'unknown')}; basis: {row.get('supplement', 'canonical-retrieval')}; @ /retrieval/results/{index})."
