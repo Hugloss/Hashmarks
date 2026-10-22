@@ -254,18 +254,17 @@ def test_nomination_revision_tracks_source_not_runtime_materialization(
         (tmp_path / "node_modules").mkdir()
         (tmp_path / "node_modules/dependency.js").write_text("v1", encoding="utf-8")
         after_runtime_only = codemap.verification.nomination("tests/test_example.py")
-        assert after_runtime_only["source_member_revision"] == before[
-            "source_member_revision"
-        ]
-        selected.write_text(
-            "def test_example(): assert True\n", encoding="utf-8"
+        assert (
+            after_runtime_only["source_member_revision"]
+            == before["source_member_revision"]
         )
+        selected.write_text("def test_example(): assert True\n", encoding="utf-8")
         codemap.index.sync()
         after_source_edit = codemap.verification.nomination("tests/test_example.py")
     assert after_source_edit["available"] is True
-    assert after_source_edit["source_member_revision"] != before[
-        "source_member_revision"
-    ]
+    assert (
+        after_source_edit["source_member_revision"] != before["source_member_revision"]
+    )
 
 
 def test_nomination_rejects_unqualified_native_source_observation(
