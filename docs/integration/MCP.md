@@ -141,6 +141,16 @@ For routing benchmarking, do not count a missing Hashmarks app as a tool-selecti
 
 Only a `READY` catalog can support a routing decision. For unknown-path semantic localization, healthy routing chooses `task_evidence` before exploratory native search/read; for an exact known-path inspection, healthy routing chooses native read directly. `ENVIRONMENT_BLOCKED: required-subject-tool-missing` means the host integration is unavailable, not that Hashmarks lost the routing decision.
 
+For an **explicit restricted MCP tool projection**, Hashmarks also repeats the
+first intent sentence of each selected core tool's existing canonical catalog
+description in server-level discovery instructions. It does not synthesize new
+routing rules, recommend withheld tools, or change the full 14-tool server
+instructions. This enables independent EvalShot discovery comparisons while
+holding the selected tool inventory and repository-evidence semantics explicit.
+The changed instructions affect the projection identity for newly generated
+projections; do not reinterpret historical projection receipts as equivalent.
+The presence of hints proves neither model visibility nor voluntary adoption.
+
 ## Tool surface
 
 Hashmarks intentionally exposes a small read-only repository-intelligence tool catalog:
