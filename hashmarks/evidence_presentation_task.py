@@ -543,9 +543,7 @@ def project_initial_task(
     owner_path = owner.get("path") if isinstance(owner, Mapping) else None
     qualification["display_qualification"] = (
         "producer-claimed-qualified"
-        if _task_owner_display_qualified(
-            ownership, owner_path, packet.get("freshness")
-        )
+        if _task_owner_display_qualified(ownership, owner_path, packet.get("freshness"))
         else "unqualified"
     )
     p.add(
