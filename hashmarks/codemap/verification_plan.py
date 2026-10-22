@@ -11,6 +11,7 @@ from hashmarks.paths import normalize_relative_path
 
 from .decision_session import decision_scoped, reconcile_decision
 from .repository_domains import RepositoryDomain, classify_repository_path
+from .repository_observation import evidence_identity
 
 if TYPE_CHECKING:
     from .evidence_verification import RepositoryVerification
@@ -329,6 +330,16 @@ class VerificationPlanMixin:
             return self._ecmascript_surface_nomination(rel, source, members)
         return None
 
+    @staticmethod
+    def _bound_nomination(payload: dict[str, object]) -> dict[str, object]:
+        """Bind this evidence projection without creating execution authority."""
+        return {
+            **payload,
+            "nomination_identity": evidence_identity(
+                operation_schema("verification_nomination"), payload
+            ),
+        }
+
     def _qualified_nomination(
         self, rel: str, *, symbol: str | None, qualname: str | None
     ) -> dict[str, object] | None:
@@ -342,7 +353,7 @@ class VerificationPlanMixin:
         if nominated is None:
             return None
         runner, scope, evidence, confidence, test_symbol = nominated
-        return {
+        return self._bound_nomination({
             "schema": operation_schema("verification_nomination"),
             "available": True,
             "verification_target": {
@@ -357,7 +368,7 @@ class VerificationPlanMixin:
             "confidence": confidence,
             "authority": "repository-evidence-only",
             "execution_authority": "external",
-        }
+        })
 
     @operation_response("verification_nomination")
     @reconcile_decision
@@ -389,14 +400,14 @@ class VerificationPlanMixin:
                 if nomination is not None:
                     return nomination
                 reason = "unsupported-repository-verification-source"
-        return {
+        return self._bound_nomination({
             "schema": operation_schema("verification_nomination"),
             "available": False,
             "path": rel,
             "reason": reason,
             "authority": "repository-evidence-only",
             "execution_authority": "external",
-        }
+        })
 
     def plan(
         self, path: str, *, symbol: str | None = None, qualname: str | None = None

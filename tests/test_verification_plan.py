@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.repository_observation import evidence_identity
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -126,6 +127,9 @@ def test_verification_nomination_excludes_native_command_for_python(
         nomination = codemap.verification.nomination(
             "tests/test_widget.py", symbol="test_widget"
         )
+    assert nomination.pop("nomination_identity") == evidence_identity(
+        nomination["schema"], nomination
+    )
     assert nomination == {
         "schema": "hashmarks.verification-nomination.v1",
         "available": True,
@@ -161,6 +165,9 @@ def test_verification_nomination_preserves_unavailable_scope(tmp_path: Path) -> 
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         nomination = codemap.verification.nomination("src/widget.py")
+    assert nomination.pop("nomination_identity") == evidence_identity(
+        nomination["schema"], nomination
+    )
     assert nomination == {
         "schema": "hashmarks.verification-nomination.v1",
         "available": False,
@@ -452,3 +459,55 @@ def test_nomination_qualifies_missing_metadata_as_observed_absence(
         "state": "known-absent",
     }
     assert nomination["confidence"] == "medium"
+
+
+def test_nomination_identity_binds_source_provenance_without_execution_claims(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "tests").mkdir()
+    target = tmp_path / "tests/test_demo.py"
+    target.write_text("def test_demo(): pass\n", encoding="utf-8")
+    manifest = tmp_path / "pyproject.toml"
+    manifest.write_text("[tool.pytest.ini_options]\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        first = codemap.verification.nomination("tests/test_demo.py")
+        repeated = codemap.verification.nomination("tests/test_demo.py")
+        assert repeated == first
+        assert first["available"] is True
+
+        (tmp_path / "node_modules").mkdir()
+        (tmp_path / "node_modules/cache.js").write_text("v1", encoding="utf-8")
+        runtime_only = codemap.verification.nomination("tests/test_demo.py")
+        assert runtime_only["nomination_identity"] == first["nomination_identity"]
+
+        manifest.write_text(
+            "[tool.pytest.ini_options]\naddopts = '-q'\n", encoding="utf-8"
+        )
+        codemap.index.sync()
+        after_manifest_change = codemap.verification.nomination("tests/test_demo.py")
+        assert (
+            after_manifest_change["source_member_revision"]
+            == first["source_member_revision"]
+        )
+        assert after_manifest_change["nomination_identity"] != first[
+            "nomination_identity"
+        ]
+
+    assert first["execution_authority"] == "external"
+    assert {"argv", "working_directory", "executable"}.isdisjoint(first)
+
+
+def test_nomination_identity_detects_foreign_field_changes(tmp_path: Path) -> None:
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/test_demo.py").write_text(
+        "def test_demo(): pass\n", encoding="utf-8"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        original = codemap.verification.nomination("tests/test_demo.py")
+    identity = original["nomination_identity"]
+    contents = {key: value for key, value in original.items() if key != "nomination_identity"}
+    assert evidence_identity(original["schema"], contents) == identity
+    contents["execution_authority"] = "hashmarks"
+    assert evidence_identity(original["schema"], contents) != identity

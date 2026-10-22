@@ -412,3 +412,15 @@ legacy hash algorithm, not a new native repository-content authority. Its
 scope/exclusions are deliberately distinct from `RepositoryIdentity`
 observations, and must not be substituted into external source admission.
 No OH-Goon execution behavior is controlled by these developer shards.
+
+### Stable nomination projection identity
+
+Each available or unavailable `verification_nomination` response carries a
+`nomination_identity` computed through Hashmarks' existing
+`repository_observation.evidence_identity` function. The domain is the
+operation-registered schema and the payload includes all other response
+fields, including source/supporting-member revisions and unknown reasons.
+Consumers may recompute this content identity to detect representation drift.
+This digest is **not a signature, trust proof, freshness lease, execution
+authorization or new repository-source identity**; only the source observer
+qualifies member revisions and the consumer remains responsible for policy.
