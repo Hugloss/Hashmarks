@@ -539,6 +539,15 @@ def project_initial_task(
             for alternative in ambiguity.get("alternatives", [])
         ]
     qualification["freshness"] = packet.get("freshness")
+    owner = ownership.get("owner")
+    owner_path = owner.get("path") if isinstance(owner, Mapping) else None
+    qualification["display_qualification"] = (
+        "producer-claimed-qualified"
+        if _task_owner_display_qualified(
+            ownership, owner_path, packet.get("freshness")
+        )
+        else "unqualified"
+    )
     p.add(
         "ownership_evidence",
         "initial_owner",
