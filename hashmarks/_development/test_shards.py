@@ -21,7 +21,6 @@ from pathlib import Path
 from typing import NotRequired, TypedDict
 
 from hashmarks._command_output import log_command_output
-
 from hashmarks._version import __version__
 from hashmarks.digest import hash_file
 from hashmarks.python_ast_cache import read_python_ast

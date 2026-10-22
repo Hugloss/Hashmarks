@@ -4,10 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from hashmarks import RepositoryIdentity
+from hashmarks import RepositoryIdentity, test_shards as legacy_shards
 from hashmarks._development import test_shards as developer_shards
 from hashmarks.codemap import CodeMap
-from hashmarks import test_shards as legacy_shards
 
 
 def test_developer_shard_compatibility_is_one_module_object(tmp_path: Path) -> None:
@@ -78,7 +77,11 @@ def test_verification_target_is_evidence_not_command_authority(tmp_path: Path) -
     assert nomination["execution_authority"] == "external"
     # Preserve existing callers during migration, without promoting argv.
     assert nomination["argv"] == [
-        "python", "-m", "pytest", "-q", "tests/test_demo.py::test_demo"
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_demo.py::test_demo",
     ]
 
 
@@ -99,5 +102,8 @@ def test_legacy_brief_safety_words_are_scoped_to_evidence(tmp_path: Path) -> Non
     assert decision["status_scope"] == "evidence-role-coverage"
     assert action["status_scope"] == "evidence-role-coverage"
     assert action["status"] in {
-        "unsafe", "safe-stale", "safe-fresh", "safe-unknown"
+        "unsafe",
+        "safe-stale",
+        "safe-fresh",
+        "safe-unknown",
     }
