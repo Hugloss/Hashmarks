@@ -82,6 +82,42 @@ class VerificationMembershipMixin:
         self.source.ensure_current(path)
         return self._collection_source_member(path)
 
+    def _nomination_source_checks(
+        self, members: list[dict[str, object]]
+    ) -> tuple[list[dict[str, object]], list[str]]:
+        """Retain native first/recheck facts and classify only after rechecking."""
+        checks: list[dict[str, object]] = []
+        observed_by_path: list[dict[str, object]] = []
+        reasons: list[str] = []
+        for claimed in members:
+            path = str(claimed["path"])
+            observed = self._observe_nomination_source_member(path)
+            observed_by_path.append(observed)
+            relation = self._nomination_member_correspondence(claimed, observed)
+            checks.append(
+                {
+                    "path": path,
+                    "correspondence": relation,
+                    "observed_member": observed,
+                }
+            )
+        # These are two observations, not an atomic filesystem lease.
+        for row, originally in zip(checks, observed_by_path, strict=True):
+            current = self._observe_nomination_source_member(str(row["path"]))
+            if current != originally:
+                row["correspondence"] = "unknown"
+                row["recheck"] = "changed"
+                row["reobserved_member"] = current
+            else:
+                row["recheck"] = "stable"
+        for row in checks:
+            path = str(row["path"])
+            if row["recheck"] == "changed":
+                reasons.append(f"source-changed-during-observation:{path}")
+            elif row["correspondence"] != "matched":
+                reasons.append(f"source-{row['correspondence']}:{path}")
+        return checks, reasons
+
     @operation_response("verification_nomination_binding")
     @reconcile_decision
     @decision_scoped
@@ -105,36 +141,10 @@ class VerificationMembershipMixin:
             state = "not-applicable"
             if nomination["available"] is True:
                 assert isinstance(nomination["supporting_source_members"], list)
-                observed_by_path: list[dict[str, object]] = []
-                for claimed in nomination["supporting_source_members"]:
-                    assert isinstance(claimed, dict)
-                    path = str(claimed["path"])
-                    observed = self._observe_nomination_source_member(path)
-                    observed_by_path.append(observed)
-                    relation = self._nomination_member_correspondence(claimed, observed)
-                    checks.append(
-                        {
-                            "path": path,
-                            "correspondence": relation,
-                            "observed_member": observed,
-                        }
-                    )
-                # A single read scope does not prevent source files changing on
-                # disk. Reobserve each participant before reporting matched.
-                for row, originally in zip(checks, observed_by_path, strict=True):
-                    current = self._observe_nomination_source_member(str(row["path"]))
-                    if current != originally:
-                        row["correspondence"] = "unknown"
-                        row["recheck"] = "changed"
-                        row["reobserved_member"] = current
-                    else:
-                        row["recheck"] = "stable"
-                for row in checks:
-                    path = str(row["path"])
-                    if row["recheck"] == "changed":
-                        reasons.append(f"source-changed-during-observation:{path}")
-                    elif row["correspondence"] != "matched":
-                        reasons.append(f"source-{row['correspondence']}:{path}")
+                checks, source_reasons = self._nomination_source_checks(
+                    nomination["supporting_source_members"]
+                )
+                reasons.extend(source_reasons)
                 relations = {row["correspondence"] for row in checks}
                 state = (
                     "mismatch"
