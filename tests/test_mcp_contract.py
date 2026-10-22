@@ -409,7 +409,9 @@ def test_restricted_projection_intent_hints_use_only_canonical_selected_tools() 
     assert "source_observation" not in broad
 
     task = mcp_projection_instructions(("task_evidence",))
-    assert "task_evidence: " + tool_description("task_evidence").split(". ", 1)[0] in task
+    assert (
+        "task_evidence: " + tool_description("task_evidence").split(". ", 1)[0] in task
+    )
     assert "repository_context:" not in task
     assert "find:" not in task
 
