@@ -421,24 +421,17 @@ def mcp_projection_instructions(
             + ", ".join(selected_surfaces)
             + ". Other repository_intelligence_query surfaces are intentionally withheld."
         )
-    # Projection experiments may expose only a subset of the catalog. The
-    # first sentence of each selected tool contract supplies the same intent
-    # description at server discovery time, without a second routing owner or
-    # instructions to call tools deliberately withheld from this projection.
-    discovery_names = (
-        "repository_context",
-        "find",
-        "task_evidence",
-        "source_observation",
-        "change_impact",
-    )
+    # Every selected tool gets its existing canonical intent, rather than
+    # maintaining a second hand-picked catalog of tools that deserve hints.
+    # Tool descriptions remain the sole owner of their discovery semantics.
+    selected_names = set(selected)
     intent_hints = " ".join(
-        name
+        contract.name
         + ": "
-        + _TOOL_BY_NAME[name].description.split(". ", 1)[0].rstrip(".")
+        + contract.description.split(". ", 1)[0].rstrip(".")
         + "."
-        for name in discovery_names
-        if name in selected
+        for contract in MCP_TOOL_CONTRACTS
+        if contract.name in selected_names
     )
     return (
         "Hashmarks read-only MCP tool projection derived from the canonical "
