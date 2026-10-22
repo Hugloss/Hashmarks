@@ -204,7 +204,10 @@ def test_nomination_never_calls_legacy_plan_or_native_lookup(
         codemap.index.sync()
         monkeypatch.setattr(codemap.verification, "plan", fail_if_called)
         monkeypatch.setattr(codemap.verification, "_vitest_runner", fail_if_called)
-        assert codemap.verification.nomination("tests/test_example.py")["available"] is True
+        assert (
+            codemap.verification.nomination("tests/test_example.py")["available"]
+            is True
+        )
         assert (
             codemap.verification.nomination("tests/example.test.ts")["runner_evidence"]
             == "typescript-compiler"
@@ -229,7 +232,9 @@ def test_nomination_uses_authored_vitest_manifest_without_installation(
         assert first["source_evidence"] == "package-manifest-vitest-declaration"
         assert {"argv", "working_directory", "executable"}.isdisjoint(first)
         (tmp_path / "node_modules/.bin").mkdir(parents=True)
-        (tmp_path / "node_modules/.bin/vitest").write_text("untrusted", encoding="utf-8")
+        (tmp_path / "node_modules/.bin/vitest").write_text(
+            "untrusted", encoding="utf-8"
+        )
         second = codemap.verification.nomination("tests/example.test.ts")
     assert second == first
 

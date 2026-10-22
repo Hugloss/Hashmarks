@@ -190,7 +190,6 @@ class VerificationPlanMixin:
             "reason": "unsupported-test-runner",
         }
 
-
     def _vitest_declared(self) -> bool:
         """Look at authored package metadata, never installed executable paths."""
         if TYPE_CHECKING:
@@ -215,43 +214,61 @@ class VerificationPlanMixin:
         """Recognize explicit node:test source evidence, not a runtime install."""
         return "node:test" in source or "node:test/" in source
 
-    def _test_surface_nomination(
-        self, rel: str, *, symbol: str | None, qualname: str | None
+    def _python_surface_nomination(
+        self, *, symbol: str | None, qualname: str | None
+    ) -> tuple[str, str, str, str, str | None]:
+        declared = self._pytest_declared()
+        test_symbol = self._verification_test_symbol(symbol, qualname)
+        return (
+            "pytest",
+            "test-node" if test_symbol else "test-file",
+            "pyproject-pytest-config" if declared else "python-test-domain",
+            "high" if declared else "medium",
+            test_symbol,
+        )
+
+    def _go_surface_nomination(
+        self, rel: str
     ) -> tuple[str, str, str, str, str | None] | None:
-        """One repository-derived nomination; no command or executable lookup."""
         if TYPE_CHECKING:
             self = cast("RepositoryVerification", self)
-        target = Path(rel)
-        suffix = target.suffix.lower()
-        if suffix == ".py":
-            declared = self._pytest_declared()
-            test_symbol = self._verification_test_symbol(symbol, qualname)
-            return (
-                "pytest",
-                "test-node" if test_symbol else "test-file",
-                "pyproject-pytest-config" if declared else "python-test-domain",
-                "high" if declared else "medium",
-                test_symbol,
-            )
-        if suffix == ".go" and target.name.endswith("_test.go"):
-            if (self.workspace / "go.mod").is_file():
-                return ("go-test", "go-package", "go-mod-plus-test-file", "high", None)
-            return None
-        javascript = {".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts"}
-        if suffix not in javascript:
-            return None
+        if Path(rel).name.endswith("_test.go") and (
+            self.workspace / "go.mod"
+        ).is_file():
+            return ("go-test", "go-package", "go-mod-plus-test-file", "high", None)
+        return None
+
+    def _ecmascript_surface_nomination(
+        self, rel: str
+    ) -> tuple[str, str, str, str, str | None] | None:
+        if TYPE_CHECKING:
+            self = cast("RepositoryVerification", self)
+        suffix = Path(rel).suffix.lower()
         if self._vitest_declared():
-            return ("vitest", "test-file", "package-manifest-vitest-declaration", "high", None)
+            return (
+                "vitest",
+                "test-file",
+                "package-manifest-vitest-declaration",
+                "high",
+                None,
+            )
         if suffix in {".js", ".mjs", ".cjs"}:
             try:
                 source = (self.workspace / rel).read_text(encoding="utf-8")
             except (OSError, UnicodeError):
                 source = ""
             if self._source_test_import(source):
-                return ("node-test", "test-file", "node-test-import-plus-test-file", "high", None)
-        if suffix in {".ts", ".tsx", ".mts", ".cts"} and (
-            self.workspace / "tsconfig.json"
-        ).is_file():
+                return (
+                    "node-test",
+                    "test-file",
+                    "node-test-import-plus-test-file",
+                    "high",
+                    None,
+                )
+        if (
+            suffix in {".ts", ".tsx", ".mts", ".cts"}
+            and (self.workspace / "tsconfig.json").is_file()
+        ):
             return (
                 "typescript-compiler",
                 "typescript-project",
@@ -259,6 +276,19 @@ class VerificationPlanMixin:
                 "medium",
                 None,
             )
+        return None
+
+    def _test_surface_nomination(
+        self, rel: str, *, symbol: str | None, qualname: str | None
+    ) -> tuple[str, str, str, str, str | None] | None:
+        """One repository-derived nomination dispatcher, not an executable selector."""
+        suffix = Path(rel).suffix.lower()
+        if suffix == ".py":
+            return self._python_surface_nomination(symbol=symbol, qualname=qualname)
+        if suffix == ".go":
+            return self._go_surface_nomination(rel)
+        if suffix in {".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts"}:
+            return self._ecmascript_surface_nomination(rel)
         return None
 
     @operation_response("verification_nomination")
