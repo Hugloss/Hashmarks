@@ -710,25 +710,27 @@ def test_next_read_never_inherits_owner_display_qualification(
     )
     groups = assert_array(assert_object(response["presentation"])["groups"])
     owner_group = next(
-        assert_object(row) for row in groups
+        assert_object(row)
+        for row in groups
         if assert_object(row)["family"] == "ownership_evidence"
     )
     findings = assert_array(owner_group["findings"])
     owner = next(
-        assert_object(row) for row in findings
+        assert_object(row)
+        for row in findings
         if "/ownership/owner" in assert_object(row)["source_refs"]
     )
     read = next(
-        assert_object(row) for row in findings
+        assert_object(row)
+        for row in findings
         if "/ownership/next_read" in assert_object(row)["source_refs"]
     )
     owner_context = assert_object(owner["source_context"])
     assert owner_context["display_qualification"] in {
-        "producer-claimed-qualified", "unqualified"
+        "producer-claimed-qualified",
+        "unqualified",
     }
-    assert "display_qualification" not in assert_object(
-        read.get("source_context", {})
-    )
+    assert "display_qualification" not in assert_object(read.get("source_context", {}))
     assert read["details"] == next_read
     shared = assert_object(owner_group["finding_qualifiers"])
     assert read.get("assertion", shared.get("assertion")) == "producer_claim"
