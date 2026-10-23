@@ -408,6 +408,8 @@ class VerificationPlanMixin:
             return self._python_surface_nomination(
                 source, members, symbol=symbol, qualname=qualname
             )
+        if symbol is not None or qualname is not None:
+            raise _UnqualifiedNominationMember("polyglot-test-node-not-qualified")
         if suffix == ".go":
             return self._go_surface_nomination(rel, members)
         if suffix in {".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts"}:
