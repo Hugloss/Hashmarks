@@ -750,8 +750,7 @@ def _initial_next_read_text(ownership: Mapping[str, object]) -> list[str]:
     # Only known locator/reason fields belong in the bounded first-response
     # text. The native initial packet still carries every producer field.
     displayed = {
-        key: value for key, value in next_read.items()
-        if key in _NEXT_READ_TEXT_FIELDS
+        key: value for key, value in next_read.items() if key in _NEXT_READ_TEXT_FIELDS
     }
     payload = json.dumps(
         displayed, sort_keys=True, ensure_ascii=False, separators=(",", ":")
