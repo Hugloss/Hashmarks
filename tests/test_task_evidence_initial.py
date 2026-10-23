@@ -738,6 +738,50 @@ def test_next_read_never_inherits_owner_display_qualification(
     assert response["result"] == original_wire
 
 
+@pytest.mark.parametrize("oversized_known", [False, True])
+def test_initial_next_read_text_is_bounded_without_dropping_native_fields(
+    initial_text_source: tuple[dict[str, Any], dict[str, object]],
+    oversized_known: bool,
+) -> None:
+    native = deepcopy(initial_text_source[0])
+    marker = "INVISIBLE_FUTURE_DETAIL_" * 1200
+    next_read = {
+        "path": "owner.py",
+        "reason": marker if oversized_known else "inspect the selected source",
+        "role": "inspect",
+    }
+    if not oversized_known:
+        next_read["future_payload"] = marker
+    native["ownership"]["next_read"] = next_read
+    unchanged = deepcopy(native)
+    initial = initial_task_evidence(native)
+    initial["evidence_packet_identity"] = initial_packet_identity(initial)
+    wire = encode_initial_packet(initial)
+    original_wire = deepcopy(wire)
+    response = presentation_response(
+        "task_evidence", wire, result_mode="initial", format="text"
+    )
+    text = assert_text(assert_object(response["presentation"])["text"])
+    line = next(
+        row
+        for row in text.splitlines()
+        if row.startswith("Producer next-read candidate:")
+    )
+    assert len(line.encode("utf-8")) < 2600
+    assert marker not in line
+    assert "full details @ /ownership/next_read" in line
+    assert "not an execution instruction" in line
+    if oversized_known:
+        assert "inline-budget-exceeded" in line
+        assert "omitted fields: 3" in line
+    else:
+        assert '"path":"owner.py"' in line
+        assert "omitted fields: 1" in line
+    assert native == unchanged
+    assert wire == response["result"] == original_wire
+    assert initial["ownership"]["next_read"] == next_read
+
+
 def test_initial_text_keeps_ambiguity_alternatives_outside_retrieval_prefix(
     initial_text_source: tuple[dict[str, Any], dict[str, object]],
 ) -> None:
