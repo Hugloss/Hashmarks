@@ -763,7 +763,8 @@ def test_initial_next_read_text_is_bounded_without_dropping_native_fields(
     )
     text = assert_text(assert_object(response["presentation"])["text"])
     line = next(
-        row for row in text.splitlines()
+        row
+        for row in text.splitlines()
         if row.startswith("Producer next-read candidate:")
     )
     assert len(line.encode("utf-8")) < 2600
