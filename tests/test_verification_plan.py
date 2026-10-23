@@ -789,3 +789,70 @@ def test_python_test_node_nomination_tracks_source_edits(
     assert after["available"] is False
     assert before["nomination_identity"] != after["nomination_identity"]
     assert after["execution_authority"] == "external"
+
+
+@pytest.mark.parametrize(
+    ("symbol", "qualname", "expected_scope"),
+    [
+        ("test_widget", None, "test-node"),
+        (None, "test_widget", "test-node"),
+        ("test_widget", "test_widget", "test-node"),
+        (None, None, "test-file"),
+        ("helper", None, "test-file"),
+        ("test_widget", "test_other", "unavailable"),
+        ("helper", "test_widget", "unavailable"),
+        ("test_widget", "TestCase.test_widget", "unavailable"),
+        ("test_widget", "test_widget.inner", "unavailable"),
+        (None, "test_widget.inner", "unavailable"),
+        (None, "TestCase.test_widget", "unavailable"),
+        ("TestCase.test_widget", None, "unavailable"),
+    ],
+)
+def test_nomination_preserves_explicit_python_source_selection_precision(
+    tmp_path: Path,
+    symbol: str | None,
+    qualname: str | None,
+    expected_scope: str,
+) -> None:
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/test_widget.py").write_text(
+        "def test_widget(): pass\ndef test_other(): pass\n",
+        encoding="utf-8",
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        nomination = codemap.verification.nomination(
+            "tests/test_widget.py", symbol=symbol, qualname=qualname
+        )
+    assert nomination["execution_authority"] == "external"
+    assert {"argv", "working_directory", "executable"}.isdisjoint(nomination)
+    if expected_scope == "unavailable":
+        assert nomination["available"] is False
+        assert nomination["reason"] == "source-evidence-unqualified"
+    else:
+        assert nomination["available"] is True
+        assert nomination["scope"] == expected_scope
+        assert nomination["verification_target"]["test_symbol"] == (
+            "test_widget" if expected_scope == "test-node" else None
+        )
+
+
+def test_legacy_plan_retains_flat_projection_while_nomination_refuses_nested(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/test_widget.py").write_text(
+        "def test_widget(): pass\n", encoding="utf-8"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        legacy = codemap.verification.plan(
+            "tests/test_widget.py", qualname="test_widget.inner"
+        )
+        exact = codemap.verification.nomination(
+            "tests/test_widget.py", qualname="test_widget.inner"
+        )
+    assert legacy["available"] is True
+    assert legacy["verification_target"]["test_symbol"] == "test_widget"
+    assert exact["available"] is False
+    assert exact["reason"] == "source-evidence-unqualified"

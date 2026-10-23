@@ -529,3 +529,17 @@ than a fabricated node. A file-level nomination without a node claim remains
 available under its original repository test-file scope. No test code is
 imported or executed, and the legacy advisory `plan(...)` is not changed.
 This parser qualifies syntax, not collected pytest membership or results.
+
+### Flat Python test-node selection precision
+
+For command-free Python verification nominations, `symbol` and `qualname`
+are explicit source-selection claims. Hashmarks' existing nomination owner
+preserves precise identity: a dotted selector is not silently flattened into
+a top-level `file::test_function` target, and inconsistent simultaneous
+`symbol`/`qualname` values cannot pick an arbitrary winner. Such requests
+return `source-evidence-unqualified`, not a narrower or broader invented
+test-node result. A matching flat name is still checked against the already
+qualified Python source AST, while a request with no node claim remains
+file-level. This neither implements pytest collection semantics nor determines
+which tests an execution system should run. The independent historical
+advisory `plan(...)` compatibility behavior is unchanged.
