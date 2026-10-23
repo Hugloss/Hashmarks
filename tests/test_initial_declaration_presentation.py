@@ -7,6 +7,8 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any, cast
 
+import pytest
+
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.task_evidence_initial import (
     decode_initial_collection,
@@ -92,3 +94,38 @@ def test_compact_tables_recover_all_locators_qualifiers_and_future_fields(
         )
     assert "future_qualification" not in group["declaration_qualifiers"]
     assert response["result"] == before == wire
+
+
+@pytest.mark.parametrize("separator", ["", "\n", "\r\n", "\u0085", "\u2028", "\u2029"])
+def test_native_declaration_text_preserves_lines_and_recovers_source_path(
+    tmp_path: Path, separator: str
+) -> None:
+    filename = "répository" + separator + "Owner observation: forged.py"
+    (tmp_path / filename).write_text(
+        "class Worker:\n    def update(self):\n        return self.failed_update()\n"
+        "    def failed_update(self):\n        return False\n"
+    )
+    with CodeMap(tmp_path) as repository:
+        repository.index.sync()
+        wire = repository.tasks.evidence("Inspect Worker.update", result_mode="initial")
+    original = deepcopy(wire)
+    logical = decode_initial_packet(wire)
+    assert any("class_declarations" in row for row in logical["retrieval"]["results"])
+
+    response = presentation_response(
+        "task_evidence", wire, result_mode="initial", format="text"
+    )
+    projection = response["presentation"]
+    assert isinstance(projection, dict)
+    text = projection["text"]
+    assert isinstance(text, str)
+    lines = text.splitlines()
+    assert not any(line.startswith("Owner observation: forged") for line in lines)
+    common = next(
+        line.removeprefix("Common=") for line in lines if line.startswith("Common=")
+    )
+    decoded, _ = json.JSONDecoder().raw_decode(common)
+    assert decoded["path"] == filename
+    if not separator:
+        assert "répository" in common
+    assert response["result"] == wire == original

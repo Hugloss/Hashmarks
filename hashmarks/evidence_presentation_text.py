@@ -9,7 +9,14 @@ from typing import Any
 
 
 def _encode(value: object) -> str:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    encoded = json.dumps(
+        value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    )
+    return (
+        encoded
+        if encoded.isprintable()
+        else json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+    )
 
 
 def _relationship_delta_lines(value: Mapping[str, Any]) -> list[str]:

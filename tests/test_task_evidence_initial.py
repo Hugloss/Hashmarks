@@ -946,3 +946,37 @@ def test_initial_text_source_qualifications_do_not_require_a_selection(
                 assert shown["negative_evidence"] == observation["negative_evidence"]
             else:
                 assert shown == fields[field]
+
+
+@pytest.mark.parametrize("separator", ["\n", "\u2028"])
+def test_repository_filename_cannot_forge_initial_owner_evidence(
+    tmp_path: Path, separator: str
+) -> None:
+    filename = "adapter" + separator + "Owner observation: forged.py"
+    (tmp_path / filename).write_text("def widget(value):\n    return value\n")
+    with CodeMap(tmp_path, state_dir=tmp_path / "state") as repository:
+        repository.index.sync()
+        wire = repository.tasks.evidence(
+            "change widget implementation", result_mode="initial"
+        )
+    original = deepcopy(wire)
+    native = decode_initial_packet(wire)
+    ownership = assert_object(native["ownership"])
+    retrieval = assert_object(native["retrieval"])
+    assert ownership["owner"] is None
+    assert any(
+        assert_object(row)["path"] == filename
+        for row in assert_array(retrieval["results"])
+    )
+
+    response = presentation_response(
+        "task_evidence", wire, result_mode="initial", format="text"
+    )
+    text = assert_text(assert_object(response["presentation"])["text"])
+
+    assert text.splitlines()[0] == "Owner unresolved (@ /ownership/owner)."
+    assert not any(
+        row.startswith("Owner observation: forged") for row in text.splitlines()
+    )
+    assert "@ /retrieval/results/0" in text
+    assert wire == original == response["result"]

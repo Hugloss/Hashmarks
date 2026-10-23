@@ -10,7 +10,16 @@ from hashmarks.codemap.task_evidence_initial import decode_initial_collection
 
 
 def _dump(value: object) -> str:
-    return json.dumps(value, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+    encoded = json.dumps(
+        value, ensure_ascii=False, separators=(",", ":"), allow_nan=False
+    )
+    return (
+        encoded
+        if encoded.isprintable()
+        else json.dumps(
+            value, ensure_ascii=True, separators=(",", ":"), allow_nan=False
+        )
+    )
 
 
 def _metadata(context: Mapping[str, Any]) -> dict[str, Any]:
