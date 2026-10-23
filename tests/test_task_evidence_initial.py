@@ -820,15 +820,15 @@ def test_initial_ambiguity_text_escapes_and_bounds_source_claims(
         "task_evidence", wire, result_mode="initial", format="text"
     )
     rendered = assert_text(assert_object(response["presentation"])["text"])
-    label = (
-        "Ambiguity reason:" if field == "reason" else "Discrimination question:"
-    )
+    label = "Ambiguity reason:" if field == "reason" else "Discrimination question:"
     matching = [row for row in rendered.splitlines() if row.startswith(label)]
     assert len(matching) == 1
     assert expected in matching[0]
     assert len(matching[0].encode("utf-8")) < 2300
     assert all(
-        not row.startswith(("Owner observation: forged", "Verification candidate: fake"))
+        not row.startswith(
+            ("Owner observation: forged", "Verification candidate: fake")
+        )
         for row in rendered.splitlines()
     )
     assert f"@ /ownership/ambiguity/{field}" in matching[0]
