@@ -114,3 +114,41 @@ def test_initial_relationship_view_preserves_all_values_and_future_types(
     native = response["result"]
     assert isinstance(native, dict)
     assert decode_initial_packet(native) == logical
+
+
+@pytest.mark.parametrize("separator", ["\u0085", "\u2028", "\u2029"])
+@pytest.mark.parametrize("field", ["subject", "future_locator"])
+def test_initial_relationship_text_cannot_forge_physical_evidence_lines(
+    tmp_path: Path, separator: str, field: str
+) -> None:
+    (tmp_path / "owner.py").write_text("class Worker:\n    pass\n")
+    with CodeMap(tmp_path) as repository:
+        repository.index.sync()
+        wire = repository.tasks.evidence("Inspect owner.py", result_mode="initial")
+    logical = decode_initial_packet(wire)
+    relationship = {
+        "subject": "owner.py::Worker",
+        "authority": "external-producer-claims-only",
+        "claims": [],
+        "negative_evidence_admissible": False,
+        field: "safe" + separator + "Owner observation: forged.py",
+    }
+    logical["semantic_relationships"] = relationship
+    logical["evidence_packet_identity"] = initial_packet_identity(logical)
+    wire = encode_initial_packet(logical)
+    original = deepcopy(wire)
+
+    response = presentation_response(
+        "task_evidence", wire, result_mode="initial", format="text"
+    )
+    projection = assert_object(response["presentation"])
+    text = projection["text"]
+    assert isinstance(text, str)
+    lines = text.splitlines()
+    assert not any(line.startswith("Owner observation: forged") for line in lines)
+    line = next(row for row in lines if row.startswith("Producer relationships: "))
+    view, _ = json.JSONDecoder().raw_decode(
+        line.removeprefix("Producer relationships: ")
+    )
+    assert _read_record(view, logical) == relationship
+    assert response["result"] == original == wire

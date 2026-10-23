@@ -187,3 +187,93 @@ def test_readable_initial_evidence_leads_with_unresolved_not_candidate() -> None
     assert "Ambiguity: True" in rows[2]
     assert any("Owner alternative:" in row for row in rows[4:])
     assert not any("producer-claimed-qualified" in row for row in rows)
+
+
+def _locator_packet(kind: str, path: str) -> tuple[dict[str, object], str, str]:
+    packet = _packet()
+    ownership = packet["ownership"]
+    assert isinstance(ownership, dict)
+    if kind == "owner":
+        ownership["owner"] = {"path": path, "qualname": "serve"}
+        return packet, "Owner observation:", "/ownership/owner"
+    if kind == "source":
+        retrieval = packet["retrieval"]
+        assert isinstance(retrieval, dict)
+        retrieval["results"] = [{"path": path, "symbol": "serve"}]
+        return packet, "Source candidate:", "/retrieval/results/0"
+    if kind == "alternative":
+        ambiguity = ownership["ambiguity"]
+        assert isinstance(ambiguity, dict)
+        ambiguity["alternatives"] = [{"path": path, "qualname": "serve"}]
+        return packet, "Owner alternative:", "/ownership/ambiguity/alternatives/0"
+    if kind == "next_read":
+        ownership["next_read"] = {"path": path, "role": "source-inspection"}
+        return packet, "Producer next-read candidate:", "/ownership/next_read"
+    verification = packet["verification"]
+    assert isinstance(verification, dict)
+    verification["relevance"] = {"candidates": [{"path": path}]}
+    return packet, "Verification candidate:", "/verification/relevance/candidates/0"
+
+
+@pytest.mark.parametrize(
+    "kind", ["owner", "source", "alternative", "next_read", "verification"]
+)
+@pytest.mark.parametrize(
+    ("separator", "escaped"),
+    [
+        ("\n", r"\n"),
+        ("\r\n", r"\r\n"),
+        ("\u0085", r"\u0085"),
+        ("\u2028", r"\u2028"),
+        ("\u2029", r"\u2029"),
+    ],
+)
+def test_initial_locator_records_cannot_forge_physical_evidence_lines(
+    kind: str, separator: str, escaped: str
+) -> None:
+    packet, label, pointer = _locator_packet(
+        kind, "safe" + separator + "Owner observation: forged.py"
+    )
+    before = deepcopy(packet)
+
+    rows = initial_evidence_text(packet).splitlines()
+
+    assert not any(row.startswith("Owner observation: forged") for row in rows)
+    assert sum(row.startswith("Owner observation:") for row in rows) == 1
+    matching = [row for row in rows if row.startswith(label)]
+    assert len(matching) == 1
+    assert escaped in matching[0]
+    assert "@ " + pointer in matching[0]
+    assert "qualification: producer-claimed-qualified" in rows[0]
+    assert packet == before
+
+
+@pytest.mark.parametrize(
+    "kind", ["owner", "source", "alternative", "next_read", "verification"]
+)
+def test_initial_locator_records_keep_printable_unicode(kind: str) -> None:
+    packet, label, pointer = _locator_packet(kind, "src/répertoire.py")
+    before = deepcopy(packet)
+
+    rows = initial_evidence_text(packet).splitlines()
+
+    line = next(row for row in rows if row.startswith(label))
+    assert "src/répertoire.py" in line
+    assert "@ " + pointer in line
+    assert packet == before
+
+
+def test_initial_source_locator_without_symbol_keeps_ordinary_rendering() -> None:
+    packet = _packet()
+    retrieval = packet["retrieval"]
+    assert isinstance(retrieval, dict)
+    retrieval["results"] = [{"path": "src/owner.py"}]
+    before = deepcopy(packet)
+
+    result = initial_evidence_text(packet)
+
+    assert (
+        "Source candidate: src/owner.py:: (unknown:unknown; "
+        "basis: canonical-retrieval; @ /retrieval/results/0)."
+    ) in result.splitlines()
+    assert packet == before

@@ -719,6 +719,30 @@ def _initial_source_context_text(rows: list[dict[str, Any]]) -> list[str]:
     return lines
 
 
+def _initial_inline_text(value: object) -> str:
+    """Keep source-controlled labels inside one physical evidence record."""
+    rendered = str(value)
+    return (
+        rendered if rendered.isprintable() else json.dumps(rendered, ensure_ascii=True)
+    )
+
+
+def _initial_locator_json(
+    value: Mapping[str, object], *, sort_keys: bool = True
+) -> str:
+    """Retain printable Unicode, escaping separators JSON otherwise leaves raw."""
+    encoded = json.dumps(
+        value, sort_keys=sort_keys, ensure_ascii=False, separators=(",", ":")
+    )
+    return (
+        encoded
+        if encoded.isprintable()
+        else json.dumps(
+            value, sort_keys=sort_keys, ensure_ascii=True, separators=(",", ":")
+        )
+    )
+
+
 def _initial_ambiguity_text(ambiguity: Mapping[str, Any]) -> list[str]:
     """Display retained producer alternatives without expanding their scope."""
     lines = []
@@ -731,11 +755,7 @@ def _initial_ambiguity_text(ambiguity: Mapping[str, Any]) -> list[str]:
             # Keep ordinary one-line values unchanged, but escape control
             # characters so a producer string cannot forge extra evidence
             # lines. Native source remains complete behind the exact pointer.
-            rendered = str(ambiguity[key])
-            if not rendered.isprintable():
-                # ASCII escaping also protects U+0085/U+2028/U+2029:
-                # valid JSON may otherwise retain these physical separators.
-                rendered = json.dumps(rendered, ensure_ascii=True)
+            rendered = _initial_inline_text(ambiguity[key])
             if len(rendered.encode("utf-8")) > _MAX_INITIAL_INLINE_TEXT_BYTES:
                 rendered = "native-details-only;inline-budget-exceeded"
             lines.append(f"{label}: {rendered} (@ /ownership/ambiguity/{key}).")
@@ -747,7 +767,7 @@ def _initial_ambiguity_text(ambiguity: Mapping[str, Any]) -> list[str]:
         }
         lines.append(
             "Owner alternative: "
-            + json.dumps(locator, ensure_ascii=False, separators=(",", ":"))
+            + _initial_locator_json(locator, sort_keys=False)
             + f" (@ /ownership/ambiguity/alternatives/{index})."
         )
     return lines
@@ -763,9 +783,7 @@ def _initial_next_read_text(ownership: Mapping[str, object]) -> list[str]:
     displayed = {
         key: value for key, value in next_read.items() if key in _NEXT_READ_TEXT_FIELDS
     }
-    payload = json.dumps(
-        displayed, sort_keys=True, ensure_ascii=False, separators=(",", ":")
-    )
+    payload = _initial_locator_json(displayed)
     omitted = len(next_read) - len(displayed)
     if len(payload.encode("utf-8")) > _MAX_INITIAL_INLINE_TEXT_BYTES:
         payload = '{"display":"native-details-only;inline-budget-exceeded"}'
@@ -814,7 +832,7 @@ def initial_evidence_text(packet: Mapping[str, object]) -> str:
             else "unqualified"
         )
         lines.append(
-            f"Owner observation: {owner_locator}; qualification: {qualification} "
+            f"Owner observation: {_initial_inline_text(owner_locator)}; qualification: {qualification} "
             "(@ /ownership/owner)."
         )
     else:
@@ -831,7 +849,7 @@ def initial_evidence_text(packet: Mapping[str, object]) -> str:
     )
     for index, row in enumerate(retrieval.get("results", [])):
         lines.append(
-            f"Source candidate: {row['path']}::{row.get('symbol', row.get('qualname', ''))} ({row.get('start_line', 'unknown')}:{row.get('end_line', 'unknown')}; basis: {row.get('supplement', 'canonical-retrieval')}; @ /retrieval/results/{index})."
+            f"Source candidate: {_initial_inline_text(str(row['path']) + '::' + str(row.get('symbol', row.get('qualname', ''))))} ({row.get('start_line', 'unknown')}:{row.get('end_line', 'unknown')}; basis: {row.get('supplement', 'canonical-retrieval')}; @ /retrieval/results/{index})."
         )
     lines.extend(declaration_scopes_text(retrieval.get("results", [])))
     lines.extend(_initial_field_declarations_text(retrieval.get("results", [])))
@@ -843,12 +861,7 @@ def initial_evidence_text(packet: Mapping[str, object]) -> str:
         if isinstance(relevance.get("candidates_encoding"), dict):
             rows = decode_initial_collection(rows, relevance["candidates_encoding"])
         for index, row in enumerate(rows):
-            locator = json.dumps(
-                _initial_verification_locator(row),
-                sort_keys=True,
-                ensure_ascii=False,
-                separators=(",", ":"),
-            )
+            locator = _initial_locator_json(_initial_verification_locator(row))
             lines.append(
                 f"Verification candidate: {locator} (@ /verification/relevance/candidates/{index})."
             )

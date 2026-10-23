@@ -324,6 +324,13 @@ the canonical ownership packet includes `next_read`, both readable and structure
 initial presentations display that exact producer-supplied observation
 with a native JSON pointer. It is a source-inspection candidate, **not** an
 instruction to execute commands or a new independent owner selection.
+Initial owner and source locators, owner alternatives, next-read records,
+verification locators, declaration tables and semantic relationship records preserve
+physical evidence-line boundaries: source-controlled
+control characters and Unicode line separators are escaped in readable text.
+Ordinary printable Unicode remains readable. The native paths, qualifiers and
+packet identities are unchanged; escaping creates no new ownership authority.
+
 Ambiguity reasons and discrimination questions are also source-derived
 presentation data. Their ordinary printable single-line wording is preserved;
 control characters are escaped so that a newline in a producer string cannot
