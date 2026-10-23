@@ -671,7 +671,15 @@ def test_producer_next_read_is_visible_in_initial_text_and_structured_evidence(
     assert len(selected) == 1
     assert selected[0]["details"] == next_read
     assert selected[0]["source_refs"] == ["/ownership/next_read"]
-    assert selected[0]["assertion"] == "producer_claim"
+    owner_group = next(
+        assert_object(group)
+        for group in groups
+        if assert_object(group)["family"] == "ownership_evidence"
+    )
+    # The canonical initial compact projection factors a shared assertion
+    # into the group qualifiers; it need not repeat it on each finding.
+    shared = assert_object(owner_group["finding_qualifiers"])
+    assert selected[0].get("assertion", shared.get("assertion")) == "producer_claim"
     assert native == original
     assert wire == readable["result"] == structured["result"] == before
 
