@@ -557,3 +557,18 @@ Only a request with both selectors absent yields an unqualified file-level
 nomination. This is repository syntax precision, not pytest test discovery
 or authorization to run tests. The historical advisory `plan(...)` continues
 its separate compatibility behavior.
+
+### Polyglot verifier nominations preserve explicit selection intent
+
+The command-free verifier nomination currently represents Go package targets,
+JavaScript test files and TypeScript project targets, but does not establish
+an exact Go or JavaScript/TypeScript test-node identity. Any explicitly
+provided `symbol` or `qualname` for these non-Python test surfaces therefore
+fails closed as `source-evidence-unqualified`: a requested node cannot be
+silently widened into a package, file or project test selection. Omitting
+both selectors preserves the existing repository-derived file/package/project
+nomination. The rejection occurs before consulting runner manifests or
+installed tooling. This is source-evidence precision, not proof of no tests,
+agent tool choice, pytest/Go/JS test collection, or execution authority.
+The historical `plan(...)` compatibility API retains its independent advisory
+semantics without changes.

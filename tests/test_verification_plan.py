@@ -917,3 +917,88 @@ def test_explicit_unsupported_python_selector_never_reads_supporting_config(
             ]
             == "source-evidence-unqualified"
         )
+
+
+@pytest.mark.parametrize(
+    ("filename", "test_source", "manifest_name", "manifest_source"),
+    [
+        (
+            "tests/widget_test.go",
+            "package tests\nfunc TestWidget(t *testing.T) {}\n",
+            "go.mod",
+            "module example.test/widget\n",
+        ),
+        (
+            "tests/widget.test.js",
+            "import test from 'node:test';\n",
+            "package.json",
+            '{"devDependencies":{"vitest":"^3.0.0"}}',
+        ),
+        (
+            "tests/widget.test.ts",
+            "export const widget = 1\n",
+            "tsconfig.json",
+            "{}",
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    ("symbol", "qualname"),
+    [
+        ("test_widget", None),
+        (None, "test_widget"),
+        ("test_widget", "test_widget"),
+        ("", None),
+    ],
+)
+def test_polyglot_explicit_node_selector_cannot_widen_to_file_or_package(
+    tmp_path: Path,
+    filename: str,
+    test_source: str,
+    manifest_name: str,
+    manifest_source: str,
+    symbol: str | None,
+    qualname: str | None,
+) -> None:
+    (tmp_path / "tests").mkdir()
+    (tmp_path / filename).write_text(test_source, encoding="utf-8")
+    (tmp_path / manifest_name).write_text(manifest_source, encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        file_scope = codemap.verification.nomination(filename)
+        requested_node = codemap.verification.nomination(
+            filename, symbol=symbol, qualname=qualname
+        )
+    assert file_scope["available"] is True
+    assert file_scope["verification_target"]["test_symbol"] is None
+    assert file_scope["scope"] in {"go-package", "test-file", "typescript-project"}
+    assert requested_node["available"] is False
+    assert requested_node["reason"] == "source-evidence-unqualified"
+    assert requested_node["nomination_identity"] != file_scope["nomination_identity"]
+    assert requested_node["execution_authority"] == "external"
+    assert {"argv", "working_directory", "executable"}.isdisjoint(requested_node)
+
+
+def test_polyglot_explicit_selector_rejection_precedes_native_manifest_lookup(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/widget.test.js").write_text(
+        "import test from 'node:test';\n", encoding="utf-8"
+    )
+    (tmp_path / "package.json").write_text(
+        '{"devDependencies":{"vitest":"^3.0.0"}}', encoding="utf-8"
+    )
+
+    def forbidden(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("unsupported node selector inspected verifier manifests")
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        monkeypatch.setattr(codemap.verification, "_vitest_declared", forbidden)
+        rejection = codemap.verification.nomination(
+            "tests/widget.test.js", symbol="test_widget"
+        )
+    assert rejection["available"] is False
+    assert rejection["reason"] == "source-evidence-unqualified"
