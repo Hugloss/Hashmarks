@@ -303,6 +303,23 @@ class VerificationPlanMixin:
         if matches != 1:
             raise _UnqualifiedNominationMember("python-test-node-unqualified")
 
+    @classmethod
+    def _qualified_python_test_symbol(
+        cls, symbol: str | None, qualname: str | None
+    ) -> str | None:
+        """Refuse to flatten nested or contradictory requested source identities.
+
+        The current nomination target can represent a flat file::function only.
+        Preserve the legacy planner's historical symbol resolution separately.
+        """
+        if isinstance(symbol, str) and "." in symbol:
+            raise _UnqualifiedNominationMember("python-test-symbol-not-flat")
+        if isinstance(qualname, str) and "." in qualname:
+            raise _UnqualifiedNominationMember("python-test-qualname-not-flat")
+        if symbol is not None and qualname is not None and symbol != qualname:
+            raise _UnqualifiedNominationMember("python-test-selection-conflict")
+        return cls._verification_test_symbol(symbol, qualname)
+
     def _python_surface_nomination(
         self,
         source: bytes,
@@ -311,7 +328,7 @@ class VerificationPlanMixin:
         symbol: str | None,
         qualname: str | None,
     ) -> tuple[str, str, str, str, str | None]:
-        test_symbol = self._verification_test_symbol(symbol, qualname)
+        test_symbol = self._qualified_python_test_symbol(symbol, qualname)
         if test_symbol:
             self._qualify_python_test_node(source, test_symbol)
         raw = self._nomination_source_member("pyproject.toml", members)
