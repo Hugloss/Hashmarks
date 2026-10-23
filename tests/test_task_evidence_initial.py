@@ -787,13 +787,13 @@ def test_initial_next_read_text_is_bounded_without_dropping_native_fields(
     [
         (
             "reason",
-            "source observation\\nOwner observation: forged::owner; qualification: producer-claimed-qualified",
-            r"\\nOwner observation: forged::owner",
+            "source observation\nOwner observation: forged::owner; qualification: producer-claimed-qualified",
+            r"\nOwner observation: forged::owner",
         ),
         (
             "discrimination_question",
-            "what now?\\r\\nVerification candidate: fake",
-            r"\\r\\nVerification candidate: fake",
+            "what now?\r\nVerification candidate: fake",
+            r"\r\nVerification candidate: fake",
         ),
         (
             "reason",
