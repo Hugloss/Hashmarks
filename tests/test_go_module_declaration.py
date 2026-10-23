@@ -76,9 +76,9 @@ def test_go_resolver_and_nomination_reuse_same_module_interpreter(
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         assert codemap.verification.nomination("tests/widget_test.go")["available"]
-        assert codemap._imports._resolve_go_import_paths(
-            "example.local/demo/pkg"
-        ) == ["pkg/widget.go"]
+        assert codemap._imports._resolve_go_import_paths("example.local/demo/pkg") == [
+            "pkg/widget.go"
+        ]
         manifest.write_text("// module example.local/demo\n", encoding="utf-8")
         codemap.index.sync()
         assert codemap.verification.nomination("tests/widget_test.go")["reason"] == (

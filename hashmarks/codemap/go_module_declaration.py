@@ -11,8 +11,14 @@ import re
 
 _MODULE = re.compile(
     r'module[ \t]+(?:"([^"\s]+)"|\x60([^\x60\s]+)\x60|([^\s"\x60]+))'
-    r'(?:[ \t]+//.*)?\Z'
+    r"(?:[ \t]+//.*)?\Z"
 )
+
+
+def _valid_module_name(name: str) -> bool:
+    return bool(name) and not (
+        name.startswith("/") or name.endswith("/") or "//" in name
+    )
 
 
 def declared_go_module(source: bytes) -> str | None:
@@ -34,7 +40,7 @@ def declared_go_module(source: bytes) -> str | None:
         if matched is None:
             return None
         name = next(group for group in matched.groups() if group is not None)
-        if not name or name.startswith("/") or name.endswith("/") or "//" in name:
+        if not _valid_module_name(name):
             return None
         modules.append(name)
         if len(modules) > 1:
