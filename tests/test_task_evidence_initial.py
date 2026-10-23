@@ -684,6 +684,60 @@ def test_producer_next_read_is_visible_in_initial_text_and_structured_evidence(
     assert wire == readable["result"] == structured["result"] == before
 
 
+@pytest.mark.parametrize("freshness", ["current", "stale"])
+def test_next_read_never_inherits_owner_display_qualification(
+    initial_text_source: tuple[dict[str, Any], dict[str, object]],
+    freshness: str,
+) -> None:
+    native = deepcopy(initial_text_source[0])
+    native["freshness"]["state"] = freshness
+    next_read = {
+        "reason": "further reading is proposed, not verified",
+        "path": "owner.py",
+        "role": "inspect",
+        "lines": [1],
+        "authority": "non-authoritative-source-inspection",
+    }
+    native["ownership"]["next_read"] = next_read
+    before = deepcopy(native)
+    initial = initial_task_evidence(native)
+    initial["evidence_packet_identity"] = initial_packet_identity(initial)
+    wire = encode_initial_packet(initial)
+    original_wire = deepcopy(wire)
+
+    response = presentation_response(
+        "task_evidence", wire, result_mode="initial", format="structured"
+    )
+    groups = assert_array(assert_object(response["presentation"])["groups"])
+    owner_group = next(
+        assert_object(row)
+        for row in groups
+        if assert_object(row)["family"] == "ownership_evidence"
+    )
+    findings = assert_array(owner_group["findings"])
+    owner = next(
+        assert_object(row)
+        for row in findings
+        if "/ownership/owner" in assert_object(row)["source_refs"]
+    )
+    read = next(
+        assert_object(row)
+        for row in findings
+        if "/ownership/next_read" in assert_object(row)["source_refs"]
+    )
+    owner_context = assert_object(owner["source_context"])
+    assert owner_context["display_qualification"] in {
+        "producer-claimed-qualified",
+        "unqualified",
+    }
+    assert "display_qualification" not in assert_object(read.get("source_context", {}))
+    assert read["details"] == next_read
+    shared = assert_object(owner_group["finding_qualifiers"])
+    assert read.get("assertion", shared.get("assertion")) == "producer_claim"
+    assert native == before
+    assert response["result"] == original_wire
+
+
 def test_initial_text_keeps_ambiguity_alternatives_outside_retrieval_prefix(
     initial_text_source: tuple[dict[str, Any], dict[str, object]],
 ) -> None:

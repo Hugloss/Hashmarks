@@ -556,12 +556,15 @@ def project_initial_task(
     )
     next_read = ownership.get("next_read")
     if isinstance(next_read, Mapping):
+        # Owner display qualification belongs to the owner observation, not
+        # to an independent read suggestion. Its own native authority/reason
+        # travels in details, with the source JSON pointer and producer claim.
         p.add(
             "ownership_evidence",
             "initial_discrimination_read",
             next_read,
             (*ref, "ownership", "next_read"),
-            qualification,
+            {},
             assertion="producer_claim",
         )
     for index, row in enumerate(retrieval.get("results", [])):

@@ -321,9 +321,13 @@ readable projection leads with the existing producer-qualified owner observation
 (or explicitly unresolved owner) before retrieval candidates; stale or incomplete
 ownership cannot be silently promoted by that presentation order. When
 the canonical ownership packet includes `next_read`, both readable and structured
-initial presentations now display that exact producer-supplied observation
+initial presentations display that exact producer-supplied observation
 with a native JSON pointer. It is a source-inspection candidate, **not** an
-instruction to execute commands or a new independent owner selection. The display
+instruction to execute commands or a new independent owner selection.
+The structured next-read finding carries its **own native record qualifiers**
+and `producer_claim` assertion, not the qualified-owner display label: an
+owner observation can be proven while a suggested next read is still only a
+suggestion. The display
 consumes the producer's resolved ownership authority and proof scope: it must
 not independently reject a structurally resolved owner merely because the
 producer retained an initial ambiguity observation. The canonical resolver can
