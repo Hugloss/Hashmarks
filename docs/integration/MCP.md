@@ -324,6 +324,15 @@ the canonical ownership packet includes `next_read`, both readable and structure
 initial presentations display that exact producer-supplied observation
 with a native JSON pointer. It is a source-inspection candidate, **not** an
 instruction to execute commands or a new independent owner selection.
+Ambiguity reasons and discrimination questions are also source-derived
+presentation data. Their ordinary printable single-line wording is preserved;
+control characters are escaped so that a newline in a producer string cannot
+forge a second apparent evidence line. Each displayed value is bounded to
+2 KiB; oversized wording is replaced with a display-only native-detail marker
+and retains its exact `/ownership/ambiguity/reason` or
+`/ownership/ambiguity/discrimination_question` reference. The native packet is
+not modified, and no additional ambiguity or owner resolution takes place.
+
 Readable next-read details are intentionally bounded: only the existing
 producer-supplied locator, reason, selection and authority fields are shown
 inline, with a 2 KiB encoded display limit. Extra fields and oversized

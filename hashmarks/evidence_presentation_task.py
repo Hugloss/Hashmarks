@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from .evidence_presentation import _Projection
 
-_MAX_NEXT_READ_INLINE_BYTES = 2048
+_MAX_INITIAL_INLINE_TEXT_BYTES = 2048
 _NEXT_READ_TEXT_FIELDS = frozenset(
     {
         "reason",
@@ -727,7 +727,18 @@ def _initial_ambiguity_text(ambiguity: Mapping[str, Any]) -> list[str]:
         ("discrimination_question", "Discrimination question"),
     ):
         if ambiguity.get(key) is not None:
-            lines.append(f"{label}: {ambiguity[key]} (@ /ownership/ambiguity/{key}).")
+            # Source-derived ambiguity text is untrusted presentation data.
+            # Keep ordinary one-line values unchanged, but escape control
+            # characters so a producer string cannot forge extra evidence
+            # lines. Native source remains complete behind the exact pointer.
+            rendered = str(ambiguity[key])
+            if not rendered.isprintable():
+                # ASCII escaping also protects U+0085/U+2028/U+2029:
+                # valid JSON may otherwise retain these physical separators.
+                rendered = json.dumps(rendered, ensure_ascii=True)
+            if len(rendered.encode("utf-8")) > _MAX_INITIAL_INLINE_TEXT_BYTES:
+                rendered = "native-details-only;inline-budget-exceeded"
+            lines.append(f"{label}: {rendered} (@ /ownership/ambiguity/{key}).")
     for index, alternative in enumerate(ambiguity.get("alternatives", [])):
         locator = {
             key: alternative[key]
@@ -756,7 +767,7 @@ def _initial_next_read_text(ownership: Mapping[str, object]) -> list[str]:
         displayed, sort_keys=True, ensure_ascii=False, separators=(",", ":")
     )
     omitted = len(next_read) - len(displayed)
-    if len(payload.encode("utf-8")) > _MAX_NEXT_READ_INLINE_BYTES:
+    if len(payload.encode("utf-8")) > _MAX_INITIAL_INLINE_TEXT_BYTES:
         payload = '{"display":"native-details-only;inline-budget-exceeded"}'
         omitted = len(next_read)
     return [
