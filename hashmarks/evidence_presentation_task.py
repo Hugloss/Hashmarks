@@ -733,7 +733,9 @@ def _initial_ambiguity_text(ambiguity: Mapping[str, Any]) -> list[str]:
             # lines. Native source remains complete behind the exact pointer.
             rendered = str(ambiguity[key])
             if not rendered.isprintable():
-                rendered = json.dumps(rendered, ensure_ascii=False)
+                # ASCII escaping also protects U+0085/U+2028/U+2029:
+                # valid JSON may otherwise retain these physical separators.
+                rendered = json.dumps(rendered, ensure_ascii=True)
             if len(rendered.encode("utf-8")) > _MAX_INITIAL_INLINE_TEXT_BYTES:
                 rendered = "native-details-only;inline-budget-exceeded"
             lines.append(f"{label}: {rendered} (@ /ownership/ambiguity/{key}).")
